@@ -90,21 +90,64 @@ export async function jupTopOrganic(interval: JupInterval = "24h", limit = 10): 
   return jget<JupTokenInfo[]>(url);
 }
 
-// Find OG copycats by ticker symbol. The OG is the earliest-deployed match.
+function normalizeTickerSymbol(value: string | undefined): string {
+  return (value ?? "").replace(/^\$+/, "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+function tokenCreatedAtMs(token: JupTokenInfo): number {
+  return token.firstPool?.createdAt ? new Date(token.firstPool.createdAt).getTime() : Number.POSITIVE_INFINITY;
+}
+
+function tokenTrustScore(token: JupTokenInfo, cleanTicker: string): number {
+  const normalizedSymbol = normalizeTickerSymbol(token.symbol);
+  const normalizedName = normalizeTickerSymbol(token.name);
+  const normalizedTicker = normalizeTickerSymbol(cleanTicker);
+  const liquidity = token.liquidity ?? 0;
+  const holders = token.holderCount ?? 0;
+  const organic = token.organicScore ?? 0;
+  const volume24h = (token.stats24h?.buyVolume ?? 0) + (token.stats24h?.sellVolume ?? 0);
+  const createdAt = tokenCreatedAtMs(token);
+  const ageDays = Number.isFinite(createdAt) ? (Date.now() - createdAt) / 86_400_000 : 0;
+
+  let score = 0;
+  if (normalizedSymbol === normalizedTicker) score += 1_000;
+  if (normalizedSymbol.includes(normalizedTicker)) score += 100;
+  if (normalizedName.includes(normalizedTicker)) score += 25;
+  if (token.isVerified) score += 750;
+  score += Math.min(650, Math.log10(liquidity + 1) * 95);
+  score += Math.min(350, Math.log10(Math.max(token.mcap ?? 0, token.fdv ?? 0) + 1) * 42);
+  score += Math.min(300, Math.log10(holders + 1) * 58);
+  score += Math.min(250, organic * 2.5);
+  score += Math.min(180, Math.log10(volume24h + 1) * 36);
+  score += Math.min(220, Math.max(0, ageDays) / 7);
+
+  if (liquidity < 5_000) score -= 450;
+  if (liquidity < 1_000) score -= 650;
+  if (holders < 10) score -= 450;
+  if ((token.audit?.topHoldersPercentage ?? 0) > 80) score -= 650;
+  if (!token.audit?.mintAuthorityDisabled) score -= 300;
+  if (!token.audit?.freezeAuthorityDisabled) score -= 300;
+  if (token.id.toLowerCase().endsWith("pump") && liquidity < 25_000 && !token.isVerified) score -= 350;
+
+  return score;
+}
+
+// Find OG copycats by ticker symbol. The OG is the trusted/high-liquidity original, not a dead clone.
 export async function jupOgCopycats(ticker: string): Promise<{ og: JupTokenInfo | null; copycats: JupTokenInfo[] }> {
   const clean = ticker.replace(/^\$/, "").trim();
   if (!clean) return { og: null, copycats: [] };
   const all = await jupSearchToken(clean);
-  // Filter to exact symbol matches (case-insensitive)
-  const matches = all.filter((t) => (t.symbol ?? "").toLowerCase() === clean.toLowerCase());
-  const pool = matches.length >= 2 ? matches : all.slice(0, 30);
+  const normalizedClean = normalizeTickerSymbol(clean);
+  // Exact symbol matching must tolerate symbols like "$WIF" when the user types "wif".
+  const matches = all.filter((t) => normalizeTickerSymbol(t.symbol) === normalizedClean);
+  const pool = (matches.length > 0 ? matches : all).slice(0, 40);
   const sorted = [...pool].sort((a, b) => {
-    const da = a.firstPool?.createdAt ? new Date(a.firstPool.createdAt).getTime() : Number.POSITIVE_INFINITY;
-    const db = b.firstPool?.createdAt ? new Date(b.firstPool.createdAt).getTime() : Number.POSITIVE_INFINITY;
-    return da - db;
+    const trustDelta = tokenTrustScore(b, clean) - tokenTrustScore(a, clean);
+    if (Math.abs(trustDelta) > 75) return trustDelta;
+    return tokenCreatedAtMs(a) - tokenCreatedAtMs(b);
   });
   const og = sorted[0] ?? null;
-  const copycats = sorted.slice(1, 12);
+  const copycats = sorted.filter((t) => t.id !== og?.id).slice(0, 12);
   return { og, copycats };
 }
 

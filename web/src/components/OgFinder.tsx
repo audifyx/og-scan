@@ -139,9 +139,9 @@ export const OgFinder = ({ onSelect }: Props) => {
             <span className="text-og-gold text-glow-gold">DIRECT OG</span>
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Drop a ticker. We pull every Solana mint sharing it, sort by deploy time, then
-            score each one for liquidity, holders, audit and verification. The Direct OG is the
-            earliest with the highest confidence — everything else is a clone.
+            Drop a ticker. We pull every Solana mint sharing it, normalize symbols like $WIF,
+            then rank the market by verification, liquidity, holders, audit, organic score and age.
+            The Direct OG avoids dead low-liquidity clones — everything else is a copycat.
           </p>
         </div>
 

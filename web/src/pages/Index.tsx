@@ -38,8 +38,6 @@ type TabId =
   | "og-finder"
   | "pairs"
   | "migrations"
-  | "tape"
-  | "whales"
   | "trending"
   | "swap"
   | "tech";
@@ -52,8 +50,6 @@ const TABS: { id: TabId; label: string; Icon: React.ComponentType<{ className?: 
   { id: "pairs", label: "NEW PAIRS", Icon: Radar },
   { id: "migrations", label: "MIGRATIONS", Icon: Rocket },
   { id: "trending", label: "TRENDING", Icon: Flame },
-  { id: "tape", label: "TAPE", Icon: Activity },
-  { id: "whales", label: "WHALES", Icon: Crown },
   { id: "swap", label: "SWAP", Icon: Zap },
   { id: "tech", label: "TECH", Icon: Cpu },
 ];
@@ -167,8 +163,6 @@ const Index = () => {
         {tab === "pairs" && <PairTracker onSelect={updateMint} />}
         {tab === "migrations" && <Migrations onSelect={updateMint} />}
         {tab === "trending" && <Trending onSelect={updateMint} />}
-        {tab === "tape" && <TxFeed mint={mint} />}
-        {tab === "whales" && <Whales mint={mint} />}
         {tab === "swap" && <SwapPanel ogMint={mint} />}
         {tab === "tech" && <TechStack />}
       </main>
