@@ -15,12 +15,16 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
-import { OGSCAN_SITE_URL, OGSCAN_X_URL, shortAddr } from "@/lib/og";
+import { TxFeed } from "@/components/TxFeed";
+import {
+  OFFICIAL_OGSCAN_CHART_EMBED_URL,
+  OFFICIAL_OGSCAN_DEXSCREENER_URL,
+  OFFICIAL_OGSCAN_MINT,
+  OGSCAN_SITE_URL,
+  OGSCAN_X_URL,
+  shortAddr,
+} from "@/lib/og";
 
-/**
- * Fill these in when the official coin details are ready.
- * Once `contractAddress` is set, the DexScreener + chart placeholders become live links.
- */
 type OurCoinProfile = {
   name: string;
   symbol: string;
@@ -34,11 +38,11 @@ type OurCoinProfile = {
 const OUR_COIN_PROFILE: OurCoinProfile = {
   name: "ogscan.fun",
   symbol: "$OGSCAN",
-  contractAddress: "",
+  contractAddress: OFFICIAL_OGSCAN_MINT,
   siteUrl: OGSCAN_SITE_URL,
   xUrl: OGSCAN_X_URL,
-  dexScreenerUrl: "",
-  chartEmbedUrl: "",
+  dexScreenerUrl: OFFICIAL_OGSCAN_DEXSCREENER_URL,
+  chartEmbedUrl: OFFICIAL_OGSCAN_CHART_EMBED_URL,
 };
 
 const buildDexScreenerUrl = (contractAddress: string, overrideUrl: string): string => {
@@ -50,7 +54,7 @@ const buildDexScreenerUrl = (contractAddress: string, overrideUrl: string): stri
 const buildChartEmbedUrl = (contractAddress: string, overrideUrl: string): string => {
   if (overrideUrl.trim()) return overrideUrl.trim();
   if (!contractAddress.trim()) return "";
-  return `https://dexscreener.com/solana/${contractAddress.trim()}?embed=1&theme=dark&trades=0&info=0`;
+  return `https://dexscreener.com/solana/${contractAddress.trim()}?embed=1&theme=dark&trades=1&info=1`;
 };
 
 export const OurCoin = memo(() => {
@@ -90,9 +94,8 @@ export const OurCoin = memo(() => {
                 <span className="text-og-gold text-glow-gold">LAUNCH BAY</span>
               </h2>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Reserved command center for the official {OUR_COIN_PROFILE.name} coin. Website
-                and X profile are live now. CA, DexScreener and chart stay staged until the
-                contract address is ready, so the wrong token never gets promoted.
+                Official {OUR_COIN_PROFILE.name} coin command center with CA, chart,
+                DexScreener route, website, X profile, and live on-chain buys/sells in one place.
               </p>
             </div>
 
@@ -100,7 +103,7 @@ export const OurCoin = memo(() => {
               <div className="flex items-center gap-2">
                 <Radio className="h-3 w-3 animate-pulse" /> STATUS
               </div>
-              <div className="mt-1 text-foreground">SOCIALS LIVE · AWAITING CA</div>
+              <div className="mt-1 text-foreground">CA LIVE · CHART LIVE</div>
             </div>
           </div>
 
@@ -109,7 +112,7 @@ export const OurCoin = memo(() => {
             <InfoSlot
               Icon={Wallet}
               label="CA"
-              value={hasContract ? shortAddr(contractAddress, 6) : "placeholder · paste CA"}
+              value={hasContract ? shortAddr(contractAddress, 6) : "CA not set"}
               accent="text-og-gold"
               action={
                 <button
@@ -132,7 +135,7 @@ export const OurCoin = memo(() => {
           </div>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_300px]">
-            <div className="relative min-h-[360px] overflow-hidden border border-og-grid bg-black/35">
+            <div className="relative min-h-[440px] overflow-hidden border border-og-grid bg-black/35">
               <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between border-b border-og-grid bg-og-ink/90 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 <span className="flex items-center gap-2 text-og-cyan">
                   <TrendingUp className="h-3 w-3" /> LIVE CHART
@@ -144,7 +147,7 @@ export const OurCoin = memo(() => {
                 <iframe
                   title={`${OUR_COIN_PROFILE.symbol} DexScreener chart`}
                   src={chartEmbedUrl}
-                  className="h-[420px] w-full border-0 pt-8"
+                  className="h-[500px] w-full border-0 pt-8"
                   loading="lazy"
                 />
               ) : (
@@ -163,7 +166,7 @@ export const OurCoin = memo(() => {
               <ActionLink
                 Icon={ExternalLink}
                 label="DexScreener"
-                detail={dexScreenerUrl ? "Open official pair" : "placeholder · auto-builds from CA"}
+                detail={dexScreenerUrl ? "Open official pair + trades" : "Auto-builds from CA"}
                 href={dexScreenerUrl}
                 tone="gold"
               />
@@ -181,9 +184,9 @@ export const OurCoin = memo(() => {
                 <div className="space-y-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                   <PipelineStep active label="Reserve official coin tab" />
                   <PipelineStep active label="Connect website + X channels" />
-                  <PipelineStep active={hasContract} label="Attach CA" />
-                  <PipelineStep active={Boolean(dexScreenerUrl)} label="Open DexScreener route" />
-                  <PipelineStep active={Boolean(chartEmbedUrl)} label="Render live chart" />
+                  <PipelineStep active={hasContract} label="Official CA attached" />
+                  <PipelineStep active={Boolean(dexScreenerUrl)} label="DexScreener chart linked" />
+                  <PipelineStep active={Boolean(chartEmbedUrl)} label="Live trades enabled" />
                 </div>
               </div>
             </div>
@@ -196,10 +199,10 @@ export const OurCoin = memo(() => {
               <Sparkles className="h-3 w-3" /> READY SLOTS
             </div>
             <div className="grid gap-2">
-              <SetupCard label="Contract address" value="CA placeholder" status={hasContract ? "connected" : "waiting"} />
+              <SetupCard label="Contract address" value={shortAddr(contractAddress, 6)} status={hasContract ? "connected" : "waiting"} />
               <SetupCard label="Website" value="ogscan.fun" status={OUR_COIN_PROFILE.siteUrl ? "connected" : "waiting"} />
               <SetupCard label="X profile" value="@ogscanfun" status={OUR_COIN_PROFILE.xUrl ? "connected" : "waiting"} />
-              <SetupCard label="DexScreener" value="pair/chart placeholder" status={dexScreenerUrl ? "connected" : "waiting"} />
+              <SetupCard label="DexScreener" value="chart + trades live" status={dexScreenerUrl ? "connected" : "waiting"} />
             </div>
           </div>
 
@@ -208,15 +211,34 @@ export const OurCoin = memo(() => {
               <Zap className="h-3 w-3" /> WHAT HAPPENS NEXT
             </div>
             <p className="text-sm text-muted-foreground">
-              Website and X profile are connected. Send the CA when ready and this tab can flip into
-              a live official coin page with copyable contract address, DexScreener route
-              and chart embed.
+              Official CA is now wired through the site. Visitors can copy the mint, open
+              the chart, inspect trades, and watch live transactions without leaving OG SCAN.
             </p>
-            <div className="mt-4 border border-dashed border-og-gold/35 bg-og-gold/5 p-3 font-mono text-[10px] uppercase tracking-widest text-og-gold">
-              CA slot is intentionally empty so no wrong token gets promoted before launch.
+            <div className="mt-4 break-all border border-dashed border-og-gold/35 bg-og-gold/5 p-3 font-mono text-[10px] uppercase tracking-widest text-og-gold">
+              {contractAddress}
             </div>
           </div>
         </aside>
+      </div>
+
+      <div className="mt-4 border border-og-lime/35 bg-og-ink/80 p-4 shadow-og">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.34em] text-og-lime">
+              <Activity className="h-3.5 w-3.5 animate-pulse" /> LIVE BUYS / SELLS
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">All recent on-chain activity touching the official OG SCAN mint.</p>
+          </div>
+          <a
+            href={`https://solscan.io/token/${contractAddress}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 border border-og-lime/45 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-og-lime transition hover:bg-og-lime hover:text-og-ink"
+          >
+            Solscan <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        </div>
+        <TxFeed mint={contractAddress} compact />
       </div>
     </section>
   );

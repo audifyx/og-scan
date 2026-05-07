@@ -1,5 +1,13 @@
-import { AtSign, ExternalLink, Globe2, Newspaper } from "lucide-react";
-import { OGSCAN_BRAND_IMAGE, OGSCAN_SITE_URL, OGSCAN_TECH_POST_URL, OGSCAN_X_URL } from "@/lib/og";
+import { AtSign, ExternalLink, Globe2, LineChart, Newspaper } from "lucide-react";
+import {
+  OFFICIAL_OGSCAN_DEXSCREENER_URL,
+  OFFICIAL_OGSCAN_MINT,
+  OGSCAN_BRAND_IMAGE,
+  OGSCAN_SITE_URL,
+  OGSCAN_TECH_POST_URL,
+  OGSCAN_X_URL,
+  shortAddr,
+} from "@/lib/og";
 
 export const SiteFooter = () => {
   return (
@@ -30,6 +38,9 @@ export const SiteFooter = () => {
               <a href={OGSCAN_TECH_POST_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-og-gold/70 px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-og-gold transition hover:bg-og-gold hover:text-og-ink">
                 <Newspaper className="h-3.5 w-3.5" /> Tech post
               </a>
+              <a href={OFFICIAL_OGSCAN_DEXSCREENER_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-og-cyan/70 px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-og-cyan transition hover:bg-og-cyan hover:text-og-ink">
+                <LineChart className="h-3.5 w-3.5" /> Chart
+              </a>
               <a href={OGSCAN_SITE_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-og-grid px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-foreground/70 transition hover:border-og-lime hover:text-og-lime">
                 <Globe2 className="h-3.5 w-3.5" /> Website
               </a>
@@ -37,6 +48,14 @@ export const SiteFooter = () => {
             <div className="border-l-2 border-og-lime/70 bg-og-lime/5 px-4 py-3 text-left font-mono text-[10px] uppercase leading-relaxed tracking-[0.24em] text-og-lime lg:max-w-sm lg:text-right">
               We detect trends before they exist · scanning the chain for OG signals
             </div>
+            <a
+              href={`https://solscan.io/token/${OFFICIAL_OGSCAN_MINT}`}
+              target="_blank"
+              rel="noreferrer"
+              className="block max-w-sm break-all border border-og-grid bg-black/30 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground transition hover:border-og-lime hover:text-og-lime lg:text-right"
+            >
+              CA {shortAddr(OFFICIAL_OGSCAN_MINT, 6)} <ExternalLink className="ml-1 inline h-3 w-3" />
+            </a>
             <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground lg:text-right">
               <a href="https://jup.ag" target="_blank" rel="noreferrer" className="hover:text-og-lime">Jupiter</a>
               <a href="https://birdeye.so" target="_blank" rel="noreferrer" className="hover:text-og-lime">Birdeye</a>

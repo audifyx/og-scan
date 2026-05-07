@@ -1,6 +1,6 @@
 import { Activity, AtSign, ExternalLink, Globe2, Newspaper } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { OGSCAN_SITE_URL, OGSCAN_TECH_POST_URL, OGSCAN_X_URL } from "@/lib/og";
+import { OFFICIAL_OGSCAN_DEXSCREENER_URL, OGSCAN_SITE_URL, OGSCAN_TECH_POST_URL, OGSCAN_X_URL } from "@/lib/og";
 
 type NavItem = { id: string; label: string };
 
@@ -52,6 +52,9 @@ export const SiteHeader = ({ mint, navItems, activeId, onNavigate }: Props) => {
           </a>
           <a href={OGSCAN_TECH_POST_URL} target="_blank" rel="noreferrer" className="hidden items-center gap-1.5 border border-og-grid bg-og-ink px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-foreground/70 transition hover:border-og-gold hover:text-og-gold md:inline-flex" title="Read the tech post">
             <Newspaper className="h-3.5 w-3.5" /> Post
+          </a>
+          <a href={OFFICIAL_OGSCAN_DEXSCREENER_URL} target="_blank" rel="noreferrer" className="hidden items-center gap-1.5 border border-og-cyan/60 bg-og-cyan/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-og-cyan transition hover:bg-og-cyan hover:text-og-ink md:inline-flex" title="Open official OG SCAN chart">
+            Chart <ExternalLink className="h-3 w-3" />
           </a>
           <a href={OGSCAN_X_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 border border-og-lime bg-og-lime px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-og-ink transition hover:bg-og-lime/90" title="Follow ogscan.fun on X">
             <AtSign className="h-3.5 w-3.5" /> X <ExternalLink className="h-3 w-3" />

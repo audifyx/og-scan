@@ -35,6 +35,8 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { cn } from "@/lib/utils";
 import { DEFAULT_OG_MINT, STORAGE_OG_MINT } from "@/lib/og";
 
+const LEGACY_DEFAULT_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
+
 type TabId =
   | "overview"
   | "our-coin"
@@ -98,7 +100,11 @@ const Index = () => {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_OG_MINT);
-      if (saved) setMint(saved);
+      if (saved && saved !== LEGACY_DEFAULT_MINT) {
+        setMint(saved);
+      } else {
+        localStorage.setItem(STORAGE_OG_MINT, DEFAULT_OG_MINT);
+      }
       const t = localStorage.getItem(STORAGE_TAB) as TabId | null;
       if (t && TABS.some((x) => x.id === t)) setTab(t);
     } catch {
@@ -125,7 +131,7 @@ const Index = () => {
   };
 
   const promptMint = () => {
-    const v = window.prompt("Paste $OG mint address (Solana SPL):", mint);
+    const v = window.prompt("Paste OG SCAN mint address (Solana SPL):", mint);
     if (v && v.trim().length > 20) updateMint(v.trim());
   };
 
