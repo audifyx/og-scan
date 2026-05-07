@@ -8,16 +8,14 @@ import {
   ExternalLink,
   Globe2,
   Link2,
-  MessageCircle,
   Radio,
   ShieldCheck,
   Sparkles,
   TrendingUp,
-  Users,
   Wallet,
   Zap,
 } from "lucide-react";
-import { OGSCAN_COMMUNITY_URL, OGSCAN_SITE_URL, OGSCAN_X_URL, shortAddr } from "@/lib/og";
+import { OGSCAN_SITE_URL, OGSCAN_X_URL, shortAddr } from "@/lib/og";
 
 /**
  * Fill these in when the official coin details are ready.
@@ -29,7 +27,6 @@ type OurCoinProfile = {
   contractAddress: string;
   siteUrl: string;
   xUrl: string;
-  communityUrl: string;
   dexScreenerUrl: string;
   chartEmbedUrl: string;
 };
@@ -40,7 +37,6 @@ const OUR_COIN_PROFILE: OurCoinProfile = {
   contractAddress: "",
   siteUrl: OGSCAN_SITE_URL,
   xUrl: OGSCAN_X_URL,
-  communityUrl: OGSCAN_COMMUNITY_URL,
   dexScreenerUrl: "",
   chartEmbedUrl: "",
 };
@@ -94,9 +90,9 @@ export const OurCoin = memo(() => {
                 <span className="text-og-gold text-glow-gold">LAUNCH BAY</span>
               </h2>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Reserved command center for the official {OUR_COIN_PROFILE.name} coin. X,
-                community and website are live now. CA, DexScreener and chart stay staged until
-                the contract address is ready, so the wrong token never gets promoted.
+                Reserved command center for the official {OUR_COIN_PROFILE.name} coin. Website
+                and X profile are live now. CA, DexScreener and chart stay staged until the
+                contract address is ready, so the wrong token never gets promoted.
               </p>
             </div>
 
@@ -108,7 +104,7 @@ export const OurCoin = memo(() => {
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-3">
             <TokenIdentityCard />
             <InfoSlot
               Icon={Wallet}
@@ -132,12 +128,6 @@ export const OurCoin = memo(() => {
               label="X"
               value={OUR_COIN_PROFILE.xUrl ? "@ogscanfun connected" : "placeholder · add @handle"}
               accent="text-og-cyan"
-            />
-            <InfoSlot
-              Icon={Users}
-              label="COMMUNITY"
-              value={OUR_COIN_PROFILE.communityUrl ? "X community connected" : "placeholder · Telegram/Discord"}
-              accent="text-og-lime"
             />
           </div>
 
@@ -184,14 +174,6 @@ export const OurCoin = memo(() => {
                 href={OUR_COIN_PROFILE.xUrl}
                 tone="cyan"
               />
-              <ActionLink
-                Icon={MessageCircle}
-                label="Community"
-                detail={OUR_COIN_PROFILE.communityUrl ? "Join the X community" : "placeholder · add Telegram/Discord"}
-                href={OUR_COIN_PROFILE.communityUrl}
-                tone="lime"
-              />
-
               <div className="border border-og-grid bg-og-ink/70 p-3">
                 <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-lime">
                   <ShieldCheck className="h-3 w-3" /> CONNECTION MAP
@@ -217,7 +199,6 @@ export const OurCoin = memo(() => {
               <SetupCard label="Contract address" value="CA placeholder" status={hasContract ? "connected" : "waiting"} />
               <SetupCard label="Website" value="ogscan.fun" status={OUR_COIN_PROFILE.siteUrl ? "connected" : "waiting"} />
               <SetupCard label="X profile" value="@ogscanfun" status={OUR_COIN_PROFILE.xUrl ? "connected" : "waiting"} />
-              <SetupCard label="Community" value="X community live" status={OUR_COIN_PROFILE.communityUrl ? "connected" : "waiting"} />
               <SetupCard label="DexScreener" value="pair/chart placeholder" status={dexScreenerUrl ? "connected" : "waiting"} />
             </div>
           </div>
@@ -227,8 +208,8 @@ export const OurCoin = memo(() => {
               <Zap className="h-3 w-3" /> WHAT HAPPENS NEXT
             </div>
             <p className="text-sm text-muted-foreground">
-              Website, X profile and X community are connected. Send the CA when ready and this tab
-              can flip into a live official coin page with copyable contract address, DexScreener route
+              Website and X profile are connected. Send the CA when ready and this tab can flip into
+              a live official coin page with copyable contract address, DexScreener route
               and chart embed.
             </p>
             <div className="mt-4 border border-dashed border-og-gold/35 bg-og-gold/5 p-3 font-mono text-[10px] uppercase tracking-widest text-og-gold">

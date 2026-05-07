@@ -1,4 +1,4 @@
-import { OGSCAN_COMMUNITY_URL, OGSCAN_SITE_URL, OGSCAN_TECH_POST_URL, OGSCAN_X_URL } from "@/lib/og";
+import { OGSCAN_SITE_URL, OGSCAN_TECH_POST_URL, OGSCAN_X_URL } from "@/lib/og";
 
 export const SiteFooter = () => {
   return (
@@ -13,7 +13,6 @@ export const SiteFooter = () => {
           </div>
           <div className="grid grid-cols-2 gap-x-12 gap-y-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
             <a href={OGSCAN_X_URL} target="_blank" rel="noreferrer" className="hover:text-og-lime">X</a>
-            <a href={OGSCAN_COMMUNITY_URL} target="_blank" rel="noreferrer" className="hover:text-og-lime">Community</a>
             <a href={OGSCAN_TECH_POST_URL} target="_blank" rel="noreferrer" className="hover:text-og-lime">Tech post</a>
             <a href={OGSCAN_SITE_URL} target="_blank" rel="noreferrer" className="hover:text-og-lime">Website</a>
             <a href="https://jup.ag" target="_blank" rel="noreferrer" className="hover:text-og-lime">Jupiter</a>

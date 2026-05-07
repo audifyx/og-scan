@@ -9,7 +9,6 @@ export const QUICKNODE_WSS = "wss://floral-few-frog.solana-mainnet.quiknode.pro/
 
 export const OGSCAN_SITE_URL = "https://ogscan.fun";
 export const OGSCAN_X_URL = "https://x.com/ogscanfun";
-export const OGSCAN_COMMUNITY_URL = "https://twitter.com/i/communities/2007536315483685053";
 export const OGSCAN_TECH_POST_URL = "https://x.com/i/status/2052413018563084370";
 
 export const JUPITER_BASE = "https://lite-api.jup.ag";
