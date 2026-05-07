@@ -19,16 +19,15 @@ export const Hero = ({ onScanClick, onSwapClick }: HeroProps) => {
             href={OGSCAN_X_URL}
             target="_blank"
             rel="noreferrer"
-            className="group mb-7 block overflow-hidden border border-og-lime/35 bg-og-ink shadow-og"
+            className="group mb-7 block overflow-hidden border border-og-lime/35 bg-black shadow-og"
           >
-            <div className="relative aspect-[2.35/1] min-h-36 w-full overflow-hidden sm:min-h-44">
-              <img src={OGSCAN_BRAND_IMAGE} alt="OG Scan radar banner" className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]" />
-              <div className="absolute inset-0 bg-gradient-to-r from-og-ink/10 via-transparent to-og-ink/35" />
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 border-t border-og-lime/25 bg-og-ink/70 px-4 py-3 backdrop-blur">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-og-lime">Official OG Scan banner</span>
-                <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-foreground/80 group-hover:text-og-lime">
-                  Follow X <ExternalLink className="h-3 w-3" />
-                </span>
+            <div className="relative aspect-[16/9] max-h-[380px] w-full overflow-hidden sm:aspect-[21/9]">
+              <div className="absolute inset-0 grid-bg opacity-45" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,hsl(var(--og-lime)/0.2),transparent_34%),linear-gradient(180deg,hsl(var(--og-ink)/0.1),hsl(var(--og-ink)/0.65))]" />
+              <img src={OGSCAN_BRAND_IMAGE} alt="OG Scan radar banner" className="relative h-full w-full object-contain p-5 transition duration-700 group-hover:scale-[1.02] sm:p-7" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-og-ink via-og-ink/35 to-transparent" />
+              <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 border border-og-lime/35 bg-og-ink/75 px-2.5 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-og-lime backdrop-blur">
+                X <ExternalLink className="h-3 w-3" />
               </div>
             </div>
           </a>
@@ -41,12 +40,9 @@ export const Hero = ({ onScanClick, onSwapClick }: HeroProps) => {
             LIVE FEED // SOLANA MAINNET
           </div>
 
-          <h1 className="font-display text-[clamp(3rem,9vw,7.5rem)] font-bold leading-[0.85] tracking-tighter">
-            <span className="block text-og-gold text-glow-gold flicker">ogscan</span>
-            <span className="block text-foreground text-glow">.fun</span>
-            <span className="block text-[0.35em] mt-3 text-muted-foreground tracking-[0.4em]">
-              OG_COIN_RADAR.SOL
-            </span>
+          <h1 className="font-display text-[clamp(2.8rem,7.5vw,6.4rem)] font-bold leading-[0.9] tracking-tighter">
+            <span className="block text-og-gold text-glow-gold">Find the first pair.</span>
+            <span className="block text-og-lime text-glow">Ignore the copies.</span>
           </h1>
 
           <div className="mt-6 max-w-2xl space-y-4">

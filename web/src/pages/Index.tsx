@@ -9,7 +9,6 @@ import {
   Crown,
   Flame,
   Gauge,
-  LayoutGrid,
   Radar,
   Rocket,
   Search,
@@ -169,52 +168,6 @@ const Index = () => {
         onSwapClick={() => switchTab("swap", true)}
       />
 
-      <section className="relative border-y border-og-grid bg-og-ink/75 backdrop-blur" aria-labelledby="feature-map-title">
-        <div className="absolute inset-0 grid-bg opacity-60" />
-        <div className="relative mx-auto max-w-7xl px-4 py-5 sm:px-6">
-          <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
-            <div>
-              <div className="mb-2 inline-flex items-center gap-2 border border-og-lime/40 bg-og-lime/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.28em] text-og-lime">
-                <LayoutGrid className="h-3.5 w-3.5" /> OG Scan Control Deck
-              </div>
-              <h2 id="feature-map-title" className="font-display text-2xl font-bold uppercase tracking-tight text-foreground sm:text-4xl">
-                Pick a lane. Nothing is hidden.
-              </h2>
-            </div>
-            <div className="max-w-xl text-xs uppercase leading-relaxed tracking-[0.2em] text-muted-foreground">
-              The old tiny tabs are now a visible launch board: scanner, OG finder, swap, live pairs, tech, and every existing tool stay here.
-            </div>
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {TABS.map((tb, index) => (
-              <button
-                key={tb.id}
-                onClick={() => switchTab(tb.id, true)}
-                className={cn(
-                  "group min-h-28 border p-4 text-left transition duration-200 hover:-translate-y-0.5",
-                  getFeatureButtonClass(tab === tb.id, tb.accent),
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-10 w-10 place-items-center border border-current/35 bg-og-ink/25">
-                      <tb.Icon className="h-5 w-5" />
-                    </span>
-                    <div>
-                      <div className="font-display text-lg font-bold uppercase tracking-tight">{tb.label}</div>
-                      <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.24em] opacity-70">0{index + 1} · {tb.eyebrow}</div>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 opacity-50 transition group-hover:translate-x-1 group-hover:opacity-100" />
-                </div>
-                <p className="mt-3 text-xs leading-relaxed opacity-75">{tb.description}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <main id={WORKSPACE_ID} className="mx-auto max-w-7xl scroll-mt-32 px-4 py-6 sm:px-6">
         <div className="grid gap-5 lg:grid-cols-[290px_minmax(0,1fr)] lg:items-start">
           <aside className="hidden lg:block lg:sticky lg:top-[116px]">
@@ -314,7 +267,7 @@ const Index = () => {
         </div>
       </main>
 
-      <SiteFooter navItems={headerNavItems} activeId={tab} onNavigate={handleNavigate} />
+      <SiteFooter />
     </div>
   );
 };
