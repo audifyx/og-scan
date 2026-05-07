@@ -1,5 +1,5 @@
-import { Activity, AtSign, MessageCircle, Newspaper } from "lucide-react";
-import { OGSCAN_COMMUNITY_URL, OGSCAN_SITE_URL, OGSCAN_TECH_POST_URL, OGSCAN_X_URL } from "@/lib/og";
+import { Activity, AtSign, Newspaper } from "lucide-react";
+import { OGSCAN_SITE_URL, OGSCAN_TECH_POST_URL, OGSCAN_X_URL } from "@/lib/og";
 
 type Props = { mint: string };
 
@@ -23,7 +23,6 @@ export const SiteHeader = ({ mint }: Props) => {
           <a href="#scanner" className="hover:text-og-lime">Scanner</a>
           <a href="#swap" className="hover:text-og-lime">Swap</a>
           <a href="#tech" className="hover:text-og-lime">Tech</a>
-          <a href={OGSCAN_COMMUNITY_URL} target="_blank" rel="noreferrer" className="hover:text-og-lime">Community</a>
           <a href={`https://solscan.io/token/${mint}`} target="_blank" rel="noreferrer" className="hover:text-og-lime">Solscan</a>
         </nav>
 
@@ -33,9 +32,6 @@ export const SiteHeader = ({ mint }: Props) => {
           </span>
           <a href={OGSCAN_TECH_POST_URL} target="_blank" rel="noreferrer" className="hidden text-muted-foreground hover:text-og-gold sm:inline-flex" title="Read the tech post">
             <Newspaper className="h-4 w-4" />
-          </a>
-          <a href={OGSCAN_COMMUNITY_URL} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-og-cyan" title="Join the community">
-            <MessageCircle className="h-4 w-4" />
           </a>
           <a href={OGSCAN_X_URL} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-og-lime" title="Follow ogscan.fun on X">
             <AtSign className="h-4 w-4" />

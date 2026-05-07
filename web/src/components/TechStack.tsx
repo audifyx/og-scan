@@ -11,7 +11,6 @@ import {
   XCircle,
   Loader2,
   Newspaper,
-  MessageCircle,
   AtSign,
   Globe2,
 } from "lucide-react";
@@ -21,7 +20,6 @@ import {
   BIRDEYE_BASE,
   ALCHEMY_API_KEY,
   QUICKNODE_WSS,
-  OGSCAN_COMMUNITY_URL,
   OGSCAN_SITE_URL,
   OGSCAN_TECH_POST_URL,
   OGSCAN_X_URL,
@@ -213,9 +211,6 @@ export const TechStack = () => {
             <div className="mt-5 flex flex-wrap gap-3">
               <a href={OGSCAN_TECH_POST_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-og-gold bg-og-gold px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-og-ink transition hover:bg-og-gold/90">
                 <Newspaper className="h-4 w-4" /> Read post
-              </a>
-              <a href={OGSCAN_COMMUNITY_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-og-cyan/50 px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-og-cyan transition hover:bg-og-cyan hover:text-og-ink">
-                <MessageCircle className="h-4 w-4" /> Join community
               </a>
               <a href={OGSCAN_X_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-og-lime/50 px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-og-lime transition hover:bg-og-lime hover:text-og-ink">
                 <AtSign className="h-4 w-4" /> Follow X
