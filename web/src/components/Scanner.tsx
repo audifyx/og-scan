@@ -46,7 +46,7 @@ export const Scanner = ({ onSelect }: Props) => {
   const dropped: number = rawResults.length - filteredResults.length;
 
   return (
-    <section id="scanner" className="relative">
+    <section id="scanner" className="relative scroll-mt-36">
       <div>
         <div className="mb-6">
           <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-og-cyan">

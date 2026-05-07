@@ -59,6 +59,7 @@ const STORAGE_TAB = "og_scanner.active_tab";
 const Index = () => {
   const [mint, setMint] = useState<string>(DEFAULT_OG_MINT);
   const [tab, setTab] = useState<TabId>("overview");
+  const [pendingScrollTarget, setPendingScrollTarget] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -91,14 +92,26 @@ const Index = () => {
     if (v && v.trim().length > 20) updateMint(v.trim());
   };
 
-  const switchTab = (id: TabId) => {
+  const switchTab = (id: TabId, shouldScroll: boolean = false) => {
     setTab(id);
+    setPendingScrollTarget(shouldScroll ? id : null);
     try {
       localStorage.setItem(STORAGE_TAB, id);
     } catch {
       /* noop */
     }
   };
+
+  useEffect(() => {
+    if (!pendingScrollTarget) return;
+
+    const scrollTimer = window.setTimeout(() => {
+      document.getElementById(pendingScrollTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setPendingScrollTarget(null);
+    }, 50);
+
+    return () => window.clearTimeout(scrollTimer);
+  }, [pendingScrollTarget, tab]);
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-og-ink text-foreground">
@@ -109,8 +122,8 @@ const Index = () => {
       <Marquee />
 
       <Hero
-        onScanClick={() => switchTab("scanner")}
-        onSwapClick={() => switchTab("swap")}
+        onScanClick={() => switchTab("scanner", true)}
+        onSwapClick={() => switchTab("swap", true)}
       />
 
       {/* Tab bar */}

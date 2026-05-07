@@ -1,4 +1,4 @@
-import { Crosshair, Radar, Zap } from "lucide-react";
+import { Crosshair, SearchCode, Zap } from "lucide-react";
 
 type HeroProps = {
   onScanClick: () => void;
@@ -30,17 +30,34 @@ export const Hero = ({ onScanClick, onSwapClick }: HeroProps) => {
             </span>
           </h1>
 
-          <p className="mt-6 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Real-time on-chain intel for OG coins, new pairs, migrations, and any Solana mint. Watch the
-            tape print, route swaps through Jupiter — no node, no nonsense.
-          </p>
+          <div className="mt-6 max-w-2xl space-y-4">
+            <p className="text-lg font-semibold leading-snug text-foreground sm:text-2xl">
+              This is OG. That is OG. Everyone claims OG — but which one is actually OG?
+            </p>
+            <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              OG SCAN identifies true early pairs on Solana: not what is trending later, not influencer noise,
+              but what was there first. The origin. The real starting point.
+            </p>
+          </div>
+
+          <div className="mt-6 grid max-w-2xl gap-2 sm:grid-cols-3">
+            {[
+              "First pair ever created",
+              "Clean real-time data",
+              "No-noise signal UI",
+            ].map((item) => (
+              <div key={item} className="border border-og-grid bg-og-ink/70 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                <span className="mr-2 text-og-lime">//</span>{item}
+              </div>
+            ))}
+          </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
             <button
               onClick={onScanClick}
               className="group relative inline-flex items-center gap-2 border border-og-lime bg-og-lime px-5 py-3 text-sm font-bold uppercase tracking-widest text-og-ink transition hover:bg-og-lime/90 pulse-glow"
             >
-              <Radar className="h-4 w-4" />
+              <SearchCode className="h-4 w-4" />
               Run Scanner
               <span className="ml-2 text-[10px] opacity-70 group-hover:opacity-100">[/]</span>
             </button>
@@ -53,7 +70,11 @@ export const Hero = ({ onScanClick, onSwapClick }: HeroProps) => {
             </button>
           </div>
 
-          <div className="mt-10 grid grid-cols-3 gap-4 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          <div className="mt-8 border-l-2 border-og-lime/70 bg-og-lime/5 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.26em] text-og-lime">
+            We detect trends before they exist · scanning the chain for OG signals
+          </div>
+
+          <div className="mt-8 grid grid-cols-3 gap-4 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
             <div className="border-l-2 border-og-lime/60 pl-3">
               <div className="text-og-lime">JUPITER</div>
               <div className="text-foreground/70">routing</div>

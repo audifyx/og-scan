@@ -76,7 +76,7 @@ export const SwapPanel = ({ ogMint, onSelectMint }: Props) => {
   };
 
   return (
-    <section id="swap" className="relative">
+    <section id="swap" className="relative scroll-mt-36">
       <div className="grid gap-8 lg:grid-cols-5">
         <div className="lg:col-span-2">
           <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-og-lime">
