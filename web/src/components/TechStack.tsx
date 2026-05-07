@@ -189,26 +189,26 @@ export const TechStack = () => {
   }, []);
 
   return (
-    <section id="tech" className="grid gap-4">
-      <div className="relative overflow-hidden border border-og-gold/40 bg-og-ink/80 p-4 shadow-og-gold sm:p-6">
+    <section id="tech" className="mx-auto grid w-full max-w-6xl gap-4 scroll-mt-32">
+      <div className="relative overflow-hidden border border-og-gold/40 bg-og-ink/80 p-4 shadow-og-gold sm:p-6 lg:p-7">
         <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-og-gold/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 left-12 h-56 w-56 rounded-full bg-og-lime/10 blur-3xl" />
-        <div className="relative grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 border border-og-gold/45 bg-og-gold/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.3em] text-og-gold">
+        <div className="relative mx-auto grid max-w-5xl gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div className="text-center lg:text-left">
+            <div className="mb-3 inline-flex items-center justify-center gap-2 border border-og-gold/45 bg-og-gold/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.3em] text-og-gold">
               <Newspaper className="h-3 w-3" /> Launch broadcast
             </div>
             <h2 className="font-display text-3xl font-bold leading-tight text-foreground sm:text-5xl">
               Find the <span className="text-og-gold text-glow-gold">OG</span> before the fake finds you.
             </h2>
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base lg:mx-0">
               Most traders do not lose because they are late. They lose because they buy the wrong version of the coin:
               same ticker, same logo, same hype — but the real OG is buried under low-liquidity traps, dead pairs and scam clones.
             </p>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-foreground/80">
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-foreground/80 lg:mx-0">
               OGScan is built to verify before you ape: search any ticker, scan the market, and surface the contract that actually looks original.
             </p>
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap justify-center gap-3 lg:justify-start">
               <a href={OGSCAN_TECH_POST_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-og-gold bg-og-gold px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-og-ink transition hover:bg-og-gold/90">
                 <Newspaper className="h-4 w-4" /> Read post
               </a>
@@ -221,7 +221,7 @@ export const TechStack = () => {
             </div>
           </div>
 
-          <div className="border border-og-grid bg-black/25 p-4">
+          <div className="mx-auto w-full max-w-md border border-og-grid bg-black/25 p-4 lg:max-w-none">
             <div className="mb-3 flex items-center justify-between gap-3 border-b border-og-grid pb-2 font-mono text-[10px] uppercase tracking-[0.3em]">
               <span className="text-og-lime">Scanner checks</span>
               <span className="text-muted-foreground">before ape</span>
@@ -239,11 +239,11 @@ export const TechStack = () => {
       </div>
 
       {/* Pipeline diagram */}
-      <div className="border border-og-grid bg-og-ink/70 p-4">
+      <div className="border border-og-grid bg-og-ink/70 p-4 sm:p-5">
         <div className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-og-cyan">
           <span className="h-px w-10 bg-og-cyan" /> DATA · PIPELINE
         </div>
-        <div className="grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr]">
+        <div className="mx-auto grid max-w-5xl items-center gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr]">
           <PipeBlock title="ON-CHAIN" lines={["Solana mainnet", "raw blocks · logs"]} color="cyan" />
           <Arrow />
           <PipeBlock
@@ -258,7 +258,7 @@ export const TechStack = () => {
             color="gold"
           />
         </div>
-        <div className="mt-3 grid items-center gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr]">
+        <div className="mx-auto mt-3 grid max-w-5xl items-center gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr]">
           <PipeBlock title="CACHE" lines={["TanStack Query", "20s · 60s polls"]} color="cyan" />
           <Arrow />
           <PipeBlock title="SCORING" lines={["OG · Risk · Health", "client-side fusion"]} color="gold" />
@@ -268,7 +268,7 @@ export const TechStack = () => {
       </div>
 
       {/* Probe cards */}
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mx-auto grid w-full max-w-5xl gap-3 md:grid-cols-2 xl:grid-cols-3">
         {PROBES.map((p) => {
           const st = statuses[p.id] ?? "idle";
           const c = colorMap[p.color];
@@ -297,7 +297,7 @@ export const TechStack = () => {
       </div>
 
       {/* Capability matrix */}
-      <div className="border border-og-grid bg-og-ink/70">
+      <div className="mx-auto w-full max-w-5xl border border-og-grid bg-og-ink/70">
         <div className="border-b border-og-grid px-3 py-2 text-[10px] uppercase tracking-[0.3em] text-og-gold">
           CAPABILITY · MATRIX
         </div>
@@ -362,7 +362,7 @@ const PipeBlock = ({
 }) => {
   const c = colorMap[color];
   return (
-    <div className={`border ${c.ring} bg-og-ink/60 p-3`}>
+    <div className={`h-full border ${c.ring} bg-og-ink/60 p-3 text-center sm:text-left`}>
       <div className={`text-[10px] uppercase tracking-[0.3em] ${c.text}`}>{title}</div>
       {lines.map((l) => (
         <div key={l} className="mt-1 font-mono text-[11px] text-foreground/70">{l}</div>
