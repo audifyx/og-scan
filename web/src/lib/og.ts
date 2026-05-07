@@ -20,8 +20,9 @@ export const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 export const OFFICIAL_OGSCAN_MINT = "EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump";
-export const OFFICIAL_OGSCAN_DEXSCREENER_URL = `https://dexscreener.com/solana/${OFFICIAL_OGSCAN_MINT}`;
-export const OFFICIAL_OGSCAN_CHART_EMBED_URL = `${OFFICIAL_OGSCAN_DEXSCREENER_URL}?embed=1&theme=dark&trades=1&info=1`;
+export const OFFICIAL_OGSCAN_PAIR_ADDRESS = "2agmf8WDV3YGKZw6QNZ7H2petd3NPF5S8yXVPyMEDDmS";
+export const OFFICIAL_OGSCAN_DEXSCREENER_URL = `https://dexscreener.com/solana/${OFFICIAL_OGSCAN_PAIR_ADDRESS}`;
+export const OFFICIAL_OGSCAN_CHART_EMBED_URL = `${OFFICIAL_OGSCAN_DEXSCREENER_URL}?embed=1&theme=dark&trades=1&info=0`;
 // Default token to scan when no mint is set yet — official OG SCAN contract.
 export const DEFAULT_OG_MINT = OFFICIAL_OGSCAN_MINT;
 
