@@ -1,4 +1,5 @@
-import { Crosshair, SearchCode, Zap } from "lucide-react";
+import { Crosshair, ExternalLink, SearchCode, Zap } from "lucide-react";
+import { OGSCAN_BRAND_IMAGE, OGSCAN_SITE_URL, OGSCAN_X_URL } from "@/lib/og";
 
 type HeroProps = {
   onScanClick: () => void;
@@ -14,6 +15,24 @@ export const Hero = ({ onScanClick, onSwapClick }: HeroProps) => {
 
       <div className="relative mx-auto flex max-w-7xl flex-col gap-10 px-6 py-20 lg:flex-row lg:items-center lg:py-28">
         <div className="flex-1">
+          <a
+            href={OGSCAN_X_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="group mb-7 block overflow-hidden border border-og-lime/35 bg-og-ink shadow-og"
+          >
+            <div className="relative aspect-[2.35/1] min-h-36 w-full overflow-hidden sm:min-h-44">
+              <img src={OGSCAN_BRAND_IMAGE} alt="OG Scan radar banner" className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]" />
+              <div className="absolute inset-0 bg-gradient-to-r from-og-ink/10 via-transparent to-og-ink/35" />
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 border-t border-og-lime/25 bg-og-ink/70 px-4 py-3 backdrop-blur">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-og-lime">Official OG Scan banner</span>
+                <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-foreground/80 group-hover:text-og-lime">
+                  Follow X <ExternalLink className="h-3 w-3" />
+                </span>
+              </div>
+            </div>
+          </a>
+
           <div className="mb-6 inline-flex items-center gap-2 border border-og-lime/40 bg-og-lime/5 px-3 py-1 text-[10px] uppercase tracking-[0.3em] text-og-lime">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-og-lime opacity-75" />
@@ -68,6 +87,14 @@ export const Hero = ({ onScanClick, onSwapClick }: HeroProps) => {
               <Zap className="h-4 w-4" />
               Swap on Jupiter
             </button>
+            <a
+              href={OGSCAN_SITE_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 border border-og-grid bg-og-ink px-5 py-3 text-sm font-bold uppercase tracking-widest text-foreground/70 transition hover:border-og-lime hover:text-og-lime"
+            >
+              ogscan.fun <ExternalLink className="h-4 w-4" />
+            </a>
           </div>
 
           <div className="mt-8 border-l-2 border-og-lime/70 bg-og-lime/5 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.26em] text-og-lime">
@@ -122,12 +149,10 @@ const RadarBadge = () => {
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative">
           <div className="absolute -inset-8 rounded-full bg-og-gold/15 blur-2xl" />
-          <div className="relative flex h-40 w-40 items-center justify-center rounded-full border-4 border-og-gold bg-og-ink shadow-og-gold sm:h-52 sm:w-52">
+          <div className="relative flex h-40 w-40 items-center justify-center overflow-hidden rounded-full border-4 border-og-gold bg-og-ink shadow-og-gold sm:h-52 sm:w-52">
+            <img src="/icon.png" alt="OG Scan radar icon" className="absolute inset-0 h-full w-full scale-125 object-cover" />
             <div className="absolute inset-2 rounded-full border border-og-gold/40" />
-            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_30%,hsl(78_100%_55%/0.45),transparent_60%)]" />
-            <span className="font-display text-5xl font-bold text-og-gold text-glow-gold sm:text-6xl">
-              OG
-            </span>
+            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_30%,hsl(78_100%_55%/0.18),transparent_62%)]" />
             <Crosshair className="absolute right-3 top-3 h-3 w-3 text-og-lime" />
             <Crosshair className="absolute bottom-3 left-3 h-3 w-3 text-og-lime" />
           </div>
