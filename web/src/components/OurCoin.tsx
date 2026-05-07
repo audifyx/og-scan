@@ -54,7 +54,7 @@ const buildDexScreenerUrl = (contractAddress: string, overrideUrl: string): stri
 const buildChartEmbedUrl = (contractAddress: string, overrideUrl: string): string => {
   if (overrideUrl.trim()) return overrideUrl.trim();
   if (!contractAddress.trim()) return "";
-  return `https://dexscreener.com/solana/${contractAddress.trim()}?embed=1&theme=dark&trades=1&info=1`;
+  return `https://dexscreener.com/solana/${contractAddress.trim()}?embed=1&theme=dark&trades=1&info=0`;
 };
 
 export const OurCoin = memo(() => {
@@ -134,9 +134,9 @@ export const OurCoin = memo(() => {
             />
           </div>
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_300px]">
-            <div className="relative min-h-[440px] overflow-hidden border border-og-grid bg-black/35">
-              <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between border-b border-og-grid bg-og-ink/90 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="overflow-hidden border border-og-grid bg-black/35">
+              <div className="flex items-center justify-between border-b border-og-grid bg-og-ink/90 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 <span className="flex items-center gap-2 text-og-cyan">
                   <TrendingUp className="h-3 w-3" /> LIVE CHART
                 </span>
@@ -147,7 +147,7 @@ export const OurCoin = memo(() => {
                 <iframe
                   title={`${OUR_COIN_PROFILE.symbol} DexScreener chart`}
                   src={chartEmbedUrl}
-                  className="h-[500px] w-full border-0 pt-8"
+                  className="h-[620px] min-h-[620px] w-full border-0 sm:h-[680px] sm:min-h-[680px]"
                   loading="lazy"
                 />
               ) : (
@@ -380,7 +380,7 @@ const SetupCard = memo(
 SetupCard.displayName = "SetupCard";
 
 const ChartPlaceholder = memo(() => (
-  <div className="relative flex min-h-[420px] items-center justify-center overflow-hidden pt-8">
+  <div className="relative flex min-h-[620px] items-center justify-center overflow-hidden">
     <div className="absolute inset-0 grid-bg opacity-60" />
     <div className="absolute left-0 right-0 top-16 h-px bg-og-cyan/40 scan-line" />
     <svg viewBox="0 0 640 300" className="absolute inset-x-0 bottom-4 h-72 w-full text-og-lime/80" aria-hidden="true">
