@@ -98,8 +98,8 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       boxShadow: {
-        og: "0 0 0 1px hsl(var(--og-grid)), 0 0 24px -8px hsla(78, 100%, 55%, 0.35)",
-        "og-gold": "0 0 0 1px hsl(var(--og-gold) / 0.4), 0 0 24px -8px hsla(47, 95%, 55%, 0.45)",
+        og: "0 0 0 1px hsl(var(--og-grid)), 0 0 28px -8px hsl(var(--og-lime) / 0.38)",
+        "og-gold": "0 0 0 1px hsl(var(--og-gold) / 0.35), 0 0 28px -10px hsl(var(--og-cyan) / 0.42)",
       },
     },
   },

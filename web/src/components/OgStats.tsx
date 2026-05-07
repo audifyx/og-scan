@@ -369,12 +369,12 @@ const PriceBlock = ({ t, candles, loading }: { t?: JupTokenInfo; candles?: { c: 
             <svg viewBox="0 0 300 80" preserveAspectRatio="none" className="h-full w-full">
               <defs>
                 <linearGradient id="lg" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor={up ? "hsl(78 100% 55% / 0.5)" : "hsl(0 90% 58% / 0.5)"} />
+                  <stop offset="0%" stopColor={up ? "hsl(var(--og-lime) / 0.5)" : "hsl(var(--og-blood) / 0.5)"} />
                   <stop offset="100%" stopColor="transparent" />
                 </linearGradient>
               </defs>
               <path d={`${path} L300,80 L0,80 Z`} fill="url(#lg)" />
-              <path d={path} fill="none" stroke={up ? "hsl(78 100% 55%)" : "hsl(0 90% 58%)"} strokeWidth="1.5" />
+              <path d={path} fill="none" stroke={up ? "hsl(var(--og-lime))" : "hsl(var(--og-blood))"} strokeWidth="1.5" />
             </svg>
           ) : (
             <div className="grid h-full place-items-center text-[10px] uppercase tracking-widest text-muted-foreground">CANDLES OFFLINE</div>

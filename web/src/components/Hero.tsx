@@ -132,16 +132,16 @@ const RadarBadge = () => {
         <svg viewBox="0 0 200 200" className="h-full w-full">
           <defs>
             <radialGradient id="rg" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="hsl(78 100% 55% / 0.55)" />
-              <stop offset="100%" stopColor="hsl(78 100% 55% / 0)" />
+              <stop offset="0%" stopColor="hsl(var(--og-lime) / 0.55)" />
+              <stop offset="100%" stopColor="hsl(var(--og-lime) / 0)" />
             </radialGradient>
           </defs>
-          <circle cx="100" cy="100" r="98" stroke="hsl(78 100% 55% / 0.5)" strokeWidth="0.6" fill="none" />
-          <circle cx="100" cy="100" r="74" stroke="hsl(78 100% 55% / 0.35)" strokeWidth="0.4" fill="none" strokeDasharray="2 4" />
-          <circle cx="100" cy="100" r="50" stroke="hsl(78 100% 55% / 0.25)" strokeWidth="0.4" fill="none" />
-          <circle cx="100" cy="100" r="26" stroke="hsl(78 100% 55% / 0.18)" strokeWidth="0.3" fill="none" />
-          <line x1="100" y1="2" x2="100" y2="198" stroke="hsl(78 100% 55% / 0.2)" strokeWidth="0.3" />
-          <line x1="2" y1="100" x2="198" y2="100" stroke="hsl(78 100% 55% / 0.2)" strokeWidth="0.3" />
+          <circle cx="100" cy="100" r="98" stroke="hsl(var(--og-lime) / 0.5)" strokeWidth="0.6" fill="none" />
+          <circle cx="100" cy="100" r="74" stroke="hsl(var(--og-cyan) / 0.35)" strokeWidth="0.4" fill="none" strokeDasharray="2 4" />
+          <circle cx="100" cy="100" r="50" stroke="hsl(var(--og-lime) / 0.25)" strokeWidth="0.4" fill="none" />
+          <circle cx="100" cy="100" r="26" stroke="hsl(var(--og-gold) / 0.18)" strokeWidth="0.3" fill="none" />
+          <line x1="100" y1="2" x2="100" y2="198" stroke="hsl(var(--og-lime) / 0.2)" strokeWidth="0.3" />
+          <line x1="2" y1="100" x2="198" y2="100" stroke="hsl(var(--og-cyan) / 0.2)" strokeWidth="0.3" />
           <path d="M100 100 L100 2 A98 98 0 0 1 196 110 Z" fill="url(#rg)" />
         </svg>
       </div>
@@ -152,7 +152,7 @@ const RadarBadge = () => {
           <div className="relative flex h-40 w-40 items-center justify-center overflow-hidden rounded-full border-4 border-og-gold bg-og-ink shadow-og-gold sm:h-52 sm:w-52">
             <img src="/icon.png" alt="OG Scan radar icon" className="absolute inset-0 h-full w-full scale-125 object-cover" />
             <div className="absolute inset-2 rounded-full border border-og-gold/40" />
-            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_30%,hsl(78_100%_55%/0.18),transparent_62%)]" />
+            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_30%,hsl(var(--og-lime)/0.18),transparent_62%)]" />
             <Crosshair className="absolute right-3 top-3 h-3 w-3 text-og-lime" />
             <Crosshair className="absolute bottom-3 left-3 h-3 w-3 text-og-lime" />
           </div>

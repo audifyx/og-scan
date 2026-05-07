@@ -76,7 +76,7 @@ export const OurCoin = memo(() => {
 
   return (
     <section className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,hsla(47,95%,55%,0.12),transparent_28%),radial-gradient(circle_at_92%_12%,hsla(165,100%,55%,0.11),transparent_34%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,hsl(var(--og-lime)/0.13),transparent_28%),radial-gradient(circle_at_92%_12%,hsl(var(--og-cyan)/0.12),transparent_34%)]" />
 
       <div className="relative grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
         <div className="border border-og-gold/40 bg-og-ink/80 p-4 shadow-og-gold sm:p-6">

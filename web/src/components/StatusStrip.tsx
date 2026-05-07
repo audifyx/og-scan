@@ -44,7 +44,7 @@ export const StatusStrip = ({ mint, onChangeMint }: Props) => {
   const up = ch >= 0;
 
   return (
-    <div className="sticky top-[57px] z-30 border-b border-og-grid bg-og-ink/95 backdrop-blur">
+    <div className="relative z-30 border-b border-og-grid bg-og-ink/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5 font-mono text-[10px] uppercase tracking-widest">
         <span className="inline-flex items-center gap-1.5 text-og-lime">
           <span className="relative flex h-1.5 w-1.5">
