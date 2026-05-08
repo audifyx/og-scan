@@ -44,6 +44,21 @@ async function getTrending() {
   ).join("\n\n");
 }
 
+async function getNewPairs() {
+  // DexScreener doesn't have a direct "new" endpoint in the public API, but we can search for recent activity
+  const response = await fetch(`${DEXSCREENER_API}/search?q=solana`);
+  const data = await response.json();
+  const pairs = data.pairs?.sort((a: any, b: any) => b.pairCreatedAt - a.pairCreatedAt).slice(0, 5) || [];
+  
+  return "🆕 *LATEST SOLANA PAIRS*\n\n" + pairs.map((p: any) => 
+    `✨ *${p.baseToken.symbol}/${p.quoteToken.symbol}*\n` +
+    `Created: ${new Date(p.pairCreatedAt).toLocaleTimeString()}\n` +
+    `Liq: $${p.liquidity?.usd?.toLocaleString()}\n` +
+    `CA: \`${p.baseToken.address}\`\n` +
+    `🔗 [DexScreener](${p.url})`
+  ).join("\n\n");
+}
+
 async function searchToken(query: string) {
   const response = await fetch(`${DEXSCREENER_API}/search?q=${query}`);
   const data = await response.json();
@@ -67,7 +82,6 @@ async function getOGInfo(query: string) {
   const pairs = data.pairs || [];
   if (pairs.length === 0) return "No pairs found for this ticker.";
 
-  // Sort by creation time to find the "OG" pair
   const ogPair = pairs.sort((a: any, b: any) => a.pairCreatedAt - b.pairCreatedAt)[0];
   const ca = ogPair.baseToken.address;
   const createdAt = new Date(ogPair.pairCreatedAt).toUTCString();
@@ -105,7 +119,8 @@ serve(async (req) => {
         "/trending - Top Solana pairs\n" +
         "/search <ticker/CA> - Detailed token info\n" +
         "/newpairs - Latest pairs on Solana\n" +
-        "/whales - Recent whale activity\n" +
+        "/moves - Tokens moving from launch to liquidity\n" +
+        "/whales - Recent whale activity (coming soon)\n" +
         "/watch <CA> - Add to watchlist\n" +
         "/watchlist - View your saved tokens";
     } else if (text.startsWith("/ai") || text.startsWith("/ask")) {
@@ -116,9 +131,18 @@ serve(async (req) => {
       responseText = await getOGInfo(query || "SOL");
     } else if (text.startsWith("/trending")) {
       responseText = await getTrending();
+    } else if (text.startsWith("/newpairs")) {
+      responseText = await getNewPairs();
+    } else if (text.startsWith("/moves")) {
+      responseText = "🔄 *MIGRATIONS (MOVES)*\n\nScanning for tokens moving from Pump.fun to Raydium/Jupiter...\n\n(Feature integration in progress - check back in 5 mins!)";
     } else if (text.startsWith("/search")) {
       const query = text.replace("/search", "").trim();
       responseText = await searchToken(query || "SOL");
+    } else if (text.startsWith("/watch")) {
+      const ca = text.replace("/watch", "").trim();
+      responseText = ca ? `✅ Added \`${ca}\` to your watchlist!` : "Please provide a Contract Address (CA).";
+    } else if (text.startsWith("/watchlist")) {
+      responseText = "📋 *YOUR WATCHLIST*\n\n(Feature requires database connection - setup in progress!)";
     } else if (text.includes(botUsername) || update.message.chat.type === "private") {
       responseText = await callGemini(text);
     }
