@@ -5,6 +5,21 @@ const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || "";
 
 const DEXSCREENER_API = "https://api.dexscreener.com/latest/dex";
 
+async function sendChatAction(chatId: number, action: string = "typing") {
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendChatAction`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        action: action,
+      }),
+    });
+  } catch (e) {
+    console.error("Telegram Action Error:", e);
+  }
+}
+
 async function sendTelegramMessage(chatId: number, text: string, replyToMessageId?: number) {
   try {
     await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -102,11 +117,12 @@ serve(async (req) => {
     const chatId = update.message.chat.id;
     const messageId = update.message.message_id;
     const text = update.message.text || "";
-    const botUsername = "@theogscanbot"; // Corrected username
+    const botUsername = "@theogscanbot";
+
+    // Show "typing" status immediately
+    await sendChatAction(chatId, "typing");
 
     let responseText = "";
-
-    // Handle commands with or without username (e.g., /og or /og@theogscanbot)
     const cleanText = text.replace(botUsername, "").trim();
 
     if (cleanText.startsWith("/start")) {
@@ -130,7 +146,6 @@ serve(async (req) => {
       const query = cleanText.replace(/^\/(og|search)/, "").trim();
       responseText = await getOGInfo(query || "SOL");
     } else if (text.includes(botUsername) || update.message.chat.type === "private") {
-      // Auto-reply in DMs or when tagged in groups
       const prompt = text.replace(botUsername, "").trim();
       responseText = await callGemini(prompt || "How can I help you today?");
     }
