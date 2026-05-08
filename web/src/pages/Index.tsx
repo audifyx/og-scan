@@ -1,26 +1,26 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import {
   Activity,
-  BarChart3,
-  Bell,
+  CalendarClock,
   ChevronRight,
   Coins,
-  Copy,
+  Cpu,
   Crosshair,
   Flame,
   Gauge,
-  Layers3,
   Map,
-  MoreHorizontal,
   Radar,
   Rocket,
   Search,
   ShieldCheck,
-  Sparkles,
   Target,
-  Wallet,
   Zap,
 } from "lucide-react";
+import { Scanlines } from "@/components/Scanlines";
+import { SiteHeader } from "@/components/SiteHeader";
+import { StatusStrip } from "@/components/StatusStrip";
+import { Marquee } from "@/components/Marquee";
+import { Hero } from "@/components/Hero";
 import { OgStats } from "@/components/OgStats";
 import { Scanner } from "@/components/Scanner";
 import { Trending } from "@/components/Trending";
@@ -34,178 +34,133 @@ import { TechStack } from "@/components/TechStack";
 import { OurCoin } from "@/components/OurCoin";
 import { SnipeFeed } from "@/components/SnipeFeed";
 import { SolToolsRoadmap } from "@/components/SolToolsRoadmap";
+import { SiteFooter } from "@/components/SiteFooter";
 import { cn } from "@/lib/utils";
-import { DEFAULT_OG_MINT, OGSCAN_X_URL, shortAddr, STORAGE_OG_MINT } from "@/lib/og";
+import { DEFAULT_OG_MINT, STORAGE_OG_MINT } from "@/lib/og";
 
 const LEGACY_DEFAULT_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
-const STORAGE_TAB = "og_scanner.active_tab";
+const STORAGE_TAB = "og_scanner.active_site_tab";
 
 type TabId =
-  | "home"
-  | "snipe-feed"
-  | "scanner"
-  | "pairs"
-  | "more"
+  | "overview"
   | "our-coin"
   | "roadmap"
+  | "snipe-feed"
+  | "scanner"
   | "og-finder"
+  | "pairs"
   | "migrations"
   | "trending"
   | "swap"
   | "tech";
 
-type Tone = "blue" | "cyan" | "white" | "gold";
+type TabAccent = "blue" | "white" | "cyan" | "gold";
 
 type TabConfig = {
   id: TabId;
   label: string;
-  shortLabel: string;
-  title: string;
-  subtitle: string;
+  eyebrow: string;
+  description: string;
   Icon: ComponentType<{ className?: string }>;
-  tone: Tone;
+  accent: TabAccent;
 };
 
 const TABS: TabConfig[] = [
   {
-    id: "home",
-    label: "Home",
-    shortLabel: "Home",
-    title: "OGScan",
-    subtitle: "A cleaner mobile command center for Solana discovery.",
+    id: "overview",
+    label: "Command",
+    eyebrow: "MARKET COMMAND",
+    description: "OGScan home base with market pulse, safety notice, whales, tape, and tool shortcuts.",
     Icon: Gauge,
-    tone: "blue",
-  },
-  {
-    id: "snipe-feed",
-    label: "Snipe Feed",
-    shortLabel: "Snipe",
-    title: "Live Snipe Feed",
-    subtitle: "New launches, creator history, risk labels, and fast actions.",
-    Icon: Target,
-    tone: "cyan",
-  },
-  {
-    id: "scanner",
-    label: "Scanner",
-    shortLabel: "Scan",
-    title: "Token Scanner",
-    subtitle: "Paste a mint and inspect signal, holders, tape, and market data.",
-    Icon: Search,
-    tone: "blue",
-  },
-  {
-    id: "pairs",
-    label: "New Pairs",
-    shortLabel: "Pairs",
-    title: "New Pair Radar",
-    subtitle: "Track fresh Solana pairs before the timeline catches up.",
-    Icon: Radar,
-    tone: "cyan",
-  },
-  {
-    id: "more",
-    label: "More",
-    shortLabel: "More",
-    title: "Tool Library",
-    subtitle: "Every SolTools screen, separated into clean app pages.",
-    Icon: MoreHorizontal,
-    tone: "white",
+    accent: "blue",
   },
   {
     id: "our-coin",
     label: "Token Soon",
-    shortLabel: "Token",
-    title: "Token Coming Soon",
-    subtitle: "No official CA yet. This screen keeps launch info safe and clear.",
+    eyebrow: "OFFICIAL NOTICE",
+    description: "No public CA yet. A clear launch room that protects users from fake contracts.",
     Icon: Coins,
-    tone: "gold",
+    accent: "gold",
   },
   {
     id: "roadmap",
     label: "Roadmap",
-    shortLabel: "Roadmap",
-    title: "SolTools Roadmap",
-    subtitle: "The path from OGScan tools into a full crypto community layer.",
+    eyebrow: "SOLTOOLS VISION",
+    description: "The path from OGScan into the crypto-native community layer SolTools is building.",
     Icon: Map,
-    tone: "cyan",
+    accent: "cyan",
+  },
+  {
+    id: "snipe-feed",
+    label: "Snipe Feed",
+    eyebrow: "DEV WALLET RADAR",
+    description: "Track brand-new launches, repeat creators, watch alerts, and launch quality scores.",
+    Icon: Target,
+    accent: "cyan",
+  },
+  {
+    id: "scanner",
+    label: "Scanner",
+    eyebrow: "RUN THE CHAIN",
+    description: "Search tickers or paste a mint to inspect token signal, liquidity, holders, and risk.",
+    Icon: Search,
+    accent: "blue",
   },
   {
     id: "og-finder",
     label: "OG Finder",
-    shortLabel: "Finder",
-    title: "OG Finder",
-    subtitle: "Search tickers and separate the original from copycats.",
+    eyebrow: "ORIGIN CHECK",
+    description: "Separate the first trusted token from weak copycats using history and market quality.",
     Icon: Crosshair,
-    tone: "blue",
+    accent: "white",
+  },
+  {
+    id: "pairs",
+    label: "Pairs",
+    eyebrow: "NEW PAIR RADAR",
+    description: "Monitor fresh Solana pairs before they hit timeline hype.",
+    Icon: Radar,
+    accent: "cyan",
   },
   {
     id: "migrations",
     label: "Migrations",
-    shortLabel: "Moves",
-    title: "Migration Watch",
-    subtitle: "Find tokens breaking out of launch chaos into real liquidity.",
+    eyebrow: "BREAKOUT WATCH",
+    description: "Find launches leaving chaos behind and moving into stronger liquidity.",
     Icon: Rocket,
-    tone: "gold",
+    accent: "gold",
   },
   {
     id: "trending",
     label: "Trending",
-    shortLabel: "Trend",
-    title: "Trending Market",
-    subtitle: "See what is actually moving across Solana right now.",
+    eyebrow: "MARKET HEAT",
+    description: "See what is actually moving across Solana right now.",
     Icon: Flame,
-    tone: "cyan",
+    accent: "cyan",
   },
   {
     id: "swap",
     label: "Swap",
-    shortLabel: "Swap",
-    title: "Jupiter Swap",
-    subtitle: "Search coins and route swaps while keeping scanner context.",
+    eyebrow: "JUPITER ROUTE",
+    description: "Search coins and quote routes while keeping scanner context nearby.",
     Icon: Zap,
-    tone: "blue",
+    accent: "blue",
   },
   {
     id: "tech",
-    label: "Tech Stack",
-    shortLabel: "Tech",
-    title: "How It Works",
-    subtitle: "The data pipeline behind OG detection and live Solana signals.",
-    Icon: Layers3,
-    tone: "white",
+    label: "Tech",
+    eyebrow: "DATA PIPELINE",
+    description: "The APIs and systems powering OG detection, candles, live tape, and token intel.",
+    Icon: Cpu,
+    accent: "white",
   },
 ];
 
-const PRIMARY_TAB_IDS: TabId[] = ["home", "snipe-feed", "scanner", "pairs", "more"];
-
-const getToneRingClass = (tone: Tone): string => {
-  if (tone === "cyan") return "border-sky-300/35 bg-sky-300/10 text-sky-200 shadow-[0_18px_60px_-36px_rgba(125,211,252,0.9)]";
-  if (tone === "gold") return "border-amber-200/35 bg-amber-200/10 text-amber-100 shadow-[0_18px_60px_-36px_rgba(253,230,138,0.9)]";
-  if (tone === "white") return "border-white/20 bg-white/10 text-white shadow-[0_18px_60px_-42px_rgba(255,255,255,0.8)]";
-  return "border-blue-300/35 bg-blue-400/10 text-blue-100 shadow-[0_18px_60px_-36px_rgba(96,165,250,0.9)]";
-};
-
-const getToneTextClass = (tone: Tone): string => {
-  if (tone === "cyan") return "text-sky-200";
-  if (tone === "gold") return "text-amber-100";
-  if (tone === "white") return "text-white";
-  return "text-blue-100";
-};
-
-const getAccentGlowClass = (tone: Tone): string => {
-  if (tone === "cyan") return "from-sky-400/30 via-cyan-300/10 to-transparent";
-  if (tone === "gold") return "from-amber-300/30 via-white/10 to-transparent";
-  if (tone === "white") return "from-white/20 via-slate-300/10 to-transparent";
-  return "from-blue-500/30 via-sky-300/10 to-transparent";
-};
+const navItems = TABS.map((tab) => ({ id: tab.id, label: tab.label }));
 
 const Index = () => {
-  const scrollRef = useRef<HTMLElement | null>(null);
   const [mint, setMint] = useState<string>(DEFAULT_OG_MINT);
-  const [tab, setTab] = useState<TabId>("home");
-  const [headerQuery, setHeaderQuery] = useState<string>("");
-  const [scannerQuery, setScannerQuery] = useState<string>("");
+  const [tab, setTab] = useState<TabId>("overview");
 
   useEffect(() => {
     try {
@@ -226,453 +181,246 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [tab]);
 
   const activeTab: TabConfig = useMemo<TabConfig>(() => TABS.find((item) => item.id === tab) ?? TABS[0], [tab]);
-  const bottomActiveId: TabId = PRIMARY_TAB_IDS.includes(tab) ? tab : "more";
-  const moreTools: TabConfig[] = useMemo<TabConfig[]>(
-    () => TABS.filter((item) => !PRIMARY_TAB_IDS.includes(item.id)),
-    [],
-  );
 
-  const switchTab = (nextTab: TabId): void => {
-    setTab(nextTab);
+  const switchTab = (nextTab: string): void => {
+    const safeTab: TabId = TABS.some((item) => item.id === nextTab) ? (nextTab as TabId) : "overview";
+    setTab(safeTab);
     try {
-      localStorage.setItem(STORAGE_TAB, nextTab);
+      localStorage.setItem(STORAGE_TAB, safeTab);
     } catch {
       /* noop */
     }
   };
 
-  const updateMint = (nextMint: string, nextTab: TabId = "home"): void => {
+  const updateMint = (nextMint: string): void => {
     setMint(nextMint);
-    setHeaderQuery(nextMint);
-    setScannerQuery(nextMint);
     try {
       localStorage.setItem(STORAGE_OG_MINT, nextMint);
     } catch {
       /* noop */
     }
-    switchTab(nextTab);
-  };
-
-  const runHeaderSearch = (query?: string): void => {
-    const cleanQuery: string = (query ?? headerQuery).trim();
-    if (cleanQuery.length < 2) return;
-
-    setHeaderQuery(cleanQuery);
-    setScannerQuery(cleanQuery);
-
-    const looksLikeMint: boolean = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(cleanQuery);
-    if (looksLikeMint) {
-      setMint(cleanQuery);
-      try {
-        localStorage.setItem(STORAGE_OG_MINT, cleanQuery);
-      } catch {
-        /* noop */
-      }
-    }
-
-    switchTab("scanner");
   };
 
   const promptMint = (): void => {
     const nextMint: string | null = window.prompt("Paste any Solana mint address to inspect:", mint);
-    if (nextMint && nextMint.trim().length > 20) updateMint(nextMint.trim(), "scanner");
+    if (nextMint && nextMint.trim().length > 20) {
+      updateMint(nextMint.trim());
+      switchTab("scanner");
+    }
   };
 
-  const copyMint = (): void => {
-    void navigator.clipboard?.writeText(mint);
-  };
+  const openScanner = (): void => switchTab("scanner");
+  const openSwap = (): void => switchTab("swap");
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#02040b] text-white">
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(59,130,246,0.34),transparent_38%),radial-gradient(circle_at_90%_8%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(180deg,#07111f_0%,#02040b_45%,#02040b_100%)]" />
-      <div className="fixed inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.9)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.9)_1px,transparent_1px)] [background-size:44px_44px]" />
+    <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
+      <Scanlines />
+      <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_50%_-10%,hsl(var(--og-lime)/0.18),transparent_36%),radial-gradient(circle_at_85%_8%,hsl(var(--og-cyan)/0.12),transparent_28%),linear-gradient(180deg,hsl(var(--background)),hsl(var(--og-ink)))]" />
 
-      <div className="relative mx-auto flex h-[100svh] w-full max-w-[430px] flex-col overflow-hidden border-x border-white/10 bg-[#07101d]/92 shadow-[0_0_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl">
-        <NativeTopBar
-          activeTab={activeTab}
-          activeId={bottomActiveId}
-          mint={mint}
-          query={headerQuery}
-          onQueryChange={setHeaderQuery}
-          onRunSearch={runHeaderSearch}
-          onCopyMint={copyMint}
-          onSwitchTab={switchTab}
-        />
+      <SiteHeader navItems={navItems} activeId={tab} onNavigate={switchTab} />
+      <StatusStrip mint={mint} onChangeMint={promptMint} />
+      <Marquee />
 
-        <main ref={scrollRef} className="ios-scroll flex-1 overflow-y-auto px-4 pb-32 pt-4">
-          {tab === "home" && <HomeScreen mint={mint} onSelectMint={updateMint} onSwitchTab={switchTab} />}
-          {tab === "snipe-feed" && (
-            <ToolScreen tab={activeTab} trailing={<LiveBadge label="New launches" />}>
-              <SnipeFeed onSelect={updateMint} />
-            </ToolScreen>
-          )}
-          {tab === "scanner" && (
-            <ToolScreen tab={activeTab} trailing={<button onClick={() => runHeaderSearch()} className="ios-mini-button">Search</button>}>
-              <Scanner onSelect={updateMint} initialQuery={scannerQuery} />
-            </ToolScreen>
-          )}
-          {tab === "pairs" && (
-            <ToolScreen tab={activeTab} trailing={<LiveBadge label="Pair radar" />}>
-              <PairTracker onSelect={updateMint} />
-            </ToolScreen>
-          )}
-          {tab === "more" && <MoreScreen tools={moreTools} onSwitchTab={switchTab} />}
-          {tab === "our-coin" && (
-            <ToolScreen tab={activeTab} trailing={<LiveBadge label="No CA yet" tone="gold" />}>
-              <OurCoin />
-            </ToolScreen>
-          )}
-          {tab === "roadmap" && (
-            <ToolScreen tab={activeTab} trailing={<LiveBadge label="Vision" />}>
-              <SolToolsRoadmap />
-            </ToolScreen>
-          )}
-          {tab === "og-finder" && (
-            <ToolScreen tab={activeTab} trailing={<button onClick={promptMint} className="ios-mini-button">Target</button>}>
-              <OgFinder onSelect={updateMint} />
-            </ToolScreen>
-          )}
-          {tab === "migrations" && (
-            <ToolScreen tab={activeTab} trailing={<LiveBadge label="Breakouts" tone="gold" />}>
-              <Migrations onSelect={updateMint} />
-            </ToolScreen>
-          )}
-          {tab === "trending" && (
-            <ToolScreen tab={activeTab} trailing={<LiveBadge label="Market heat" />}>
-              <Trending onSelect={updateMint} />
-            </ToolScreen>
-          )}
-          {tab === "swap" && (
-            <ToolScreen tab={activeTab} trailing={<button onClick={promptMint} className="ios-mini-button">Target</button>}>
-              <SwapPanel ogMint={mint} onSelectMint={(nextMint: string) => updateMint(nextMint, "swap")} />
-            </ToolScreen>
-          )}
-          {tab === "tech" && (
-            <ToolScreen tab={activeTab} trailing={<LiveBadge label="Pipeline" tone="white" />}>
-              <TechStack />
-            </ToolScreen>
-          )}
-        </main>
+      <main>
+        {tab === "overview" ? (
+          <OverviewPage mint={mint} onSelectMint={updateMint} onSwitchTab={(nextTab: TabId) => switchTab(nextTab)} onScanClick={openScanner} onSwapClick={openSwap} />
+        ) : (
+          <ToolPage tab={activeTab} onBack={() => switchTab("overview")}>
+            {tab === "our-coin" && <OurCoin />}
+            {tab === "roadmap" && <SolToolsRoadmap />}
+            {tab === "snipe-feed" && <SnipeFeed onSelect={updateMint} />}
+            {tab === "scanner" && <Scanner onSelect={updateMint} />}
+            {tab === "og-finder" && <OgFinder onSelect={updateMint} />}
+            {tab === "pairs" && <PairTracker onSelect={updateMint} />}
+            {tab === "migrations" && <Migrations onSelect={updateMint} />}
+            {tab === "trending" && <Trending onSelect={updateMint} />}
+            {tab === "swap" && <SwapPanel ogMint={mint} onSelectMint={updateMint} />}
+            {tab === "tech" && <TechStack />}
+          </ToolPage>
+        )}
+      </main>
 
-        <BottomTabs activeId={bottomActiveId} onSwitchTab={switchTab} />
-      </div>
+      <SiteFooter />
     </div>
   );
 };
 
-const NativeTopBar = ({
-  activeTab,
-  activeId,
-  mint,
-  query,
-  onQueryChange,
-  onRunSearch,
-  onCopyMint,
-  onSwitchTab,
-}: {
-  activeTab: TabConfig;
-  activeId: TabId;
-  mint: string;
-  query: string;
-  onQueryChange: (nextQuery: string) => void;
-  onRunSearch: (query?: string) => void;
-  onCopyMint: () => void;
-  onSwitchTab: (nextTab: TabId) => void;
-}) => {
-  const primaryTabs: TabConfig[] = TABS.filter((item) => PRIMARY_TAB_IDS.includes(item.id));
-
-  return (
-    <header className="z-40 shrink-0 border-b border-white/10 bg-[#07101d]/88 px-4 pb-3 pt-4 backdrop-blur-2xl">
-      <div className="mb-3 flex items-center gap-3">
-        <a href={OGSCAN_X_URL} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-2.5">
-          <span className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-[1.1rem] border border-white/15 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
-            <img src="/icon.png" alt="OGScan" className="h-full w-full scale-110 object-cover" />
-            <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-[#07101d] bg-sky-300" />
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-[25px] font-black leading-none tracking-[-0.055em] text-white">{activeTab.shortLabel}</span>
-            <span className="mt-1 block truncate text-[10px] font-black uppercase tracking-[0.18em] text-sky-100/55">OGScan mobile beta</span>
-          </span>
-        </a>
-
-        <button className="grid h-11 w-11 shrink-0 place-items-center rounded-[1rem] border border-white/10 bg-white/[0.07] text-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] active:scale-95" aria-label="Open menu">
-          <MoreHorizontal className="h-5 w-5" />
-        </button>
-        <button className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[1rem] border border-white/10 bg-white/[0.07] text-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] active:scale-95" aria-label="Open alerts">
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_14px_rgba(125,211,252,0.9)]" />
-        </button>
-      </div>
-
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          onRunSearch();
-        }}
-        className="flex items-center gap-2 rounded-[1.25rem] border border-white/10 bg-black/25 p-1.5 pl-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] focus-within:border-sky-300/55"
-      >
-        <Search className="h-4 w-4 shrink-0 text-sky-200" />
-        <input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search ticker or paste CA"
-          className="min-w-0 flex-1 bg-transparent py-2 text-[13px] font-bold text-white outline-none placeholder:text-white/34"
-          enterKeyHint="search"
-        />
-        <button type="submit" className="rounded-[0.95rem] bg-white px-3 py-2 text-[11px] font-black text-[#07101d] active:scale-95">
-          Scan
-        </button>
-      </form>
-
-      <div className="ios-scroll mt-3 flex gap-2 overflow-x-auto pb-0.5">
-        {primaryTabs.map((item) => {
-          const isActive: boolean = activeId === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSwitchTab(item.id)}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-black transition active:scale-95",
-                isActive ? "border-white bg-white text-[#07101d]" : "border-white/10 bg-white/[0.06] text-white/48",
-              )}
-            >
-              <item.Icon className="h-3.5 w-3.5" />
-              {item.shortLabel}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-2 flex items-center gap-2 px-1 text-[10px] font-bold text-white/38">
-        <span className={cn("h-1.5 w-1.5 rounded-full shadow-[0_0_14px_currentColor]", getToneTextClass(activeTab.tone))} />
-        <span className="min-w-0 flex-1 truncate">Tracking {shortAddr(mint, 5)} · search opens scanner page</span>
-        <button onClick={onCopyMint} className="inline-flex items-center gap-1 text-white/55 active:scale-95" aria-label="Copy target contract address">
-          <Copy className="h-3 w-3" /> Copy
-        </button>
-      </div>
-    </header>
-  );
-};
-
-const HomeScreen = ({
+const OverviewPage = ({
   mint,
   onSelectMint,
   onSwitchTab,
+  onScanClick,
+  onSwapClick,
 }: {
   mint: string;
-  onSelectMint: (nextMint: string, nextTab?: TabId) => void;
+  onSelectMint: (nextMint: string) => void;
   onSwitchTab: (nextTab: TabId) => void;
+  onScanClick: () => void;
+  onSwapClick: () => void;
 }) => {
-  const featuredTools: TabConfig[] = TABS.filter((item) => item.id !== "home" && item.id !== "more");
+  const featuredTabs: TabConfig[] = TABS.filter((item) => item.id !== "overview");
 
   return (
-    <div className="space-y-4">
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.07] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(125,211,252,0.22),transparent_35%),radial-gradient(circle_at_100%_20%,rgba(59,130,246,0.24),transparent_32%)]" />
-        <div className="relative">
-          <div className="mb-4 overflow-hidden rounded-[1.5rem] border border-white/10 bg-black/35">
-            <img src="/og-brand.jpg" alt="OG Scan radar banner" className="h-40 w-full object-contain p-4" />
-          </div>
-          <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-sky-200">
-            <Sparkles className="h-3.5 w-3.5" /> iOS-style redesign
-          </div>
-          <h2 className="mt-2 text-[38px] font-black leading-[0.9] tracking-[-0.07em] text-white">
-            Crypto tools that feel like an app.
-          </h2>
-          <p className="mt-3 max-w-sm text-sm font-medium leading-relaxed text-white/58">
-            Bottom tabs, separated screens, native cards, and no more endless chaotic dashboard.
-          </p>
-          <div className="mt-5 grid grid-cols-2 gap-2">
-            <button onClick={() => onSwitchTab("snipe-feed")} className="ios-primary-button">
-              <Target className="h-4 w-4" /> Live Feed
-            </button>
-            <button onClick={() => onSwitchTab("scanner")} className="ios-secondary-button">
-              <Search className="h-4 w-4" /> Scan Token
-            </button>
-          </div>
-        </div>
-      </section>
+    <>
+      <Hero onScanClick={onScanClick} onSwapClick={onSwapClick} />
 
-      <section className="rounded-[1.65rem] border border-amber-200/20 bg-amber-200/[0.08] p-4">
-        <div className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em] text-amber-100">
-          <ShieldCheck className="h-4 w-4" /> Official token notice
-        </div>
-        <p className="text-xl font-black tracking-[-0.04em] text-white">No token out yet. Coming soon.</p>
-        <p className="mt-1 text-sm font-medium leading-relaxed text-white/55">
-          No public CA or official chart is live. This protects the community from fake contracts.
-        </p>
-        <button onClick={() => onSwitchTab("our-coin")} className="mt-3 inline-flex items-center gap-1.5 text-sm font-black text-amber-100">
-          Open token room <ChevronRight className="h-4 w-4" />
-        </button>
-      </section>
-
-      <section className="space-y-3">
-        <SectionTitle icon={Activity} title="Market Pulse" action="Live" />
-        <div className="ios-tool-surface">
-          <OgStats mint={mint} onSelect={onSelectMint} />
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <SectionTitle icon={Bell} title="Tool Stack" action="Swipe-ready" />
-        <div className="grid grid-cols-2 gap-3">
-          {featuredTools.map((tool) => (
-            <ToolLauncherCard key={tool.id} tool={tool} onPress={() => onSwitchTab(tool.id)} />
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-3">
-        <MiniPanel title="Whales" icon={Wallet} tone="cyan">
-          <Whales mint={mint} />
-        </MiniPanel>
-        <MiniPanel title="Live Tape" icon={BarChart3} tone="gold">
-          <TxFeed mint={mint} />
-        </MiniPanel>
-      </section>
-
-      <button onClick={() => onSwitchTab("scanner")} className="w-full rounded-[1.4rem] border border-white/10 bg-white/[0.07] px-4 py-4 text-sm font-black text-white/75 active:scale-[0.99]">
-        Search another token
-      </button>
-    </div>
-  );
-};
-
-const ToolScreen = ({ tab, trailing, children }: { tab: TabConfig; trailing?: ReactNode; children: ReactNode }) => {
-  return (
-    <div className="space-y-3">
-      <section className="relative overflow-hidden rounded-[1.55rem] border border-white/10 bg-white/[0.07] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
-        <div className={cn("absolute inset-0 bg-gradient-to-br opacity-80", getAccentGlowClass(tab.tone))} />
-        <div className="relative flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-[1rem] border", getToneRingClass(tab.tone))}>
-              <tab.Icon className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="truncate text-[21px] font-black leading-none tracking-[-0.05em] text-white">{tab.title}</h2>
-              <p className="mt-1 line-clamp-1 text-[12px] font-semibold text-white/48">{tab.subtitle}</p>
+      <section className="relative border-b border-og-grid bg-og-ink/60">
+        <div className="absolute inset-0 grid-bg opacity-30" />
+        <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
+          <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.35em] text-og-cyan">
+                <span className="h-px w-12 bg-og-cyan" /> SOLTOOLS DECK
+              </div>
+              <h2 className="font-display text-3xl font-black uppercase tracking-tight text-foreground sm:text-5xl">
+                Site UI is back. Tools are separated.
+              </h2>
+            </div>
+            <div className="border border-og-gold/45 bg-og-gold/10 px-4 py-3 font-mono text-[10px] uppercase leading-relaxed tracking-[0.24em] text-og-gold lg:max-w-sm">
+              No token out yet · Coming soon · Ignore fake CAs
             </div>
           </div>
-          {trailing ? <div className="shrink-0">{trailing}</div> : null}
+
+          <div className="grid gap-4 lg:grid-cols-[0.82fr_1.18fr]">
+            <section className="border border-og-grid bg-og-ink/82 p-4 shadow-og">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <PanelTitle icon={ShieldCheck} eyebrow="Official notice" title="Token safety banner" />
+                <button onClick={() => onSwitchTab("our-coin")} className="border border-og-gold/50 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-og-gold transition hover:bg-og-gold hover:text-og-ink">
+                  Open
+                </button>
+              </div>
+              <div className="relative overflow-hidden border border-og-gold/35 bg-og-gold/5 p-5">
+                <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-og-gold/10 blur-3xl" />
+                <div className="relative">
+                  <p className="font-display text-4xl font-black uppercase leading-none tracking-tighter text-og-gold text-glow-gold sm:text-5xl">
+                    No token out yet.
+                  </p>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                    OGScan has no public contract address or official chart live. This dashboard remains focused on scanning and discovery until launch.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="border border-og-grid bg-og-ink/82 p-4 shadow-og">
+              <PanelTitle icon={Activity} eyebrow="Live overview" title="Market pulse" />
+              <div className="mt-4">
+                <OgStats mint={mint} onSelect={onSelectMint} />
+              </div>
+            </section>
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr]">
+            <section className="border border-og-grid bg-og-ink/82 p-4 shadow-og">
+              <PanelTitle icon={Target} eyebrow="Quick launch" title="Open a tool" />
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2">
+                {featuredTabs.map((tool) => (
+                  <ToolCard key={tool.id} tool={tool} onClick={() => onSwitchTab(tool.id)} />
+                ))}
+              </div>
+            </section>
+
+            <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-1">
+              <div className="border border-og-grid bg-og-ink/82 p-4 shadow-og">
+                <PanelTitle icon={Radar} eyebrow="Wallet radar" title="Whales" />
+                <div className="mt-4 border border-og-grid bg-black/20 p-3">
+                  <Whales mint={mint} />
+                </div>
+              </div>
+              <div className="border border-og-grid bg-og-ink/82 p-4 shadow-og">
+                <PanelTitle icon={Activity} eyebrow="Tape" title="Live transactions" />
+                <div className="mt-4 border border-og-grid bg-black/20 p-3">
+                  <TxFeed mint={mint} />
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
       </section>
-
-      <div className="ios-tool-surface">{children}</div>
-    </div>
+    </>
   );
 };
 
-const MoreScreen = ({ tools, onSwitchTab }: { tools: TabConfig[]; onSwitchTab: (nextTab: TabId) => void }) => {
+const ToolPage = ({ tab, onBack, children }: { tab: TabConfig; onBack: () => void; children: ReactNode }) => {
   return (
-    <div className="space-y-4">
-      <section className="rounded-[2rem] border border-white/10 bg-white/[0.07] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
-        <div className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-white/45">
-          <MoreHorizontal className="h-4 w-4" /> all screens
-        </div>
-        <h2 className="text-[36px] font-black leading-[0.9] tracking-[-0.07em] text-white">Every tool has its own page.</h2>
-        <p className="mt-3 text-sm font-medium leading-relaxed text-white/55">
-          Tap a screen below. Each opens as a clean full-page app view instead of blending into one long feed.
-        </p>
-      </section>
-
-      <div className="grid gap-3">
-        {tools.map((tool) => (
-          <button
-            key={tool.id}
-            onClick={() => onSwitchTab(tool.id)}
-            className="group flex items-center gap-3 rounded-[1.45rem] border border-white/10 bg-white/[0.07] p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] active:scale-[0.99]"
-          >
-            <span className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-[1.05rem] border", getToneRingClass(tool.tone))}>
-              <tool.Icon className="h-5 w-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-black text-white">{tool.label}</span>
-              <span className="mt-0.5 line-clamp-2 block text-xs font-medium leading-relaxed text-white/45">{tool.subtitle}</span>
-            </span>
-            <ChevronRight className="h-5 w-5 shrink-0 text-white/25 transition group-hover:text-white/65" />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const BottomTabs = ({ activeId, onSwitchTab }: { activeId: TabId; onSwitchTab: (nextTab: TabId) => void }) => {
-  const primaryTabs: TabConfig[] = TABS.filter((item) => PRIMARY_TAB_IDS.includes(item.id));
-
-  return (
-    <nav className="absolute inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#07101d]/88 px-3 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] pt-2 backdrop-blur-2xl">
-      <div className="grid grid-cols-5 gap-1 rounded-[1.65rem] border border-white/10 bg-black/24 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-        {primaryTabs.map((item) => {
-          const isActive: boolean = activeId === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSwitchTab(item.id)}
-              className={cn(
-                "group flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-[1.25rem] text-[10px] font-black transition active:scale-95",
-                isActive ? "bg-white text-[#07101d] shadow-[0_12px_34px_-20px_rgba(255,255,255,0.9)]" : "text-white/45 hover:bg-white/[0.06] hover:text-white/75",
-              )}
-            >
-              <item.Icon className="h-5 w-5" />
-              <span>{item.shortLabel}</span>
+    <section className="relative min-h-screen border-b border-og-grid bg-background">
+      <div className="absolute inset-0 grid-bg opacity-35" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--og-lime)/0.1),transparent_34%),linear-gradient(180deg,hsl(var(--og-ink)/0.25),hsl(var(--background)))]" />
+      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
+        <div className="mb-5 border border-og-grid bg-og-ink/88 p-4 shadow-og sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className={cn("grid h-14 w-14 shrink-0 place-items-center border", getAccentClass(tab.accent, "icon"))}>
+                <tab.Icon className="h-7 w-7" />
+              </div>
+              <div>
+                <div className={cn("mb-2 font-mono text-[10px] uppercase tracking-[0.34em]", getAccentClass(tab.accent, "text"))}>
+                  {tab.eyebrow}
+                </div>
+                <h1 className="font-display text-4xl font-black uppercase leading-none tracking-tighter text-foreground sm:text-6xl">
+                  {tab.label}
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+                  {tab.description}
+                </p>
+              </div>
+            </div>
+            <button onClick={onBack} className="inline-flex items-center justify-center gap-2 border border-og-grid bg-black/20 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-foreground/70 transition hover:border-og-lime hover:text-og-lime">
+              Command deck <ChevronRight className="h-3.5 w-3.5" />
             </button>
-          );
-        })}
+          </div>
+        </div>
+
+        <div className="border border-og-grid bg-og-ink/72 p-3 shadow-og sm:p-5">
+          {children}
+        </div>
       </div>
-    </nav>
+    </section>
   );
 };
 
-const ToolLauncherCard = ({ tool, onPress }: { tool: TabConfig; onPress: () => void }) => (
-  <button
-    onClick={onPress}
-    className="group min-h-[132px] rounded-[1.55rem] border border-white/10 bg-white/[0.07] p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] active:scale-[0.98]"
-  >
-    <span className={cn("mb-3 grid h-11 w-11 place-items-center rounded-[1rem] border", getToneRingClass(tool.tone))}>
-      <tool.Icon className="h-5 w-5" />
-    </span>
-    <span className="block text-[15px] font-black text-white">{tool.label}</span>
-    <span className="mt-1 line-clamp-2 block text-xs font-medium leading-relaxed text-white/45">{tool.subtitle}</span>
-  </button>
-);
-
-const MiniPanel = ({
-  title,
-  icon: Icon,
-  tone,
-  children,
-}: {
-  title: string;
-  icon: ComponentType<{ className?: string }>;
-  tone: Tone;
-  children: ReactNode;
-}) => (
-  <section className="rounded-[1.65rem] border border-white/10 bg-white/[0.07] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-    <div className={cn("mb-3 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.18em]", getToneTextClass(tone))}>
-      <Icon className="h-4 w-4" /> {title}
+const PanelTitle = ({ icon: Icon, eyebrow, title }: { icon: ComponentType<{ className?: string }>; eyebrow: string; title: string }) => (
+  <div>
+    <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
+      <Icon className="h-3.5 w-3.5" /> {eyebrow}
     </div>
-    <div className="overflow-hidden rounded-[1.15rem] border border-white/10 bg-black/20 p-2">{children}</div>
-  </section>
-);
-
-const SectionTitle = ({ icon: Icon, title, action }: { icon: ComponentType<{ className?: string }>; title: string; action: string }) => (
-  <div className="flex items-center justify-between px-1">
-    <div className="flex items-center gap-2 text-lg font-black tracking-[-0.04em] text-white">
-      <Icon className="h-5 w-5 text-sky-200" /> {title}
-    </div>
-    <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/48">{action}</span>
+    <h3 className="font-display text-2xl font-black uppercase tracking-tight text-foreground">{title}</h3>
   </div>
 );
 
-const LiveBadge = ({ label, tone = "cyan" }: { label: string; tone?: Tone }) => (
-  <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.16em]", getToneRingClass(tone))}>
-    <span className="h-1.5 w-1.5 rounded-full bg-current" /> {label}
-  </span>
+const ToolCard = ({ tool, onClick }: { tool: TabConfig; onClick: () => void }) => (
+  <button
+    onClick={onClick}
+    className="group relative min-h-[132px] overflow-hidden border border-og-grid bg-black/22 p-4 text-left transition hover:border-og-lime hover:bg-og-lime/5"
+  >
+    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-og-lime/50 to-transparent opacity-0 transition group-hover:opacity-100" />
+    <div className={cn("mb-3 grid h-10 w-10 place-items-center border", getAccentClass(tool.accent, "icon"))}>
+      <tool.Icon className="h-5 w-5" />
+    </div>
+    <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground">{tool.eyebrow}</div>
+    <div className="mt-1 flex items-center justify-between gap-3">
+      <span className="font-display text-xl font-black uppercase tracking-tight text-foreground">{tool.label}</span>
+      <ChevronRight className="h-4 w-4 text-og-lime opacity-0 transition group-hover:translate-x-1 group-hover:opacity-100" />
+    </div>
+  </button>
 );
+
+const getAccentClass = (accent: TabAccent, part: "icon" | "text"): string => {
+  if (part === "text") {
+    if (accent === "gold") return "text-og-gold";
+    if (accent === "cyan") return "text-og-cyan";
+    if (accent === "white") return "text-og-gold";
+    return "text-og-lime";
+  }
+
+  if (accent === "gold") return "border-og-gold/50 bg-og-gold/10 text-og-gold shadow-og-gold";
+  if (accent === "cyan") return "border-og-cyan/50 bg-og-cyan/10 text-og-cyan";
+  if (accent === "white") return "border-foreground/25 bg-foreground/10 text-foreground";
+  return "border-og-lime/50 bg-og-lime/10 text-og-lime shadow-og";
+};
 
 export default Index;
