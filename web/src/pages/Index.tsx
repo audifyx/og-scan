@@ -302,17 +302,18 @@ const Index = () => {
       <div className="fixed inset-0 grid-bg opacity-35" />
       <div className="fixed inset-0 noise" />
 
-      <div className="relative">
-        <SiteHeader
-          navItems={NAV_ITEMS}
-          activeId={activeNavId}
-          mint={mint}
-          query={headerQuery}
-          onQueryChange={setHeaderQuery}
-          onRunSearch={runHeaderSearch}
-          onCopyMint={copyMint}
-          onNavigate={(id: string) => navigateTo(id as NavId)}
-        />
+      <SiteHeader
+        navItems={NAV_ITEMS}
+        activeId={activeNavId}
+        mint={mint}
+        query={headerQuery}
+        onQueryChange={setHeaderQuery}
+        onRunSearch={runHeaderSearch}
+        onCopyMint={copyMint}
+        onNavigate={(id: string) => navigateTo(id as NavId)}
+      />
+
+      <div className="relative lg:pl-[280px]">
         <StatusStrip mint={mint} onChangeMint={promptMint} />
 
         <main>
@@ -323,7 +324,6 @@ const Index = () => {
               scannerQuery={scannerQuery}
               onSelectMint={updateMint}
               onPromptMint={promptMint}
-              onNavigate={navigateTo}
             />
           ) : (
             <HomePage mint={mint} onSelectMint={updateMint} onNavigate={navigateTo} />
@@ -354,7 +354,7 @@ const HomePage = ({
     <>
       <Hero onScanClick={() => onNavigate("scanner")} onSwapClick={() => onNavigate("swap")} />
 
-      <section className="mx-auto grid max-w-7xl gap-5 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:py-10">
+      <section className="mx-auto grid max-w-[1220px] gap-5 px-4 py-8 sm:px-6 xl:grid-cols-[minmax(0,1fr)_360px] lg:py-10">
         <div className="space-y-5">
           <section className="relative overflow-hidden border border-og-gold/45 bg-og-gold/[0.08] p-5 shadow-og-gold">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,hsl(var(--og-gold)/0.18),transparent_32%),linear-gradient(90deg,hsl(var(--og-gold)/0.08),transparent)]" />
@@ -423,42 +423,20 @@ const ToolPage = ({
   scannerQuery,
   onSelectMint,
   onPromptMint,
-  onNavigate,
 }: {
   activeTool: ToolConfig;
   mint: string;
   scannerQuery: string;
   onSelectMint: (nextMint: string, nextTool?: ToolId) => void;
   onPromptMint: () => void;
-  onNavigate: (nextId: NavId) => void;
 }) => {
   return (
-    <section className="mx-auto min-h-[calc(100vh-9rem)] max-w-7xl px-4 py-7 sm:px-6 lg:py-10">
-      <div className="grid gap-6 lg:grid-cols-[270px_minmax(0,1fr)]">
-        <aside className="hidden lg:block">
-          <div className="sticky top-32 space-y-4">
-            <ToolRail activeId={activeTool.id} onNavigate={onNavigate} />
-            <section className="border border-og-grid bg-og-ink/78 p-4 shadow-og">
-              <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.28em] text-og-cyan">
-                <Copy className="h-3.5 w-3.5" /> target ca
-              </div>
-              <div className="break-all font-mono text-xs text-muted-foreground">{shortAddr(mint, 6)}</div>
-              <button
-                onClick={onPromptMint}
-                className="mt-3 w-full border border-og-grid px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 transition hover:border-og-lime hover:text-og-lime"
-              >
-                Change target
-              </button>
-            </section>
-          </div>
-        </aside>
-
-        <div className="min-w-0 space-y-5">
-          <ToolHeroCard tool={activeTool} />
-          <div className="relative overflow-hidden border border-og-grid bg-og-ink/86 p-3 shadow-og sm:p-5">
-            <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b opacity-75", getToneGlowClass(activeTool.tone))} />
-            <div className="relative min-w-0">{renderTool(activeTool.id, mint, scannerQuery, onSelectMint, onPromptMint)}</div>
-          </div>
+    <section className="mx-auto min-h-[calc(100vh-9rem)] max-w-[1220px] px-4 py-5 sm:px-6 lg:py-7">
+      <div className="min-w-0 space-y-4">
+        <ToolHeroCard tool={activeTool} mint={mint} onPromptMint={onPromptMint} />
+        <div className="relative overflow-hidden rounded-[1.6rem] border border-og-grid/80 bg-[#06110f]/88 shadow-[0_0_0_1px_hsl(var(--og-cyan)/0.12),0_38px_140px_-92px_hsl(var(--og-cyan))]">
+          <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b opacity-60", getToneGlowClass(activeTool.tone))} />
+          <div className="relative min-w-0 p-3 sm:p-5">{renderTool(activeTool.id, mint, scannerQuery, onSelectMint, onPromptMint)}</div>
         </div>
       </div>
     </section>
@@ -498,62 +476,29 @@ function renderTool(
   }
 }
 
-const ToolHeroCard = ({ tool }: { tool: ToolConfig }) => (
-  <section className="relative overflow-hidden border border-og-grid bg-og-ink/88 p-5 shadow-og sm:p-7">
-    <div className="absolute inset-0 grid-bg opacity-40" />
-    <div className={cn("absolute inset-0 bg-gradient-to-br", getToneGlowClass(tool.tone))} />
-    <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-      <div className="max-w-3xl">
-        <div className="mb-4 flex items-center gap-3">
-          <span className={cn("grid h-14 w-14 place-items-center border", getToneFrameClass(tool.tone))}>
-            <tool.Icon className="h-7 w-7" />
-          </span>
-          <div>
-            <div className="font-mono text-[10px] font-bold uppercase tracking-[0.34em] text-og-cyan">{tool.eyebrow}</div>
-            <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{tool.path}</div>
-          </div>
+const ToolHeroCard = ({ tool, mint, onPromptMint }: { tool: ToolConfig; mint: string; onPromptMint: () => void }) => (
+  <section className="relative overflow-hidden rounded-[1.6rem] border border-og-grid/80 bg-[#06110f]/90 p-4 shadow-[0_0_0_1px_hsl(var(--og-lime)/0.08),0_28px_110px_-80px_hsl(var(--og-lime))] sm:p-5">
+    <div className="absolute inset-0 grid-bg opacity-20" />
+    <div className={cn("absolute inset-0 bg-gradient-to-br opacity-80", getToneGlowClass(tool.tone))} />
+    <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex min-w-0 items-center gap-4">
+        <span className={cn("grid h-14 w-14 shrink-0 place-items-center rounded-2xl border", getToneFrameClass(tool.tone))}>
+          <tool.Icon className="h-7 w-7" />
+        </span>
+        <div className="min-w-0">
+          <div className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-og-cyan">{tool.eyebrow}</div>
+          <h1 className="truncate font-display text-3xl font-black tracking-tight text-foreground sm:text-4xl">{tool.title}</h1>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">{tool.subtitle}</p>
         </div>
-        <h1 className="font-display text-[clamp(2.5rem,7vw,5.8rem)] font-black uppercase leading-[0.86] tracking-tighter text-og-gold text-glow-gold">
-          {tool.title}
-        </h1>
-        <p className="mt-4 max-w-2xl text-base font-semibold leading-relaxed text-foreground/78 sm:text-lg">{tool.subtitle}</p>
       </div>
-      <div className="border border-og-grid bg-black/30 px-4 py-3 font-mono text-[10px] uppercase leading-relaxed tracking-[0.22em] text-muted-foreground md:max-w-xs md:text-right">
-        Dedicated page view. Header tab active. No stacked scrolling tool chaos.
-      </div>
+      <button
+        onClick={onPromptMint}
+        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-og-grid bg-black/30 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 transition hover:border-og-lime hover:text-og-lime"
+      >
+        <Copy className="h-3.5 w-3.5" /> Target {shortAddr(mint, 4)}
+      </button>
     </div>
   </section>
-);
-
-const ToolRail = ({ activeId, onNavigate }: { activeId: ToolId; onNavigate: (nextId: NavId) => void }) => (
-  <nav className="border border-og-grid bg-og-ink/80 p-2 shadow-og" aria-label="Tool pages">
-    <button
-      onClick={() => onNavigate("home")}
-      className="mb-2 flex w-full items-center gap-2 border border-og-grid bg-black/30 px-3 py-2 text-left font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground transition hover:border-og-lime hover:text-og-lime"
-    >
-      <Gauge className="h-3.5 w-3.5" /> Home
-    </button>
-    <div className="space-y-1">
-      {TOOL_ROUTES.map((tool) => {
-        const isActive: boolean = activeId === tool.id;
-        return (
-          <button
-            key={tool.id}
-            onClick={() => onNavigate(tool.id)}
-            className={cn(
-              "group flex w-full items-center gap-2 border px-3 py-2.5 text-left transition",
-              isActive
-                ? "border-og-lime bg-og-lime text-og-ink"
-                : "border-transparent text-muted-foreground hover:border-og-grid hover:bg-og-lime/[0.08] hover:text-og-lime",
-            )}
-          >
-            <tool.Icon className="h-4 w-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate font-mono text-[10px] font-bold uppercase tracking-[0.2em]">{tool.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  </nav>
 );
 
 const ToolDirectoryGrid = ({ tools, onNavigate }: { tools: ToolConfig[]; onNavigate: (nextId: NavId) => void }) => (

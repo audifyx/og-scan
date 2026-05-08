@@ -175,6 +175,34 @@
     @apply overflow-hidden rounded-[1.8rem] border border-white/10 bg-white/[0.065] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.13)];
   }
 
+  .monitor-panel {
+    @apply overflow-hidden rounded-[1.45rem] border border-og-grid/80 bg-[#07110f]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_30px_110px_-80px_hsl(var(--og-cyan))];
+  }
+
+  .monitor-panel-header {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-og-grid/70 bg-black/20 px-4 py-3;
+  }
+
+  .token-feed-row {
+    @apply relative flex w-full items-center gap-3 border-b border-og-grid/50 bg-[#07110f]/70 p-3 text-left transition last:border-b-0 hover:bg-og-lime/[0.045];
+  }
+
+  .token-avatar {
+    @apply grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-og-grid bg-og-ink text-xs font-black text-og-lime;
+  }
+
+  .token-stat-pill {
+    @apply rounded-xl border border-og-grid/70 bg-black/24 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground;
+  }
+
+  .tool-searchbar {
+    @apply flex items-center rounded-[1.2rem] border border-og-grid bg-black/25 px-3 focus-within:border-og-lime;
+  }
+
+  .tool-chip {
+    @apply rounded-full border border-og-grid bg-white/[0.035] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-foreground/65 transition hover:border-og-lime hover:text-og-lime;
+  }
+
   .ios-scroll {
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;

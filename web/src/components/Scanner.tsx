@@ -55,19 +55,21 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   return (
     <section id="scanner" className="relative scroll-mt-36">
       <div>
-        <div className="mb-6">
-          <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-og-cyan">
-            <span className="h-px w-10 bg-og-cyan" /> SCANNER.EXE
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.34em] text-og-cyan">
+              <span className="h-px w-8 bg-og-cyan" /> Token search
+            </div>
+            <h2 className="font-display text-2xl font-black tracking-tight text-foreground sm:text-3xl">Live Token Monitor</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Search by ticker, name, or paste a mint address. Results now scan like a coin feed.</p>
           </div>
-          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-5xl">
-            <span className="text-foreground">SCAN ANY</span>{" "}
-            <span className="text-og-cyan text-glow">MINT</span>
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">Search by ticker, name, or paste a mint address. Powered by Jupiter token registry.</p>
+          <span className="rounded-full border border-og-lime/40 bg-og-lime/10 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-og-lime">
+            {rawResults.length ? `${filteredResults.length}/${rawResults.length} hits` : "ready"}
+          </span>
         </div>
 
         <div className="relative">
-          <div className="flex items-center border border-og-grid bg-og-ink/80 focus-within:border-og-lime">
+          <div className="tool-searchbar">
             <Search className="ml-3 h-4 w-4 text-og-lime" />
             <input
               value={q}
@@ -94,14 +96,14 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
         </div>
 
         {/* Filters */}
-        <div className="mt-3 border border-og-grid bg-og-ink/70 p-3">
+        <div className="mt-3 rounded-[1.2rem] border border-og-grid/80 bg-black/20 p-3">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
               <Filter className="h-3 w-3" /> filters
             </div>
             <button
               onClick={() => setFilters(DEFAULT_FILTERS)}
-              className="ml-auto border border-og-grid px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-foreground/60 transition hover:border-og-cyan hover:text-og-cyan"
+              className="ml-auto tool-chip"
             >
               RESET
             </button>
@@ -118,22 +120,37 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
         </div>
 
         {/* Results */}
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-          {filteredResults.slice(0, 12).map((t) => (
+        <div className="monitor-panel mt-4">
+          <div className="monitor-panel-header">
+            <div className="flex items-center gap-2 font-display text-xl font-black text-foreground">
+              <Search className="h-5 w-5 text-og-lime" /> Search Feed
+            </div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              <span className="text-og-lime">{filteredResults.length}</span> shown · <span className="text-og-blood">{dropped}</span> filtered
+            </div>
+          </div>
+          <div className="hidden grid-cols-12 gap-3 border-b border-og-grid/60 px-4 py-2 font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground md:grid">
+            <div className="col-span-5">Token</div>
+            <div className="col-span-2 text-right">Price / 24h</div>
+            <div className="col-span-2 text-right">Mcap</div>
+            <div className="col-span-2 text-right">Liquidity</div>
+            <div className="col-span-1 text-right">Open</div>
+          </div>
+          {filteredResults.slice(0, 16).map((t) => (
             <ResultRow key={t.id} t={t} onSelect={() => onSelect(t.id)} />
           ))}
           {debounced.length >= 2 && !isFetching && rawResults.length === 0 && (
-            <div className="col-span-full border border-og-grid bg-og-ink/70 p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
+            <div className="p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
               NO MATCHES // EOF
             </div>
           )}
           {debounced.length >= 2 && !isFetching && rawResults.length > 0 && filteredResults.length === 0 && (
-            <div className="col-span-full border border-dashed border-og-grid p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
+            <div className="p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
               NO RESULTS PASS FILTERS · RESET OR LOWER THE BAR
             </div>
           )}
           {debounced.length < 2 && (
-            <div className="col-span-full border border-dashed border-og-grid p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
+            <div className="p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
               › type 2+ chars to engage
             </div>
           )}
@@ -192,29 +209,41 @@ const ResultRow = ({ t, onSelect }: { t: JupTokenInfo; onSelect: () => void }) =
   const ch = t.stats24h?.priceChange ?? 0;
   const up = ch >= 0;
   return (
-    <button
-      onClick={onSelect}
-      className="group flex items-center gap-4 border border-og-grid bg-og-ink/70 p-3 text-left transition hover:border-og-lime hover:bg-og-lime/5"
-    >
-      <div className="relative h-10 w-10 shrink-0 overflow-hidden border border-og-grid bg-og-ink">
-        {t.icon ? (
-          <img src={t.icon} alt={t.symbol} className="h-full w-full object-cover" loading="lazy" />
-        ) : (
-          <div className="grid h-full w-full place-items-center text-xs text-og-lime">{t.symbol?.[0]}</div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-display text-sm font-bold text-og-gold truncate">${t.symbol}</span>
-          {t.isVerified && <ShieldCheck className="h-3 w-3 text-og-lime" />}
-          <span className="ml-auto text-xs text-foreground">{fmtUsd(t.usdPrice)}</span>
+    <button onClick={onSelect} className="token-feed-row md:grid md:grid-cols-12 md:gap-3">
+      <div className="flex min-w-0 items-center gap-3 md:col-span-5">
+        <div className="token-avatar">
+          {t.icon ? (
+            <img src={t.icon} alt={t.symbol} className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            <span>{t.symbol?.[0]}</span>
+          )}
         </div>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-          <span className="truncate">{t.name}</span>
-          <span className={up ? "text-og-lime" : "text-og-blood"}>{fmtPct(ch)}</span>
-          <span>· LQ {fmtUsd(t.liquidity)}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-display text-base font-black text-foreground">{t.name}</span>
+            <span className="rounded-full border border-og-grid bg-black/25 px-2 py-0.5 font-mono text-[10px] font-bold text-foreground/80">{t.symbol}</span>
+            {t.isVerified && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-og-lime" />}
+          </div>
+          <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{t.id.slice(0, 6)}... · jupiter</div>
         </div>
       </div>
+
+      <div className="ml-auto text-right md:col-span-2 md:ml-0">
+        <div className="font-mono text-sm font-bold text-foreground">{fmtUsd(t.usdPrice)}</div>
+        <div className={`font-mono text-[10px] ${up ? "text-og-lime" : "text-og-blood"}`}>{fmtPct(ch)}</div>
+      </div>
+
+      <div className="hidden text-right md:block md:col-span-2">
+        <div className="font-mono text-sm font-bold text-foreground">{fmtUsd(t.mcap ?? t.fdv)}</div>
+        <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">MCap</div>
+      </div>
+
+      <div className="hidden text-right md:block md:col-span-2">
+        <div className="font-mono text-sm font-bold text-foreground">{fmtUsd(t.liquidity)}</div>
+        <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Liq</div>
+      </div>
+
+      <div className="hidden text-right font-mono text-lg text-og-lime md:block md:col-span-1">+</div>
     </button>
   );
 };

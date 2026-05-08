@@ -740,9 +740,24 @@ export const PairTracker = ({ onSelect }: Props) => {
         </div>
 
         {/* Pair list */}
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="monitor-panel mt-4">
+          <div className="monitor-panel-header">
+            <div className="flex items-center gap-2 font-display text-xl font-black text-foreground">
+              <Radar className="h-5 w-5 text-og-lime" /> Live Token Feed
+            </div>
+            <span className="rounded-full border border-og-lime/30 bg-og-lime/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-og-lime">
+              {filtered.length} tokens
+            </span>
+          </div>
+          <div className="hidden grid-cols-12 gap-3 border-b border-og-grid/60 px-4 py-2 font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground md:grid">
+            <div className="col-span-5">Token</div>
+            <div className="col-span-2 text-right">Price / 24h</div>
+            <div className="col-span-2 text-right">Mcap</div>
+            <div className="col-span-2 text-right">Liq / Age</div>
+            <div className="col-span-1 text-right">Open</div>
+          </div>
           {filtered.length === 0 && !isFetching && (
-            <div className="md:col-span-2 xl:col-span-3 border border-dashed border-og-grid p-6 text-center font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            <div className="p-6 text-center font-mono text-xs uppercase tracking-widest text-muted-foreground">
               NO PAIRS PASS THE BAR · TAP OPEN OR RESET FILTERS
             </div>
           )}
@@ -853,76 +868,44 @@ const PairCard = ({
   return (
     <button
       onClick={onSelect}
-      className={`group relative flex flex-col gap-3 border bg-og-ink/70 p-4 text-left transition ${
-        flash
-          ? "border-og-cyan animate-pulse shadow-[0_0_24px_rgba(0,229,255,0.35)]"
-          : isFresh
-            ? "border-og-lime/60 hover:border-og-lime"
-            : "border-og-grid hover:border-og-gold"
-      }`}
+      className={`token-feed-row md:grid md:grid-cols-12 md:gap-3 ${flash ? "animate-pulse bg-og-cyan/10" : isFresh ? "bg-og-lime/[0.035]" : ""}`}
     >
-      {flash && (
-        <span className="absolute -top-2 left-3 inline-flex items-center gap-1 bg-og-cyan px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-og-ink">
-          <Sparkles className="h-3 w-3" /> JUST DETECTED
-        </span>
-      )}
-      {!flash && isFresh && (
-        <span className="absolute -top-2 left-3 bg-og-lime px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-og-ink">
-          NEW · &lt;24H
-        </span>
-      )}
-
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 shrink-0 overflow-hidden border border-og-grid bg-og-ink">
+      <div className="flex min-w-0 items-center gap-3 md:col-span-5">
+        <div className="token-avatar">
           {t.icon ? (
             <img src={t.icon} alt={t.symbol} className="h-full w-full object-cover" loading="lazy" />
           ) : (
-            <div className="grid h-full w-full place-items-center text-xs text-og-lime">
-              {t.symbol?.[0]}
-            </div>
+            <span>{t.symbol?.[0]}</span>
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="font-display text-sm font-bold text-foreground">${t.symbol}</span>
-            {t.isVerified && <ShieldCheck className="h-3 w-3 text-og-lime" />}
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="truncate font-display text-base font-black text-foreground">{t.name}</span>
+            <span className="rounded-full border border-og-grid bg-black/25 px-2 py-0.5 font-mono text-[10px] font-bold text-foreground/80">{t.symbol}</span>
+            {t.isVerified && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-og-lime" />}
+            {flash ? <span className="rounded-full bg-og-cyan px-2 py-0.5 font-mono text-[9px] font-black uppercase tracking-widest text-og-ink">New</span> : null}
+            {!flash && isFresh ? <span className="rounded-full bg-og-lime px-2 py-0.5 font-mono text-[9px] font-black uppercase tracking-widest text-og-ink">&lt;24h</span> : null}
           </div>
-          <div className="truncate text-[10px] uppercase tracking-widest text-muted-foreground">
-            {t.name}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="font-mono text-xs text-foreground">{fmtUsd(t.usdPrice)}</div>
-          <div className={`font-mono text-[10px] ${up ? "text-og-lime" : "text-og-blood"}`}>
-            {fmtPct(ch)}
-          </div>
+          <div className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{shortAddr(t.id, 5)} · holders {fmtNum(t.holderCount)}</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        <Stat icon={Droplets} label="LIQ" value={fmtUsd(t.liquidity)} />
-        <Stat icon={Users} label="HLDR" value={fmtNum(t.holderCount)} />
-        <Stat
-          icon={Calendar}
-          label="AGE"
-          value={ageLabel}
-          accent={isFresh ? "text-og-lime" : undefined}
-        />
-        <Stat
-          icon={ShieldCheck}
-          label="TOP10"
-          value={
-            t.audit?.topHoldersPercentage != null
-              ? `${t.audit.topHoldersPercentage.toFixed(0)}%`
-              : "—"
-          }
-        />
+      <div className="ml-auto text-right md:col-span-2 md:ml-0">
+        <div className="font-mono text-sm font-bold text-foreground">{fmtUsd(t.usdPrice)}</div>
+        <div className={`font-mono text-[10px] ${up ? "text-og-lime" : "text-og-blood"}`}>{fmtPct(ch)}</div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-og-grid/60 pt-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-        <span>{shortAddr(t.id, 5)}</span>
-        <span className="text-og-gold">OPEN →</span>
+      <div className="hidden text-right md:block md:col-span-2">
+        <div className="font-mono text-sm font-bold text-foreground">{fmtUsd(t.mcap ?? t.fdv)}</div>
+        <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">MCap</div>
       </div>
+
+      <div className="hidden text-right md:block md:col-span-2">
+        <div className="font-mono text-sm font-bold text-foreground">{fmtUsd(t.liquidity)}</div>
+        <div className={`font-mono text-[10px] uppercase tracking-widest ${isFresh ? "text-og-lime" : "text-muted-foreground"}`}>{ageLabel} old</div>
+      </div>
+
+      <div className="hidden text-right font-mono text-lg text-og-lime md:block md:col-span-1">+</div>
     </button>
   );
 };
