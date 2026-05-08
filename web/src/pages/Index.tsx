@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import {
   Activity,
   BarChart3,
@@ -201,8 +201,11 @@ const getAccentGlowClass = (tone: Tone): string => {
 };
 
 const Index = () => {
+  const scrollRef = useRef<HTMLElement | null>(null);
   const [mint, setMint] = useState<string>(DEFAULT_OG_MINT);
   const [tab, setTab] = useState<TabId>("home");
+  const [headerQuery, setHeaderQuery] = useState<string>("");
+  const [scannerQuery, setScannerQuery] = useState<string>("");
 
   useEffect(() => {
     try {
@@ -223,7 +226,7 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, [tab]);
 
   const activeTab: TabConfig = useMemo<TabConfig>(() => TABS.find((item) => item.id === tab) ?? TABS[0], [tab]);
@@ -244,12 +247,34 @@ const Index = () => {
 
   const updateMint = (nextMint: string, nextTab: TabId = "home"): void => {
     setMint(nextMint);
+    setHeaderQuery(nextMint);
+    setScannerQuery(nextMint);
     try {
       localStorage.setItem(STORAGE_OG_MINT, nextMint);
     } catch {
       /* noop */
     }
     switchTab(nextTab);
+  };
+
+  const runHeaderSearch = (query?: string): void => {
+    const cleanQuery: string = (query ?? headerQuery).trim();
+    if (cleanQuery.length < 2) return;
+
+    setHeaderQuery(cleanQuery);
+    setScannerQuery(cleanQuery);
+
+    const looksLikeMint: boolean = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(cleanQuery);
+    if (looksLikeMint) {
+      setMint(cleanQuery);
+      try {
+        localStorage.setItem(STORAGE_OG_MINT, cleanQuery);
+      } catch {
+        /* noop */
+      }
+    }
+
+    switchTab("scanner");
   };
 
   const promptMint = (): void => {
@@ -266,19 +291,28 @@ const Index = () => {
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(59,130,246,0.34),transparent_38%),radial-gradient(circle_at_90%_8%,rgba(34,211,238,0.16),transparent_30%),linear-gradient(180deg,#07111f_0%,#02040b_45%,#02040b_100%)]" />
       <div className="fixed inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.9)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.9)_1px,transparent_1px)] [background-size:44px_44px]" />
 
-      <div className="relative mx-auto min-h-screen w-full max-w-[430px] overflow-hidden border-x border-white/10 bg-[#07101d]/92 shadow-[0_0_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl">
-        <NativeTopBar activeTab={activeTab} mint={mint} onChangeMint={promptMint} onCopyMint={copyMint} />
+      <div className="relative mx-auto flex h-[100svh] w-full max-w-[430px] flex-col overflow-hidden border-x border-white/10 bg-[#07101d]/92 shadow-[0_0_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl">
+        <NativeTopBar
+          activeTab={activeTab}
+          activeId={bottomActiveId}
+          mint={mint}
+          query={headerQuery}
+          onQueryChange={setHeaderQuery}
+          onRunSearch={runHeaderSearch}
+          onCopyMint={copyMint}
+          onSwitchTab={switchTab}
+        />
 
-        <main className="ios-scroll min-h-[calc(100vh-88px)] px-4 pb-32 pt-4">
-          {tab === "home" && <HomeScreen mint={mint} onSelectMint={updateMint} onSwitchTab={switchTab} onChangeMint={promptMint} />}
+        <main ref={scrollRef} className="ios-scroll flex-1 overflow-y-auto px-4 pb-32 pt-4">
+          {tab === "home" && <HomeScreen mint={mint} onSelectMint={updateMint} onSwitchTab={switchTab} />}
           {tab === "snipe-feed" && (
             <ToolScreen tab={activeTab} trailing={<LiveBadge label="New launches" />}>
               <SnipeFeed onSelect={updateMint} />
             </ToolScreen>
           )}
           {tab === "scanner" && (
-            <ToolScreen tab={activeTab} trailing={<button onClick={promptMint} className="ios-mini-button">Paste CA</button>}>
-              <Scanner onSelect={updateMint} />
+            <ToolScreen tab={activeTab} trailing={<button onClick={() => runHeaderSearch()} className="ios-mini-button">Search</button>}>
+              <Scanner onSelect={updateMint} initialQuery={scannerQuery} />
             </ToolScreen>
           )}
           {tab === "pairs" && (
@@ -332,61 +366,93 @@ const Index = () => {
 
 const NativeTopBar = ({
   activeTab,
+  activeId,
   mint,
-  onChangeMint,
+  query,
+  onQueryChange,
+  onRunSearch,
   onCopyMint,
+  onSwitchTab,
 }: {
   activeTab: TabConfig;
+  activeId: TabId;
   mint: string;
-  onChangeMint: () => void;
+  query: string;
+  onQueryChange: (nextQuery: string) => void;
+  onRunSearch: (query?: string) => void;
   onCopyMint: () => void;
+  onSwitchTab: (nextTab: TabId) => void;
 }) => {
+  const primaryTabs: TabConfig[] = TABS.filter((item) => PRIMARY_TAB_IDS.includes(item.id));
+
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#07101d]/82 px-4 pb-3 pt-4 backdrop-blur-2xl">
-      <div className="mb-3 flex items-center justify-between">
-        <a href={OGSCAN_X_URL} target="_blank" rel="noreferrer" className="flex items-center gap-2.5">
-          <span className="relative grid h-11 w-11 place-items-center overflow-hidden rounded-[1rem] border border-white/15 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
+    <header className="z-40 shrink-0 border-b border-white/10 bg-[#07101d]/88 px-4 pb-3 pt-4 backdrop-blur-2xl">
+      <div className="mb-3 flex items-center gap-3">
+        <a href={OGSCAN_X_URL} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-2.5">
+          <span className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-[1.1rem] border border-white/15 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
             <img src="/icon.png" alt="OGScan" className="h-full w-full scale-110 object-cover" />
             <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-[#07101d] bg-sky-300" />
           </span>
-          <span>
-            <span className="block text-[15px] font-black tracking-tight text-white">OGScan</span>
-            <span className="block text-[11px] font-semibold text-white/45">SolTools mobile beta</span>
+          <span className="min-w-0">
+            <span className="block truncate text-[25px] font-black leading-none tracking-[-0.055em] text-white">{activeTab.shortLabel}</span>
+            <span className="mt-1 block truncate text-[10px] font-black uppercase tracking-[0.18em] text-sky-100/55">OGScan mobile beta</span>
           </span>
         </a>
 
-        <button
-          onClick={onChangeMint}
-          className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-2 text-[11px] font-bold text-white/75 active:scale-95"
-        >
-          Change CA
+        <button className="grid h-11 w-11 shrink-0 place-items-center rounded-[1rem] border border-white/10 bg-white/[0.07] text-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] active:scale-95" aria-label="Open menu">
+          <MoreHorizontal className="h-5 w-5" />
+        </button>
+        <button className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[1rem] border border-white/10 bg-white/[0.07] text-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] active:scale-95" aria-label="Open alerts">
+          <Bell className="h-5 w-5" />
+          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_14px_rgba(125,211,252,0.9)]" />
         </button>
       </div>
 
-      <div className="rounded-[1.45rem] border border-white/10 bg-white/[0.075] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-sky-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-sky-300 shadow-[0_0_16px_rgba(125,211,252,0.9)]" />
-              current screen
-            </div>
-            <h1 className="truncate text-[28px] font-black leading-none tracking-[-0.05em] text-white">{activeTab.title}</h1>
-          </div>
-          <div className={cn("grid h-12 w-12 shrink-0 place-items-center rounded-[1.05rem] border", getToneRingClass(activeTab.tone))}>
-            <activeTab.Icon className="h-5 w-5" />
-          </div>
-        </div>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          onRunSearch();
+        }}
+        className="flex items-center gap-2 rounded-[1.25rem] border border-white/10 bg-black/25 p-1.5 pl-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] focus-within:border-sky-300/55"
+      >
+        <Search className="h-4 w-4 shrink-0 text-sky-200" />
+        <input
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="Search ticker or paste CA"
+          className="min-w-0 flex-1 bg-transparent py-2 text-[13px] font-bold text-white outline-none placeholder:text-white/34"
+          enterKeyHint="search"
+        />
+        <button type="submit" className="rounded-[0.95rem] bg-white px-3 py-2 text-[11px] font-black text-[#07101d] active:scale-95">
+          Scan
+        </button>
+      </form>
 
-        <div className="mt-3 flex items-center gap-2 rounded-full border border-white/10 bg-black/20 p-1 pl-3">
-          <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-white/55">Target: {shortAddr(mint, 5)}</span>
-          <button
-            onClick={onCopyMint}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-white/70 active:scale-95"
-            aria-label="Copy target contract address"
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </button>
-        </div>
+      <div className="ios-scroll mt-3 flex gap-2 overflow-x-auto pb-0.5">
+        {primaryTabs.map((item) => {
+          const isActive: boolean = activeId === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onSwitchTab(item.id)}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-black transition active:scale-95",
+                isActive ? "border-white bg-white text-[#07101d]" : "border-white/10 bg-white/[0.06] text-white/48",
+              )}
+            >
+              <item.Icon className="h-3.5 w-3.5" />
+              {item.shortLabel}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 flex items-center gap-2 px-1 text-[10px] font-bold text-white/38">
+        <span className={cn("h-1.5 w-1.5 rounded-full shadow-[0_0_14px_currentColor]", getToneTextClass(activeTab.tone))} />
+        <span className="min-w-0 flex-1 truncate">Tracking {shortAddr(mint, 5)} · search opens scanner page</span>
+        <button onClick={onCopyMint} className="inline-flex items-center gap-1 text-white/55 active:scale-95" aria-label="Copy target contract address">
+          <Copy className="h-3 w-3" /> Copy
+        </button>
       </div>
     </header>
   );
@@ -396,12 +462,10 @@ const HomeScreen = ({
   mint,
   onSelectMint,
   onSwitchTab,
-  onChangeMint,
 }: {
   mint: string;
   onSelectMint: (nextMint: string, nextTab?: TabId) => void;
   onSwitchTab: (nextTab: TabId) => void;
-  onChangeMint: () => void;
 }) => {
   const featuredTools: TabConfig[] = TABS.filter((item) => item.id !== "home" && item.id !== "more");
 
@@ -471,8 +535,8 @@ const HomeScreen = ({
         </MiniPanel>
       </section>
 
-      <button onClick={onChangeMint} className="w-full rounded-[1.4rem] border border-white/10 bg-white/[0.07] px-4 py-4 text-sm font-black text-white/75 active:scale-[0.99]">
-        Change scan target
+      <button onClick={() => onSwitchTab("scanner")} className="w-full rounded-[1.4rem] border border-white/10 bg-white/[0.07] px-4 py-4 text-sm font-black text-white/75 active:scale-[0.99]">
+        Search another token
       </button>
     </div>
   );
@@ -480,16 +544,18 @@ const HomeScreen = ({
 
 const ToolScreen = ({ tab, trailing, children }: { tab: TabConfig; trailing?: ReactNode; children: ReactNode }) => {
   return (
-    <div className="space-y-4">
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.07] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]">
-        <div className={cn("absolute inset-0 bg-gradient-to-br", getAccentGlowClass(tab.tone))} />
-        <div className="relative flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className={cn("mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.22em]", getToneTextClass(tab.tone))}>
-              <tab.Icon className="h-3.5 w-3.5" /> app page
+    <div className="space-y-3">
+      <section className="relative overflow-hidden rounded-[1.55rem] border border-white/10 bg-white/[0.07] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+        <div className={cn("absolute inset-0 bg-gradient-to-br opacity-80", getAccentGlowClass(tab.tone))} />
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-[1rem] border", getToneRingClass(tab.tone))}>
+              <tab.Icon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="truncate text-[21px] font-black leading-none tracking-[-0.05em] text-white">{tab.title}</h2>
+              <p className="mt-1 line-clamp-1 text-[12px] font-semibold text-white/48">{tab.subtitle}</p>
             </div>
-            <h2 className="text-[34px] font-black leading-[0.92] tracking-[-0.07em] text-white">{tab.title}</h2>
-            <p className="mt-2 text-sm font-medium leading-relaxed text-white/56">{tab.subtitle}</p>
           </div>
           {trailing ? <div className="shrink-0">{trailing}</div> : null}
         </div>
@@ -539,7 +605,7 @@ const BottomTabs = ({ activeId, onSwitchTab }: { activeId: TabId; onSwitchTab: (
   const primaryTabs: TabConfig[] = TABS.filter((item) => PRIMARY_TAB_IDS.includes(item.id));
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] border-t border-white/10 bg-[#07101d]/88 px-3 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] pt-2 backdrop-blur-2xl">
+    <nav className="absolute inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#07101d]/88 px-3 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] pt-2 backdrop-blur-2xl">
       <div className="grid grid-cols-5 gap-1 rounded-[1.65rem] border border-white/10 bg-black/24 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
         {primaryTabs.map((item) => {
           const isActive: boolean = activeId === item.id;
