@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, ShieldCheck, Loader2, Filter } from "lucide-react";
 import { jupSearchToken, fmtPct, fmtUsd, fmtNum, type JupTokenInfo } from "@/lib/og";
 
-type Props = { onSelect: (mint: string) => void };
+type Props = { onSelect: (mint: string) => void; initialQuery?: string };
 
 type ScanFilters = {
   minLiq: number;
@@ -27,10 +27,17 @@ function passesScanFilters(t: JupTokenInfo, filters: ScanFilters): boolean {
   return true;
 }
 
-export const Scanner = ({ onSelect }: Props) => {
-  const [q, setQ] = useState<string>("");
-  const [debounced, setDebounced] = useState<string>("");
+export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
+  const [q, setQ] = useState<string>(initialQuery);
+  const [debounced, setDebounced] = useState<string>(initialQuery.trim());
   const [filters, setFilters] = useState<ScanFilters>(DEFAULT_FILTERS);
+
+  useEffect(() => {
+    const cleanQuery: string = initialQuery.trim();
+    if (!cleanQuery) return;
+    setQ(cleanQuery);
+    setDebounced(cleanQuery);
+  }, [initialQuery]);
 
   const { data, isFetching } = useQuery({
     queryKey: ["scan", debounced],
