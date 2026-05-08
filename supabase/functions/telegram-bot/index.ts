@@ -31,10 +31,10 @@ async function callGemini(prompt: string) {
 async function getTrending() {
   const response = await fetch(`${DEXSCREENER_API}/search?q=solana`);
   const data = await response.json();
-  const pairs = data.pairs?.slice(0, 5) || [];
-  if (pairs.length === 0) return "No trending pairs found right now.";
+  const pairs = data.pairs?.filter((p: any) => p.chainId === "solana").slice(0, 5) || [];
+  if (pairs.length === 0) return "No trending Solana pairs found right now.";
   
-  return pairs.map((p: any) => 
+  return "🔥 *TRENDING SOLANA PAIRS*\n\n" + pairs.map((p: any) => 
     `🚀 *${p.baseToken.symbol}/${p.quoteToken.symbol}*\n` +
     `💰 Price: $${p.priceUsd}\n` +
     `📊 MCap: $${p.fdv?.toLocaleString()}\n` +
@@ -45,10 +45,10 @@ async function getTrending() {
 }
 
 async function getNewPairs() {
-  // DexScreener doesn't have a direct "new" endpoint in the public API, but we can search for recent activity
   const response = await fetch(`${DEXSCREENER_API}/search?q=solana`);
   const data = await response.json();
-  const pairs = data.pairs?.sort((a: any, b: any) => b.pairCreatedAt - a.pairCreatedAt).slice(0, 5) || [];
+  const pairs = data.pairs?.filter((p: any) => p.chainId === "solana")
+    .sort((a: any, b: any) => b.pairCreatedAt - a.pairCreatedAt).slice(0, 5) || [];
   
   return "🆕 *LATEST SOLANA PAIRS*\n\n" + pairs.map((p: any) => 
     `✨ *${p.baseToken.symbol}/${p.quoteToken.symbol}*\n` +
@@ -62,8 +62,8 @@ async function getNewPairs() {
 async function searchToken(query: string) {
   const response = await fetch(`${DEXSCREENER_API}/search?q=${query}`);
   const data = await response.json();
-  const pair = data.pairs?.[0];
-  if (!pair) return "Token not found.";
+  const pair = data.pairs?.find((p: any) => p.chainId === "solana");
+  if (!pair) return "Solana token not found.";
   
   const ca = pair.baseToken.address;
   return `🔍 *${pair.baseToken.name} (${pair.baseToken.symbol})*\n` +
@@ -79,23 +79,32 @@ async function searchToken(query: string) {
 async function getOGInfo(query: string) {
   const response = await fetch(`${DEXSCREENER_API}/search?q=${query}`);
   const data = await response.json();
-  const pairs = data.pairs || [];
-  if (pairs.length === 0) return "No pairs found for this ticker.";
+  const solanaPairs = data.pairs?.filter((p: any) => p.chainId === "solana") || [];
+  
+  if (solanaPairs.length === 0) return "No Solana pairs found for this ticker.";
 
-  const ogPair = pairs.sort((a: any, b: any) => a.pairCreatedAt - b.pairCreatedAt)[0];
-  const ca = ogPair.baseToken.address;
-  const createdAt = new Date(ogPair.pairCreatedAt).toUTCString();
+  // Sort by creation time to find the "OG" pair
+  const sortedPairs = solanaPairs.sort((a: any, b: any) => a.pairCreatedAt - b.pairCreatedAt);
+  const ogPair = sortedPairs[0];
+  const otherPairs = sortedPairs.slice(1, 4); // Show up to 3 more pairs
 
-  return `💎 *OG FINDER: ${ogPair.baseToken.symbol}*\n` +
-    `The original pair was detected on: \n📅 ${createdAt}\n\n` +
-    `✅ *Origin Pair:* ${ogPair.baseToken.symbol}/${ogPair.quoteToken.symbol}\n` +
-    `✅ *DEX:* ${ogPair.dexId}\n` +
-    `✅ *CA:* \`${ca}\`\n\n` +
-    `📊 *Current Stats:* \n` +
-    `Price: $${ogPair.priceUsd}\n` +
-    `MCap: $${ogPair.fdv?.toLocaleString()}\n` +
-    `Liq: $${ogPair.liquidity?.usd?.toLocaleString()}\n\n` +
-    `🔗 [View Origin on DexScreener](${ogPair.url})`;
+  let message = `💎 *OG FINDER: ${ogPair.baseToken.symbol}*\n` +
+    `Network: Solana ☀️\n\n` +
+    `👑 *ORIGIN PAIR (THE OG):*\n` +
+    `📅 Created: ${new Date(ogPair.pairCreatedAt).toUTCString()}\n` +
+    `DEX: ${ogPair.dexId}\n` +
+    `CA: \`${ogPair.baseToken.address}\`\n` +
+    `Liq: $${ogPair.liquidity?.usd?.toLocaleString()}\n` +
+    `🔗 [View OG on DexScreener](${ogPair.url})\n\n`;
+
+  if (otherPairs.length > 0) {
+    message += `⚠️ *OTHER PAIRS (COPIES/LATER):*\n`;
+    otherPairs.forEach((p: any) => {
+      message += `- ${p.dexId}: $${p.liquidity?.usd?.toLocaleString()} Liq | [Link](${p.url})\n`;
+    });
+  }
+
+  return message;
 }
 
 serve(async (req) => {
@@ -119,8 +128,8 @@ serve(async (req) => {
         "/trending - Top Solana pairs\n" +
         "/search <ticker/CA> - Detailed token info\n" +
         "/newpairs - Latest pairs on Solana\n" +
-        "/moves - Tokens moving from launch to liquidity\n" +
-        "/whales - Recent whale activity (coming soon)\n" +
+        "/moves - Tokens moving to liquidity\n" +
+        "/whales - Recent whale activity\n" +
         "/watch <CA> - Add to watchlist\n" +
         "/watchlist - View your saved tokens";
     } else if (text.startsWith("/ai") || text.startsWith("/ask")) {
@@ -134,7 +143,7 @@ serve(async (req) => {
     } else if (text.startsWith("/newpairs")) {
       responseText = await getNewPairs();
     } else if (text.startsWith("/moves")) {
-      responseText = "🔄 *MIGRATIONS (MOVES)*\n\nScanning for tokens moving from Pump.fun to Raydium/Jupiter...\n\n(Feature integration in progress - check back in 5 mins!)";
+      responseText = "🔄 *MIGRATIONS (MOVES)*\n\nScanning for tokens moving from Pump.fun to Raydium/Jupiter...\n\n(Feature integration in progress!)";
     } else if (text.startsWith("/search")) {
       const query = text.replace("/search", "").trim();
       responseText = await searchToken(query || "SOL");
