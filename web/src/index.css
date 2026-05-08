@@ -34,7 +34,7 @@
     --input: 222 30% 12%;
     --ring: 204 100% 56%;
 
-    --radius: 2px;
+    --radius: 22px;
 
     --og-lime: 204 100% 56%;
     --og-gold: 210 40% 98%;
@@ -51,8 +51,13 @@
   }
   html, body, #root {
     @apply bg-background text-foreground;
-    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    min-height: 100%;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+  body {
+    overscroll-behavior-y: none;
   }
   ::selection {
     background: hsl(var(--og-lime));
@@ -151,4 +156,60 @@
   text-shadow:
     0 0 8px hsl(var(--og-gold) / 0.5),
     0 0 22px hsl(var(--og-cyan) / 0.22);
+}
+
+@layer components {
+  .ios-primary-button {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-[1.2rem] bg-white px-4 py-3 text-sm font-black text-[#07101d] shadow-[0_16px_36px_-24px_rgba(255,255,255,0.95)] transition active:scale-95;
+  }
+
+  .ios-secondary-button {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-[1.2rem] border border-white/10 bg-white/[0.08] px-4 py-3 text-sm font-black text-white transition active:scale-95;
+  }
+
+  .ios-mini-button {
+    @apply rounded-full border border-white/10 bg-white/[0.09] px-3 py-2 text-[11px] font-black text-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition active:scale-95;
+  }
+
+  .ios-tool-surface {
+    @apply overflow-hidden rounded-[1.8rem] border border-white/10 bg-white/[0.065] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.13)];
+  }
+
+  .ios-scroll {
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ios-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.ios-tool-surface section,
+.ios-tool-surface article {
+  border-radius: 1.35rem;
+}
+
+.ios-tool-surface button,
+.ios-tool-surface a,
+.ios-tool-surface input,
+.ios-tool-surface textarea,
+.ios-tool-surface select {
+  border-radius: 999px;
+}
+
+.ios-tool-surface input,
+.ios-tool-surface textarea,
+.ios-tool-surface select {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.ios-tool-surface table,
+.ios-tool-surface iframe {
+  border-radius: 1.25rem;
+  overflow: hidden;
+}
+
+.ios-tool-surface .font-display {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
 }
