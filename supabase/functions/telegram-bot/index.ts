@@ -61,6 +61,29 @@ async function searchToken(query: string) {
     `🔗 [DexScreener](${pair.url}) | [Birdeye](https://birdeye.so/token/${ca}?chain=solana) | [Jupiter](https://jup.ag/swap/SOL-${pair.baseToken.symbol})`;
 }
 
+async function getOGInfo(query: string) {
+  const response = await fetch(`${DEXSCREENER_API}/search?q=${query}`);
+  const data = await response.json();
+  const pairs = data.pairs || [];
+  if (pairs.length === 0) return "No pairs found for this ticker.";
+
+  // Sort by creation time to find the "OG" pair
+  const ogPair = pairs.sort((a: any, b: any) => a.pairCreatedAt - b.pairCreatedAt)[0];
+  const ca = ogPair.baseToken.address;
+  const createdAt = new Date(ogPair.pairCreatedAt).toUTCString();
+
+  return `💎 *OG FINDER: ${ogPair.baseToken.symbol}*\n` +
+    `The original pair was detected on: \n📅 ${createdAt}\n\n` +
+    `✅ *Origin Pair:* ${ogPair.baseToken.symbol}/${ogPair.quoteToken.symbol}\n` +
+    `✅ *DEX:* ${ogPair.dexId}\n` +
+    `✅ *CA:* \`${ca}\`\n\n` +
+    `📊 *Current Stats:* \n` +
+    `Price: $${ogPair.priceUsd}\n` +
+    `MCap: $${ogPair.fdv?.toLocaleString()}\n` +
+    `Liq: $${ogPair.liquidity?.usd?.toLocaleString()}\n\n` +
+    `🔗 [View Origin on DexScreener](${ogPair.url})`;
+}
+
 serve(async (req) => {
   try {
     const update = await req.json();
@@ -78,6 +101,7 @@ serve(async (req) => {
       responseText = "*Available Commands:*\n" +
         "/ai <msg> - Chat with Gemini AI\n" +
         "/ask <msg> - Ask a specific question\n" +
+        "/og <ticker> - Find the original pair (OG Finder)\n" +
         "/trending - Top Solana pairs\n" +
         "/search <ticker/CA> - Detailed token info\n" +
         "/newpairs - Latest pairs on Solana\n" +
@@ -87,6 +111,9 @@ serve(async (req) => {
     } else if (text.startsWith("/ai") || text.startsWith("/ask")) {
       const prompt = text.replace(/^\/(ai|ask)/, "").trim();
       responseText = await callGemini(prompt || "Tell me about Solana meme coins.");
+    } else if (text.startsWith("/og")) {
+      const query = text.replace("/og", "").trim();
+      responseText = await getOGInfo(query || "SOL");
     } else if (text.startsWith("/trending")) {
       responseText = await getTrending();
     } else if (text.startsWith("/search")) {
