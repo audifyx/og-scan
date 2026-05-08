@@ -13,6 +13,12 @@ type Props = {
 export const SiteHeader = ({ navItems, activeId, onNavigate }: Props) => {
   return (
     <header className="sticky top-0 z-40 border-b border-og-grid bg-og-ink/92 backdrop-blur-xl">
+      <div className="border-b border-og-gold/35 bg-og-gold/10 px-4 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-og-gold">
+        <span className="inline-flex items-center justify-center gap-2">
+          <CalendarClock className="h-3.5 w-3.5" /> No token out yet · coming soon · ignore fake CAs
+        </span>
+      </div>
+
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <a href={OGSCAN_SITE_URL} target="_blank" rel="noreferrer" className="group flex shrink-0 items-center gap-3">
           <div className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-og-lime bg-og-ink shadow-og">
@@ -61,9 +67,6 @@ export const SiteHeader = ({ navItems, activeId, onNavigate }: Props) => {
         </div>
       </div>
 
-      <div className="border-t border-og-grid px-4 py-2 text-center font-mono text-[10px] uppercase tracking-[0.26em] text-og-gold lg:hidden">
-        No token out yet · coming soon
-      </div>
 
       <nav className="flex gap-1 overflow-x-auto border-t border-og-grid px-4 py-2 lg:hidden" aria-label="Mobile feature navigation">
         {navItems.map((item) => (
