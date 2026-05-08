@@ -17,14 +17,13 @@
 
 ## **Design**
 
-- [x] Use the requested dark teal / black SolTools dashboard style with electric cyan-green accents.
+- [x] Use a sharper blue, black, and white Solana-style command center theme.
 - [x] Make each tool feel like a separate premium panel with clear headers, borders, labels, and status chips.
 - [x] Redesign the workspace so each tool opens as its own full-page tab instead of one chaotic scrolling page.
 - [x] Give the Snipe Feed a fast live-market feel with pulsing rows, “new launch” badges, and clear risk colors.
 - [x] Use simple beginner-friendly labels like “Clean,” “Watch,” “Risky,” and “Danger” instead of overwhelming users.
 - [x] Add a stronger top summary area showing live launches, risky launches blocked, watched devs, and hot opportunities.
 - [x] Make the layout easier to scan on mobile with stacked cards and sticky quick actions.
-- [x] Match the reference layout closer with a left sidebar, compact metric cards, toolbar tabs, and token-feed style rows.
 - [x] Present the roadmap as a premium full-page tab instead of a plain text block.
 
 ## **Pages / Screens**

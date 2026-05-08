@@ -2,46 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
-/* SOLTOOLS — dark teal trading dashboard theme */
+/* OG SCANNER — blue / black / white Solana signal theme */
 
 @layer base {
   :root {
-    --background: 165 58% 2%;
-    --foreground: 170 24% 92%;
+    --background: 220 58% 3%;
+    --foreground: 210 40% 98%;
 
-    --card: 166 44% 5%;
-    --card-foreground: 170 24% 92%;
+    --card: 222 52% 6%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 166 44% 5%;
-    --popover-foreground: 170 24% 92%;
+    --popover: 222 52% 5%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 174 100% 44%;
-    --primary-foreground: 165 58% 2%;
+    --primary: 204 100% 56%;
+    --primary-foreground: 220 58% 3%;
 
-    --secondary: 170 24% 92%;
-    --secondary-foreground: 165 58% 2%;
+    --secondary: 210 40% 98%;
+    --secondary-foreground: 220 58% 3%;
 
-    --muted: 166 28% 9%;
-    --muted-foreground: 170 8% 48%;
+    --muted: 222 30% 12%;
+    --muted-foreground: 214 22% 68%;
 
-    --accent: 174 100% 44%;
-    --accent-foreground: 165 58% 2%;
+    --accent: 188 100% 57%;
+    --accent-foreground: 220 58% 3%;
 
-    --destructive: 0 88% 58%;
-    --destructive-foreground: 170 24% 92%;
+    --destructive: 0 92% 62%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 170 38% 12%;
-    --input: 166 28% 9%;
-    --ring: 174 100% 44%;
+    --border: 214 42% 20%;
+    --input: 222 30% 12%;
+    --ring: 204 100% 56%;
 
-    --radius: 16px;
+    --radius: 22px;
 
-    --og-lime: 174 100% 44%;
-    --og-gold: 42 86% 53%;
-    --og-cyan: 174 100% 44%;
-    --og-blood: 0 88% 58%;
-    --og-ink: 165 58% 2%;
-    --og-grid: 170 38% 12%;
+    --og-lime: 204 100% 56%;
+    --og-gold: 210 40% 98%;
+    --og-cyan: 188 100% 57%;
+    --og-blood: 0 92% 62%;
+    --og-ink: 220 58% 3%;
+    --og-grid: 214 42% 20%;
   }
 }
 
@@ -52,7 +52,7 @@
   html, body, #root {
     @apply bg-background text-foreground;
     min-height: 100%;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", sans-serif;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
   }
@@ -96,9 +96,9 @@
 
 .grid-bg {
   background-image:
-    linear-gradient(hsl(var(--og-lime) / 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--og-cyan) / 0.035) 1px, transparent 1px);
-  background-size: 44px 44px;
+    linear-gradient(hsl(var(--og-lime) / 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--og-cyan) / 0.06) 1px, transparent 1px);
+  background-size: 36px 36px;
 }
 
 .noise::before {
@@ -176,34 +176,31 @@
   }
 
   .monitor-panel {
-    @apply overflow-hidden rounded-[18px] border border-og-grid/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.045),0_30px_110px_-88px_hsl(var(--og-cyan))];
-    background-color: rgba(7, 17, 15, 0.9);
+    @apply overflow-hidden rounded-[1.45rem] border border-og-grid/80 bg-[#07110f]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_30px_110px_-80px_hsl(var(--og-cyan))];
   }
 
   .monitor-panel-header {
-    @apply flex flex-wrap items-center justify-between gap-3 border-b border-og-grid/55 px-4 py-5;
-    background-color: rgba(7, 17, 15, 0.86);
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-og-grid/70 bg-black/20 px-4 py-3;
   }
 
   .token-feed-row {
-    @apply relative flex w-full items-center gap-3 border-b border-og-grid/45 p-4 text-left transition last:border-b-0 hover:bg-og-lime/[0.035];
-    background-color: rgba(7, 17, 15, 0.64);
+    @apply relative flex w-full items-center gap-3 border-b border-og-grid/50 bg-[#07110f]/70 p-3 text-left transition last:border-b-0 hover:bg-og-lime/[0.045];
   }
 
   .token-avatar {
-    @apply grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-[12px] border border-og-grid/70 bg-[#06100e] text-xs font-black text-og-lime;
+    @apply grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-og-grid bg-og-ink text-xs font-black text-og-lime;
   }
 
   .token-stat-pill {
-    @apply rounded-[12px] border border-og-grid/60 bg-black/20 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-tight text-muted-foreground;
+    @apply rounded-xl border border-og-grid/70 bg-black/24 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground;
   }
 
   .tool-searchbar {
-    @apply flex items-center rounded-[13px] border border-og-grid/80 bg-black/20 px-3 focus-within:border-og-lime/50;
+    @apply flex items-center rounded-[1.2rem] border border-og-grid bg-black/25 px-3 focus-within:border-og-lime;
   }
 
   .tool-chip {
-    @apply rounded-[12px] border border-og-grid bg-white/[0.025] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-foreground/65 transition hover:border-og-lime/50 hover:text-og-lime;
+    @apply rounded-full border border-og-grid bg-white/[0.035] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-foreground/65 transition hover:border-og-lime hover:text-og-lime;
   }
 
   .ios-scroll {

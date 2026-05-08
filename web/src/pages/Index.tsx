@@ -8,25 +8,20 @@ import {
   Compass,
   Copy,
   Crosshair,
-  Eye,
-  Filter,
   Flame,
   Gauge,
   Layers3,
   Map,
-  Pause,
   Radar,
-  RefreshCw,
   Rocket,
   Search,
   ShieldCheck,
   Sparkles,
-  Star,
   Target,
-  TrendingUp,
   Wallet,
   Zap,
 } from "lucide-react";
+import { Hero } from "@/components/Hero";
 import { Migrations } from "@/components/Migrations";
 import { OgFinder } from "@/components/OgFinder";
 import { OgStats } from "@/components/OgStats";
@@ -37,6 +32,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SnipeFeed } from "@/components/SnipeFeed";
 import { SolToolsRoadmap } from "@/components/SolToolsRoadmap";
+import { StatusStrip } from "@/components/StatusStrip";
 import { SwapPanel } from "@/components/SwapPanel";
 import { TechStack } from "@/components/TechStack";
 import { Trending } from "@/components/Trending";
@@ -193,7 +189,7 @@ export const TOOL_ROUTES: ToolConfig[] = [
 ];
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "home", label: "Tokens" },
+  { id: "home", label: "Home" },
   ...TOOL_ROUTES.map((tool) => ({ id: tool.id, label: tool.shortLabel })),
 ];
 
@@ -202,15 +198,17 @@ const normalizePath = (pathname: string): string => pathname.replace(/\/+$/, "")
 const findToolById = (id: ToolId): ToolConfig => TOOL_ROUTES.find((tool) => tool.id === id) ?? TOOL_ROUTES[0];
 
 const getToneFrameClass = (tone: Tone): string => {
-  if (tone === "gold") return "border-og-gold/25 bg-og-gold/10 text-og-gold shadow-[0_0_36px_-22px_hsl(var(--og-gold))]";
-  if (tone === "white") return "border-white/12 bg-white/[0.045] text-white/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]";
-  return "border-og-lime/25 bg-og-lime/10 text-og-lime shadow-[0_0_36px_-22px_hsl(var(--og-lime))]";
+  if (tone === "cyan") return "border-og-cyan/45 bg-og-cyan/10 text-og-cyan shadow-[0_24px_90px_-58px_hsl(var(--og-cyan)/0.85)]";
+  if (tone === "gold") return "border-og-gold/45 bg-og-gold/10 text-og-gold shadow-[0_24px_90px_-58px_hsl(var(--og-gold)/0.8)]";
+  if (tone === "white") return "border-white/25 bg-white/10 text-white shadow-[0_24px_90px_-64px_rgba(255,255,255,0.72)]";
+  return "border-og-lime/45 bg-og-lime/10 text-og-lime shadow-[0_24px_90px_-58px_hsl(var(--og-lime)/0.82)]";
 };
 
 const getToneGlowClass = (tone: Tone): string => {
-  if (tone === "gold") return "from-og-gold/16 via-og-lime/6 to-transparent";
-  if (tone === "white") return "from-white/10 via-og-cyan/5 to-transparent";
-  return "from-og-lime/18 via-og-cyan/8 to-transparent";
+  if (tone === "cyan") return "from-og-cyan/24 via-og-lime/8 to-transparent";
+  if (tone === "gold") return "from-og-gold/24 via-og-cyan/8 to-transparent";
+  if (tone === "white") return "from-white/18 via-og-cyan/8 to-transparent";
+  return "from-og-lime/24 via-og-cyan/8 to-transparent";
 };
 
 const Index = () => {
@@ -299,10 +297,10 @@ const Index = () => {
   }, [mint]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#020706] text-foreground">
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_76%_0%,rgba(0,224,199,0.12),transparent_31%),radial-gradient(circle_at_18%_18%,rgba(4,144,125,0.16),transparent_34%),linear-gradient(180deg,#020706_0%,#03100e_48%,#010504_100%)]" />
-      <div className="fixed inset-0 grid-bg opacity-20" />
-      <div className="fixed inset-0 noise opacity-70" />
+    <div className="min-h-screen overflow-x-hidden bg-og-ink text-foreground">
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_22%_0%,hsl(var(--og-lime)/0.22),transparent_34%),radial-gradient(circle_at_86%_10%,hsl(var(--og-cyan)/0.16),transparent_32%),linear-gradient(180deg,hsl(var(--og-ink)),hsl(var(--background))_44%,hsl(var(--og-ink)))]" />
+      <div className="fixed inset-0 grid-bg opacity-35" />
+      <div className="fixed inset-0 noise" />
 
       <SiteHeader
         navItems={NAV_ITEMS}
@@ -315,7 +313,9 @@ const Index = () => {
         onNavigate={(id: string) => navigateTo(id as NavId)}
       />
 
-      <div className="relative lg:pl-[274px]">
+      <div className="relative lg:pl-[280px]">
+        <StatusStrip mint={mint} onChangeMint={promptMint} />
+
         <main>
           {activeTool ? (
             <ToolPage
@@ -324,10 +324,9 @@ const Index = () => {
               scannerQuery={scannerQuery}
               onSelectMint={updateMint}
               onPromptMint={promptMint}
-              onOpenScanner={() => navigateTo("scanner")}
             />
           ) : (
-            <HomePage mint={mint} onSelectMint={updateMint} onNavigate={navigateTo} onOpenScanner={() => navigateTo("scanner")} />
+            <HomePage mint={mint} onSelectMint={updateMint} onNavigate={navigateTo} />
           )}
         </main>
 
@@ -341,58 +340,80 @@ const HomePage = ({
   mint,
   onSelectMint,
   onNavigate,
-  onOpenScanner,
 }: {
   mint: string;
   onSelectMint: (nextMint: string, nextTool?: ToolId) => void;
   onNavigate: (nextId: NavId) => void;
-  onOpenScanner: () => void;
 }) => {
-  const featuredTools: ToolConfig[] = useMemo<ToolConfig[]>(() => TOOL_ROUTES, []);
+  const featuredTools: ToolConfig[] = useMemo<ToolConfig[]>(
+    () => TOOL_ROUTES.filter((tool) => tool.id !== "token" && tool.id !== "tech"),
+    [],
+  );
 
   return (
-    <section className="mx-auto min-h-screen max-w-[1180px] px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
-      <WorkspaceHeader title="Token Monitor" subtitle="Real-time Solana token tracking & analysis" mint={mint} onPromptMint={onOpenScanner} />
-      <MetricStrip />
-      <SearchToolbar onOpenScanner={onOpenScanner} />
-      <ModeTabs activeLabel="Trending" />
+    <>
+      <Hero onScanClick={() => onNavigate("scanner")} onSwapClick={() => onNavigate("swap")} />
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
-        <div className="monitor-panel">
-          <div className="monitor-panel-header">
-            <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-[13px] border border-og-lime/20 bg-og-lime/10 text-og-lime">
-                <Coins className="h-5 w-5" />
-              </span>
+      <section className="mx-auto grid max-w-[1220px] gap-5 px-4 py-8 sm:px-6 xl:grid-cols-[minmax(0,1fr)_360px] lg:py-10">
+        <div className="space-y-5">
+          <section className="relative overflow-hidden border border-og-gold/45 bg-og-gold/[0.08] p-5 shadow-og-gold">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,hsl(var(--og-gold)/0.18),transparent_32%),linear-gradient(90deg,hsl(var(--og-gold)/0.08),transparent)]" />
+            <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-black tracking-[-0.04em] text-white">Live Tool Feed</h2>
-                  <span className="rounded-full border border-og-lime/25 bg-og-lime/10 px-2.5 py-1 font-mono text-[10px] font-bold text-og-lime">{featuredTools.length} tools</span>
+                <div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.32em] text-og-gold">
+                  <ShieldCheck className="h-4 w-4" /> official token notice
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">Each row opens one full-page SolTools workspace.</p>
+                <h2 className="font-display text-3xl font-black uppercase tracking-tight text-og-gold text-glow-gold sm:text-5xl">
+                  No token out yet. Coming soon.
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  The tools are live, but OGScan has no official contract address or buy chart yet. Anything claiming otherwise is unofficial.
+                </p>
               </div>
+              <button
+                onClick={() => onNavigate("token")}
+                className="inline-flex shrink-0 items-center justify-center gap-2 border border-og-gold bg-og-gold px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-og-ink transition hover:bg-transparent hover:text-og-gold"
+              >
+                Open safety page <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
-          </div>
-          <ToolDirectoryFeed tools={featuredTools} onNavigate={onNavigate} />
+          </section>
+
+          <section className="border border-og-grid bg-og-ink/82 p-4 shadow-og">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.34em] text-og-cyan">
+                  <Compass className="h-4 w-4" /> page directory
+                </div>
+                <h2 className="font-display text-3xl font-bold tracking-tight text-og-gold">Pick one tool. Open one page.</h2>
+              </div>
+              <span className="border border-og-grid bg-black/30 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                no endless tool stack
+              </span>
+            </div>
+            <ToolDirectoryGrid tools={featuredTools} onNavigate={onNavigate} />
+          </section>
         </div>
 
         <aside className="space-y-5">
-          <OfficialTokenNotice onNavigate={onNavigate} />
-          <section className="monitor-panel p-4">
+          <section className="border border-og-grid bg-og-ink/82 p-4 shadow-og">
             <MiniHeader icon={Activity} title="Market Pulse" action="Live" />
-            <div className="mt-4 overflow-hidden rounded-[16px] border border-og-grid/70 bg-black/20 p-3">
+            <div className="mt-4 overflow-hidden border border-og-grid bg-black/25 p-3">
               <OgStats mint={mint} onSelect={(nextMint: string) => onSelectMint(nextMint, "scanner")} />
             </div>
           </section>
-          <MiniPanel title="Whales" icon={Wallet} tone="cyan">
-            <Whales mint={mint} />
-          </MiniPanel>
-          <MiniPanel title="Live Tape" icon={BarChart3} tone="gold">
-            <TxFeed mint={mint} compact />
-          </MiniPanel>
+
+          <section className="grid gap-4">
+            <MiniPanel title="Whales" icon={Wallet} tone="cyan">
+              <Whales mint={mint} />
+            </MiniPanel>
+            <MiniPanel title="Live Tape" icon={BarChart3} tone="gold">
+              <TxFeed mint={mint} compact />
+            </MiniPanel>
+          </section>
         </aside>
-      </div>
-    </section>
+      </section>
+    </>
   );
 };
 
@@ -402,25 +423,21 @@ const ToolPage = ({
   scannerQuery,
   onSelectMint,
   onPromptMint,
-  onOpenScanner,
 }: {
   activeTool: ToolConfig;
   mint: string;
   scannerQuery: string;
   onSelectMint: (nextMint: string, nextTool?: ToolId) => void;
   onPromptMint: () => void;
-  onOpenScanner: () => void;
 }) => {
   return (
-    <section className="mx-auto min-h-screen max-w-[1180px] px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
-      <WorkspaceHeader title={activeTool.title} subtitle={activeTool.subtitle} mint={mint} icon={activeTool.Icon} tone={activeTool.tone} onPromptMint={onPromptMint} />
-      <MetricStrip />
-      <SearchToolbar onOpenScanner={onOpenScanner} />
-      <ModeTabs activeLabel={activeTool.shortLabel} />
-
-      <div className="relative mt-5 overflow-hidden rounded-[18px] border border-og-grid/80 bg-[#07110f]/92 shadow-[0_0_0_1px_rgba(0,224,199,0.06),0_34px_120px_-92px_hsl(var(--og-lime))]">
-        <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b opacity-80", getToneGlowClass(activeTool.tone))} />
-        <div className="relative min-w-0 p-3 sm:p-5">{renderTool(activeTool.id, mint, scannerQuery, onSelectMint, onPromptMint)}</div>
+    <section className="mx-auto min-h-[calc(100vh-9rem)] max-w-[1220px] px-4 py-5 sm:px-6 lg:py-7">
+      <div className="min-w-0 space-y-4">
+        <ToolHeroCard tool={activeTool} mint={mint} onPromptMint={onPromptMint} />
+        <div className="relative overflow-hidden rounded-[1.6rem] border border-og-grid/80 bg-[#06110f]/88 shadow-[0_0_0_1px_hsl(var(--og-cyan)/0.12),0_38px_140px_-92px_hsl(var(--og-cyan))]">
+          <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b opacity-60", getToneGlowClass(activeTool.tone))} />
+          <div className="relative min-w-0 p-3 sm:p-5">{renderTool(activeTool.id, mint, scannerQuery, onSelectMint, onPromptMint)}</div>
+        </div>
       </div>
     </section>
   );
@@ -459,187 +476,54 @@ function renderTool(
   }
 }
 
-const WorkspaceHeader = ({
-  title,
-  subtitle,
-  mint,
-  icon: Icon,
-  tone = "cyan",
-  onPromptMint,
-}: {
-  title: string;
-  subtitle: string;
-  mint: string;
-  icon?: ComponentType<{ className?: string }>;
-  tone?: Tone;
-  onPromptMint: () => void;
-}) => (
-  <header className="flex flex-col gap-4 border-b border-og-grid/60 pb-5 sm:flex-row sm:items-start sm:justify-between">
-    <div className="flex min-w-0 items-start gap-3">
-      {Icon ? (
-        <span className={cn("mt-0.5 hidden h-12 w-12 shrink-0 place-items-center rounded-[16px] border sm:grid", getToneFrameClass(tone))}>
-          <Icon className="h-6 w-6" />
+const ToolHeroCard = ({ tool, mint, onPromptMint }: { tool: ToolConfig; mint: string; onPromptMint: () => void }) => (
+  <section className="relative overflow-hidden rounded-[1.6rem] border border-og-grid/80 bg-[#06110f]/90 p-4 shadow-[0_0_0_1px_hsl(var(--og-lime)/0.08),0_28px_110px_-80px_hsl(var(--og-lime))] sm:p-5">
+    <div className="absolute inset-0 grid-bg opacity-20" />
+    <div className={cn("absolute inset-0 bg-gradient-to-br opacity-80", getToneGlowClass(tool.tone))} />
+    <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex min-w-0 items-center gap-4">
+        <span className={cn("grid h-14 w-14 shrink-0 place-items-center rounded-2xl border", getToneFrameClass(tool.tone))}>
+          <tool.Icon className="h-7 w-7" />
         </span>
-      ) : null}
-      <div className="min-w-0">
-        <h1 className="text-[32px] font-black leading-none tracking-[-0.055em] text-white sm:text-[36px]">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{subtitle}</p>
+        <div className="min-w-0">
+          <div className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.3em] text-og-cyan">{tool.eyebrow}</div>
+          <h1 className="truncate font-display text-3xl font-black tracking-tight text-foreground sm:text-4xl">{tool.title}</h1>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">{tool.subtitle}</p>
+        </div>
       </div>
-    </div>
-
-    <div className="flex items-center gap-2 sm:justify-end">
       <button
         onClick={onPromptMint}
-        className="hidden items-center gap-2 rounded-[12px] border border-og-lime/18 bg-og-lime/9 px-3 py-2 font-mono text-xs font-bold text-og-lime shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition hover:border-og-lime/50 sm:inline-flex"
+        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-og-grid bg-black/30 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 transition hover:border-og-lime hover:text-og-lime"
       >
-        <Sparkles className="h-4 w-4" /> $6.4K
-        <span className="h-1.5 w-20 rounded-full bg-og-lime/20">
-          <span className="block h-full w-4/5 rounded-full bg-og-lime shadow-[0_0_16px_hsl(var(--og-lime)/0.6)]" />
-        </span>
-      </button>
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-og-lime/20 bg-og-lime/12 px-3 py-2 font-mono text-[11px] font-bold text-og-lime">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-og-lime opacity-60" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-og-lime" />
-        </span>
-        Live
-      </span>
-      <button
-        onClick={() => void navigator.clipboard?.writeText(mint)}
-        className="inline-flex items-center gap-1.5 rounded-[12px] border border-og-grid bg-white/[0.035] px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground transition hover:border-og-lime/50 hover:text-og-lime"
-      >
-        <Copy className="h-3.5 w-3.5" /> {shortAddr(mint, 4)}
+        <Copy className="h-3.5 w-3.5" /> Target {shortAddr(mint, 4)}
       </button>
     </div>
-  </header>
+  </section>
 );
 
-const MetricStrip = () => {
-  const metrics: { label: string; value: string; Icon: ComponentType<{ className?: string }>; tone: Tone; muted?: boolean }[] = [
-    { label: "Watching", value: "3", Icon: Eye, tone: "cyan" },
-    { label: "Favorites", value: "0", Icon: Star, tone: "gold" },
-    { label: "Gainers", value: "8", Icon: TrendingUp, tone: "cyan" },
-    { label: "Trending", value: "15", Icon: BarChart3, tone: "white", muted: true },
-  ];
-
-  return (
-    <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {metrics.map((metric) => (
-        <div key={metric.label} className="rounded-[15px] border border-og-grid/85 bg-[#07110f]/82 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]">
-          <div className="flex items-center gap-4">
-            <span className={cn("grid h-12 w-12 place-items-center rounded-[15px] border", metric.muted ? "border-white/5 bg-white/[0.025] text-white/18" : getToneFrameClass(metric.tone))}>
-              <metric.Icon className="h-6 w-6" />
+const ToolDirectoryGrid = ({ tools, onNavigate }: { tools: ToolConfig[]; onNavigate: (nextId: NavId) => void }) => (
+  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    {tools.map((tool) => (
+      <button
+        key={tool.id}
+        onClick={() => onNavigate(tool.id)}
+        className="group relative min-h-[174px] overflow-hidden border border-og-grid bg-black/24 p-4 text-left transition hover:-translate-y-0.5 hover:border-og-lime hover:bg-og-lime/6"
+      >
+        <div className={cn("absolute inset-x-0 top-0 h-20 bg-gradient-to-b opacity-0 transition group-hover:opacity-100", getToneGlowClass(tool.tone))} />
+        <div className="relative flex h-full flex-col">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <span className={cn("grid h-11 w-11 place-items-center border", getToneFrameClass(tool.tone))}>
+              <tool.Icon className="h-5 w-5" />
             </span>
-            <div>
-              <div className="text-[31px] font-black leading-none tracking-[-0.06em] text-white">{metric.value}</div>
-              <div className="mt-1 text-xs text-muted-foreground">{metric.label}</div>
-            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-og-lime" />
           </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const SearchToolbar = ({ onOpenScanner }: { onOpenScanner: () => void }) => (
-  <div className="mt-5 rounded-[16px] border border-og-grid/80 bg-[#07110f]/88 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-      <button
-        onClick={onOpenScanner}
-        className="flex min-h-12 flex-1 items-center gap-3 rounded-[13px] border border-og-grid bg-black/16 px-4 text-left transition hover:border-og-lime/40"
-      >
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[13px] bg-og-lime/10 text-og-lime">
-          <Search className="h-5 w-5" />
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">Search or paste token address...</span>
-      </button>
-      <div className="flex flex-wrap gap-2">
-        <button className="inline-flex items-center gap-2 rounded-[12px] border border-og-grid bg-black/18 px-4 py-3 text-sm font-bold text-white/82 transition hover:border-og-lime/35">
-          <Filter className="h-4 w-4" /> All Tokens <ChevronRight className="h-4 w-4 rotate-90 text-muted-foreground" />
-        </button>
-        <button className="inline-flex items-center gap-2 rounded-[12px] border border-og-grid bg-black/18 px-4 py-3 text-sm font-bold text-white/82 transition hover:border-og-lime/35">
-          Market Cap <ChevronRight className="h-4 w-4 rotate-90 text-muted-foreground" />
-        </button>
-        <button className="inline-flex items-center gap-2 rounded-[12px] bg-og-lime px-4 py-3 text-sm font-black text-[#02100e] shadow-[0_0_26px_-10px_hsl(var(--og-lime))] transition active:scale-95">
-          <Pause className="h-4 w-4" /> Pause
-        </button>
-        <button className="grid h-12 w-12 place-items-center rounded-[12px] border border-og-grid bg-black/28 text-muted-foreground transition hover:border-og-lime/40 hover:text-og-lime">
-          <RefreshCw className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  </div>
-);
-
-const ModeTabs = ({ activeLabel }: { activeLabel: string }) => (
-  <div className="mt-5 grid max-w-[450px] grid-cols-2 overflow-hidden rounded-[9px] border border-og-grid/70 bg-black/18 p-1">
-    <button className="rounded-[7px] bg-black/55 px-4 py-2.5 text-sm font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <TrendingUp className="mr-2 inline h-4 w-4 text-white/85" /> {activeLabel}
-    </button>
-    <button className="rounded-[7px] px-4 py-2.5 text-sm font-bold text-muted-foreground transition hover:text-og-lime">
-      <Star className="mr-2 inline h-4 w-4" /> Watchlist (3)
-    </button>
-  </div>
-);
-
-const ToolDirectoryFeed = ({ tools, onNavigate }: { tools: ToolConfig[]; onNavigate: (nextId: NavId) => void }) => (
-  <div>
-    {tools.map((tool, index) => (
-      <button key={tool.id} onClick={() => onNavigate(tool.id)} className="token-feed-row group md:grid md:grid-cols-12 md:items-center md:gap-3">
-        <div className="flex min-w-0 items-center gap-3 md:col-span-6">
-          <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-[13px] border", getToneFrameClass(tool.tone))}>
-            <tool.Icon className="h-5 w-5" />
-          </span>
-          <span className="min-w-0 flex-1 text-left">
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-base font-black tracking-[-0.03em] text-white">{tool.label}</span>
-              <span className="rounded-full border border-white/8 bg-white/[0.035] px-2 py-0.5 font-mono text-[10px] font-bold text-white/75">{tool.shortLabel}</span>
-            </span>
-            <span className="mt-1 block truncate font-mono text-[11px] text-muted-foreground">
-              {String(index + 1).padStart(2, "0")} · {tool.eyebrow} · page
-            </span>
-          </span>
-        </div>
-        <div className="mt-3 grid grid-cols-3 gap-2 text-right md:col-span-6 md:mt-0 md:grid-cols-4 md:items-center">
-          <span className="token-stat-pill">
-            <span className="block text-sm font-black text-white">{index % 2 === 0 ? "$108.0K" : "$26.3K"}</span>
-            <span>MCap</span>
-          </span>
-          <span className="token-stat-pill">
-            <span className="block text-sm font-black text-white">{index % 3 === 0 ? "$25.6K" : "$8.6K"}</span>
-            <span>Liq</span>
-          </span>
-          <span className="token-stat-pill">
-            <span className="block text-sm font-black text-og-lime">+{index % 2 === 0 ? "204" : "82"}%</span>
-            <span>Signal</span>
-          </span>
-          <span className="hidden items-center justify-end gap-4 text-white/80 md:flex">
-            <span className="text-xl leading-none text-white/70 transition group-hover:text-og-lime">+</span>
-            <ChevronRight className="h-5 w-5 transition group-hover:translate-x-1 group-hover:text-og-lime" />
-          </span>
+          <div className="font-display text-xl font-bold tracking-tight text-foreground">{tool.label}</div>
+          <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{tool.subtitle}</p>
+          <div className="mt-auto pt-4 font-mono text-[9px] uppercase tracking-[0.24em] text-og-cyan">Open page</div>
         </div>
       </button>
     ))}
   </div>
-);
-
-const OfficialTokenNotice = ({ onNavigate }: { onNavigate: (nextId: NavId) => void }) => (
-  <button
-    onClick={() => onNavigate("token")}
-    className="group relative w-full overflow-hidden rounded-[16px] border border-og-gold/25 bg-og-gold/[0.07] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-og-gold/50"
-  >
-    <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,hsl(var(--og-gold)/0.18),transparent_36%)]" />
-    <div className="relative flex items-center gap-3">
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[14px] bg-og-gold text-[#06100d]">
-        <ShieldCheck className="h-5 w-5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-lg font-black tracking-[-0.04em] text-og-gold">No token out yet</span>
-        <span className="mt-1 block text-xs text-muted-foreground">Coming soon · ignore fake contracts</span>
-      </span>
-      <ChevronRight className="h-5 w-5 text-og-gold/70 transition group-hover:translate-x-1" />
-    </div>
-  </button>
 );
 
 const MiniPanel = ({
@@ -653,18 +537,18 @@ const MiniPanel = ({
   tone: Tone;
   children: ReactNode;
 }) => (
-  <section className="monitor-panel p-4">
+  <section className="border border-og-grid bg-og-ink/82 p-4 shadow-og">
     <MiniHeader icon={Icon} title={title} action={tone === "gold" ? "Tape" : "Watch"} />
-    <div className="mt-4 overflow-hidden rounded-[16px] border border-og-grid/70 bg-black/20 p-3">{children}</div>
+    <div className="mt-4 overflow-hidden border border-og-grid bg-black/24 p-3">{children}</div>
   </section>
 );
 
 const MiniHeader = ({ icon: Icon, title, action }: { icon: ComponentType<{ className?: string }>; title: string; action: string }) => (
   <div className="flex items-center justify-between gap-3">
-    <div className="flex items-center gap-2 text-xl font-black tracking-[-0.04em] text-white">
-      <Icon className="h-5 w-5 text-og-lime" /> {title}
+    <div className="flex items-center gap-2 font-display text-xl font-bold tracking-tight text-foreground">
+      <Icon className="h-5 w-5 text-og-cyan" /> {title}
     </div>
-    <span className="rounded-full border border-og-grid bg-black/24 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">{action}</span>
+    <span className="border border-og-grid bg-black/30 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">{action}</span>
   </div>
 );
 

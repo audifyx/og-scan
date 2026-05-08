@@ -58,7 +58,7 @@ async function getTrending(limit: number = 10) {
   try {
     const response = await fetch(`${DEXSCREENER_API}/search?q=solana`);
     const data = await response.json();
-    const pairs = data.pairs?.filter((p: any) => p.chainId === "solana" && p.baseToken.symbol !== "SOL")
+    const pairs = data.pairs?.filter((p: any) => p.chainId === "solana")
       .sort((a: any, b: any) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
       .slice(0, limit) || [];
     
@@ -73,15 +73,12 @@ async function getTrending(limit: number = 10) {
 
 async function getNewPairs() {
   try {
-    // Fetching tokens with low liquidity/newly created to avoid native SOL
-    const response = await fetch(`${DEXSCREENER_API}/search?q=raydium`);
+    const response = await fetch(`${DEXSCREENER_API}/search?q=solana`);
     const data = await response.json();
-    const pairs = data.pairs?.filter((p: any) => p.chainId === "solana" && p.baseToken.symbol !== "SOL" && p.baseToken.symbol !== "WSOL")
+    const pairs = data.pairs?.filter((p: any) => p.chainId === "solana")
       .sort((a: any, b: any) => b.pairCreatedAt - a.pairCreatedAt)
       .slice(0, 5) || [];
     
-    if (pairs.length === 0) return "No new Solana pairs found right now.";
-
     return "🆕 *LATEST SOLANA PAIRS*\n\n" + pairs.map((p: any) => 
       `✨ *${p.baseToken.symbol}* | ${new Date(p.pairCreatedAt).toLocaleTimeString()}\n` +
       `   Liq: $${p.liquidity?.usd?.toLocaleString()} | [Chart](${p.url})`
