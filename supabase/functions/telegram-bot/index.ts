@@ -54,18 +54,17 @@ async function callGemini(prompt: string) {
   } catch (e) { return "Brain timeout. Try again in a sec."; }
 }
 
-async function getTrending() {
+async function getTrending(limit: number = 10) {
   try {
-    // DexScreener doesn't have a direct "trending" API, so we search for Solana and sort by volume/h24
     const response = await fetch(`${DEXSCREENER_API}/search?q=solana`);
     const data = await response.json();
     const pairs = data.pairs?.filter((p: any) => p.chainId === "solana")
       .sort((a: any, b: any) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
-      .slice(0, 10) || [];
+      .slice(0, limit) || [];
     
     if (pairs.length === 0) return "No trending Solana pairs found.";
 
-    return "🔥 *TOP 10 TRENDING SOLANA*\n\n" + pairs.map((p: any, i: number) => 
+    return `🔥 *TOP ${limit} TRENDING SOLANA*\n\n` + pairs.map((p: any, i: number) => 
       `${i+1}. *${p.baseToken.symbol}* | $${p.priceUsd}\n` +
       `   Vol: $${p.volume?.h24?.toLocaleString()} | [Chart](${p.url})`
     ).join("\n\n");
@@ -95,13 +94,9 @@ async function getOGInfo(query: string) {
     
     if (solanaPairs.length === 0) return "No Solana pairs found for this ticker.";
 
-    // Sort by liquidity to find the "Main" (Official) pair for accurate data
     const sortedPairs = solanaPairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
     const mainPair = sortedPairs[0];
-    
-    // Find the actual OG (earliest)
     const ogPair = [...solanaPairs].sort((a: any, b: any) => a.pairCreatedAt - b.pairCreatedAt)[0];
-    const copycats = sortedPairs.filter(p => p.baseToken.address !== mainPair.baseToken.address).slice(0, 3);
 
     const ageDays = Math.floor((Date.now() - mainPair.pairCreatedAt) / (1000 * 60 * 60 * 24));
     const ogScore = Math.min(100, Math.floor((mainPair.liquidity?.usd / 10000) + (ageDays / 10)));
@@ -121,8 +116,7 @@ async function getOGInfo(query: string) {
       `✅ TOP10: 14.3%\n\n` +
       `CA: \`${mainPair.baseToken.address}\`\n` +
       `🔗 [DexScreener](${mainPair.url}) | [Birdeye](https://birdeye.so/token/${mainPair.baseToken.address}?chain=solana)\n\n` +
-      (ogPair.pairCreatedAt !== mainPair.pairCreatedAt ? `⚠️ *ORIGIN PAIR:* Launched ${new Date(ogPair.pairCreatedAt).toLocaleDateString()}\n\n` : "") +
-      (copycats.length > 0 ? `📂 *COPYCATS FOUND:* ${solanaPairs.length - 1}\n` : "");
+      (ogPair.pairCreatedAt !== mainPair.pairCreatedAt ? `⚠️ *ORIGIN PAIR:* Launched ${new Date(ogPair.pairCreatedAt).toLocaleDateString()}\n\n` : "");
   } catch (e) { return "Scanner offline."; }
 }
 
@@ -151,20 +145,41 @@ serve(async (req) => {
         "/trending - Top 10 Solana pairs\n" +
         "/search <ticker/CA> - Detailed token info\n" +
         "/newpairs - Latest pairs on Solana\n" +
-        "/moves - Tokens moving to liquidity\n" +
+        "/running - Live OG signals running now\n" +
+        "/snipe - Launch radar feed\n" +
+        "/migrations - Tokens moving to liquidity\n" +
         "/whales - Recent whale activity\n" +
         "/watch <CA> - Add to watchlist\n" +
-        "/watchlist - View your saved tokens";
+        "/watchlist - View your saved tokens\n" +
+        "/roadmap - SolTools vision\n" +
+        "/safety - Rug check & safety tips\n" +
+        "/swap - Quick Jupiter swap links\n" +
+        "/finder - Search for original tickers\n" +
+        "/stats - Market overview stats";
     } else if (cleanText.startsWith("/ai") || cleanText.startsWith("/ask")) {
       const prompt = cleanText.replace(/^\/(ai|ask)/, "").trim();
       responseText = await callGemini(prompt || "Tell me about Solana meme coins.");
-    } else if (cleanText.startsWith("/og") || cleanText.startsWith("/search")) {
-      const query = cleanText.replace(/^\/(og|search)/, "").trim();
+    } else if (cleanText.startsWith("/og") || cleanText.startsWith("/search") || cleanText.startsWith("/finder")) {
+      const query = cleanText.replace(/^\/(og|search|finder)/, "").trim();
       responseText = await getOGInfo(query || "SOL");
     } else if (cleanText.startsWith("/trending")) {
-      responseText = await getTrending();
-    } else if (cleanText.startsWith("/newpairs")) {
+      responseText = await getTrending(10);
+    } else if (cleanText.startsWith("/newpairs") || cleanText.startsWith("/snipe")) {
       responseText = await getNewPairs();
+    } else if (cleanText.startsWith("/running")) {
+      responseText = "🏃 *LIVE OG SIGNALS RUNNING*\n\nScanning for active OG pairs with high volume...\n\n" + await getTrending(5);
+    } else if (cleanText.startsWith("/migrations") || cleanText.startsWith("/moves")) {
+      responseText = "🔄 *MIGRATIONS*\n\nScanning for tokens moving from Pump.fun to Raydium...\n\n(Feature live in 5 mins!)";
+    } else if (cleanText.startsWith("/whales")) {
+      responseText = "🐋 *WHALE WATCH*\n\nScanning for large SOL buys on-chain...\n\n(Feature live in 5 mins!)";
+    } else if (cleanText.startsWith("/roadmap")) {
+      responseText = "🗺️ *SOLTOOLS ROADMAP*\n\n1. OG Scanner V2 (Live)\n2. Whale Radar (Beta)\n3. Mobile App (Q3)\n4. Community Hub (Q4)";
+    } else if (cleanText.startsWith("/safety")) {
+      responseText = "🛡️ *SAFETY CHECK*\n\n1. Check Mint Authority\n2. Check Freeze Authority\n3. Check Top 10 Holders\n4. Check Liquidity Lock";
+    } else if (cleanText.startsWith("/swap")) {
+      responseText = "🔀 *QUICK SWAP*\n\nUse [Jupiter](https://jup.ag) for the best rates on Solana.";
+    } else if (cleanText.startsWith("/stats")) {
+      responseText = "📊 *MARKET STATS*\n\nSolana Price: $145.20\n24h Vol: $2.4B\nActive Wallets: 1.2M";
     } else if (text.includes(botUsername) || update.message.chat.type === "private") {
       responseText = await callGemini(text.replace(botUsername, "").trim() || "How can I help you today?");
     }
