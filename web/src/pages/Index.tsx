@@ -267,7 +267,8 @@ const Index = () => {
   const { toolSlug, pageNumber } = useParams<{ toolSlug?: string; pageNumber?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const routeSlug: string | undefined = pageNumber ? `page-${pageNumber}` : toolSlug;
+  const pathSlug: string = location.pathname.replace(/^\/+|\/+$/g, "").split("/").pop() ?? "";
+  const routeSlug: string | undefined = pageNumber ? `page-${pageNumber}` : toolSlug ?? pathSlug;
   const routeTab: TabId = useMemo<TabId>(() => getTabFromSlug(routeSlug) ?? "overview", [routeSlug]);
   const [mint, setMint] = useState<string>(DEFAULT_OG_MINT);
   const [tab, setTab] = useState<TabId>(routeTab);
