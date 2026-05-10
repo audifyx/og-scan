@@ -61,9 +61,19 @@ export type JupTokenInfo = {
   creationSource?: TokenCreationSource;
   ctLikes?: number;
   smartCtLikes?: number;
+  allTimeHighUsd?: number;
+  allTimeHighAt?: string;
+  migrationCreatedAt?: string;
+  dexPaidAmount?: number;
+  dexBoostAmount?: number;
+  dexBoostTotalAmount?: number;
+  dexBoostActive?: number;
+  dexUrl?: string;
+  pairAddress?: string;
+  pairDexId?: string;
 };
 
-type DexSearchPair = {
+export type DexSearchPair = {
   chainId?: string;
   dexId?: string;
   url?: string;
@@ -84,9 +94,23 @@ type DexSearchPair = {
   marketCap?: number;
   pairCreatedAt?: number;
   info?: { imageUrl?: string };
+  boosts?: { active?: number };
 };
 
 type DexSearchResponse = { pairs?: DexSearchPair[] | null };
+
+export type DexBoostInfo = {
+  chainId?: string;
+  tokenAddress?: string;
+  url?: string;
+  amount?: number;
+  totalAmount?: number;
+};
+
+type BirdeyeOverviewResponse = {
+  success?: boolean;
+  data?: Record<string, unknown> | null;
+};
 
 const DEFAULT_HEADERS: Record<string, string> = {
   "Content-Type": "application/json",
@@ -208,6 +232,16 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
     creationSource: oldestMintCreatedAtIso ? "chain" : existing.creationSource ?? next.creationSource,
     ctLikes: existing.ctLikes ?? next.ctLikes,
     smartCtLikes: existing.smartCtLikes ?? next.smartCtLikes,
+    allTimeHighUsd: existing.allTimeHighUsd ?? next.allTimeHighUsd,
+    allTimeHighAt: existing.allTimeHighAt ?? next.allTimeHighAt,
+    migrationCreatedAt: existing.migrationCreatedAt ?? next.migrationCreatedAt,
+    dexPaidAmount: existing.dexPaidAmount ?? next.dexPaidAmount,
+    dexBoostAmount: existing.dexBoostAmount ?? next.dexBoostAmount,
+    dexBoostTotalAmount: existing.dexBoostTotalAmount ?? next.dexBoostTotalAmount,
+    dexBoostActive: existing.dexBoostActive ?? next.dexBoostActive,
+    dexUrl: existing.dexUrl ?? next.dexUrl,
+    pairAddress: existing.pairAddress ?? next.pairAddress,
+    pairDexId: existing.pairDexId ?? next.pairDexId,
   };
 }
 
@@ -250,6 +284,11 @@ function dexPairToToken(pair: DexSearchPair): JupTokenInfo | null {
     stats1h: { priceChange: pair.priceChange?.h1 },
     stats5m: { priceChange: pair.priceChange?.m5 },
     firstPool: createdAt ? { createdAt } : undefined,
+    migrationCreatedAt: createdAt,
+    dexBoostActive: pair.boosts?.active,
+    dexUrl: pair.url,
+    pairAddress: pair.pairAddress,
+    pairDexId: pair.dexId,
   };
 }
 
@@ -260,6 +299,230 @@ function mergeTokenCandidates(tokens: JupTokenInfo[]): JupTokenInfo[] {
     byMint.set(token.id, existing ? mergeTokenCandidate(existing, token) : token);
   }
   return Array.from(byMint.values());
+}
+
+const dexBoostCache = new Map<string, Promise<Map<string, DexBoostInfo>>>();
+const birdeyeOverviewCache = new Map<string, Promise<Record<string, unknown> | null>>();
+
+function finiteNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed: number = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function finiteIso(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const parsedMs: number = new Date(value).getTime();
+    if (Number.isFinite(parsedMs)) return new Date(parsedMs).toISOString();
+  }
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    const ms: number = value > 10_000_000_000 ? value : value * 1000;
+    return new Date(ms).toISOString();
+  }
+  return undefined;
+}
+
+function pickFirstNumber(record: Record<string, unknown> | null, keys: string[]): number | undefined {
+  if (!record) return undefined;
+  for (const key of keys) {
+    const value: number | undefined = finiteNumber(record[key]);
+    if (value != null) return value;
+  }
+  return undefined;
+}
+
+function pickFirstIso(record: Record<string, unknown> | null, keys: string[]): string | undefined {
+  if (!record) return undefined;
+  for (const key of keys) {
+    const value: string | undefined = finiteIso(record[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function bestPairByMint(pairs: DexSearchPair[]): Map<string, DexSearchPair> {
+  const byMint = new Map<string, DexSearchPair>();
+  for (const pair of pairs) {
+    const mint: string | undefined = pair.baseToken?.address;
+    if (pair.chainId !== "solana" || !mint) continue;
+    const currentScore: number = (pair.liquidity?.usd ?? 0) + (pair.volume?.h24 ?? 0) * 0.4;
+    const previous: DexSearchPair | undefined = byMint.get(mint);
+    const previousScore: number = (previous?.liquidity?.usd ?? 0) + (previous?.volume?.h24 ?? 0) * 0.4;
+    if (!previous || currentScore >= previousScore) byMint.set(mint, pair);
+  }
+  return byMint;
+}
+
+export async function dexPairsForMints(mints: string[]): Promise<DexSearchPair[]> {
+  const cleanMints: string[] = Array.from(new Set(mints.filter(Boolean))).slice(0, 60);
+  if (cleanMints.length === 0) return [];
+
+  const chunks: string[][] = [];
+  for (let index = 0; index < cleanMints.length; index += 30) chunks.push(cleanMints.slice(index, index + 30));
+
+  const responses = await Promise.allSettled(
+    chunks.map((chunk) => jget<DexSearchPair[]>(`https://api.dexscreener.com/tokens/v1/solana/${chunk.join(",")}`))
+  );
+
+  return responses.flatMap((response) => (response.status === "fulfilled" ? response.value : []));
+}
+
+export async function dexBoostsByMint(): Promise<Map<string, DexBoostInfo>> {
+  const cached = dexBoostCache.get("solana");
+  if (cached) return cached;
+
+  const task = (async (): Promise<Map<string, DexBoostInfo>> => {
+    const endpoints: string[] = [
+      "https://api.dexscreener.com/token-boosts/latest/v1",
+      "https://api.dexscreener.com/token-boosts/top/v1",
+    ];
+    const responses = await Promise.allSettled(endpoints.map((endpoint) => jget<DexBoostInfo[]>(endpoint)));
+    const byMint = new Map<string, DexBoostInfo>();
+
+    for (const response of responses) {
+      if (response.status !== "fulfilled") continue;
+      for (const boost of response.value) {
+        if (boost.chainId !== "solana" || !boost.tokenAddress) continue;
+        const previous: DexBoostInfo | undefined = byMint.get(boost.tokenAddress);
+        const previousPaid: number = previous?.totalAmount ?? previous?.amount ?? 0;
+        const nextPaid: number = boost.totalAmount ?? boost.amount ?? 0;
+        if (!previous || nextPaid >= previousPaid) byMint.set(boost.tokenAddress, boost);
+      }
+    }
+
+    return byMint;
+  })();
+
+  dexBoostCache.set("solana", task);
+  return task;
+}
+
+async function birdeyeTokenOverview(mint: string): Promise<Record<string, unknown> | null> {
+  const cached = birdeyeOverviewCache.get(mint);
+  if (cached) return cached;
+
+  const task = (async (): Promise<Record<string, unknown> | null> => {
+    try {
+      const url = `${BIRDEYE_BASE}/defi/token_overview?address=${encodeURIComponent(mint)}`;
+      const response = await jget<BirdeyeOverviewResponse>(url, {
+        "X-API-KEY": BIRDEYE_API_KEY,
+        "x-chain": "solana",
+      });
+      return response.data ?? null;
+    } catch {
+      return null;
+    }
+  })();
+
+  birdeyeOverviewCache.set(mint, task);
+  return task;
+}
+
+function athFromOverview(overview: Record<string, unknown> | null): { price?: number; at?: string } {
+  return {
+    price: pickFirstNumber(overview, [
+      "ath",
+      "athPrice",
+      "priceAth",
+      "priceATH",
+      "allTimeHigh",
+      "allTimeHighPrice",
+      "highestPrice",
+      "priceHighest",
+      "maxPrice",
+    ]),
+    at: pickFirstIso(overview, [
+      "athTime",
+      "athAt",
+      "athDate",
+      "priceAthTime",
+      "priceATHTime",
+      "allTimeHighAt",
+      "allTimeHighTime",
+      "highestPriceTime",
+    ]),
+  };
+}
+
+async function athFromOhlcv(mint: string, fromIso: string | undefined): Promise<{ price?: number; at?: string }> {
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const fromMs: number = fromIso ? new Date(fromIso).getTime() : Date.now() - 365 * 86_400_000;
+    const from = Number.isFinite(fromMs) ? Math.max(0, Math.floor(fromMs / 1000)) : now - 365 * 86_400;
+    const candles = await birdeyeOhlcv(mint, "1D", from, now);
+    const best = candles.reduce<{ price: number; unixTime: number } | null>((current, candle) => {
+      const high: number = candle.h;
+      if (!Number.isFinite(high)) return current;
+      if (!current || high > current.price) return { price: high, unixTime: candle.unixTime };
+      return current;
+    }, null);
+    return best ? { price: best.price, at: new Date(best.unixTime * 1000).toISOString() } : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function enrichTokensWithMarketIntel(
+  tokens: JupTokenInfo[],
+  options: { includeAth?: boolean; maxAth?: number } = {},
+): Promise<JupTokenInfo[]> {
+  if (tokens.length === 0) return [];
+
+  const mints: string[] = tokens.map((token) => token.id).filter(Boolean);
+  const [pairsResult, boostsResult] = await Promise.allSettled([dexPairsForMints(mints), dexBoostsByMint()]);
+  const pairByMint: Map<string, DexSearchPair> = pairsResult.status === "fulfilled" ? bestPairByMint(pairsResult.value) : new Map<string, DexSearchPair>();
+  const boostByMint: Map<string, DexBoostInfo> = boostsResult.status === "fulfilled" ? boostsResult.value : new Map<string, DexBoostInfo>();
+  const maxAth: number = options.includeAth ? options.maxAth ?? tokens.length : 0;
+  const athMints = new Set<string>(tokens.slice(0, maxAth).map((token) => token.id));
+
+  return mapWithConcurrency(tokens, 4, async (token) => {
+    const pair: DexSearchPair | undefined = pairByMint.get(token.id);
+    const boost: DexBoostInfo | undefined = boostByMint.get(token.id);
+    const migrationCreatedAt: string | undefined = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : token.migrationCreatedAt ?? token.firstPool?.createdAt;
+    const overview: Record<string, unknown> | null = athMints.has(token.id) ? await birdeyeTokenOverview(token.id) : null;
+    const overviewAth = athFromOverview(overview);
+    const ath = overviewAth.price != null ? overviewAth : athMints.has(token.id) ? await athFromOhlcv(token.id, token.onChainCreatedAt ?? token.firstPool?.createdAt ?? migrationCreatedAt) : overviewAth;
+
+    return {
+      ...token,
+      icon: token.icon ?? pair?.info?.imageUrl,
+      usdPrice: token.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined),
+      mcap: token.mcap ?? pair?.marketCap,
+      fdv: token.fdv ?? pair?.fdv,
+      liquidity: token.liquidity ?? pair?.liquidity?.usd,
+      firstPool: token.firstPool?.createdAt ? token.firstPool : migrationCreatedAt ? { createdAt: migrationCreatedAt } : token.firstPool,
+      allTimeHighUsd: token.allTimeHighUsd ?? ath.price,
+      allTimeHighAt: token.allTimeHighAt ?? ath.at,
+      migrationCreatedAt,
+      dexPaidAmount: token.dexPaidAmount ?? boost?.totalAmount ?? boost?.amount,
+      dexBoostAmount: token.dexBoostAmount ?? boost?.amount,
+      dexBoostTotalAmount: token.dexBoostTotalAmount ?? boost?.totalAmount,
+      dexBoostActive: token.dexBoostActive ?? pair?.boosts?.active,
+      dexUrl: token.dexUrl ?? pair?.url ?? boost?.url,
+      pairAddress: token.pairAddress ?? pair?.pairAddress,
+      pairDexId: token.pairDexId ?? pair?.dexId,
+    };
+  });
+}
+
+export function tokenMigrationDateIso(token: JupTokenInfo): string | undefined {
+  return token.migrationCreatedAt ?? token.firstPool?.createdAt;
+}
+
+export function tokenDexPaidLabel(token: Pick<JupTokenInfo, "dexPaidAmount" | "dexBoostAmount" | "dexBoostTotalAmount" | "dexBoostActive">): string {
+  const paid: number | undefined = token.dexPaidAmount ?? token.dexBoostTotalAmount ?? token.dexBoostAmount;
+  if (paid != null && Number.isFinite(paid) && paid > 0) return `${fmtNum(paid)} paid`;
+  if ((token.dexBoostActive ?? 0) > 0) return `${fmtNum(token.dexBoostActive)} boost`;
+  return "—";
+}
+
+export function shortDate(iso: string | undefined): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : "—";
 }
 
 type BirdeyeCreationResponse = {
@@ -425,7 +688,13 @@ export async function jupOgCopycats(ticker: string): Promise<{ og: JupTokenInfo 
     .sort(compareByOnChainAgeOnly)
     .slice(0, 24);
 
-  return { og, copycats };
+  const enriched = await enrichTokensWithMarketIntel([...(og ? [og] : []), ...copycats], { includeAth: true, maxAth: 12 });
+  const enrichedByMint = new Map<string, JupTokenInfo>(enriched.map((token) => [token.id, token]));
+
+  return {
+    og: og ? enrichedByMint.get(og.id) ?? og : null,
+    copycats: copycats.map((token) => enrichedByMint.get(token.id) ?? token),
+  };
 }
 
 export type JupPriceMap = Record<string, { usdPrice: number; priceChange24h?: number }>;
@@ -471,10 +740,11 @@ export async function heliusTxs(address: string, limit = 25): Promise<HeliusTx[]
 export type BirdeyeOhlcv = {
   data: { items: { unixTime: number; o: number; h: number; l: number; c: number; v: number }[] };
 };
-export async function birdeyeOhlcv(mint: string, type = "15m"): Promise<BirdeyeOhlcv["data"]["items"]> {
+export async function birdeyeOhlcv(mint: string, type = "15m", timeFrom?: number, timeTo?: number): Promise<BirdeyeOhlcv["data"]["items"]> {
   const now = Math.floor(Date.now() / 1000);
-  const from = now - 60 * 60 * 24; // 24h
-  const url = `${BIRDEYE_BASE}/defi/ohlcv?address=${mint}&type=${type}&time_from=${from}&time_to=${now}`;
+  const from = timeFrom ?? now - 60 * 60 * 24; // default 24h
+  const to = timeTo ?? now;
+  const url = `${BIRDEYE_BASE}/defi/ohlcv?address=${mint}&type=${type}&time_from=${from}&time_to=${to}`;
   const r = await jget<BirdeyeOhlcv>(url, {
     "X-API-KEY": BIRDEYE_API_KEY,
     "x-chain": "solana",

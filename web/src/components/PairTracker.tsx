@@ -11,6 +11,8 @@ import {
   Sparkles,
   Filter,
   Bell,
+  Flame,
+  BadgeDollarSign,
   BellOff,
   Pause,
   Play,
@@ -26,6 +28,10 @@ import {
   fmtPct,
   shortAddr,
   timeAgo,
+  enrichTokensWithMarketIntel,
+  shortDate,
+  tokenDexPaidLabel,
+  tokenMigrationDateIso,
   type JupTokenInfo,
 } from "@/lib/og";
 
@@ -174,7 +180,7 @@ async function fetchTracked(tickers: string[]): Promise<JupTokenInfo[]> {
   }
   const map = new Map<string, JupTokenInfo>();
   for (const t of out) if (!map.has(t.id)) map.set(t.id, t);
-  return Array.from(map.values());
+  return enrichTokensWithMarketIntel(Array.from(map.values()), { includeAth: true, maxAth: 12 });
 }
 
 // Free-form keyword scan: any symbol / name / address match.
@@ -182,7 +188,7 @@ async function fetchAny(query: string): Promise<JupTokenInfo[]> {
   if (!query.trim()) return [];
   try {
     const res = await jupSearchToken(query.trim());
-    return res;
+    return enrichTokensWithMarketIntel(res, { includeAth: true, maxAth: 12 });
   } catch {
     return [];
   }
@@ -261,6 +267,11 @@ function dexPairToToken(pair: DexPair, fresh?: DexFreshToken): JupTokenInfo | nu
     stats1h: { priceChange: pair.priceChange?.h1 },
     stats5m: { priceChange: pair.priceChange?.m5 },
     firstPool: { createdAt: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : new Date().toISOString() },
+    migrationCreatedAt: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : undefined,
+    dexBoostActive: undefined,
+    dexUrl: pair.url,
+    pairAddress: pair.pairAddress,
+    pairDexId: pair.dexId,
   };
 }
 
@@ -277,6 +288,16 @@ function mergeTokenData(primary: JupTokenInfo, fallback: JupTokenInfo): JupToken
     stats1h: primary.stats1h ?? fallback.stats1h,
     stats5m: primary.stats5m ?? fallback.stats5m,
     firstPool: primary.firstPool?.createdAt ? primary.firstPool : fallback.firstPool,
+    allTimeHighUsd: primary.allTimeHighUsd ?? fallback.allTimeHighUsd,
+    allTimeHighAt: primary.allTimeHighAt ?? fallback.allTimeHighAt,
+    migrationCreatedAt: primary.migrationCreatedAt ?? fallback.migrationCreatedAt,
+    dexPaidAmount: primary.dexPaidAmount ?? fallback.dexPaidAmount,
+    dexBoostAmount: primary.dexBoostAmount ?? fallback.dexBoostAmount,
+    dexBoostTotalAmount: primary.dexBoostTotalAmount ?? fallback.dexBoostTotalAmount,
+    dexBoostActive: primary.dexBoostActive ?? fallback.dexBoostActive,
+    dexUrl: primary.dexUrl ?? fallback.dexUrl,
+    pairAddress: primary.pairAddress ?? fallback.pairAddress,
+    pairDexId: primary.pairDexId ?? fallback.pairDexId,
   };
 }
 
@@ -333,7 +354,7 @@ async function fetchAllFresh(): Promise<JupTokenInfo[]> {
   }
 
   for (const t of jupiterTokens) if (!map.has(t.id)) map.set(t.id, t);
-  return Array.from(map.values());
+  return enrichTokensWithMarketIntel(Array.from(map.values()), { includeAth: true, maxAth: 12 });
 }
 
 export const PairTracker = ({ onSelect }: Props) => {
@@ -850,6 +871,7 @@ const PairCard = ({
       : ageHours < 24
         ? `${Math.floor(ageHours)}h`
         : `${Math.floor(ageDays)}d`;
+  const dexPaid = tokenDexPaidLabel(t);
 
   return (
     <article
@@ -907,26 +929,18 @@ const PairCard = ({
 
       <div className="grid grid-cols-4 gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
         <Stat icon={Droplets} label="LIQ" value={fmtUsd(t.liquidity)} />
-        <Stat icon={Users} label="HLDR" value={fmtNum(t.holderCount)} />
+        <Stat icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
         <Stat
           icon={Calendar}
-          label="AGE"
-          value={ageLabel}
-          accent={isFresh ? "text-og-lime" : undefined}
+          label="MIGR"
+          value={shortDate(tokenMigrationDateIso(t))}
+          accent={isFresh ? "text-og-lime" : "text-og-cyan"}
         />
-        <Stat
-          icon={ShieldCheck}
-          label="TOP10"
-          value={
-            t.audit?.topHoldersPercentage != null
-              ? `${t.audit.topHoldersPercentage.toFixed(0)}%`
-              : "—"
-          }
-        />
+        <Stat icon={BadgeDollarSign} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-og-grid/60 pt-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-        <span>CA {shortAddr(t.id, 5)}</span>
+        <span>CA {shortAddr(t.id, 5)} · age {ageLabel} · hldr {fmtNum(t.holderCount)}</span>
         <span className="inline-flex items-center gap-2">
           <CopyMintButton mint={t.id} label="copy" copiedLabel="copied" className="px-2 py-1" iconClassName="h-3 w-3" />
           <span className="text-og-gold">OPEN →</span>

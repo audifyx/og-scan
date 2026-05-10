@@ -12,7 +12,17 @@ import {
   Zap,
 } from "lucide-react";
 import { CopyMintButton } from "@/components/CopyMintButton";
-import { fmtPct, fmtUsd, shortAddr, timeAgo } from "@/lib/og";
+import {
+  enrichTokensWithMarketIntel,
+  fmtPct,
+  fmtUsd,
+  shortAddr,
+  shortDate,
+  timeAgo,
+  tokenDexPaidLabel,
+  tokenMigrationDateIso,
+  type JupTokenInfo,
+} from "@/lib/og";
 
 type Props = { onSelect: (mint: string) => void };
 
@@ -63,6 +73,7 @@ type DexPair = {
 type TrendCoin = {
   pair: DexPair;
   boost?: DexBoost;
+  token?: JupTokenInfo;
   score: number;
 };
 
@@ -174,6 +185,32 @@ async function fetchPairsForMints(mints: string[]): Promise<DexPair[]> {
   return responses.flatMap((response) => (response.status === "fulfilled" ? response.value : []));
 }
 
+function pairToToken(pair: DexPair, boost?: DexBoost): JupTokenInfo {
+  const price: number | undefined = pair.priceUsd ? Number(pair.priceUsd) : undefined;
+  const migrationCreatedAt: string | undefined = pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : undefined;
+  return {
+    id: pair.baseToken.address,
+    name: pair.baseToken.name,
+    symbol: pair.baseToken.symbol,
+    icon: pair.info?.imageUrl ?? boost?.icon,
+    decimals: 0,
+    usdPrice: Number.isFinite(price) ? price : undefined,
+    mcap: pair.marketCap,
+    fdv: pair.fdv,
+    liquidity: pair.liquidity?.usd,
+    stats24h: { priceChange: pair.priceChange?.h24, numBuys: pair.txns?.h24?.buys, numSells: pair.txns?.h24?.sells },
+    firstPool: migrationCreatedAt ? { createdAt: migrationCreatedAt } : undefined,
+    migrationCreatedAt,
+    dexPaidAmount: boost?.totalAmount ?? boost?.amount,
+    dexBoostAmount: boost?.amount,
+    dexBoostTotalAmount: boost?.totalAmount,
+    dexBoostActive: pair.boosts?.active,
+    dexUrl: pair.url ?? boost?.url,
+    pairAddress: pair.pairAddress,
+    pairDexId: pair.dexId,
+  };
+}
+
 async function fetchLiveTrending(interval: TrendInterval): Promise<TrendCoin[]> {
   const boosts = await fetchDexBoosts();
   const boostByMint = new Map<string, DexBoost>();
@@ -182,10 +219,14 @@ async function fetchLiveTrending(interval: TrendInterval): Promise<TrendCoin[]> 
   }
 
   const pairs = dedupePairsByToken(await fetchPairsForMints(Array.from(boostByMint.keys())));
+  const tokenSeed: JupTokenInfo[] = pairs.map((pair) => pairToToken(pair, boostByMint.get(pair.baseToken.address)));
+  const enrichedTokens: JupTokenInfo[] = await enrichTokensWithMarketIntel(tokenSeed, { includeAth: true, maxAth: 10 });
+  const tokenByMint = new Map(enrichedTokens.map((token) => [token.id, token]));
+
   return pairs
     .map((pair) => {
       const boost = boostByMint.get(pair.baseToken.address);
-      return { pair, boost, score: trendScore(pair, boost, interval) };
+      return { pair, boost, token: tokenByMint.get(pair.baseToken.address), score: trendScore(pair, boost, interval) };
     })
     .filter((coin) => coin.score > 0)
     .sort((a, b) => b.score - a.score);
@@ -385,6 +426,7 @@ const TrendingRow = ({
   const marketCap = pair.marketCap ?? pair.fdv;
   const ageSeconds = pair.pairCreatedAt ? Math.floor(pair.pairCreatedAt / 1000) : 0;
   const imageUrl = pair.info?.imageUrl ?? coin.boost?.icon;
+  const dexPaid = coin.token ? tokenDexPaidLabel(coin.token) : tokenDexPaidLabel({ dexPaidAmount: coin.boost?.totalAmount ?? coin.boost?.amount, dexBoostActive: pair.boosts?.active });
 
   return (
     <div className="group w-full border-b border-og-grid/50 p-3 transition hover:bg-og-blood/5 last:border-b-0 md:grid md:grid-cols-12 md:items-center md:gap-2 md:px-4 md:py-3">
@@ -409,6 +451,9 @@ const TrendingRow = ({
             </div>
             <div className="truncate text-[10px] uppercase tracking-widest text-muted-foreground">
               {pair.baseToken.name} · {pair.dexId} {ageSeconds ? `· ${timeAgo(ageSeconds)} old` : ""}
+            </div>
+            <div className="mt-1 truncate font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+              ATH <span className="text-og-gold">{fmtUsd(coin.token?.allTimeHighUsd)}</span> · MIGR <span className="text-og-cyan">{shortDate(coin.token ? tokenMigrationDateIso(coin.token) : undefined)}</span> · DEX <span className={dexPaid === "—" ? "" : "text-og-lime"}>{dexPaid}</span>
             </div>
           </div>
         </div>
@@ -450,7 +495,7 @@ const TrendingRow = ({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-og-grid/40 pt-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground md:col-span-12 md:ml-[calc(8.333333%+0.75rem)]">
-        <span>boost {pair.boosts?.active ?? coin.boost?.amount ?? 0} · score {Math.round(coin.score).toLocaleString()} · CA {shortAddr(pair.baseToken.address, 4)}</span>
+        <span>boost {pair.boosts?.active ?? coin.boost?.amount ?? 0} · DEX {dexPaid} · ATH {fmtUsd(coin.token?.allTimeHighUsd)} · CA {shortAddr(pair.baseToken.address, 4)}</span>
         <span className="inline-flex items-center gap-2">
           <CopyMintButton mint={pair.baseToken.address} label="copy" copiedLabel="copied" className="px-2 py-1" iconClassName="h-3 w-3" />
           <button onClick={onSelect} className="inline-flex items-center gap-1 text-og-blood transition group-hover:text-og-lime">

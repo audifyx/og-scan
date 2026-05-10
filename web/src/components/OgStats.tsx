@@ -14,9 +14,24 @@ import {
   DatabaseZap,
   RadioTower,
   CandlestickChart,
+  Calendar,
+  BadgeDollarSign,
 } from "lucide-react";
 import { CopyMintButton } from "@/components/CopyMintButton";
-import { jupGetTokens, jupSearchToken, birdeyeOhlcv, fmtUsd, fmtNum, fmtPct, shortAddr, type JupTokenInfo } from "@/lib/og";
+import {
+  enrichTokensWithMarketIntel,
+  jupGetTokens,
+  jupSearchToken,
+  birdeyeOhlcv,
+  fmtUsd,
+  fmtNum,
+  fmtPct,
+  shortAddr,
+  shortDate,
+  tokenDexPaidLabel,
+  tokenMigrationDateIso,
+  type JupTokenInfo,
+} from "@/lib/og";
 
 type Props = { mint: string; onSelect: (mint: string) => void };
 
@@ -33,16 +48,16 @@ export const OgStats = ({ mint, onSelect }: Props) => {
     return () => window.clearTimeout(timer);
   }, [query]);
   const { data: tokens, isLoading } = useQuery({
-    queryKey: ["og-token", mint],
-    queryFn: () => jupGetTokens([mint]),
+    queryKey: ["og-token", mint, "market-intel-v1"],
+    queryFn: async () => enrichTokensWithMarketIntel(await jupGetTokens([mint]), { includeAth: true, maxAth: 1 }),
     refetchInterval: 20_000,
     enabled: !!mint,
   });
   const t: JupTokenInfo | undefined = tokens?.[0];
 
   const { data: searchResults, isFetching: isSearching } = useQuery({
-    queryKey: ["vitals-search", debouncedQuery],
-    queryFn: () => jupSearchToken(debouncedQuery),
+    queryKey: ["vitals-search", debouncedQuery, "market-intel-v1"],
+    queryFn: async () => enrichTokensWithMarketIntel(await jupSearchToken(debouncedQuery), { includeAth: true, maxAth: 6 }),
     staleTime: 30_000,
     enabled: debouncedQuery.length >= 2,
   });
@@ -183,6 +198,9 @@ export const OgStats = ({ mint, onSelect }: Props) => {
           <PriceBlock t={t} candles={candles} loading={isLoading} />
           <Stat label="MARKET CAP" value={fmtUsd(t?.mcap)} accent="gold" />
           <Stat label="LIQUIDITY" value={fmtUsd(t?.liquidity)} accent="cyan" />
+          <Stat label="ALL TIME HIGH" value={fmtUsd(t?.allTimeHighUsd)} sub={<span className="text-[10px] uppercase tracking-widest">{shortDate(t?.allTimeHighAt)}</span>} icon={<Flame className="h-4 w-4" />} accent="gold" />
+          <Stat label="MIGRATION DAY" value={shortDate(t ? tokenMigrationDateIso(t) : undefined)} sub={<span className="text-[10px] uppercase tracking-widest">Pool/date only · not OG proof</span>} icon={<Calendar className="h-4 w-4" />} accent="cyan" />
+          <Stat label="DEX PAID / BOOST" value={t ? tokenDexPaidLabel(t) : "—"} sub={<span className="text-[10px] uppercase tracking-widest">DexScreener boost spend when public</span>} icon={<BadgeDollarSign className="h-4 w-4" />} />
 
           <Stat label="24H VOLUME" value={fmtUsd((t?.stats24h?.buyVolume ?? 0) + (t?.stats24h?.sellVolume ?? 0))} sub={
             <span className="flex gap-3 text-[10px]">
@@ -485,8 +503,9 @@ const BuzzBlock = ({ t }: { t?: JupTokenInfo }) => {
           <div className="font-display text-2xl font-bold text-og-cyan">{fmtNum(t?.smartCtLikes)}</div>
         </div>
       </div>
-      <div className="mt-3 text-[10px] uppercase tracking-widest text-muted-foreground">
-        first pool · {t?.firstPool?.createdAt ? new Date(t.firstPool.createdAt).toISOString().slice(0, 10) : "—"}
+      <div className="mt-3 space-y-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+        <div>first pool · {shortDate(t?.firstPool?.createdAt)}</div>
+        <div>migration · {shortDate(t ? tokenMigrationDateIso(t) : undefined)} · DEX {t ? tokenDexPaidLabel(t) : "—"}</div>
       </div>
     </div>
   );

@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, ShieldCheck, Loader2, Filter } from "lucide-react";
+import { Search, ShieldCheck, Loader2, Filter, Calendar, Flame, BadgeDollarSign } from "lucide-react";
 import { CopyMintButton } from "@/components/CopyMintButton";
-import { jupSearchToken, fmtPct, fmtUsd, fmtNum, shortAddr, type JupTokenInfo } from "@/lib/og";
+import {
+  enrichTokensWithMarketIntel,
+  jupSearchToken,
+  fmtPct,
+  fmtUsd,
+  shortAddr,
+  shortDate,
+  tokenDexPaidLabel,
+  tokenMigrationDateIso,
+  type JupTokenInfo,
+} from "@/lib/og";
 
 type Props = { onSelect: (mint: string) => void; initialQuery?: string };
 
@@ -41,8 +51,11 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   }, [initialQuery]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["scan", debounced],
-    queryFn: () => jupSearchToken(debounced),
+    queryKey: ["scan", debounced, "market-intel-v1"],
+    queryFn: async () => {
+      const tokens: JupTokenInfo[] = await jupSearchToken(debounced);
+      return enrichTokensWithMarketIntel(tokens, { includeAth: true, maxAth: 12 });
+    },
     enabled: debounced.length >= 2,
     staleTime: 30_000,
   });
@@ -192,6 +205,8 @@ const FilterToggle = ({
 const ResultRow = ({ t, onSelect }: { t: JupTokenInfo; onSelect: () => void }) => {
   const ch = t.stats24h?.priceChange ?? 0;
   const up = ch >= 0;
+  const migrationDate: string = shortDate(tokenMigrationDateIso(t));
+  const dexPaid: string = tokenDexPaidLabel(t);
   return (
     <article className="group flex items-center gap-3 border border-og-grid bg-og-ink/70 p-3 text-left transition hover:border-og-lime hover:bg-og-lime/5">
       <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-4 text-left">
@@ -213,6 +228,11 @@ const ResultRow = ({ t, onSelect }: { t: JupTokenInfo; onSelect: () => void }) =
             <span className={up ? "text-og-lime" : "text-og-blood"}>{fmtPct(ch)}</span>
             <span>· LQ {fmtUsd(t.liquidity)}</span>
           </div>
+          <div className="mt-2 grid grid-cols-3 gap-1.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+            <MiniIntel icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
+            <MiniIntel icon={Calendar} label="Migrated" value={migrationDate} accent="text-og-cyan" />
+            <MiniIntel icon={BadgeDollarSign} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
+          </div>
           <div className="mt-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">CA {shortAddr(t.id, 5)}</div>
         </div>
       </button>
@@ -220,3 +240,22 @@ const ResultRow = ({ t, onSelect }: { t: JupTokenInfo; onSelect: () => void }) =
     </article>
   );
 };
+
+const MiniIntel = ({
+  icon: Icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  accent?: string;
+}) => (
+  <span className="min-w-0 border border-og-grid/60 bg-og-ink/55 px-1.5 py-1">
+    <span className="flex items-center gap-1 text-foreground/40">
+      <Icon className="h-2.5 w-2.5" /> {label}
+    </span>
+    <span className={`block truncate ${accent ?? "text-foreground"}`}>{value}</span>
+  </span>
+);

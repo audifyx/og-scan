@@ -16,7 +16,18 @@ import {
   Activity,
 } from "lucide-react";
 import { CopyMintButton } from "@/components/CopyMintButton";
-import { fmtUsd, fmtPct, fmtNum, shortAddr, timeAgo } from "@/lib/og";
+import {
+  enrichTokensWithMarketIntel,
+  fmtUsd,
+  fmtPct,
+  fmtNum,
+  shortAddr,
+  shortDate,
+  timeAgo,
+  tokenDexPaidLabel,
+  tokenMigrationDateIso,
+  type JupTokenInfo,
+} from "@/lib/og";
 
 type Props = { onSelect: (mint: string) => void };
 
@@ -44,6 +55,28 @@ type DSPair = {
 };
 
 type DSResponse = { pairs?: DSPair[] | null; schemaVersion?: string };
+
+function pairToToken(p: DSPair): JupTokenInfo {
+  const price: number | undefined = p.priceUsd ? Number(p.priceUsd) : undefined;
+  const migrationCreatedAt: string | undefined = p.pairCreatedAt ? new Date(p.pairCreatedAt).toISOString() : undefined;
+  return {
+    id: p.baseToken.address,
+    name: p.baseToken.name,
+    symbol: p.baseToken.symbol,
+    icon: p.info?.imageUrl,
+    decimals: 0,
+    usdPrice: Number.isFinite(price) ? price : undefined,
+    mcap: p.marketCap,
+    fdv: p.fdv,
+    liquidity: p.liquidity?.usd,
+    stats24h: { priceChange: p.priceChange?.h24, numBuys: p.txns?.h24?.buys, numSells: p.txns?.h24?.sells },
+    firstPool: migrationCreatedAt ? { createdAt: migrationCreatedAt } : undefined,
+    migrationCreatedAt,
+    dexUrl: p.url,
+    pairAddress: p.pairAddress,
+    pairDexId: p.dexId,
+  };
+}
 
 type Source = {
   id: "pumpfun" | "moonshot" | "jupiter" | "all";
@@ -181,6 +214,15 @@ export const Migrations = ({ onSelect }: Props) => {
   }, [sourceMatches, q]);
 
   const dropped = sourceMatches.length - filtered.length;
+  const intelSeed = useMemo(() => filtered.slice(0, 40).map(pairToToken), [filtered]);
+  const intelKey = intelSeed.map((token) => token.id).join(",");
+  const { data: intelTokens } = useQuery({
+    queryKey: ["migration-token-intel", intelKey],
+    queryFn: () => enrichTokensWithMarketIntel(intelSeed, { includeAth: true, maxAth: 12 }),
+    enabled: intelSeed.length > 0,
+    staleTime: 60_000,
+  });
+  const intelByMint = useMemo(() => new Map((intelTokens ?? []).map((token) => [token.id, token])), [intelTokens]);
 
   const stats = useMemo(() => {
     const total = filtered.length;
@@ -310,7 +352,7 @@ export const Migrations = ({ onSelect }: Props) => {
           </div>
         )}
         {filtered.slice(0, 40).map((p) => (
-          <PairRow key={p.pairAddress} p={p} onSelect={() => onSelect(p.baseToken.address)} />
+          <PairRow key={p.pairAddress} p={p} token={intelByMint.get(p.baseToken.address)} onSelect={() => onSelect(p.baseToken.address)} />
         ))}
       </div>
 
@@ -391,7 +433,7 @@ const Range = ({
   </label>
 );
 
-const PairRow = ({ p, onSelect }: { p: DSPair; onSelect: () => void }) => {
+const PairRow = ({ p, token, onSelect }: { p: DSPair; token?: JupTokenInfo; onSelect: () => void }) => {
   const ch = p.priceChange?.h24 ?? 0;
   const up = ch >= 0;
   const created = p.pairCreatedAt ? Math.floor(p.pairCreatedAt / 1000) : 0;
@@ -401,6 +443,7 @@ const PairRow = ({ p, onSelect }: { p: DSPair; onSelect: () => void }) => {
   const buyPct = total > 0 ? (buys / total) * 100 : 50;
   const fresh = Boolean(created && Date.now() / 1000 - created < 60 * 60 * 6);
   const meterWidth: CSSProperties = { width: `${buyPct}%` };
+  const dexPaid = token ? tokenDexPaidLabel(token) : "—";
 
   return (
     <div className="border-b border-og-grid/50 p-3 transition hover:bg-og-lime/5 last:border-b-0 md:grid md:grid-cols-12 md:items-center md:gap-2 md:px-3 md:py-2.5">
@@ -426,6 +469,9 @@ const PairRow = ({ p, onSelect }: { p: DSPair; onSelect: () => void }) => {
           </div>
           <div className="truncate text-[10px] uppercase tracking-widest text-muted-foreground">
             {p.baseToken.name}
+          </div>
+          <div className="mt-1 truncate font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+            ATH <span className="text-og-gold">{fmtUsd(token?.allTimeHighUsd)}</span> · Migrated <span className="text-og-cyan">{shortDate(token ? tokenMigrationDateIso(token) : undefined)}</span> · DEX <span className={dexPaid === "—" ? "" : "text-og-lime"}>{dexPaid}</span>
           </div>
         </div>
       </button>
@@ -460,6 +506,7 @@ const PairRow = ({ p, onSelect }: { p: DSPair; onSelect: () => void }) => {
             <div className="text-foreground">{created ? timeAgo(created) : "—"}</div>
             <div className="max-w-[180px] truncate text-og-lime md:max-w-[120px]">{p.dexId}</div>
             <div className="text-muted-foreground">CA {shortAddr(p.baseToken.address, 4)}</div>
+            <div className="text-og-gold">ATH {fmtUsd(token?.allTimeHighUsd)}</div>
           </div>
           <CopyMintButton mint={p.baseToken.address} label="copy" copiedLabel="copied" className="shrink-0 px-2 py-2 md:px-1" iconClassName="h-3 w-3" />
           <a

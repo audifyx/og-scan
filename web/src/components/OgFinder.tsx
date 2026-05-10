@@ -24,6 +24,8 @@ import {
   fmtUsd,
   fmtNum,
   shortAddr,
+  tokenDexPaidLabel,
+  tokenMigrationDateIso,
   tokenOgCreatedAtIso,
   tokenOgCreatedAtMs,
   type JupTokenInfo,
@@ -352,6 +354,8 @@ const CoinCard = ({
   const onChainCreatedAt = tokenOgCreatedAtIso(t);
   const mintAgeDays = ageDaysFromIso(onChainCreatedAt);
   const poolCreatedAt = t.firstPool?.createdAt;
+  const migrationCreatedAt = tokenMigrationDateIso(t);
+  const dexPaid = tokenDexPaidLabel(t);
 
   return (
     <article
@@ -410,14 +414,14 @@ const CoinCard = ({
       )}
 
       <div className="grid grid-cols-4 gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        <Stat icon={Flame} label="MCAP" value={fmtUsd(t.mcap)} accent="text-og-cyan" />
+        <Stat icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
         <Stat icon={Droplets} label="LIQ" value={fmtUsd(t.liquidity)} />
-        <Stat icon={Users} label="HLDR" value={fmtNum(t.holderCount)} />
+        <Stat icon={Users} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
         <Stat
           icon={Calendar}
-          label="MINT AGE"
-          value={mintAgeDays != null ? `${mintAgeDays}d` : "—"}
-          accent={highlight ? "text-og-gold" : undefined}
+          label="MIGR"
+          value={shortDate(migrationCreatedAt)}
+          accent="text-og-cyan"
         />
       </div>
 
@@ -439,6 +443,9 @@ const CoinCard = ({
         </span>
         <span className="hidden text-muted-foreground sm:inline">
           POOL <span className="text-foreground">{shortDate(poolCreatedAt)}</span>
+        </span>
+        <span className="hidden text-muted-foreground sm:inline">
+          MINT AGE <span className="text-foreground">{mintAgeDays != null ? `${mintAgeDays}d` : "—"}</span>
         </span>
         <span className="ml-auto flex items-center gap-2">
           <span className="text-muted-foreground">{shortAddr(t.id, 5)}</span>

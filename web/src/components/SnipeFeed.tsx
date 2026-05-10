@@ -35,11 +35,14 @@ import {
   fmtUsd,
   heliusTxs,
   jupGetTokens,
+  enrichTokensWithMarketIntel,
   OGSCAN_DEV_WALLET,
   OGSCAN_TOKEN_MINT,
   copyTextToClipboard,
   shortAddr,
+  shortDate,
   timeAgo,
+  tokenDexPaidLabel,
   type HeliusTx,
   type JupTokenInfo,
 } from "@/lib/og";
@@ -131,6 +134,12 @@ type SnipeLaunch = {
   priceChange5m: number;
   priceChange1h: number;
   boostAmount: number;
+  dexPaidAmount?: number;
+  dexBoostTotalAmount?: number;
+  dexBoostActive?: number;
+  allTimeHighUsd?: number;
+  allTimeHighAt?: string;
+  migrationCreatedAt?: string;
   hasSocials: boolean;
   verified: boolean;
   audit?: JupTokenInfo["audit"];
@@ -395,7 +404,10 @@ async function fetchSnipePayload(): Promise<SnipePayload> {
   const mints = Array.from(new Set([...profileByMint.keys(), ...boostByMint.keys()])).slice(0, 60);
   const pairs = dedupeBestPairs(await fetchPairsForMints(mints));
   const pairMints = pairs.map((pair) => pair.baseToken?.address).filter((mint): mint is string => Boolean(mint)).slice(0, 30);
-  const [tokensResult, creators] = await Promise.allSettled([jupGetTokens(pairMints), fetchCreatorWallets(pairMints.slice(0, 12))]);
+  const [tokensResult, creators] = await Promise.allSettled([
+    jupGetTokens(pairMints).then((tokens) => enrichTokensWithMarketIntel(tokens, { includeAth: true, maxAth: 12 })),
+    fetchCreatorWallets(pairMints.slice(0, 12)),
+  ]);
 
   const tokenByMint = new Map<string, JupTokenInfo>();
   if (tokensResult.status === "fulfilled") {
@@ -420,7 +432,8 @@ async function fetchSnipePayload(): Promise<SnipePayload> {
       const score = launchScore(pair, token, profile, boost, duplicateSymbol);
       const flags = buildRiskFlags(pair, token, profile, duplicateSymbol);
       const creator = creatorByMint.get(mint) ?? { wallet: null, confidence: "low" as const };
-      const createdAtMs = pair.pairCreatedAt ?? (token?.firstPool?.createdAt ? new Date(token.firstPool.createdAt).getTime() : Date.now());
+      const migrationCreatedAt = pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : token?.migrationCreatedAt ?? token?.firstPool?.createdAt;
+      const createdAtMs = pair.pairCreatedAt ?? (migrationCreatedAt ? new Date(migrationCreatedAt).getTime() : Date.now());
 
       return {
         mint,
@@ -442,6 +455,12 @@ async function fetchSnipePayload(): Promise<SnipePayload> {
         priceChange5m: pair.priceChange?.m5 ?? token?.stats5m?.priceChange ?? 0,
         priceChange1h: pair.priceChange?.h1 ?? token?.stats1h?.priceChange ?? 0,
         boostAmount: boost?.amount ?? boost?.totalAmount ?? pair.boosts?.active ?? 0,
+        dexPaidAmount: token?.dexPaidAmount ?? boost?.totalAmount ?? boost?.amount,
+        dexBoostTotalAmount: token?.dexBoostTotalAmount ?? boost?.totalAmount,
+        dexBoostActive: token?.dexBoostActive ?? pair.boosts?.active,
+        allTimeHighUsd: token?.allTimeHighUsd,
+        allTimeHighAt: token?.allTimeHighAt,
+        migrationCreatedAt,
         hasSocials: socialCount(profile, pair) > 0,
         verified: Boolean(token?.isVerified),
         audit: token?.audit,
@@ -693,6 +712,7 @@ const LaunchRow = ({
   const risk = riskStyles(launch.riskLevel);
   const RiskIcon = risk.Icon;
   const ageSeconds = Math.floor(launch.createdAtMs / 1000);
+  const dexPaid = tokenDexPaidLabel(launch);
   return (
     <article
       className={cn(
@@ -721,6 +741,8 @@ const LaunchRow = ({
                 <span className="text-og-cyan">{timeAgo(ageSeconds)} old</span>
                 <span>CA {shortAddr(launch.mint, 4)}</span>
                 <span>DEV {shortAddr(launch.devWallet ?? undefined, 4)}</span>
+                <span>MIGR {shortDate(launch.migrationCreatedAt)}</span>
+                <span>DEX {dexPaid}</span>
                 {watchedDev ? <span className="text-og-lime">dev watched</span> : null}
               </div>
             </div>
@@ -729,9 +751,9 @@ const LaunchRow = ({
 
         <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-4">
           <Metric label="Score" value={String(launch.launchScore)} className={scoreTone(launch.launchScore)} />
-          <Metric label="Liq" value={fmtUsd(launch.liquidity)} className="text-og-cyan" />
-          <Metric label="5m tx" value={`${fmtNum(launch.txns5m)}`} className="text-foreground" />
-          <Metric label="5m" value={fmtPct(launch.priceChange5m)} className={launch.priceChange5m >= 0 ? "text-og-lime" : "text-og-blood"} />
+          <Metric label="ATH" value={fmtUsd(launch.allTimeHighUsd)} className="text-og-gold" />
+          <Metric label="Migr" value={shortDate(launch.migrationCreatedAt)} className="text-og-cyan" />
+          <Metric label="DEX" value={dexPaid} className={dexPaid === "—" ? "text-foreground" : "text-og-lime"} />
         </div>
       </div>
 
@@ -799,9 +821,9 @@ const LaunchAnalyzer = ({ launch, watched, onCopy, onScan, onWatchMint }: { laun
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Metric label="Launch score" value={`${launch.launchScore}/100`} className={scoreTone(launch.launchScore)} />
-        <Metric label="Heat" value={fmtNum(launch.heatScore)} className="text-og-lime" />
-        <Metric label="Market cap" value={fmtUsd(launch.marketCap ?? launch.fdv)} className="text-og-gold" />
-        <Metric label="Holders" value={fmtNum(launch.holderCount)} className="text-og-cyan" />
+        <Metric label="ATH" value={fmtUsd(launch.allTimeHighUsd)} className="text-og-gold" />
+        <Metric label="Migration" value={shortDate(launch.migrationCreatedAt)} className="text-og-cyan" />
+        <Metric label="DEX paid" value={tokenDexPaidLabel(launch)} className={tokenDexPaidLabel(launch) === "—" ? "text-foreground" : "text-og-lime"} />
       </div>
 
       <div className="mt-4 space-y-2">
@@ -809,6 +831,7 @@ const LaunchAnalyzer = ({ launch, watched, onCopy, onScan, onWatchMint }: { laun
         <SignalLine label="Freeze authority" ok={Boolean(launch.audit?.freezeAuthorityDisabled)} good="disabled" bad="open" />
         <SignalLine label="Social proof" ok={launch.hasSocials} good="links found" bad="missing" />
         <SignalLine label="Copycat check" ok={!launch.copycatSignal} good="clear" bad="watch" />
+        <SignalLine label="DEX boost" ok={tokenDexPaidLabel(launch) !== "—"} good={tokenDexPaidLabel(launch)} bad="none public" />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -869,7 +892,7 @@ const DevIntelPanel = ({ dev, launches, watched, onWatch, onSelectDev }: { dev: 
               <button key={launch.mint} type="button" onClick={() => onSelectDev(launch.devWallet)} className="flex items-center justify-between gap-2 border border-og-grid bg-background/35 px-3 py-2 text-left transition hover:border-og-lime/60">
                 <span className="min-w-0">
                   <span className="block truncate font-mono text-[11px] font-bold text-foreground">${launch.symbol}</span>
-                  <span className="block font-mono text-[9px] uppercase tracking-widest text-muted-foreground">{fmtUsd(launch.liquidity)} · {timeAgo(Math.floor(launch.createdAtMs / 1000))}</span>
+                  <span className="block font-mono text-[9px] uppercase tracking-widest text-muted-foreground">{fmtUsd(launch.liquidity)} · MIGR {shortDate(launch.migrationCreatedAt)} · DEX {tokenDexPaidLabel(launch)}</span>
                 </span>
                 <span className={cn("font-mono text-[11px] font-bold", scoreTone(launch.launchScore))}>{launch.launchScore}</span>
               </button>
@@ -902,7 +925,7 @@ const AlertsPanel = ({ alerts, watchedDevs, watchedMints, onSelect }: { alerts: 
             {isDanger ? <AlertTriangle className="h-4 w-4 shrink-0 text-og-blood" /> : <TrendingUp className="h-4 w-4 shrink-0 text-og-lime" />}
             <span className="min-w-0 flex-1">
               <span className="block truncate font-mono text-[11px] font-bold uppercase text-foreground">${launch.symbol} · {isDanger ? "risk warning" : "hot launch"}</span>
-              <span className="block truncate font-mono text-[9px] uppercase tracking-widest text-muted-foreground">score {launch.launchScore} · {fmtUsd(launch.liquidity)} liq</span>
+              <span className="block truncate font-mono text-[9px] uppercase tracking-widest text-muted-foreground">score {launch.launchScore} · ATH {fmtUsd(launch.allTimeHighUsd)} · DEX {tokenDexPaidLabel(launch)}</span>
             </span>
           </button>
         );
