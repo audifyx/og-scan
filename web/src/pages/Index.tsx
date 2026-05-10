@@ -138,7 +138,7 @@ const TABS: TabConfig[] = [
     slug: "og-finder",
     pageNumber: 7,
     eyebrow: "ORIGIN CHECK",
-    description: "Separate the first trusted token from weak copycats using history and market quality.",
+    description: "Separate the earliest on-chain mint from copycats using token creation time only — not price or migration.",
     Icon: Crosshair,
     accent: "white",
   },

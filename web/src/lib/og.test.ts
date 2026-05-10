@@ -12,6 +12,8 @@ const makeToken = (overrides: Partial<JupTokenInfo>): JupTokenInfo => ({
   holderCount: 0,
   isVerified: false,
   firstPool: { createdAt: daysAgoIso(1) },
+  onChainCreatedAt: daysAgoIso(1),
+  creationSource: "chain",
   audit: {
     mintAuthorityDisabled: true,
     freezeAuthorityDisabled: true,
@@ -25,21 +27,23 @@ describe("jupOgCopycats", () => {
     vi.restoreAllMocks();
   });
 
-  it("uses the oldest dated token as the original before ranking copycats by trust", async () => {
+  it("uses the oldest on-chain mint date as the original, regardless of price or trust", async () => {
     const newerTrusted = makeToken({
       id: "newer-trusted-token",
       liquidity: 5_000_000,
       holderCount: 25_000,
       organicScore: 8,
       isVerified: true,
-      firstPool: { createdAt: daysAgoIso(188) },
+      firstPool: { createdAt: daysAgoIso(650) },
+      onChainCreatedAt: daysAgoIso(188),
     });
     const olderLowTrust = makeToken({
       id: "older-low-trust-token",
-      liquidity: 95_000,
-      holderCount: 5_000,
+      liquidity: 95,
+      holderCount: 5,
       isVerified: false,
-      firstPool: { createdAt: daysAgoIso(699) },
+      firstPool: { createdAt: daysAgoIso(2) },
+      onChainCreatedAt: daysAgoIso(699),
     });
 
     vi.stubGlobal(
@@ -54,5 +58,31 @@ describe("jupOgCopycats", () => {
 
     expect(result.og?.id).toBe("older-low-trust-token");
     expect(result.copycats.map((token: JupTokenInfo) => token.id)).toContain("newer-trusted-token");
+  });
+
+  it("does not treat an older migrated pool as OG when the mint was created later", async () => {
+    const olderMigratedPool = makeToken({
+      id: "older-migrated-pool-token",
+      firstPool: { createdAt: daysAgoIso(800) },
+      onChainCreatedAt: daysAgoIso(20),
+    });
+    const originalMint = makeToken({
+      id: "original-mint-token",
+      firstPool: { createdAt: daysAgoIso(3) },
+      onChainCreatedAt: daysAgoIso(200),
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => [olderMigratedPool, originalMint],
+      }))
+    );
+
+    const result = await jupOgCopycats("WOJAK");
+
+    expect(result.og?.id).toBe("original-mint-token");
+    expect(result.copycats.map((token: JupTokenInfo) => token.id)).toContain("older-migrated-pool-token");
   });
 });

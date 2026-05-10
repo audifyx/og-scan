@@ -29,6 +29,8 @@ export const DEFAULT_OG_MINT = OGSCAN_TOKEN_MINT;
 
 export const STORAGE_OG_MINT = "og_scanner.mint";
 
+export type TokenCreationSource = "chain" | "pool" | "unknown";
+
 export type JupTokenInfo = {
   id: string;
   name: string;
@@ -55,6 +57,8 @@ export type JupTokenInfo = {
   stats5m?: { priceChange?: number };
   audit?: { mintAuthorityDisabled?: boolean; freezeAuthorityDisabled?: boolean; topHoldersPercentage?: number };
   firstPool?: { createdAt?: string };
+  onChainCreatedAt?: string;
+  creationSource?: TokenCreationSource;
   ctLikes?: number;
   smartCtLikes?: number;
 };
@@ -129,12 +133,26 @@ function normalizeTickerSymbol(value: string | undefined): string {
   return (value ?? "").replace(/^\$+/, "").replace(/[^a-z0-9]/gi, "").toLowerCase();
 }
 
-function tokenCreatedAtMs(token: JupTokenInfo): number {
-  const rawCreatedAt: string | undefined = token.firstPool?.createdAt;
+function isoToMs(rawCreatedAt: string | undefined): number {
   if (!rawCreatedAt) return Number.POSITIVE_INFINITY;
-
   const createdAtMs: number = new Date(rawCreatedAt).getTime();
   return Number.isFinite(createdAtMs) ? createdAtMs : Number.POSITIVE_INFINITY;
+}
+
+function tokenPoolCreatedAtMs(token: JupTokenInfo): number {
+  return isoToMs(token.firstPool?.createdAt);
+}
+
+function tokenCreatedAtMs(token: JupTokenInfo): number {
+  return isoToMs(token.onChainCreatedAt);
+}
+
+export function tokenOgCreatedAtMs(token: JupTokenInfo): number {
+  return tokenCreatedAtMs(token);
+}
+
+export function tokenOgCreatedAtIso(token: JupTokenInfo): string | undefined {
+  return Number.isFinite(tokenCreatedAtMs(token)) ? token.onChainCreatedAt : undefined;
 }
 
 function createdAtIsoFromMs(createdAtMs: number): string | undefined {
@@ -157,10 +175,14 @@ function mergeStats(
 }
 
 function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTokenInfo {
-  const existingCreatedAt: number = tokenCreatedAtMs(existing);
-  const nextCreatedAt: number = tokenCreatedAtMs(next);
-  const oldestCreatedAt: number = Math.min(existingCreatedAt, nextCreatedAt);
-  const oldestCreatedAtIso: string | undefined = createdAtIsoFromMs(oldestCreatedAt);
+  const existingPoolCreatedAt: number = tokenPoolCreatedAtMs(existing);
+  const nextPoolCreatedAt: number = tokenPoolCreatedAtMs(next);
+  const oldestPoolCreatedAt: number = Math.min(existingPoolCreatedAt, nextPoolCreatedAt);
+  const oldestPoolCreatedAtIso: string | undefined = createdAtIsoFromMs(oldestPoolCreatedAt);
+  const existingMintCreatedAt: number = tokenCreatedAtMs(existing);
+  const nextMintCreatedAt: number = tokenCreatedAtMs(next);
+  const oldestMintCreatedAt: number = Math.min(existingMintCreatedAt, nextMintCreatedAt);
+  const oldestMintCreatedAtIso: string | undefined = createdAtIsoFromMs(oldestMintCreatedAt);
 
   return {
     ...existing,
@@ -181,7 +203,9 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
     stats1h: existing.stats1h ?? next.stats1h,
     stats5m: existing.stats5m ?? next.stats5m,
     audit: existing.audit ?? next.audit,
-    firstPool: oldestCreatedAtIso ? { createdAt: oldestCreatedAtIso } : existing.firstPool ?? next.firstPool,
+    firstPool: oldestPoolCreatedAtIso ? { createdAt: oldestPoolCreatedAtIso } : existing.firstPool ?? next.firstPool,
+    onChainCreatedAt: oldestMintCreatedAtIso ?? existing.onChainCreatedAt ?? next.onChainCreatedAt,
+    creationSource: oldestMintCreatedAtIso ? "chain" : existing.creationSource ?? next.creationSource,
     ctLikes: existing.ctLikes ?? next.ctLikes,
     smartCtLikes: existing.smartCtLikes ?? next.smartCtLikes,
   };
@@ -238,50 +262,141 @@ function mergeTokenCandidates(tokens: JupTokenInfo[]): JupTokenInfo[] {
   return Array.from(byMint.values());
 }
 
-function tokenTrustScore(token: JupTokenInfo, cleanTicker: string): number {
-  const normalizedSymbol = normalizeTickerSymbol(token.symbol);
-  const normalizedName = normalizeTickerSymbol(token.name);
-  const normalizedTicker = normalizeTickerSymbol(cleanTicker);
-  const liquidity = token.liquidity ?? 0;
-  const holders = token.holderCount ?? 0;
-  const organic = token.organicScore ?? 0;
-  const volume24h = (token.stats24h?.buyVolume ?? 0) + (token.stats24h?.sellVolume ?? 0);
-  const createdAt = tokenCreatedAtMs(token);
-  const ageDays = Number.isFinite(createdAt) ? (Date.now() - createdAt) / 86_400_000 : 0;
+type BirdeyeCreationResponse = {
+  data?: {
+    creationTime?: number | null;
+    mintTime?: number | null;
+  };
+  success?: boolean;
+};
 
-  let score = 0;
-  if (normalizedSymbol === normalizedTicker) score += 1_000;
-  if (normalizedSymbol.includes(normalizedTicker)) score += 100;
-  if (normalizedName.includes(normalizedTicker)) score += 25;
-  if (token.isVerified) score += 750;
-  score += Math.min(650, Math.log10(liquidity + 1) * 95);
-  score += Math.min(350, Math.log10(Math.max(token.mcap ?? 0, token.fdv ?? 0) + 1) * 42);
-  score += Math.min(300, Math.log10(holders + 1) * 58);
-  score += Math.min(250, organic * 2.5);
-  score += Math.min(180, Math.log10(volume24h + 1) * 36);
-  score += Math.min(220, Math.max(0, ageDays) / 7);
+type RpcSignatureInfo = { signature: string; blockTime?: number | null };
+type RpcSignatureResponse = { result?: RpcSignatureInfo[]; error?: { message?: string } };
 
-  if (liquidity < 5_000) score -= 450;
-  if (liquidity < 1_000) score -= 650;
-  if (holders < 10) score -= 450;
-  if ((token.audit?.topHoldersPercentage ?? 0) > 80) score -= 650;
-  if (!token.audit?.mintAuthorityDisabled) score -= 300;
-  if (!token.audit?.freezeAuthorityDisabled) score -= 300;
-  if (token.id.toLowerCase().endsWith("pump") && liquidity < 25_000 && !token.isVerified) score -= 350;
+const mintCreationCache = new Map<string, Promise<string | undefined>>();
 
-  return score;
+function unixSecondsToIso(value: number | null | undefined): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return undefined;
+  return new Date(value * 1000).toISOString();
 }
 
-function compareByAgeThenTrust(a: JupTokenInfo, b: JupTokenInfo, cleanTicker: string): number {
+async function birdeyeMintCreatedAt(mint: string): Promise<string | undefined> {
+  const url = `${BIRDEYE_BASE}/defi/token_creation_info?address=${encodeURIComponent(mint)}`;
+  const res = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-KEY": BIRDEYE_API_KEY,
+      "x-chain": "solana",
+    },
+  });
+  if (!res.ok) return undefined;
+  const json = (await res.json()) as BirdeyeCreationResponse;
+  return unixSecondsToIso(json.data?.creationTime) ?? unixSecondsToIso(json.data?.mintTime);
+}
+
+async function heliusMintCreatedAt(mint: string): Promise<string | undefined> {
+  const limit = 1000;
+  let before: string | undefined;
+  let oldestBlockTime: number | undefined;
+
+  for (let page = 0; page < 25; page += 1) {
+    const params = before ? [mint, { limit, before }] : [mint, { limit }];
+    const res = await fetch(HELIUS_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: `og-mint-created-${page}`,
+        method: "getSignaturesForAddress",
+        params,
+      }),
+    });
+    if (!res.ok) return undefined;
+
+    const json = (await res.json()) as RpcSignatureResponse;
+    const signatures: RpcSignatureInfo[] = json.result ?? [];
+    if (signatures.length === 0) break;
+
+    for (const signature of signatures) {
+      if (typeof signature.blockTime === "number") {
+        oldestBlockTime = Math.min(oldestBlockTime ?? signature.blockTime, signature.blockTime);
+      }
+    }
+
+    const lastSignature: string | undefined = signatures[signatures.length - 1]?.signature;
+    if (signatures.length < limit || !lastSignature) break;
+    before = lastSignature;
+  }
+
+  return unixSecondsToIso(oldestBlockTime);
+}
+
+async function mintCreatedAt(mint: string): Promise<string | undefined> {
+  const cached = mintCreationCache.get(mint);
+  if (cached) return cached;
+
+  const task = (async (): Promise<string | undefined> => {
+    try {
+      const birdeyeCreatedAt = await birdeyeMintCreatedAt(mint);
+      if (birdeyeCreatedAt) return birdeyeCreatedAt;
+    } catch {
+      /* fall back to RPC scan */
+    }
+
+    return heliusMintCreatedAt(mint);
+  })();
+
+  mintCreationCache.set(mint, task);
+  return task;
+}
+
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+
+  async function worker(): Promise<void> {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await mapper(items[index]);
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
+async function withOnChainCreationDates(tokens: JupTokenInfo[]): Promise<JupTokenInfo[]> {
+  return mapWithConcurrency(tokens, 4, async (token) => {
+    if (Number.isFinite(tokenCreatedAtMs(token))) return { ...token, creationSource: "chain" };
+
+    try {
+      const onChainCreatedAt = await mintCreatedAt(token.id);
+      return {
+        ...token,
+        onChainCreatedAt,
+        creationSource: onChainCreatedAt ? "chain" : token.firstPool?.createdAt ? "pool" : "unknown",
+      };
+    } catch {
+      return { ...token, creationSource: token.firstPool?.createdAt ? "pool" : "unknown" };
+    }
+  });
+}
+
+function compareByOnChainAgeOnly(a: JupTokenInfo, b: JupTokenInfo): number {
   const aCreatedAt: number = tokenCreatedAtMs(a);
   const bCreatedAt: number = tokenCreatedAtMs(b);
-  if (aCreatedAt !== bCreatedAt) return aCreatedAt - bCreatedAt;
 
-  return tokenTrustScore(b, cleanTicker) - tokenTrustScore(a, cleanTicker);
+  if (Number.isFinite(aCreatedAt) && Number.isFinite(bCreatedAt)) return aCreatedAt - bCreatedAt;
+  if (Number.isFinite(aCreatedAt)) return -1;
+  if (Number.isFinite(bCreatedAt)) return 1;
+  return normalizeTickerSymbol(a.symbol).localeCompare(normalizeTickerSymbol(b.symbol));
 }
 
-// Find OG copycats by ticker symbol. The OG must be the oldest exact-symbol token we can date;
-// market quality/trust is only a tie-breaker so an older token never appears as a copycat.
+// Find OG copycats by ticker symbol. The OG is the oldest exact-symbol mint by
+// on-chain creation date only. Price, liquidity, volume, market cap, verification,
+// and migrated/new pool dates are never used to decide which token is the OG.
 export async function jupOgCopycats(ticker: string): Promise<{ og: JupTokenInfo | null; copycats: JupTokenInfo[] }> {
   const clean = ticker.replace(/^\$/, "").trim();
   if (!clean) return { og: null, copycats: [] };
@@ -302,12 +417,12 @@ export async function jupOgCopycats(ticker: string): Promise<{ og: JupTokenInfo 
     return normalizedSymbol.includes(normalizedClean) || normalizedName.includes(normalizedClean);
   });
   const pool = exactSymbolMatches.length > 0 ? exactSymbolMatches : looseMatches.length > 0 ? looseMatches : all;
-  const tokensWithDates = pool.filter((token) => Number.isFinite(tokenCreatedAtMs(token)));
-  const ogPool = tokensWithDates.length > 0 ? tokensWithDates : pool;
-  const og = [...ogPool].sort((a, b) => compareByAgeThenTrust(a, b, clean))[0] ?? null;
-  const copycats = pool
+  const chainDatedPool = await withOnChainCreationDates(pool);
+  const tokensWithChainDates = chainDatedPool.filter((token) => Number.isFinite(tokenCreatedAtMs(token)));
+  const og = [...tokensWithChainDates].sort(compareByOnChainAgeOnly)[0] ?? null;
+  const copycats = chainDatedPool
     .filter((token) => token.id !== og?.id)
-    .sort((a, b) => compareByAgeThenTrust(a, b, clean))
+    .sort(compareByOnChainAgeOnly)
     .slice(0, 24);
 
   return { og, copycats };

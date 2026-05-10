@@ -24,6 +24,8 @@ import {
   fmtUsd,
   fmtNum,
   shortAddr,
+  tokenOgCreatedAtIso,
+  tokenOgCreatedAtMs,
   type JupTokenInfo,
 } from "@/lib/og";
 
@@ -45,31 +47,25 @@ const DEFAULT_FILTERS: FinderFilters = {
   hideHighRisk: false,
 };
 
-// OG-confidence: 0-100. Older + verified + liquid + organic = real OG.
+// OG score is intentionally age-only. Price, liquidity, verification, migration,
+// and market quality never decide OG status.
 function ogScore(t: JupTokenInfo, oldest: number | null): number {
-  let score = 0;
-  const created = t.firstPool?.createdAt ? new Date(t.firstPool.createdAt).getTime() : null;
-  // Age: up to 35 pts. If this is the oldest, full points.
-  if (created && oldest) {
-    const ageDays = (Date.now() - created) / 86_400_000;
-    const oldestDays = (Date.now() - oldest) / 86_400_000;
-    score += Math.min(35, (ageDays / Math.max(1, oldestDays)) * 35);
-  }
-  // Verified: 15 pts
-  if (t.isVerified) score += 15;
-  // Liquidity: up to 20 pts (log scale, $1M = full)
-  const liq = t.liquidity ?? 0;
-  if (liq > 0) score += Math.min(20, (Math.log10(liq + 1) / 6) * 20);
-  // Organic score: up to 15 pts
-  if (typeof t.organicScore === "number") {
-    score += Math.min(15, Math.max(0, t.organicScore) * 1.5);
-  }
-  // Holders: up to 10 pts (log scale, 100k = full)
-  const h = t.holderCount ?? 0;
-  if (h > 0) score += Math.min(10, (Math.log10(h + 1) / 5) * 10);
-  // Audit: 5 pts if mint+freeze disabled
-  if (t.audit?.mintAuthorityDisabled && t.audit?.freezeAuthorityDisabled) score += 5;
-  return Math.min(100, Math.round(score));
+  const created = tokenOgCreatedAtMs(t);
+  if (!Number.isFinite(created) || !oldest) return 0;
+  const ageDays = Math.max(0, (Date.now() - created) / 86_400_000);
+  const oldestDays = Math.max(1, (Date.now() - oldest) / 86_400_000);
+  return Math.min(100, Math.round((ageDays / oldestDays) * 100));
+}
+
+function ageDaysFromIso(createdAt: string | undefined): number | null {
+  if (!createdAt) return null;
+  const createdMs = new Date(createdAt).getTime();
+  if (!Number.isFinite(createdMs)) return null;
+  return Math.max(0, Math.floor((Date.now() - createdMs) / 86_400_000));
+}
+
+function shortDate(createdAt: string | undefined): string {
+  return createdAt ? new Date(createdAt).toISOString().slice(0, 10) : "—";
 }
 
 function rugRisk(t: JupTokenInfo): "low" | "med" | "high" {
@@ -102,8 +98,8 @@ export const OgFinder = ({ onSelect }: Props) => {
   const oldestTs = useMemo(() => {
     const all = [og, ...cats].filter(Boolean) as JupTokenInfo[];
     const ts = all
-      .map((t) => (t.firstPool?.createdAt ? new Date(t.firstPool.createdAt).getTime() : null))
-      .filter((x): x is number => typeof x === "number");
+      .map((t) => tokenOgCreatedAtMs(t))
+      .filter((x): x is number => Number.isFinite(x));
     return ts.length ? Math.min(...ts) : null;
   }, [og, cats]);
 
@@ -140,8 +136,8 @@ export const OgFinder = ({ onSelect }: Props) => {
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Drop a ticker. We pull every Solana mint sharing it, normalize symbols like $WIF,
-            then rank the market by verification, liquidity, holders, audit, organic score and age.
-            The Direct OG avoids dead low-liquidity clones — everything else is a copycat.
+            then crown the earliest on-chain mint creation date. Price, liquidity, migrated pools,
+            market cap, and hype never decide the OG.
           </p>
         </div>
 
@@ -196,7 +192,7 @@ export const OgFinder = ({ onSelect }: Props) => {
                 <Filter className="h-3 w-3" /> filters
               </div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                <span className="text-og-lime">{filteredCats.length}</span> copycats shown · <span className="text-og-blood">{droppedCats}</span> filtered
+                <span className="text-og-lime">{filteredCats.length}</span> copycats shown · <span className="text-og-blood">{droppedCats}</span> filtered · filters do not change OG
               </div>
               <button
                 onClick={() => setFilters(DEFAULT_FILTERS)}
@@ -206,7 +202,7 @@ export const OgFinder = ({ onSelect }: Props) => {
               </button>
             </div>
             <div className="grid gap-2 sm:grid-cols-4">
-              <FilterNum label="MIN SCORE" value={filters.minScore} step={5} onChange={(v) => setFilters({ ...filters, minScore: v })} />
+              <FilterNum label="MIN AGE SCORE" value={filters.minScore} step={5} onChange={(v) => setFilters({ ...filters, minScore: v })} />
               <FilterNum label="MIN LIQ" value={filters.minLiq} step={1000} onChange={(v) => setFilters({ ...filters, minLiq: v })} />
               <FilterToggle label="VERIFIED" value={filters.verifiedOnly} onChange={(v) => setFilters({ ...filters, verifiedOnly: v })} />
               <FilterToggle label="HIDE RUG RISK" value={filters.hideHighRisk} onChange={(v) => setFilters({ ...filters, hideHighRisk: v })} />
@@ -353,8 +349,9 @@ const CoinCard = ({
 }) => {
   const ch = t.stats24h?.priceChange ?? 0;
   const up = ch >= 0;
-  const created = t.firstPool?.createdAt ? new Date(t.firstPool.createdAt) : null;
-  const ageDays = created ? Math.floor((Date.now() - created.getTime()) / 86_400_000) : null;
+  const onChainCreatedAt = tokenOgCreatedAtIso(t);
+  const mintAgeDays = ageDaysFromIso(onChainCreatedAt);
+  const poolCreatedAt = t.firstPool?.createdAt;
 
   return (
     <article
@@ -372,7 +369,7 @@ const CoinCard = ({
     >
       {highlight && (
         <span className="absolute -top-2 left-3 bg-og-gold px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-og-ink">
-          ◆ ORIGINAL
+          ◆ EARLIEST MINT
         </span>
       )}
       <div className="flex items-center gap-3">
@@ -407,7 +404,7 @@ const CoinCard = ({
 
       {!highlight ? null : (
         <div className="flex items-center justify-between border-y border-og-gold/30 py-2">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-og-gold/80">OG SCORE</span>
+          <span className="font-mono text-[10px] uppercase tracking-widest text-og-gold/80">CHAIN AGE SCORE</span>
           <ScoreBar score={score} />
         </div>
       )}
@@ -418,8 +415,8 @@ const CoinCard = ({
         <Stat icon={Users} label="HLDR" value={fmtNum(t.holderCount)} />
         <Stat
           icon={Calendar}
-          label="AGE"
-          value={ageDays != null ? `${ageDays}d` : "—"}
+          label="MINT AGE"
+          value={mintAgeDays != null ? `${mintAgeDays}d` : "—"}
           accent={highlight ? "text-og-gold" : undefined}
         />
       </div>
@@ -438,7 +435,10 @@ const CoinCard = ({
           BadIcon={Snowflake}
         />
         <span className="text-muted-foreground">
-          TOP10 <span className="text-foreground">{t.audit?.topHoldersPercentage != null ? `${t.audit.topHoldersPercentage.toFixed(1)}%` : "—"}</span>
+          MINTED <span className="text-foreground">{shortDate(onChainCreatedAt)}</span>
+        </span>
+        <span className="hidden text-muted-foreground sm:inline">
+          POOL <span className="text-foreground">{shortDate(poolCreatedAt)}</span>
         </span>
         <span className="ml-auto flex items-center gap-2">
           <span className="text-muted-foreground">{shortAddr(t.id, 5)}</span>

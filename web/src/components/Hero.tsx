@@ -41,7 +41,7 @@ export const Hero = ({ onScanClick, onSwapClick }: HeroProps) => {
           </div>
 
           <h1 className="font-display text-[clamp(2.8rem,7.5vw,6.4rem)] font-bold leading-[0.9] tracking-tighter">
-            <span className="block text-og-gold text-glow-gold">Find the first pair.</span>
+            <span className="block text-og-gold text-glow-gold">Find the first mint.</span>
             <span className="block text-og-lime text-glow">Ignore the copies.</span>
           </h1>
 
@@ -50,14 +50,14 @@ export const Hero = ({ onScanClick, onSwapClick }: HeroProps) => {
               This is OG. That is OG. Everyone claims OG — but which one is actually OG?
             </p>
             <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              OG SCAN identifies true early pairs on Solana: not what is trending later, not influencer noise,
-              but what was there first. The origin. The real starting point.
+              OG SCAN identifies the true on-chain origin on Solana: not later price action, not migrated pools,
+              not influencer noise — only when the coin itself was created on-chain.
             </p>
           </div>
 
           <div className="mt-6 grid max-w-2xl gap-2 sm:grid-cols-3">
             {[
-              "First pair ever created",
+              "First mint ever created",
               "Clean real-time data",
               "No-noise signal UI",
             ].map((item) => (
