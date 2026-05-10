@@ -105,7 +105,11 @@ function normalizeTickerSymbol(value: string | undefined): string {
 }
 
 function tokenCreatedAtMs(token: JupTokenInfo): number {
-  return token.firstPool?.createdAt ? new Date(token.firstPool.createdAt).getTime() : Number.POSITIVE_INFINITY;
+  const rawCreatedAt: string | undefined = token.firstPool?.createdAt;
+  if (!rawCreatedAt) return Number.POSITIVE_INFINITY;
+
+  const createdAtMs: number = new Date(rawCreatedAt).getTime();
+  return Number.isFinite(createdAtMs) ? createdAtMs : Number.POSITIVE_INFINITY;
 }
 
 function tokenTrustScore(token: JupTokenInfo, cleanTicker: string): number {
@@ -142,22 +146,33 @@ function tokenTrustScore(token: JupTokenInfo, cleanTicker: string): number {
   return score;
 }
 
-// Find OG copycats by ticker symbol. The OG is the trusted/high-liquidity original, not a dead clone.
+function compareByAgeThenTrust(a: JupTokenInfo, b: JupTokenInfo, cleanTicker: string): number {
+  const aCreatedAt: number = tokenCreatedAtMs(a);
+  const bCreatedAt: number = tokenCreatedAtMs(b);
+  if (aCreatedAt !== bCreatedAt) return aCreatedAt - bCreatedAt;
+
+  return tokenTrustScore(b, cleanTicker) - tokenTrustScore(a, cleanTicker);
+}
+
+// Find OG copycats by ticker symbol. The OG must be the oldest token we can date;
+// market quality/trust is only a tie-breaker so an older token never appears as a copycat.
 export async function jupOgCopycats(ticker: string): Promise<{ og: JupTokenInfo | null; copycats: JupTokenInfo[] }> {
   const clean = ticker.replace(/^\$/, "").trim();
   if (!clean) return { og: null, copycats: [] };
+
   const all = await jupSearchToken(clean);
   const normalizedClean = normalizeTickerSymbol(clean);
   // Exact symbol matching must tolerate symbols like "$WIF" when the user types "wif".
   const matches = all.filter((t) => normalizeTickerSymbol(t.symbol) === normalizedClean);
   const pool = (matches.length > 0 ? matches : all).slice(0, 40);
-  const sorted = [...pool].sort((a, b) => {
-    const trustDelta = tokenTrustScore(b, clean) - tokenTrustScore(a, clean);
-    if (Math.abs(trustDelta) > 75) return trustDelta;
-    return tokenCreatedAtMs(a) - tokenCreatedAtMs(b);
-  });
-  const og = sorted[0] ?? null;
-  const copycats = sorted.filter((t) => t.id !== og?.id).slice(0, 12);
+  const tokensWithDates = pool.filter((t) => Number.isFinite(tokenCreatedAtMs(t)));
+  const ogPool = tokensWithDates.length > 0 ? tokensWithDates : pool;
+  const og = [...ogPool].sort((a, b) => compareByAgeThenTrust(a, b, clean))[0] ?? null;
+  const copycats = pool
+    .filter((t) => t.id !== og?.id)
+    .sort((a, b) => compareByAgeThenTrust(a, b, clean))
+    .slice(0, 12);
+
   return { og, copycats };
 }
 
