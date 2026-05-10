@@ -15,12 +15,15 @@
 - [x] Replace the old token-coming-soon banner with the live official OGScan coin CA, dev wallet, chart links, and copy actions.
 - [x] Add the official **SolTools Roadmap** with goal, plan, next step, long-term vision, expansion plans, mobile rollout, mission, and community links.
 - [x] Add a new **Community Beta homepage** as the first screen with iOS/Android Expo Go instructions, beta link, issue tips, and an enter-OGScan button.
+- [x] Add direct standalone routes for every OGScan tool so each page can be embedded link-for-link in the mobile app.
+- [x] Create a standalone embed prompt file explaining every page, route, numbered path, and mobile-app embedding approach.
 
 ## **Design**
 
 - [x] Use a sharper blue, black, and white Solana-style command center theme.
 - [x] Make each tool feel like a separate premium panel with clear headers, borders, labels, and status chips.
 - [x] Redesign the workspace so each tool opens as its own full-page tab instead of one chaotic scrolling page.
+- [x] Convert tool navigation from internal-only tabs into real URL pages such as `/scanner`, `/snipe-feed`, `/migrations`, and `/page/6`.
 - [x] Give the Snipe Feed a fast live-market feel with pulsing rows, “new launch” badges, and clear risk colors.
 - [x] Use simple beginner-friendly labels like “Clean,” “Watch,” “Risky,” and “Danger” instead of overwhelming users.
 - [x] Add a stronger top summary area showing live launches, risky launches blocked, watched devs, and hot opportunities.
@@ -38,6 +41,7 @@
 - [x] **Alerts Center**: A clean timeline of new launches, whale moves, dev relaunches, and risk warnings.
 - [x] **SolTools Roadmap**: A polished vision page showing OGScan’s path into the broader SolTools ecosystem.
 - [x] **Community Beta Home**: The new root homepage with beta onboarding, Expo Go links, copy link action, issue tips, and a button into the OG scanner.
+- [x] **Standalone Tool Routes**: Every existing tool now has a direct canonical route plus numbered page route for mobile embedding.
 
 ## **Suggested build order**
 

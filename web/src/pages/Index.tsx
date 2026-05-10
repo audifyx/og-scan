@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Activity,
   CalendarClock,
@@ -62,6 +63,8 @@ type TabAccent = "blue" | "white" | "cyan" | "gold";
 type TabConfig = {
   id: TabId;
   label: string;
+  slug: string;
+  pageNumber: number;
   eyebrow: string;
   description: string;
   Icon: ComponentType<{ className?: string }>;
@@ -72,6 +75,8 @@ const TABS: TabConfig[] = [
   {
     id: "overview",
     label: "Command",
+    slug: "command",
+    pageNumber: 1,
     eyebrow: "MARKET COMMAND",
     description: "OGScan home base with market pulse, safety notice, whales, tape, and tool shortcuts.",
     Icon: Gauge,
@@ -80,6 +85,8 @@ const TABS: TabConfig[] = [
   {
     id: "our-coin",
     label: "Our Coin",
+    slug: "our-coin",
+    pageNumber: 2,
     eyebrow: "OFFICIAL TOKEN LIVE",
     description: "Official OGScan coin CA, dev wallet, chart links, and copy buttons in one verified room.",
     Icon: Coins,
@@ -88,6 +95,8 @@ const TABS: TabConfig[] = [
   {
     id: "roadmap",
     label: "Roadmap",
+    slug: "roadmap",
+    pageNumber: 3,
     eyebrow: "SOLTOOLS VISION",
     description: "The path from OGScan into the crypto-native community layer SolTools is building.",
     Icon: Map,
@@ -95,7 +104,9 @@ const TABS: TabConfig[] = [
   },
   {
     id: "market-pulse",
-    label: "Market",
+    label: "Market Pulse",
+    slug: "market-pulse",
+    pageNumber: 4,
     eyebrow: "LIVE OVERVIEW",
     description: "A dedicated market pulse screen for the active mint with price, liquidity, holders, and core signal stats.",
     Icon: Activity,
@@ -104,6 +115,8 @@ const TABS: TabConfig[] = [
   {
     id: "snipe-feed",
     label: "Snipe Feed",
+    slug: "snipe-feed",
+    pageNumber: 5,
     eyebrow: "DEV WALLET RADAR",
     description: "Track brand-new launches, repeat creators, watch alerts, and launch quality scores.",
     Icon: Target,
@@ -112,6 +125,8 @@ const TABS: TabConfig[] = [
   {
     id: "scanner",
     label: "Scanner",
+    slug: "scanner",
+    pageNumber: 6,
     eyebrow: "RUN THE CHAIN",
     description: "Search tickers or paste a mint to inspect token signal, liquidity, holders, and risk.",
     Icon: Search,
@@ -120,6 +135,8 @@ const TABS: TabConfig[] = [
   {
     id: "og-finder",
     label: "OG Finder",
+    slug: "og-finder",
+    pageNumber: 7,
     eyebrow: "ORIGIN CHECK",
     description: "Separate the first trusted token from weak copycats using history and market quality.",
     Icon: Crosshair,
@@ -128,6 +145,8 @@ const TABS: TabConfig[] = [
   {
     id: "pairs",
     label: "Pairs",
+    slug: "pairs",
+    pageNumber: 8,
     eyebrow: "NEW PAIR RADAR",
     description: "Monitor fresh Solana pairs before they hit timeline hype.",
     Icon: Radar,
@@ -136,6 +155,8 @@ const TABS: TabConfig[] = [
   {
     id: "migrations",
     label: "Migrations",
+    slug: "migrations",
+    pageNumber: 9,
     eyebrow: "BREAKOUT WATCH",
     description: "Find launches leaving chaos behind and moving into stronger liquidity.",
     Icon: Rocket,
@@ -144,6 +165,8 @@ const TABS: TabConfig[] = [
   {
     id: "trending",
     label: "Trending",
+    slug: "trending",
+    pageNumber: 10,
     eyebrow: "MARKET HEAT",
     description: "See what is actually moving across Solana right now.",
     Icon: Flame,
@@ -152,6 +175,8 @@ const TABS: TabConfig[] = [
   {
     id: "whales",
     label: "Whales",
+    slug: "whales",
+    pageNumber: 11,
     eyebrow: "WALLET RADAR",
     description: "A standalone whale watch screen for holder concentration and largest token accounts.",
     Icon: Radar,
@@ -159,7 +184,9 @@ const TABS: TabConfig[] = [
   },
   {
     id: "tx-feed",
-    label: "Tape",
+    label: "Tx Feed",
+    slug: "tx-feed",
+    pageNumber: 12,
     eyebrow: "LIVE TRANSACTIONS",
     description: "A focused transaction tape for the selected mint, separated from every other tool.",
     Icon: Activity,
@@ -168,6 +195,8 @@ const TABS: TabConfig[] = [
   {
     id: "swap",
     label: "Swap",
+    slug: "swap",
+    pageNumber: 13,
     eyebrow: "JUPITER ROUTE",
     description: "Search coins and quote routes while keeping scanner context nearby.",
     Icon: Zap,
@@ -176,6 +205,8 @@ const TABS: TabConfig[] = [
   {
     id: "tech",
     label: "Tech",
+    slug: "tech",
+    pageNumber: 14,
     eyebrow: "DATA PIPELINE",
     description: "The APIs and systems powering OG detection, candles, live tape, and token intel.",
     Icon: Cpu,
@@ -183,11 +214,63 @@ const TABS: TabConfig[] = [
   },
 ];
 
-const navItems = TABS.map((tab) => ({ id: tab.id, label: tab.label }));
+const TAB_BY_ID: Record<TabId, TabConfig> = TABS.reduce(
+  (acc: Record<TabId, TabConfig>, tabConfig: TabConfig): Record<TabId, TabConfig> => {
+    acc[tabConfig.id] = tabConfig;
+    return acc;
+  },
+  {} as Record<TabId, TabConfig>,
+);
+
+const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
+  (acc: Record<string, TabId>, tabConfig: TabConfig): Record<string, TabId> => {
+    acc[tabConfig.slug] = tabConfig.id;
+    acc[tabConfig.id] = tabConfig.id;
+    acc[`page-${tabConfig.pageNumber}`] = tabConfig.id;
+    acc[`page${tabConfig.pageNumber}`] = tabConfig.id;
+    return acc;
+  },
+  {
+    app: "overview",
+    home: "overview",
+    market: "market-pulse",
+    tape: "tx-feed",
+    transactions: "tx-feed",
+    "transaction-feed": "tx-feed",
+    "og-scanner": "scanner",
+    "ogscan-scanner": "scanner",
+    "dev-wallet": "snipe-feed",
+    "dev-wallet-radar": "snipe-feed",
+    "migration-tool": "migrations",
+    "migration-tracker": "migrations",
+  },
+);
+
+const navItems = TABS.map((tabConfig: TabConfig) => ({ id: tabConfig.id, label: tabConfig.label }));
+
+const getTabFromSlug = (slug: string | undefined): TabId | null => {
+  const normalizedSlug: string = decodeURIComponent(slug ?? "")
+    .trim()
+    .replace(/^\/+|\/+$/g, "")
+    .toLowerCase();
+
+  if (!normalizedSlug) return "overview";
+  return ROUTE_ALIASES[normalizedSlug] ?? null;
+};
+
+const getTabPath = (tabId: TabId): string => {
+  if (tabId === "overview") return "/app";
+  return `/${TAB_BY_ID[tabId].slug}`;
+};
 
 const Index = () => {
+  const { toolSlug, pageNumber } = useParams<{ toolSlug?: string; pageNumber?: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const routeSlug: string | undefined = pageNumber ? `page-${pageNumber}` : toolSlug;
+  const routeTab: TabId = useMemo<TabId>(() => getTabFromSlug(routeSlug) ?? "overview", [routeSlug]);
   const [mint, setMint] = useState<string>(DEFAULT_OG_MINT);
-  const [tab, setTab] = useState<TabId>("overview");
+  const [tab, setTab] = useState<TabId>(routeTab);
 
   useEffect(() => {
     try {
@@ -199,29 +282,36 @@ const Index = () => {
         localStorage.setItem(STORAGE_OG_MINT, DEFAULT_OG_MINT);
       }
 
-      const savedTab: string | null = localStorage.getItem(STORAGE_TAB);
-      if (savedTab && TABS.some((item) => item.id === savedTab)) {
-        setTab(savedTab as TabId);
-      }
     } catch {
       /* localStorage can be unavailable in restricted browser contexts */
     }
   }, []);
 
   useEffect(() => {
+    setTab(routeTab);
+  }, [routeTab]);
+
+  useEffect(() => {
+    if (routeSlug && !getTabFromSlug(routeSlug)) {
+      navigate("/app", { replace: true });
+    }
+  }, [navigate, routeSlug]);
+
+  useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [tab]);
+  }, [location.pathname, tab]);
 
   const activeTab: TabConfig = useMemo<TabConfig>(() => TABS.find((item) => item.id === tab) ?? TABS[0], [tab]);
 
   const switchTab = (nextTab: string): void => {
-    const safeTab: TabId = TABS.some((item) => item.id === nextTab) ? (nextTab as TabId) : "overview";
+    const safeTab: TabId = TABS.some((item: TabConfig) => item.id === nextTab) ? (nextTab as TabId) : "overview";
     setTab(safeTab);
     try {
       localStorage.setItem(STORAGE_TAB, safeTab);
     } catch {
       /* noop */
     }
+    navigate(getTabPath(safeTab));
   };
 
   const updateMint = (nextMint: string): void => {
@@ -308,7 +398,7 @@ const OverviewPage = ({
                 <span className="h-px w-12 bg-og-cyan" /> SOLTOOLS DECK
               </div>
               <h2 className="font-display text-3xl font-black uppercase tracking-tight text-foreground sm:text-5xl">
-                OGScan token is live. Tools are separated.
+                OGScan token is live. Every tool has its own page.
               </h2>
             </div>
             <button onClick={() => onSwitchTab("our-coin")} className="border border-og-gold/45 bg-og-gold/10 px-4 py-3 text-left font-mono text-[10px] uppercase leading-relaxed tracking-[0.24em] text-og-gold transition hover:bg-og-gold hover:text-og-ink lg:max-w-sm">
@@ -320,7 +410,7 @@ const OverviewPage = ({
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <PanelTitle icon={Target} eyebrow="Tool tabs" title="Pick one screen" />
               <p className="max-w-md font-mono text-[10px] uppercase leading-relaxed tracking-[0.22em] text-muted-foreground">
-                Each card opens a separate full-page tab. No more blended tool stack.
+                Each card opens a direct URL page like /scanner, /snipe-feed, /migrations, or /page-6.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -414,7 +504,7 @@ const ToolPage = ({
             <span className={cn("inline-flex items-center gap-2", getAccentClass(tab.accent, "text"))}>
               <tab.Icon className="h-3.5 w-3.5" /> Active tab
             </span>
-            <span>{tab.label} only</span>
+            <span>/{tab.slug} · page {tab.pageNumber}</span>
           </div>
           {children}
         </div>
@@ -448,7 +538,7 @@ const ToolCard = ({ tool, onClick }: { tool: TabConfig; onClick: () => void }) =
     </div>
     <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{tool.description}</p>
     <div className="absolute bottom-3 left-4 right-4 border-t border-og-grid/70 pt-2 font-mono text-[8px] uppercase tracking-[0.24em] text-og-cyan">
-      Open full tab
+      /{tool.slug} · page {tool.pageNumber}
     </div>
   </button>
 );
