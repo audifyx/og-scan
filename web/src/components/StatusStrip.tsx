@@ -49,46 +49,44 @@ export const StatusStrip = ({ mint, onChangeMint }: Props) => {
   const up = ch >= 0;
 
   return (
-    <div className="relative z-30 border-b border-og-grid bg-og-ink/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5 font-mono text-[10px] uppercase tracking-widest">
-        <span className="inline-flex items-center gap-1.5 text-og-lime">
+    <div className="relative z-30 border-b border-white/10 bg-[#020915]/88 backdrop-blur-xl">
+      <div className="ios-scroll mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto px-4 py-2 font-mono text-[10px] uppercase tracking-widest sm:px-6">
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-og-lime/35 bg-og-lime/10 px-2.5 py-1 text-og-lime">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-og-lime opacity-75" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-og-lime" />
           </span>
           MAINNET
         </span>
-        <span className="text-og-grid">|</span>
-        <span className="text-muted-foreground">SLOT</span>
-        <span className="text-og-cyan">{slot != null ? slot.toLocaleString() : "—"}</span>
-        <span className="text-og-grid">|</span>
-        <span className="text-muted-foreground">${t?.symbol ?? "—"}</span>
-        <span className="text-foreground">{fmtUsd(t?.usdPrice)}</span>
-        <span className={up ? "text-og-lime" : "text-og-blood"}>
-          {up ? "▲" : "▼"} {fmtPct(ch)}
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-muted-foreground">
+          SLOT <span className="text-og-cyan">{slot != null ? slot.toLocaleString() : "—"}</span>
         </span>
-        <span className="text-og-grid hidden sm:inline">|</span>
-        <span className="hidden text-muted-foreground sm:inline">MCAP</span>
-        <span className="hidden text-og-gold sm:inline">{fmtUsd(t?.mcap)}</span>
-        <span className="text-og-grid hidden md:inline">|</span>
-        <span className="hidden text-muted-foreground md:inline">LIQ</span>
-        <span className="hidden text-og-cyan md:inline">{fmtUsd(t?.liquidity)}</span>
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-muted-foreground">
+          ${t?.symbol ?? "—"} <span className="text-foreground">{fmtUsd(t?.usdPrice)}</span>
+          <span className={up ? "text-og-lime" : "text-og-blood"}>{up ? "▲" : "▼"} {fmtPct(ch)}</span>
+        </span>
+        <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-muted-foreground sm:inline-flex">
+          MCAP <span className="text-og-gold">{fmtUsd(t?.mcap)}</span>
+        </span>
+        <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-muted-foreground md:inline-flex">
+          LIQ <span className="text-og-cyan">{fmtUsd(t?.liquidity)}</span>
+        </span>
 
-        <span className="ml-auto inline-flex items-center gap-1.5">
+        <span className="ml-auto inline-flex shrink-0 items-center gap-1.5">
           <button
             onClick={onChangeMint}
-            className="inline-flex items-center gap-1 border border-og-grid px-1.5 py-0.5 text-foreground/70 transition hover:border-og-lime hover:text-og-lime"
+            className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-foreground/70 transition hover:border-og-lime hover:text-og-lime"
             title="Change mint"
           >
             <Pencil className="h-3 w-3" /> {shortAddr(mint, 4)}
           </button>
           <button
             onClick={copy}
-            className="inline-flex items-center gap-1 border border-og-grid px-1.5 py-0.5 text-foreground/70 transition hover:border-og-gold hover:text-og-gold"
+            className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-foreground/70 transition hover:border-og-gold hover:text-og-gold"
           >
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           </button>
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
+          <span className="hidden items-center gap-1 text-muted-foreground sm:inline-flex">
             <Activity className="h-3 w-3" /> {String(tick).padStart(2, "0")}
           </span>
         </span>

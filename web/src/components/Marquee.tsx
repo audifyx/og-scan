@@ -23,22 +23,21 @@ export const Marquee = () => {
   const loop = items.length > 0 ? [...items, ...items] : [];
 
   return (
-    <div className="relative overflow-hidden border-y border-og-grid bg-og-ink/80 py-2">
-      <div className="flex w-max gap-10 ticker-track whitespace-nowrap">
+    <div className="relative overflow-hidden border-y border-white/10 bg-[#020915]/82 py-2 backdrop-blur-xl">
+      <div className="flex w-max gap-3 ticker-track whitespace-nowrap px-3">
         {loop.length === 0 && (
-          <span className="px-6 text-xs text-muted-foreground">CONNECTING TO JUPITER FEED…</span>
+          <span className="rounded-full border border-white/10 bg-white/[0.045] px-4 py-2 text-xs text-muted-foreground">CONNECTING TO JUPITER FEED…</span>
         )}
         {loop.map((t, i) => {
           const ch = t.stats24h?.priceChange ?? 0;
           const up = ch >= 0;
           return (
-            <span key={`${t.id}-${i}`} className="flex items-center gap-2 text-xs uppercase tracking-widest">
+            <span key={`${t.id}-${i}`} className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs uppercase tracking-widest">
               <span className="text-og-gold font-bold">${t.symbol}</span>
               <span className="text-foreground">{fmtUsd(t.usdPrice)}</span>
               <span className={up ? "text-og-lime" : "text-og-blood"}>
                 {up ? "▲" : "▼"} {fmtPct(ch)}
               </span>
-              <span className="text-og-grid">●</span>
             </span>
           );
         })}

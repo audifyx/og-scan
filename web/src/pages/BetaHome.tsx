@@ -1,7 +1,6 @@
 import { memo, useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertTriangle,
   ArrowRight,
   CheckCircle2,
   Coins,
@@ -11,7 +10,11 @@ import {
   Globe2,
   MessageCircle,
   Radio,
+  Radar,
+  Search,
+  ShieldCheck,
   Sparkles,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 import { Scanlines } from "@/components/Scanlines";
@@ -29,6 +32,14 @@ type CommunityCard = {
   url: string;
   description: string;
   accent: "cyan" | "lime";
+};
+
+type SplashToolLink = {
+  title: string;
+  href: string;
+  description: string;
+  Icon: LucideIcon;
+  accent: "cyan" | "lime" | "gold";
 };
 
 const communityCards: CommunityCard[] = [
@@ -52,13 +63,48 @@ const communityCards: CommunityCard[] = [
   },
 ];
 
-const issueTips: string[] = ["Join Telegram for the fastest support", "Watch backup X for DEX status posts", "Use the scanner while the next DEX update is prepared"];
+const splashToolLinks: SplashToolLink[] = [
+  {
+    title: "OG Scanner",
+    href: "/scanner",
+    description: "Paste a mint or ticker and run the main origin check.",
+    Icon: Search,
+    accent: "lime",
+  },
+  {
+    title: "Snipe Feed",
+    href: "/snipe-feed",
+    description: "Watch new Solana launches and dev-wallet signals.",
+    Icon: Target,
+    accent: "cyan",
+  },
+  {
+    title: "OG Finder",
+    href: "/og-finder",
+    description: "Find the earliest on-chain mint, not the loudest copy.",
+    Icon: Radar,
+    accent: "gold",
+  },
+  {
+    title: "Migrations",
+    href: "/migrations",
+    description: "Track migration timing without confusing it for OG status.",
+    Icon: ShieldCheck,
+    accent: "cyan",
+  },
+];
+
+const issueTips: string[] = [
+  "Use Scanner first if you only need one tool",
+  "Open All Tools if you want the full command dashboard",
+  "Join Telegram for fastest support while the next DEX update is prepared",
+];
 
 const BetaHome = memo(() => {
   const [copied, setCopied] = useState<"coin" | null>(null);
 
-  const communityUpdates: string[] = useMemo<string[]>(
-    () => ["Telegram is the main room for quick updates", "Backup X will carry launch notes and status posts", "DEX updates are next and will be announced there first"],
+  const launchNotes: string[] = useMemo<string[]>(
+    () => ["Scanner is the fastest entry point", "Every tool has its own direct URL", "DEX updates will be announced in the community first"],
     [],
   );
 
@@ -72,7 +118,6 @@ const BetaHome = memo(() => {
     }
   }, []);
 
-
   const copyCoinCa = useCallback((): void => {
     void copyValue("coin", OGSCAN_TOKEN_MINT);
   }, [copyValue]);
@@ -80,82 +125,139 @@ const BetaHome = memo(() => {
   return (
     <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <Scanlines />
-      <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_18%_0%,hsl(var(--og-cyan)/0.22),transparent_31%),radial-gradient(circle_at_90%_10%,hsl(var(--og-lime)/0.18),transparent_34%),linear-gradient(180deg,hsl(var(--background)),hsl(var(--og-ink))_58%,#020511)]" />
-      <div className="pointer-events-none fixed inset-0 -z-10 grid-bg opacity-30" />
+      <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_16%_0%,hsl(var(--og-cyan)/0.26),transparent_30%),radial-gradient(circle_at_78%_8%,hsl(var(--og-lime)/0.2),transparent_32%),radial-gradient(circle_at_50%_95%,hsl(var(--og-gold)/0.08),transparent_34%),linear-gradient(180deg,#020716_0%,hsl(var(--background))_48%,#020409_100%)]" />
+      <div className="pointer-events-none fixed inset-0 -z-10 grid-bg opacity-25" />
+      <div className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-48 bg-gradient-to-b from-white/[0.05] to-transparent" />
 
-      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-5 sm:px-6 lg:px-8">
-        <header className="flex items-center justify-between gap-3 border border-og-grid bg-og-ink/82 p-3 shadow-og backdrop-blur-xl">
-          <div className="flex items-center gap-3">
-            <div className="relative h-11 w-11 overflow-hidden rounded-full border-2 border-og-lime bg-og-ink shadow-og">
-              <img src="/icon.png" alt="OG Scan icon" className="h-full w-full object-cover" />
-              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-og-cyan shadow-og" />
+      <section className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 pb-24 sm:px-6 lg:px-8 lg:pb-8">
+        <header className="sticky top-3 z-40 rounded-[1.5rem] border border-white/10 bg-[#031020]/88 p-2 shadow-[0_20px_80px_-48px_hsl(var(--og-cyan))] backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3 px-1">
+              <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-og-lime bg-og-ink shadow-og">
+                <img src="/icon.png" alt="OG Scan icon" className="h-full w-full object-cover" />
+                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-og-cyan shadow-og" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate font-display text-sm font-black uppercase tracking-[0.24em] text-white">OGScan</p>
+                <p className="truncate font-mono text-[9px] uppercase tracking-[0.25em] text-og-cyan">Origin tools · beta HQ</p>
+              </div>
             </div>
-            <div>
-              <p className="font-display text-sm font-black uppercase tracking-[0.28em] text-white">OGScan</p>
-              <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-og-cyan">Community HQ</p>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                to="/app"
+                className="hidden min-h-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] px-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:border-og-cyan hover:text-og-cyan sm:inline-flex"
+              >
+                All tools
+              </Link>
+              <Link
+                to="/scanner"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-og-lime bg-og-lime px-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-og-ink shadow-[0_0_34px_-10px_hsl(var(--og-lime))] transition hover:bg-white active:scale-[0.98]"
+              >
+                Open scanner <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
           </div>
-          <Link
-            to="/scanner"
-            className="hidden border border-og-lime bg-og-lime px-4 py-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-ink transition hover:bg-transparent hover:text-og-lime sm:inline-flex"
-          >
-            Enter app
-          </Link>
         </header>
 
-        <div className="grid flex-1 items-center gap-5 py-7 lg:grid-cols-[1.04fr_0.96fr] lg:gap-8 lg:py-10">
-          <section className="relative overflow-hidden border border-og-grid bg-og-ink/84 p-5 shadow-[0_0_0_1px_hsl(var(--og-grid)),0_34px_120px_-72px_hsl(var(--og-cyan))] sm:p-7 lg:p-8">
+        <div className="grid flex-1 items-center gap-5 py-6 lg:grid-cols-[1.02fr_0.98fr] lg:gap-7 lg:py-8">
+          <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.055] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_36px_130px_-78px_hsl(var(--og-cyan))] backdrop-blur-xl sm:p-7 lg:p-8">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-og-cyan via-og-lime to-white" />
-            <div className="absolute right-4 top-4 hidden border border-og-cyan/40 bg-og-cyan/10 px-3 py-1.5 font-mono text-[9px] font-black uppercase tracking-[0.26em] text-og-cyan sm:block">
-              Community links live
-            </div>
+            <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-og-lime/10 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-20 left-10 h-52 w-52 rounded-full bg-og-cyan/10 blur-3xl" />
 
-            <div className="mb-5 inline-flex items-center gap-2 border border-og-lime/45 bg-og-lime/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.26em] text-og-lime">
-              <Sparkles className="h-3.5 w-3.5" /> Updates moving here first
-            </div>
+            <div className="relative">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-og-lime/40 bg-og-lime/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-lime">
+                <Sparkles className="h-3.5 w-3.5" /> Start here
+              </div>
 
-            <h1 className="font-display text-4xl font-black uppercase leading-[0.92] tracking-tighter text-white text-glow sm:text-6xl lg:text-7xl">
-              OGScan community is open
-            </h1>
+              <h1 className="font-display text-5xl font-black uppercase leading-[0.86] tracking-tighter text-white text-glow sm:text-7xl lg:text-8xl">
+                Find the real OG faster.
+              </h1>
 
-            <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-              The next OGScan DEX update is being worked on now. Until it lands, follow the live community channels for status updates, beta notes, and every official announcement.
-            </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-[1.15fr_0.85fr]">
+                <Link
+                  to="/scanner"
+                  className="group relative overflow-hidden rounded-[1.4rem] border border-og-lime bg-og-lime px-5 py-4 text-og-ink shadow-[0_0_48px_-12px_hsl(var(--og-lime))] transition hover:bg-white active:scale-[0.985]"
+                >
+                  <div className="absolute inset-y-0 right-0 w-24 bg-white/30 blur-2xl transition group-hover:translate-x-4" />
+                  <div className="relative flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-mono text-[10px] font-black uppercase tracking-[0.25em] opacity-70">Main action</p>
+                      <p className="mt-1 font-display text-2xl font-black uppercase leading-none sm:text-3xl">Open OG Scanner</p>
+                    </div>
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-og-ink text-og-lime">
+                      <Search className="h-6 w-6" />
+                    </div>
+                  </div>
+                </Link>
 
-            <div className="mt-6 grid gap-2 sm:grid-cols-3">
-              {communityUpdates.map((step: string, index: number) => (
-                <div key={step} className="border border-og-grid bg-black/24 p-3">
-                  <span className="mb-2 grid h-7 w-7 place-items-center border border-og-cyan/50 bg-og-cyan/10 font-mono text-[10px] font-black text-og-cyan">
-                    {index + 1}
-                  </span>
-                  <p className="text-xs font-bold leading-relaxed text-white/82">{step}</p>
-                </div>
-              ))}
-            </div>
+                <Link
+                  to="/app"
+                  className="inline-flex min-h-[88px] items-center justify-between gap-3 rounded-[1.4rem] border border-white/12 bg-white/[0.07] px-5 py-4 font-display text-xl font-black uppercase text-white transition hover:border-og-cyan hover:text-og-cyan active:scale-[0.985]"
+                >
+                  View all tools <ArrowRight className="h-5 w-5" />
+                </Link>
+              </div>
 
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <a
-                href={OGSCAN_TELEGRAM_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 border border-og-lime bg-og-lime px-5 py-3 font-mono text-[11px] font-black uppercase tracking-[0.18em] text-og-ink shadow-og transition hover:bg-white hover:text-og-ink active:scale-[0.98]"
-              >
-                Join Telegram <ExternalLink className="h-4 w-4" />
-              </a>
-              <a
-                href={OGSCAN_BACKUP_X_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 border border-og-grid bg-black/24 px-5 py-3 font-mono text-[11px] font-black uppercase tracking-[0.18em] text-white transition hover:border-og-cyan hover:text-og-cyan active:scale-[0.98]"
-              >
-                Follow backup X <ExternalLink className="h-4 w-4" />
-              </a>
+              <p className="mt-5 max-w-2xl text-base leading-7 text-white/72 sm:text-lg">
+                OGScan is being reorganized so users can find the scanner, snipe feed, migration tracker, and wallet tools without hunting through a messy page.
+              </p>
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                {launchNotes.map((step: string, index: number) => (
+                  <div key={step} className="rounded-[1.1rem] border border-white/10 bg-black/24 p-3">
+                    <span className="mb-2 grid h-7 w-7 place-items-center rounded-full border border-og-cyan/50 bg-og-cyan/10 font-mono text-[10px] font-black text-og-cyan">
+                      {index + 1}
+                    </span>
+                    <p className="text-xs font-bold leading-relaxed text-white/82">{step}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <a
+                  href={OGSCAN_TELEGRAM_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border border-og-cyan/45 bg-og-cyan/10 px-5 py-3 font-mono text-[11px] font-black uppercase tracking-[0.18em] text-og-cyan transition hover:bg-og-cyan hover:text-og-ink active:scale-[0.98]"
+                >
+                  Join Telegram <ExternalLink className="h-4 w-4" />
+                </a>
+                <a
+                  href={OGSCAN_BACKUP_X_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border border-white/12 bg-black/24 px-5 py-3 font-mono text-[11px] font-black uppercase tracking-[0.18em] text-white transition hover:border-white hover:bg-white hover:text-og-ink active:scale-[0.98]"
+                >
+                  Follow backup X <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
             </div>
           </section>
 
           <aside className="space-y-4">
-            <section className="border border-og-lime/45 bg-og-lime/10 p-4 shadow-og">
-              <div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-og-lime">
+            <section className="rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl sm:p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <div className="mb-1 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-lime">
+                    <Flame className="h-4 w-4" /> Tool shortcuts
+                  </div>
+                  <h2 className="font-display text-2xl font-black uppercase tracking-tight text-white">Pick your tool</h2>
+                </div>
+                <Link to="/app" className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-2 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-white/70 transition hover:text-og-cyan">
+                  All
+                </Link>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {splashToolLinks.map((tool: SplashToolLink) => (
+                  <SplashToolCard key={tool.href} tool={tool} />
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[1.6rem] border border-og-lime/35 bg-og-lime/10 p-4 shadow-og">
+              <div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-lime">
                 <Coins className="h-4 w-4" /> Token is live
               </div>
               <p className="text-sm font-semibold leading-6 text-white/86">
@@ -167,7 +269,7 @@ const BetaHome = memo(() => {
               <button
                 type="button"
                 onClick={copyCoinCa}
-                className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 border border-og-gold/60 bg-og-gold/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-og-gold transition hover:bg-og-gold hover:text-og-ink"
+                className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-og-gold/60 bg-og-gold/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-og-gold transition hover:bg-og-gold hover:text-og-ink"
               >
                 {copied === "coin" ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 {copied === "coin" ? "CA copied" : "Copy official CA"}
@@ -180,18 +282,9 @@ const BetaHome = memo(() => {
               ))}
             </div>
 
-            <section className="border border-og-gold/40 bg-og-gold/10 p-4 shadow-og-gold">
-              <div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-og-gold">
-                <AlertTriangle className="h-4 w-4" /> Please note
-              </div>
-              <p className="text-sm leading-6 text-white/78">
-                We&apos;re updating the DEX experience as fast as possible. For now, Telegram and backup X are the best places to follow progress, report issues, and catch official OGScan updates.
-              </p>
-            </section>
-
-            <section className="border border-og-grid bg-og-ink/82 p-4">
-              <div className="mb-3 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-og-cyan">
-                <Globe2 className="h-4 w-4" /> Having issues?
+            <section className="rounded-[1.6rem] border border-white/10 bg-white/[0.045] p-4">
+              <div className="mb-3 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-cyan">
+                <Globe2 className="h-4 w-4" /> Quick note
               </div>
               <ul className="space-y-2">
                 {issueTips.map((tip: string) => (
@@ -201,43 +294,70 @@ const BetaHome = memo(() => {
                   </li>
                 ))}
               </ul>
-              <p className="mt-4 border-t border-og-grid pt-3 text-xs leading-5 text-white/60">
-                Found a bug or have feedback? Join Telegram or follow backup X so we can keep everyone updated in one place.
+              <p className="mt-4 border-t border-white/10 pt-3 text-xs leading-5 text-white/60">
+                We&apos;re updating the DEX experience as fast as possible. For now, Telegram and backup X are the best places for official updates.
               </p>
             </section>
           </aside>
         </div>
-
-        <footer className="pb-4 text-center">
-          <div className="mb-3 flex items-center justify-center gap-2 font-mono text-[9px] uppercase tracking-[0.28em] text-muted-foreground">
-            <Flame className="h-3.5 w-3.5 text-og-lime" /> Want the web tools instead?
-          </div>
-          <Link
-            to="/scanner"
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 border border-white/20 bg-white px-5 py-3 font-mono text-[11px] font-black uppercase tracking-[0.2em] text-og-ink transition hover:border-og-lime hover:bg-og-lime sm:w-auto"
-          >
-            Or go ahead and enter OG scanner <ArrowRight className="h-4 w-4" />
-          </Link>
-        </footer>
       </section>
+
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#020814]/92 p-3 backdrop-blur-xl sm:hidden">
+        <div className="mx-auto grid max-w-md grid-cols-[1fr_0.8fr] gap-2">
+          <Link to="/scanner" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-og-lime px-4 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-og-ink shadow-og">
+            Open scanner <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link to="/app" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] px-4 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-white">
+            All tools
+          </Link>
+        </div>
+      </div>
     </main>
   );
 });
 
 BetaHome.displayName = "BetaHome";
 
+const SplashToolCard = memo(({ tool }: { tool: SplashToolLink }) => {
+  const accentClass: string =
+    tool.accent === "gold"
+      ? "border-og-gold/45 bg-og-gold/10 text-og-gold"
+      : tool.accent === "cyan"
+        ? "border-og-cyan/45 bg-og-cyan/10 text-og-cyan"
+        : "border-og-lime/45 bg-og-lime/10 text-og-lime";
+
+  return (
+    <Link to={tool.href} className="group rounded-[1.25rem] border border-white/10 bg-black/24 p-3 transition hover:border-og-lime hover:bg-og-lime/5 active:scale-[0.985]">
+      <div className="flex items-start gap-3">
+        <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-full border", accentClass)}>
+          <tool.Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-display text-lg font-black uppercase leading-none text-white">{tool.title}</h3>
+            <ArrowRight className="h-4 w-4 shrink-0 text-og-lime opacity-0 transition group-hover:translate-x-1 group-hover:opacity-100" />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-white/58">{tool.description}</p>
+        </div>
+      </div>
+    </Link>
+  );
+});
+
+SplashToolCard.displayName = "SplashToolCard";
+
 const CommunityCardView = memo(({ card }: { card: CommunityCard }) => {
   const accentClass: string = card.accent === "cyan" ? "border-og-cyan/45 bg-og-cyan/10 text-og-cyan" : "border-og-lime/45 bg-og-lime/10 text-og-lime";
   const underlineClass: string = card.accent === "cyan" ? "decoration-og-cyan/50 hover:text-og-cyan" : "decoration-og-lime/50 hover:text-og-lime";
 
   return (
-    <section className="border border-og-grid bg-og-ink/82 p-4 shadow-og">
+    <section className="rounded-[1.6rem] border border-white/10 bg-white/[0.045] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
       <div className="flex items-start gap-3">
-        <div className={cn("grid h-11 w-11 shrink-0 place-items-center border", accentClass)}>
+        <div className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-full border", accentClass)}>
           <card.Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[9px] font-black uppercase tracking-[0.26em] text-muted-foreground">{card.eyebrow}</p>
+          <p className="font-mono text-[9px] font-black uppercase tracking-[0.24em] text-muted-foreground">{card.eyebrow}</p>
           <h2 className="mt-1 font-display text-2xl font-black uppercase tracking-tight text-white">{card.title}</h2>
         </div>
       </div>
