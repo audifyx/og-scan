@@ -155,12 +155,12 @@ const colorMap: Record<string, { ring: string; text: string; chip: string }> = {
 };
 
 const TECH_BULLETS: string[] = [
-  "Contract address history",
-  "Pair age + liquidity strength",
-  "Volume activity + holder signals",
-  "DexScreener routes + duplicate tickers",
-  "Fresh pairs vs dead clones",
-  "Scam-looking copycat detection",
+  "Narrative fingerprint clustering",
+  "Earliest on-chain mint proof",
+  "First liquidity + timeline graph",
+  "Clone / relaunch probability",
+  "Deployer trust fingerprint",
+  "Migration and CTO risk separation",
 ];
 
 export const TechStack = () => {
@@ -206,7 +206,7 @@ export const TechStack = () => {
               same ticker, same logo, same hype — while the real OG gets buried under copycats.
             </p>
             <p className="mx-auto mt-2 max-w-2xl text-xs leading-relaxed text-foreground/80 sm:text-sm">
-              OGScan verifies before you ape: search any ticker, scan the market, and surface the contract that actually looks original.
+              OGScan verifies before you ape: search any ticker, reconstruct the origin timeline, and surface the contract with the earliest provable chain history.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <a href={OGSCAN_TECH_POST_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-og-gold bg-og-gold px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-widest text-og-ink transition hover:bg-og-gold/90">
@@ -244,26 +244,26 @@ export const TechStack = () => {
           <span className="h-px w-10 bg-og-cyan" /> DATA · PIPELINE
         </div>
         <div className="mx-auto grid max-w-5xl items-center gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr]">
-          <PipeBlock title="ON-CHAIN" lines={["Solana mainnet", "raw blocks · logs"]} color="cyan" />
+          <PipeBlock title="CHAIN ORIGIN" lines={["Mint timestamps", "first tx · first holder"]} color="cyan" />
           <Arrow />
           <PipeBlock
-            title="INGESTION"
-            lines={["Helius · Alchemy", "QuickNode WSS"]}
+            title="ATTRIBUTION"
+            lines={["Jupiter · DexScreener", "Helius · Birdeye"]}
             color="lime"
           />
           <Arrow />
           <PipeBlock
-            title="ENRICHMENT"
-            lines={["Jupiter Tokens v2", "Birdeye OHLCV"]}
+            title="FORENSICS"
+            lines={["deployer · liquidity", "clone · migration risk"]}
             color="gold"
           />
         </div>
         <div className="mx-auto mt-3 grid max-w-5xl items-center gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr]">
-          <PipeBlock title="CACHE" lines={["TanStack Query", "20s · 60s polls"]} color="cyan" />
+          <PipeBlock title="CLUSTER" lines={["unicode normalized", "leet · emoji · symbol safe"]} color="cyan" />
           <Arrow />
-          <PipeBlock title="SCORING" lines={["OG · Risk · Health", "client-side fusion"]} color="gold" />
+          <PipeBlock title="SCORING" lines={["TRUE_OG_SCORE", "12-factor formula"]} color="gold" />
           <Arrow />
-          <PipeBlock title="UI" lines={["React · Vite", "CRT · scanlines"]} color="lime" />
+          <PipeBlock title="OUTPUT" lines={["TRUE OG · CLONE", "CTO · MIGRATION"]} color="lime" />
         </div>
       </div>
 
@@ -304,17 +304,17 @@ export const TechStack = () => {
         <div className="grid grid-cols-2 gap-px bg-og-grid sm:grid-cols-3 lg:grid-cols-4">
           {[
             { label: "TOKEN SEARCH", src: "JUPITER" },
-            { label: "ORGANIC SCORE", src: "JUPITER" },
-            { label: "SWAP QUOTES", src: "JUPITER" },
-            { label: "TRENDING / TOP", src: "JUPITER" },
+            { label: "NARRATIVE CLUSTER", src: "OGSCAN" },
+            { label: "TRUE OG SCORE", src: "12-FACTOR FUSION" },
+            { label: "CLONE PROBABILITY", src: "ORIGIN GRAPH" },
             { label: "PARSED TX", src: "HELIUS" },
-            { label: "WHALES / HOLDERS", src: "HELIUS RPC" },
-            { label: "SUPPLY · FDV", src: "HELIUS RPC" },
-            { label: "OHLCV · CANDLES", src: "BIRDEYE" },
-            { label: "WSS · LIVE", src: "QUICKNODE" },
-            { label: "RPC FAILOVER", src: "ALCHEMY" },
-            { label: "RUG / OG SCORING", src: "FUSION" },
-            { label: "AUDIT FLAGS", src: "JUPITER" },
+            { label: "FIRST LIQUIDITY", src: "DEXSCREENER" },
+            { label: "ATH / CANDLES", src: "BIRDEYE" },
+            { label: "DEPLOYER TRUST", src: "AUDIT + GRAPH" },
+            { label: "MIGRATION RISK", src: "TIMELINE DELTA" },
+            { label: "CTO RISK", src: "BEHAVIORAL MODEL" },
+            { label: "RUG / AUTHORITY", src: "JUPITER AUDIT" },
+            { label: "ROUTE QUOTES", src: "JUPITER" },
           ].map((row) => (
             <div key={row.label} className="bg-og-ink p-3">
               <div className="text-[10px] uppercase tracking-[0.3em] text-foreground/60">{row.label}</div>

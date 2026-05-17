@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, ShieldCheck, Loader2, Filter, Calendar, Flame, BadgeDollarSign } from "lucide-react";
+import { Search, ShieldCheck, Loader2, Filter, Calendar, Flame, BadgeDollarSign, Fingerprint, GitBranch, ShieldAlert } from "lucide-react";
 import { CopyMintButton } from "@/components/CopyMintButton";
 import {
   enrichTokensWithMarketIntel,
+  forensicOgAttribution,
   jupSearchToken,
   fmtPct,
   fmtUsd,
@@ -11,7 +12,9 @@ import {
   shortDate,
   tokenDexPaidLabel,
   tokenMigrationDateIso,
+  type ForensicOgReport,
   type JupTokenInfo,
+  type TokenForensicScores,
 } from "@/lib/og";
 
 type Props = { onSelect: (mint: string) => void; initialQuery?: string };
@@ -29,6 +32,10 @@ const DEFAULT_FILTERS: ScanFilters = {
   verifiedOnly: false,
   greenOnly: false,
 };
+
+function forensicKey(t: JupTokenInfo): string {
+  return `${t.chainId ?? "solana"}:${t.id}`;
+}
 
 function passesScanFilters(t: JupTokenInfo, filters: ScanFilters): boolean {
   if ((t.liquidity ?? 0) < filters.minLiq) return false;
@@ -51,16 +58,21 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   }, [initialQuery]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["scan", debounced, "market-intel-v1"],
-    queryFn: async () => {
+    queryKey: ["scan", debounced, "forensic-v3"],
+    queryFn: async (): Promise<ForensicOgReport> => {
+      const report: ForensicOgReport = await forensicOgAttribution(debounced);
+      if (report.candidates.length > 0) return report;
+
       const tokens: JupTokenInfo[] = await jupSearchToken(debounced);
-      return enrichTokensWithMarketIntel(tokens, { includeAth: true, maxAth: 12 });
+      const fallbackCandidates: JupTokenInfo[] = await enrichTokensWithMarketIntel(tokens, { includeAth: true, maxAth: 12 });
+      return { ...report, candidates: fallbackCandidates, copycats: fallbackCandidates.slice(1) };
     },
     enabled: debounced.length >= 2,
     staleTime: 30_000,
   });
 
-  const rawResults: JupTokenInfo[] = data ?? [];
+  const report: ForensicOgReport | undefined = data;
+  const rawResults: JupTokenInfo[] = report?.candidates ?? [];
   const filteredResults: JupTokenInfo[] = useMemo(() => {
     return rawResults.filter((t) => passesScanFilters(t, filters));
   }, [rawResults, filters]);
@@ -77,7 +89,9 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <span className="text-foreground">SCAN ANY</span>{" "}
             <span className="text-og-cyan text-glow">MINT</span>
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">Search by ticker, name, or paste a mint address. Powered by Jupiter token registry.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Search a ticker, meme, brand, narrative, or mint. OGSCAN now clusters variants and ranks origin by earliest on-chain proof — not hype.
+          </p>
         </div>
 
         <div className="relative">
@@ -131,10 +145,19 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
           </div>
         </div>
 
+        {report && rawResults.length > 0 && (
+          <div className="mt-4 grid gap-2 border border-og-cyan/35 bg-og-cyan/5 p-3 sm:grid-cols-4">
+            <ForensicStat icon={Fingerprint} label="Narrative ID" value={report.narrativeFingerprintId} accent="text-og-cyan" />
+            <ForensicStat icon={GitBranch} label="Cluster" value={`${report.summary.candidateCount} tokens · ${report.summary.chainCount} chains`} accent="text-og-gold" />
+            <ForensicStat icon={ShieldCheck} label="True OG" value={report.og ? `${report.og.symbol}` : "Unknown"} accent="text-og-lime" />
+            <ForensicStat icon={ShieldAlert} label="Clones" value={`${report.summary.cloneCount} flagged`} accent={report.summary.cloneCount > 0 ? "text-og-blood" : "text-og-lime"} />
+          </div>
+        )}
+
         {/* Results */}
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
           {filteredResults.slice(0, 12).map((t) => (
-            <ResultRow key={t.id} t={t} onSelect={() => onSelect(t.id)} />
+            <ResultRow key={forensicKey(t)} t={t} score={report?.tokenScores[forensicKey(t)]} onSelect={() => onSelect(t.id)} />
           ))}
           {debounced.length >= 2 && !isFetching && rawResults.length === 0 && (
             <div className="col-span-full border border-og-grid bg-og-ink/70 p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
@@ -202,11 +225,14 @@ const FilterToggle = ({
   </button>
 );
 
-const ResultRow = ({ t, onSelect }: { t: JupTokenInfo; onSelect: () => void }) => {
+const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForensicScores; onSelect: () => void }) => {
   const ch = t.stats24h?.priceChange ?? 0;
   const up = ch >= 0;
   const migrationDate: string = shortDate(tokenMigrationDateIso(t));
   const dexPaid: string = tokenDexPaidLabel(t);
+  const ogProbability: string = score ? `${score.trueOgProbability}%` : "—";
+  const cloneProbability: string = score ? `${score.cloneProbability}%` : "—";
+  const label: string = score?.label ?? "SCANNED";
   return (
     <article className="group flex items-center gap-3 border border-og-grid bg-og-ink/70 p-3 text-left transition hover:border-og-lime hover:bg-og-lime/5">
       <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-4 text-left">
@@ -229,6 +255,9 @@ const ResultRow = ({ t, onSelect }: { t: JupTokenInfo; onSelect: () => void }) =
             <span>· LQ {fmtUsd(t.liquidity)}</span>
           </div>
           <div className="mt-2 grid grid-cols-3 gap-1.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+            <MiniIntel icon={Fingerprint} label="OG" value={ogProbability} accent={score?.label === "TRUE OG" ? "text-og-lime" : "text-og-gold"} />
+            <MiniIntel icon={ShieldAlert} label="Clone" value={cloneProbability} accent={(score?.cloneProbability ?? 0) >= 58 ? "text-og-blood" : "text-foreground"} />
+            <MiniIntel icon={GitBranch} label="Label" value={label} accent={score?.label === "TRUE OG" ? "text-og-lime" : score ? "text-og-cyan" : undefined} />
             <MiniIntel icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
             <MiniIntel icon={Calendar} label="Migrated" value={migrationDate} accent="text-og-cyan" />
             <MiniIntel icon={BadgeDollarSign} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
@@ -240,6 +269,25 @@ const ResultRow = ({ t, onSelect }: { t: JupTokenInfo; onSelect: () => void }) =
     </article>
   );
 };
+
+const ForensicStat = ({
+  icon: Icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  accent?: string;
+}) => (
+  <div className="min-w-0 border border-og-grid/70 bg-og-ink/70 p-2 font-mono uppercase tracking-widest">
+    <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+      <Icon className="h-3 w-3" /> {label}
+    </div>
+    <div className={`mt-1 truncate text-[11px] ${accent ?? "text-foreground"}`}>{value}</div>
+  </div>
+);
 
 const MiniIntel = ({
   icon: Icon,

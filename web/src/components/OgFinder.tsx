@@ -16,19 +16,25 @@ import {
   Lock,
   Unlock,
   Filter,
+  Fingerprint,
+  GitBranch,
+  Network,
+  BrainCircuit,
+  AlertTriangle,
 } from "lucide-react";
 import { CopyMintButton } from "@/components/CopyMintButton";
 import {
-  jupOgCopycats,
+  forensicOgAttribution,
   fmtPct,
   fmtUsd,
-  fmtNum,
   shortAddr,
   tokenDexPaidLabel,
   tokenMigrationDateIso,
   tokenOgCreatedAtIso,
   tokenOgCreatedAtMs,
+  type ForensicOgReport,
   type JupTokenInfo,
+  type TokenForensicScores,
 } from "@/lib/og";
 
 type Props = { onSelect: (mint: string) => void };
@@ -70,6 +76,10 @@ function shortDate(createdAt: string | undefined): string {
   return createdAt ? new Date(createdAt).toISOString().slice(0, 10) : "—";
 }
 
+function forensicKey(t: JupTokenInfo): string {
+  return `${t.chainId ?? "solana"}:${t.id}`;
+}
+
 function rugRisk(t: JupTokenInfo): "low" | "med" | "high" {
   let bad = 0;
   if (!t.audit?.mintAuthorityDisabled) bad++;
@@ -88,14 +98,15 @@ export const OgFinder = ({ onSelect }: Props) => {
   const [filters, setFilters] = useState<FinderFilters>(DEFAULT_FILTERS);
 
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ["og-copycats", submitted],
-    queryFn: () => jupOgCopycats(submitted),
+    queryKey: ["og-forensic-attribution", submitted, "v3"],
+    queryFn: (): Promise<ForensicOgReport> => forensicOgAttribution(submitted),
     enabled: submitted.length >= 1,
     staleTime: 30_000,
   });
 
-  const og = data?.og ?? null;
-  const cats = data?.copycats ?? [];
+  const report: ForensicOgReport | undefined = data;
+  const og = report?.og ?? null;
+  const cats = report?.copycats ?? [];
 
   const oldestTs = useMemo(() => {
     const all = [og, ...cats].filter(Boolean) as JupTokenInfo[];
@@ -109,13 +120,14 @@ export const OgFinder = ({ onSelect }: Props) => {
 
   const filteredCats = useMemo(() => {
     return cats.filter((c) => {
-      if (ogScore(c, oldestTs) < filters.minScore) return false;
+      const forensicScore: number = report?.tokenScores[forensicKey(c)]?.trueOgProbability ?? ogScore(c, oldestTs);
+      if (forensicScore < filters.minScore) return false;
       if ((c.liquidity ?? 0) < filters.minLiq) return false;
       if (filters.verifiedOnly && !c.isVerified) return false;
       if (filters.hideHighRisk && rugRisk(c) === "high") return false;
       return true;
     });
-  }, [cats, oldestTs, filters]);
+  }, [cats, oldestTs, filters, report]);
 
   const droppedCats = cats.length - filteredCats.length;
 
@@ -137,9 +149,8 @@ export const OgFinder = ({ onSelect }: Props) => {
             <span className="text-og-gold text-glow-gold">DIRECT OG</span>
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Drop a ticker. We pull every Solana mint sharing it, normalize symbols like $WIF,
-            then crown the earliest on-chain mint creation date. Price, liquidity, migrated pools,
-            market cap, and hype never decide the OG.
+            Drop any ticker, meme, brand, or narrative. OGSCAN normalizes unicode, punctuation, emoji, casing, duplicate characters,
+            and leetspeak, then reconstructs the origin cluster by earliest provable chain history — never by hype, market cap, or migration.
           </p>
         </div>
 
@@ -204,12 +215,16 @@ export const OgFinder = ({ onSelect }: Props) => {
               </button>
             </div>
             <div className="grid gap-2 sm:grid-cols-4">
-              <FilterNum label="MIN AGE SCORE" value={filters.minScore} step={5} onChange={(v) => setFilters({ ...filters, minScore: v })} />
+              <FilterNum label="MIN OG SCORE" value={filters.minScore} step={5} onChange={(v) => setFilters({ ...filters, minScore: v })} />
               <FilterNum label="MIN LIQ" value={filters.minLiq} step={1000} onChange={(v) => setFilters({ ...filters, minLiq: v })} />
               <FilterToggle label="VERIFIED" value={filters.verifiedOnly} onChange={(v) => setFilters({ ...filters, verifiedOnly: v })} />
               <FilterToggle label="HIDE RUG RISK" value={filters.hideHighRisk} onChange={(v) => setFilters({ ...filters, hideHighRisk: v })} />
             </div>
           </div>
+        )}
+
+        {submitted && report && report.summary.candidateCount > 0 && (
+          <ForensicReportPanel report={report} />
         )}
 
         {submitted && og && (
@@ -221,7 +236,7 @@ export const OgFinder = ({ onSelect }: Props) => {
                 </span>
                 <ScoreBar score={ogS} />
               </div>
-              <CoinCard t={og} highlight score={ogS} onSelect={() => onSelect(og.id)} />
+              <CoinCard t={og} highlight score={report?.tokenScores[forensicKey(og)]?.trueOgProbability ?? ogS} forensic={report?.tokenScores[forensicKey(og)]} onSelect={() => onSelect(og.id)} />
             </div>
             <div className="lg:col-span-2">
               <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-og-blood">
@@ -239,9 +254,10 @@ export const OgFinder = ({ onSelect }: Props) => {
                 <div className="grid gap-3 sm:grid-cols-2">
                   {filteredCats.map((c) => (
                     <CoinCard
-                      key={c.id}
+                      key={forensicKey(c)}
                       t={c}
-                      score={ogScore(c, oldestTs)}
+                      score={report?.tokenScores[forensicKey(c)]?.trueOgProbability ?? ogScore(c, oldestTs)}
+                      forensic={report?.tokenScores[forensicKey(c)]}
                       onSelect={() => onSelect(c.id)}
                     />
                   ))}
@@ -343,11 +359,13 @@ const CoinCard = ({
   onSelect,
   highlight = false,
   score,
+  forensic,
 }: {
   t: JupTokenInfo;
   onSelect: () => void;
   highlight?: boolean;
   score: number;
+  forensic?: TokenForensicScores;
 }) => {
   const ch = t.stats24h?.priceChange ?? 0;
   const up = ch >= 0;
@@ -408,12 +426,16 @@ const CoinCard = ({
 
       {!highlight ? null : (
         <div className="flex items-center justify-between border-y border-og-gold/30 py-2">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-og-gold/80">CHAIN AGE SCORE</span>
+          <span className="font-mono text-[10px] uppercase tracking-widest text-og-gold/80">TRUE OG SCORE</span>
           <ScoreBar score={score} />
         </div>
       )}
 
       <div className="grid grid-cols-4 gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        <Stat icon={Fingerprint} label="OG" value={forensic ? `${forensic.trueOgProbability}%` : `${score}%`} accent={highlight ? "text-og-lime" : "text-og-gold"} />
+        <Stat icon={ShieldAlert} label="CLONE" value={forensic ? `${forensic.cloneProbability}%` : "—"} accent={(forensic?.cloneProbability ?? 0) >= 58 ? "text-og-blood" : undefined} />
+        <Stat icon={GitBranch} label="LABEL" value={forensic?.label ?? (highlight ? "TRUE OG" : "COPY")} accent={highlight ? "text-og-lime" : "text-og-cyan"} />
+        <Stat icon={BrainCircuit} label="DEV" value={forensic ? `${forensic.deployerTrustScore}%` : "—"} accent="text-og-cyan" />
         <Stat icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
         <Stat icon={Droplets} label="LIQ" value={fmtUsd(t.liquidity)} />
         <Stat icon={Users} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
@@ -424,6 +446,13 @@ const CoinCard = ({
           accent="text-og-cyan"
         />
       </div>
+
+      {forensic && (forensic.reasons.length > 0 || forensic.warnings.length > 0) && (
+        <div className="border-t border-og-grid/60 pt-2 font-mono text-[9px] uppercase tracking-widest">
+          <div className="text-og-lime">WHY: {forensic.reasons[0] ?? "Origin scoring complete."}</div>
+          {forensic.warnings[0] && <div className="mt-1 text-og-blood">WATCH: {forensic.warnings[0]}</div>}
+        </div>
+      )}
 
       <div className="flex items-center gap-2 border-t border-og-grid/60 pt-2 font-mono text-[9px] uppercase tracking-widest">
         <AuditChip
@@ -455,6 +484,98 @@ const CoinCard = ({
     </article>
   );
 };
+
+const ForensicReportPanel = ({ report }: { report: ForensicOgReport }) => {
+  const ogScore: TokenForensicScores | undefined = report.og ? report.tokenScores[forensicKey(report.og)] : undefined;
+  return (
+    <div className="mt-5 border border-og-gold/40 bg-og-gold/5 p-3 sm:p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-gold">
+          <Fingerprint className="h-3.5 w-3.5" /> forensic origin report
+        </div>
+        <span className="border border-og-grid bg-og-ink/80 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-og-cyan">
+          {report.narrativeFingerprintId}
+        </span>
+        <span className="border border-og-grid bg-og-ink/80 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+          normalized: {report.normalizedQuery}
+        </span>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <ForensicMetric icon={Crown} label="TRUE OG" value={report.og ? `${report.og.symbol}` : "UNKNOWN"} accent="text-og-lime" />
+          <ForensicMetric icon={BrainCircuit} label="CONFIDENCE" value={ogScore ? `${ogScore.trueOgProbability}%` : "—"} accent="text-og-gold" />
+          <ForensicMetric icon={ShieldAlert} label="CLONES" value={`${report.summary.cloneCount}/${report.summary.candidateCount}`} accent={report.summary.cloneCount > 0 ? "text-og-blood" : "text-og-lime"} />
+          <ForensicMetric icon={Network} label="CHAINS" value={`${report.summary.chainCount}`} accent="text-og-cyan" />
+          <ForensicMetric icon={Calendar} label="FIRST PROOF" value={shortDate(report.summary.earliestProof)} accent="text-og-lime" />
+          <ForensicMetric icon={Droplets} label="FIRST LP" value={shortDate(report.summary.earliestLiquidity)} accent="text-og-cyan" />
+        </div>
+
+        <div className="border border-og-grid bg-og-ink/70 p-3">
+          <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
+            <GitBranch className="h-3 w-3" /> lineage map
+          </div>
+          <div className="space-y-1.5">
+            {report.familyTree.slice(0, 7).map((node, index) => (
+              <div key={`${node.relationship}-${node.token.id}`} className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest">
+                <span className={index === 0 ? "text-og-gold" : "text-muted-foreground"}>{index === 0 ? "TRUE OG" : `├─ ${node.relationship}`}</span>
+                <span className="truncate text-foreground">${node.token.symbol}</span>
+                <span className="ml-auto text-og-cyan">{node.score}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <div className="border border-og-grid bg-og-ink/70 p-3">
+          <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-lime">
+            <Calendar className="h-3 w-3" /> chronological proof
+          </div>
+          <div className="space-y-1.5">
+            {report.timeline.slice(0, 6).map((event) => (
+              <div key={`${event.at}-${event.tokenId}-${event.type}`} className="grid grid-cols-[82px_1fr] gap-2 font-mono text-[9px] uppercase tracking-widest">
+                <span className="text-muted-foreground">{shortDate(event.at)}</span>
+                <span className="truncate text-foreground"><span className="text-og-cyan">{event.type}</span> · {event.detail}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="border border-og-grid bg-og-ink/70 p-3">
+          <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-blood">
+            <AlertTriangle className="h-3 w-3" /> attribution warnings
+          </div>
+          <div className="space-y-1.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+            <div>Migration probability: <span className="text-og-cyan">{ogScore ? `${ogScore.migrationProbability}%` : "—"}</span></div>
+            <div>CTO probability: <span className="text-og-cyan">{ogScore ? `${ogScore.ctoProbability}%` : "—"}</span></div>
+            <div>Artificial trend probability: <span className="text-og-cyan">{ogScore ? `${ogScore.artificialTrendProbability}%` : "—"}</span></div>
+            <div>Labels: <span className="text-og-gold">TRUE OG · LIKELY CLONE · MIGRATION · CTO · HIGH RISK</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ForensicMetric = ({
+  icon: Icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  accent?: string;
+}) => (
+  <div className="border border-og-grid bg-og-ink/80 p-3 font-mono uppercase tracking-widest">
+    <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
+      <Icon className="h-3 w-3" /> {label}
+    </div>
+    <div className={`mt-1 truncate text-sm ${accent ?? "text-foreground"}`}>{value}</div>
+  </div>
+);
 
 const Stat = ({
   icon: Icon,

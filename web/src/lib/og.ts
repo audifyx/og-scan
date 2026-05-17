@@ -33,6 +33,7 @@ export type TokenCreationSource = "chain" | "pool" | "unknown";
 
 export type JupTokenInfo = {
   id: string;
+  chainId?: string;
   name: string;
   symbol: string;
   icon?: string;
@@ -153,8 +154,34 @@ export async function jupTopOrganic(interval: JupInterval = "24h", limit = 10): 
   return jget<JupTokenInfo[]>(url);
 }
 
+const ZERO_WIDTH_RE = /[\u200B-\u200D\uFEFF\u2060]/g;
+const LEET_TABLE: Record<string, string> = {
+  "0": "o",
+  "1": "i",
+  "2": "z",
+  "3": "e",
+  "4": "a",
+  "5": "s",
+  "7": "t",
+  "8": "b",
+  "9": "g",
+};
+
+export function normalizeNarrativeText(value: string | undefined): string {
+  const raw: string = value ?? "";
+  return raw
+    .normalize("NFKD")
+    .replace(ZERO_WIDTH_RE, "")
+    .toLowerCase()
+    .replace(/[０-９]/g, (char: string): string => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+    .replace(/[ａ-ｚ]/g, (char: string): string => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+    .replace(/[0-9]/g, (char: string): string => LEET_TABLE[char] ?? char)
+    .replace(/[^\p{Letter}\p{Number}]+/gu, "")
+    .replace(/(.)\1{2,}/g, "$1");
+}
+
 function normalizeTickerSymbol(value: string | undefined): string {
-  return (value ?? "").replace(/^\$+/, "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+  return normalizeNarrativeText((value ?? "").replace(/^\$+/, ""));
 }
 
 function isoToMs(rawCreatedAt: string | undefined): number {
@@ -211,6 +238,7 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
   return {
     ...existing,
     id: existing.id,
+    chainId: existing.chainId ?? next.chainId,
     name: existing.name || next.name,
     symbol: existing.symbol || next.symbol,
     icon: existing.icon ?? next.icon,
@@ -251,6 +279,12 @@ async function dexSearchPairs(query: string): Promise<DexSearchPair[]> {
   return (response.pairs ?? []).filter((pair) => pair.chainId === "solana" && Boolean(pair.baseToken?.address));
 }
 
+async function dexSearchAllPairs(query: string): Promise<DexSearchPair[]> {
+  const url = `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`;
+  const response = await jget<DexSearchResponse>(url);
+  return (response.pairs ?? []).filter((pair) => Boolean(pair.chainId) && Boolean(pair.baseToken?.address));
+}
+
 function dexPairToToken(pair: DexSearchPair): JupTokenInfo | null {
   const mint: string | undefined = pair.baseToken?.address;
   if (!mint) return null;
@@ -265,6 +299,7 @@ function dexPairToToken(pair: DexSearchPair): JupTokenInfo | null {
 
   return {
     id: mint,
+    chainId: pair.chainId ?? "solana",
     name: pair.baseToken?.name ?? "Solana token",
     symbol: pair.baseToken?.symbol ?? "TOKEN",
     icon: pair.info?.imageUrl,
@@ -471,7 +506,10 @@ export async function enrichTokensWithMarketIntel(
 ): Promise<JupTokenInfo[]> {
   if (tokens.length === 0) return [];
 
-  const mints: string[] = tokens.map((token) => token.id).filter(Boolean);
+  const mints: string[] = tokens
+    .filter((token) => (token.chainId ?? "solana") === "solana")
+    .map((token) => token.id)
+    .filter(Boolean);
   const [pairsResult, boostsResult] = await Promise.allSettled([dexPairsForMints(mints), dexBoostsByMint()]);
   const pairByMint: Map<string, DexSearchPair> = pairsResult.status === "fulfilled" ? bestPairByMint(pairsResult.value) : new Map<string, DexSearchPair>();
   const boostByMint: Map<string, DexBoostInfo> = boostsResult.status === "fulfilled" ? boostsResult.value : new Map<string, DexBoostInfo>();
@@ -479,12 +517,17 @@ export async function enrichTokensWithMarketIntel(
   const athMints = new Set<string>(tokens.slice(0, maxAth).map((token) => token.id));
 
   return mapWithConcurrency(tokens, 4, async (token) => {
-    const pair: DexSearchPair | undefined = pairByMint.get(token.id);
+    const isSolanaToken: boolean = (token.chainId ?? "solana") === "solana";
+    const pair: DexSearchPair | undefined = isSolanaToken ? pairByMint.get(token.id) : undefined;
     const boost: DexBoostInfo | undefined = boostByMint.get(token.id);
     const migrationCreatedAt: string | undefined = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : token.migrationCreatedAt ?? token.firstPool?.createdAt;
-    const overview: Record<string, unknown> | null = athMints.has(token.id) ? await birdeyeTokenOverview(token.id) : null;
+    const overview: Record<string, unknown> | null = isSolanaToken && athMints.has(token.id) ? await birdeyeTokenOverview(token.id) : null;
     const overviewAth = athFromOverview(overview);
-    const ath = overviewAth.price != null ? overviewAth : athMints.has(token.id) ? await athFromOhlcv(token.id, token.onChainCreatedAt ?? token.firstPool?.createdAt ?? migrationCreatedAt) : overviewAth;
+    const ath = overviewAth.price != null
+      ? overviewAth
+      : isSolanaToken && athMints.has(token.id)
+        ? await athFromOhlcv(token.id, token.onChainCreatedAt ?? token.firstPool?.createdAt ?? migrationCreatedAt)
+        : overviewAth;
 
     return {
       ...token,
@@ -632,17 +675,22 @@ async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper:
 
 async function withOnChainCreationDates(tokens: JupTokenInfo[]): Promise<JupTokenInfo[]> {
   return mapWithConcurrency(tokens, 4, async (token) => {
-    if (Number.isFinite(tokenCreatedAtMs(token))) return { ...token, creationSource: "chain" };
+    const chainId: string = token.chainId ?? "solana";
+    if (chainId !== "solana") {
+      return { ...token, creationSource: token.firstPool?.createdAt ? "pool" : "unknown" };
+    }
+    if (Number.isFinite(tokenCreatedAtMs(token))) return { ...token, chainId, creationSource: "chain" };
 
     try {
       const onChainCreatedAt = await mintCreatedAt(token.id);
       return {
         ...token,
+        chainId,
         onChainCreatedAt,
         creationSource: onChainCreatedAt ? "chain" : token.firstPool?.createdAt ? "pool" : "unknown",
       };
     } catch {
-      return { ...token, creationSource: token.firstPool?.createdAt ? "pool" : "unknown" };
+      return { ...token, chainId, creationSource: token.firstPool?.createdAt ? "pool" : "unknown" };
     }
   });
 }
@@ -657,44 +705,539 @@ function compareByOnChainAgeOnly(a: JupTokenInfo, b: JupTokenInfo): number {
   return normalizeTickerSymbol(a.symbol).localeCompare(normalizeTickerSymbol(b.symbol));
 }
 
-// Find OG copycats by ticker symbol. The OG is the oldest exact-symbol mint by
-// on-chain creation date only. Price, liquidity, volume, market cap, verification,
-// and migrated/new pool dates are never used to decide which token is the OG.
-export async function jupOgCopycats(ticker: string): Promise<{ og: JupTokenInfo | null; copycats: JupTokenInfo[] }> {
-  const clean = ticker.replace(/^\$/, "").trim();
-  if (!clean) return { og: null, copycats: [] };
+export type ForensicLabel =
+  | "TRUE OG"
+  | "AUTHENTIC"
+  | "LIKELY CLONE"
+  | "CLONE FARM"
+  | "MIGRATION"
+  | "CTO"
+  | "REVIVAL"
+  | "HIGH RISK"
+  | "FAKE COMMUNITY TAKEOVER";
 
-  const [jupiterResult, dexResult] = await Promise.allSettled([jupSearchToken(clean), dexSearchPairs(clean)]);
-  const jupiterTokens: JupTokenInfo[] = jupiterResult.status === "fulfilled" ? jupiterResult.value : [];
+export type TokenForensicScores = {
+  chainOriginScore: number;
+  earliestLiquidityScore: number;
+  firstTransactionScore: number;
+  firstHolderDistribution: number;
+  deployerAuthenticity: number;
+  metadataStability: number;
+  socialOriginAlignment: number;
+  organicGrowthPattern: number;
+  antiCloneConfidence: number;
+  walletBehaviorScore: number;
+  liquiditySurvivalScore: number;
+  narrativeContinuityScore: number;
+  trueOgProbability: number;
+  cloneProbability: number;
+  manipulatedRelaunchProbability: number;
+  ctoProbability: number;
+  migrationProbability: number;
+  artificialTrendProbability: number;
+  deployerTrustScore: number;
+  cloneConfidenceScore: number;
+  liquidityAuthenticityScore: number;
+  label: ForensicLabel;
+  reasons: string[];
+  warnings: string[];
+  evidence: {
+    chainId: string;
+    normalizedTicker: string;
+    narrativeFingerprintId: string;
+    firstOnChainProof?: string;
+    firstLiquidity?: string;
+    earliestKnownEvent?: string;
+    creationSource: TokenCreationSource;
+    chronologicalRank: number;
+    candidateCount: number;
+    liquidityDelayHours?: number;
+  };
+};
+
+export type ForensicTimelineEvent = {
+  at: string;
+  type: "mint" | "liquidity" | "trade" | "metadata" | "social" | "migration" | "candidate";
+  tokenId: string;
+  chainId: string;
+  label: string;
+  detail: string;
+};
+
+export type TokenLineageNode = {
+  token: JupTokenInfo;
+  relationship: "TRUE OG" | "early clone" | "migration" | "CTO" | "revival" | "fake revival" | "community fork" | "exploit copy";
+  score: number;
+  createdAt?: string;
+  liquidityAt?: string;
+};
+
+export type ForensicOgReport = {
+  query: string;
+  normalizedQuery: string;
+  narrativeFingerprintId: string;
+  generatedAt: string;
+  og: JupTokenInfo | null;
+  copycats: JupTokenInfo[];
+  candidates: JupTokenInfo[];
+  clusterAliases: string[];
+  timeline: ForensicTimelineEvent[];
+  familyTree: TokenLineageNode[];
+  tokenScores: Record<string, TokenForensicScores>;
+  summary: {
+    candidateCount: number;
+    chainCount: number;
+    earliestProof?: string;
+    earliestLiquidity?: string;
+    cloneCount: number;
+    migrationCount: number;
+    highRiskCount: number;
+  };
+};
+
+function clampScore(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function simpleHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+export function narrativeFingerprintId(value: string): string {
+  const normalized: string = normalizeNarrativeText(value);
+  return `OGN-${simpleHash(normalized || value).toUpperCase()}`;
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a) return b.length;
+  if (!b) return a.length;
+  const previous: number[] = Array.from({ length: b.length + 1 }, (_, index: number) => index);
+  const current: number[] = new Array(b.length + 1);
+  for (let i = 1; i <= a.length; i += 1) {
+    current[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost: number = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + cost);
+    }
+    for (let j = 0; j <= b.length; j += 1) previous[j] = current[j];
+  }
+  return previous[b.length];
+}
+
+function stringSimilarity(a: string, b: string): number {
+  if (!a && !b) return 1;
+  if (!a || !b) return 0;
+  const maxLength: number = Math.max(a.length, b.length);
+  return maxLength === 0 ? 1 : 1 - levenshteinDistance(a, b) / maxLength;
+}
+
+function tokenNarrativeSimilarity(token: JupTokenInfo, normalizedQuery: string): number {
+  const symbol: string = normalizeTickerSymbol(token.symbol);
+  const name: string = normalizeNarrativeText(token.name);
+  if (!normalizedQuery) return 0;
+  if (symbol === normalizedQuery) return 1;
+  if (name === normalizedQuery) return 0.96;
+  if (symbol.includes(normalizedQuery) || normalizedQuery.includes(symbol)) return 0.88;
+  if (name.includes(normalizedQuery) || normalizedQuery.includes(name)) return 0.78;
+  return Math.max(stringSimilarity(symbol, normalizedQuery), stringSimilarity(name, normalizedQuery) * 0.92);
+}
+
+function tokenKey(token: JupTokenInfo): string {
+  return `${token.chainId ?? "solana"}:${token.id}`;
+}
+
+function mergeMultiChainTokenCandidates(tokens: JupTokenInfo[]): JupTokenInfo[] {
+  const byKey = new Map<string, JupTokenInfo>();
+  for (const token of tokens) {
+    const chainId: string = token.chainId ?? "solana";
+    const existing: JupTokenInfo | undefined = byKey.get(`${chainId}:${token.id}`);
+    byKey.set(`${chainId}:${token.id}`, existing ? mergeTokenCandidate(existing, { ...token, chainId }) : { ...token, chainId });
+  }
+  return Array.from(byKey.values());
+}
+
+function earliestCandidateEventMs(token: JupTokenInfo): number {
+  const chainCreatedAt: number = tokenCreatedAtMs(token);
+  const poolCreatedAt: number = tokenPoolCreatedAtMs(token);
+  return Math.min(chainCreatedAt, poolCreatedAt);
+}
+
+function isoFromCandidateEvent(token: JupTokenInfo): string | undefined {
+  return createdAtIsoFromMs(earliestCandidateEventMs(token));
+}
+
+function scoreByEarliest(candidateMs: number, earliestMs: number, fallback = 25): number {
+  if (!Number.isFinite(candidateMs) || !Number.isFinite(earliestMs)) return fallback;
+  const delayDays: number = Math.max(0, (candidateMs - earliestMs) / 86_400_000);
+  if (delayDays <= 0.02) return 100;
+  if (delayDays <= 1) return 92;
+  if (delayDays <= 7) return 78;
+  if (delayDays <= 30) return 58;
+  if (delayDays <= 180) return 35;
+  return 16;
+}
+
+function scoreHolderDistribution(token: JupTokenInfo): number {
+  const top: number | undefined = token.audit?.topHoldersPercentage;
+  if (top == null) return 52;
+  if (top <= 15) return 94;
+  if (top <= 30) return 78;
+  if (top <= 45) return 55;
+  if (top <= 65) return 30;
+  return 12;
+}
+
+function scoreLiquiditySurvival(token: JupTokenInfo): number {
+  const poolMs: number = tokenPoolCreatedAtMs(token);
+  const ageDays: number = Number.isFinite(poolMs) ? Math.max(0, (Date.now() - poolMs) / 86_400_000) : 0;
+  const liq: number = token.liquidity ?? 0;
+  if (ageDays > 180 && liq > 10_000) return 92;
+  if (ageDays > 30 && liq > 2_500) return 76;
+  if (ageDays > 7 && liq > 1_000) return 58;
+  if (liq > 25_000) return 46;
+  return 28;
+}
+
+function scoreOrganicGrowth(token: JupTokenInfo): number {
+  const organic: number | undefined = token.organicScore;
+  if (organic != null) return clampScore(organic * 10);
+  const buys: number = token.stats24h?.numBuys ?? 0;
+  const sells: number = token.stats24h?.numSells ?? 0;
+  const total: number = buys + sells;
+  if (total === 0) return 45;
+  const balance: number = 1 - Math.abs(buys - sells) / total;
+  return clampScore(40 + balance * 45 + Math.min(15, Math.log10(total + 1) * 7));
+}
+
+function scoreDeployerAuthenticity(token: JupTokenInfo): number {
+  let score = 48;
+  if (token.audit?.mintAuthorityDisabled) score += 18;
+  if (token.audit?.freezeAuthorityDisabled) score += 14;
+  if (token.isVerified) score += 8;
+  if ((token.audit?.topHoldersPercentage ?? 0) > 55) score -= 18;
+  return clampScore(score);
+}
+
+function scoreMetadataStability(token: JupTokenInfo, normalizedQuery: string): number {
+  const similarity: number = tokenNarrativeSimilarity(token, normalizedQuery);
+  let score: number = 35 + similarity * 55;
+  if (token.icon) score += 6;
+  if (token.name && token.symbol) score += 4;
+  return clampScore(score);
+}
+
+function scoreSocialAlignment(token: JupTokenInfo, normalizedQuery: string): number {
+  const similarity: number = tokenNarrativeSimilarity(token, normalizedQuery);
+  let score: number = 34 + similarity * 42;
+  if (token.isVerified) score += 8;
+  if (token.dexUrl) score += 5;
+  if (token.ctLikes || token.smartCtLikes) score += 6;
+  return clampScore(score);
+}
+
+function classifyRelationship(token: JupTokenInfo, scores: TokenForensicScores, isOg: boolean): TokenLineageNode["relationship"] {
+  if (isOg) return "TRUE OG";
+  if (scores.migrationProbability >= 60) return "migration";
+  if (scores.ctoProbability >= 60) return "CTO";
+  if (scores.cloneConfidenceScore >= 78 && scores.manipulatedRelaunchProbability >= 58) return "fake revival";
+  if (scores.cloneConfidenceScore >= 70) return "early clone";
+  if (scores.trueOgProbability >= 58) return "community fork";
+  return token.isVerified ? "revival" : "exploit copy";
+}
+
+function forensicLabelForScores(scores: Omit<TokenForensicScores, "label">, isOg: boolean): ForensicLabel {
+  if (isOg && scores.trueOgProbability >= 70) return "TRUE OG";
+  if (isOg) return "AUTHENTIC";
+  if (scores.cloneConfidenceScore >= 86) return "CLONE FARM";
+  if (scores.manipulatedRelaunchProbability >= 72) return "FAKE COMMUNITY TAKEOVER";
+  if (scores.migrationProbability >= 68) return "MIGRATION";
+  if (scores.ctoProbability >= 66) return "CTO";
+  if (scores.cloneProbability >= 58) return "LIKELY CLONE";
+  if (scores.deployerTrustScore < 35 || scores.walletBehaviorScore < 30) return "HIGH RISK";
+  return "REVIVAL";
+}
+
+function buildForensicScores(
+  token: JupTokenInfo,
+  context: {
+    normalizedQuery: string;
+    narrativeId: string;
+    earliestChainMs: number;
+    earliestLiquidityMs: number;
+    earliestEventMs: number;
+    chronologicalRank: number;
+    candidateCount: number;
+    isOg: boolean;
+  },
+): TokenForensicScores {
+  const chainCreatedAtMs: number = tokenCreatedAtMs(token);
+  const liquidityCreatedAtMs: number = tokenPoolCreatedAtMs(token);
+  const earliestKnownEventMs: number = earliestCandidateEventMs(token);
+  const chainOriginScore: number = scoreByEarliest(chainCreatedAtMs, context.earliestChainMs, Number.isFinite(liquidityCreatedAtMs) ? 42 : 18);
+  const earliestLiquidityScore: number = scoreByEarliest(liquidityCreatedAtMs, context.earliestLiquidityMs, 32);
+  const firstTransactionScore: number = scoreByEarliest(earliestKnownEventMs, context.earliestEventMs, 35);
+  const firstHolderDistribution: number = scoreHolderDistribution(token);
+  const deployerAuthenticity: number = scoreDeployerAuthenticity(token);
+  const metadataStability: number = scoreMetadataStability(token, context.normalizedQuery);
+  const socialOriginAlignment: number = scoreSocialAlignment(token, context.normalizedQuery);
+  const organicGrowthPattern: number = scoreOrganicGrowth(token);
+  const antiCloneConfidence: number = context.chronologicalRank === 1 ? 94 : clampScore(95 - context.chronologicalRank * 12 - (100 - metadataStability) * 0.3);
+  const walletBehaviorScore: number = clampScore(deployerAuthenticity * 0.72 + firstHolderDistribution * 0.28);
+  const liquiditySurvivalScore: number = scoreLiquiditySurvival(token);
+  const narrativeContinuityScore: number = clampScore((metadataStability + socialOriginAlignment + firstTransactionScore) / 3);
+  const trueOgProbability: number = clampScore(
+    chainOriginScore * 0.18 +
+      earliestLiquidityScore * 0.15 +
+      firstTransactionScore * 0.10 +
+      firstHolderDistribution * 0.08 +
+      deployerAuthenticity * 0.12 +
+      metadataStability * 0.07 +
+      socialOriginAlignment * 0.08 +
+      organicGrowthPattern * 0.08 +
+      antiCloneConfidence * 0.06 +
+      walletBehaviorScore * 0.04 +
+      liquiditySurvivalScore * 0.02 +
+      narrativeContinuityScore * 0.02,
+  );
+  const cloneConfidenceScore: number = clampScore((100 - chainOriginScore) * 0.42 + (100 - firstTransactionScore) * 0.22 + (100 - antiCloneConfidence) * 0.2 + metadataStability * 0.16);
+  const cloneProbability: number = clampScore(context.isOg ? Math.max(0, 100 - trueOgProbability) * 0.18 : cloneConfidenceScore * 0.88 + (100 - trueOgProbability) * 0.12);
+  const migrationProbability: number = clampScore(
+    Number.isFinite(liquidityCreatedAtMs) && Number.isFinite(chainCreatedAtMs) && liquidityCreatedAtMs - chainCreatedAtMs > 30 * 86_400_000
+      ? 68 + Math.min(24, (liquidityCreatedAtMs - chainCreatedAtMs) / 86_400_000 / 12)
+      : token.migrationCreatedAt
+        ? 45
+        : 16,
+  );
+  const manipulatedRelaunchProbability: number = clampScore((cloneConfidenceScore * 0.55) + (migrationProbability * 0.25) + ((100 - organicGrowthPattern) * 0.2));
+  const ctoProbability: number = clampScore((cloneConfidenceScore * 0.35) + ((token.isVerified ? 22 : 48)) + (metadataStability > 70 ? 10 : 0));
+  const artificialTrendProbability: number = clampScore(((token.dexPaidAmount ?? token.dexBoostTotalAmount ?? 0) > 0 ? 42 : 10) + (100 - organicGrowthPattern) * 0.42 + ((token.stats24h?.numTraders ?? 0) > 800 ? 12 : 0));
+  const liquidityAuthenticityScore: number = clampScore(earliestLiquidityScore * 0.35 + liquiditySurvivalScore * 0.4 + (migrationProbability > 65 ? 10 : 25));
+  const deployerTrustScore: number = clampScore(deployerAuthenticity * 0.62 + walletBehaviorScore * 0.38);
+  const liquidityDelayHours: number | undefined = Number.isFinite(chainCreatedAtMs) && Number.isFinite(liquidityCreatedAtMs)
+    ? Math.max(0, (liquidityCreatedAtMs - chainCreatedAtMs) / 3_600_000)
+    : undefined;
+
+  const withoutLabel = {
+    chainOriginScore,
+    earliestLiquidityScore,
+    firstTransactionScore,
+    firstHolderDistribution,
+    deployerAuthenticity,
+    metadataStability,
+    socialOriginAlignment,
+    organicGrowthPattern,
+    antiCloneConfidence,
+    walletBehaviorScore,
+    liquiditySurvivalScore,
+    narrativeContinuityScore,
+    trueOgProbability,
+    cloneProbability,
+    manipulatedRelaunchProbability,
+    ctoProbability,
+    migrationProbability,
+    artificialTrendProbability,
+    deployerTrustScore,
+    cloneConfidenceScore,
+    liquidityAuthenticityScore,
+    reasons: [] as string[],
+    warnings: [] as string[],
+    evidence: {
+      chainId: token.chainId ?? "solana",
+      normalizedTicker: normalizeTickerSymbol(token.symbol),
+      narrativeFingerprintId: context.narrativeId,
+      firstOnChainProof: tokenOgCreatedAtIso(token),
+      firstLiquidity: token.firstPool?.createdAt,
+      earliestKnownEvent: createdAtIsoFromMs(earliestKnownEventMs),
+      creationSource: token.creationSource ?? "unknown",
+      chronologicalRank: context.chronologicalRank,
+      candidateCount: context.candidateCount,
+      liquidityDelayHours,
+    },
+  };
+
+  const label: ForensicLabel = forensicLabelForScores(withoutLabel, context.isOg);
+  const reasons: string[] = [];
+  const warnings: string[] = [];
+  if (context.isOg) reasons.push("Earliest provable candidate in the narrative cluster.");
+  if (Number.isFinite(chainCreatedAtMs)) reasons.push(`On-chain mint proof: ${shortDate(token.onChainCreatedAt)}.`);
+  if (Number.isFinite(liquidityCreatedAtMs)) reasons.push(`First liquidity seen: ${shortDate(token.firstPool?.createdAt)}.`);
+  if (metadataStability >= 80) reasons.push("Ticker/name metadata remains aligned with the searched narrative.");
+  if (liquidityDelayHours != null && liquidityDelayHours > 720) warnings.push("Liquidity appeared long after mint creation; possible migration, revival, or delayed launch.");
+  if (cloneConfidenceScore >= 65 && !context.isOg) warnings.push("Newer than the origin cluster with high narrative overlap.");
+  if ((token.audit?.topHoldersPercentage ?? 0) > 45) warnings.push("Holder concentration is elevated.");
+  if (!token.audit?.mintAuthorityDisabled || !token.audit?.freezeAuthorityDisabled) warnings.push("Mint/freeze authority is not fully disabled in registry data.");
+  if (artificialTrendProbability >= 60) warnings.push("Boost/trend pattern may be artificial and is not used to decide OG status.");
+
+  return { ...withoutLabel, label, reasons, warnings };
+}
+
+function buildTimeline(candidates: JupTokenInfo[]): ForensicTimelineEvent[] {
+  const events: ForensicTimelineEvent[] = [];
+  for (const token of candidates) {
+    const chainId: string = token.chainId ?? "solana";
+    if (token.onChainCreatedAt) {
+      events.push({
+        at: token.onChainCreatedAt,
+        type: "mint",
+        tokenId: token.id,
+        chainId,
+        label: `${token.symbol} mint`,
+        detail: `${shortAddr(token.id, 5)} first on-chain proof`,
+      });
+    }
+    if (token.firstPool?.createdAt) {
+      events.push({
+        at: token.firstPool.createdAt,
+        type: "liquidity",
+        tokenId: token.id,
+        chainId,
+        label: `${token.symbol} liquidity`,
+        detail: `${shortAddr(token.id, 5)} first pool / DEX route`,
+      });
+    }
+    if (token.migrationCreatedAt && token.migrationCreatedAt !== token.firstPool?.createdAt) {
+      events.push({
+        at: token.migrationCreatedAt,
+        type: "migration",
+        tokenId: token.id,
+        chainId,
+        label: `${token.symbol} migration`,
+        detail: "Later migration-like liquidity event detected",
+      });
+    }
+  }
+  return events
+    .filter((event) => Number.isFinite(new Date(event.at).getTime()))
+    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+    .slice(0, 48);
+}
+
+// Build OG attribution by narrative cluster. Market cap, holders, volume, trending,
+// bonding, and virality never decide the winner; they only affect risk/context labels.
+export async function forensicOgAttribution(ticker: string): Promise<ForensicOgReport> {
+  const clean: string = ticker.replace(/^\$/, "").trim();
+  const normalizedQuery: string = normalizeNarrativeText(clean);
+  const narrativeId: string = narrativeFingerprintId(clean);
+  const emptyReport: ForensicOgReport = {
+    query: clean,
+    normalizedQuery,
+    narrativeFingerprintId: narrativeId,
+    generatedAt: new Date().toISOString(),
+    og: null,
+    copycats: [],
+    candidates: [],
+    clusterAliases: [],
+    timeline: [],
+    familyTree: [],
+    tokenScores: {},
+    summary: { candidateCount: 0, chainCount: 0, cloneCount: 0, migrationCount: 0, highRiskCount: 0 },
+  };
+  if (!clean || !normalizedQuery) return emptyReport;
+
+  const [jupiterResult, dexResult] = await Promise.allSettled([jupSearchToken(clean), dexSearchAllPairs(clean)]);
+  const jupiterTokens: JupTokenInfo[] = jupiterResult.status === "fulfilled"
+    ? jupiterResult.value.map((token: JupTokenInfo): JupTokenInfo => ({ ...token, chainId: token.chainId ?? "solana" }))
+    : [];
   const dexTokens: JupTokenInfo[] = dexResult.status === "fulfilled"
     ? dexResult.value.map(dexPairToToken).filter((token): token is JupTokenInfo => Boolean(token))
     : [];
 
-  const all = mergeTokenCandidates([...jupiterTokens, ...dexTokens]);
-  const normalizedClean = normalizeTickerSymbol(clean);
-  // Exact symbol matching must tolerate symbols like "$WIF" when the user types "wif".
-  const exactSymbolMatches = all.filter((token) => normalizeTickerSymbol(token.symbol) === normalizedClean);
-  const looseMatches = all.filter((token) => {
-    const normalizedSymbol = normalizeTickerSymbol(token.symbol);
-    const normalizedName = normalizeTickerSymbol(token.name);
-    return normalizedSymbol.includes(normalizedClean) || normalizedName.includes(normalizedClean);
-  });
-  const pool = exactSymbolMatches.length > 0 ? exactSymbolMatches : looseMatches.length > 0 ? looseMatches : all;
-  const chainDatedPool = await withOnChainCreationDates(pool);
-  const tokensWithChainDates = chainDatedPool.filter((token) => Number.isFinite(tokenCreatedAtMs(token)));
-  const og = [...tokensWithChainDates].sort(compareByOnChainAgeOnly)[0] ?? null;
-  const copycats = chainDatedPool
-    .filter((token) => token.id !== og?.id)
-    .sort(compareByOnChainAgeOnly)
-    .slice(0, 24);
+  const merged: JupTokenInfo[] = mergeMultiChainTokenCandidates([...jupiterTokens, ...dexTokens]);
+  const similar = merged
+    .map((token: JupTokenInfo) => ({ token, similarity: tokenNarrativeSimilarity(token, normalizedQuery) }))
+    .filter((item) => item.similarity >= 0.58 || normalizeTickerSymbol(item.token.symbol).includes(normalizedQuery))
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 64)
+    .map((item) => item.token);
+  const exactMatches: JupTokenInfo[] = similar.filter((token) => normalizeTickerSymbol(token.symbol) === normalizedQuery);
+  const pool: JupTokenInfo[] = exactMatches.length > 0 ? exactMatches : similar.length > 0 ? similar : merged.slice(0, 32);
+  const chainDatedPool: JupTokenInfo[] = await withOnChainCreationDates(pool);
+  const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: true, maxAth: 14 });
 
-  const enriched = await enrichTokensWithMarketIntel([...(og ? [og] : []), ...copycats], { includeAth: true, maxAth: 12 });
-  const enrichedByMint = new Map<string, JupTokenInfo>(enriched.map((token) => [token.id, token]));
+  const candidates: JupTokenInfo[] = enriched
+    .filter((token) => Number.isFinite(tokenCreatedAtMs(token)) || Number.isFinite(tokenPoolCreatedAtMs(token)))
+    .sort((a, b) => earliestCandidateEventMs(a) - earliestCandidateEventMs(b))
+    .slice(0, 40);
+
+  const chainCandidates: JupTokenInfo[] = candidates.filter((token) => Number.isFinite(tokenCreatedAtMs(token)));
+  const chainSorted: JupTokenInfo[] = [...chainCandidates].sort(compareByOnChainAgeOnly);
+  const eventSorted: JupTokenInfo[] = [...candidates].sort((a, b) => earliestCandidateEventMs(a) - earliestCandidateEventMs(b));
+  const og: JupTokenInfo | null = chainSorted[0] ?? eventSorted[0] ?? null;
+  const earliestChainMs: number = chainSorted.length ? tokenCreatedAtMs(chainSorted[0]) : Number.POSITIVE_INFINITY;
+  const liquidityEvents: number[] = candidates.map(tokenPoolCreatedAtMs).filter((value) => Number.isFinite(value));
+  const earliestLiquidityMs: number = liquidityEvents.length ? Math.min(...liquidityEvents) : Number.POSITIVE_INFINITY;
+  const eventEvents: number[] = candidates.map(earliestCandidateEventMs).filter((value) => Number.isFinite(value));
+  const earliestEventMs: number = eventEvents.length ? Math.min(...eventEvents) : Number.POSITIVE_INFINITY;
+
+  const chronologicalRankByKey = new Map<string, number>();
+  eventSorted.forEach((token: JupTokenInfo, index: number) => chronologicalRankByKey.set(tokenKey(token), index + 1));
+
+  const tokenScores: Record<string, TokenForensicScores> = {};
+  for (const token of candidates) {
+    tokenScores[tokenKey(token)] = buildForensicScores(token, {
+      normalizedQuery,
+      narrativeId,
+      earliestChainMs,
+      earliestLiquidityMs,
+      earliestEventMs,
+      chronologicalRank: chronologicalRankByKey.get(tokenKey(token)) ?? candidates.length,
+      candidateCount: candidates.length,
+      isOg: Boolean(og && tokenKey(token) === tokenKey(og)),
+    });
+  }
+
+  const copycats: JupTokenInfo[] = candidates.filter((token) => !og || tokenKey(token) !== tokenKey(og));
+  const familyTree: TokenLineageNode[] = candidates.map((token) => {
+    const scores: TokenForensicScores = tokenScores[tokenKey(token)];
+    return {
+      token,
+      relationship: classifyRelationship(token, scores, Boolean(og && tokenKey(token) === tokenKey(og))),
+      score: scores.trueOgProbability,
+      createdAt: tokenOgCreatedAtIso(token),
+      liquidityAt: token.firstPool?.createdAt,
+    };
+  });
+  const clusterAliases: string[] = Array.from(
+    new Set(candidates.flatMap((token) => [token.symbol, token.name]).filter(Boolean).map((value) => value.trim()).slice(0, 18)),
+  );
+  const chains: Set<string> = new Set(candidates.map((token) => token.chainId ?? "solana"));
+  const scoreValues: TokenForensicScores[] = Object.values(tokenScores);
 
   return {
-    og: og ? enrichedByMint.get(og.id) ?? og : null,
-    copycats: copycats.map((token) => enrichedByMint.get(token.id) ?? token),
+    query: clean,
+    normalizedQuery,
+    narrativeFingerprintId: narrativeId,
+    generatedAt: new Date().toISOString(),
+    og,
+    copycats,
+    candidates,
+    clusterAliases,
+    timeline: buildTimeline(candidates),
+    familyTree,
+    tokenScores,
+    summary: {
+      candidateCount: candidates.length,
+      chainCount: chains.size,
+      earliestProof: og ? tokenOgCreatedAtIso(og) ?? isoFromCandidateEvent(og) : undefined,
+      earliestLiquidity: createdAtIsoFromMs(earliestLiquidityMs),
+      cloneCount: scoreValues.filter((score) => score.cloneProbability >= 58).length,
+      migrationCount: scoreValues.filter((score) => score.migrationProbability >= 60).length,
+      highRiskCount: scoreValues.filter((score) => score.label === "HIGH RISK" || score.walletBehaviorScore < 35).length,
+    },
   };
+}
+
+// Backward-compatible helper for screens/tests expecting OG + copycats only.
+export async function jupOgCopycats(ticker: string): Promise<{ og: JupTokenInfo | null; copycats: JupTokenInfo[] }> {
+  const report: ForensicOgReport = await forensicOgAttribution(ticker);
+  return { og: report.og, copycats: report.copycats };
 }
 
 export type JupPriceMap = Record<string, { usdPrice: number; priceChange24h?: number }>;

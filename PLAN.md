@@ -1,4 +1,4 @@
-# Build OG Scan V2: dev-wallet radar, snipe feed, and safer launch intelligence
+# Build OG Scan V3: forensic-grade OG token intelligence engine
 
 ## **Features**
 
@@ -18,6 +18,12 @@
 - [x] Update the landing page beta area into a **Community HQ** notice with Telegram, backup X, and DEX-update messaging.
 - [x] Add direct standalone routes for every OGScan tool so each page can be embedded link-for-link in the mobile app.
 - [x] Create a standalone embed prompt file explaining every page, route, numbered path, and mobile-app embedding approach.
+- [x] Add a forensic **Narrative Fingerprint ID** system that normalizes casing, punctuation, unicode, emoji noise, duplicate characters, and leetspeak variants.
+- [x] Add universal token clustering for narrative searches so symbols like `$PEPE`, `P.E.P.E`, `ＰＥＰＥ`, and `P3P3` resolve into one attribution graph.
+- [x] Add a 12-factor **TRUE_OG_SCORE** formula that prioritizes earliest chain origin, earliest liquidity, first transaction evidence, deployer trust, metadata stability, organic behavior, clone confidence, and narrative continuity.
+- [x] Add deployer / wallet trust, clone confidence, liquidity authenticity, migration probability, CTO probability, manipulated relaunch probability, and artificial trend probability outputs.
+- [x] Add chronological origin timelines and token family tree relationships for TRUE OG, early clone, migration, CTO, revival, fake revival, community fork, and exploit copy labels.
+- [x] Keep price, market cap, holders, volume, trend status, and migration status out of OG selection logic.
 
 ## **Design**
 
@@ -32,6 +38,9 @@
 - [x] Present the roadmap as a premium full-page tab instead of a plain text block.
 - [x] Make the beta announcement feel like a polished launch page while keeping the existing OG scanner UI behind the enter button.
 - [x] Refresh the root landing page copy so the main calls-to-action point users to Telegram and backup X until the DEX update is ready.
+- [x] Upgrade Scanner results with forensic probability chips, Narrative ID, clone count, chain count, TRUE OG label, and attribution labels.
+- [x] Upgrade OG Finder into a forensic origin report with timeline proof, lineage map, confidence metrics, migration/CTO/trend warnings, and direct evidence explanations.
+- [x] Update the Tech page to describe the new attribution pipeline instead of a generic token scanner pipeline.
 
 ## **Pages / Screens**
 
@@ -44,6 +53,8 @@
 - [x] **SolTools Roadmap**: A polished vision page showing OGScan’s path into the broader SolTools ecosystem.
 - [x] **Community Beta Home / Community HQ**: The root homepage now directs users to Telegram and backup X while the next DEX update is prepared.
 - [x] **Standalone Tool Routes**: Every existing tool now has a direct canonical route plus numbered page route for mobile embedding.
+- [x] **Forensic OG Finder**: Search a token narrative and return TRUE OG probability, clone probability, migration/CTO/relaunch risk, earliest proof, family tree, and timeline reconstruction.
+- [x] **Forensic Scanner**: Every scan result now shows OG probability, clone probability, attribution label, ATH, migration date, DEX boost/paid status, and mint copy actions.
 
 ## **Suggested build order**
 
