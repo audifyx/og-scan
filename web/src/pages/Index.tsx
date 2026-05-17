@@ -499,21 +499,25 @@ const ToolPage = ({
   onSwitchTab: (nextTab: string) => void;
   children: ReactNode;
 }) => {
-  const toolTabs: TabConfig[] = allTabs.filter((item) => item.id !== "overview");
+  const toolTabs: TabConfig[] = allTabs.filter((item: TabConfig) => item.id !== "overview");
   const quickTabs: TabConfig[] = [TAB_BY_ID.scanner, TAB_BY_ID["snipe-feed"], TAB_BY_ID["og-finder"], TAB_BY_ID.migrations];
+  const quickTabIds: TabId[] = quickTabs.map((item: TabConfig) => item.id);
+  const secondaryTabs: TabConfig[] = toolTabs.filter((item: TabConfig) => !quickTabIds.includes(item.id));
+  const accentTextClass: string = getAccentClass(tab.accent, "text");
 
   return (
-    <section className="relative min-h-screen border-b border-white/10 bg-background">
-      <div className="absolute inset-0 grid-bg opacity-24" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,hsl(var(--og-cyan)/0.14),transparent_30%),radial-gradient(circle_at_88%_8%,hsl(var(--og-lime)/0.1),transparent_32%),linear-gradient(180deg,hsl(var(--og-ink)/0.3),hsl(var(--background)))]" />
+    <section className="relative min-h-screen overflow-hidden border-b border-white/10 bg-[#010611]">
+      <div className="absolute inset-0 grid-bg opacity-20" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_-8%,hsl(var(--og-cyan)/0.22),transparent_34%),radial-gradient(circle_at_86%_2%,hsl(var(--og-lime)/0.14),transparent_28%),radial-gradient(circle_at_50%_100%,hsl(var(--og-gold)/0.07),transparent_40%),linear-gradient(180deg,#020915_0%,hsl(var(--background))_55%,#010308_100%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white/[0.055] to-transparent" />
 
       <div className="relative mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:py-8">
-        <div className="mb-4 overflow-x-auto rounded-[1.4rem] border border-white/10 bg-white/[0.055] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] ios-scroll lg:hidden">
+        <div className="mb-5 overflow-x-auto rounded-[1.35rem] border border-white/10 bg-white/[0.065] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_16px_64px_-52px_hsl(var(--og-cyan))] backdrop-blur-xl ios-scroll xl:hidden">
           <div className="flex min-w-max gap-2">
             <button
               type="button"
               onClick={onBack}
-              className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/70 transition hover:border-og-lime hover:text-og-lime"
+              className="og-pill px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-white/76 transition hover:border-og-lime hover:text-og-lime active:scale-[0.98]"
             >
               All tools
             </button>
@@ -523,9 +527,9 @@ const ToolPage = ({
                 type="button"
                 onClick={() => onSwitchTab(item.id)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] transition",
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.16em] transition active:scale-[0.98]",
                   activeId === item.id
-                    ? "border-og-lime bg-og-lime text-og-ink"
+                    ? "border-og-lime bg-og-lime text-og-ink shadow-[0_0_28px_-12px_hsl(var(--og-lime))]"
                     : "border-white/10 bg-black/20 text-muted-foreground hover:border-og-cyan hover:text-og-cyan",
                 )}
               >
@@ -535,78 +539,131 @@ const ToolPage = ({
           </div>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start">
-          <aside className="hidden lg:sticky lg:top-36 lg:block">
-            <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl">
-              <button
-                type="button"
-                onClick={onBack}
-                className="mb-4 flex w-full items-center justify-between rounded-[1.25rem] border border-og-lime/35 bg-og-lime/10 p-3 text-left transition hover:bg-og-lime hover:text-og-ink"
-              >
-                <span>
-                  <span className="block font-mono text-[9px] font-black uppercase tracking-[0.22em] opacity-70">Home base</span>
-                  <span className="mt-1 block font-display text-xl font-black uppercase leading-none">All tools</span>
-                </span>
-                <ChevronRight className="h-4 w-4" />
-              </button>
+        <div className="grid gap-5 xl:grid-cols-[316px_minmax(0,1fr)] xl:items-start">
+          <aside className="hidden xl:sticky xl:top-36 xl:block">
+            <div className="og-glass-frame p-4">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="group mb-4 flex w-full items-center justify-between overflow-hidden rounded-[1.35rem] border border-og-lime/35 bg-og-lime/10 p-4 text-left transition hover:bg-og-lime hover:text-og-ink active:scale-[0.99]"
+                >
+                  <span>
+                    <span className="block font-mono text-[9px] font-black uppercase tracking-[0.22em] opacity-70">Workspace map</span>
+                    <span className="mt-1 block font-display text-2xl font-black uppercase leading-none">All tools</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1" />
+                </button>
 
-              <div className="mb-3 font-mono text-[9px] font-black uppercase tracking-[0.28em] text-og-cyan">Most used</div>
-              <div className="space-y-2">
-                {quickTabs.map((item: TabConfig) => (
-                  <SideToolButton key={item.id} item={item} activeId={activeId} onSwitchTab={onSwitchTab} />
-                ))}
-              </div>
+                <div className="rounded-[1.35rem] border border-white/10 bg-black/20 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="font-mono text-[9px] font-black uppercase tracking-[0.28em] text-og-cyan">Priority tools</div>
+                    <span className="rounded-full bg-og-cyan/10 px-2 py-1 font-mono text-[8px] font-black uppercase tracking-[0.2em] text-og-cyan">Fast</span>
+                  </div>
+                  <div className="space-y-2">
+                    {quickTabs.map((item: TabConfig) => (
+                      <SideToolButton key={item.id} item={item} activeId={activeId} onSwitchTab={onSwitchTab} />
+                    ))}
+                  </div>
+                </div>
 
-              <div className="my-4 h-px bg-white/10" />
-              <div className="mb-3 font-mono text-[9px] font-black uppercase tracking-[0.28em] text-muted-foreground">All direct pages</div>
-              <div className="max-h-[46vh] space-y-2 overflow-y-auto pr-1 ios-scroll">
-                {toolTabs.map((item: TabConfig) => (
-                  <SideToolButton key={item.id} item={item} activeId={activeId} onSwitchTab={onSwitchTab} compact />
-                ))}
+                <div className="my-4 h-px bg-gradient-to-r from-transparent via-white/14 to-transparent" />
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="font-mono text-[9px] font-black uppercase tracking-[0.28em] text-muted-foreground">Standalone pages</div>
+                  <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-og-gold">/{tab.slug}</span>
+                </div>
+                <div className="max-h-[48vh] space-y-2 overflow-y-auto pr-1 ios-scroll">
+                  {secondaryTabs.map((item: TabConfig) => (
+                    <SideToolButton key={item.id} item={item} activeId={activeId} onSwitchTab={onSwitchTab} compact />
+                  ))}
+                </div>
               </div>
             </div>
           </aside>
 
           <div className="min-w-0">
-            <div className="mb-5 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_28px_110px_-82px_hsl(var(--og-cyan))] backdrop-blur-xl sm:p-6">
+            <div className="og-glass-frame mb-5 p-0">
               <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-og-cyan via-og-lime to-white" />
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-start gap-4">
-                  <div className={cn("grid h-14 w-14 shrink-0 place-items-center rounded-[1.2rem] border", getAccentClass(tab.accent, "icon"))}>
-                    <tab.Icon className="h-7 w-7" />
-                  </div>
-                  <div>
-                    <div className={cn("mb-2 font-mono text-[10px] uppercase tracking-[0.3em]", getAccentClass(tab.accent, "text"))}>
-                      {tab.eyebrow}
+              <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-stretch">
+                <div className="flex min-w-0 flex-col justify-between gap-5">
+                  <div className="flex items-start gap-4">
+                    <div className={cn("grid h-16 w-16 shrink-0 place-items-center rounded-[1.35rem] border backdrop-blur", getAccentClass(tab.accent, "icon"))}>
+                      <tab.Icon className="h-8 w-8" />
                     </div>
-                    <h1 className="font-display text-4xl font-black uppercase leading-none tracking-tighter text-foreground sm:text-6xl">
-                      {tab.label}
-                    </h1>
-                    <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-                      {tab.description}
-                    </p>
+                    <div className="min-w-0">
+                      <div className={cn("mb-2 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.3em]", accentTextClass)}>
+                        <span className="h-px w-9 bg-current" /> {tab.eyebrow}
+                      </div>
+                      <h1 className="font-display text-4xl font-black uppercase leading-none tracking-tighter text-foreground text-glow sm:text-6xl lg:text-7xl">
+                        {tab.label}
+                      </h1>
+                      <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/72 sm:text-base">
+                        {tab.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 font-mono text-[9px] font-black uppercase tracking-[0.2em]">
+                    <span className={cn("og-pill px-3 py-2", accentTextClass)}>
+                      <tab.Icon className="h-3.5 w-3.5" /> /{tab.slug}
+                    </span>
+                    <span className="og-pill px-3 py-2 text-og-cyan">/page/{tab.pageNumber}</span>
+                    <span className="og-pill px-3 py-2 text-og-gold">page-{tab.pageNumber}</span>
+                    <span className="og-pill px-3 py-2 text-white/62">WebView ready</span>
                   </div>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
-                  <button onClick={() => onSwitchTab("scanner")} className="inline-flex items-center justify-center gap-2 rounded-full border border-og-lime bg-og-lime px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-og-ink transition hover:bg-white active:scale-[0.98]">
-                    Scanner <Search className="h-3.5 w-3.5" />
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                  <button
+                    type="button"
+                    onClick={() => onSwitchTab("scanner")}
+                    className="group relative overflow-hidden rounded-[1.3rem] border border-og-lime bg-og-lime px-4 py-4 text-left text-og-ink shadow-[0_0_40px_-16px_hsl(var(--og-lime))] transition hover:bg-white active:scale-[0.985]"
+                  >
+                    <span className="absolute -right-8 -top-8 h-20 w-20 rounded-full bg-white/40 blur-2xl transition group-hover:translate-x-2" />
+                    <span className="relative flex items-center justify-between gap-3">
+                      <span>
+                        <span className="block font-mono text-[9px] font-black uppercase tracking-[0.24em] opacity-70">Need proof?</span>
+                        <span className="mt-1 block font-display text-xl font-black uppercase leading-none">Run scanner</span>
+                      </span>
+                      <Search className="h-5 w-5" />
+                    </span>
                   </button>
-                  <button onClick={onBack} className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-foreground/70 transition hover:border-og-cyan hover:text-og-cyan active:scale-[0.98]">
-                    All tools <ChevronRight className="h-3.5 w-3.5" />
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="rounded-[1.3rem] border border-white/10 bg-white/[0.065] px-4 py-4 text-left font-mono text-[10px] font-black uppercase leading-relaxed tracking-[0.2em] text-white/76 transition hover:border-og-cyan hover:text-og-cyan active:scale-[0.985]"
+                  >
+                    Back to organized tool grid <ChevronRight className="ml-2 inline h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="relative overflow-hidden rounded-[2rem] border border-og-cyan/25 bg-og-ink/76 p-3 shadow-[0_0_0_1px_hsl(var(--og-grid)/0.5),0_26px_110px_-78px_hsl(var(--og-cyan))] sm:p-5">
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-og-cyan via-og-lime to-og-gold" />
-              <div className="mb-3 flex items-center justify-between gap-3 border-b border-white/10 pb-3 font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground">
-                <span className={cn("inline-flex items-center gap-2", getAccentClass(tab.accent, "text"))}>
-                  <tab.Icon className="h-3.5 w-3.5" /> Standalone route
-                </span>
-                <span>/{tab.slug} · page {tab.pageNumber}</span>
+            <div className="og-glass-frame p-3 sm:p-5">
+              <div className="relative mb-4 flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className={cn("mb-1 flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-[0.28em]", accentTextClass)}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_16px_currentColor]" /> Tool canvas starts here
+                  </div>
+                  <h2 className="font-display text-2xl font-black uppercase tracking-tight text-white sm:text-3xl">{tab.label} workspace</h2>
+                </div>
+                <div className="flex flex-wrap gap-2 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                  <span className="og-pill px-3 py-2">Dedicated page</span>
+                  <span className="og-pill px-3 py-2">Clean boundary</span>
+                </div>
               </div>
-              {children}
+
+              <div className="og-tool-shell relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#020917]/72 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] sm:p-5">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-og-cyan/75 to-transparent" />
+                <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-og-cyan/10 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-24 left-8 h-56 w-56 rounded-full bg-og-lime/8 blur-3xl" />
+                <div className="relative">{children}</div>
+              </div>
+
+              <div className="relative mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4 font-mono text-[9px] font-black uppercase tracking-[0.24em] text-muted-foreground">
+                <span>Tool canvas ends</span>
+                <span className={accentTextClass}>/{tab.slug} · page {tab.pageNumber}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -630,10 +687,10 @@ const SideToolButton = ({
     type="button"
     onClick={() => onSwitchTab(item.id)}
     className={cn(
-      "group flex w-full items-center gap-3 rounded-[1.1rem] border p-3 text-left transition active:scale-[0.99]",
+      "group flex w-full items-center gap-3 overflow-hidden rounded-[1.15rem] border p-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition active:scale-[0.99]",
       activeId === item.id
-        ? "border-og-lime bg-og-lime text-og-ink"
-        : "border-white/10 bg-white/[0.045] text-white/76 hover:border-og-lime/65 hover:bg-og-lime/5 hover:text-white",
+        ? "border-og-lime bg-og-lime text-og-ink shadow-[0_0_30px_-16px_hsl(var(--og-lime))]"
+        : "border-white/10 bg-white/[0.05] text-white/76 hover:border-og-lime/65 hover:bg-og-lime/[0.07] hover:text-white",
       compact && "p-2.5",
     )}
   >
@@ -646,6 +703,7 @@ const SideToolButton = ({
         /{item.slug} · page {item.pageNumber}
       </span>
     </span>
+    <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 transition", activeId === item.id ? "text-og-ink/70" : "text-og-cyan opacity-0 group-hover:translate-x-0.5 group-hover:opacity-100")} />
   </button>
 );
 
@@ -662,8 +720,8 @@ const ToolCard = ({ tool, onClick, featured = false }: { tool: TabConfig; onClic
   <button
     onClick={onClick}
     className={cn(
-      "group relative min-h-[164px] overflow-hidden rounded-[1.4rem] border border-white/10 bg-black/24 p-4 text-left transition hover:border-og-lime hover:bg-og-lime/5 active:scale-[0.99]",
-      featured && "border-og-lime/30 bg-og-lime/8 shadow-[0_0_38px_-26px_hsl(var(--og-lime))]",
+      "group relative min-h-[170px] overflow-hidden rounded-[1.55rem] border border-white/10 bg-white/[0.055] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_18px_64px_-52px_hsl(var(--og-cyan))] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-og-lime hover:bg-og-lime/[0.07] active:scale-[0.99]",
+      featured && "border-og-lime/35 bg-og-lime/10 shadow-[0_0_48px_-28px_hsl(var(--og-lime))]",
     )}
   >
     <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-og-lime/60 to-transparent opacity-0 transition group-hover:opacity-100" />

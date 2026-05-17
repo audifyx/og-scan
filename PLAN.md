@@ -41,6 +41,7 @@
 - [x] Upgrade Scanner results with forensic probability chips, Narrative ID, clone count, chain count, TRUE OG label, and attribution labels.
 - [x] Upgrade OG Finder into a forensic origin report with timeline proof, lineage map, confidence metrics, migration/CTO/trend warnings, and direct evidence explanations.
 - [x] Update the Tech page to describe the new attribution pipeline instead of a generic token scanner pipeline.
+- [x] Redesign the full tool workspace with a modern glass shell, stronger page boundaries, clearer tool start/end markers, premium route headers, and improved side navigation without changing routes.
 
 ## **Pages / Screens**
 
