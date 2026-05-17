@@ -159,6 +159,55 @@
 }
 
 @layer components {
+  .og-glass-frame {
+    position: relative;
+    overflow: hidden;
+    border-radius: 2rem;
+    border: 1px solid rgb(255 255 255 / 0.12);
+    background:
+      linear-gradient(135deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.035)),
+      linear-gradient(180deg, hsl(var(--og-ink) / 0.86), hsl(var(--background) / 0.78));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.14),
+      inset 0 -1px 0 rgb(255 255 255 / 0.04),
+      0 30px 110px -78px hsl(var(--og-cyan) / 0.9),
+      0 12px 46px -34px rgb(0 0 0 / 0.9);
+    backdrop-filter: blur(22px) saturate(150%);
+  }
+
+  .og-glass-frame::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 12% 0%, hsl(var(--og-cyan) / 0.14), transparent 34%),
+      radial-gradient(circle at 92% 6%, hsl(var(--og-lime) / 0.1), transparent 30%),
+      linear-gradient(90deg, transparent, rgb(255 255 255 / 0.035), transparent);
+  }
+
+  .og-glass-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    border: 1px solid rgb(255 255 255 / 0.11);
+    background: rgb(255 255 255 / 0.055);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 18px 60px -48px hsl(var(--og-cyan));
+    backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  .og-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    border: 1px solid rgb(255 255 255 / 0.12);
+    background: rgb(255 255 255 / 0.065);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+    backdrop-filter: blur(14px);
+  }
+
   .ios-primary-button {
     @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-[1.2rem] bg-white px-4 py-3 text-sm font-black text-[#07101d] shadow-[0_16px_36px_-24px_rgba(255,255,255,0.95)] transition active:scale-95;
   }
@@ -212,4 +261,112 @@
 
 .ios-tool-surface .font-display {
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
+}
+
+.og-tool-shell {
+  isolation: isolate;
+}
+
+.og-tool-shell > section,
+.og-tool-shell > div,
+.og-tool-shell article,
+.og-tool-shell form,
+.og-tool-shell label,
+.og-tool-shell table,
+.og-tool-shell iframe {
+  border-color: rgb(255 255 255 / 0.12) !important;
+}
+
+.og-tool-shell > section,
+.og-tool-shell > div:not(.absolute):not(.pointer-events-none),
+.og-tool-shell article,
+.og-tool-shell form,
+.og-tool-shell .bg-og-ink,
+.og-tool-shell .bg-og-ink\/70,
+.og-tool-shell .bg-og-ink\/72,
+.og-tool-shell .bg-og-ink\/75,
+.og-tool-shell .bg-og-ink\/80,
+.og-tool-shell .bg-og-ink\/90,
+.og-tool-shell .bg-og-ink\/95,
+.og-tool-shell .bg-black\/24,
+.og-tool-shell .bg-black\/28,
+.og-tool-shell .bg-black\/50 {
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.078), rgb(255 255 255 / 0.03)),
+    hsl(var(--og-ink) / 0.74) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 16px 52px -42px hsl(var(--og-cyan) / 0.75);
+  backdrop-filter: blur(16px) saturate(145%);
+}
+
+.og-tool-shell > section,
+.og-tool-shell > div:not(.absolute):not(.pointer-events-none),
+.og-tool-shell article,
+.og-tool-shell form,
+.og-tool-shell label,
+.og-tool-shell .border,
+.og-tool-shell .border-b,
+.og-tool-shell .border-t {
+  border-radius: 1.35rem;
+}
+
+.og-tool-shell form,
+.og-tool-shell label,
+.og-tool-shell input,
+.og-tool-shell textarea,
+.og-tool-shell select,
+.og-tool-shell button,
+.og-tool-shell a {
+  min-height: 2.65rem;
+}
+
+.og-tool-shell input,
+.og-tool-shell textarea,
+.og-tool-shell select {
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.075) !important;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+
+.og-tool-shell button,
+.og-tool-shell a,
+.og-tool-shell code,
+.og-tool-shell .rounded-none {
+  border-radius: 999px;
+}
+
+.og-tool-shell h2,
+.og-tool-shell h3 {
+  letter-spacing: -0.045em;
+}
+
+.og-tool-shell .border-dashed {
+  background: rgb(255 255 255 / 0.035);
+  border-color: rgb(255 255 255 / 0.14) !important;
+}
+
+.og-tool-shell .grid-bg {
+  opacity: 0.16 !important;
+}
+
+.og-tool-shell img {
+  border-radius: inherit;
+}
+
+.og-tool-shell .scan-line {
+  filter: drop-shadow(0 0 12px hsl(var(--og-cyan)));
+}
+
+@media (max-width: 640px) {
+  .og-tool-shell > section,
+  .og-tool-shell > div:not(.absolute):not(.pointer-events-none),
+  .og-tool-shell article,
+  .og-tool-shell form,
+  .og-tool-shell label,
+  .og-tool-shell .border,
+  .og-tool-shell .border-b,
+  .og-tool-shell .border-t {
+    border-radius: 1.15rem;
+  }
 }
