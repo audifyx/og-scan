@@ -169,8 +169,14 @@ function mergeToken(primary: JupTokenInfo, fallback: JupTokenInfo): JupTokenInfo
     creationSource: primary.creationSource ?? fallback.creationSource,
     allTimeHighUsd: primary.allTimeHighUsd ?? fallback.allTimeHighUsd,
     allTimeHighAt: primary.allTimeHighAt ?? fallback.allTimeHighAt,
+    allTimeHighSource: primary.allTimeHighSource ?? fallback.allTimeHighSource,
     allTimeLowUsd: primary.allTimeLowUsd ?? fallback.allTimeLowUsd,
     allTimeLowAt: primary.allTimeLowAt ?? fallback.allTimeLowAt,
+    allTimeLowSource: primary.allTimeLowSource ?? fallback.allTimeLowSource,
+    allTimeHighMarketCap: primary.allTimeHighMarketCap ?? fallback.allTimeHighMarketCap,
+    allTimeHighMarketCapAt: primary.allTimeHighMarketCapAt ?? fallback.allTimeHighMarketCapAt,
+    allTimeLowMarketCap: primary.allTimeLowMarketCap ?? fallback.allTimeLowMarketCap,
+    allTimeLowMarketCapAt: primary.allTimeLowMarketCapAt ?? fallback.allTimeLowMarketCapAt,
     migrationCreatedAt: primary.migrationCreatedAt ?? fallback.migrationCreatedAt,
     dexPaidAmount: primary.dexPaidAmount ?? fallback.dexPaidAmount,
     dexBoostAmount: primary.dexBoostAmount ?? fallback.dexBoostAmount,
@@ -252,6 +258,15 @@ function getPairTxns(pair: DetailDexPair | undefined, window: "m5" | "h1" | "h24
   return { buys: bucket?.buys ?? 0, sells: bucket?.sells ?? 0 };
 }
 
+function marketExtremeSub(dateIso: string | undefined, source: string | undefined): string {
+  const dateText: string = dateIso ? shortDate(dateIso) : "history unavailable";
+  return source ? `${dateText} · ${source}` : dateText;
+}
+
+function marketExtremeLine(price: number | undefined, dateIso: string | undefined): string {
+  return price != null ? `${fmtUsd(price)} · ${shortDate(dateIso)}` : "historical data unavailable";
+}
+
 function linkHost(url: string | undefined): string {
   if (!url) return "link";
   try {
@@ -275,7 +290,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const pair = useMemo(() => bestPair(dexPairs ?? []), [dexPairs]);
 
   const { data: enrichedTokens, isFetching: isFetchingToken } = useQuery({
-    queryKey: ["coin-detail-token-intel", token.id, pair?.pairAddress ?? "none", "v8-quote-backed-lp"],
+    queryKey: ["coin-detail-token-intel", token.id, pair?.pairAddress ?? "none", "v9-market-extremes"],
     queryFn: async (): Promise<JupTokenInfo[]> => {
       const jupTokens = await jupGetTokens([token.id]);
       const base = jupTokens[0] ? mergeToken(jupTokens[0], token) : token;
@@ -309,7 +324,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const pairCreated = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : migratedAt;
 
   const { data: classificationReport, isFetching: isFetchingClassification } = useQuery({
-    queryKey: ["coin-detail-layered-classification", detailToken.symbol, "v8-quote-backed-lp"],
+    queryKey: ["coin-detail-layered-classification", detailToken.symbol, "v9-market-extremes"],
     queryFn: () => forensicOgAttribution(detailToken.symbol),
     enabled: open && Boolean(detailToken.symbol),
     staleTime: 30_000,
@@ -429,11 +444,13 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <IntelCard icon={Flame} label="All-Time High" value={fmtUsd(detailToken.allTimeHighUsd)} sub={`ATH date ${shortDate(detailToken.allTimeHighAt)}`} tone="gold" />
-                <IntelCard icon={Activity} label="All-Time Low" value={fmtUsd(detailToken.allTimeLowUsd)} sub={`ATL date ${shortDate(detailToken.allTimeLowAt)}`} tone="cyan" />
+                <IntelCard icon={Flame} label="All-Time High" value={fmtUsd(detailToken.allTimeHighUsd)} sub={marketExtremeSub(detailToken.allTimeHighAt, detailToken.allTimeHighSource)} tone="gold" />
+                <IntelCard icon={Activity} label="All-Time Low" value={fmtUsd(detailToken.allTimeLowUsd)} sub={marketExtremeSub(detailToken.allTimeLowAt, detailToken.allTimeLowSource)} tone="cyan" />
+                <IntelCard icon={BadgeDollarSign} label="ATH Market Cap" value={fmtUsd(detailToken.allTimeHighMarketCap)} sub={detailToken.allTimeHighMarketCap ? `estimated ${shortDate(detailToken.allTimeHighMarketCapAt)}` : "needs price history + MC"} tone="gold" />
                 <IntelCard icon={Users} label="Holders" value={fmtNum(detailToken.holderCount)} sub={`top 10 ${detailToken.topHoldersPercent != null ? `${detailToken.topHoldersPercent.toFixed(1)}%` : "scanning"}`} tone="lime" />
-                <IntelCard icon={Zap} label="Pools" value={fmtNum(detailToken.poolCount ?? detailToken.allPools?.length)} sub={`${detailToken.pairDexId ?? pair?.dexId ?? "DEX"} routes tracked`} tone="cyan" />
               </div>
+
+              <MarketExtremesPanel token={detailToken} />
 
               <div className="rounded-3xl border border-og-cyan/25 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
@@ -507,8 +524,10 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <MetaLine label="Pair" value={shortAddr(pair?.pairAddress ?? detailToken.pairAddress, 5)} />
                   <MetaLine label="CA" value={shortAddr(detailToken.id, 7)} />
                   <MetaLine label="Decimals" value={String(detailToken.decimals ?? "—")} />
-                  <MetaLine label="ATH" value={`${fmtUsd(detailToken.allTimeHighUsd)} · ${shortDate(detailToken.allTimeHighAt)}`} />
-                  <MetaLine label="ATL" value={`${fmtUsd(detailToken.allTimeLowUsd)} · ${shortDate(detailToken.allTimeLowAt)}`} />
+                  <MetaLine label="ATH" value={marketExtremeLine(detailToken.allTimeHighUsd, detailToken.allTimeHighAt)} />
+                  <MetaLine label="ATL" value={marketExtremeLine(detailToken.allTimeLowUsd, detailToken.allTimeLowAt)} />
+                  <MetaLine label="ATH MC" value={marketExtremeLine(detailToken.allTimeHighMarketCap, detailToken.allTimeHighMarketCapAt)} />
+                  <MetaLine label="ATL MC" value={marketExtremeLine(detailToken.allTimeLowMarketCap, detailToken.allTimeLowMarketCapAt)} />
                   <MetaLine label="Migration" value={shortDate(migratedAt)} />
                   <MetaLine label="Mint proof" value={proofTimestampText(createdAt)} />
                 </div>
@@ -601,6 +620,31 @@ const TapePanel = ({ pair, token, buyPct, buys24, sells24 }: { pair?: DetailDexP
   );
 };
 
+const MarketExtremesPanel = ({ token }: { token: JupTokenInfo }) => {
+  const hasHistory: boolean = token.allTimeHighUsd != null || token.allTimeLowUsd != null;
+  return (
+    <div className="rounded-3xl border border-og-gold/30 bg-og-gold/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-gold">
+          <Flame className="h-3.5 w-3.5" /> historical market extremes
+        </div>
+        <span className={cn("rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-widest", hasHistory ? "border-og-lime/35 bg-og-lime/10 text-og-lime" : "border-og-gold/35 bg-og-gold/10 text-og-gold")}>
+          {hasHistory ? "history resolved" : "provider history limited"}
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <MetaLine label="ATH price" value={marketExtremeLine(token.allTimeHighUsd, token.allTimeHighAt)} />
+        <MetaLine label="ATH MC" value={marketExtremeLine(token.allTimeHighMarketCap, token.allTimeHighMarketCapAt)} />
+        <MetaLine label="ATL price" value={marketExtremeLine(token.allTimeLowUsd, token.allTimeLowAt)} />
+        <MetaLine label="ATL MC" value={marketExtremeLine(token.allTimeLowMarketCap, token.allTimeLowMarketCapAt)} />
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        ATH/ATL pulls from Birdeye when available, then falls back to DEX pool OHLCV history. Market-cap extremes are estimated from current MC/supply ratio when historical MC is not directly published.
+      </p>
+    </div>
+  );
+};
+
 const MetadataPanel = ({ token, pair, createdAt, migratedAt, pairCreated }: { token: JupTokenInfo; pair?: DetailDexPair; createdAt?: string; migratedAt?: string; pairCreated?: string }) => (
   <div className="rounded-3xl border border-og-cyan/25 bg-white/[0.035] p-4">
     <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
@@ -610,8 +654,9 @@ const MetadataPanel = ({ token, pair, createdAt, migratedAt, pairCreated }: { to
       <MetaLine label="On-chain mint" value={createdAt ? `${shortDate(createdAt)} · ${timeAgo(Math.floor(new Date(createdAt).getTime() / 1000))} old` : "unknown"} />
       <MetaLine label="Pair created" value={pairCreated ? `${shortDate(pairCreated)} · ${timeAgo(Math.floor(new Date(pairCreated).getTime() / 1000))} old` : "—"} />
       <MetaLine label="Migration day" value={shortDate(migratedAt)} />
-      <MetaLine label="ATH" value={`${fmtUsd(token.allTimeHighUsd)} · ${shortDate(token.allTimeHighAt)}`} />
-      <MetaLine label="ATL" value={`${fmtUsd(token.allTimeLowUsd)} · ${shortDate(token.allTimeLowAt)}`} />
+      <MetaLine label="ATH" value={marketExtremeLine(token.allTimeHighUsd, token.allTimeHighAt)} />
+      <MetaLine label="ATL" value={marketExtremeLine(token.allTimeLowUsd, token.allTimeLowAt)} />
+      <MetaLine label="History source" value={token.allTimeHighSource ?? token.allTimeLowSource ?? "provider limited"} />
       <MetaLine label="Labels" value={(pair?.labels ?? []).join(", ") || "—"} />
       <MetaLine label="Pair quote" value={pair?.quoteToken?.symbol ? `${pair.quoteToken.symbol} · ${pair.dexId ?? "DEX"}` : "—"} />
     </div>

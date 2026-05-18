@@ -135,8 +135,14 @@ export type JupTokenInfo = {
   smartCtLikes?: number;
   allTimeHighUsd?: number;
   allTimeHighAt?: string;
+  allTimeHighSource?: string;
   allTimeLowUsd?: number;
   allTimeLowAt?: string;
+  allTimeLowSource?: string;
+  allTimeHighMarketCap?: number;
+  allTimeHighMarketCapAt?: string;
+  allTimeLowMarketCap?: number;
+  allTimeLowMarketCapAt?: string;
   migrationCreatedAt?: string;
   dexPaidAmount?: number;
   dexBoostAmount?: number;
@@ -484,8 +490,14 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
     smartCtLikes: existing.smartCtLikes ?? next.smartCtLikes,
     allTimeHighUsd: existing.allTimeHighUsd ?? next.allTimeHighUsd,
     allTimeHighAt: existing.allTimeHighAt ?? next.allTimeHighAt,
+    allTimeHighSource: existing.allTimeHighSource ?? next.allTimeHighSource,
     allTimeLowUsd: existing.allTimeLowUsd ?? next.allTimeLowUsd,
     allTimeLowAt: existing.allTimeLowAt ?? next.allTimeLowAt,
+    allTimeLowSource: existing.allTimeLowSource ?? next.allTimeLowSource,
+    allTimeHighMarketCap: existing.allTimeHighMarketCap ?? next.allTimeHighMarketCap,
+    allTimeHighMarketCapAt: existing.allTimeHighMarketCapAt ?? next.allTimeHighMarketCapAt,
+    allTimeLowMarketCap: existing.allTimeLowMarketCap ?? next.allTimeLowMarketCap,
+    allTimeLowMarketCapAt: existing.allTimeLowMarketCapAt ?? next.allTimeLowMarketCapAt,
     migrationCreatedAt: existing.migrationCreatedAt ?? next.migrationCreatedAt,
     dexPaidAmount: existing.dexPaidAmount ?? next.dexPaidAmount,
     dexBoostAmount: existing.dexBoostAmount ?? next.dexBoostAmount,
@@ -587,6 +599,7 @@ function mergeTokenCandidates(tokens: JupTokenInfo[]): JupTokenInfo[] {
 const dexBoostCache = new Map<string, Promise<Map<string, DexBoostInfo>>>();
 const dexOrdersCache = new Map<string, Promise<DexPaidOrderSummary>>();
 const birdeyeOverviewCache = new Map<string, Promise<Record<string, unknown> | null>>();
+const geckoOhlcvCache = new Map<string, Promise<GeckoOhlcvCandle[]>>();
 const heliusAuthorityCache = new Map<string, Promise<TokenAuthorityIntel | null>>();
 const creatorFundingCache = new Map<string, Promise<TokenCreatorFundingIntel>>();
 const pumpFunIntelCache = new Map<string, Promise<TokenPumpFunIntel | null>>();
@@ -826,13 +839,22 @@ function birdeyeMarketPatch(overview: Record<string, unknown> | null): Pick<JupT
   };
 }
 
-type PriceExtreme = { price?: number; at?: string };
+type PriceExtreme = { price?: number; at?: string; source?: string };
+
+type GeckoOhlcvCandle = { unixTime: number; o: number; h: number; l: number; c: number; v: number };
+
+type GeckoOhlcvResponse = {
+  data?: {
+    attributes?: {
+      ohlcv_list?: unknown[];
+    };
+  };
+};
 
 type PriceExtremes = { ath: PriceExtreme; atl: PriceExtreme };
 
 function athFromOverview(overview: Record<string, unknown> | null): PriceExtreme {
-  return {
-    price: pickFirstNumber(overview, [
+  const price: number | undefined = pickFirstNumber(overview, [
       "ath",
       "athPrice",
       "priceAth",
@@ -842,7 +864,10 @@ function athFromOverview(overview: Record<string, unknown> | null): PriceExtreme
       "highestPrice",
       "priceHighest",
       "maxPrice",
-    ]),
+    ]);
+  return {
+    price,
+    source: price != null ? "Birdeye overview" : undefined,
     at: pickFirstIso(overview, [
       "athTime",
       "athAt",
@@ -858,8 +883,7 @@ function athFromOverview(overview: Record<string, unknown> | null): PriceExtreme
 }
 
 function atlFromOverview(overview: Record<string, unknown> | null): PriceExtreme {
-  return {
-    price: pickFirstNumber(overview, [
+  const price: number | undefined = pickFirstNumber(overview, [
       "atl",
       "atlPrice",
       "priceAtl",
@@ -869,7 +893,10 @@ function atlFromOverview(overview: Record<string, unknown> | null): PriceExtreme
       "lowestPrice",
       "priceLowest",
       "minPrice",
-    ]),
+    ]);
+  return {
+    price,
+    source: price != null ? "Birdeye overview" : undefined,
     at: pickFirstIso(overview, [
       "atlTime",
       "atlAt",
@@ -901,17 +928,104 @@ async function priceExtremesFromOhlcv(mint: string, fromIso: string | undefined)
       { high: null, low: null },
     );
     return {
-      ath: extremes.high ? { price: extremes.high.price, at: new Date(extremes.high.unixTime * 1000).toISOString() } : {},
-      atl: extremes.low ? { price: extremes.low.price, at: new Date(extremes.low.unixTime * 1000).toISOString() } : {},
+      ath: extremes.high ? { price: extremes.high.price, at: new Date(extremes.high.unixTime * 1000).toISOString(), source: "Birdeye OHLCV" } : {},
+      atl: extremes.low ? { price: extremes.low.price, at: new Date(extremes.low.unixTime * 1000).toISOString(), source: "Birdeye OHLCV" } : {},
     };
   } catch {
     return { ath: {}, atl: {} };
   }
 }
 
+function parseGeckoCandle(raw: unknown): GeckoOhlcvCandle | null {
+  if (!Array.isArray(raw) || raw.length < 6) return null;
+  const [timestampRaw, openRaw, highRaw, lowRaw, closeRaw, volumeRaw] = raw;
+  const unixTime: number | undefined = finiteNumber(timestampRaw);
+  const o: number | undefined = finiteNumber(openRaw);
+  const h: number | undefined = finiteNumber(highRaw);
+  const l: number | undefined = finiteNumber(lowRaw);
+  const c: number | undefined = finiteNumber(closeRaw);
+  const v: number | undefined = finiteNumber(volumeRaw);
+  if (unixTime == null || o == null || h == null || l == null || c == null || v == null) return null;
+  const seconds: number = unixTime > 10_000_000_000 ? Math.floor(unixTime / 1000) : unixTime;
+  return { unixTime: seconds, o, h, l, c, v };
+}
+
+async function geckoPoolDailyOhlcv(poolAddress: string, tokenAddress: string, maxPages = 4): Promise<GeckoOhlcvCandle[]> {
+  const cacheKey = `${poolAddress}:${tokenAddress}:${maxPages}`;
+  const cached = geckoOhlcvCache.get(cacheKey);
+  if (cached) return cached;
+
+  const task = (async (): Promise<GeckoOhlcvCandle[]> => {
+    const byTimestamp = new Map<number, GeckoOhlcvCandle>();
+    let beforeTimestamp: number | undefined;
+
+    for (let page = 0; page < maxPages; page += 1) {
+      const params = new URLSearchParams({ aggregate: "1", limit: "1000", currency: "usd", token: tokenAddress });
+      if (beforeTimestamp != null) params.set("before_timestamp", String(beforeTimestamp));
+      const url = `https://api.geckoterminal.com/api/v2/networks/solana/pools/${encodeURIComponent(poolAddress)}/ohlcv/day?${params.toString()}`;
+      const json = await jget<GeckoOhlcvResponse>(url);
+      const pageCandles: GeckoOhlcvCandle[] = (json.data?.attributes?.ohlcv_list ?? [])
+        .map(parseGeckoCandle)
+        .filter((candle): candle is GeckoOhlcvCandle => Boolean(candle));
+
+      if (pageCandles.length === 0) break;
+      for (const candle of pageCandles) byTimestamp.set(candle.unixTime, candle);
+      const oldest: number = Math.min(...pageCandles.map((candle) => candle.unixTime));
+      if (!Number.isFinite(oldest) || oldest <= 0 || beforeTimestamp === oldest - 1) break;
+      beforeTimestamp = oldest - 1;
+    }
+
+    return Array.from(byTimestamp.values());
+  })().catch(() => []);
+
+  geckoOhlcvCache.set(cacheKey, task);
+  return task;
+}
+
+function mergePriceExtremes(extremes: PriceExtremes[]): PriceExtremes {
+  const athCandidates: PriceExtreme[] = extremes.map((item) => item.ath).filter((item) => item.price != null && Number.isFinite(item.price));
+  const atlCandidates: PriceExtreme[] = extremes.map((item) => item.atl).filter((item) => item.price != null && Number.isFinite(item.price) && item.price > 0);
+  return {
+    ath: athCandidates.sort((a, b) => (b.price ?? 0) - (a.price ?? 0))[0] ?? {},
+    atl: atlCandidates.sort((a, b) => (a.price ?? Number.POSITIVE_INFINITY) - (b.price ?? Number.POSITIVE_INFINITY))[0] ?? {},
+  };
+}
+
+async function priceExtremesFromGeckoPools(mint: string, poolAddresses: string[]): Promise<PriceExtremes> {
+  const uniquePools: string[] = Array.from(new Set(poolAddresses.filter(Boolean))).slice(0, 2);
+  if (uniquePools.length === 0) return { ath: {}, atl: {} };
+
+  const results = await Promise.allSettled(
+    uniquePools.map(async (poolAddress): Promise<PriceExtremes> => {
+      const candles: GeckoOhlcvCandle[] = await geckoPoolDailyOhlcv(poolAddress, mint);
+      const extremes = candles.reduce<{ high: GeckoOhlcvCandle | null; low: GeckoOhlcvCandle | null }>(
+        (current, candle) => {
+          if (Number.isFinite(candle.h) && (!current.high || candle.h > current.high.h)) current.high = candle;
+          if (Number.isFinite(candle.l) && candle.l > 0 && (!current.low || candle.l < current.low.l)) current.low = candle;
+          return current;
+        },
+        { high: null, low: null },
+      );
+      return {
+        ath: extremes.high ? { price: extremes.high.h, at: new Date(extremes.high.unixTime * 1000).toISOString(), source: "GeckoTerminal OHLCV" } : {},
+        atl: extremes.low ? { price: extremes.low.l, at: new Date(extremes.low.unixTime * 1000).toISOString(), source: "GeckoTerminal OHLCV" } : {},
+      };
+    }),
+  );
+
+  return mergePriceExtremes(results.map((result) => (result.status === "fulfilled" ? result.value : { ath: {}, atl: {} })));
+}
+
+function estimateMarketCapAtPrice(price: number | undefined, currentPrice: number | undefined, currentMarketCap: number | undefined): number | undefined {
+  if (price == null || currentPrice == null || currentMarketCap == null) return undefined;
+  if (!Number.isFinite(price) || !Number.isFinite(currentPrice) || !Number.isFinite(currentMarketCap) || currentPrice <= 0 || currentMarketCap <= 0) return undefined;
+  return (currentMarketCap / currentPrice) * price;
+}
+
 type TokenEnrichmentOptions = {
   includeAth?: boolean;
   maxAth?: number;
+  maxDexHistory?: number;
   includeOnChainIntel?: boolean;
   maxOnChain?: number;
   maxBirdeye?: number;
@@ -933,9 +1047,11 @@ export async function enrichTokensWithMarketIntel(
   const poolsByMint: Map<string, TokenDexPoolIntel[]> = dexPoolsByMint(allPairs);
   const boostByMint: Map<string, DexBoostInfo> = boostsResult.status === "fulfilled" ? boostsResult.value : new Map<string, DexBoostInfo>();
   const maxAth: number = options.includeAth ? options.maxAth ?? tokens.length : 0;
+  const maxDexHistory: number = options.includeAth ? options.maxDexHistory ?? Math.min(maxAth, 4) : 0;
   const maxBirdeye: number = Math.max(maxAth, options.maxBirdeye ?? Math.min(tokens.length, 24));
   const maxOnChain: number = options.includeOnChainIntel ? options.maxOnChain ?? Math.min(tokens.length, 24) : 0;
   const athMints = new Set<string>(tokens.slice(0, maxAth).map((token) => token.id));
+  const dexHistoryMints = new Set<string>(tokens.slice(0, maxDexHistory).map((token) => token.id));
   const birdeyeMints = new Set<string>(tokens.slice(0, maxBirdeye).map((token) => token.id));
   const onChainMints = new Set<string>(tokens.slice(0, maxOnChain).map((token) => token.id));
 
@@ -950,12 +1066,19 @@ export async function enrichTokensWithMarketIntel(
     const marketPatch = birdeyeMarketPatch(overview);
     const overviewAth: PriceExtreme = athFromOverview(overview);
     const overviewAtl: PriceExtreme = atlFromOverview(overview);
-    const shouldLoadExtremesFromCandles: boolean = isSolanaToken && athMints.has(token.id) && (overviewAth.price == null || overviewAtl.price == null);
+    const geckoPoolAddresses: string[] = [pair?.pairAddress, ...pools.map((pool) => pool.pairAddress)].filter((value): value is string => Boolean(value));
+    const shouldLoadExtremesFromDexHistory: boolean = isSolanaToken && dexHistoryMints.has(token.id) && geckoPoolAddresses.length > 0 && (overviewAth.price == null || overviewAtl.price == null);
+    const dexHistoryExtremes: PriceExtremes = shouldLoadExtremesFromDexHistory
+      ? await priceExtremesFromGeckoPools(token.id, geckoPoolAddresses)
+      : { ath: {}, atl: {} };
+    const shouldLoadExtremesFromCandles: boolean = isSolanaToken && athMints.has(token.id) && ((overviewAth.price ?? dexHistoryExtremes.ath.price) == null || (overviewAtl.price ?? dexHistoryExtremes.atl.price) == null);
     const ohlcvExtremes: PriceExtremes = shouldLoadExtremesFromCandles
       ? await priceExtremesFromOhlcv(token.id, token.onChainCreatedAt ?? token.firstPool?.createdAt ?? migrationCreatedAt)
       : { ath: {}, atl: {} };
-    const ath: PriceExtreme = overviewAth.price != null ? overviewAth : ohlcvExtremes.ath;
-    const atl: PriceExtreme = overviewAtl.price != null ? overviewAtl : ohlcvExtremes.atl;
+    const ath: PriceExtreme = overviewAth.price != null ? overviewAth : dexHistoryExtremes.ath.price != null ? dexHistoryExtremes.ath : ohlcvExtremes.ath;
+    const atl: PriceExtreme = overviewAtl.price != null ? overviewAtl : dexHistoryExtremes.atl.price != null ? dexHistoryExtremes.atl : ohlcvExtremes.atl;
+    const resolvedCurrentPrice: number | undefined = token.usdPrice ?? marketPatch.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined);
+    const resolvedMarketCap: number | undefined = token.mcap ?? marketPatch.mcap ?? pair?.marketCap ?? token.fdv ?? marketPatch.fdv ?? pair?.fdv;
     const [authorityResult, holderResult, creatorFundingResult, pumpFunResult] = await Promise.allSettled([
       isSolanaToken && onChainMints.has(token.id) ? heliusTokenAuthorityIntel(token.id) : Promise.resolve(null),
       isSolanaToken && onChainMints.has(token.id) ? tokenHolderBundleIntel(token) : Promise.resolve(undefined),
@@ -985,7 +1108,7 @@ export async function enrichTokensWithMarketIntel(
     return {
       ...token,
       icon: token.icon ?? pair?.info?.imageUrl,
-      usdPrice: token.usdPrice ?? marketPatch.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined),
+      usdPrice: resolvedCurrentPrice,
       mcap: token.mcap ?? marketPatch.mcap ?? pair?.marketCap,
       fdv: token.fdv ?? marketPatch.fdv ?? pair?.fdv,
       liquidity: pair ? pairEffectiveLiquidity ?? marketPatch.effectiveLiquidityUsd ?? token.effectiveLiquidityUsd ?? token.liquidity : marketPatch.effectiveLiquidityUsd ?? token.effectiveLiquidityUsd ?? token.liquidity,
@@ -1003,8 +1126,14 @@ export async function enrichTokensWithMarketIntel(
       firstPool: token.firstPool?.createdAt ? token.firstPool : migrationCreatedAt ? { createdAt: migrationCreatedAt } : token.firstPool,
       allTimeHighUsd: token.allTimeHighUsd ?? ath.price,
       allTimeHighAt: token.allTimeHighAt ?? ath.at,
+      allTimeHighSource: token.allTimeHighSource ?? ath.source,
       allTimeLowUsd: token.allTimeLowUsd ?? atl.price,
       allTimeLowAt: token.allTimeLowAt ?? atl.at,
+      allTimeLowSource: token.allTimeLowSource ?? atl.source,
+      allTimeHighMarketCap: token.allTimeHighMarketCap ?? estimateMarketCapAtPrice(ath.price, resolvedCurrentPrice, resolvedMarketCap),
+      allTimeHighMarketCapAt: token.allTimeHighMarketCapAt ?? ath.at,
+      allTimeLowMarketCap: token.allTimeLowMarketCap ?? estimateMarketCapAtPrice(atl.price, resolvedCurrentPrice, resolvedMarketCap),
+      allTimeLowMarketCapAt: token.allTimeLowMarketCapAt ?? atl.at,
       migrationCreatedAt: pumpFun?.migrationAt ?? migrationCreatedAt,
       dexPaidAmount: token.dexPaidAmount ?? boost?.totalAmount ?? boost?.amount,
       dexBoostAmount: token.dexBoostAmount ?? boost?.amount,

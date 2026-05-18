@@ -61,7 +61,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   }, [initialQuery]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["scan", debounced, "forensic-v8-quote-backed-lp"],
+    queryKey: ["scan", debounced, "forensic-v9-market-extremes"],
     queryFn: async (): Promise<ForensicOgReport> => {
       const report: ForensicOgReport = await forensicOgAttribution(debounced);
       if (report.candidates.length > 0) return report;

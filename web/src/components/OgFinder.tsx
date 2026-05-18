@@ -115,7 +115,7 @@ export const OgFinder = ({ onSelect }: Props) => {
   const [showAllCopycats, setShowAllCopycats] = useState<boolean>(false);
 
   const { data, isFetching, refetch, dataUpdatedAt } = useQuery({
-    queryKey: ["og-forensic-attribution", submitted, "v8-quote-backed-lp"],
+    queryKey: ["og-forensic-attribution", submitted, "v9-market-extremes"],
     queryFn: (): Promise<ForensicOgReport> => forensicOgAttribution(submitted),
     enabled: submitted.length >= 1,
     staleTime: 30_000,
