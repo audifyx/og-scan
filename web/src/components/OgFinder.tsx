@@ -28,6 +28,7 @@ import {
   forensicOgAttribution,
   fmtPct,
   fmtUsd,
+  fmtNum,
   shortAddr,
   timeAgo,
   tokenDexPaidLabel,
@@ -506,6 +507,9 @@ const CoinCard = ({
         <Stat icon={ShieldAlert} label="ATL" value={fmtUsd(t.allTimeLowUsd)} accent="text-og-cyan" />
         <Stat icon={Droplets} label="QUOTE LP" value={fmtUsd(tokenEffectiveLiquidityUsd(t))} />
         <Stat icon={Users} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
+        <Stat icon={Network} label="POOLS" value={fmtNum(t.poolCount ?? t.allPools?.length)} accent={(t.poolCount ?? t.allPools?.length ?? 0) > 0 ? "text-og-cyan" : undefined} />
+        <Stat icon={Users} label="HOLDERS" value={fmtNum(t.holderCount)} accent="text-og-lime" />
+        <Stat icon={ShieldAlert} label="WHALES" value={fmtNum(t.whaleCount)} accent={(t.whaleCount ?? 0) >= 3 ? "text-og-blood" : "text-og-lime"} />
         <Stat
           icon={Calendar}
           label="MIGR"
@@ -517,6 +521,7 @@ const CoinCard = ({
       {forensic && (forensic.reasons.length > 0 || forensic.warnings.length > 0) && (
         <div className="border-t border-og-grid/60 pt-2 font-mono text-[9px] uppercase tracking-widest">
           <div className="text-og-lime">WHY: {forensic.classification.reasoning_summary}</div>
+          {t.lpPulled ? <div className="mt-1 text-og-blood">LP BLOCK: {t.lpPullReason ?? "pulled/dead liquidity"}</div> : null}
           {forensic.warnings[0] && <div className="mt-1 text-og-blood">WATCH: {forensic.warnings[0]}</div>}
         </div>
       )}
@@ -591,6 +596,7 @@ const TopRiskyCopycats = ({ tokens, report, onSelect }: { tokens: JupTokenInfo[]
                   <span><HelpLabel label="ORIGIN" /> <span className={scoreTextClass("origin", forensic?.originScore ?? 0)}>{forensic ? `${forensic.originScore}%` : "—"}</span></span>
                   <span><HelpLabel label="RISK" /> <span className={scoreTextClass("risk", forensic?.riskScore ?? 0)}>{forensic ? `${forensic.riskScore}%` : "—"}</span></span>
                   <span>LP <span className="text-foreground">{shortDate(token.firstPool?.createdAt)}</span></span>
+                  <span>WHALES <span className={(token.whaleCount ?? 0) >= 3 ? "text-og-blood" : "text-foreground"}>{fmtNum(token.whaleCount)}</span></span>
                   <span><HelpLabel label="MINT" /> <span className={mintSafe ? "text-og-lime" : "text-og-blood"}>{mintSafe ? "OFF" : "ON/UNK"}</span></span>
                   <span><HelpLabel label="FREEZE" /> <span className={freezeSafe ? "text-og-lime" : "text-og-blood"}>{freezeSafe ? "OFF" : "ON/UNK"}</span></span>
                 </div>

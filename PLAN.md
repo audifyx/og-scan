@@ -38,6 +38,8 @@
 - [x] Make OGSCAN attribution Solana-only and protect canonical origin mappings such as Fartcoin `9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump` from scam/copycat overrides.
 - [x] Separate **first credible Solana OG** from **later official/verified tokens**, so TRUMP/YE-style later official launches show as `LATER OFFICIAL` without replacing the original mint.
 - [x] Add **quote-backed LP / LP-pulled exclusion** so dead-liquidity or pulled-pool scams cannot become TRUE OG even if they are first on-chain or show inflated market cap.
+- [x] Add **full frontend-only enrichment** using existing Helius, Birdeye, Pump.fun, and DexScreener APIs: mint/freeze authorities, token accounts, largest holders, creator/funding txs, ATH/ATL, holders, price, liquidity, MC/FDV, Pump.fun creator/bonding/migration duration, all DEX pools, pair dates, boosts, orders, and paid-promotion signals.
+- [x] Hard-block known LP-pulled/scam mint `5sNU6g1qVji5dEBnb6SWSX2Gu2rtDvvk7khKyujj6cuU` and apply the same dead-liquidity logic to future candidates.
 
 ## **Design**
 
@@ -86,6 +88,7 @@
 - [x] **Live Feed**: A standalone `/feed` and `/live-feed` tool showing trending tokens, why they are moving, spotlight coins, high-ranking runners, bundle status, buys/sells, DEX paid/boosts, DexScreener charts, and CTO/dev-launch bonded coin analytics.
 - [x] **Bundle + Dev Risk Analytics**: Feed and coin popups now show holder-owner bundle tracking, suspected bundlers, dev farming scores, rug/dead-coin scores, low-liquidity linked coins, and average linked LP.
 - [x] **News / Viral Catalyst Feed**: Feed now watches RSS/news/X-style Elon, Trump, crypto, and breaking-news catalysts, explains why topics may go viral, and links matching live meme coins when detected.
+- [x] **Expanded Coin Intelligence Popup**: Popup now shows Helius authority truth, largest-holder owner rows, whale counts, creator/funding wallet inference, Pump.fun launch/migration timing, all DexScreener pools, DEX paid orders, boosts, Birdeye ATH/ATL, holders, liquidity, MC, and FDV.
 
 ## **Suggested build order**
 

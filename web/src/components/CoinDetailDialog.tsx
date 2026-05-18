@@ -51,8 +51,11 @@ import {
   tokenMigrationDateIso,
   tokenOgCreatedAtIso,
   type JupTokenInfo,
+  type TokenCreatorFundingIntel,
   type TokenDevLaunchIntel,
+  type TokenDexPoolIntel,
   type TokenHolderBundleIntel,
+  type TokenPumpFunIntel,
 } from "@/lib/og";
 
 type DetailDexPair = {
@@ -183,6 +186,14 @@ function mergeToken(primary: JupTokenInfo, fallback: JupTokenInfo): JupTokenInfo
     dexUrl: primary.dexUrl ?? fallback.dexUrl,
     pairAddress: primary.pairAddress ?? fallback.pairAddress,
     pairDexId: primary.pairDexId ?? fallback.pairDexId,
+    heliusAuthorities: primary.heliusAuthorities ?? fallback.heliusAuthorities,
+    topHolders: primary.topHolders ?? fallback.topHolders,
+    topHoldersPercent: primary.topHoldersPercent ?? fallback.topHoldersPercent,
+    whaleCount: primary.whaleCount ?? fallback.whaleCount,
+    creatorFunding: primary.creatorFunding ?? fallback.creatorFunding,
+    pumpFun: primary.pumpFun ?? fallback.pumpFun,
+    allPools: primary.allPools ?? fallback.allPools,
+    poolCount: primary.poolCount ?? fallback.poolCount,
   };
 }
 
@@ -269,7 +280,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
       const jupTokens = await jupGetTokens([token.id]);
       const base = jupTokens[0] ? mergeToken(jupTokens[0], token) : token;
       const withPair = pair ? pairFallbackToken(pair, base) : base;
-      return enrichTokensWithMarketIntel([withPair], { includeAth: true, maxAth: 1 });
+      return enrichTokensWithMarketIntel([withPair], { includeAth: true, maxAth: 1, includeOnChainIntel: true, maxOnChain: 1, maxBirdeye: 1 });
     },
     enabled: open && Boolean(token.id),
     staleTime: 30_000,
@@ -336,6 +347,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
     raw.push({ label: "DexScreener Chart", url: chartUrl });
     raw.push({ label: "Solscan", url: `https://solscan.io/token/${detailToken.id}` });
     raw.push({ label: "Jupiter", url: `https://jup.ag/swap/SOL-${detailToken.id}` });
+    if (detailToken.pumpFun?.sourceUrl) raw.push({ label: "Pump.fun", url: detailToken.pumpFun.sourceUrl });
     for (const website of pair?.info?.websites ?? []) if (website.url) raw.push({ label: website.label ?? linkHost(website.url), url: website.url });
     for (const social of pair?.info?.socials ?? []) if (social.url) raw.push({ label: social.type ?? linkHost(social.url), url: social.url });
     const seen = new Set<string>();
@@ -416,9 +428,11 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                 <IntelCard icon={BadgeDollarSign} label="DEX Paid" value={dexPaid} sub={`${fmtNum(detailToken.dexBoostActive ?? pair?.boosts?.active)} active · last ${shortDate(detailToken.dexLastPaidAt)}`} tone={dexPaid === "—" ? "muted" : "lime"} />
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <IntelCard icon={Flame} label="All-Time High" value={fmtUsd(detailToken.allTimeHighUsd)} sub={`ATH date ${shortDate(detailToken.allTimeHighAt)}`} tone="gold" />
                 <IntelCard icon={Activity} label="All-Time Low" value={fmtUsd(detailToken.allTimeLowUsd)} sub={`ATL date ${shortDate(detailToken.allTimeLowAt)}`} tone="cyan" />
+                <IntelCard icon={Users} label="Holders" value={fmtNum(detailToken.holderCount)} sub={`top 10 ${detailToken.topHoldersPercent != null ? `${detailToken.topHoldersPercent.toFixed(1)}%` : "scanning"}`} tone="lime" />
+                <IntelCard icon={Zap} label="Pools" value={fmtNum(detailToken.poolCount ?? detailToken.allPools?.length)} sub={`${detailToken.pairDexId ?? pair?.dexId ?? "DEX"} routes tracked`} tone="cyan" />
               </div>
 
               <div className="rounded-3xl border border-og-cyan/25 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
@@ -471,8 +485,11 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
 
               <div className="grid gap-4 xl:grid-cols-3">
                 <DexPaidPanel token={detailToken} pair={pair} />
-                <DevLaunchPanel intel={devIntel} isLoading={isFetchingDevIntel} primaryLabel={primaryLabel} />
+                <DevLaunchPanel intel={devIntel} isLoading={isFetchingDevIntel} primaryLabel={primaryLabel} creatorFunding={detailToken.creatorFunding} pumpFun={detailToken.pumpFun} />
                 <HolderBundlePanel intel={bundleIntel} isLoading={isFetchingBundleIntel} token={detailToken} />
+                <OnChainIntelPanel token={detailToken} />
+                <PumpFunPanel pumpFun={detailToken.pumpFun} createdAt={createdAt} migratedAt={migratedAt} />
+                <DexPoolsPanel pools={detailToken.allPools ?? []} />
               </div>
 
               <TokenRiskAlerts alerts={riskAlerts} title="Watch Items" />
@@ -486,6 +503,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                 <div className="grid gap-2">
                   <MetaLine label="Chain" value={chainId} />
                   <MetaLine label="DEX" value={pair?.dexId ?? detailToken.pairDexId ?? "—"} />
+                  <MetaLine label="Pools" value={fmtNum(detailToken.poolCount ?? detailToken.allPools?.length)} />
                   <MetaLine label="Pair" value={shortAddr(pair?.pairAddress ?? detailToken.pairAddress, 5)} />
                   <MetaLine label="CA" value={shortAddr(detailToken.id, 7)} />
                   <MetaLine label="Decimals" value={String(detailToken.decimals ?? "—")} />
@@ -501,13 +519,14 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <ShieldCheck className="h-3.5 w-3.5" /> safety + audit
                 </div>
                 <div className="grid gap-2">
-                  <AuditLine label="Mint authority" ok={detailToken.audit?.mintAuthorityDisabled === true} good="disabled" bad="open / unknown" />
-                  <AuditLine label="Freeze authority" ok={detailToken.audit?.freezeAuthorityDisabled === true} good="disabled" bad="open / unknown" />
+                  <AuditLine label="Mint authority" ok={detailToken.audit?.mintAuthorityDisabled === true} good="disabled" bad={detailToken.heliusAuthorities?.mintAuthority ? `open ${shortAddr(detailToken.heliusAuthorities.mintAuthority, 4)}` : "open / unknown"} />
+                  <AuditLine label="Freeze authority" ok={detailToken.audit?.freezeAuthorityDisabled === true} good="disabled" bad={detailToken.heliusAuthorities?.freezeAuthority ? `open ${shortAddr(detailToken.heliusAuthorities.freezeAuthority, 4)}` : "open / unknown"} />
                   <AuditLine label="Verified" ok={detailToken.isVerified === true} good="verified" bad="unverified" />
                   <MetaLine label="Quote-backed LP" value={fmtUsd(quoteBackedLiquidity)} />
                   <MetaLine label="Reported LP" value={fmtUsd(detailToken.reportedLiquidity ?? pair?.liquidity?.usd)} />
                   <MetaLine label="LP status" value={lpPulled ? "pulled / dead liquidity" : "quote-backed"} />
-                  <MetaLine label="Top holders" value={detailToken.audit?.topHoldersPercentage != null ? `${detailToken.audit.topHoldersPercentage.toFixed(1)}%` : "—"} />
+                  <MetaLine label="Top holders" value={detailToken.topHoldersPercent != null ? `${detailToken.topHoldersPercent.toFixed(1)}%` : detailToken.audit?.topHoldersPercentage != null ? `${detailToken.audit.topHoldersPercentage.toFixed(1)}%` : "—"} />
+                  <MetaLine label="Whales" value={fmtNum(detailToken.whaleCount)} />
                   <MetaLine label="Organic score" value={detailToken.organicScore != null ? `${detailToken.organicScore.toFixed(0)} · ${detailToken.organicScoreLabel ?? ""}` : "—"} />
                   <MetaLine label="Origin score" value={forensicScore ? `${forensicScore.originScore}%` : "—"} />
                   <MetaLine label="Official status" value={forensicScore ? `${forensicScore.officialVerificationScore}%` : "—"} />
@@ -630,7 +649,7 @@ const DexPaidPanel = ({ token, pair }: { token: JupTokenInfo; pair?: DetailDexPa
   );
 };
 
-const DevLaunchPanel = ({ intel, isLoading, primaryLabel }: { intel?: TokenDevLaunchIntel; isLoading: boolean; primaryLabel: string }) => {
+const DevLaunchPanel = ({ intel, isLoading, primaryLabel, creatorFunding, pumpFun }: { intel?: TokenDevLaunchIntel; isLoading: boolean; primaryLabel: string; creatorFunding?: TokenCreatorFundingIntel; pumpFun?: TokenPumpFunIntel }) => {
   const isCto = intel?.launchType === "CTO / community support" || primaryLabel.includes("CTO");
   const devRiskTone: "lime" | "gold" | "blood" = intel?.devRiskLabel === "severe" || intel?.devRiskLabel === "high" ? "blood" : intel?.devRiskLabel === "watch" ? "gold" : "lime";
   return (
@@ -642,8 +661,9 @@ const DevLaunchPanel = ({ intel, isLoading, primaryLabel }: { intel?: TokenDevLa
         {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-og-cyan" /> : <span className={cn("rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-widest", isCto ? "border-og-gold/50 bg-og-gold/10 text-og-gold" : devRiskTone === "blood" ? "border-og-blood/50 bg-og-blood/10 text-og-blood" : "border-og-cyan/35 bg-og-cyan/10 text-og-cyan")}>{intel?.launchType ?? "scanning"}</span>}
       </div>
       <div className="grid gap-2">
-        <MetaLine label="Creator wallet" value={shortAddr(intel?.wallet ?? undefined, 6)} />
-        <MetaLine label="Confidence" value={intel?.confidence ?? "scanning"} />
+        <MetaLine label="Creator wallet" value={shortAddr(pumpFun?.creator ?? creatorFunding?.creatorWallet ?? intel?.wallet ?? undefined, 6)} />
+        <MetaLine label="Funding wallet" value={shortAddr(creatorFunding?.fundingWallet ?? undefined, 6)} />
+        <MetaLine label="Confidence" value={creatorFunding?.confidence ?? intel?.confidence ?? "scanning"} />
         <MetaLine label="Recent mints" value={fmtNum(intel?.recentTokenMints)} />
         <MetaLine label="Bonded coins" value={fmtNum(intel?.bondedCoinCount)} />
         <MetaLine label="DEX-paid coins" value={fmtNum(intel?.dexPaidCoinCount)} />
@@ -655,7 +675,7 @@ const DevLaunchPanel = ({ intel, isLoading, primaryLabel }: { intel?: TokenDevLa
         <MetaLine label="Last seen" value={shortDate(intel?.lastSeenAt)} />
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        {(intel?.riskNotes?.[0] ?? intel?.notes?.[0]) ?? "Wallet history loads from early mint/pool fee-payer activity and public DEX pair/order data."}
+        {(intel?.riskNotes?.[0] ?? intel?.notes?.[0]) ?? "Wallet history loads from Helius early mint/pool fee-payer activity, Pump.fun creator data, and public DEX pair/order data."}
       </p>
       {intel?.sampleMints.length ? (
         <div className="mt-3 flex flex-wrap gap-1 font-mono text-[9px] uppercase tracking-widest">
@@ -705,6 +725,100 @@ const HolderBundlePanel = ({ intel, isLoading, token }: { intel?: TokenHolderBun
     </div>
   );
 };
+
+const OnChainIntelPanel = ({ token }: { token: JupTokenInfo }) => {
+  const authority = token.heliusAuthorities;
+  const creator = token.creatorFunding;
+  const topHolders = token.topHolders ?? [];
+  return (
+    <div className="rounded-3xl border border-og-lime/25 bg-white/[0.035] p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-lime">
+          <ShieldCheck className="h-3.5 w-3.5" /> Helius on-chain truth
+        </div>
+        <span className="rounded-full border border-og-lime/35 bg-og-lime/10 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-og-lime">
+          {authority?.source ?? creator?.source ?? "helius"}
+        </span>
+      </div>
+      <div className="grid gap-2">
+        <MetaLine label="Mint authority" value={authority ? authority.mintAuthorityDisabled ? "disabled" : shortAddr(authority.mintAuthority ?? undefined, 5) : token.audit?.mintAuthorityDisabled ? "disabled" : "open / unknown"} />
+        <MetaLine label="Freeze authority" value={authority ? authority.freezeAuthorityDisabled ? "disabled" : shortAddr(authority.freezeAuthority ?? undefined, 5) : token.audit?.freezeAuthorityDisabled ? "disabled" : "open / unknown"} />
+        <MetaLine label="Creator" value={shortAddr(creator?.creatorWallet ?? token.pumpFun?.creator, 6)} />
+        <MetaLine label="Funding tx" value={shortAddr(creator?.fundingWallet ?? undefined, 6)} />
+        <MetaLine label="Largest holder" value={topHolders[0] ? `${shortAddr(topHolders[0].owner, 4)} · ${topHolders[0].percent.toFixed(1)}%` : "scanning"} />
+        <MetaLine label="Whale wallets" value={fmtNum(token.whaleCount)} />
+      </div>
+      <div className="mt-3 grid gap-1.5">
+        {topHolders.slice(0, 3).map((holder) => (
+          <div key={`${holder.owner}-${holder.tokenAccount}`} className="flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2 font-mono text-[9px] uppercase tracking-widest">
+            <span className="truncate text-muted-foreground">{holder.label}</span>
+            <span className="shrink-0 text-og-lime">{shortAddr(holder.owner, 4)} · {holder.percent.toFixed(1)}%</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        Authorities come from Helius parsed mint account data. Holder rows resolve largest token accounts to owner wallets for whale/bundle monitoring.
+      </p>
+    </div>
+  );
+};
+
+const PumpFunPanel = ({ pumpFun, createdAt, migratedAt }: { pumpFun?: TokenPumpFunIntel; createdAt?: string; migratedAt?: string }) => (
+  <div className="rounded-3xl border border-og-cyan/25 bg-white/[0.035] p-4">
+    <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
+        <Zap className="h-3.5 w-3.5" /> Pump.fun migration
+      </div>
+      <span className={cn("rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-widest", pumpFun?.isPumpFun ? "border-og-cyan/45 bg-og-cyan/10 text-og-cyan" : "border-white/10 text-muted-foreground")}>
+        {pumpFun?.isPumpFun ? "pump tracked" : "no pump signal"}
+      </span>
+    </div>
+    <div className="grid gap-2">
+      <MetaLine label="Launch creator" value={shortAddr(pumpFun?.creator, 6)} />
+      <MetaLine label="Bonding curve" value={shortAddr(pumpFun?.bondingCurve ?? pumpFun?.associatedBondingCurve, 5)} />
+      <MetaLine label="Launch date" value={shortDate(pumpFun?.launchAt ?? createdAt)} />
+      <MetaLine label="Migration date" value={shortDate(pumpFun?.migrationAt ?? migratedAt)} />
+      <MetaLine label="Migration time" value={pumpFun?.migrationDurationHours != null ? `${pumpFun.migrationDurationHours}h` : "—"} />
+      <MetaLine label="Bonding status" value={pumpFun?.complete === true ? "complete / migrated" : pumpFun?.complete === false ? "bonding" : "unknown"} />
+    </div>
+    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+      Pump.fun data is used for launch creator, bonding-curve context, migration timestamp, and migration-duration timing. It never overrides first-on-chain OG selection.
+    </p>
+  </div>
+);
+
+const DexPoolsPanel = ({ pools }: { pools: TokenDexPoolIntel[] }) => (
+  <div className="rounded-3xl border border-og-gold/25 bg-white/[0.035] p-4">
+    <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-gold">
+        <CandlestickChart className="h-3.5 w-3.5" /> all DEX pools
+      </div>
+      <span className="rounded-full border border-og-gold/35 bg-og-gold/10 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-og-gold">
+        {fmtNum(pools.length)} tracked
+      </span>
+    </div>
+    <div className="grid gap-2">
+      {pools.slice(0, 4).map((pool) => (
+        <a key={`${pool.dexId}-${pool.pairAddress}`} href={pool.url} target="_blank" rel="noreferrer" className="grid gap-1 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2 text-left transition hover:border-og-gold/60">
+          <div className="flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest">
+            <span className="truncate text-foreground">{pool.dexId ?? "DEX"} / {pool.quoteSymbol ?? "quote"}</span>
+            <span className="text-og-gold">{fmtUsd(pool.effectiveLiquidityUsd ?? pool.liquidityUsd)}</span>
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+            <span>LP {shortDate(pool.createdAt)}</span>
+            <span>VOL {fmtUsd(pool.volume24h)}</span>
+            <span>B/S {fmtNum(pool.buys24h)}/{fmtNum(pool.sells24h)}</span>
+            <span>BOOST {fmtNum(pool.boostsActive)}</span>
+          </div>
+        </a>
+      ))}
+      {pools.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-3 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">No public DEX pools returned yet</div> : null}
+    </div>
+    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+      Pools are pulled from DexScreener token routes and sorted by quote-backed/effective liquidity so dead LP cannot fake OG eligibility.
+    </p>
+  </div>
+);
 
 const DexFlag = ({ active, label }: { active: boolean; label: string }) => (
   <span className={cn("rounded-full border px-2 py-1", active ? "border-og-lime/35 bg-og-lime/10 text-og-lime" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>{label}</span>

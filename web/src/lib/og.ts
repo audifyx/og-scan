@@ -39,9 +39,68 @@ const CANONICAL_SOLANA_ORIGINS: Record<string, string> = {
   fart: FARTCOIN_CANONICAL_MINT,
 };
 
+const KNOWN_LP_PULLED_OR_SCAM_MINTS = new Set<string>([
+  "5sNU6g1qVji5dEBnb6SWSX2Gu2rtDvvk7khKyujj6cuU",
+]);
+
 export const STORAGE_OG_MINT = "og_scanner.mint";
 
 export type TokenCreationSource = "chain" | "pool" | "unknown";
+
+export type TokenAuthorityIntel = {
+  mintAuthority: string | null;
+  freezeAuthority: string | null;
+  mintAuthorityDisabled: boolean;
+  freezeAuthorityDisabled: boolean;
+  source: "helius" | "registry" | "unknown";
+};
+
+export type TokenTopHolder = {
+  owner: string;
+  tokenAccount: string;
+  uiAmount: number;
+  percent: number;
+  label: string;
+};
+
+export type TokenCreatorFundingIntel = {
+  creatorWallet: string | null;
+  fundingWallet: string | null;
+  creationSignature?: string;
+  createdAt?: string;
+  confidence: "high" | "medium" | "low";
+  source: "helius" | "pump.fun" | "inferred" | "unknown";
+};
+
+export type TokenPumpFunIntel = {
+  isPumpFun: boolean;
+  creator?: string;
+  bondingCurve?: string;
+  associatedBondingCurve?: string;
+  launchAt?: string;
+  migrationAt?: string;
+  migrationDurationHours?: number;
+  complete?: boolean;
+  sourceUrl?: string;
+};
+
+export type TokenDexPoolIntel = {
+  dexId?: string;
+  pairAddress?: string;
+  url?: string;
+  quoteSymbol?: string;
+  quoteAddress?: string;
+  liquidityUsd?: number;
+  effectiveLiquidityUsd?: number;
+  quoteLiquidityUsd?: number;
+  marketCap?: number;
+  fdv?: number;
+  volume24h?: number;
+  buys24h?: number;
+  sells24h?: number;
+  createdAt?: string;
+  boostsActive?: number;
+};
 
 export type JupTokenInfo = {
   id: string;
@@ -98,6 +157,14 @@ export type JupTokenInfo = {
   quoteLiquidityUsd?: number;
   lpPulled?: boolean;
   lpPullReason?: string;
+  heliusAuthorities?: TokenAuthorityIntel;
+  topHolders?: TokenTopHolder[];
+  topHoldersPercent?: number;
+  whaleCount?: number;
+  creatorFunding?: TokenCreatorFundingIntel;
+  pumpFun?: TokenPumpFunIntel;
+  allPools?: TokenDexPoolIntel[];
+  poolCount?: number;
 };
 
 export type DexSearchPair = {
@@ -331,7 +398,8 @@ function tokenReportedLiquidityUsd(token: Pick<JupTokenInfo, "liquidity" | "repo
   return token.reportedLiquidity ?? token.liquidity ?? 0;
 }
 
-export function hasPulledOrDeadLiquidity(token: Pick<JupTokenInfo, "liquidity" | "effectiveLiquidityUsd" | "reportedLiquidity" | "quoteLiquidityUsd" | "lpPulled" | "mcap" | "fdv">): boolean {
+export function hasPulledOrDeadLiquidity(token: Pick<JupTokenInfo, "liquidity" | "effectiveLiquidityUsd" | "reportedLiquidity" | "quoteLiquidityUsd" | "lpPulled" | "mcap" | "fdv"> & { id?: string }): boolean {
+  if (token.id && KNOWN_LP_PULLED_OR_SCAM_MINTS.has(token.id)) return true;
   const effectiveLiquidity: number = tokenEffectiveLiquidityUsd(token);
   const reportedLiquidity: number = tokenReportedLiquidityUsd(token);
   const quoteLiquidity: number | undefined = token.quoteLiquidityUsd;
@@ -433,6 +501,14 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
     dexUrl: existing.dexUrl ?? next.dexUrl,
     pairAddress: existing.pairAddress ?? next.pairAddress,
     pairDexId: existing.pairDexId ?? next.pairDexId,
+    heliusAuthorities: existing.heliusAuthorities ?? next.heliusAuthorities,
+    topHolders: existing.topHolders ?? next.topHolders,
+    topHoldersPercent: existing.topHoldersPercent ?? next.topHoldersPercent,
+    whaleCount: existing.whaleCount ?? next.whaleCount,
+    creatorFunding: existing.creatorFunding ?? next.creatorFunding,
+    pumpFun: existing.pumpFun ?? next.pumpFun,
+    allPools: existing.allPools ?? next.allPools,
+    poolCount: existing.poolCount ?? next.poolCount,
   };
 }
 
@@ -511,6 +587,9 @@ function mergeTokenCandidates(tokens: JupTokenInfo[]): JupTokenInfo[] {
 const dexBoostCache = new Map<string, Promise<Map<string, DexBoostInfo>>>();
 const dexOrdersCache = new Map<string, Promise<DexPaidOrderSummary>>();
 const birdeyeOverviewCache = new Map<string, Promise<Record<string, unknown> | null>>();
+const heliusAuthorityCache = new Map<string, Promise<TokenAuthorityIntel | null>>();
+const creatorFundingCache = new Map<string, Promise<TokenCreatorFundingIntel>>();
+const pumpFunIntelCache = new Map<string, Promise<TokenPumpFunIntel | null>>();
 
 function finiteNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -608,6 +687,44 @@ export async function dexPairsForMints(mints: string[]): Promise<DexSearchPair[]
   return responses.flatMap((response) => (response.status === "fulfilled" ? response.value : []));
 }
 
+function dexPoolIntelFromPair(pair: DexSearchPair): TokenDexPoolIntel {
+  return {
+    dexId: pair.dexId,
+    pairAddress: pair.pairAddress,
+    url: pair.url,
+    quoteSymbol: pair.quoteToken?.symbol,
+    quoteAddress: pair.quoteToken?.address,
+    liquidityUsd: pair.liquidity?.usd,
+    effectiveLiquidityUsd: pairEffectiveLiquidityUsd(pair),
+    quoteLiquidityUsd: pairQuoteLiquidityUsd(pair),
+    marketCap: pair.marketCap,
+    fdv: pair.fdv,
+    volume24h: pair.volume?.h24,
+    buys24h: pair.txns?.h24?.buys,
+    sells24h: pair.txns?.h24?.sells,
+    createdAt: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : undefined,
+    boostsActive: pair.boosts?.active,
+  };
+}
+
+function dexPoolsByMint(pairs: DexSearchPair[]): Map<string, TokenDexPoolIntel[]> {
+  const byMint = new Map<string, TokenDexPoolIntel[]>();
+  for (const pair of pairs) {
+    const mint: string | undefined = pair.baseToken?.address;
+    if (!mint || !isSolanaChainId(pair.chainId)) continue;
+    const current = byMint.get(mint) ?? [];
+    current.push(dexPoolIntelFromPair(pair));
+    byMint.set(mint, current);
+  }
+  for (const [mint, pools] of byMint) {
+    byMint.set(
+      mint,
+      pools.sort((a, b) => (b.effectiveLiquidityUsd ?? b.liquidityUsd ?? 0) - (a.effectiveLiquidityUsd ?? a.liquidityUsd ?? 0)),
+    );
+  }
+  return byMint;
+}
+
 export async function dexBoostsByMint(): Promise<Map<string, DexBoostInfo>> {
   const cached = dexBoostCache.get(SOLANA_CHAIN_ID);
   if (cached) return cached;
@@ -698,6 +815,17 @@ async function birdeyeTokenOverview(mint: string): Promise<Record<string, unknow
   return task;
 }
 
+function birdeyeMarketPatch(overview: Record<string, unknown> | null): Pick<JupTokenInfo, "usdPrice" | "liquidity" | "effectiveLiquidityUsd" | "holderCount" | "mcap" | "fdv"> {
+  return {
+    usdPrice: pickFirstNumber(overview, ["price", "priceUsd", "value", "currentPrice"]),
+    liquidity: pickFirstNumber(overview, ["liquidity", "liquidityUsd", "liquidityUSD", "liquidity_usd"]),
+    effectiveLiquidityUsd: pickFirstNumber(overview, ["liquidity", "liquidityUsd", "liquidityUSD", "liquidity_usd"]),
+    holderCount: pickFirstNumber(overview, ["holder", "holders", "holderCount", "numberHolders", "uniqueWallets"]),
+    mcap: pickFirstNumber(overview, ["mc", "marketCap", "market_cap", "marketcap"]),
+    fdv: pickFirstNumber(overview, ["fdv", "fullyDilutedValuation", "fully_diluted_valuation"]),
+  };
+}
+
 type PriceExtreme = { price?: number; at?: string };
 
 type PriceExtremes = { ath: PriceExtreme; atl: PriceExtreme };
@@ -781,9 +909,17 @@ async function priceExtremesFromOhlcv(mint: string, fromIso: string | undefined)
   }
 }
 
+type TokenEnrichmentOptions = {
+  includeAth?: boolean;
+  maxAth?: number;
+  includeOnChainIntel?: boolean;
+  maxOnChain?: number;
+  maxBirdeye?: number;
+};
+
 export async function enrichTokensWithMarketIntel(
   tokens: JupTokenInfo[],
-  options: { includeAth?: boolean; maxAth?: number } = {},
+  options: TokenEnrichmentOptions = {},
 ): Promise<JupTokenInfo[]> {
   if (tokens.length === 0) return [];
 
@@ -792,18 +928,26 @@ export async function enrichTokensWithMarketIntel(
     .map((token) => token.id)
     .filter(Boolean);
   const [pairsResult, boostsResult] = await Promise.allSettled([dexPairsForMints(mints), dexBoostsByMint()]);
-  const pairByMint: Map<string, DexSearchPair> = pairsResult.status === "fulfilled" ? bestPairByMint(pairsResult.value) : new Map<string, DexSearchPair>();
+  const allPairs: DexSearchPair[] = pairsResult.status === "fulfilled" ? pairsResult.value : [];
+  const pairByMint: Map<string, DexSearchPair> = bestPairByMint(allPairs);
+  const poolsByMint: Map<string, TokenDexPoolIntel[]> = dexPoolsByMint(allPairs);
   const boostByMint: Map<string, DexBoostInfo> = boostsResult.status === "fulfilled" ? boostsResult.value : new Map<string, DexBoostInfo>();
   const maxAth: number = options.includeAth ? options.maxAth ?? tokens.length : 0;
+  const maxBirdeye: number = Math.max(maxAth, options.maxBirdeye ?? Math.min(tokens.length, 24));
+  const maxOnChain: number = options.includeOnChainIntel ? options.maxOnChain ?? Math.min(tokens.length, 24) : 0;
   const athMints = new Set<string>(tokens.slice(0, maxAth).map((token) => token.id));
+  const birdeyeMints = new Set<string>(tokens.slice(0, maxBirdeye).map((token) => token.id));
+  const onChainMints = new Set<string>(tokens.slice(0, maxOnChain).map((token) => token.id));
 
   return mapWithConcurrency(tokens, 4, async (token) => {
     const isSolanaToken: boolean = isSolanaChainId(token.chainId);
     const pair: DexSearchPair | undefined = isSolanaToken ? pairByMint.get(token.id) : undefined;
+    const pools: TokenDexPoolIntel[] = isSolanaToken ? poolsByMint.get(token.id) ?? [] : [];
     const boost: DexBoostInfo | undefined = boostByMint.get(token.id);
     const migrationCreatedAt: string | undefined = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : token.migrationCreatedAt ?? token.firstPool?.createdAt;
     const orders: DexPaidOrderSummary | undefined = isSolanaToken ? await dexPaidOrdersForToken(SOLANA_CHAIN_ID, token.id) : undefined;
-    const overview: Record<string, unknown> | null = isSolanaToken && athMints.has(token.id) ? await birdeyeTokenOverview(token.id) : null;
+    const overview: Record<string, unknown> | null = isSolanaToken && birdeyeMints.has(token.id) ? await birdeyeTokenOverview(token.id) : null;
+    const marketPatch = birdeyeMarketPatch(overview);
     const overviewAth: PriceExtreme = athFromOverview(overview);
     const overviewAtl: PriceExtreme = atlFromOverview(overview);
     const shouldLoadExtremesFromCandles: boolean = isSolanaToken && athMints.has(token.id) && (overviewAth.price == null || overviewAtl.price == null);
@@ -812,25 +956,56 @@ export async function enrichTokensWithMarketIntel(
       : { ath: {}, atl: {} };
     const ath: PriceExtreme = overviewAth.price != null ? overviewAth : ohlcvExtremes.ath;
     const atl: PriceExtreme = overviewAtl.price != null ? overviewAtl : ohlcvExtremes.atl;
+    const [authorityResult, holderResult, creatorFundingResult, pumpFunResult] = await Promise.allSettled([
+      isSolanaToken && onChainMints.has(token.id) ? heliusTokenAuthorityIntel(token.id) : Promise.resolve(null),
+      isSolanaToken && onChainMints.has(token.id) ? tokenHolderBundleIntel(token) : Promise.resolve(undefined),
+      isSolanaToken && onChainMints.has(token.id) ? tokenCreatorFundingIntel(token.id) : Promise.resolve(undefined),
+      isSolanaToken ? pumpFunTokenIntel(token.id, token.onChainCreatedAt, migrationCreatedAt) : Promise.resolve(null),
+    ]);
+    const authority: TokenAuthorityIntel | null = authorityResult.status === "fulfilled" ? authorityResult.value : null;
+    const holderIntel: TokenHolderBundleIntel | undefined = holderResult.status === "fulfilled" ? holderResult.value : undefined;
+    const creatorFunding: TokenCreatorFundingIntel | undefined = creatorFundingResult.status === "fulfilled" ? creatorFundingResult.value : undefined;
+    const pumpFun: TokenPumpFunIntel | null = pumpFunResult.status === "fulfilled" ? pumpFunResult.value : null;
+    const forcedLpBlocked: boolean = KNOWN_LP_PULLED_OR_SCAM_MINTS.has(token.id);
+    const pairLpPulled: boolean = pair ? isPairLpPulled(pair) : false;
+    const pairEffectiveLiquidity: number | undefined = pair ? pairEffectiveLiquidityUsd(pair) : undefined;
+    const pairReportedLiquidity: number | undefined = pair?.liquidity?.usd;
+    const lpPulled: boolean = forcedLpBlocked || pairLpPulled || hasPulledOrDeadLiquidity({ ...token, id: token.id, effectiveLiquidityUsd: pairEffectiveLiquidity ?? token.effectiveLiquidityUsd, reportedLiquidity: pairReportedLiquidity ?? token.reportedLiquidity });
+    const authorityAudit = authority
+      ? {
+          ...token.audit,
+          mintAuthorityDisabled: authority.mintAuthorityDisabled,
+          freezeAuthorityDisabled: authority.freezeAuthorityDisabled,
+          topHoldersPercentage: holderIntel?.top10Percent ?? token.audit?.topHoldersPercentage,
+        }
+      : holderIntel
+        ? { ...token.audit, topHoldersPercentage: holderIntel.top10Percent }
+        : token.audit;
 
     return {
       ...token,
       icon: token.icon ?? pair?.info?.imageUrl,
-      usdPrice: token.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined),
-      mcap: token.mcap ?? pair?.marketCap,
-      fdv: token.fdv ?? pair?.fdv,
-      liquidity: pair ? pairEffectiveLiquidityUsd(pair) ?? token.effectiveLiquidityUsd ?? token.liquidity : token.effectiveLiquidityUsd ?? token.liquidity,
-      reportedLiquidity: bestLiquidityUsd(token.reportedLiquidity ?? token.liquidity, pair?.liquidity?.usd),
-      effectiveLiquidityUsd: pair ? pairEffectiveLiquidityUsd(pair) ?? token.effectiveLiquidityUsd ?? token.liquidity : token.effectiveLiquidityUsd ?? token.liquidity,
+      usdPrice: token.usdPrice ?? marketPatch.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined),
+      mcap: token.mcap ?? marketPatch.mcap ?? pair?.marketCap,
+      fdv: token.fdv ?? marketPatch.fdv ?? pair?.fdv,
+      liquidity: pair ? pairEffectiveLiquidity ?? marketPatch.effectiveLiquidityUsd ?? token.effectiveLiquidityUsd ?? token.liquidity : marketPatch.effectiveLiquidityUsd ?? token.effectiveLiquidityUsd ?? token.liquidity,
+      reportedLiquidity: bestLiquidityUsd(token.reportedLiquidity ?? token.liquidity, pairReportedLiquidity, marketPatch.liquidity),
+      effectiveLiquidityUsd: pair ? pairEffectiveLiquidity ?? marketPatch.effectiveLiquidityUsd ?? token.effectiveLiquidityUsd ?? token.liquidity : marketPatch.effectiveLiquidityUsd ?? token.effectiveLiquidityUsd ?? token.liquidity,
       quoteLiquidityUsd: pairQuoteLiquidityUsd(pair ?? ({} as DexSearchPair)) ?? token.quoteLiquidityUsd,
-      lpPulled: pair ? isPairLpPulled(pair) || hasPulledOrDeadLiquidity({ ...token, effectiveLiquidityUsd: pairEffectiveLiquidityUsd(pair) ?? token.effectiveLiquidityUsd, reportedLiquidity: pair.liquidity?.usd ?? token.reportedLiquidity }) : hasPulledOrDeadLiquidity(token),
-      lpPullReason: pair && isPairLpPulled(pair) ? `LP appears pulled/dead: ${fmtUsd(pair.liquidity?.usd)} reported liquidity but only ${fmtUsd(pairQuoteLiquidityUsd(pair))} quote-side depth.` : token.lpPullReason,
+      lpPulled,
+      lpPullReason: forcedLpBlocked
+        ? "Known LP-pulled/scam mint: blocked from TRUE OG selection even if it is first on-chain."
+        : pairLpPulled
+          ? `LP appears pulled/dead: ${fmtUsd(pairReportedLiquidity)} reported liquidity but only ${fmtUsd(pairQuoteLiquidityUsd(pair))} quote-side depth.`
+          : token.lpPullReason,
+      holderCount: token.holderCount ?? marketPatch.holderCount,
+      audit: authorityAudit,
       firstPool: token.firstPool?.createdAt ? token.firstPool : migrationCreatedAt ? { createdAt: migrationCreatedAt } : token.firstPool,
       allTimeHighUsd: token.allTimeHighUsd ?? ath.price,
       allTimeHighAt: token.allTimeHighAt ?? ath.at,
       allTimeLowUsd: token.allTimeLowUsd ?? atl.price,
       allTimeLowAt: token.allTimeLowAt ?? atl.at,
-      migrationCreatedAt,
+      migrationCreatedAt: pumpFun?.migrationAt ?? migrationCreatedAt,
       dexPaidAmount: token.dexPaidAmount ?? boost?.totalAmount ?? boost?.amount,
       dexBoostAmount: token.dexBoostAmount ?? boost?.amount,
       dexBoostTotalAmount: token.dexBoostTotalAmount ?? boost?.totalAmount,
@@ -845,6 +1020,14 @@ export async function enrichTokensWithMarketIntel(
       dexUrl: token.dexUrl ?? pair?.url ?? boost?.url,
       pairAddress: token.pairAddress ?? pair?.pairAddress,
       pairDexId: token.pairDexId ?? pair?.dexId,
+      heliusAuthorities: authority ?? token.heliusAuthorities,
+      topHolders: holderIntel?.topHolders ?? token.topHolders,
+      topHoldersPercent: holderIntel?.top10Percent ?? token.topHoldersPercent,
+      whaleCount: holderIntel?.suspectedBundlers.filter((holder) => holder.percent >= 5).length ?? token.whaleCount,
+      creatorFunding: creatorFunding ?? token.creatorFunding,
+      pumpFun: pumpFun ?? token.pumpFun,
+      allPools: pools.length > 0 ? pools : token.allPools,
+      poolCount: pools.length || token.poolCount,
     };
   });
 }
@@ -883,6 +1066,22 @@ type BirdeyeCreationResponse = {
 type RpcSignatureInfo = { signature: string; blockTime?: number | null };
 type RpcSignatureResponse = { result?: RpcSignatureInfo[]; error?: { message?: string } };
 
+type RpcParsedMintAccount = {
+  data?: {
+    parsed?: {
+      info?: {
+        mintAuthority?: string | null;
+        freezeAuthority?: string | null;
+        decimals?: number;
+        supply?: string;
+      };
+      type?: string;
+    };
+  };
+};
+
+type RpcAccountInfoResponse = { result?: { value?: RpcParsedMintAccount | null } };
+
 const mintCreationCache = new Map<string, Promise<string | undefined>>();
 
 function unixSecondsToIso(value: number | null | undefined): string | undefined {
@@ -902,6 +1101,44 @@ async function birdeyeMintCreatedAt(mint: string): Promise<string | undefined> {
   if (!res.ok) return undefined;
   const json = (await res.json()) as BirdeyeCreationResponse;
   return unixSecondsToIso(json.data?.creationTime) ?? unixSecondsToIso(json.data?.mintTime);
+}
+
+async function heliusTokenAuthorityIntel(mint: string): Promise<TokenAuthorityIntel | null> {
+  const cached = heliusAuthorityCache.get(mint);
+  if (cached) return cached;
+
+  const task = (async (): Promise<TokenAuthorityIntel | null> => {
+    try {
+      const res = await fetch(HELIUS_RPC, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "og-mint-authorities",
+          method: "getAccountInfo",
+          params: [mint, { encoding: "jsonParsed", commitment: "confirmed" }],
+        }),
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as RpcAccountInfoResponse;
+      const info = json.result?.value?.data?.parsed?.info;
+      if (!info) return null;
+      const mintAuthority: string | null = info.mintAuthority ?? null;
+      const freezeAuthority: string | null = info.freezeAuthority ?? null;
+      return {
+        mintAuthority,
+        freezeAuthority,
+        mintAuthorityDisabled: mintAuthority == null,
+        freezeAuthorityDisabled: freezeAuthority == null,
+        source: "helius",
+      };
+    } catch {
+      return null;
+    }
+  })();
+
+  heliusAuthorityCache.set(mint, task);
+  return task;
 }
 
 async function heliusMintCreatedAt(mint: string): Promise<string | undefined> {
@@ -1606,12 +1843,14 @@ function buildForensicScores(
   );
   const isLaterOfficial: boolean = !context.isOg && officialVerificationScore >= 62 && context.chronologicalRank > 1;
   const riskScore: number = clampScore(
-    cloneScore * 0.26 +
-      manipulatedRelaunchProbability * 0.20 +
-      artificialTrendProbability * 0.18 +
-      (100 - deployerTrustScore) * 0.18 +
-      (100 - liquidityAuthenticityScore) * 0.10 +
-      ((token.audit?.topHoldersPercentage ?? 0) > 45 ? 8 : 0),
+    cloneScore * 0.24 +
+      manipulatedRelaunchProbability * 0.18 +
+      artificialTrendProbability * 0.16 +
+      (100 - deployerTrustScore) * 0.16 +
+      (100 - liquidityAuthenticityScore) * 0.12 +
+      (hasPulledOrDeadLiquidity(token) ? 28 : 0) +
+      ((token.whaleCount ?? 0) >= 3 ? 8 : 0) +
+      ((token.audit?.topHoldersPercentage ?? token.topHoldersPercent ?? 0) > 45 ? 10 : 0),
   );
   const classification: TokenLayeredClassification = buildLayeredClassification({
     token,
@@ -1697,8 +1936,10 @@ function buildForensicScores(
   if (liquidityDelayHours != null && liquidityDelayHours > 720) warnings.push("Liquidity appeared long after mint creation; possible migration, revival, CTO rebuild, or delayed launch.");
   if (classification.primary_label === "LATER OFFICIAL") warnings.push("Official does not mean OG; this token launched after an older credible origin contract.");
   if (cloneScore >= 65 && !context.isOg && classification.primary_label !== "LATER OFFICIAL") warnings.push("Newer than the origin cluster with high narrative overlap.");
-  if ((token.audit?.topHoldersPercentage ?? 0) > 45) warnings.push("Holder concentration is elevated.");
-  if (!token.audit?.mintAuthorityDisabled || !token.audit?.freezeAuthorityDisabled) warnings.push("Mint/freeze authority is not fully disabled in registry data.");
+  if ((token.audit?.topHoldersPercentage ?? token.topHoldersPercent ?? 0) > 45) warnings.push("Holder concentration is elevated.");
+  if (hasPulledOrDeadLiquidity(token)) warnings.push(token.lpPullReason ?? "LP appears pulled/dead and cannot qualify as TRUE OG.");
+  if ((token.whaleCount ?? 0) >= 3) warnings.push(`${token.whaleCount} whale / bundle-sized holders detected in largest-account sample.`);
+  if (!token.audit?.mintAuthorityDisabled || !token.audit?.freezeAuthorityDisabled) warnings.push("Mint/freeze authority is not fully disabled in Helius/registry data.");
   if (artificialTrendProbability >= 60) warnings.push("Boost/trend pattern may be artificial and is not used to decide OG status.");
 
   return { ...baseScore, reasons, warnings };
@@ -1802,7 +2043,7 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   const exactMatches: JupTokenInfo[] = similar.filter((token) => normalizeTickerSymbol(token.symbol) === normalizedQuery);
   const pool: JupTokenInfo[] = exactMatches.length > 0 ? exactMatches : similar.length > 0 ? similar : merged.slice(0, 32);
   const chainDatedPool: JupTokenInfo[] = await withOnChainCreationDates(pool);
-  const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: true, maxAth: 14 });
+  const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: true, maxAth: 14, includeOnChainIntel: true, maxOnChain: 14, maxBirdeye: 24 });
 
   const liquidCandidates: JupTokenInfo[] = enriched.filter(hasMinimumOgScanLiquidity);
   const originPool: JupTokenInfo[] = liquidCandidates.filter((token) => !hasPulledOrDeadLiquidity(token) && (isCanonicalSolanaOriginForQuery(token, clean) || !hasUnsafeTokenAuthority(token)));
@@ -1932,6 +2173,7 @@ export type HeliusTx = {
   description?: string;
   fee?: number;
   feePayer?: string;
+  nativeTransfers?: { fromUserAccount?: string; toUserAccount?: string; amount?: number }[];
   tokenTransfers?: { mint: string; tokenAmount: number; fromUserAccount?: string; toUserAccount?: string }[];
 };
 
@@ -1964,13 +2206,8 @@ export type TokenHolderBundleIntel = {
   bundleCount: number;
   topHolderPercent: number;
   top10Percent: number;
-  suspectedBundlers: {
-    owner: string;
-    tokenAccount: string;
-    uiAmount: number;
-    percent: number;
-    label: string;
-  }[];
+  topHolders: TokenTopHolder[];
+  suspectedBundlers: TokenTopHolder[];
   evidence: string[];
   trackingNotes: string[];
 };
@@ -1978,6 +2215,96 @@ export type TokenHolderBundleIntel = {
 export async function heliusTxs(address: string, limit = 25): Promise<HeliusTx[]> {
   const url = `${HELIUS_BASE}/addresses/${address}/transactions?api-key=${HELIUS_API_KEY}&limit=${limit}`;
   return jget<HeliusTx[]>(url);
+}
+
+function inferFundingWalletFromTx(tx: HeliusTx | undefined, creatorWallet: string | null): string | null {
+  if (!tx || !creatorWallet) return null;
+  const incoming = (tx.nativeTransfers ?? []).find((transfer) => transfer.toUserAccount === creatorWallet && transfer.fromUserAccount && (transfer.amount ?? 0) > 0);
+  return incoming?.fromUserAccount ?? null;
+}
+
+export async function tokenCreatorFundingIntel(mint: string): Promise<TokenCreatorFundingIntel> {
+  const cached = creatorFundingCache.get(mint);
+  if (cached) return cached;
+
+  const task = (async (): Promise<TokenCreatorFundingIntel> => {
+    try {
+      const txs = await heliusTxs(mint, 20);
+      const ordered = [...txs].sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+      const creationTx = ordered.find((tx) => /create|initialize|mint|pool|liquidity|pump|bond/i.test(`${tx.type} ${tx.description ?? ""}`)) ?? ordered[0];
+      const creatorWallet: string | null = creationTx?.feePayer ?? null;
+      return {
+        creatorWallet,
+        fundingWallet: inferFundingWalletFromTx(creationTx, creatorWallet),
+        creationSignature: creationTx?.signature,
+        createdAt: creationTx?.timestamp ? new Date(creationTx.timestamp * 1000).toISOString() : undefined,
+        confidence: creationTx?.feePayer ? (/create|initialize|mint|pump|bond/i.test(`${creationTx.type} ${creationTx.description ?? ""}`) ? "high" : "medium") : "low",
+        source: creationTx?.feePayer ? "helius" : "unknown",
+      };
+    } catch {
+      return { creatorWallet: null, fundingWallet: null, confidence: "low", source: "unknown" };
+    }
+  })();
+
+  creatorFundingCache.set(mint, task);
+  return task;
+}
+
+type PumpFunCoinResponse = Record<string, unknown>;
+
+async function pumpFunTokenIntel(mint: string, launchAt?: string, migrationAt?: string): Promise<TokenPumpFunIntel | null> {
+  const cached = pumpFunIntelCache.get(mint);
+  if (cached) return cached;
+
+  const task = (async (): Promise<TokenPumpFunIntel | null> => {
+    const endpoints = [
+      `https://frontend-api-v3.pump.fun/coins/${encodeURIComponent(mint)}`,
+      `https://frontend-api.pump.fun/coins/${encodeURIComponent(mint)}`,
+    ];
+    let data: PumpFunCoinResponse | null = null;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint);
+        if (!response.ok) continue;
+        const json = (await response.json()) as PumpFunCoinResponse;
+        if (json && Object.keys(json).length > 0) {
+          data = json;
+          break;
+        }
+      } catch {
+        /* try next Pump.fun endpoint */
+      }
+    }
+
+    const creator = typeof data?.creator === "string" ? data.creator : typeof data?.user === "string" ? data.user : undefined;
+    const bondingCurve = typeof data?.bonding_curve === "string" ? data.bonding_curve : typeof data?.bondingCurve === "string" ? data.bondingCurve : undefined;
+    const associatedBondingCurve = typeof data?.associated_bonding_curve === "string" ? data.associated_bonding_curve : typeof data?.associatedBondingCurve === "string" ? data.associatedBondingCurve : undefined;
+    const createdTimestamp = finiteIso(data?.created_timestamp) ?? finiteIso(data?.createdAt) ?? finiteIso(data?.created_at) ?? launchAt;
+    const migratedTimestamp = finiteIso(data?.migrated_timestamp) ?? finiteIso(data?.migration_timestamp) ?? finiteIso(data?.raydium_pool) ?? migrationAt;
+    const isPumpFun: boolean = Boolean(data) || mint.toLowerCase().endsWith("pump") || Boolean(bondingCurve || associatedBondingCurve);
+    if (!isPumpFun) return null;
+
+    const launchMs: number = createdTimestamp ? new Date(createdTimestamp).getTime() : Number.NaN;
+    const migrationMs: number = migratedTimestamp ? new Date(migratedTimestamp).getTime() : Number.NaN;
+    const migrationDurationHours: number | undefined = Number.isFinite(launchMs) && Number.isFinite(migrationMs) && migrationMs >= launchMs
+      ? Math.round(((migrationMs - launchMs) / 3_600_000) * 10) / 10
+      : undefined;
+
+    return {
+      isPumpFun,
+      creator,
+      bondingCurve,
+      associatedBondingCurve,
+      launchAt: createdTimestamp,
+      migrationAt: migratedTimestamp,
+      migrationDurationHours,
+      complete: typeof data?.complete === "boolean" ? data.complete : Boolean(migratedTimestamp),
+      sourceUrl: `https://pump.fun/coin/${mint}`,
+    };
+  })();
+
+  pumpFunIntelCache.set(mint, task);
+  return task;
 }
 
 const devLaunchIntelCache = new Map<string, Promise<TokenDevLaunchIntel>>();
@@ -2277,6 +2604,7 @@ export async function tokenHolderBundleIntel(token: JupTokenInfo): Promise<Token
         bundleCount: 0,
         topHolderPercent: 0,
         top10Percent: 0,
+        topHolders: [],
         suspectedBundlers: [],
         evidence: ["Bundle owner tracking currently uses Solana token-account data."],
         trackingNotes: ["No Solana holder owner graph was available for this chain."],
@@ -2349,6 +2677,7 @@ export async function tokenHolderBundleIntel(token: JupTokenInfo): Promise<Token
       bundleCount,
       topHolderPercent,
       top10Percent,
+      topHolders: holders.slice(0, 20),
       suspectedBundlers,
       evidence: evidence.slice(0, 5),
       trackingNotes: [
