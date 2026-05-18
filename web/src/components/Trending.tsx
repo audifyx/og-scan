@@ -455,7 +455,7 @@ const TrendingRow = ({
               {pair.baseToken.name} · {pair.dexId} {ageSeconds ? `· ${timeAgo(ageSeconds)} old` : ""}
             </div>
             <div className="mt-1 truncate font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-              ATH <span className="text-og-gold">{fmtUsd(coin.token?.allTimeHighUsd)}</span> · MIGR <span className="text-og-cyan">{shortDate(coin.token ? tokenMigrationDateIso(coin.token) : undefined)}</span> · DEX <span className={dexPaid === "—" ? "" : "text-og-lime"}>{dexPaid}</span>
+              ATH <span className="text-og-gold">{fmtUsd(coin.token?.allTimeHighUsd)}</span> <span className="text-og-gold/70">{shortDate(coin.token?.allTimeHighAt)}</span> · ATL <span className="text-og-cyan">{fmtUsd(coin.token?.allTimeLowUsd)}</span> · MIGR <span className="text-og-cyan">{shortDate(coin.token ? tokenMigrationDateIso(coin.token) : undefined)}</span> · DEX <span className={dexPaid === "—" ? "" : "text-og-lime"}>{dexPaid}</span>
             </div>
           </div>
         </div>
@@ -497,7 +497,7 @@ const TrendingRow = ({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-og-grid/40 pt-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground md:col-span-12 md:ml-[calc(8.333333%+0.75rem)]">
-        <span>boost {pair.boosts?.active ?? coin.boost?.amount ?? 0} · DEX {dexPaid} · ATH {fmtUsd(coin.token?.allTimeHighUsd)} · CA {shortAddr(pair.baseToken.address, 4)}</span>
+        <span>boost {pair.boosts?.active ?? coin.boost?.amount ?? 0} · DEX {dexPaid} · ATH {fmtUsd(coin.token?.allTimeHighUsd)} {shortDate(coin.token?.allTimeHighAt)} · ATL {fmtUsd(coin.token?.allTimeLowUsd)} · CA {shortAddr(pair.baseToken.address, 4)}</span>
         <span className="inline-flex items-center gap-2">
           <CoinDetailDialog token={detailToken} onOpenScanner={() => onSelect()} actionLabel="Load" className="px-2 py-1" />
           <CopyMintButton mint={pair.baseToken.address} label="copy" copiedLabel="copied" className="px-2 py-1" iconClassName="h-3 w-3" />

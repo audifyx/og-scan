@@ -30,6 +30,7 @@
 - [x] Add live DexScreener paid-order intelligence for token profile, CTO, ads, first/last paid timing, and active boost counts.
 - [x] Add CTO/dev-launch wallet history intelligence showing inferred creator wallet, bonded coin count, DEX-paid coin count, boosted coins, and CTO order count.
 - [x] Make DexScreener the chart source across token popups, Vitals, chart actions, and chart/provider labels.
+- [x] Add ATH date plus ATH/ATL values across scanner results, Vitals, Snipe Feed, migrations, trending, pair cards, and coin popups.
 
 ## **Design**
 
@@ -72,6 +73,7 @@
 - [x] **Layered Classification Output**: Every forensic search now distinguishes TRUE OG CTO vs TRUE OG vs MIGRATED OG vs REVIVAL vs CLONE/COPYCAT using origin, control, lifecycle, confidence scores, and secondary badges.
 - [x] **DEX Paid + CTO/Dev Intel**: Coin popups and Snipe Feed now show live DEX paid-order status, active boosts, payment timing, CTO/profile/ad flags, and inferred dev wallet bonded-history counts.
 - [x] **DexScreener Charts**: Every visible chart panel and chart action now uses DexScreener as the primary chart source.
+- [x] **ATH / ATL Market Extremes**: Token cards and popups now show ATH value, ATH date, and ATL value/date when historical market data is available.
 
 ## **Suggested build order**
 

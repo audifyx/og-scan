@@ -147,6 +147,8 @@ type SnipeLaunch = {
   dexLastPaidAt?: string;
   allTimeHighUsd?: number;
   allTimeHighAt?: string;
+  allTimeLowUsd?: number;
+  allTimeLowAt?: string;
   migrationCreatedAt?: string;
   hasSocials: boolean;
   verified: boolean;
@@ -475,6 +477,8 @@ async function fetchSnipePayload(): Promise<SnipePayload> {
         dexLastPaidAt: token?.dexLastPaidAt,
         allTimeHighUsd: token?.allTimeHighUsd,
         allTimeHighAt: token?.allTimeHighAt,
+        allTimeLowUsd: token?.allTimeLowUsd,
+        allTimeLowAt: token?.allTimeLowAt,
         migrationCreatedAt,
         hasSocials: socialCount(profile, pair) > 0,
         verified: Boolean(token?.isVerified),
@@ -540,6 +544,8 @@ function launchToToken(launch: SnipeLaunch): JupTokenInfo {
     firstPool: launch.migrationCreatedAt ? { createdAt: launch.migrationCreatedAt } : undefined,
     allTimeHighUsd: launch.allTimeHighUsd,
     allTimeHighAt: launch.allTimeHighAt,
+    allTimeLowUsd: launch.allTimeLowUsd,
+    allTimeLowAt: launch.allTimeLowAt,
     migrationCreatedAt: launch.migrationCreatedAt,
     dexPaidAmount: launch.dexPaidAmount,
     dexBoostTotalAmount: launch.dexBoostTotalAmount,
@@ -810,9 +816,11 @@ const LaunchRow = ({
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
           <Metric label="Score" value={String(launch.launchScore)} className={scoreTone(launch.launchScore)} />
           <Metric label="ATH" value={fmtUsd(launch.allTimeHighUsd)} className="text-og-gold" />
+          <Metric label="ATH Date" value={shortDate(launch.allTimeHighAt)} className="text-og-gold" />
+          <Metric label="ATL" value={fmtUsd(launch.allTimeLowUsd)} className="text-og-cyan" />
           <Metric label="Migr" value={shortDate(launch.migrationCreatedAt)} className="text-og-cyan" />
           <Metric label="DEX" value={dexPaid} className={dexPaid === "—" ? "text-foreground" : "text-og-lime"} />
         </div>
@@ -885,6 +893,8 @@ const LaunchAnalyzer = ({ launch, watched, onCopy, onScan, onWatchMint }: { laun
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Metric label="Launch score" value={`${launch.launchScore}/100`} className={scoreTone(launch.launchScore)} />
         <Metric label="ATH" value={fmtUsd(launch.allTimeHighUsd)} className="text-og-gold" />
+        <Metric label="ATH date" value={shortDate(launch.allTimeHighAt)} className="text-og-gold" />
+        <Metric label="ATL" value={fmtUsd(launch.allTimeLowUsd)} className="text-og-cyan" />
         <Metric label="Migration" value={shortDate(launch.migrationCreatedAt)} className="text-og-cyan" />
         <Metric label="DEX paid" value={tokenDexPaidLabel(launch)} className={tokenDexPaidLabel(launch) === "—" ? "text-foreground" : "text-og-lime"} />
       </div>
@@ -995,7 +1005,7 @@ const AlertsPanel = ({ alerts, watchedDevs, watchedMints, onSelect }: { alerts: 
             {isDanger ? <AlertTriangle className="h-4 w-4 shrink-0 text-og-blood" /> : <TrendingUp className="h-4 w-4 shrink-0 text-og-lime" />}
             <span className="min-w-0 flex-1">
               <span className="block truncate font-mono text-[11px] font-bold uppercase text-foreground">${launch.symbol} · {isDanger ? "risk warning" : "hot launch"}</span>
-              <span className="block truncate font-mono text-[9px] uppercase tracking-widest text-muted-foreground">score {launch.launchScore} · ATH {fmtUsd(launch.allTimeHighUsd)} · DEX {tokenDexPaidLabel(launch)}</span>
+              <span className="block truncate font-mono text-[9px] uppercase tracking-widest text-muted-foreground">score {launch.launchScore} · ATH {fmtUsd(launch.allTimeHighUsd)} {shortDate(launch.allTimeHighAt)} · ATL {fmtUsd(launch.allTimeLowUsd)} · DEX {tokenDexPaidLabel(launch)}</span>
             </span>
           </button>
         );

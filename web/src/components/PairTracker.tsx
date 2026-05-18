@@ -291,6 +291,8 @@ function mergeTokenData(primary: JupTokenInfo, fallback: JupTokenInfo): JupToken
     firstPool: primary.firstPool?.createdAt ? primary.firstPool : fallback.firstPool,
     allTimeHighUsd: primary.allTimeHighUsd ?? fallback.allTimeHighUsd,
     allTimeHighAt: primary.allTimeHighAt ?? fallback.allTimeHighAt,
+    allTimeLowUsd: primary.allTimeLowUsd ?? fallback.allTimeLowUsd,
+    allTimeLowAt: primary.allTimeLowAt ?? fallback.allTimeLowAt,
     migrationCreatedAt: primary.migrationCreatedAt ?? fallback.migrationCreatedAt,
     dexPaidAmount: primary.dexPaidAmount ?? fallback.dexPaidAmount,
     dexBoostAmount: primary.dexBoostAmount ?? fallback.dexBoostAmount,
@@ -931,6 +933,8 @@ const PairCard = ({
       <div className="grid grid-cols-4 gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
         <Stat icon={Droplets} label="LIQ" value={fmtUsd(t.liquidity)} />
         <Stat icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
+        <Stat icon={Calendar} label="ATH DATE" value={shortDate(t.allTimeHighAt)} accent="text-og-gold" />
+        <Stat icon={ShieldCheck} label="ATL" value={fmtUsd(t.allTimeLowUsd)} accent="text-og-cyan" />
         <Stat
           icon={Calendar}
           label="MIGR"

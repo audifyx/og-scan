@@ -29,6 +29,7 @@ import {
   fmtPct,
   fmtUsd,
   shortAddr,
+  shortDate,
   tokenDexPaidLabel,
   tokenMigrationDateIso,
   tokenOgCreatedAtIso,
@@ -452,6 +453,8 @@ const CoinCard = ({
         <Stat icon={GitBranch} label="CTO" value={forensic ? `${forensic.ctoScore}%` : "—"} accent={(forensic?.ctoScore ?? 0) >= 60 ? "text-og-lime" : "text-og-cyan"} />
         <Stat icon={BrainCircuit} label="RISK" value={forensic ? `${forensic.riskScore}%` : "—"} accent={(forensic?.riskScore ?? 0) >= 65 ? "text-og-blood" : "text-og-cyan"} />
         <Stat icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
+        <Stat icon={Calendar} label="ATH DATE" value={shortDate(t.allTimeHighAt)} accent="text-og-gold" />
+        <Stat icon={ShieldAlert} label="ATL" value={fmtUsd(t.allTimeLowUsd)} accent="text-og-cyan" />
         <Stat icon={Droplets} label="LIQ" value={fmtUsd(t.liquidity)} />
         <Stat icon={Users} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
         <Stat

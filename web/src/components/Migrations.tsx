@@ -473,7 +473,7 @@ const PairRow = ({ p, token, onSelect }: { p: DSPair; token?: JupTokenInfo; onSe
             {p.baseToken.name}
           </div>
           <div className="mt-1 truncate font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-            ATH <span className="text-og-gold">{fmtUsd(token?.allTimeHighUsd)}</span> · Migrated <span className="text-og-cyan">{shortDate(token ? tokenMigrationDateIso(token) : undefined)}</span> · DEX <span className={dexPaid === "—" ? "" : "text-og-lime"}>{dexPaid}</span>
+            ATH <span className="text-og-gold">{fmtUsd(token?.allTimeHighUsd)}</span> <span className="text-og-gold/70">{shortDate(token?.allTimeHighAt)}</span> · ATL <span className="text-og-cyan">{fmtUsd(token?.allTimeLowUsd)}</span> · Migrated <span className="text-og-cyan">{shortDate(token ? tokenMigrationDateIso(token) : undefined)}</span> · DEX <span className={dexPaid === "—" ? "" : "text-og-lime"}>{dexPaid}</span>
           </div>
         </div>
       </button>
@@ -508,7 +508,8 @@ const PairRow = ({ p, token, onSelect }: { p: DSPair; token?: JupTokenInfo; onSe
             <div className="text-foreground">{created ? timeAgo(created) : "—"}</div>
             <div className="max-w-[180px] truncate text-og-lime md:max-w-[120px]">{p.dexId}</div>
             <div className="text-muted-foreground">CA {shortAddr(p.baseToken.address, 4)}</div>
-            <div className="text-og-gold">ATH {fmtUsd(token?.allTimeHighUsd)}</div>
+            <div className="text-og-gold">ATH {fmtUsd(token?.allTimeHighUsd)} · {shortDate(token?.allTimeHighAt)}</div>
+            <div className="text-og-cyan">ATL {fmtUsd(token?.allTimeLowUsd)}</div>
           </div>
           <CoinDetailDialog token={detailToken} onOpenScanner={() => onSelect()} actionLabel="Load" className="shrink-0 px-2 py-2 md:px-1" />
           <CopyMintButton mint={p.baseToken.address} label="copy" copiedLabel="copied" className="shrink-0 px-2 py-2 md:px-1" iconClassName="h-3 w-3" />

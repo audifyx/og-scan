@@ -65,6 +65,8 @@ export type JupTokenInfo = {
   smartCtLikes?: number;
   allTimeHighUsd?: number;
   allTimeHighAt?: string;
+  allTimeLowUsd?: number;
+  allTimeLowAt?: string;
   migrationCreatedAt?: string;
   dexPaidAmount?: number;
   dexBoostAmount?: number;
@@ -315,6 +317,8 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
     smartCtLikes: existing.smartCtLikes ?? next.smartCtLikes,
     allTimeHighUsd: existing.allTimeHighUsd ?? next.allTimeHighUsd,
     allTimeHighAt: existing.allTimeHighAt ?? next.allTimeHighAt,
+    allTimeLowUsd: existing.allTimeLowUsd ?? next.allTimeLowUsd,
+    allTimeLowAt: existing.allTimeLowAt ?? next.allTimeLowAt,
     migrationCreatedAt: existing.migrationCreatedAt ?? next.migrationCreatedAt,
     dexPaidAmount: existing.dexPaidAmount ?? next.dexPaidAmount,
     dexBoostAmount: existing.dexBoostAmount ?? next.dexBoostAmount,
@@ -556,7 +560,11 @@ async function birdeyeTokenOverview(mint: string): Promise<Record<string, unknow
   return task;
 }
 
-function athFromOverview(overview: Record<string, unknown> | null): { price?: number; at?: string } {
+type PriceExtreme = { price?: number; at?: string };
+
+type PriceExtremes = { ath: PriceExtreme; atl: PriceExtreme };
+
+function athFromOverview(overview: Record<string, unknown> | null): PriceExtreme {
   return {
     price: pickFirstNumber(overview, [
       "ath",
@@ -578,25 +586,60 @@ function athFromOverview(overview: Record<string, unknown> | null): { price?: nu
       "allTimeHighAt",
       "allTimeHighTime",
       "highestPriceTime",
+      "maxPriceTime",
     ]),
   };
 }
 
-async function athFromOhlcv(mint: string, fromIso: string | undefined): Promise<{ price?: number; at?: string }> {
+function atlFromOverview(overview: Record<string, unknown> | null): PriceExtreme {
+  return {
+    price: pickFirstNumber(overview, [
+      "atl",
+      "atlPrice",
+      "priceAtl",
+      "priceATL",
+      "allTimeLow",
+      "allTimeLowPrice",
+      "lowestPrice",
+      "priceLowest",
+      "minPrice",
+    ]),
+    at: pickFirstIso(overview, [
+      "atlTime",
+      "atlAt",
+      "atlDate",
+      "priceAtlTime",
+      "priceATLTime",
+      "allTimeLowAt",
+      "allTimeLowTime",
+      "lowestPriceTime",
+      "minPriceTime",
+    ]),
+  };
+}
+
+async function priceExtremesFromOhlcv(mint: string, fromIso: string | undefined): Promise<PriceExtremes> {
   try {
     const now = Math.floor(Date.now() / 1000);
     const fromMs: number = fromIso ? new Date(fromIso).getTime() : Date.now() - 365 * 86_400_000;
     const from = Number.isFinite(fromMs) ? Math.max(0, Math.floor(fromMs / 1000)) : now - 365 * 86_400;
     const candles = await birdeyeOhlcv(mint, "1D", from, now);
-    const best = candles.reduce<{ price: number; unixTime: number } | null>((current, candle) => {
-      const high: number = candle.h;
-      if (!Number.isFinite(high)) return current;
-      if (!current || high > current.price) return { price: high, unixTime: candle.unixTime };
-      return current;
-    }, null);
-    return best ? { price: best.price, at: new Date(best.unixTime * 1000).toISOString() } : {};
+    const extremes = candles.reduce<{ high: { price: number; unixTime: number } | null; low: { price: number; unixTime: number } | null }>(
+      (current, candle) => {
+        const high: number = candle.h;
+        const low: number = candle.l;
+        if (Number.isFinite(high) && (!current.high || high > current.high.price)) current.high = { price: high, unixTime: candle.unixTime };
+        if (Number.isFinite(low) && low > 0 && (!current.low || low < current.low.price)) current.low = { price: low, unixTime: candle.unixTime };
+        return current;
+      },
+      { high: null, low: null },
+    );
+    return {
+      ath: extremes.high ? { price: extremes.high.price, at: new Date(extremes.high.unixTime * 1000).toISOString() } : {},
+      atl: extremes.low ? { price: extremes.low.price, at: new Date(extremes.low.unixTime * 1000).toISOString() } : {},
+    };
   } catch {
-    return {};
+    return { ath: {}, atl: {} };
   }
 }
 
@@ -623,12 +666,14 @@ export async function enrichTokensWithMarketIntel(
     const migrationCreatedAt: string | undefined = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : token.migrationCreatedAt ?? token.firstPool?.createdAt;
     const orders: DexPaidOrderSummary | undefined = isSolanaToken ? await dexPaidOrdersForToken("solana", token.id) : undefined;
     const overview: Record<string, unknown> | null = isSolanaToken && athMints.has(token.id) ? await birdeyeTokenOverview(token.id) : null;
-    const overviewAth = athFromOverview(overview);
-    const ath = overviewAth.price != null
-      ? overviewAth
-      : isSolanaToken && athMints.has(token.id)
-        ? await athFromOhlcv(token.id, token.onChainCreatedAt ?? token.firstPool?.createdAt ?? migrationCreatedAt)
-        : overviewAth;
+    const overviewAth: PriceExtreme = athFromOverview(overview);
+    const overviewAtl: PriceExtreme = atlFromOverview(overview);
+    const shouldLoadExtremesFromCandles: boolean = isSolanaToken && athMints.has(token.id) && (overviewAth.price == null || overviewAtl.price == null);
+    const ohlcvExtremes: PriceExtremes = shouldLoadExtremesFromCandles
+      ? await priceExtremesFromOhlcv(token.id, token.onChainCreatedAt ?? token.firstPool?.createdAt ?? migrationCreatedAt)
+      : { ath: {}, atl: {} };
+    const ath: PriceExtreme = overviewAth.price != null ? overviewAth : ohlcvExtremes.ath;
+    const atl: PriceExtreme = overviewAtl.price != null ? overviewAtl : ohlcvExtremes.atl;
 
     return {
       ...token,
@@ -640,6 +685,8 @@ export async function enrichTokensWithMarketIntel(
       firstPool: token.firstPool?.createdAt ? token.firstPool : migrationCreatedAt ? { createdAt: migrationCreatedAt } : token.firstPool,
       allTimeHighUsd: token.allTimeHighUsd ?? ath.price,
       allTimeHighAt: token.allTimeHighAt ?? ath.at,
+      allTimeLowUsd: token.allTimeLowUsd ?? atl.price,
+      allTimeLowAt: token.allTimeLowAt ?? atl.at,
       migrationCreatedAt,
       dexPaidAmount: token.dexPaidAmount ?? boost?.totalAmount ?? boost?.amount,
       dexBoostAmount: token.dexBoostAmount ?? boost?.amount,

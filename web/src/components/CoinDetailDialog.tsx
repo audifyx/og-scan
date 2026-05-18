@@ -7,6 +7,7 @@ import {
   Calendar,
   CandlestickChart,
   ExternalLink,
+  Flame,
   Globe,
   Image as ImageIcon,
   Info,
@@ -130,6 +131,8 @@ function mergeToken(primary: JupTokenInfo, fallback: JupTokenInfo): JupTokenInfo
     creationSource: primary.creationSource ?? fallback.creationSource,
     allTimeHighUsd: primary.allTimeHighUsd ?? fallback.allTimeHighUsd,
     allTimeHighAt: primary.allTimeHighAt ?? fallback.allTimeHighAt,
+    allTimeLowUsd: primary.allTimeLowUsd ?? fallback.allTimeLowUsd,
+    allTimeLowAt: primary.allTimeLowAt ?? fallback.allTimeLowAt,
     migrationCreatedAt: primary.migrationCreatedAt ?? fallback.migrationCreatedAt,
     dexPaidAmount: primary.dexPaidAmount ?? fallback.dexPaidAmount,
     dexBoostAmount: primary.dexBoostAmount ?? fallback.dexBoostAmount,
@@ -358,6 +361,11 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                 <IntelCard icon={BadgeDollarSign} label="DEX Paid" value={dexPaid} sub={`${fmtNum(detailToken.dexBoostActive ?? pair?.boosts?.active)} active · last ${shortDate(detailToken.dexLastPaidAt)}`} tone={dexPaid === "—" ? "muted" : "lime"} />
               </div>
 
+              <div className="grid gap-3 sm:grid-cols-2">
+                <IntelCard icon={Flame} label="All-Time High" value={fmtUsd(detailToken.allTimeHighUsd)} sub={`ATH date ${shortDate(detailToken.allTimeHighAt)}`} tone="gold" />
+                <IntelCard icon={Activity} label="All-Time Low" value={fmtUsd(detailToken.allTimeLowUsd)} sub={`ATL date ${shortDate(detailToken.allTimeLowAt)}`} tone="cyan" />
+              </div>
+
               <div className="rounded-3xl border border-og-cyan/25 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
                   <Radar className="h-3.5 w-3.5" /> layered token truth
@@ -424,6 +432,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <MetaLine label="CA" value={shortAddr(detailToken.id, 7)} />
                   <MetaLine label="Decimals" value={String(detailToken.decimals ?? "—")} />
                   <MetaLine label="ATH" value={`${fmtUsd(detailToken.allTimeHighUsd)} · ${shortDate(detailToken.allTimeHighAt)}`} />
+                  <MetaLine label="ATL" value={`${fmtUsd(detailToken.allTimeLowUsd)} · ${shortDate(detailToken.allTimeLowAt)}`} />
                   <MetaLine label="Migration" value={shortDate(migratedAt)} />
                   <MetaLine label="OG mint proof" value={shortDate(createdAt)} />
                 </div>
@@ -520,7 +529,8 @@ const MetadataPanel = ({ token, pair, createdAt, migratedAt, pairCreated }: { to
       <MetaLine label="On-chain mint" value={createdAt ? `${shortDate(createdAt)} · ${timeAgo(Math.floor(new Date(createdAt).getTime() / 1000))} old` : "unknown"} />
       <MetaLine label="Pair created" value={pairCreated ? `${shortDate(pairCreated)} · ${timeAgo(Math.floor(new Date(pairCreated).getTime() / 1000))} old` : "—"} />
       <MetaLine label="Migration day" value={shortDate(migratedAt)} />
-      <MetaLine label="ATH date" value={shortDate(token.allTimeHighAt)} />
+      <MetaLine label="ATH" value={`${fmtUsd(token.allTimeHighUsd)} · ${shortDate(token.allTimeHighAt)}`} />
+      <MetaLine label="ATL" value={`${fmtUsd(token.allTimeLowUsd)} · ${shortDate(token.allTimeLowAt)}`} />
       <MetaLine label="Labels" value={(pair?.labels ?? []).join(", ") || "—"} />
       <MetaLine label="Pair quote" value={pair?.quoteToken?.symbol ? `${pair.quoteToken.symbol} · ${pair.dexId ?? "DEX"}` : "—"} />
     </div>

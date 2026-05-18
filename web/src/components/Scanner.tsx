@@ -256,11 +256,13 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
             <span className={up ? "text-og-lime" : "text-og-blood"}>{fmtPct(ch)}</span>
             <span>· LQ {fmtUsd(t.liquidity)}</span>
           </div>
-          <div className="mt-2 grid grid-cols-3 gap-1.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+          <div className="mt-2 grid grid-cols-2 gap-1.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground sm:grid-cols-4">
             <MiniIntel icon={Fingerprint} label="Origin" value={ogProbability} accent={label.includes("TRUE OG") ? "text-og-lime" : "text-og-gold"} />
             <MiniIntel icon={ShieldAlert} label="Clone" value={cloneProbability} accent={(score?.cloneScore ?? 0) >= 70 ? "text-og-blood" : "text-foreground"} />
             <MiniIntel icon={GitBranch} label="Label" value={label} accent={label.includes("TRUE OG") ? "text-og-lime" : score ? "text-og-cyan" : undefined} />
             <MiniIntel icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
+            <MiniIntel icon={Calendar} label="ATH Date" value={shortDate(t.allTimeHighAt)} accent="text-og-gold" />
+            <MiniIntel icon={ShieldAlert} label="ATL" value={fmtUsd(t.allTimeLowUsd)} accent="text-og-cyan" />
             <MiniIntel icon={Calendar} label="Migrated" value={migrationDate} accent="text-og-cyan" />
             <MiniIntel icon={BadgeDollarSign} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
           </div>

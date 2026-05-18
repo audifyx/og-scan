@@ -193,7 +193,8 @@ export const OgStats = ({ mint, onSelect }: Props) => {
           <PriceBlock t={t} loading={isLoading} />
           <Stat label="MARKET CAP" value={fmtUsd(t?.mcap)} accent="gold" />
           <Stat label="LIQUIDITY" value={fmtUsd(t?.liquidity)} accent="cyan" />
-          <Stat label="ALL TIME HIGH" value={fmtUsd(t?.allTimeHighUsd)} sub={<span className="text-[10px] uppercase tracking-widest">{shortDate(t?.allTimeHighAt)}</span>} icon={<Flame className="h-4 w-4" />} accent="gold" />
+          <Stat label="ALL TIME HIGH" value={fmtUsd(t?.allTimeHighUsd)} sub={<span className="text-[10px] uppercase tracking-widest">ATH date · {shortDate(t?.allTimeHighAt)}</span>} icon={<Flame className="h-4 w-4" />} accent="gold" />
+          <Stat label="ALL TIME LOW" value={fmtUsd(t?.allTimeLowUsd)} sub={<span className="text-[10px] uppercase tracking-widest">ATL date · {shortDate(t?.allTimeLowAt)}</span>} icon={<ArrowDownRight className="h-4 w-4" />} accent="cyan" />
           <Stat label="MIGRATION DAY" value={shortDate(t ? tokenMigrationDateIso(t) : undefined)} sub={<span className="text-[10px] uppercase tracking-widest">Pool/date only · not OG proof</span>} icon={<Calendar className="h-4 w-4" />} accent="cyan" />
           <Stat label="DEX PAID / BOOST" value={t ? tokenDexPaidLabel(t) : "—"} sub={<span className="text-[10px] uppercase tracking-widest">DexScreener boost spend when public</span>} icon={<BadgeDollarSign className="h-4 w-4" />} />
 
