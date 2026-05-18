@@ -69,6 +69,13 @@ export type JupTokenInfo = {
   dexBoostAmount?: number;
   dexBoostTotalAmount?: number;
   dexBoostActive?: number;
+  dexPaidOrderCount?: number;
+  dexApprovedOrderCount?: number;
+  dexProfilePaid?: boolean;
+  dexCommunityTakeoverPaid?: boolean;
+  dexAdsPaid?: boolean;
+  dexFirstPaidAt?: string;
+  dexLastPaidAt?: string;
   dexUrl?: string;
   pairAddress?: string;
   pairDexId?: string;
@@ -106,6 +113,23 @@ export type DexBoostInfo = {
   url?: string;
   amount?: number;
   totalAmount?: number;
+};
+
+export type DexPaidOrder = {
+  type?: "tokenProfile" | "communityTakeover" | "tokenAd" | "trendingBarAd" | string;
+  status?: "processing" | "cancelled" | "on-hold" | "approved" | "rejected" | string;
+  paymentTimestamp?: number;
+};
+
+export type DexPaidOrderSummary = {
+  orders: DexPaidOrder[];
+  totalOrders: number;
+  approvedOrders: number;
+  profilePaid: boolean;
+  communityTakeoverPaid: boolean;
+  adsPaid: boolean;
+  firstPaidAt?: string;
+  lastPaidAt?: string;
 };
 
 type BirdeyeOverviewResponse = {
@@ -267,6 +291,13 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
     dexBoostAmount: existing.dexBoostAmount ?? next.dexBoostAmount,
     dexBoostTotalAmount: existing.dexBoostTotalAmount ?? next.dexBoostTotalAmount,
     dexBoostActive: existing.dexBoostActive ?? next.dexBoostActive,
+    dexPaidOrderCount: existing.dexPaidOrderCount ?? next.dexPaidOrderCount,
+    dexApprovedOrderCount: existing.dexApprovedOrderCount ?? next.dexApprovedOrderCount,
+    dexProfilePaid: existing.dexProfilePaid ?? next.dexProfilePaid,
+    dexCommunityTakeoverPaid: existing.dexCommunityTakeoverPaid ?? next.dexCommunityTakeoverPaid,
+    dexAdsPaid: existing.dexAdsPaid ?? next.dexAdsPaid,
+    dexFirstPaidAt: existing.dexFirstPaidAt ?? next.dexFirstPaidAt,
+    dexLastPaidAt: existing.dexLastPaidAt ?? next.dexLastPaidAt,
     dexUrl: existing.dexUrl ?? next.dexUrl,
     pairAddress: existing.pairAddress ?? next.pairAddress,
     pairDexId: existing.pairDexId ?? next.pairDexId,
@@ -337,6 +368,7 @@ function mergeTokenCandidates(tokens: JupTokenInfo[]): JupTokenInfo[] {
 }
 
 const dexBoostCache = new Map<string, Promise<Map<string, DexBoostInfo>>>();
+const dexOrdersCache = new Map<string, Promise<DexPaidOrderSummary>>();
 const birdeyeOverviewCache = new Map<string, Promise<Record<string, unknown> | null>>();
 
 function finiteNumber(value: unknown): number | undefined {
@@ -435,6 +467,45 @@ export async function dexBoostsByMint(): Promise<Map<string, DexBoostInfo>> {
   return task;
 }
 
+function summarizeDexPaidOrders(orders: DexPaidOrder[]): DexPaidOrderSummary {
+  const approved = orders.filter((order) => order.status === "approved" || order.status === "processing" || order.status === "on-hold");
+  const paidTimes: string[] = approved
+    .map((order) => finiteIso(order.paymentTimestamp))
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+  return {
+    orders,
+    totalOrders: orders.length,
+    approvedOrders: approved.length,
+    profilePaid: approved.some((order) => order.type === "tokenProfile"),
+    communityTakeoverPaid: approved.some((order) => order.type === "communityTakeover"),
+    adsPaid: approved.some((order) => order.type === "tokenAd" || order.type === "trendingBarAd"),
+    firstPaidAt: paidTimes[0],
+    lastPaidAt: paidTimes[paidTimes.length - 1],
+  };
+}
+
+export async function dexPaidOrdersForToken(chainId: string, tokenAddress: string): Promise<DexPaidOrderSummary> {
+  const cleanChainId: string = chainId || "solana";
+  const cacheKey = `${cleanChainId}:${tokenAddress}`;
+  const cached = dexOrdersCache.get(cacheKey);
+  if (cached) return cached;
+
+  const task = (async (): Promise<DexPaidOrderSummary> => {
+    try {
+      const url = `https://api.dexscreener.com/orders/v1/${encodeURIComponent(cleanChainId)}/${encodeURIComponent(tokenAddress)}`;
+      const orders = await jget<DexPaidOrder[]>(url);
+      return summarizeDexPaidOrders(Array.isArray(orders) ? orders : []);
+    } catch {
+      return summarizeDexPaidOrders([]);
+    }
+  })();
+
+  dexOrdersCache.set(cacheKey, task);
+  return task;
+}
+
 async function birdeyeTokenOverview(mint: string): Promise<Record<string, unknown> | null> {
   const cached = birdeyeOverviewCache.get(mint);
   if (cached) return cached;
@@ -521,6 +592,7 @@ export async function enrichTokensWithMarketIntel(
     const pair: DexSearchPair | undefined = isSolanaToken ? pairByMint.get(token.id) : undefined;
     const boost: DexBoostInfo | undefined = boostByMint.get(token.id);
     const migrationCreatedAt: string | undefined = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : token.migrationCreatedAt ?? token.firstPool?.createdAt;
+    const orders: DexPaidOrderSummary | undefined = isSolanaToken ? await dexPaidOrdersForToken("solana", token.id) : undefined;
     const overview: Record<string, unknown> | null = isSolanaToken && athMints.has(token.id) ? await birdeyeTokenOverview(token.id) : null;
     const overviewAth = athFromOverview(overview);
     const ath = overviewAth.price != null
@@ -544,6 +616,13 @@ export async function enrichTokensWithMarketIntel(
       dexBoostAmount: token.dexBoostAmount ?? boost?.amount,
       dexBoostTotalAmount: token.dexBoostTotalAmount ?? boost?.totalAmount,
       dexBoostActive: token.dexBoostActive ?? pair?.boosts?.active,
+      dexPaidOrderCount: token.dexPaidOrderCount ?? orders?.totalOrders,
+      dexApprovedOrderCount: token.dexApprovedOrderCount ?? orders?.approvedOrders,
+      dexProfilePaid: token.dexProfilePaid ?? orders?.profilePaid,
+      dexCommunityTakeoverPaid: token.dexCommunityTakeoverPaid ?? orders?.communityTakeoverPaid,
+      dexAdsPaid: token.dexAdsPaid ?? orders?.adsPaid,
+      dexFirstPaidAt: token.dexFirstPaidAt ?? orders?.firstPaidAt,
+      dexLastPaidAt: token.dexLastPaidAt ?? orders?.lastPaidAt,
       dexUrl: token.dexUrl ?? pair?.url ?? boost?.url,
       pairAddress: token.pairAddress ?? pair?.pairAddress,
       pairDexId: token.pairDexId ?? pair?.dexId,
@@ -555,10 +634,16 @@ export function tokenMigrationDateIso(token: JupTokenInfo): string | undefined {
   return token.migrationCreatedAt ?? token.firstPool?.createdAt;
 }
 
-export function tokenDexPaidLabel(token: Pick<JupTokenInfo, "dexPaidAmount" | "dexBoostAmount" | "dexBoostTotalAmount" | "dexBoostActive">): string {
+export function tokenDexPaidLabel(
+  token: Pick<JupTokenInfo, "dexPaidAmount" | "dexBoostAmount" | "dexBoostTotalAmount" | "dexBoostActive" | "dexApprovedOrderCount" | "dexProfilePaid" | "dexCommunityTakeoverPaid" | "dexAdsPaid">,
+): string {
   const paid: number | undefined = token.dexPaidAmount ?? token.dexBoostTotalAmount ?? token.dexBoostAmount;
-  if (paid != null && Number.isFinite(paid) && paid > 0) return `${fmtNum(paid)} paid`;
-  if ((token.dexBoostActive ?? 0) > 0) return `${fmtNum(token.dexBoostActive)} boost`;
+  if (paid != null && Number.isFinite(paid) && paid > 0) return `${fmtNum(paid)} boosts paid`;
+  if ((token.dexBoostActive ?? 0) > 0) return `${fmtNum(token.dexBoostActive)} active boost`;
+  if ((token.dexApprovedOrderCount ?? 0) > 0) return `${fmtNum(token.dexApprovedOrderCount)} DEX order`;
+  if (token.dexCommunityTakeoverPaid) return "CTO paid";
+  if (token.dexProfilePaid) return "profile paid";
+  if (token.dexAdsPaid) return "ads paid";
   return "—";
 }
 
@@ -1541,9 +1626,170 @@ export type HeliusTx = {
   tokenTransfers?: { mint: string; tokenAmount: number; fromUserAccount?: string; toUserAccount?: string }[];
 };
 
+export type TokenDevLaunchIntel = {
+  wallet: string | null;
+  confidence: "high" | "medium" | "low";
+  launchType: "CTO / community support" | "dev launch" | "unknown";
+  recentTokenMints: number;
+  bondedCoinCount: number;
+  dexPaidCoinCount: number;
+  activeBoostedCoinCount: number;
+  ctoOrderCount: number;
+  sampleMints: string[];
+  lastSeenAt?: string;
+  notes: string[];
+};
+
 export async function heliusTxs(address: string, limit = 25): Promise<HeliusTx[]> {
   const url = `${HELIUS_BASE}/addresses/${address}/transactions?api-key=${HELIUS_API_KEY}&limit=${limit}`;
   return jget<HeliusTx[]>(url);
+}
+
+const devLaunchIntelCache = new Map<string, Promise<TokenDevLaunchIntel>>();
+
+function inferCreatorWalletFromTxs(txs: HeliusTx[]): { wallet: string | null; confidence: TokenDevLaunchIntel["confidence"] } {
+  const ordered = [...txs].sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+  const creationLike = ordered.find((tx) => /create|initialize|mint|pool|liquidity|pump|bond/i.test(`${tx.type} ${tx.description ?? ""}`));
+  const chosen = creationLike ?? ordered[0] ?? txs[0];
+  if (!chosen?.feePayer) return { wallet: null, confidence: "low" };
+  return {
+    wallet: chosen.feePayer,
+    confidence: creationLike ? "high" : txs.length >= 4 ? "medium" : "low",
+  };
+}
+
+function txLastSeenIso(txs: HeliusTx[]): string | undefined {
+  const latest = txs.reduce<number | null>((current, tx) => {
+    if (!Number.isFinite(tx.timestamp)) return current;
+    return Math.max(current ?? tx.timestamp, tx.timestamp);
+  }, null);
+  return latest ? new Date(latest * 1000).toISOString() : undefined;
+}
+
+function tokenMintsFromWalletTxs(txs: HeliusTx[], targetMint: string): string[] {
+  const ignored = new Set<string>([SOL_MINT, USDC_MINT]);
+  const mints = new Set<string>([targetMint]);
+  for (const tx of txs) {
+    for (const transfer of tx.tokenTransfers ?? []) {
+      if (!transfer.mint || ignored.has(transfer.mint)) continue;
+      if ((transfer.tokenAmount ?? 0) <= 0) continue;
+      mints.add(transfer.mint);
+    }
+  }
+  return Array.from(mints).slice(0, 24);
+}
+
+export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDevLaunchIntel> {
+  const chainId = token.chainId ?? "solana";
+  const cacheKey = `${chainId}:${token.id}`;
+  const cached = devLaunchIntelCache.get(cacheKey);
+  if (cached) return cached;
+
+  const task = (async (): Promise<TokenDevLaunchIntel> => {
+    if (chainId !== "solana") {
+      return {
+        wallet: null,
+        confidence: "low",
+        launchType: token.dexCommunityTakeoverPaid ? "CTO / community support" : "unknown",
+        recentTokenMints: 0,
+        bondedCoinCount: 0,
+        dexPaidCoinCount: token.dexApprovedOrderCount ? 1 : 0,
+        activeBoostedCoinCount: (token.dexBoostActive ?? 0) > 0 ? 1 : 0,
+        ctoOrderCount: token.dexCommunityTakeoverPaid ? 1 : 0,
+        sampleMints: [],
+        notes: ["Dev wallet inference currently runs on Solana public transaction history."],
+      };
+    }
+
+    const tokenOrders = await dexPaidOrdersForToken(chainId, token.id);
+    let seedTxs: HeliusTx[] = [];
+    try {
+      seedTxs = await heliusTxs(token.id, 12);
+    } catch {
+      seedTxs = [];
+    }
+
+    const creator = inferCreatorWalletFromTxs(seedTxs);
+    const launchType: TokenDevLaunchIntel["launchType"] = tokenOrders.communityTakeoverPaid || token.dexCommunityTakeoverPaid
+      ? "CTO / community support"
+      : creator.wallet
+        ? "dev launch"
+        : "unknown";
+
+    if (!creator.wallet) {
+      return {
+        wallet: null,
+        confidence: "low",
+        launchType,
+        recentTokenMints: 1,
+        bondedCoinCount: token.pairAddress || token.firstPool?.createdAt ? 1 : 0,
+        dexPaidCoinCount: tokenOrders.approvedOrders > 0 || (token.dexBoostTotalAmount ?? token.dexBoostAmount ?? 0) > 0 ? 1 : 0,
+        activeBoostedCoinCount: (token.dexBoostActive ?? 0) > 0 ? 1 : 0,
+        ctoOrderCount: tokenOrders.communityTakeoverPaid ? 1 : 0,
+        sampleMints: [token.id],
+        notes: ["Creator wallet could not be confidently inferred from early token transactions."],
+      };
+    }
+
+    let devTxs: HeliusTx[] = [];
+    try {
+      devTxs = await heliusTxs(creator.wallet, 80);
+    } catch {
+      devTxs = [];
+    }
+
+    const sampleMints = tokenMintsFromWalletTxs(devTxs, token.id);
+    const [pairsResult, boostsResult, orderResults] = await Promise.allSettled([
+      dexPairsForMints(sampleMints),
+      dexBoostsByMint(),
+      Promise.all(sampleMints.slice(0, 12).map((mint) => dexPaidOrdersForToken(chainId, mint))),
+    ]);
+
+    const pairs = pairsResult.status === "fulfilled" ? pairsResult.value : [];
+    const boostByMint = boostsResult.status === "fulfilled" ? boostsResult.value : new Map<string, DexBoostInfo>();
+    const orderSummaries = orderResults.status === "fulfilled" ? orderResults.value : [];
+    const bondedMints = new Set<string>();
+    const activeBoostedMints = new Set<string>();
+
+    for (const pair of pairs) {
+      const mint = pair.baseToken?.address;
+      if (!mint) continue;
+      if (pair.pairAddress || pair.pairCreatedAt || (pair.liquidity?.usd ?? 0) > 0) bondedMints.add(mint);
+      if ((pair.boosts?.active ?? 0) > 0) activeBoostedMints.add(mint);
+    }
+    for (const mint of sampleMints) {
+      const boost = boostByMint.get(mint);
+      if ((boost?.amount ?? boost?.totalAmount ?? 0) > 0) activeBoostedMints.add(mint);
+    }
+
+    const dexPaidCoinCount = orderSummaries.filter((summary) => summary.approvedOrders > 0).length + sampleMints.filter((mint) => {
+      const boost = boostByMint.get(mint);
+      return (boost?.totalAmount ?? boost?.amount ?? 0) > 0;
+    }).length;
+    const ctoOrderCount = orderSummaries.filter((summary) => summary.communityTakeoverPaid).length;
+    const notes: string[] = [
+      "Dev history is inferred from early fee-payer and recent wallet token activity.",
+      "Bonded means a public DexScreener pair/liquidity route was found for that mint.",
+    ];
+    if (launchType === "CTO / community support") notes.unshift("DexScreener community-takeover order or CTO classification signal detected.");
+
+    return {
+      wallet: creator.wallet,
+      confidence: creator.confidence,
+      launchType,
+      recentTokenMints: sampleMints.length,
+      bondedCoinCount: bondedMints.size,
+      dexPaidCoinCount: Math.min(sampleMints.length, dexPaidCoinCount),
+      activeBoostedCoinCount: activeBoostedMints.size,
+      ctoOrderCount,
+      sampleMints,
+      lastSeenAt: txLastSeenIso(devTxs),
+      notes,
+    };
+  })();
+
+  devLaunchIntelCache.set(cacheKey, task);
+  return task;
 }
 
 export type BirdeyeOhlcv = {
