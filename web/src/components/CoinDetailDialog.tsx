@@ -39,12 +39,14 @@ import {
   fmtNum,
   fmtPct,
   fmtUsd,
+  hasPulledOrDeadLiquidity,
   jupGetTokens,
   shortAddr,
   shortDate,
   timeAgo,
   tokenDevLaunchIntel,
   tokenDexPaidLabel,
+  tokenEffectiveLiquidityUsd,
   tokenHolderBundleIntel,
   tokenMigrationDateIso,
   tokenOgCreatedAtIso,
@@ -99,12 +101,37 @@ async function fetchDexPairs(mint: string): Promise<DetailDexPair[]> {
   return Array.isArray(json) ? json : [];
 }
 
+function pairQuoteLiquidityUsd(pair: DetailDexPair | undefined): number | undefined {
+  const quoteAmount: number | undefined = pair?.liquidity?.quote;
+  if (quoteAmount == null || !Number.isFinite(quoteAmount)) return undefined;
+  const quoteSymbol: string = (pair?.quoteToken?.symbol ?? "").toUpperCase();
+  const quoteMint: string | undefined = pair?.quoteToken?.address;
+  if (quoteSymbol === "USDC" || quoteSymbol === "USDT" || quoteSymbol === "USDH" || quoteSymbol === "USDS" || quoteMint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v") return quoteAmount;
+  return undefined;
+}
+
+function pairEffectiveLiquidityUsd(pair: DetailDexPair | undefined): number | undefined {
+  const reported: number | undefined = pair?.liquidity?.usd;
+  const quoteLiquidity: number | undefined = pairQuoteLiquidityUsd(pair);
+  if (quoteLiquidity != null) return reported != null ? Math.min(reported, quoteLiquidity * 2) : quoteLiquidity * 2;
+  return reported;
+}
+
+function pairHasPulledLiquidity(pair: DetailDexPair | undefined): boolean {
+  if (!pair) return false;
+  const reported: number = pair.liquidity?.usd ?? 0;
+  const quoteLiquidity: number | undefined = pairQuoteLiquidityUsd(pair);
+  const effective: number = pairEffectiveLiquidityUsd(pair) ?? 0;
+  const marketCap: number = pair.marketCap ?? pair.fdv ?? 0;
+  return (quoteLiquidity != null && quoteLiquidity < 500 && reported >= 10_000) || (effective < 1_000 && marketCap >= 100_000);
+}
+
 function bestPair(pairs: DetailDexPair[]): DetailDexPair | undefined {
   return [...pairs]
     .filter((pair) => pair.baseToken?.address)
     .sort((a, b) => {
-      const scoreA = (a.liquidity?.usd ?? 0) + (a.volume?.h24 ?? 0) * 0.35 + (a.txns?.h24?.buys ?? 0) * 12;
-      const scoreB = (b.liquidity?.usd ?? 0) + (b.volume?.h24 ?? 0) * 0.35 + (b.txns?.h24?.buys ?? 0) * 12;
+      const scoreA = (pairEffectiveLiquidityUsd(a) ?? 0) + (a.volume?.h24 ?? 0) * 0.35 + (a.txns?.h24?.buys ?? 0) * 12;
+      const scoreB = (pairEffectiveLiquidityUsd(b) ?? 0) + (b.volume?.h24 ?? 0) * 0.35 + (b.txns?.h24?.buys ?? 0) * 12;
       return scoreB - scoreA;
     })[0];
 }
@@ -121,6 +148,11 @@ function mergeToken(primary: JupTokenInfo, fallback: JupTokenInfo): JupTokenInfo
     mcap: primary.mcap ?? fallback.mcap,
     fdv: primary.fdv ?? fallback.fdv,
     liquidity: primary.liquidity ?? fallback.liquidity,
+    reportedLiquidity: primary.reportedLiquidity ?? fallback.reportedLiquidity,
+    effectiveLiquidityUsd: primary.effectiveLiquidityUsd ?? fallback.effectiveLiquidityUsd,
+    quoteLiquidityUsd: primary.quoteLiquidityUsd ?? fallback.quoteLiquidityUsd,
+    lpPulled: primary.lpPulled ?? fallback.lpPulled,
+    lpPullReason: primary.lpPullReason ?? fallback.lpPullReason,
     holderCount: primary.holderCount ?? fallback.holderCount,
     organicScore: primary.organicScore ?? fallback.organicScore,
     organicScoreLabel: primary.organicScoreLabel ?? fallback.organicScoreLabel,
@@ -162,6 +194,10 @@ function pairFallbackToken(pair: DetailDexPair, token: JupTokenInfo): JupTokenIn
   const buyRatio = total24h > 0 ? buys24h / total24h : 0.5;
   const volume24h = pair.volume?.h24;
   const migrationCreatedAt = pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : undefined;
+  const reportedLiquidity: number | undefined = pair.liquidity?.usd;
+  const effectiveLiquidityUsd: number | undefined = pairEffectiveLiquidityUsd(pair);
+  const quoteLiquidityUsd: number | undefined = pairQuoteLiquidityUsd(pair);
+  const lpPulled: boolean = pairHasPulledLiquidity(pair);
 
   return mergeToken(
     {
@@ -173,7 +209,12 @@ function pairFallbackToken(pair: DetailDexPair, token: JupTokenInfo): JupTokenIn
       usdPrice: Number.isFinite(price) ? price : token.usdPrice,
       mcap: pair.marketCap ?? token.mcap,
       fdv: pair.fdv ?? token.fdv,
-      liquidity: pair.liquidity?.usd ?? token.liquidity,
+      liquidity: effectiveLiquidityUsd ?? token.liquidity,
+      reportedLiquidity: reportedLiquidity ?? token.reportedLiquidity,
+      effectiveLiquidityUsd: effectiveLiquidityUsd ?? token.effectiveLiquidityUsd,
+      quoteLiquidityUsd: quoteLiquidityUsd ?? token.quoteLiquidityUsd,
+      lpPulled: lpPulled || token.lpPulled,
+      lpPullReason: lpPulled ? `LP appears pulled/dead: ${fmtUsd(reportedLiquidity)} reported liquidity but only ${fmtUsd(quoteLiquidityUsd)} quote-side depth.` : token.lpPullReason,
       stats24h: {
         priceChange: pair.priceChange?.h24 ?? token.stats24h?.priceChange,
         buyVolume: volume24h != null ? volume24h * buyRatio : token.stats24h?.buyVolume,
@@ -223,7 +264,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const pair = useMemo(() => bestPair(dexPairs ?? []), [dexPairs]);
 
   const { data: enrichedTokens, isFetching: isFetchingToken } = useQuery({
-    queryKey: ["coin-detail-token-intel", token.id, pair?.pairAddress ?? "none"],
+    queryKey: ["coin-detail-token-intel", token.id, pair?.pairAddress ?? "none", "v8-quote-backed-lp"],
     queryFn: async (): Promise<JupTokenInfo[]> => {
       const jupTokens = await jupGetTokens([token.id]);
       const base = jupTokens[0] ? mergeToken(jupTokens[0], token) : token;
@@ -257,7 +298,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const pairCreated = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : migratedAt;
 
   const { data: classificationReport, isFetching: isFetchingClassification } = useQuery({
-    queryKey: ["coin-detail-layered-classification", detailToken.symbol, "v7-origin-vs-later-official"],
+    queryKey: ["coin-detail-layered-classification", detailToken.symbol, "v8-quote-backed-lp"],
     queryFn: () => forensicOgAttribution(detailToken.symbol),
     enabled: open && Boolean(detailToken.symbol),
     staleTime: 30_000,
@@ -280,6 +321,8 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const forensicScore = classificationReport?.tokenScores[forensicKey];
   const primaryLabel: string = forensicScore?.classification.primary_label ?? "SCANNED";
   const secondaryLabels: string[] = forensicScore?.classification.secondary_labels.slice(0, 6) ?? [];
+  const lpPulled = hasPulledOrDeadLiquidity(detailToken);
+  const quoteBackedLiquidity: number = tokenEffectiveLiquidityUsd(detailToken);
   const primaryTone: "lime" | "gold" | "cyan" | "blood" | "muted" = primaryLabel.includes("TRUE OG")
     ? "lime"
     : primaryLabel.includes("CLONE") || primaryLabel.includes("COPY")
@@ -369,7 +412,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <IntelCard icon={Radar} label="Main Label" value={primaryLabel} sub={forensicScore ? `origin ${forensicScore.originScore}% · official ${forensicScore.officialVerificationScore}%` : "layered classifier"} tone={primaryTone} helpLabel="MAIN LABEL" />
                 <IntelCard icon={CandlestickChart} label="Price" value={fmtUsd(detailToken.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined))} sub={<span className={isUp24 ? "text-og-lime" : "text-og-blood"}>24H {fmtPct(change24)}</span>} tone={isUp24 ? "lime" : "blood"} />
-                <IntelCard icon={Users} label="Market Cap" value={fmtUsd(detailToken.mcap ?? detailToken.fdv ?? pair?.marketCap ?? pair?.fdv)} sub={`holders ${fmtNum(detailToken.holderCount)}`} tone="gold" />
+                <IntelCard icon={Users} label="Quote-Backed LP" value={fmtUsd(quoteBackedLiquidity)} sub={lpPulled ? "LP pulled/dead liquidity blocked" : `reported ${fmtUsd(detailToken.reportedLiquidity ?? pair?.liquidity?.usd ?? quoteBackedLiquidity)}`} tone={lpPulled ? "blood" : "gold"} />
                 <IntelCard icon={BadgeDollarSign} label="DEX Paid" value={dexPaid} sub={`${fmtNum(detailToken.dexBoostActive ?? pair?.boosts?.active)} active · last ${shortDate(detailToken.dexLastPaidAt)}`} tone={dexPaid === "—" ? "muted" : "lime"} />
               </div>
 
@@ -461,6 +504,9 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <AuditLine label="Mint authority" ok={detailToken.audit?.mintAuthorityDisabled === true} good="disabled" bad="open / unknown" />
                   <AuditLine label="Freeze authority" ok={detailToken.audit?.freezeAuthorityDisabled === true} good="disabled" bad="open / unknown" />
                   <AuditLine label="Verified" ok={detailToken.isVerified === true} good="verified" bad="unverified" />
+                  <MetaLine label="Quote-backed LP" value={fmtUsd(quoteBackedLiquidity)} />
+                  <MetaLine label="Reported LP" value={fmtUsd(detailToken.reportedLiquidity ?? pair?.liquidity?.usd)} />
+                  <MetaLine label="LP status" value={lpPulled ? "pulled / dead liquidity" : "quote-backed"} />
                   <MetaLine label="Top holders" value={detailToken.audit?.topHoldersPercentage != null ? `${detailToken.audit.topHoldersPercentage.toFixed(1)}%` : "—"} />
                   <MetaLine label="Organic score" value={detailToken.organicScore != null ? `${detailToken.organicScore.toFixed(0)} · ${detailToken.organicScoreLabel ?? ""}` : "—"} />
                   <MetaLine label="Origin score" value={forensicScore ? `${forensicScore.originScore}%` : "—"} />

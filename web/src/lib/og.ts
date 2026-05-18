@@ -27,6 +27,9 @@ export const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_
 
 export const SOL_MINT = "So11111111111111111111111111111111111111112";
 export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkYgGPhbNHnc1j7Na";
+const STABLE_QUOTE_MINTS = new Set<string>([USDC_MINT, USDT_MINT]);
+const STABLE_QUOTE_SYMBOLS = new Set<string>(["USDC", "USDT", "USDH", "USDS", "PYUSD"]);
 // Default scan target is now the official live OG Scan token.
 export const DEFAULT_OG_MINT = OGSCAN_TOKEN_MINT;
 export const MIN_OGSCAN_LIQUIDITY_USD = 1_000;
@@ -90,6 +93,11 @@ export type JupTokenInfo = {
   dexUrl?: string;
   pairAddress?: string;
   pairDexId?: string;
+  reportedLiquidity?: number;
+  effectiveLiquidityUsd?: number;
+  quoteLiquidityUsd?: number;
+  lpPulled?: boolean;
+  lpPullReason?: string;
 };
 
 export type DexSearchPair = {
@@ -309,8 +317,35 @@ function bestLiquidityUsd(...values: Array<number | undefined>): number | undefi
   return Math.max(...finiteValues);
 }
 
-export function hasMinimumOgScanLiquidity(token: Pick<JupTokenInfo, "liquidity">): boolean {
-  return (token.liquidity ?? 0) >= MIN_OGSCAN_LIQUIDITY_USD;
+function smallestLiquidityUsd(...values: Array<number | undefined>): number | undefined {
+  const finiteValues: number[] = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (finiteValues.length === 0) return undefined;
+  return Math.min(...finiteValues);
+}
+
+export function tokenEffectiveLiquidityUsd(token: Pick<JupTokenInfo, "liquidity" | "effectiveLiquidityUsd">): number {
+  return token.effectiveLiquidityUsd ?? token.liquidity ?? 0;
+}
+
+function tokenReportedLiquidityUsd(token: Pick<JupTokenInfo, "liquidity" | "reportedLiquidity">): number {
+  return token.reportedLiquidity ?? token.liquidity ?? 0;
+}
+
+export function hasPulledOrDeadLiquidity(token: Pick<JupTokenInfo, "liquidity" | "effectiveLiquidityUsd" | "reportedLiquidity" | "quoteLiquidityUsd" | "lpPulled" | "mcap" | "fdv">): boolean {
+  const effectiveLiquidity: number = tokenEffectiveLiquidityUsd(token);
+  const reportedLiquidity: number = tokenReportedLiquidityUsd(token);
+  const quoteLiquidity: number | undefined = token.quoteLiquidityUsd;
+  const marketCap: number = token.mcap ?? token.fdv ?? 0;
+
+  if (token.lpPulled === true && effectiveLiquidity < MIN_OGSCAN_LIQUIDITY_USD) return true;
+  if (quoteLiquidity != null && quoteLiquidity < 500 && reportedLiquidity >= 10_000) return true;
+  if (effectiveLiquidity < MIN_OGSCAN_LIQUIDITY_USD && reportedLiquidity >= 25_000) return true;
+  if (effectiveLiquidity < MIN_OGSCAN_LIQUIDITY_USD && marketCap >= 100_000) return true;
+  return false;
+}
+
+export function hasMinimumOgScanLiquidity(token: Pick<JupTokenInfo, "liquidity" | "effectiveLiquidityUsd" | "reportedLiquidity" | "quoteLiquidityUsd" | "lpPulled" | "mcap" | "fdv">): boolean {
+  return tokenEffectiveLiquidityUsd(token) >= MIN_OGSCAN_LIQUIDITY_USD && !hasPulledOrDeadLiquidity(token);
 }
 
 export function hasUnsafeTokenAuthority(token: Pick<JupTokenInfo, "audit">): boolean {
@@ -319,7 +354,7 @@ export function hasUnsafeTokenAuthority(token: Pick<JupTokenInfo, "audit">): boo
   return mintAuthorityStillOn || freezeAuthorityStillOn;
 }
 
-export function isTrustedOgScanCandidate(token: Pick<JupTokenInfo, "liquidity" | "audit">): boolean {
+export function isTrustedOgScanCandidate(token: Pick<JupTokenInfo, "liquidity" | "effectiveLiquidityUsd" | "reportedLiquidity" | "quoteLiquidityUsd" | "lpPulled" | "mcap" | "fdv" | "audit">): boolean {
   return hasMinimumOgScanLiquidity(token) && !hasUnsafeTokenAuthority(token);
 }
 
@@ -333,6 +368,22 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
   const oldestMintCreatedAt: number = Math.min(existingMintCreatedAt, nextMintCreatedAt);
   const oldestMintCreatedAtIso: string | undefined = createdAtIsoFromMs(oldestMintCreatedAt);
 
+  const quoteLiquidity: number | undefined = smallestLiquidityUsd(existing.quoteLiquidityUsd, next.quoteLiquidityUsd);
+  const hasQuoteBackedEvidence: boolean = quoteLiquidity != null || existing.lpPulled === true || next.lpPulled === true;
+  const effectiveLiquidity: number | undefined = hasQuoteBackedEvidence
+    ? smallestLiquidityUsd(existing.effectiveLiquidityUsd ?? existing.liquidity, next.effectiveLiquidityUsd ?? next.liquidity)
+    : bestLiquidityUsd(existing.effectiveLiquidityUsd ?? existing.liquidity, next.effectiveLiquidityUsd ?? next.liquidity);
+  const reportedLiquidity: number | undefined = bestLiquidityUsd(existing.reportedLiquidity ?? existing.liquidity, next.reportedLiquidity ?? next.liquidity);
+  const liquidityMergeProbe: Pick<JupTokenInfo, "liquidity" | "effectiveLiquidityUsd" | "reportedLiquidity" | "quoteLiquidityUsd" | "lpPulled" | "mcap" | "fdv"> = {
+    liquidity: effectiveLiquidity,
+    effectiveLiquidityUsd: effectiveLiquidity,
+    reportedLiquidity,
+    quoteLiquidityUsd: quoteLiquidity,
+    mcap: existing.mcap ?? next.mcap,
+    fdv: existing.fdv ?? next.fdv,
+  };
+  const lpPulled: boolean = hasPulledOrDeadLiquidity(liquidityMergeProbe);
+
   return {
     ...existing,
     id: existing.id,
@@ -344,7 +395,12 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
     usdPrice: existing.usdPrice ?? next.usdPrice,
     mcap: existing.mcap ?? next.mcap,
     fdv: existing.fdv ?? next.fdv,
-    liquidity: bestLiquidityUsd(existing.liquidity, next.liquidity),
+    liquidity: effectiveLiquidity,
+    reportedLiquidity,
+    effectiveLiquidityUsd: effectiveLiquidity,
+    quoteLiquidityUsd: quoteLiquidity,
+    lpPulled,
+    lpPullReason: lpPulled ? existing.lpPullReason ?? next.lpPullReason ?? "LP appears pulled or dead: reported MC/LP is not backed by enough quote-side liquidity." : undefined,
     holderCount: existing.holderCount ?? next.holderCount,
     organicScore: existing.organicScore ?? next.organicScore,
     organicScoreLabel: existing.organicScoreLabel ?? next.organicScoreLabel,
@@ -403,6 +459,10 @@ function dexPairToToken(pair: DexSearchPair): JupTokenInfo | null {
   const buyRatio: number = totalTxns24h > 0 ? buys24h / totalTxns24h : 0.5;
   const volume24h: number | undefined = pair.volume?.h24;
   const createdAt: string | undefined = pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : undefined;
+  const reportedLiquidity: number | undefined = pair.liquidity?.usd;
+  const quoteLiquidityUsd: number | undefined = pairQuoteLiquidityUsd(pair);
+  const effectiveLiquidityUsd: number | undefined = pairEffectiveLiquidityUsd(pair);
+  const lpPulled: boolean = isPairLpPulled(pair);
 
   return {
     id: mint,
@@ -414,7 +474,12 @@ function dexPairToToken(pair: DexSearchPair): JupTokenInfo | null {
     usdPrice: price != null && Number.isFinite(price) ? price : undefined,
     mcap: pair.marketCap,
     fdv: pair.fdv,
-    liquidity: pair.liquidity?.usd,
+    liquidity: effectiveLiquidityUsd,
+    reportedLiquidity,
+    effectiveLiquidityUsd,
+    quoteLiquidityUsd,
+    lpPulled,
+    lpPullReason: lpPulled ? `LP appears pulled/dead: ${fmtUsd(reportedLiquidity)} reported liquidity but only ${fmtUsd(quoteLiquidityUsd)} quote-side depth.` : undefined,
     stats24h: {
       priceChange: pair.priceChange?.h24,
       buyVolume: volume24h != null ? volume24h * buyRatio : undefined,
@@ -486,14 +551,44 @@ function pickFirstIso(record: Record<string, unknown> | null, keys: string[]): s
   return undefined;
 }
 
+function pairQuoteLiquidityUsd(pair: DexSearchPair): number | undefined {
+  const quoteAmount: number | undefined = pair.liquidity?.quote;
+  if (quoteAmount == null || !Number.isFinite(quoteAmount)) return undefined;
+
+  const quoteMint: string | undefined = pair.quoteToken?.address;
+  const quoteSymbol: string = (pair.quoteToken?.symbol ?? "").toUpperCase();
+  if ((quoteMint && STABLE_QUOTE_MINTS.has(quoteMint)) || STABLE_QUOTE_SYMBOLS.has(quoteSymbol)) return quoteAmount;
+  return undefined;
+}
+
+function pairEffectiveLiquidityUsd(pair: DexSearchPair): number | undefined {
+  const reported: number | undefined = pair.liquidity?.usd;
+  const quoteLiquidity: number | undefined = pairQuoteLiquidityUsd(pair);
+  if (quoteLiquidity != null) {
+    const quoteBackedLiquidity: number = quoteLiquidity * 2;
+    return reported != null && Number.isFinite(reported) ? Math.min(reported, quoteBackedLiquidity) : quoteBackedLiquidity;
+  }
+  return reported;
+}
+
+function isPairLpPulled(pair: DexSearchPair): boolean {
+  const reported: number = pair.liquidity?.usd ?? 0;
+  const effective: number = pairEffectiveLiquidityUsd(pair) ?? 0;
+  const quoteLiquidity: number | undefined = pairQuoteLiquidityUsd(pair);
+  const marketCap: number = pair.marketCap ?? pair.fdv ?? 0;
+  if (quoteLiquidity != null && quoteLiquidity < 500 && reported >= 10_000) return true;
+  if (effective < MIN_OGSCAN_LIQUIDITY_USD && marketCap >= 100_000) return true;
+  return false;
+}
+
 function bestPairByMint(pairs: DexSearchPair[]): Map<string, DexSearchPair> {
   const byMint = new Map<string, DexSearchPair>();
   for (const pair of pairs) {
     const mint: string | undefined = pair.baseToken?.address;
     if (!isSolanaChainId(pair.chainId) || !mint) continue;
-    const currentScore: number = (pair.liquidity?.usd ?? 0) + (pair.volume?.h24 ?? 0) * 0.4;
+    const currentScore: number = (pairEffectiveLiquidityUsd(pair) ?? 0) + (pair.volume?.h24 ?? 0) * 0.4;
     const previous: DexSearchPair | undefined = byMint.get(mint);
-    const previousScore: number = (previous?.liquidity?.usd ?? 0) + (previous?.volume?.h24 ?? 0) * 0.4;
+    const previousScore: number = previous ? (pairEffectiveLiquidityUsd(previous) ?? 0) + (previous.volume?.h24 ?? 0) * 0.4 : 0;
     if (!previous || currentScore >= previousScore) byMint.set(mint, pair);
   }
   return byMint;
@@ -724,7 +819,12 @@ export async function enrichTokensWithMarketIntel(
       usdPrice: token.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined),
       mcap: token.mcap ?? pair?.marketCap,
       fdv: token.fdv ?? pair?.fdv,
-      liquidity: bestLiquidityUsd(token.liquidity, pair?.liquidity?.usd),
+      liquidity: pair ? pairEffectiveLiquidityUsd(pair) ?? token.effectiveLiquidityUsd ?? token.liquidity : token.effectiveLiquidityUsd ?? token.liquidity,
+      reportedLiquidity: bestLiquidityUsd(token.reportedLiquidity ?? token.liquidity, pair?.liquidity?.usd),
+      effectiveLiquidityUsd: pair ? pairEffectiveLiquidityUsd(pair) ?? token.effectiveLiquidityUsd ?? token.liquidity : token.effectiveLiquidityUsd ?? token.liquidity,
+      quoteLiquidityUsd: pairQuoteLiquidityUsd(pair ?? ({} as DexSearchPair)) ?? token.quoteLiquidityUsd,
+      lpPulled: pair ? isPairLpPulled(pair) || hasPulledOrDeadLiquidity({ ...token, effectiveLiquidityUsd: pairEffectiveLiquidityUsd(pair) ?? token.effectiveLiquidityUsd, reportedLiquidity: pair.liquidity?.usd ?? token.reportedLiquidity }) : hasPulledOrDeadLiquidity(token),
+      lpPullReason: pair && isPairLpPulled(pair) ? `LP appears pulled/dead: ${fmtUsd(pair.liquidity?.usd)} reported liquidity but only ${fmtUsd(pairQuoteLiquidityUsd(pair))} quote-side depth.` : token.lpPullReason,
       firstPool: token.firstPool?.createdAt ? token.firstPool : migrationCreatedAt ? { createdAt: migrationCreatedAt } : token.firstPool,
       allTimeHighUsd: token.allTimeHighUsd ?? ath.price,
       allTimeHighAt: token.allTimeHighAt ?? ath.at,
@@ -1171,7 +1271,8 @@ function scoreHolderDistribution(token: JupTokenInfo): number {
 function scoreLiquiditySurvival(token: JupTokenInfo): number {
   const poolMs: number = tokenPoolCreatedAtMs(token);
   const ageDays: number = Number.isFinite(poolMs) ? Math.max(0, (Date.now() - poolMs) / 86_400_000) : 0;
-  const liq: number = token.liquidity ?? 0;
+  const liq: number = tokenEffectiveLiquidityUsd(token);
+  if (hasPulledOrDeadLiquidity(token)) return 4;
   if (ageDays > 180 && liq > 10_000) return 92;
   if (ageDays > 30 && liq > 2_500) return 76;
   if (ageDays > 7 && liq > 1_000) return 58;
@@ -1704,7 +1805,7 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: true, maxAth: 14 });
 
   const liquidCandidates: JupTokenInfo[] = enriched.filter(hasMinimumOgScanLiquidity);
-  const originPool: JupTokenInfo[] = liquidCandidates.filter((token) => isCanonicalSolanaOriginForQuery(token, clean) || !hasUnsafeTokenAuthority(token));
+  const originPool: JupTokenInfo[] = liquidCandidates.filter((token) => !hasPulledOrDeadLiquidity(token) && (isCanonicalSolanaOriginForQuery(token, clean) || !hasUnsafeTokenAuthority(token)));
 
   const candidates: JupTokenInfo[] = originPool
     .filter((token) => isCanonicalSolanaOriginForQuery(token, clean) || Number.isFinite(tokenCreatedAtMs(token)) || Number.isFinite(tokenPoolCreatedAtMs(token)))

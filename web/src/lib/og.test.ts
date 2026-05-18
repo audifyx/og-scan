@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FARTCOIN_CANONICAL_MINT, forensicOgAttribution, jupOgCopycats, type JupTokenInfo } from "./og";
+import { FARTCOIN_CANONICAL_MINT, USDC_MINT, forensicOgAttribution, hasPulledOrDeadLiquidity, jupOgCopycats, type JupTokenInfo } from "./og";
 
 const daysAgoIso = (days: number): string => new Date(Date.now() - days * 86_400_000).toISOString();
 
@@ -185,6 +185,102 @@ describe("jupOgCopycats", () => {
     expect(report.candidates.map((token: JupTokenInfo) => token.id)).not.toContain("0xnot-solana-fartcoin");
     expect(report.candidates.map((token: JupTokenInfo) => token.id)).not.toContain("scam-corn-copy");
     expect(report.tokenScores[`solana:${FARTCOIN_CANONICAL_MINT}`]?.classification.primary_label).toBe("TRUE OG");
+  });
+
+  it("blocks LP-pulled tokens with inflated reported liquidity from TRUE OG selection", async () => {
+    const lpPulledScam = makeToken({
+      id: "5sNU6g1qVji5dEBnb6SWSX2Gu2rtDvvk7khKyujj6cuU",
+      name: "MAGA (magamemecoin.com)",
+      symbol: "TRUMP",
+      liquidity: 122_064_005,
+      mcap: 123_183_921,
+      fdv: 123_183_921,
+      holderCount: 10,
+      isVerified: false,
+      firstPool: { createdAt: "2025-01-10T11:15:36.000Z" },
+      onChainCreatedAt: "2024-01-01T00:00:00.000Z",
+      audit: {
+        mintAuthorityDisabled: true,
+        freezeAuthorityDisabled: true,
+        topHoldersPercentage: 72,
+      },
+    });
+    const firstCredibleTrump = makeToken({
+      id: "first-credible-trump",
+      name: "Trump",
+      symbol: "TRUMP",
+      liquidity: 25_000,
+      holderCount: 1_400,
+      isVerified: false,
+      firstPool: { createdAt: "2024-02-01T00:00:00.000Z" },
+      onChainCreatedAt: "2024-02-01T00:00:00.000Z",
+      audit: {
+        mintAuthorityDisabled: true,
+        freezeAuthorityDisabled: true,
+        topHoldersPercentage: 24,
+      },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/latest/dex/search")) {
+          return {
+            ok: true,
+            json: async () => ({
+              pairs: [
+                {
+                  chainId: "solana",
+                  dexId: "raydium",
+                  url: "https://dexscreener.com/solana/lp-pulled-pair",
+                  pairAddress: "lp-pulled-pair",
+                  baseToken: { address: "5sNU6g1qVji5dEBnb6SWSX2Gu2rtDvvk7khKyujj6cuU", name: "MAGA (magamemecoin.com)", symbol: "TRUMP" },
+                  quoteToken: { address: USDC_MINT, name: "USD Coin", symbol: "USDC" },
+                  liquidity: { usd: 122_064_005.84, base: 43_597_358, quote: 3.2588 },
+                  marketCap: 123_183_921,
+                  fdv: 123_183_921,
+                  volume: { h24: 3.99 },
+                  txns: { h24: { buys: 1, sells: 1 } },
+                  pairCreatedAt: 1736498136000,
+                },
+              ],
+            }),
+          };
+        }
+        if (url.includes("/tokens/v1/solana/")) {
+          return {
+            ok: true,
+            json: async () => [
+              {
+                chainId: "solana",
+                dexId: "raydium",
+                url: "https://dexscreener.com/solana/lp-pulled-pair",
+                pairAddress: "lp-pulled-pair",
+                baseToken: { address: "5sNU6g1qVji5dEBnb6SWSX2Gu2rtDvvk7khKyujj6cuU", name: "MAGA (magamemecoin.com)", symbol: "TRUMP" },
+                quoteToken: { address: USDC_MINT, name: "USD Coin", symbol: "USDC" },
+                liquidity: { usd: 122_064_005.84, base: 43_597_358, quote: 3.2588 },
+                marketCap: 123_183_921,
+                fdv: 123_183_921,
+                volume: { h24: 3.99 },
+                txns: { h24: { buys: 1, sells: 1 } },
+                pairCreatedAt: 1736498136000,
+              },
+            ],
+          };
+        }
+        if (url.includes("/orders/v1/")) return { ok: true, json: async () => [] };
+        if (url.includes("/token-boosts/")) return { ok: true, json: async () => [] };
+        if (url.includes("/defi/token_overview") || url.includes("/defi/ohlcv")) return { ok: false, json: async () => ({}) };
+        return { ok: true, json: async () => [lpPulledScam, firstCredibleTrump] };
+      })
+    );
+
+    const report = await forensicOgAttribution("TRUMP");
+
+    expect(hasPulledOrDeadLiquidity({ ...lpPulledScam, effectiveLiquidityUsd: 6.5176, quoteLiquidityUsd: 3.2588, reportedLiquidity: 122_064_005.84 })).toBe(true);
+    expect(report.og?.id).toBe("first-credible-trump");
+    expect(report.candidates.map((token: JupTokenInfo) => token.id)).not.toContain("5sNU6g1qVji5dEBnb6SWSX2Gu2rtDvvk7khKyujj6cuU");
   });
 
   it("does not treat an older migrated pool as OG when the mint was created later", async () => {
