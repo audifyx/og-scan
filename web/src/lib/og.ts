@@ -27,6 +27,7 @@ export const SOL_MINT = "So11111111111111111111111111111111111111112";
 export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 // Default scan target is now the official live OG Scan token.
 export const DEFAULT_OG_MINT = OGSCAN_TOKEN_MINT;
+export const MIN_OGSCAN_LIQUIDITY_USD = 1_000;
 
 export const STORAGE_OG_MINT = "og_scanner.mint";
 
@@ -280,6 +281,16 @@ function mergeStats(
   };
 }
 
+function bestLiquidityUsd(...values: Array<number | undefined>): number | undefined {
+  const finiteValues: number[] = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (finiteValues.length === 0) return undefined;
+  return Math.max(...finiteValues);
+}
+
+export function hasMinimumOgScanLiquidity(token: Pick<JupTokenInfo, "liquidity">): boolean {
+  return (token.liquidity ?? 0) >= MIN_OGSCAN_LIQUIDITY_USD;
+}
+
 function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTokenInfo {
   const existingPoolCreatedAt: number = tokenPoolCreatedAtMs(existing);
   const nextPoolCreatedAt: number = tokenPoolCreatedAtMs(next);
@@ -301,7 +312,7 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
     usdPrice: existing.usdPrice ?? next.usdPrice,
     mcap: existing.mcap ?? next.mcap,
     fdv: existing.fdv ?? next.fdv,
-    liquidity: existing.liquidity ?? next.liquidity,
+    liquidity: bestLiquidityUsd(existing.liquidity, next.liquidity),
     holderCount: existing.holderCount ?? next.holderCount,
     organicScore: existing.organicScore ?? next.organicScore,
     organicScoreLabel: existing.organicScoreLabel ?? next.organicScoreLabel,
@@ -681,7 +692,7 @@ export async function enrichTokensWithMarketIntel(
       usdPrice: token.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined),
       mcap: token.mcap ?? pair?.marketCap,
       fdv: token.fdv ?? pair?.fdv,
-      liquidity: token.liquidity ?? pair?.liquidity?.usd,
+      liquidity: bestLiquidityUsd(token.liquidity, pair?.liquidity?.usd),
       firstPool: token.firstPool?.createdAt ? token.firstPool : migrationCreatedAt ? { createdAt: migrationCreatedAt } : token.firstPool,
       allTimeHighUsd: token.allTimeHighUsd ?? ath.price,
       allTimeHighAt: token.allTimeHighAt ?? ath.at,
@@ -1588,7 +1599,9 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   const chainDatedPool: JupTokenInfo[] = await withOnChainCreationDates(pool);
   const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: true, maxAth: 14 });
 
-  const candidates: JupTokenInfo[] = enriched
+  const liquidCandidates: JupTokenInfo[] = enriched.filter(hasMinimumOgScanLiquidity);
+
+  const candidates: JupTokenInfo[] = liquidCandidates
     .filter((token) => Number.isFinite(tokenCreatedAtMs(token)) || Number.isFinite(tokenPoolCreatedAtMs(token)))
     .sort((a, b) => earliestCandidateEventMs(a) - earliestCandidateEventMs(b))
     .slice(0, 40);

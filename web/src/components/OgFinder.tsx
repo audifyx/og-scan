@@ -52,7 +52,7 @@ type FinderFilters = {
 
 const DEFAULT_FILTERS: FinderFilters = {
   minScore: 0,
-  minLiq: 0,
+  minLiq: 1000,
   verifiedOnly: false,
   hideHighRisk: false,
 };
@@ -100,7 +100,7 @@ export const OgFinder = ({ onSelect }: Props) => {
   const [filters, setFilters] = useState<FinderFilters>(DEFAULT_FILTERS);
 
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ["og-forensic-attribution", submitted, "v3"],
+    queryKey: ["og-forensic-attribution", submitted, "v4-min-liq"],
     queryFn: (): Promise<ForensicOgReport> => forensicOgAttribution(submitted),
     enabled: submitted.length >= 1,
     staleTime: 30_000,
@@ -207,7 +207,7 @@ export const OgFinder = ({ onSelect }: Props) => {
                 <Filter className="h-3 w-3" /> filters
               </div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                <span className="text-og-lime">{filteredCats.length}</span> copycats shown · <span className="text-og-blood">{droppedCats}</span> filtered · filters do not change OG
+                <span className="text-og-lime">{filteredCats.length}</span> copycats shown · <span className="text-og-blood">{droppedCats}</span> filtered · OG requires $1k+ live liquidity
               </div>
               <button
                 onClick={() => setFilters(DEFAULT_FILTERS)}
@@ -218,7 +218,7 @@ export const OgFinder = ({ onSelect }: Props) => {
             </div>
             <div className="grid gap-2 sm:grid-cols-4">
               <FilterNum label="MIN OG SCORE" value={filters.minScore} step={5} onChange={(v) => setFilters({ ...filters, minScore: v })} />
-              <FilterNum label="MIN LIQ" value={filters.minLiq} step={1000} onChange={(v) => setFilters({ ...filters, minLiq: v })} />
+              <FilterNum label="MIN LIQ" value={filters.minLiq} step={1000} onChange={(v) => setFilters({ ...filters, minLiq: Math.max(1000, v) })} />
               <FilterToggle label="VERIFIED" value={filters.verifiedOnly} onChange={(v) => setFilters({ ...filters, verifiedOnly: v })} />
               <FilterToggle label="HIDE RUG RISK" value={filters.hideHighRisk} onChange={(v) => setFilters({ ...filters, hideHighRisk: v })} />
             </div>
@@ -299,10 +299,10 @@ const FilterNum = ({
     <span className="text-muted-foreground">{label}</span>
     <input
       type="number"
-      min={0}
+      min={label === "MIN LIQ" ? 1000 : 0}
       step={step}
       value={value}
-      onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+      onChange={(e) => onChange(Math.max(label === "MIN LIQ" ? 1000 : 0, Number(e.target.value) || 0))}
       className="og-filter-input w-24 px-2 py-1 text-right text-foreground outline-none"
     />
   </label>

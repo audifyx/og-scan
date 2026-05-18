@@ -11,6 +11,7 @@ import {
   fmtUsd,
   shortAddr,
   shortDate,
+  hasMinimumOgScanLiquidity,
   tokenDexPaidLabel,
   tokenMigrationDateIso,
   type ForensicOgReport,
@@ -28,7 +29,7 @@ type ScanFilters = {
 };
 
 const DEFAULT_FILTERS: ScanFilters = {
-  minLiq: 0,
+  minLiq: 1000,
   minMcap: 0,
   verifiedOnly: false,
   greenOnly: false,
@@ -59,13 +60,14 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   }, [initialQuery]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["scan", debounced, "forensic-v3"],
+    queryKey: ["scan", debounced, "forensic-v4-min-liq"],
     queryFn: async (): Promise<ForensicOgReport> => {
       const report: ForensicOgReport = await forensicOgAttribution(debounced);
       if (report.candidates.length > 0) return report;
 
       const tokens: JupTokenInfo[] = await jupSearchToken(debounced);
-      const fallbackCandidates: JupTokenInfo[] = await enrichTokensWithMarketIntel(tokens, { includeAth: true, maxAth: 12 });
+      const fallbackCandidates: JupTokenInfo[] = (await enrichTokensWithMarketIntel(tokens, { includeAth: true, maxAth: 12 }))
+        .filter(hasMinimumOgScanLiquidity);
       return { ...report, candidates: fallbackCandidates, copycats: fallbackCandidates.slice(1) };
     },
     enabled: debounced.length >= 2,
@@ -136,7 +138,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             </button>
           </div>
           <div className="grid gap-2 sm:grid-cols-4">
-            <FilterNum label="MIN LIQ" value={filters.minLiq} step={1000} onChange={(v) => setFilters({ ...filters, minLiq: v })} />
+            <FilterNum label="MIN LIQ" value={filters.minLiq} step={1000} onChange={(v) => setFilters({ ...filters, minLiq: Math.max(1000, v) })} />
             <FilterNum label="MIN MCAP" value={filters.minMcap} step={10_000} onChange={(v) => setFilters({ ...filters, minMcap: v })} />
             <FilterToggle label="VERIFIED" value={filters.verifiedOnly} onChange={(v) => setFilters({ ...filters, verifiedOnly: v })} />
             <FilterToggle label="GREEN 24H" value={filters.greenOnly} onChange={(v) => setFilters({ ...filters, greenOnly: v })} />
@@ -196,10 +198,10 @@ const FilterNum = ({
     <span className="text-muted-foreground">{label}</span>
     <input
       type="number"
-      min={0}
+      min={label === "MIN LIQ" ? 1000 : 0}
       step={step}
       value={value}
-      onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+      onChange={(e) => onChange(Math.max(label === "MIN LIQ" ? 1000 : 0, Number(e.target.value) || 0))}
       className="og-filter-input w-24 px-2 py-1 text-right text-foreground outline-none"
     />
   </label>

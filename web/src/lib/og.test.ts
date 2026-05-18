@@ -27,9 +27,9 @@ describe("jupOgCopycats", () => {
     vi.restoreAllMocks();
   });
 
-  it("uses the oldest on-chain mint date as the original, regardless of price or trust", async () => {
-    const newerTrusted = makeToken({
-      id: "newer-trusted-token",
+  it("excludes dead low-liquidity contracts before choosing the original", async () => {
+    const newerLiquid = makeToken({
+      id: "newer-liquid-token",
       liquidity: 5_000_000,
       holderCount: 25_000,
       organicScore: 8,
@@ -37,8 +37,8 @@ describe("jupOgCopycats", () => {
       firstPool: { createdAt: daysAgoIso(650) },
       onChainCreatedAt: daysAgoIso(188),
     });
-    const olderLowTrust = makeToken({
-      id: "older-low-trust-token",
+    const olderDeadFake = makeToken({
+      id: "older-dead-fake-token",
       liquidity: 95,
       holderCount: 5,
       isVerified: false,
@@ -50,24 +50,26 @@ describe("jupOgCopycats", () => {
       "fetch",
       vi.fn(async () => ({
         ok: true,
-        json: async () => [newerTrusted, olderLowTrust],
+        json: async () => [newerLiquid, olderDeadFake],
       }))
     );
 
     const result = await jupOgCopycats("WOJAK");
 
-    expect(result.og?.id).toBe("older-low-trust-token");
-    expect(result.copycats.map((token: JupTokenInfo) => token.id)).toContain("newer-trusted-token");
+    expect(result.og?.id).toBe("newer-liquid-token");
+    expect(result.copycats.map((token: JupTokenInfo) => token.id)).not.toContain("older-dead-fake-token");
   });
 
   it("does not treat an older migrated pool as OG when the mint was created later", async () => {
     const olderMigratedPool = makeToken({
       id: "older-migrated-pool-token",
+      liquidity: 3_500,
       firstPool: { createdAt: daysAgoIso(800) },
       onChainCreatedAt: daysAgoIso(20),
     });
     const originalMint = makeToken({
       id: "original-mint-token",
+      liquidity: 8_000,
       firstPool: { createdAt: daysAgoIso(3) },
       onChainCreatedAt: daysAgoIso(200),
     });
