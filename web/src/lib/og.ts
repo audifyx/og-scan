@@ -350,7 +350,13 @@ function isoToMs(rawCreatedAt: string | undefined): number {
 }
 
 function tokenPoolCreatedAtMs(token: JupTokenInfo): number {
-  return isoToMs(token.firstPool?.createdAt);
+  const poolDates: number[] = [
+    token.firstPool?.createdAt,
+    ...(token.allPools?.map((pool) => pool.createdAt) ?? []),
+  ]
+    .map(isoToMs)
+    .filter((value: number): boolean => Number.isFinite(value));
+  return poolDates.length > 0 ? Math.min(...poolDates) : Number.POSITIVE_INFINITY;
 }
 
 function tokenCreatedAtMs(token: JupTokenInfo): number {
@@ -682,6 +688,21 @@ function bestPairByMint(pairs: DexSearchPair[]): Map<string, DexSearchPair> {
     const previous: DexSearchPair | undefined = byMint.get(mint);
     const previousScore: number = previous ? (pairEffectiveLiquidityUsd(previous) ?? 0) + (previous.volume?.h24 ?? 0) * 0.4 : 0;
     if (!previous || currentScore >= previousScore) byMint.set(mint, pair);
+  }
+  return byMint;
+}
+
+function oldestCrediblePairByMint(pairs: DexSearchPair[]): Map<string, DexSearchPair> {
+  const byMint = new Map<string, DexSearchPair>();
+  for (const pair of pairs) {
+    const mint: string | undefined = pair.baseToken?.address;
+    const pairCreatedAt: number | undefined = pair.pairCreatedAt;
+    if (!isSolanaChainId(pair.chainId) || !mint || pairCreatedAt == null || !Number.isFinite(pairCreatedAt)) continue;
+    if (isPairLpPulled(pair)) continue;
+
+    const previous: DexSearchPair | undefined = byMint.get(mint);
+    const previousCreatedAt: number = previous?.pairCreatedAt ?? Number.POSITIVE_INFINITY;
+    if (!previous || pairCreatedAt < previousCreatedAt) byMint.set(mint, pair);
   }
   return byMint;
 }
@@ -1044,6 +1065,7 @@ export async function enrichTokensWithMarketIntel(
   const [pairsResult, boostsResult] = await Promise.allSettled([dexPairsForMints(mints), dexBoostsByMint()]);
   const allPairs: DexSearchPair[] = pairsResult.status === "fulfilled" ? pairsResult.value : [];
   const pairByMint: Map<string, DexSearchPair> = bestPairByMint(allPairs);
+  const oldestPairByMint: Map<string, DexSearchPair> = oldestCrediblePairByMint(allPairs);
   const poolsByMint: Map<string, TokenDexPoolIntel[]> = dexPoolsByMint(allPairs);
   const boostByMint: Map<string, DexBoostInfo> = boostsResult.status === "fulfilled" ? boostsResult.value : new Map<string, DexBoostInfo>();
   const maxAth: number = options.includeAth ? options.maxAth ?? tokens.length : 0;
@@ -1058,9 +1080,12 @@ export async function enrichTokensWithMarketIntel(
   return mapWithConcurrency(tokens, 4, async (token) => {
     const isSolanaToken: boolean = isSolanaChainId(token.chainId);
     const pair: DexSearchPair | undefined = isSolanaToken ? pairByMint.get(token.id) : undefined;
+    const oldestPair: DexSearchPair | undefined = isSolanaToken ? oldestPairByMint.get(token.id) : undefined;
     const pools: TokenDexPoolIntel[] = isSolanaToken ? poolsByMint.get(token.id) ?? [] : [];
     const boost: DexBoostInfo | undefined = boostByMint.get(token.id);
     const migrationCreatedAt: string | undefined = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : token.migrationCreatedAt ?? token.firstPool?.createdAt;
+    const oldestPoolMs: number = Math.min(tokenPoolCreatedAtMs(token), oldestPair?.pairCreatedAt ?? Number.POSITIVE_INFINITY);
+    const oldestPoolCreatedAt: string | undefined = createdAtIsoFromMs(oldestPoolMs);
     const orders: DexPaidOrderSummary | undefined = isSolanaToken ? await dexPaidOrdersForToken(SOLANA_CHAIN_ID, token.id) : undefined;
     const overview: Record<string, unknown> | null = isSolanaToken && birdeyeMints.has(token.id) ? await birdeyeTokenOverview(token.id) : null;
     const marketPatch = birdeyeMarketPatch(overview);
@@ -1123,7 +1148,7 @@ export async function enrichTokensWithMarketIntel(
           : token.lpPullReason,
       holderCount: token.holderCount ?? marketPatch.holderCount,
       audit: authorityAudit,
-      firstPool: token.firstPool?.createdAt ? token.firstPool : migrationCreatedAt ? { createdAt: migrationCreatedAt } : token.firstPool,
+      firstPool: oldestPoolCreatedAt ? { createdAt: oldestPoolCreatedAt } : migrationCreatedAt ? { createdAt: migrationCreatedAt } : token.firstPool,
       allTimeHighUsd: token.allTimeHighUsd ?? ath.price,
       allTimeHighAt: token.allTimeHighAt ?? ath.at,
       allTimeHighSource: token.allTimeHighSource ?? ath.source,

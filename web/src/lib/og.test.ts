@@ -283,6 +283,159 @@ describe("jupOgCopycats", () => {
     expect(report.candidates.map((token: JupTokenInfo) => token.id)).not.toContain("5sNU6g1qVji5dEBnb6SWSX2Gu2rtDvvk7khKyujj6cuU");
   });
 
+  it("keeps a two-year-old credible pool as OG over a newer high-liquidity pair", async () => {
+    const olderOg = makeToken({
+      id: "two-year-old-og",
+      name: "Wojak",
+      symbol: "WOJAK",
+      liquidity: 4_500,
+      holderCount: 1_100,
+      firstPool: { createdAt: "2024-01-15T00:00:00.000Z" },
+      onChainCreatedAt: undefined,
+      creationSource: "pool",
+    });
+    const newerRunner = makeToken({
+      id: "five-month-newer-pair",
+      name: "Wojak",
+      symbol: "WOJAK",
+      liquidity: 880_000,
+      holderCount: 35_000,
+      isVerified: true,
+      firstPool: { createdAt: "2025-08-15T00:00:00.000Z" },
+      onChainCreatedAt: undefined,
+      creationSource: "pool",
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/latest/dex/search")) {
+          return {
+            ok: true,
+            json: async () => ({
+              pairs: [
+                {
+                  chainId: "solana",
+                  dexId: "raydium",
+                  pairAddress: "newer-runner-pair",
+                  baseToken: { address: "five-month-newer-pair", name: "Wojak", symbol: "WOJAK" },
+                  quoteToken: { address: USDC_MINT, name: "USD Coin", symbol: "USDC" },
+                  liquidity: { usd: 880_000, quote: 440_000 },
+                  volume: { h24: 90_000 },
+                  pairCreatedAt: new Date("2025-08-15T00:00:00.000Z").getTime(),
+                },
+                {
+                  chainId: "solana",
+                  dexId: "raydium",
+                  pairAddress: "older-og-pair",
+                  baseToken: { address: "two-year-old-og", name: "Wojak", symbol: "WOJAK" },
+                  quoteToken: { address: USDC_MINT, name: "USD Coin", symbol: "USDC" },
+                  liquidity: { usd: 4_500, quote: 2_250 },
+                  volume: { h24: 250 },
+                  pairCreatedAt: new Date("2024-01-15T00:00:00.000Z").getTime(),
+                },
+              ],
+            }),
+          };
+        }
+        if (url.includes("/tokens/v1/solana/")) return { ok: true, json: async () => [] };
+        if (url.includes("/orders/v1/") || url.includes("/token-boosts/")) return { ok: true, json: async () => [] };
+        if (url.includes("/defi/token_overview") || url.includes("/defi/ohlcv")) return { ok: false, json: async () => ({}) };
+        return { ok: true, json: async () => [newerRunner, olderOg] };
+      })
+    );
+
+    const report = await forensicOgAttribution("WOJAK");
+
+    expect(report.og?.id).toBe("two-year-old-og");
+    expect(report.tokenScores["solana:two-year-old-og"]?.classification.primary_label).toBe("TRUE OG");
+    expect(report.tokenScores["solana:five-month-newer-pair"]?.classification.primary_label).not.toBe("TRUE OG");
+  });
+
+  it("uses the oldest credible pool for origin proof even when a newer pool has better liquidity", async () => {
+    const olderOrigin = makeToken({
+      id: "older-origin-multi-pool",
+      name: "Wojak",
+      symbol: "WOJAK",
+      liquidity: 120_000,
+      holderCount: 4_200,
+      firstPool: { createdAt: "2025-08-15T00:00:00.000Z" },
+      onChainCreatedAt: undefined,
+      creationSource: "pool",
+    });
+    const newerCopy = makeToken({
+      id: "newer-copy-token",
+      name: "Wojak",
+      symbol: "WOJAK",
+      liquidity: 400_000,
+      holderCount: 20_000,
+      firstPool: { createdAt: "2025-09-01T00:00:00.000Z" },
+      onChainCreatedAt: undefined,
+      creationSource: "pool",
+      isVerified: true,
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/latest/dex/search")) {
+          return {
+            ok: true,
+            json: async () => ({ pairs: [] }),
+          };
+        }
+        if (url.includes("/tokens/v1/solana/")) {
+          return {
+            ok: true,
+            json: async () => [
+              {
+                chainId: "solana",
+                dexId: "raydium",
+                pairAddress: "current-liquid-pair",
+                baseToken: { address: "older-origin-multi-pool", name: "Wojak", symbol: "WOJAK" },
+                quoteToken: { address: USDC_MINT, name: "USD Coin", symbol: "USDC" },
+                liquidity: { usd: 120_000, quote: 60_000 },
+                volume: { h24: 20_000 },
+                pairCreatedAt: new Date("2025-08-15T00:00:00.000Z").getTime(),
+              },
+              {
+                chainId: "solana",
+                dexId: "raydium",
+                pairAddress: "first-origin-pair",
+                baseToken: { address: "older-origin-multi-pool", name: "Wojak", symbol: "WOJAK" },
+                quoteToken: { address: USDC_MINT, name: "USD Coin", symbol: "USDC" },
+                liquidity: { usd: 2_500, quote: 1_250 },
+                volume: { h24: 50 },
+                pairCreatedAt: new Date("2024-01-15T00:00:00.000Z").getTime(),
+              },
+              {
+                chainId: "solana",
+                dexId: "raydium",
+                pairAddress: "newer-copy-pair",
+                baseToken: { address: "newer-copy-token", name: "Wojak", symbol: "WOJAK" },
+                quoteToken: { address: USDC_MINT, name: "USD Coin", symbol: "USDC" },
+                liquidity: { usd: 400_000, quote: 200_000 },
+                volume: { h24: 80_000 },
+                pairCreatedAt: new Date("2025-09-01T00:00:00.000Z").getTime(),
+              },
+            ],
+          };
+        }
+        if (url.includes("/orders/v1/") || url.includes("/token-boosts/")) return { ok: true, json: async () => [] };
+        if (url.includes("/defi/token_overview") || url.includes("/defi/ohlcv")) return { ok: false, json: async () => ({}) };
+        return { ok: true, json: async () => [newerCopy, olderOrigin] };
+      })
+    );
+
+    const report = await forensicOgAttribution("WOJAK");
+
+    expect(report.og?.id).toBe("older-origin-multi-pool");
+    expect(report.og?.firstPool?.createdAt).toBe("2024-01-15T00:00:00.000Z");
+    expect(report.summary.earliestLiquidity).toBe("2024-01-15T00:00:00.000Z");
+  });
+
   it("does not treat an older migrated pool as OG when the mint was created later", async () => {
     const olderMigratedPool = makeToken({
       id: "older-migrated-pool-token",
