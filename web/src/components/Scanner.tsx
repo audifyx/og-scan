@@ -11,7 +11,7 @@ import {
   fmtUsd,
   shortAddr,
   shortDate,
-  hasMinimumOgScanLiquidity,
+  isTrustedOgScanCandidate,
   tokenDexPaidLabel,
   tokenMigrationDateIso,
   type ForensicOgReport,
@@ -60,14 +60,14 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   }, [initialQuery]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["scan", debounced, "forensic-v4-min-liq"],
+    queryKey: ["scan", debounced, "forensic-v5-trusted-og"],
     queryFn: async (): Promise<ForensicOgReport> => {
       const report: ForensicOgReport = await forensicOgAttribution(debounced);
       if (report.candidates.length > 0) return report;
 
       const tokens: JupTokenInfo[] = await jupSearchToken(debounced);
       const fallbackCandidates: JupTokenInfo[] = (await enrichTokensWithMarketIntel(tokens, { includeAth: true, maxAth: 12 }))
-        .filter(hasMinimumOgScanLiquidity);
+        .filter(isTrustedOgScanCandidate);
       return { ...report, candidates: fallbackCandidates, copycats: fallbackCandidates.slice(1) };
     },
     enabled: debounced.length >= 2,

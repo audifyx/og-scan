@@ -60,6 +60,54 @@ describe("jupOgCopycats", () => {
     expect(result.copycats.map((token: JupTokenInfo) => token.id)).not.toContain("older-dead-fake-token");
   });
 
+  it("blocks unsafe scam copies from being crowned or shown as OG candidates", async () => {
+    const originalFartcoin = makeToken({
+      id: "real-fartcoin-origin",
+      name: "$Fartcoin",
+      symbol: "FARTCOIN",
+      liquidity: 7_230_000,
+      holderCount: 120_000,
+      organicScore: 9,
+      isVerified: true,
+      firstPool: { createdAt: "2024-10-18T00:00:00.000Z" },
+      onChainCreatedAt: undefined,
+      audit: {
+        mintAuthorityDisabled: true,
+        freezeAuthorityDisabled: true,
+        topHoldersPercentage: 18,
+      },
+    });
+    const scamCornCopy = makeToken({
+      id: "scam-corn-copy",
+      name: "$FARTCOIN",
+      symbol: "FARTCOIN",
+      liquidity: 1_170_000_000,
+      holderCount: 5,
+      isVerified: false,
+      firstPool: { createdAt: "2025-01-14T00:00:00.000Z" },
+      onChainCreatedAt: "2025-01-14T00:00:00.000Z",
+      audit: {
+        mintAuthorityDisabled: false,
+        freezeAuthorityDisabled: false,
+        topHoldersPercentage: 72,
+      },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => [scamCornCopy, originalFartcoin],
+      }))
+    );
+
+    const report = await forensicOgAttribution("FARTCOIN");
+
+    expect(report.og?.id).toBe("real-fartcoin-origin");
+    expect(report.candidates.map((token: JupTokenInfo) => token.id)).not.toContain("scam-corn-copy");
+    expect(report.tokenScores["solana:real-fartcoin-origin"]?.classification.primary_label).toBe("TRUE OG");
+  });
+
   it("does not treat an older migrated pool as OG when the mint was created later", async () => {
     const olderMigratedPool = makeToken({
       id: "older-migrated-pool-token",

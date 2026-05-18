@@ -100,7 +100,7 @@ export const OgFinder = ({ onSelect }: Props) => {
   const [filters, setFilters] = useState<FinderFilters>(DEFAULT_FILTERS);
 
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ["og-forensic-attribution", submitted, "v4-min-liq"],
+    queryKey: ["og-forensic-attribution", submitted, "v5-trusted-og"],
     queryFn: (): Promise<ForensicOgReport> => forensicOgAttribution(submitted),
     enabled: submitted.length >= 1,
     staleTime: 30_000,
@@ -207,7 +207,7 @@ export const OgFinder = ({ onSelect }: Props) => {
                 <Filter className="h-3 w-3" /> filters
               </div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                <span className="text-og-lime">{filteredCats.length}</span> copycats shown · <span className="text-og-blood">{droppedCats}</span> filtered · OG requires $1k+ live liquidity
+                <span className="text-og-lime">{filteredCats.length}</span> copycats shown · <span className="text-og-blood">{droppedCats}</span> filtered · OG requires $1k+ live liquidity + safe authority
               </div>
               <button
                 onClick={() => setFilters(DEFAULT_FILTERS)}

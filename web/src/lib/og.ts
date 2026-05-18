@@ -291,6 +291,16 @@ export function hasMinimumOgScanLiquidity(token: Pick<JupTokenInfo, "liquidity">
   return (token.liquidity ?? 0) >= MIN_OGSCAN_LIQUIDITY_USD;
 }
 
+export function hasUnsafeTokenAuthority(token: Pick<JupTokenInfo, "audit">): boolean {
+  const mintAuthorityStillOn: boolean = token.audit?.mintAuthorityDisabled === false;
+  const freezeAuthorityStillOn: boolean = token.audit?.freezeAuthorityDisabled === false;
+  return mintAuthorityStillOn || freezeAuthorityStillOn;
+}
+
+export function isTrustedOgScanCandidate(token: Pick<JupTokenInfo, "liquidity" | "audit">): boolean {
+  return hasMinimumOgScanLiquidity(token) && !hasUnsafeTokenAuthority(token);
+}
+
 function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTokenInfo {
   const existingPoolCreatedAt: number = tokenPoolCreatedAtMs(existing);
   const nextPoolCreatedAt: number = tokenPoolCreatedAtMs(next);
@@ -1078,11 +1088,38 @@ function mergeMultiChainTokenCandidates(tokens: JupTokenInfo[]): JupTokenInfo[] 
 function earliestCandidateEventMs(token: JupTokenInfo): number {
   const chainCreatedAt: number = tokenCreatedAtMs(token);
   const poolCreatedAt: number = tokenPoolCreatedAtMs(token);
-  return Math.min(chainCreatedAt, poolCreatedAt);
+
+  if (Number.isFinite(chainCreatedAt) && Number.isFinite(poolCreatedAt)) {
+    const poolBeforeMintMs: number = chainCreatedAt - poolCreatedAt;
+    const poolPredatesMintByMoreThanGrace: boolean = poolBeforeMintMs > 6 * 3_600_000;
+    return poolPredatesMintByMoreThanGrace ? chainCreatedAt : Math.min(chainCreatedAt, poolCreatedAt);
+  }
+
+  if (Number.isFinite(chainCreatedAt)) return chainCreatedAt;
+  if (Number.isFinite(poolCreatedAt)) return poolCreatedAt;
+  return Number.POSITIVE_INFINITY;
 }
 
 function isoFromCandidateEvent(token: JupTokenInfo): string | undefined {
   return createdAtIsoFromMs(earliestCandidateEventMs(token));
+}
+
+function compareByOriginProofAndSafety(a: JupTokenInfo, b: JupTokenInfo): number {
+  const aUnsafe: boolean = hasUnsafeTokenAuthority(a);
+  const bUnsafe: boolean = hasUnsafeTokenAuthority(b);
+  if (aUnsafe !== bUnsafe) return aUnsafe ? 1 : -1;
+
+  const aOriginMs: number = earliestCandidateEventMs(a);
+  const bOriginMs: number = earliestCandidateEventMs(b);
+  if (Number.isFinite(aOriginMs) && Number.isFinite(bOriginMs) && aOriginMs !== bOriginMs) return aOriginMs - bOriginMs;
+  if (Number.isFinite(aOriginMs)) return -1;
+  if (Number.isFinite(bOriginMs)) return 1;
+
+  const aVerified: boolean = a.isVerified === true;
+  const bVerified: boolean = b.isVerified === true;
+  if (aVerified !== bVerified) return aVerified ? -1 : 1;
+
+  return normalizeTickerSymbol(a.symbol).localeCompare(normalizeTickerSymbol(b.symbol));
 }
 
 function scoreByEarliest(candidateMs: number, earliestMs: number, fallback = 25): number {
@@ -1214,25 +1251,25 @@ function buildLayeredClassification(input: LayeredClassificationInput): TokenLay
   } = input;
 
   let primary_label: TokenPrimaryLabel = "UNKNOWN";
-  if (originScore >= 75 && ctoScore >= 60 && sameContractContinued) {
+  if (isOg && originScore >= 75 && ctoScore >= 60 && sameContractContinued) {
     primary_label = "TRUE OG CTO";
-  } else if (originScore >= 75) {
+  } else if (isOg && originScore >= 68) {
     primary_label = "TRUE OG";
-  } else if (migrationScore >= 70) {
+  } else if (!isOg && migrationScore >= 70) {
     primary_label = "MIGRATED OG";
   } else if (isOg && originScore >= 68 && revivalScore >= 65) {
     primary_label = "OG WITH REVIVAL ACTIVITY";
-  } else if (ctoScore >= 60) {
-    primary_label = "CTO";
-  } else if (revivalScore >= 65 && migrationScore < 70) {
-    primary_label = "REVIVAL";
-  } else if (migrationScore >= 60) {
-    primary_label = "MIGRATION";
-  } else if (cloneScore >= 70) {
+  } else if (!isOg && cloneScore >= 70) {
     primary_label = "CLONE";
-  } else if (cloneScore >= 50) {
+  } else if (!isOg && revivalScore >= 65 && migrationScore < 70) {
+    primary_label = "REVIVAL";
+  } else if (!isOg && ctoScore >= 60) {
+    primary_label = "CTO";
+  } else if (!isOg && migrationScore >= 60) {
+    primary_label = "MIGRATION";
+  } else if (!isOg && cloneScore >= 50) {
     primary_label = "COPYCAT";
-  } else if (migrationScore >= 55) {
+  } else if (!isOg && migrationScore >= 55) {
     primary_label = "MIGRATION CANDIDATE";
   }
 
@@ -1600,17 +1637,18 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: true, maxAth: 14 });
 
   const liquidCandidates: JupTokenInfo[] = enriched.filter(hasMinimumOgScanLiquidity);
+  const originPool: JupTokenInfo[] = liquidCandidates.filter((token) => !hasUnsafeTokenAuthority(token));
 
-  const candidates: JupTokenInfo[] = liquidCandidates
+  const candidates: JupTokenInfo[] = originPool
     .filter((token) => Number.isFinite(tokenCreatedAtMs(token)) || Number.isFinite(tokenPoolCreatedAtMs(token)))
-    .sort((a, b) => earliestCandidateEventMs(a) - earliestCandidateEventMs(b))
+    .sort(compareByOriginProofAndSafety)
     .slice(0, 40);
 
   const chainCandidates: JupTokenInfo[] = candidates.filter((token) => Number.isFinite(tokenCreatedAtMs(token)));
   const chainSorted: JupTokenInfo[] = [...chainCandidates].sort(compareByOnChainAgeOnly);
-  const eventSorted: JupTokenInfo[] = [...candidates].sort((a, b) => earliestCandidateEventMs(a) - earliestCandidateEventMs(b));
-  const og: JupTokenInfo | null = chainSorted[0] ?? eventSorted[0] ?? null;
-  const earliestChainMs: number = chainSorted.length ? tokenCreatedAtMs(chainSorted[0]) : Number.POSITIVE_INFINITY;
+  const eventSorted: JupTokenInfo[] = [...candidates].sort(compareByOriginProofAndSafety);
+  const og: JupTokenInfo | null = eventSorted[0] ?? chainSorted[0] ?? null;
+  const earliestChainMs: number = chainSorted.length ? tokenCreatedAtMs(chainSorted[0]) : earliestCandidateEventMs(og ?? candidates[0] ?? ({} as JupTokenInfo));
   const liquidityEvents: number[] = candidates.map(tokenPoolCreatedAtMs).filter((value) => Number.isFinite(value));
   const earliestLiquidityMs: number = liquidityEvents.length ? Math.min(...liquidityEvents) : Number.POSITIVE_INFINITY;
   const eventEvents: number[] = candidates.map(earliestCandidateEventMs).filter((value) => Number.isFinite(value));
