@@ -184,6 +184,7 @@ export function scoreBarClass(kind: ScoreKind, score: number): string {
 
 export function labelToneClass(label: string): string {
   if (label.includes("TRUE OG")) return "border-og-lime/45 bg-og-lime/10 text-og-lime shadow-[0_0_26px_rgba(0,229,255,0.12)]";
+  if (label.includes("LATER OFFICIAL")) return "border-og-gold/50 bg-og-gold/10 text-og-gold";
   if (label.includes("UNKNOWN") || label.includes("MID RISK")) return "border-orange-300/45 bg-orange-400/10 text-orange-200";
   if (label.includes("CLONE") || label.includes("COPY") || label.includes("RUG")) return "border-og-blood/50 bg-og-blood/10 text-og-blood";
   if (label.includes("MIGR")) return "border-og-gold/45 bg-og-gold/10 text-og-gold";
@@ -288,6 +289,7 @@ export function buildClusterRiskAlerts(report: ForensicOgReport): TokenRiskAlert
   const ogLiquidity: number = report.og?.liquidity ?? 0;
   const richerCopycat = report.copycats.find((token) => (token.liquidity ?? 0) > Math.max(25_000, ogLiquidity * 2));
   const authorityCopycat = report.copycats.find((token) => token.audit?.mintAuthorityDisabled !== true || token.audit?.freezeAuthorityDisabled !== true);
+  const laterOfficial = report.copycats.find((token) => report.tokenScores[`${token.chainId ?? "solana"}:${token.id}`]?.classification.primary_label === "LATER OFFICIAL");
 
   if (authorityCopycat) {
     alerts.push({
@@ -297,11 +299,19 @@ export function buildClusterRiskAlerts(report: ForensicOgReport): TokenRiskAlert
     });
   }
 
+  if (laterOfficial) {
+    alerts.push({
+      level: "info",
+      title: "Later official token detected",
+      text: `${shortAddr(laterOfficial.id, 5)} appears verified/official, but launched after the first credible Solana origin. Official status is shown as context, not as OG proof.`,
+    });
+  }
+
   if (richerCopycat) {
     alerts.push({
       level: "warning",
       title: "Liquidity difference detected",
-      text: `A later copycat (${shortAddr(richerCopycat.id, 5)}) has materially higher liquidity than the OG. Higher LP does not make it the origin.`,
+      text: `A later token (${shortAddr(richerCopycat.id, 5)}) has materially higher liquidity than the OG. Higher LP does not make it the origin.`,
     });
   }
 

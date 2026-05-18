@@ -53,7 +53,7 @@ import {
 
 type Props = { onSelect: (mint: string) => void };
 
-const QUICK_TICKERS = ["OG", "BONK", "WIF", "MOG", "PEPE", "POPCAT", "FARTCOIN"];
+const QUICK_TICKERS = ["TRUMP", "YE", "FARTCOIN", "OG", "BONK", "WIF", "POPCAT"];
 
 type FinderFilters = {
   minScore: number;
@@ -113,7 +113,7 @@ export const OgFinder = ({ onSelect }: Props) => {
   const [showAllCopycats, setShowAllCopycats] = useState<boolean>(false);
 
   const { data, isFetching, refetch, dataUpdatedAt } = useQuery({
-    queryKey: ["og-forensic-attribution", submitted, "v6-solana-canonical-og"],
+    queryKey: ["og-forensic-attribution", submitted, "v7-origin-vs-later-official"],
     queryFn: (): Promise<ForensicOgReport> => forensicOgAttribution(submitted),
     enabled: submitted.length >= 1,
     staleTime: 30_000,
@@ -187,8 +187,7 @@ export const OgFinder = ({ onSelect }: Props) => {
             <span className="text-og-gold text-glow-gold">DIRECT OG</span>
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Drop any ticker, meme, brand, or narrative. OGSCAN normalizes unicode, punctuation, emoji, casing, duplicate characters,
-            and leetspeak, then reconstructs the origin cluster by earliest provable chain history — never by hype, market cap, or migration.
+            Drop any ticker, meme, brand, or narrative. OGSCAN reconstructs the Solana origin cluster by earliest credible mint proof — never by hype, market cap, or later official status. Official launches are labeled separately when they came after the first origin.
           </p>
         </div>
 
@@ -248,7 +247,7 @@ export const OgFinder = ({ onSelect }: Props) => {
                 <Filter className="h-3 w-3" /> filters
               </div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                <span className="text-og-lime">{filteredCats.length}</span> copycats shown · <span className="text-og-blood">{droppedCats}</span> filtered · OG requires $1k+ live liquidity + safe authority
+                <span className="text-og-lime">{filteredCats.length}</span> later tokens shown · <span className="text-og-blood">{droppedCats}</span> filtered · OG requires $1k+ live liquidity + safe authority
               </div>
               <button
                 onClick={() => setFilters(DEFAULT_FILTERS)}
@@ -289,7 +288,7 @@ export const OgFinder = ({ onSelect }: Props) => {
             </div>
             <div className="lg:col-span-2">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-[0.4em] text-og-blood">
-                <span className="flex items-center gap-2"><Copy className="h-3 w-3" /> COPYCATS · {filteredCats.length}/{cats.length}</span>
+                <span className="flex items-center gap-2"><Copy className="h-3 w-3" /> LATER TOKENS · {filteredCats.length}/{cats.length}</span>
                 {filteredCats.length > 6 ? (
                   <button
                     type="button"
@@ -305,11 +304,11 @@ export const OgFinder = ({ onSelect }: Props) => {
               ) : null}
               {cats.length === 0 ? (
                 <div className="border border-dashed border-og-grid p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
-                  NO COPYCATS DETECTED
+                  NO LATER TOKENS DETECTED
                 </div>
               ) : filteredCats.length === 0 ? (
                 <div className="border border-dashed border-og-grid p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
-                  NO COPYCATS PASS FILTERS · RESET OR LOWER THE BAR
+                  NO LATER TOKENS PASS FILTERS · RESET OR LOWER THE BAR
                 </div>
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -444,7 +443,7 @@ const CoinCard = ({
     >
       {highlight && (
         <span className="absolute -top-2 left-3 bg-og-lime px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-og-ink">
-          ◆ TRUE OG · EARLIEST MINT PROOF
+          ◆ TRUE OG · FIRST CREDIBLE SOLANA MINT
         </span>
       )}
       <div className="flex items-center gap-3">
@@ -559,7 +558,7 @@ const TopRiskyCopycats = ({ tokens, report, onSelect }: { tokens: JupTokenInfo[]
     <div className="mb-3 border border-og-blood/35 bg-og-blood/[0.045] p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-blood">
-          <ShieldAlert className="h-3.5 w-3.5" /> top risky copycats
+          <ShieldAlert className="h-3.5 w-3.5" /> top risky later tokens
         </div>
         <span className="rounded-full border border-og-blood/35 bg-og-ink/70 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-og-blood">
           ranked by risk + liquidity
@@ -567,7 +566,7 @@ const TopRiskyCopycats = ({ tokens, report, onSelect }: { tokens: JupTokenInfo[]
       </div>
       {hasAuthorityRisk ? (
         <div className="mb-2 border border-og-blood/45 bg-og-blood/10 px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-og-blood">
-          warning: one or more copycats has mint/freeze authority open or unknown
+          warning: one or more later tokens has mint/freeze authority open or unknown
         </div>
       ) : null}
       <div className="grid gap-2">
@@ -675,7 +674,7 @@ const ForensicReportPanel = ({ report, scanFreshness }: { report: ForensicOgRepo
             <div><HelpLabel label="Control status" term="communitySupportShift" />: <span className="text-og-cyan">{ogScore?.classification.layers.control_status ?? "—"}</span></div>
             <div>Lifecycle status: <span className="text-og-cyan">{ogScore?.classification.layers.lifecycle_status ?? "—"}</span></div>
             <div><HelpLabel label="CTO" /> score: <span className={scoreTextClass("cto", ogScore?.ctoScore ?? 0)}>{ogScore ? `${ogScore.ctoScore}%` : "—"}</span> · <HelpLabel label="Migration" /> score: <span className={scoreTextClass("migration", ogScore?.migrationScore ?? 0)}>{ogScore ? `${ogScore.migrationScore}%` : "—"}</span></div>
-            <div>Priority labels: <span className="text-og-gold">TRUE OG CTO · TRUE OG · MIGRATED OG · CTO · MIGRATION · REVIVAL · CLONE</span></div>
+            <div>Priority labels: <span className="text-og-gold">TRUE OG CTO · TRUE OG · LATER OFFICIAL · MIGRATED OG · CTO · MIGRATION · REVIVAL · CLONE</span></div>
           </div>
         </div>
       </div>
