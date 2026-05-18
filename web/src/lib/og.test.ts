@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { forensicOgAttribution, jupOgCopycats, type JupTokenInfo } from "./og";
+import { FARTCOIN_CANONICAL_MINT, forensicOgAttribution, jupOgCopycats, type JupTokenInfo } from "./og";
 
 const daysAgoIso = (days: number): string => new Date(Date.now() - days * 86_400_000).toISOString();
 
@@ -106,6 +106,85 @@ describe("jupOgCopycats", () => {
     expect(report.og?.id).toBe("real-fartcoin-origin");
     expect(report.candidates.map((token: JupTokenInfo) => token.id)).not.toContain("scam-corn-copy");
     expect(report.tokenScores["solana:real-fartcoin-origin"]?.classification.primary_label).toBe("TRUE OG");
+  });
+
+  it("selects the canonical Solana Fartcoin pump mint as OG over scam/cross-chain copies", async () => {
+    const canonicalFartcoin = makeToken({
+      id: FARTCOIN_CANONICAL_MINT,
+      chainId: "solana",
+      name: "Fartcoin",
+      symbol: "FARTCOIN",
+      liquidity: 7_230_000,
+      holderCount: 120_000,
+      organicScore: 9,
+      isVerified: true,
+      firstPool: { createdAt: "2024-10-18T00:00:00.000Z" },
+      onChainCreatedAt: undefined,
+      audit: {
+        mintAuthorityDisabled: true,
+        freezeAuthorityDisabled: true,
+        topHoldersPercentage: 18,
+      },
+    });
+    const scamCornCopy = makeToken({
+      id: "scam-corn-copy",
+      chainId: "solana",
+      name: "$FARTCOIN CORN",
+      symbol: "FARTCOIN",
+      liquidity: 1_170_000_000,
+      holderCount: 12,
+      isVerified: false,
+      firstPool: { createdAt: "2023-01-14T00:00:00.000Z" },
+      onChainCreatedAt: "2023-01-14T00:00:00.000Z",
+      audit: {
+        mintAuthorityDisabled: false,
+        freezeAuthorityDisabled: false,
+        topHoldersPercentage: 88,
+      },
+    });
+    const ethereumCopy = makeToken({
+      id: "0xnot-solana-fartcoin",
+      chainId: "ethereum",
+      name: "Fartcoin",
+      symbol: "FARTCOIN",
+      liquidity: 9_000_000,
+      firstPool: { createdAt: "2022-01-01T00:00:00.000Z" },
+      onChainCreatedAt: "2022-01-01T00:00:00.000Z",
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/latest/dex/search")) {
+          return {
+            ok: true,
+            json: async () => ({
+              pairs: [
+                {
+                  chainId: "ethereum",
+                  baseToken: { address: "0xnot-solana-fartcoin", name: "Fartcoin", symbol: "FARTCOIN" },
+                  liquidity: { usd: 9_000_000 },
+                  pairCreatedAt: 1640995200000,
+                },
+              ],
+            }),
+          };
+        }
+        if (url.includes("/tokens/v1/solana/")) {
+          return { ok: true, json: async () => [] };
+        }
+        return { ok: true, json: async () => [scamCornCopy, ethereumCopy, canonicalFartcoin] };
+      })
+    );
+
+    const report = await forensicOgAttribution("FARTCOIN");
+
+    expect(report.og?.id).toBe(FARTCOIN_CANONICAL_MINT);
+    expect(report.summary.chainCount).toBe(1);
+    expect(report.candidates.map((token: JupTokenInfo) => token.id)).not.toContain("0xnot-solana-fartcoin");
+    expect(report.candidates.map((token: JupTokenInfo) => token.id)).not.toContain("scam-corn-copy");
+    expect(report.tokenScores[`solana:${FARTCOIN_CANONICAL_MINT}`]?.classification.primary_label).toBe("TRUE OG");
   });
 
   it("does not treat an older migrated pool as OG when the mint was created later", async () => {

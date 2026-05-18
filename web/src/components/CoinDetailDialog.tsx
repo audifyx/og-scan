@@ -256,7 +256,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const pairCreated = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : migratedAt;
 
   const { data: classificationReport, isFetching: isFetchingClassification } = useQuery({
-    queryKey: ["coin-detail-layered-classification", detailToken.symbol, "v4-min-liq"],
+    queryKey: ["coin-detail-layered-classification", detailToken.symbol, "v6-solana-canonical-og"],
     queryFn: () => forensicOgAttribution(detailToken.symbol),
     enabled: open && Boolean(detailToken.symbol),
     staleTime: 30_000,

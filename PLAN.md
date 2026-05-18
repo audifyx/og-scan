@@ -35,6 +35,7 @@
 - [x] Upgrade Feed bundle tracking with largest-holder owner resolution, estimated bundle count, suspected bundler wallets, holder concentration, and tracking notes.
 - [x] Upgrade dev wallet analytics with farming risk, rug/dead-coin risk, low-liquidity linked coin counts, average linked liquidity, and dev risk labels.
 - [x] Add a viral catalyst/news feed that watches RSS/news/X-style Elon/Trump/news narratives and matches live meme coins to those topics.
+- [x] Make OGSCAN attribution Solana-only and protect canonical origin mappings such as Fartcoin `9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump` from scam/copycat overrides.
 
 ## **Design**
 

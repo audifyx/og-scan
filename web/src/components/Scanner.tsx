@@ -60,13 +60,14 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   }, [initialQuery]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["scan", debounced, "forensic-v5-trusted-og"],
+    queryKey: ["scan", debounced, "forensic-v6-solana-canonical-og"],
     queryFn: async (): Promise<ForensicOgReport> => {
       const report: ForensicOgReport = await forensicOgAttribution(debounced);
       if (report.candidates.length > 0) return report;
 
       const tokens: JupTokenInfo[] = await jupSearchToken(debounced);
       const fallbackCandidates: JupTokenInfo[] = (await enrichTokensWithMarketIntel(tokens, { includeAth: true, maxAth: 12 }))
+        .filter((token: JupTokenInfo): boolean => (token.chainId ?? "solana") === "solana")
         .filter(isTrustedOgScanCandidate);
       return { ...report, candidates: fallbackCandidates, copycats: fallbackCandidates.slice(1) };
     },
@@ -93,7 +94,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <span className="text-og-cyan text-glow">MINT</span>
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Search a ticker, meme, brand, narrative, or mint. OGSCAN now clusters variants and ranks origin by earliest on-chain proof — not hype.
+            Search a Solana ticker, meme, brand, narrative, or mint. OGSCAN clusters variants and ranks origin by earliest Solana proof — not hype.
           </p>
         </div>
 
@@ -151,7 +152,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
         {report && rawResults.length > 0 && (
           <div className="mt-4 grid gap-2 border border-og-cyan/35 bg-og-cyan/5 p-3 sm:grid-cols-4">
             <ForensicStat icon={Fingerprint} label="Narrative ID" value={report.narrativeFingerprintId} accent="text-og-cyan" />
-            <ForensicStat icon={GitBranch} label="Cluster" value={`${report.summary.candidateCount} tokens · ${report.summary.chainCount} chains`} accent="text-og-gold" />
+            <ForensicStat icon={GitBranch} label="Cluster" value={`${report.summary.candidateCount} Solana tokens`} accent="text-og-gold" />
             <ForensicStat icon={ShieldCheck} label="True OG" value={report.og ? `${report.og.symbol}` : "Unknown"} accent="text-og-lime" />
             <ForensicStat icon={ShieldAlert} label="Clones" value={`${report.summary.cloneCount} flagged`} accent={report.summary.cloneCount > 0 ? "text-og-blood" : "text-og-lime"} />
           </div>

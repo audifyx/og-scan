@@ -100,7 +100,7 @@ export const OgFinder = ({ onSelect }: Props) => {
   const [filters, setFilters] = useState<FinderFilters>(DEFAULT_FILTERS);
 
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ["og-forensic-attribution", submitted, "v5-trusted-og"],
+    queryKey: ["og-forensic-attribution", submitted, "v6-solana-canonical-og"],
     queryFn: (): Promise<ForensicOgReport> => forensicOgAttribution(submitted),
     enabled: submitted.length >= 1,
     staleTime: 30_000,
@@ -525,7 +525,7 @@ const ForensicReportPanel = ({ report }: { report: ForensicOgReport }) => {
           <ForensicMetric icon={Crown} label="MAIN LABEL" value={ogScore?.classification.primary_label ?? (report.og ? "TRUE OG" : "UNKNOWN")} accent="text-og-lime" />
           <ForensicMetric icon={BrainCircuit} label="ORIGIN SCORE" value={ogScore ? `${ogScore.originScore}%` : "—"} accent="text-og-gold" />
           <ForensicMetric icon={ShieldAlert} label="CLONES" value={`${report.summary.cloneCount}/${report.summary.candidateCount}`} accent={report.summary.cloneCount > 0 ? "text-og-blood" : "text-og-lime"} />
-          <ForensicMetric icon={Network} label="CHAINS" value={`${report.summary.chainCount}`} accent="text-og-cyan" />
+          <ForensicMetric icon={Network} label="CHAIN" value="Solana only" accent="text-og-cyan" />
           <ForensicMetric icon={Calendar} label="FIRST PROOF" value={shortDate(report.summary.earliestProof)} accent="text-og-lime" />
           <ForensicMetric icon={Droplets} label="FIRST LP" value={shortDate(report.summary.earliestLiquidity)} accent="text-og-cyan" />
         </div>

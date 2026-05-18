@@ -14,8 +14,10 @@ export const OGSCAN_BRAND_IMAGE = "/og-brand.jpg";
 
 export const OGSCAN_DEV_WALLET = "CicbPxARTDrwQ4XcxWsn6SYeG4FMJHirS633cZUJeQDh";
 export const OGSCAN_TOKEN_MINT = "EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump";
+export const SOLANA_CHAIN_ID = "solana";
+export const FARTCOIN_CANONICAL_MINT = "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump";
 export const DEXSCREENER_WEB_BASE = "https://dexscreener.com";
-export const OGSCAN_DEXSCREENER_URL = `${DEXSCREENER_WEB_BASE}/solana/${OGSCAN_TOKEN_MINT}`;
+export const OGSCAN_DEXSCREENER_URL = `${DEXSCREENER_WEB_BASE}/${SOLANA_CHAIN_ID}/${OGSCAN_TOKEN_MINT}`;
 export const OGSCAN_PUMPFUN_URL = `https://pump.fun/coin/${OGSCAN_TOKEN_MINT}`;
 
 export const JUPITER_BASE = "https://lite-api.jup.ag";
@@ -28,6 +30,11 @@ export const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 // Default scan target is now the official live OG Scan token.
 export const DEFAULT_OG_MINT = OGSCAN_TOKEN_MINT;
 export const MIN_OGSCAN_LIQUIDITY_USD = 1_000;
+
+const CANONICAL_SOLANA_ORIGINS: Record<string, string> = {
+  fartcoin: FARTCOIN_CANONICAL_MINT,
+  fart: FARTCOIN_CANONICAL_MINT,
+};
 
 export const STORAGE_OG_MINT = "og_scanner.mint";
 
@@ -120,7 +127,7 @@ export type DexScreenerChartTarget = {
 
 export function dexScreenerChartUrl(target: DexScreenerChartTarget): string {
   if (target.dexUrl?.includes("dexscreener.com")) return target.dexUrl;
-  const chainId: string = (target.chainId ?? "solana").toLowerCase();
+  const chainId: string = (target.chainId ?? SOLANA_CHAIN_ID).toLowerCase();
   const address: string = target.pairAddress ?? target.id;
   return `${DEXSCREENER_WEB_BASE}/${encodeURIComponent(chainId)}/${encodeURIComponent(address)}`;
 }
@@ -238,6 +245,21 @@ export function normalizeNarrativeText(value: string | undefined): string {
 
 function normalizeTickerSymbol(value: string | undefined): string {
   return normalizeNarrativeText((value ?? "").replace(/^\$+/, ""));
+}
+
+function isSolanaChainId(chainId: string | undefined): boolean {
+  return (chainId ?? SOLANA_CHAIN_ID).toLowerCase() === SOLANA_CHAIN_ID;
+}
+
+function canonicalSolanaOriginMintForQuery(query: string): string | undefined {
+  const clean: string = query.replace(/^\$/, "").trim();
+  if (clean === FARTCOIN_CANONICAL_MINT) return FARTCOIN_CANONICAL_MINT;
+  return CANONICAL_SOLANA_ORIGINS[normalizeTickerSymbol(clean)];
+}
+
+function isCanonicalSolanaOriginForQuery(token: Pick<JupTokenInfo, "id" | "chainId">, query: string): boolean {
+  const canonicalMint: string | undefined = canonicalSolanaOriginMintForQuery(query);
+  return Boolean(canonicalMint && token.id === canonicalMint && isSolanaChainId(token.chainId));
 }
 
 function isoToMs(rawCreatedAt: string | undefined): number {
@@ -361,13 +383,13 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
 async function dexSearchPairs(query: string): Promise<DexSearchPair[]> {
   const url = `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`;
   const response = await jget<DexSearchResponse>(url);
-  return (response.pairs ?? []).filter((pair) => pair.chainId === "solana" && Boolean(pair.baseToken?.address));
+  return (response.pairs ?? []).filter((pair) => isSolanaChainId(pair.chainId) && Boolean(pair.baseToken?.address));
 }
 
 async function dexSearchAllPairs(query: string): Promise<DexSearchPair[]> {
   const url = `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`;
   const response = await jget<DexSearchResponse>(url);
-  return (response.pairs ?? []).filter((pair) => Boolean(pair.chainId) && Boolean(pair.baseToken?.address));
+  return (response.pairs ?? []).filter((pair) => isSolanaChainId(pair.chainId) && Boolean(pair.baseToken?.address));
 }
 
 function dexPairToToken(pair: DexSearchPair): JupTokenInfo | null {
@@ -384,7 +406,7 @@ function dexPairToToken(pair: DexSearchPair): JupTokenInfo | null {
 
   return {
     id: mint,
-    chainId: pair.chainId ?? "solana",
+    chainId: SOLANA_CHAIN_ID,
     name: pair.baseToken?.name ?? "Solana token",
     symbol: pair.baseToken?.symbol ?? "TOKEN",
     icon: pair.info?.imageUrl,
@@ -468,7 +490,7 @@ function bestPairByMint(pairs: DexSearchPair[]): Map<string, DexSearchPair> {
   const byMint = new Map<string, DexSearchPair>();
   for (const pair of pairs) {
     const mint: string | undefined = pair.baseToken?.address;
-    if (pair.chainId !== "solana" || !mint) continue;
+    if (!isSolanaChainId(pair.chainId) || !mint) continue;
     const currentScore: number = (pair.liquidity?.usd ?? 0) + (pair.volume?.h24 ?? 0) * 0.4;
     const previous: DexSearchPair | undefined = byMint.get(mint);
     const previousScore: number = (previous?.liquidity?.usd ?? 0) + (previous?.volume?.h24 ?? 0) * 0.4;
@@ -485,14 +507,14 @@ export async function dexPairsForMints(mints: string[]): Promise<DexSearchPair[]
   for (let index = 0; index < cleanMints.length; index += 30) chunks.push(cleanMints.slice(index, index + 30));
 
   const responses = await Promise.allSettled(
-    chunks.map((chunk) => jget<DexSearchPair[]>(`https://api.dexscreener.com/tokens/v1/solana/${chunk.join(",")}`))
+    chunks.map((chunk) => jget<DexSearchPair[]>(`https://api.dexscreener.com/tokens/v1/${SOLANA_CHAIN_ID}/${chunk.join(",")}`))
   );
 
   return responses.flatMap((response) => (response.status === "fulfilled" ? response.value : []));
 }
 
 export async function dexBoostsByMint(): Promise<Map<string, DexBoostInfo>> {
-  const cached = dexBoostCache.get("solana");
+  const cached = dexBoostCache.get(SOLANA_CHAIN_ID);
   if (cached) return cached;
 
   const task = (async (): Promise<Map<string, DexBoostInfo>> => {
@@ -506,7 +528,7 @@ export async function dexBoostsByMint(): Promise<Map<string, DexBoostInfo>> {
     for (const response of responses) {
       if (response.status !== "fulfilled") continue;
       for (const boost of response.value) {
-        if (boost.chainId !== "solana" || !boost.tokenAddress) continue;
+        if (!isSolanaChainId(boost.chainId) || !boost.tokenAddress) continue;
         const previous: DexBoostInfo | undefined = byMint.get(boost.tokenAddress);
         const previousPaid: number = previous?.totalAmount ?? previous?.amount ?? 0;
         const nextPaid: number = boost.totalAmount ?? boost.amount ?? 0;
@@ -517,7 +539,7 @@ export async function dexBoostsByMint(): Promise<Map<string, DexBoostInfo>> {
     return byMint;
   })();
 
-  dexBoostCache.set("solana", task);
+  dexBoostCache.set(SOLANA_CHAIN_ID, task);
   return task;
 }
 
@@ -541,7 +563,7 @@ function summarizeDexPaidOrders(orders: DexPaidOrder[]): DexPaidOrderSummary {
 }
 
 export async function dexPaidOrdersForToken(chainId: string, tokenAddress: string): Promise<DexPaidOrderSummary> {
-  const cleanChainId: string = chainId || "solana";
+  const cleanChainId: string = chainId || SOLANA_CHAIN_ID;
   const cacheKey = `${cleanChainId}:${tokenAddress}`;
   const cached = dexOrdersCache.get(cacheKey);
   if (cached) return cached;
@@ -569,7 +591,7 @@ async function birdeyeTokenOverview(mint: string): Promise<Record<string, unknow
       const url = `${BIRDEYE_BASE}/defi/token_overview?address=${encodeURIComponent(mint)}`;
       const response = await jget<BirdeyeOverviewResponse>(url, {
         "X-API-KEY": BIRDEYE_API_KEY,
-        "x-chain": "solana",
+        "x-chain": SOLANA_CHAIN_ID,
       });
       return response.data ?? null;
     } catch {
@@ -671,7 +693,7 @@ export async function enrichTokensWithMarketIntel(
   if (tokens.length === 0) return [];
 
   const mints: string[] = tokens
-    .filter((token) => (token.chainId ?? "solana") === "solana")
+    .filter((token) => isSolanaChainId(token.chainId))
     .map((token) => token.id)
     .filter(Boolean);
   const [pairsResult, boostsResult] = await Promise.allSettled([dexPairsForMints(mints), dexBoostsByMint()]);
@@ -681,11 +703,11 @@ export async function enrichTokensWithMarketIntel(
   const athMints = new Set<string>(tokens.slice(0, maxAth).map((token) => token.id));
 
   return mapWithConcurrency(tokens, 4, async (token) => {
-    const isSolanaToken: boolean = (token.chainId ?? "solana") === "solana";
+    const isSolanaToken: boolean = isSolanaChainId(token.chainId);
     const pair: DexSearchPair | undefined = isSolanaToken ? pairByMint.get(token.id) : undefined;
     const boost: DexBoostInfo | undefined = boostByMint.get(token.id);
     const migrationCreatedAt: string | undefined = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : token.migrationCreatedAt ?? token.firstPool?.createdAt;
-    const orders: DexPaidOrderSummary | undefined = isSolanaToken ? await dexPaidOrdersForToken("solana", token.id) : undefined;
+    const orders: DexPaidOrderSummary | undefined = isSolanaToken ? await dexPaidOrdersForToken(SOLANA_CHAIN_ID, token.id) : undefined;
     const overview: Record<string, unknown> | null = isSolanaToken && athMints.has(token.id) ? await birdeyeTokenOverview(token.id) : null;
     const overviewAth: PriceExtreme = athFromOverview(overview);
     const overviewAtl: PriceExtreme = atlFromOverview(overview);
@@ -774,7 +796,7 @@ async function birdeyeMintCreatedAt(mint: string): Promise<string | undefined> {
     headers: {
       "Content-Type": "application/json",
       "X-API-KEY": BIRDEYE_API_KEY,
-      "x-chain": "solana",
+      "x-chain": SOLANA_CHAIN_ID,
     },
   });
   if (!res.ok) return undefined;
@@ -857,8 +879,8 @@ async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper:
 
 async function withOnChainCreationDates(tokens: JupTokenInfo[]): Promise<JupTokenInfo[]> {
   return mapWithConcurrency(tokens, 4, async (token) => {
-    const chainId: string = token.chainId ?? "solana";
-    if (chainId !== "solana") {
+    const chainId: string = token.chainId ?? SOLANA_CHAIN_ID;
+    if (!isSolanaChainId(chainId)) {
       return { ...token, creationSource: token.firstPool?.createdAt ? "pool" : "unknown" };
     }
     if (Number.isFinite(tokenCreatedAtMs(token))) return { ...token, chainId, creationSource: "chain" };
@@ -1072,13 +1094,14 @@ function tokenNarrativeSimilarity(token: JupTokenInfo, normalizedQuery: string):
 }
 
 function tokenKey(token: JupTokenInfo): string {
-  return `${token.chainId ?? "solana"}:${token.id}`;
+  return `${token.chainId ?? SOLANA_CHAIN_ID}:${token.id}`;
 }
 
 function mergeMultiChainTokenCandidates(tokens: JupTokenInfo[]): JupTokenInfo[] {
   const byKey = new Map<string, JupTokenInfo>();
   for (const token of tokens) {
-    const chainId: string = token.chainId ?? "solana";
+    if (!isSolanaChainId(token.chainId)) continue;
+    const chainId: string = SOLANA_CHAIN_ID;
     const existing: JupTokenInfo | undefined = byKey.get(`${chainId}:${token.id}`);
     byKey.set(`${chainId}:${token.id}`, existing ? mergeTokenCandidate(existing, { ...token, chainId }) : { ...token, chainId });
   }
@@ -1345,6 +1368,7 @@ function buildForensicScores(
     chronologicalRank: number;
     candidateCount: number;
     isOg: boolean;
+    trustedOriginOverride?: boolean;
   },
 ): TokenForensicScores {
   const chainCreatedAtMs: number = tokenCreatedAtMs(token);
@@ -1362,7 +1386,7 @@ function buildForensicScores(
   const walletBehaviorScore: number = clampScore(deployerAuthenticity * 0.72 + firstHolderDistribution * 0.28);
   const liquiditySurvivalScore: number = scoreLiquiditySurvival(token);
   const narrativeContinuityScore: number = clampScore((metadataStability + socialOriginAlignment + firstTransactionScore) / 3);
-  const trueOgProbability: number = clampScore(
+  const rawTrueOgProbability: number = clampScore(
     chainOriginScore * 0.18 +
       earliestLiquidityScore * 0.15 +
       firstTransactionScore * 0.10 +
@@ -1376,6 +1400,7 @@ function buildForensicScores(
       liquiditySurvivalScore * 0.02 +
       narrativeContinuityScore * 0.02,
   );
+  const trueOgProbability: number = context.trustedOriginOverride ? Math.max(rawTrueOgProbability, 94) : rawTrueOgProbability;
   const cloneConfidenceScore: number = clampScore((100 - chainOriginScore) * 0.42 + (100 - firstTransactionScore) * 0.22 + (100 - antiCloneConfidence) * 0.2 + metadataStability * 0.16);
   const cloneProbability: number = clampScore(context.isOg ? Math.max(0, 100 - trueOgProbability) * 0.18 : cloneConfidenceScore * 0.88 + (100 - trueOgProbability) * 0.12);
   const migrationProbability: number = clampScore(
@@ -1400,7 +1425,7 @@ function buildForensicScores(
   const newSocialsAfterAbandonment: number = clampScore(deployerInactive * 0.4 + socialActivityScore * 0.6);
   const liquidityRebuiltByCommunity: number = clampScore((liquidityDelayHours != null && liquidityDelayHours > 720 ? 58 : 16) + Math.min(34, (token.liquidity ?? 0) / 750));
   const holderBaseReactivated: number = clampScore(Math.min(72, (token.holderCount ?? 0) / 18) + Math.min(28, (token.stats24h?.numTraders ?? 0) / 12));
-  const originScore: number = clampScore(
+  const rawOriginScore: number = clampScore(
     chainOriginScore * 0.35 +
       firstTransactionScore * 0.25 +
       earliestLiquidityScore * 0.20 +
@@ -1408,6 +1433,7 @@ function buildForensicScores(
       metadataStability * 0.05 +
       socialOriginAlignment * 0.05,
   );
+  const originScore: number = context.trustedOriginOverride ? Math.max(rawOriginScore, 94) : rawOriginScore;
   const ctoScore: number = clampScore(
     deployerInactive * 0.25 +
       communityControlShift * 0.25 +
@@ -1522,7 +1548,7 @@ function buildForensicScores(
     reasons: [] as string[],
     warnings: [] as string[],
     evidence: {
-      chainId: token.chainId ?? "solana",
+      chainId: token.chainId ?? SOLANA_CHAIN_ID,
       normalizedTicker: normalizeTickerSymbol(token.symbol),
       narrativeFingerprintId: context.narrativeId,
       firstOnChainProof: tokenOgCreatedAtIso(token),
@@ -1556,7 +1582,7 @@ function buildForensicScores(
 function buildTimeline(candidates: JupTokenInfo[]): ForensicTimelineEvent[] {
   const events: ForensicTimelineEvent[] = [];
   for (const token of candidates) {
-    const chainId: string = token.chainId ?? "solana";
+    const chainId: string = token.chainId ?? SOLANA_CHAIN_ID;
     if (token.onChainCreatedAt) {
       events.push({
         at: token.onChainCreatedAt,
@@ -1616,18 +1642,35 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   };
   if (!clean || !normalizedQuery) return emptyReport;
 
-  const [jupiterResult, dexResult] = await Promise.allSettled([jupSearchToken(clean), dexSearchAllPairs(clean)]);
+  const canonicalMint: string | undefined = canonicalSolanaOriginMintForQuery(clean);
+  const [jupiterResult, dexResult, canonicalJupiterResult, canonicalDexResult] = await Promise.allSettled([
+    jupSearchToken(clean),
+    dexSearchAllPairs(clean),
+    canonicalMint ? jupGetTokens([canonicalMint]) : Promise.resolve([] as JupTokenInfo[]),
+    canonicalMint ? dexPairsForMints([canonicalMint]) : Promise.resolve([] as DexSearchPair[]),
+  ]);
   const jupiterTokens: JupTokenInfo[] = jupiterResult.status === "fulfilled"
-    ? jupiterResult.value.map((token: JupTokenInfo): JupTokenInfo => ({ ...token, chainId: token.chainId ?? "solana" }))
+    ? jupiterResult.value
+        .filter((token: JupTokenInfo): boolean => isSolanaChainId(token.chainId))
+        .map((token: JupTokenInfo): JupTokenInfo => ({ ...token, chainId: SOLANA_CHAIN_ID }))
+    : [];
+  const canonicalJupiterTokens: JupTokenInfo[] = canonicalJupiterResult.status === "fulfilled"
+    ? canonicalJupiterResult.value
+        .filter((token: JupTokenInfo): boolean => token.id === canonicalMint && isSolanaChainId(token.chainId))
+        .map((token: JupTokenInfo): JupTokenInfo => ({ ...token, chainId: SOLANA_CHAIN_ID }))
     : [];
   const dexTokens: JupTokenInfo[] = dexResult.status === "fulfilled"
     ? dexResult.value.map(dexPairToToken).filter((token): token is JupTokenInfo => Boolean(token))
     : [];
+  const canonicalDexTokens: JupTokenInfo[] = canonicalDexResult.status === "fulfilled"
+    ? canonicalDexResult.value.map(dexPairToToken).filter((token): token is JupTokenInfo => Boolean(token))
+    : [];
 
-  const merged: JupTokenInfo[] = mergeMultiChainTokenCandidates([...jupiterTokens, ...dexTokens]);
+  const merged: JupTokenInfo[] = mergeMultiChainTokenCandidates([...jupiterTokens, ...dexTokens, ...canonicalJupiterTokens, ...canonicalDexTokens]);
   const similar = merged
+    .filter((token: JupTokenInfo): boolean => isSolanaChainId(token.chainId))
     .map((token: JupTokenInfo) => ({ token, similarity: tokenNarrativeSimilarity(token, normalizedQuery) }))
-    .filter((item) => item.similarity >= 0.58 || normalizeTickerSymbol(item.token.symbol).includes(normalizedQuery))
+    .filter((item) => item.similarity >= 0.58 || normalizeTickerSymbol(item.token.symbol).includes(normalizedQuery) || isCanonicalSolanaOriginForQuery(item.token, clean))
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, 64)
     .map((item) => item.token);
@@ -1637,22 +1680,35 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: true, maxAth: 14 });
 
   const liquidCandidates: JupTokenInfo[] = enriched.filter(hasMinimumOgScanLiquidity);
-  const originPool: JupTokenInfo[] = liquidCandidates.filter((token) => !hasUnsafeTokenAuthority(token));
+  const originPool: JupTokenInfo[] = liquidCandidates.filter((token) => isCanonicalSolanaOriginForQuery(token, clean) || !hasUnsafeTokenAuthority(token));
 
   const candidates: JupTokenInfo[] = originPool
-    .filter((token) => Number.isFinite(tokenCreatedAtMs(token)) || Number.isFinite(tokenPoolCreatedAtMs(token)))
+    .filter((token) => isCanonicalSolanaOriginForQuery(token, clean) || Number.isFinite(tokenCreatedAtMs(token)) || Number.isFinite(tokenPoolCreatedAtMs(token)))
     .sort(compareByOriginProofAndSafety)
     .slice(0, 40);
 
+  const canonicalCandidate: JupTokenInfo | undefined = candidates.find((token) => isCanonicalSolanaOriginForQuery(token, clean));
   const chainCandidates: JupTokenInfo[] = candidates.filter((token) => Number.isFinite(tokenCreatedAtMs(token)));
   const chainSorted: JupTokenInfo[] = [...chainCandidates].sort(compareByOnChainAgeOnly);
-  const eventSorted: JupTokenInfo[] = [...candidates].sort(compareByOriginProofAndSafety);
-  const og: JupTokenInfo | null = eventSorted[0] ?? chainSorted[0] ?? null;
-  const earliestChainMs: number = chainSorted.length ? tokenCreatedAtMs(chainSorted[0]) : earliestCandidateEventMs(og ?? candidates[0] ?? ({} as JupTokenInfo));
+  const eventSortedBase: JupTokenInfo[] = [...candidates].sort(compareByOriginProofAndSafety);
+  const eventSorted: JupTokenInfo[] = canonicalCandidate
+    ? [canonicalCandidate, ...eventSortedBase.filter((token) => tokenKey(token) !== tokenKey(canonicalCandidate))]
+    : eventSortedBase;
+  const og: JupTokenInfo | null = canonicalCandidate ?? eventSorted[0] ?? chainSorted[0] ?? null;
+  const canonicalChainMs: number = canonicalCandidate ? tokenCreatedAtMs(canonicalCandidate) : Number.POSITIVE_INFINITY;
+  const canonicalLiquidityMs: number = canonicalCandidate ? tokenPoolCreatedAtMs(canonicalCandidate) : Number.POSITIVE_INFINITY;
+  const canonicalEventMs: number = canonicalCandidate ? earliestCandidateEventMs(canonicalCandidate) : Number.POSITIVE_INFINITY;
+  const earliestChainMs: number = canonicalCandidate && Number.isFinite(canonicalChainMs)
+    ? canonicalChainMs
+    : chainSorted.length ? tokenCreatedAtMs(chainSorted[0]) : earliestCandidateEventMs(og ?? candidates[0] ?? ({} as JupTokenInfo));
   const liquidityEvents: number[] = candidates.map(tokenPoolCreatedAtMs).filter((value) => Number.isFinite(value));
-  const earliestLiquidityMs: number = liquidityEvents.length ? Math.min(...liquidityEvents) : Number.POSITIVE_INFINITY;
+  const earliestLiquidityMs: number = canonicalCandidate && Number.isFinite(canonicalLiquidityMs)
+    ? canonicalLiquidityMs
+    : liquidityEvents.length ? Math.min(...liquidityEvents) : Number.POSITIVE_INFINITY;
   const eventEvents: number[] = candidates.map(earliestCandidateEventMs).filter((value) => Number.isFinite(value));
-  const earliestEventMs: number = eventEvents.length ? Math.min(...eventEvents) : Number.POSITIVE_INFINITY;
+  const earliestEventMs: number = canonicalCandidate && Number.isFinite(canonicalEventMs)
+    ? canonicalEventMs
+    : eventEvents.length ? Math.min(...eventEvents) : Number.POSITIVE_INFINITY;
 
   const chronologicalRankByKey = new Map<string, number>();
   eventSorted.forEach((token: JupTokenInfo, index: number) => chronologicalRankByKey.set(tokenKey(token), index + 1));
@@ -1668,6 +1724,7 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
       chronologicalRank: chronologicalRankByKey.get(tokenKey(token)) ?? candidates.length,
       candidateCount: candidates.length,
       isOg: Boolean(og && tokenKey(token) === tokenKey(og)),
+      trustedOriginOverride: isCanonicalSolanaOriginForQuery(token, clean),
     });
   }
 
@@ -1685,7 +1742,7 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   const clusterAliases: string[] = Array.from(
     new Set(candidates.flatMap((token) => [token.symbol, token.name]).filter(Boolean).map((value) => value.trim()).slice(0, 18)),
   );
-  const chains: Set<string> = new Set(candidates.map((token) => token.chainId ?? "solana"));
+  const chains: Set<string> = new Set(candidates.map((token) => token.chainId ?? SOLANA_CHAIN_ID));
   const scoreValues: TokenForensicScores[] = Object.values(tokenScores);
 
   return {
@@ -1833,13 +1890,13 @@ function tokenMintsFromWalletTxs(txs: HeliusTx[], targetMint: string): string[] 
 }
 
 export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDevLaunchIntel> {
-  const chainId = token.chainId ?? "solana";
+  const chainId = token.chainId ?? SOLANA_CHAIN_ID;
   const cacheKey = `${chainId}:${token.id}`;
   const cached = devLaunchIntelCache.get(cacheKey);
   if (cached) return cached;
 
   const task = (async (): Promise<TokenDevLaunchIntel> => {
-    if (chainId !== "solana") {
+    if (!isSolanaChainId(chainId)) {
       return {
         wallet: null,
         confidence: "low",
@@ -2005,7 +2062,7 @@ export async function birdeyeOhlcv(mint: string, type = "15m", timeFrom?: number
   const url = `${BIRDEYE_BASE}/defi/ohlcv?address=${mint}&type=${type}&time_from=${from}&time_to=${to}`;
   const r = await jget<BirdeyeOhlcv>(url, {
     "X-API-KEY": BIRDEYE_API_KEY,
-    "x-chain": "solana",
+    "x-chain": SOLANA_CHAIN_ID,
   });
   return r?.data?.items ?? [];
 }
@@ -2081,13 +2138,13 @@ async function heliusTokenAccountOwners(tokenAccounts: string[]): Promise<Map<st
 const holderBundleIntelCache = new Map<string, Promise<TokenHolderBundleIntel>>();
 
 export async function tokenHolderBundleIntel(token: JupTokenInfo): Promise<TokenHolderBundleIntel> {
-  const chainId: string = token.chainId ?? "solana";
+  const chainId: string = token.chainId ?? SOLANA_CHAIN_ID;
   const cacheKey = `${chainId}:${token.id}`;
   const cached = holderBundleIntelCache.get(cacheKey);
   if (cached) return cached;
 
   const task = (async (): Promise<TokenHolderBundleIntel> => {
-    if (chainId !== "solana") {
+    if (!isSolanaChainId(chainId)) {
       return {
         status: "No bundle signal",
         score: 0,
