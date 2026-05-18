@@ -61,7 +61,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   }, [initialQuery]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["scan", debounced, "forensic-v7-origin-vs-later-official"],
+    queryKey: ["scan", debounced, "forensic-v8-quote-backed-lp"],
     queryFn: async (): Promise<ForensicOgReport> => {
       const report: ForensicOgReport = await forensicOgAttribution(debounced);
       if (report.candidates.length > 0) return report;
@@ -95,7 +95,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <span className="text-og-cyan text-glow">MINT</span>
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Search a Solana ticker, meme, brand, narrative, or mint. OGSCAN ranks the first credible Solana origin as OG — not the later official token, not market cap, and not hype.
+            Search a Solana ticker, meme, brand, narrative, or mint. OGSCAN ranks the first credible Solana origin as OG — but LP-pulled/dead-liquidity scams are blocked even if they minted first.
           </p>
         </div>
 
@@ -265,7 +265,7 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
             <span className="truncate">{t.name}</span>
             <span className={up ? "text-og-lime" : "text-og-blood"}>{fmtPct(ch)}</span>
-            <span>· LQ {fmtUsd(t.liquidity)}</span>
+            <span>· Quote-backed LQ {fmtUsd(t.liquidity)}</span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-1.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground sm:grid-cols-4">
             <MiniIntel icon={Fingerprint} label="Origin" value={ogProbability} accent={scoreTextClass("origin", originScore)} meter={score ? <ScoreMeter score={originScore} kind="origin" className="mt-1" /> : undefined} />

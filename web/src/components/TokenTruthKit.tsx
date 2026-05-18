@@ -1,7 +1,7 @@
 import { AlertTriangle, Info, ShieldAlert } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { fmtUsd, shortAddr, shortDate, type ForensicOgReport, type JupTokenInfo, type TokenForensicScores } from "@/lib/og";
+import { fmtUsd, hasPulledOrDeadLiquidity, shortAddr, shortDate, tokenEffectiveLiquidityUsd, type ForensicOgReport, type JupTokenInfo, type TokenForensicScores } from "@/lib/og";
 
 export type TruthTermKey =
   | "mintProof"
@@ -216,8 +216,17 @@ export function buildTokenRiskAlerts(token: JupTokenInfo, forensic?: TokenForens
   const freezeOpen: boolean = token.audit?.freezeAuthorityDisabled !== true;
   const cloneScore: number = forensic?.cloneScore ?? 0;
   const ctoScore: number = forensic?.ctoScore ?? 0;
-  const liquidity: number = token.liquidity ?? 0;
+  const liquidity: number = tokenEffectiveLiquidityUsd(token);
   const delayHours: number | undefined = forensic?.evidence.liquidityDelayHours;
+  const lpPulled: boolean = hasPulledOrDeadLiquidity(token);
+
+  if (lpPulled) {
+    alerts.push({
+      level: "danger",
+      title: "LP pulled / dead liquidity detected",
+      text: token.lpPullReason ?? `This token shows ${fmtUsd(token.reportedLiquidity ?? token.liquidity)} reported LP/MC but only ${fmtUsd(liquidity)} quote-backed live liquidity. OGSCAN excludes it from TRUE OG selection.`,
+    });
+  }
 
   if (mintOpen) {
     alerts.push({
@@ -269,7 +278,7 @@ export function buildTokenRiskAlerts(token: JupTokenInfo, forensic?: TokenForens
     alerts.push({
       level: "warning",
       title: "Thin liquidity anomaly",
-      text: `Live liquidity is only ${fmtUsd(liquidity)}. OGSCAN excludes sub-$1k candidates from OG selection, but thin LP still deserves caution.`,
+      text: `Quote-backed live liquidity is only ${fmtUsd(liquidity)}. OGSCAN excludes sub-$1k or LP-pulled candidates from OG selection, but thin LP still deserves caution.`,
     });
   }
 
@@ -287,9 +296,18 @@ export function buildTokenRiskAlerts(token: JupTokenInfo, forensic?: TokenForens
 export function buildClusterRiskAlerts(report: ForensicOgReport): TokenRiskAlert[] {
   const alerts: TokenRiskAlert[] = [];
   const ogLiquidity: number = report.og?.liquidity ?? 0;
-  const richerCopycat = report.copycats.find((token) => (token.liquidity ?? 0) > Math.max(25_000, ogLiquidity * 2));
+  const richerCopycat = report.copycats.find((token) => tokenEffectiveLiquidityUsd(token) > Math.max(25_000, ogLiquidity * 2));
   const authorityCopycat = report.copycats.find((token) => token.audit?.mintAuthorityDisabled !== true || token.audit?.freezeAuthorityDisabled !== true);
+  const lpPulledCopycat = report.copycats.find(hasPulledOrDeadLiquidity);
   const laterOfficial = report.copycats.find((token) => report.tokenScores[`${token.chainId ?? "solana"}:${token.id}`]?.classification.primary_label === "LATER OFFICIAL");
+
+  if (lpPulledCopycat) {
+    alerts.push({
+      level: "danger",
+      title: "LP-pulled token blocked",
+      text: `${shortAddr(lpPulledCopycat.id, 5)} has dead/pulled quote-side liquidity and is excluded from TRUE OG eligibility even if it has earlier mint proof or inflated market cap.`,
+    });
+  }
 
   if (authorityCopycat) {
     alerts.push({
@@ -329,10 +347,11 @@ export function buildClusterRiskAlerts(report: ForensicOgReport): TokenRiskAlert
 export function copycatDangerScore(token: JupTokenInfo, forensic?: TokenForensicScores): number {
   const risk: number = forensic?.riskScore ?? 0;
   const clone: number = forensic?.cloneScore ?? 0;
-  const liquidity: number = Math.min(30, Math.log10((token.liquidity ?? 0) + 1) * 5);
+  const liquidity: number = Math.min(30, Math.log10(tokenEffectiveLiquidityUsd(token) + 1) * 5);
   const authorityPenalty: number = (token.audit?.mintAuthorityDisabled !== true ? 12 : 0) + (token.audit?.freezeAuthorityDisabled !== true ? 12 : 0);
   const holderPenalty: number = (token.audit?.topHoldersPercentage ?? 0) >= 40 ? 10 : 0;
-  return Math.round(risk * 0.45 + clone * 0.3 + liquidity + authorityPenalty + holderPenalty);
+  const lpPulledPenalty: number = hasPulledOrDeadLiquidity(token) ? 30 : 0;
+  return Math.round(risk * 0.45 + clone * 0.3 + liquidity + authorityPenalty + holderPenalty + lpPulledPenalty);
 }
 
 export function TokenRiskAlerts({ alerts, title = "Risk Alerts" }: { alerts: TokenRiskAlert[]; title?: string }) {

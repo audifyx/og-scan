@@ -37,6 +37,7 @@
 - [x] Add a viral catalyst/news feed that watches RSS/news/X-style Elon/Trump/news narratives and matches live meme coins to those topics.
 - [x] Make OGSCAN attribution Solana-only and protect canonical origin mappings such as Fartcoin `9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump` from scam/copycat overrides.
 - [x] Separate **first credible Solana OG** from **later official/verified tokens**, so TRUMP/YE-style later official launches show as `LATER OFFICIAL` without replacing the original mint.
+- [x] Add **quote-backed LP / LP-pulled exclusion** so dead-liquidity or pulled-pool scams cannot become TRUE OG even if they are first on-chain or show inflated market cap.
 
 ## **Design**
 

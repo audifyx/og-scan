@@ -31,6 +31,7 @@ import {
   shortAddr,
   timeAgo,
   tokenDexPaidLabel,
+  tokenEffectiveLiquidityUsd,
   tokenMigrationDateIso,
   tokenOgCreatedAtIso,
   tokenOgCreatedAtMs,
@@ -69,8 +70,8 @@ const DEFAULT_FILTERS: FinderFilters = {
   hideHighRisk: false,
 };
 
-// OG score is intentionally age-only. Price, liquidity, verification, migration,
-// and market quality never decide OG status.
+// OG score is intentionally age-only after quote-backed LP safety gates. Price,
+// verification, migration, and market hype never decide OG status.
 function ogScore(t: JupTokenInfo, oldest: number | null): number {
   const created = tokenOgCreatedAtMs(t);
   if (!Number.isFinite(created) || !oldest) return 0;
@@ -99,7 +100,7 @@ function rugRisk(t: JupTokenInfo): "low" | "med" | "high" {
   if (!t.audit?.mintAuthorityDisabled) bad++;
   if (!t.audit?.freezeAuthorityDisabled) bad++;
   if ((t.audit?.topHoldersPercentage ?? 0) > 40) bad++;
-  if ((t.liquidity ?? 0) < 5000) bad++;
+  if (tokenEffectiveLiquidityUsd(t) < 5000) bad++;
   if (!t.isVerified) bad++;
   if (bad >= 4) return "high";
   if (bad >= 2) return "med";
@@ -113,7 +114,7 @@ export const OgFinder = ({ onSelect }: Props) => {
   const [showAllCopycats, setShowAllCopycats] = useState<boolean>(false);
 
   const { data, isFetching, refetch, dataUpdatedAt } = useQuery({
-    queryKey: ["og-forensic-attribution", submitted, "v7-origin-vs-later-official"],
+    queryKey: ["og-forensic-attribution", submitted, "v8-quote-backed-lp"],
     queryFn: (): Promise<ForensicOgReport> => forensicOgAttribution(submitted),
     enabled: submitted.length >= 1,
     staleTime: 30_000,
@@ -144,7 +145,7 @@ export const OgFinder = ({ onSelect }: Props) => {
     return cats.filter((c) => {
       const forensicScore: number = report?.tokenScores[forensicKey(c)]?.trueOgProbability ?? ogScore(c, oldestTs);
       if (forensicScore < filters.minScore) return false;
-      if ((c.liquidity ?? 0) < filters.minLiq) return false;
+      if (tokenEffectiveLiquidityUsd(c) < filters.minLiq) return false;
       if (filters.verifiedOnly && !c.isVerified) return false;
       if (filters.hideHighRisk && rugRisk(c) === "high") return false;
       return true;
@@ -247,7 +248,7 @@ export const OgFinder = ({ onSelect }: Props) => {
                 <Filter className="h-3 w-3" /> filters
               </div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                <span className="text-og-lime">{filteredCats.length}</span> later tokens shown · <span className="text-og-blood">{droppedCats}</span> filtered · OG requires $1k+ live liquidity + safe authority
+                <span className="text-og-lime">{filteredCats.length}</span> later tokens shown · <span className="text-og-blood">{droppedCats}</span> filtered · OG requires $1k+ quote-backed LP, no LP-pull signal, and safe authority
               </div>
               <button
                 onClick={() => setFilters(DEFAULT_FILTERS)}
@@ -503,7 +504,7 @@ const CoinCard = ({
         <Stat icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
         <Stat icon={Calendar} label="ATH DATE" value={shortDate(t.allTimeHighAt)} accent="text-og-gold" />
         <Stat icon={ShieldAlert} label="ATL" value={fmtUsd(t.allTimeLowUsd)} accent="text-og-cyan" />
-        <Stat icon={Droplets} label="LIQ" value={fmtUsd(t.liquidity)} />
+        <Stat icon={Droplets} label="QUOTE LP" value={fmtUsd(tokenEffectiveLiquidityUsd(t))} />
         <Stat icon={Users} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
         <Stat
           icon={Calendar}
@@ -595,7 +596,7 @@ const TopRiskyCopycats = ({ tokens, report, onSelect }: { tokens: JupTokenInfo[]
                 </div>
               </div>
               <div className="flex items-center justify-between gap-2 sm:flex-col sm:items-end">
-                <span className="font-mono text-[10px] uppercase tracking-widest text-og-gold">LQ {fmtUsd(token.liquidity)}</span>
+                <span className="font-mono text-[10px] uppercase tracking-widest text-og-gold">QUOTE LP {fmtUsd(tokenEffectiveLiquidityUsd(token))}</span>
                 <span className="font-mono text-[9px] uppercase tracking-widest text-og-blood">danger {copycatDangerScore(token, forensic)}</span>
               </div>
             </button>
