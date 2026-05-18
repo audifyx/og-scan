@@ -24,6 +24,8 @@ const App = () => (
           <Route path="/roadmap" element={<Index />} />
           <Route path="/market-pulse" element={<Index />} />
           <Route path="/market" element={<Index />} />
+          <Route path="/feed" element={<Index />} />
+          <Route path="/live-feed" element={<Index />} />
           <Route path="/snipe-feed" element={<Index />} />
           <Route path="/dev-wallet-radar" element={<Index />} />
           <Route path="/dev-wallet" element={<Index />} />

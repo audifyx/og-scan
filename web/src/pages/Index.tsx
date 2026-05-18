@@ -15,6 +15,7 @@ import {
   Menu,
   Radar,
   Rocket,
+  Rss,
   Search,
   ShieldCheck,
   Target,
@@ -34,6 +35,7 @@ import { SwapPanel } from "@/components/SwapPanel";
 import { TechStack } from "@/components/TechStack";
 import { OurCoin } from "@/components/OurCoin";
 import { SnipeFeed } from "@/components/SnipeFeed";
+import { Feed } from "@/components/Feed";
 import { SolToolsRoadmap } from "@/components/SolToolsRoadmap";
 import { cn } from "@/lib/utils";
 import { DEFAULT_OG_MINT, OGSCAN_DEV_WALLET, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr } from "@/lib/og";
@@ -47,6 +49,7 @@ type TabId =
   | "roadmap"
   | "market-pulse"
   | "snipe-feed"
+  | "feed"
   | "scanner"
   | "og-finder"
   | "pairs"
@@ -127,6 +130,17 @@ const TABS: TabConfig[] = [
     Icon: Rocket,
     accent: "gold",
     group: "Forensics",
+  },
+  {
+    id: "feed",
+    label: "Feed",
+    slug: "feed",
+    pageNumber: 15,
+    eyebrow: "LIVE TOKEN INTEL",
+    description: "A live token feed showing what is trending, why it is moving, spotlight coins, runners, bundle status, CTO/dev-launch context, and analytics.",
+    Icon: Rss,
+    accent: "lime" as TabAccent,
+    group: "Market",
   },
   {
     id: "market-pulse",
@@ -249,6 +263,8 @@ const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
     app: "overview",
     home: "overview",
     market: "market-pulse",
+    "live-feed": "feed",
+    feed: "feed",
     tape: "tx-feed",
     transactions: "tx-feed",
     "transaction-feed": "tx-feed",
@@ -281,6 +297,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (nextMint: string) => 
   if (tab === "roadmap") return <SolToolsRoadmap />;
   if (tab === "market-pulse") return <OgStats mint={mint} onSelect={updateMint} />;
   if (tab === "snipe-feed") return <SnipeFeed onSelect={updateMint} />;
+  if (tab === "feed") return <Feed onSelect={updateMint} />;
   if (tab === "scanner") return <Scanner onSelect={updateMint} />;
   if (tab === "og-finder") return <OgFinder onSelect={updateMint} />;
   if (tab === "pairs") return <PairTracker onSelect={updateMint} />;
@@ -570,7 +587,7 @@ const OverviewPage = ({
   onScanClick: () => void;
   onChangeMint: () => void;
 }) => {
-  const priorityTabs: TabConfig[] = [TAB_BY_ID.scanner, TAB_BY_ID["og-finder"], TAB_BY_ID["snipe-feed"], TAB_BY_ID.migrations];
+  const priorityTabs: TabConfig[] = [TAB_BY_ID.scanner, TAB_BY_ID.feed, TAB_BY_ID["og-finder"], TAB_BY_ID["snipe-feed"]];
   const metricCards: { label: string; value: string; note: string; Icon: ComponentType<{ className?: string }>; accent: TabAccent }[] = [
     { label: "Primary flow", value: "Scanner", note: "Fastest start point", Icon: Search, accent: "blue" },
     { label: "Attribution", value: "OG Finder", note: "Oldest on-chain proof", Icon: Crosshair, accent: "white" },

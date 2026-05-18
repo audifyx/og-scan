@@ -31,6 +31,7 @@
 - [x] Add CTO/dev-launch wallet history intelligence showing inferred creator wallet, bonded coin count, DEX-paid coin count, boosted coins, and CTO order count.
 - [x] Make DexScreener the chart source across token popups, Vitals, chart actions, and chart/provider labels.
 - [x] Add ATH date plus ATH/ATL values across scanner results, Vitals, Snipe Feed, migrations, trending, pair cards, and coin popups.
+- [x] Add a live **Feed** tool that shows current trending tokens, why each token is trending, spotlight coins, high-ranking runners, bundle-risk status, DEX paid/boost analytics, and CTO/dev-launch intelligence.
 
 ## **Design**
 
@@ -55,6 +56,7 @@
 - [x] Surface layered labels and secondary badges across Scanner results, OG Finder cards, lineage reports, and the shared coin intelligence popup.
 - [x] Add dedicated DEX paid/boost and CTO/dev launch intelligence sections to the shared coin popup and Snipe Feed analyzer.
 - [x] Replace internal/Birdeye-rendered chart panels with DexScreener chart embeds and full-chart links.
+- [x] Add a dedicated `/feed` workspace page with spotlight cards, runner board, full live feed rows, and a sticky coin analytics panel.
 
 ## **Pages / Screens**
 
@@ -74,6 +76,7 @@
 - [x] **DEX Paid + CTO/Dev Intel**: Coin popups and Snipe Feed now show live DEX paid-order status, active boosts, payment timing, CTO/profile/ad flags, and inferred dev wallet bonded-history counts.
 - [x] **DexScreener Charts**: Every visible chart panel and chart action now uses DexScreener as the primary chart source.
 - [x] **ATH / ATL Market Extremes**: Token cards and popups now show ATH value, ATH date, and ATL value/date when historical market data is available.
+- [x] **Live Feed**: A standalone `/feed` and `/live-feed` tool showing trending tokens, why they are moving, spotlight coins, high-ranking runners, bundle status, buys/sells, DEX paid/boosts, DexScreener charts, and CTO/dev-launch bonded coin analytics.
 
 ## **Suggested build order**
 
