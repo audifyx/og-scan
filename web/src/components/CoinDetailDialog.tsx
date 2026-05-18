@@ -257,7 +257,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const pairCreated = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : migratedAt;
 
   const { data: classificationReport, isFetching: isFetchingClassification } = useQuery({
-    queryKey: ["coin-detail-layered-classification", detailToken.symbol, "v6-solana-canonical-og"],
+    queryKey: ["coin-detail-layered-classification", detailToken.symbol, "v7-origin-vs-later-official"],
     queryFn: () => forensicOgAttribution(detailToken.symbol),
     enabled: open && Boolean(detailToken.symbol),
     staleTime: 30_000,
@@ -284,7 +284,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
     ? "lime"
     : primaryLabel.includes("CLONE") || primaryLabel.includes("COPY")
       ? "blood"
-      : primaryLabel.includes("MIGR")
+      : primaryLabel.includes("MIGR") || primaryLabel.includes("LATER OFFICIAL")
         ? "gold"
         : "cyan";
 
@@ -367,7 +367,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
           <div className="relative grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(330px,0.65fr)]">
             <div className="grid gap-4">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <IntelCard icon={Radar} label="Main Label" value={primaryLabel} sub={forensicScore ? `origin ${forensicScore.originScore}% · cto ${forensicScore.ctoScore}%` : "layered classifier"} tone={primaryTone} helpLabel="MAIN LABEL" />
+                <IntelCard icon={Radar} label="Main Label" value={primaryLabel} sub={forensicScore ? `origin ${forensicScore.originScore}% · official ${forensicScore.officialVerificationScore}%` : "layered classifier"} tone={primaryTone} helpLabel="MAIN LABEL" />
                 <IntelCard icon={CandlestickChart} label="Price" value={fmtUsd(detailToken.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined))} sub={<span className={isUp24 ? "text-og-lime" : "text-og-blood"}>24H {fmtPct(change24)}</span>} tone={isUp24 ? "lime" : "blood"} />
                 <IntelCard icon={Users} label="Market Cap" value={fmtUsd(detailToken.mcap ?? detailToken.fdv ?? pair?.marketCap ?? pair?.fdv)} sub={`holders ${fmtNum(detailToken.holderCount)}`} tone="gold" />
                 <IntelCard icon={BadgeDollarSign} label="DEX Paid" value={dexPaid} sub={`${fmtNum(detailToken.dexBoostActive ?? pair?.boosts?.active)} active · last ${shortDate(detailToken.dexLastPaidAt)}`} tone={dexPaid === "—" ? "muted" : "lime"} />
@@ -464,6 +464,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <MetaLine label="Top holders" value={detailToken.audit?.topHoldersPercentage != null ? `${detailToken.audit.topHoldersPercentage.toFixed(1)}%` : "—"} />
                   <MetaLine label="Organic score" value={detailToken.organicScore != null ? `${detailToken.organicScore.toFixed(0)} · ${detailToken.organicScoreLabel ?? ""}` : "—"} />
                   <MetaLine label="Origin score" value={forensicScore ? `${forensicScore.originScore}%` : "—"} />
+                  <MetaLine label="Official status" value={forensicScore ? `${forensicScore.officialVerificationScore}%` : "—"} />
                   <MetaLine label="Clone score" value={forensicScore ? `${forensicScore.cloneScore}%` : "—"} />
                 </div>
               </div>

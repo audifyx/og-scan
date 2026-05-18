@@ -61,7 +61,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   }, [initialQuery]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["scan", debounced, "forensic-v6-solana-canonical-og"],
+    queryKey: ["scan", debounced, "forensic-v7-origin-vs-later-official"],
     queryFn: async (): Promise<ForensicOgReport> => {
       const report: ForensicOgReport = await forensicOgAttribution(debounced);
       if (report.candidates.length > 0) return report;
@@ -95,7 +95,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <span className="text-og-cyan text-glow">MINT</span>
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Search a Solana ticker, meme, brand, narrative, or mint. OGSCAN clusters variants and ranks origin by earliest Solana proof — not hype.
+            Search a Solana ticker, meme, brand, narrative, or mint. OGSCAN ranks the first credible Solana origin as OG — not the later official token, not market cap, and not hype.
           </p>
         </div>
 
@@ -156,7 +156,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
               <ForensicStat icon={Fingerprint} label="Narrative ID" value={report.narrativeFingerprintId} accent="text-og-cyan" />
               <ForensicStat icon={GitBranch} label="Cluster" value={`${report.summary.candidateCount} Solana tokens`} accent="text-og-gold" />
               <ForensicStat icon={ShieldCheck} label="True OG" value={report.og ? `${report.og.symbol}` : "Unknown"} accent="text-og-lime" />
-              <ForensicStat icon={ShieldAlert} label="Clones" value={`${report.summary.cloneCount} flagged`} accent={report.summary.cloneCount > 0 ? "text-og-blood" : "text-og-lime"} />
+              <ForensicStat icon={ShieldAlert} label="Later tokens" value={`${report.copycats.length} tracked`} accent={report.copycats.length > 0 ? "text-og-gold" : "text-og-lime"} />
             </div>
             <div className="mt-3">
               <TokenTruthLegend compact />
@@ -270,7 +270,7 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
           <div className="mt-2 grid grid-cols-2 gap-1.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground sm:grid-cols-4">
             <MiniIntel icon={Fingerprint} label="Origin" value={ogProbability} accent={scoreTextClass("origin", originScore)} meter={score ? <ScoreMeter score={originScore} kind="origin" className="mt-1" /> : undefined} />
             <MiniIntel icon={ShieldAlert} label="Clone" value={cloneProbability} accent={scoreTextClass("clone", cloneScore)} meter={score ? <ScoreMeter score={cloneScore} kind="clone" className="mt-1" /> : undefined} />
-            <MiniIntel icon={GitBranch} label="Label" value={label} accent={label.includes("TRUE OG") ? "text-og-lime" : score ? "text-og-cyan" : undefined} valueClassName={labelToneClass(label)} />
+            <MiniIntel icon={GitBranch} label="Label" value={label} accent={label.includes("TRUE OG") ? "text-og-lime" : label.includes("LATER OFFICIAL") ? "text-og-gold" : score ? "text-og-cyan" : undefined} valueClassName={labelToneClass(label)} />
             <MiniIntel icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
             <MiniIntel icon={Calendar} label="ATH Date" value={shortDate(t.allTimeHighAt)} accent="text-og-gold" />
             <MiniIntel icon={ShieldAlert} label="ATL" value={fmtUsd(t.allTimeLowUsd)} accent="text-og-cyan" />

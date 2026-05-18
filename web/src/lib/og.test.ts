@@ -277,8 +277,7 @@ describe("jupOgCopycats", () => {
       liquidity: 900_000,
       holderCount: 30_000,
       organicScore: 10,
-      isVerified: true,
-      dexUrl: "https://dexscreener.com/solana/later-revival-token",
+      isVerified: false,
       stats24h: { numBuys: 900, numSells: 850, numTraders: 1_000 },
     });
 
@@ -297,5 +296,92 @@ describe("jupOgCopycats", () => {
     expect(revivalScore.classification.primary_label).toBe("REVIVAL");
     expect(revivalScore.classification.secondary_labels).toContain("New Contract");
     expect(revivalScore.classification.secondary_labels).toContain("Recreated Narrative");
+  });
+
+  it("keeps the first credible Trump mint as OG while labeling a later verified official token separately", async () => {
+    const firstTrumpMint = makeToken({
+      id: "first-trump-mint",
+      name: "Trump",
+      symbol: "TRUMP",
+      firstPool: { createdAt: "2024-02-01T00:00:00.000Z" },
+      onChainCreatedAt: "2024-02-01T00:00:00.000Z",
+      liquidity: 25_000,
+      holderCount: 1_400,
+      isVerified: false,
+      organicScore: 6,
+    });
+    const laterOfficialTrump = makeToken({
+      id: "later-official-trump",
+      name: "Official Trump",
+      symbol: "TRUMP",
+      firstPool: { createdAt: "2025-01-18T00:00:00.000Z" },
+      onChainCreatedAt: "2025-01-18T00:00:00.000Z",
+      liquidity: 125_000_000,
+      holderCount: 720_000,
+      isVerified: true,
+      organicScore: 10,
+      dexProfilePaid: true,
+      dexUrl: "https://dexscreener.com/solana/later-official-trump",
+      stats24h: { numBuys: 35_000, numSells: 30_000, numTraders: 80_000 },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => [laterOfficialTrump, firstTrumpMint],
+      }))
+    );
+
+    const report = await forensicOgAttribution("TRUMP");
+    const officialScore = report.tokenScores["solana:later-official-trump"];
+
+    expect(report.og?.id).toBe("first-trump-mint");
+    expect(report.tokenScores["solana:first-trump-mint"]?.classification.primary_label).toBe("TRUE OG");
+    expect(officialScore.classification.primary_label).toBe("LATER OFFICIAL");
+    expect(officialScore.reasons.join(" ")).toContain("Official/verified status is detected");
+    expect(officialScore.warnings.join(" ")).toContain("Official does not mean OG");
+  });
+
+  it("keeps a first YE narrative mint as OG even when a later Kanye-linked token is verified", async () => {
+    const firstYeMint = makeToken({
+      id: "first-ye-mint",
+      name: "Ye",
+      symbol: "YE",
+      firstPool: { createdAt: "2023-08-12T00:00:00.000Z" },
+      onChainCreatedAt: "2023-08-12T00:00:00.000Z",
+      liquidity: 12_500,
+      holderCount: 900,
+      isVerified: false,
+      organicScore: 5,
+    });
+    const laterOfficialYe = makeToken({
+      id: "later-official-ye",
+      name: "Kanye West Ye",
+      symbol: "YE",
+      firstPool: { createdAt: "2026-02-01T00:00:00.000Z" },
+      onChainCreatedAt: "2026-02-01T00:00:00.000Z",
+      liquidity: 8_500_000,
+      holderCount: 110_000,
+      isVerified: true,
+      dexProfilePaid: true,
+      dexUrl: "https://dexscreener.com/solana/later-official-ye",
+      stats24h: { numBuys: 9_500, numSells: 8_200, numTraders: 22_000 },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => [laterOfficialYe, firstYeMint],
+      }))
+    );
+
+    const report = await forensicOgAttribution("YE");
+
+    expect(report.og?.id).toBe("first-ye-mint");
+    expect(report.tokenScores["solana:first-ye-mint"]?.classification.primary_label).toBe("TRUE OG");
+    expect(report.tokenScores["solana:later-official-ye"]?.classification.primary_label).toBe("LATER OFFICIAL");
+    expect(report.familyTree.find((node) => node.token.id === "later-official-ye")?.relationship).toBe("later official");
   });
 });
