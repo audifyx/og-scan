@@ -642,14 +642,14 @@ export const PairTracker = ({ onSelect }: Props) => {
                 e.preventDefault();
                 addTicker(input);
               }}
-              className="ml-auto flex items-center gap-1 border border-og-grid bg-og-ink px-2"
+              className="og-search-box og-search-box-sm ml-auto px-2"
             >
               <Plus className="h-3 w-3 text-og-gold" />
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="add ticker"
-                className="w-28 bg-transparent py-1.5 font-mono text-[11px] uppercase tracking-widest text-foreground outline-none placeholder:text-muted-foreground/60"
+                className="og-search-input og-search-input-sm w-32 font-mono text-[11px] uppercase tracking-widest"
               />
             </form>
           </div>
@@ -661,18 +661,18 @@ export const PairTracker = ({ onSelect }: Props) => {
               e.preventDefault();
               setAnySubmitted(anyQuery.trim());
             }}
-            className="flex items-center gap-2 border border-og-grid bg-og-ink/80 p-3"
+            className="og-search-box px-3"
           >
             <Radar className={`h-4 w-4 ${isFetching ? "animate-pulse text-og-cyan" : "text-og-gold"}`} />
             <input
               value={anyQuery}
               onChange={(e) => setAnyQuery(e.target.value)}
               placeholder="search any token · symbol, name, or mint address"
-              className="flex-1 bg-transparent py-1.5 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/60"
+              className="og-search-input px-1 font-mono text-sm tracking-wide"
             />
             <button
               type="submit"
-              className="border border-og-cyan/60 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-og-cyan transition hover:bg-og-cyan hover:text-og-ink"
+              className="og-search-action px-4 font-mono text-[10px] uppercase tracking-widest text-og-cyan transition"
             >
               SCAN
             </button>
@@ -822,7 +822,7 @@ const FilterNum = ({
       step={step}
       min={0}
       onChange={(e) => onChange(Number(e.target.value) || 0)}
-      className="border border-og-grid bg-og-ink px-2 py-1.5 font-mono text-xs text-foreground outline-none focus:border-og-gold"
+      className="og-filter-input px-2 py-1.5 font-mono text-xs text-foreground outline-none focus:border-og-gold"
     />
   </label>
 );

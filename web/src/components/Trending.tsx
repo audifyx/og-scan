@@ -381,7 +381,7 @@ const FilterNum = ({
       step={step}
       value={value}
       onChange={(event) => onChange(Math.max(0, Number(event.target.value) || 0))}
-      className="w-20 bg-transparent text-right text-foreground outline-none"
+      className="og-filter-input w-24 px-2 py-1 text-right text-foreground outline-none"
     />
   </label>
 );
