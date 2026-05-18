@@ -375,6 +375,8 @@ const CoinCard = ({
   const poolCreatedAt = t.firstPool?.createdAt;
   const migrationCreatedAt = tokenMigrationDateIso(t);
   const dexPaid = tokenDexPaidLabel(t);
+  const primaryLabel: string = forensic?.classification.primary_label ?? (highlight ? "TRUE OG" : "COPYCAT");
+  const secondaryLabels: string[] = forensic?.classification.secondary_labels.slice(0, 5) ?? [];
 
   return (
     <article
@@ -425,18 +427,30 @@ const CoinCard = ({
         </div>
       </div>
 
-      {!highlight ? null : (
-        <div className="flex items-center justify-between border-y border-og-gold/30 py-2">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-og-gold/80">TRUE OG SCORE</span>
-          <ScoreBar score={score} />
+      <div className="border-y border-og-gold/30 py-2">
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-og-gold/80">{highlight ? "ORIGIN IDENTITY" : "CLASSIFICATION"}</span>
+          <ScoreBar score={forensic?.originScore ?? score} />
         </div>
-      )}
+        <div className={`mt-2 font-display text-xl font-black uppercase tracking-tight ${primaryLabel.includes("TRUE OG") ? "text-og-lime" : primaryLabel.includes("CLONE") || primaryLabel.includes("COPY") ? "text-og-blood" : "text-og-cyan"}`}>
+          {primaryLabel}
+        </div>
+        {secondaryLabels.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1 font-mono text-[8px] uppercase tracking-widest">
+            {secondaryLabels.map((secondary) => (
+              <span key={secondary} className="border border-og-cyan/30 bg-og-cyan/10 px-1.5 py-0.5 text-og-cyan">
+                {secondary}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-4 gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        <Stat icon={Fingerprint} label="OG" value={forensic ? `${forensic.trueOgProbability}%` : `${score}%`} accent={highlight ? "text-og-lime" : "text-og-gold"} />
-        <Stat icon={ShieldAlert} label="CLONE" value={forensic ? `${forensic.cloneProbability}%` : "—"} accent={(forensic?.cloneProbability ?? 0) >= 58 ? "text-og-blood" : undefined} />
-        <Stat icon={GitBranch} label="LABEL" value={forensic?.label ?? (highlight ? "TRUE OG" : "COPY")} accent={highlight ? "text-og-lime" : "text-og-cyan"} />
-        <Stat icon={BrainCircuit} label="DEV" value={forensic ? `${forensic.deployerTrustScore}%` : "—"} accent="text-og-cyan" />
+        <Stat icon={Fingerprint} label="ORIGIN" value={forensic ? `${forensic.originScore}%` : `${score}%`} accent={primaryLabel.includes("TRUE OG") ? "text-og-lime" : "text-og-gold"} />
+        <Stat icon={ShieldAlert} label="CLONE" value={forensic ? `${forensic.cloneScore}%` : "—"} accent={(forensic?.cloneScore ?? 0) >= 70 ? "text-og-blood" : undefined} />
+        <Stat icon={GitBranch} label="CTO" value={forensic ? `${forensic.ctoScore}%` : "—"} accent={(forensic?.ctoScore ?? 0) >= 60 ? "text-og-lime" : "text-og-cyan"} />
+        <Stat icon={BrainCircuit} label="RISK" value={forensic ? `${forensic.riskScore}%` : "—"} accent={(forensic?.riskScore ?? 0) >= 65 ? "text-og-blood" : "text-og-cyan"} />
         <Stat icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
         <Stat icon={Droplets} label="LIQ" value={fmtUsd(t.liquidity)} />
         <Stat icon={Users} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
@@ -450,7 +464,7 @@ const CoinCard = ({
 
       {forensic && (forensic.reasons.length > 0 || forensic.warnings.length > 0) && (
         <div className="border-t border-og-grid/60 pt-2 font-mono text-[9px] uppercase tracking-widest">
-          <div className="text-og-lime">WHY: {forensic.reasons[0] ?? "Origin scoring complete."}</div>
+          <div className="text-og-lime">WHY: {forensic.classification.reasoning_summary}</div>
           {forensic.warnings[0] && <div className="mt-1 text-og-blood">WATCH: {forensic.warnings[0]}</div>}
         </div>
       )}
@@ -505,8 +519,8 @@ const ForensicReportPanel = ({ report }: { report: ForensicOgReport }) => {
 
       <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="grid gap-2 sm:grid-cols-3">
-          <ForensicMetric icon={Crown} label="TRUE OG" value={report.og ? `${report.og.symbol}` : "UNKNOWN"} accent="text-og-lime" />
-          <ForensicMetric icon={BrainCircuit} label="CONFIDENCE" value={ogScore ? `${ogScore.trueOgProbability}%` : "—"} accent="text-og-gold" />
+          <ForensicMetric icon={Crown} label="MAIN LABEL" value={ogScore?.classification.primary_label ?? (report.og ? "TRUE OG" : "UNKNOWN")} accent="text-og-lime" />
+          <ForensicMetric icon={BrainCircuit} label="ORIGIN SCORE" value={ogScore ? `${ogScore.originScore}%` : "—"} accent="text-og-gold" />
           <ForensicMetric icon={ShieldAlert} label="CLONES" value={`${report.summary.cloneCount}/${report.summary.candidateCount}`} accent={report.summary.cloneCount > 0 ? "text-og-blood" : "text-og-lime"} />
           <ForensicMetric icon={Network} label="CHAINS" value={`${report.summary.chainCount}`} accent="text-og-cyan" />
           <ForensicMetric icon={Calendar} label="FIRST PROOF" value={shortDate(report.summary.earliestProof)} accent="text-og-lime" />
@@ -520,7 +534,7 @@ const ForensicReportPanel = ({ report }: { report: ForensicOgReport }) => {
           <div className="space-y-1.5">
             {report.familyTree.slice(0, 7).map((node, index) => (
               <div key={`${node.relationship}-${node.token.id}`} className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest">
-                <span className={index === 0 ? "text-og-gold" : "text-muted-foreground"}>{index === 0 ? "TRUE OG" : `├─ ${node.relationship}`}</span>
+                <span className={index === 0 ? "text-og-gold" : "text-muted-foreground"}>{report.tokenScores[forensicKey(node.token)]?.classification.primary_label ?? (index === 0 ? "TRUE OG" : `├─ ${node.relationship}`)}</span>
                 <span className="truncate text-foreground">${node.token.symbol}</span>
                 <span className="ml-auto text-og-cyan">{node.score}%</span>
               </div>
@@ -549,10 +563,10 @@ const ForensicReportPanel = ({ report }: { report: ForensicOgReport }) => {
             <AlertTriangle className="h-3 w-3" /> attribution warnings
           </div>
           <div className="space-y-1.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-            <div>Migration probability: <span className="text-og-cyan">{ogScore ? `${ogScore.migrationProbability}%` : "—"}</span></div>
-            <div>CTO probability: <span className="text-og-cyan">{ogScore ? `${ogScore.ctoProbability}%` : "—"}</span></div>
-            <div>Artificial trend probability: <span className="text-og-cyan">{ogScore ? `${ogScore.artificialTrendProbability}%` : "—"}</span></div>
-            <div>Labels: <span className="text-og-gold">TRUE OG · LIKELY CLONE · MIGRATION · CTO · HIGH RISK</span></div>
+            <div>Control status: <span className="text-og-cyan">{ogScore?.classification.layers.control_status ?? "—"}</span></div>
+            <div>Lifecycle status: <span className="text-og-cyan">{ogScore?.classification.layers.lifecycle_status ?? "—"}</span></div>
+            <div>CTO score: <span className="text-og-cyan">{ogScore ? `${ogScore.ctoScore}%` : "—"}</span> · Migration score: <span className="text-og-cyan">{ogScore ? `${ogScore.migrationScore}%` : "—"}</span></div>
+            <div>Priority labels: <span className="text-og-gold">TRUE OG CTO · TRUE OG · MIGRATED OG · CTO · MIGRATION · REVIVAL · CLONE</span></div>
           </div>
         </div>
       </div>

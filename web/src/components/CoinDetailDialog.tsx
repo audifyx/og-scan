@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import {
   birdeyeOhlcv,
   enrichTokensWithMarketIntel,
+  forensicOgAttribution,
   fmtNum,
   fmtPct,
   fmtUsd,
@@ -261,6 +262,25 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const createdAt = tokenOgCreatedAtIso(detailToken);
   const migratedAt = tokenMigrationDateIso(detailToken);
   const pairCreated = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : migratedAt;
+
+  const { data: classificationReport, isFetching: isFetchingClassification } = useQuery({
+    queryKey: ["coin-detail-layered-classification", detailToken.symbol],
+    queryFn: () => forensicOgAttribution(detailToken.symbol),
+    enabled: open && Boolean(detailToken.symbol),
+    staleTime: 30_000,
+  });
+  const forensicKey = `${detailToken.chainId ?? "solana"}:${detailToken.id}`;
+  const forensicScore = classificationReport?.tokenScores[forensicKey];
+  const primaryLabel: string = forensicScore?.classification.primary_label ?? "SCANNED";
+  const secondaryLabels: string[] = forensicScore?.classification.secondary_labels.slice(0, 6) ?? [];
+  const primaryTone: "lime" | "gold" | "cyan" | "blood" | "muted" = primaryLabel.includes("TRUE OG")
+    ? "lime"
+    : primaryLabel.includes("CLONE") || primaryLabel.includes("COPY")
+      ? "blood"
+      : primaryLabel.includes("MIGR")
+        ? "gold"
+        : "cyan";
+
   const links = useMemo(() => {
     const raw: { label: string; url: string }[] = [];
     if (pair?.url ?? detailToken.dexUrl) raw.push({ label: "DexScreener", url: pair?.url ?? detailToken.dexUrl ?? "" });
@@ -312,7 +332,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <div className="mb-1 flex flex-wrap items-center gap-2 font-mono text-[9px] uppercase tracking-[0.28em] text-og-cyan">
                     <Sparkles className="h-3 w-3" /> coin intelligence popup
                     {detailToken.isVerified ? <span className="rounded-full border border-og-lime/40 bg-og-lime/10 px-2 py-0.5 text-og-lime">verified</span> : null}
-                    {isFetchingPairs || isFetchingToken ? <span className="rounded-full border border-og-cyan/35 bg-og-cyan/10 px-2 py-0.5 text-og-cyan">syncing</span> : null}
+                    {isFetchingPairs || isFetchingToken || isFetchingClassification ? <span className="rounded-full border border-og-cyan/35 bg-og-cyan/10 px-2 py-0.5 text-og-cyan">syncing</span> : null}
                   </div>
                   <h2 className="truncate font-display text-4xl font-black uppercase tracking-tight text-foreground sm:text-6xl">
                     ${detailToken.symbol}
@@ -338,10 +358,33 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
           <div className="relative grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(330px,0.65fr)]">
             <div className="grid gap-4">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <IntelCard icon={Radar} label="Main Label" value={primaryLabel} sub={forensicScore ? `origin ${forensicScore.originScore}% · cto ${forensicScore.ctoScore}%` : "layered classifier"} tone={primaryTone} />
                 <IntelCard icon={CandlestickChart} label="Price" value={fmtUsd(detailToken.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined))} sub={<span className={isUp24 ? "text-og-lime" : "text-og-blood"}>24H {fmtPct(change24)}</span>} tone={isUp24 ? "lime" : "blood"} />
                 <IntelCard icon={Users} label="Market Cap" value={fmtUsd(detailToken.mcap ?? detailToken.fdv ?? pair?.marketCap ?? pair?.fdv)} sub={`holders ${fmtNum(detailToken.holderCount)}`} tone="gold" />
-                <IntelCard icon={Zap} label="Liquidity" value={fmtUsd(detailToken.liquidity ?? pair?.liquidity?.usd)} sub={`vol24 ${fmtUsd(pair?.volume?.h24 ?? ((detailToken.stats24h?.buyVolume ?? 0) + (detailToken.stats24h?.sellVolume ?? 0)))}`} tone="cyan" />
                 <IntelCard icon={BadgeDollarSign} label="DEX Paid" value={dexPaid} sub={`${fmtNum(detailToken.dexBoostActive ?? pair?.boosts?.active)} active boosts`} tone={dexPaid === "—" ? "muted" : "lime"} />
+              </div>
+
+              <div className="rounded-3xl border border-og-cyan/25 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
+                  <Radar className="h-3.5 w-3.5" /> layered token truth
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <MetaLine label="Origin identity" value={forensicScore?.classification.layers.origin_identity ?? "scanning"} />
+                  <MetaLine label="Control status" value={forensicScore?.classification.layers.control_status ?? "scanning"} />
+                  <MetaLine label="Lifecycle" value={forensicScore?.classification.layers.lifecycle_status ?? "scanning"} />
+                </div>
+                {secondaryLabels.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-1 font-mono text-[9px] uppercase tracking-widest">
+                    {secondaryLabels.map((label) => (
+                      <span key={label} className="rounded-full border border-og-cyan/30 bg-og-cyan/10 px-2 py-1 text-og-cyan">
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  {forensicScore?.classification.reasoning_summary ?? "Open this token from a narrative search to compare it against the full origin cluster."}
+                </p>
               </div>
 
               <div className="overflow-hidden rounded-3xl border border-og-cyan/25 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
@@ -408,6 +451,8 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <AuditLine label="Verified" ok={detailToken.isVerified === true} good="verified" bad="unverified" />
                   <MetaLine label="Top holders" value={detailToken.audit?.topHoldersPercentage != null ? `${detailToken.audit.topHoldersPercentage.toFixed(1)}%` : "—"} />
                   <MetaLine label="Organic score" value={detailToken.organicScore != null ? `${detailToken.organicScore.toFixed(0)} · ${detailToken.organicScoreLabel ?? ""}` : "—"} />
+                  <MetaLine label="Origin score" value={forensicScore ? `${forensicScore.originScore}%` : "—"} />
+                  <MetaLine label="Clone score" value={forensicScore ? `${forensicScore.cloneScore}%` : "—"} />
                 </div>
               </div>
 
