@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
+  Wallet,
   Zap,
 } from "lucide-react";
 import {
@@ -39,11 +40,13 @@ import {
   shortAddr,
   shortDate,
   timeAgo,
+  tokenDevLaunchIntel,
   tokenDexPaidLabel,
   tokenMigrationDateIso,
   tokenOgCreatedAtIso,
   type BirdeyeOhlcv,
   type JupTokenInfo,
+  type TokenDevLaunchIntel,
 } from "@/lib/og";
 
 type DetailDexPair = {
@@ -132,6 +135,13 @@ function mergeToken(primary: JupTokenInfo, fallback: JupTokenInfo): JupTokenInfo
     dexBoostAmount: primary.dexBoostAmount ?? fallback.dexBoostAmount,
     dexBoostTotalAmount: primary.dexBoostTotalAmount ?? fallback.dexBoostTotalAmount,
     dexBoostActive: primary.dexBoostActive ?? fallback.dexBoostActive,
+    dexPaidOrderCount: primary.dexPaidOrderCount ?? fallback.dexPaidOrderCount,
+    dexApprovedOrderCount: primary.dexApprovedOrderCount ?? fallback.dexApprovedOrderCount,
+    dexProfilePaid: primary.dexProfilePaid ?? fallback.dexProfilePaid,
+    dexCommunityTakeoverPaid: primary.dexCommunityTakeoverPaid ?? fallback.dexCommunityTakeoverPaid,
+    dexAdsPaid: primary.dexAdsPaid ?? fallback.dexAdsPaid,
+    dexFirstPaidAt: primary.dexFirstPaidAt ?? fallback.dexFirstPaidAt,
+    dexLastPaidAt: primary.dexLastPaidAt ?? fallback.dexLastPaidAt,
     dexUrl: primary.dexUrl ?? fallback.dexUrl,
     pairAddress: primary.pairAddress ?? fallback.pairAddress,
     pairDexId: primary.pairDexId ?? fallback.pairDexId,
@@ -269,6 +279,13 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
     enabled: open && Boolean(detailToken.symbol),
     staleTime: 30_000,
   });
+
+  const { data: devIntel, isFetching: isFetchingDevIntel } = useQuery({
+    queryKey: ["coin-detail-dev-launch-intel", detailToken.chainId ?? "solana", detailToken.id],
+    queryFn: (): Promise<TokenDevLaunchIntel> => tokenDevLaunchIntel(detailToken),
+    enabled: open && Boolean(detailToken.id),
+    staleTime: 60_000,
+  });
   const forensicKey = `${detailToken.chainId ?? "solana"}:${detailToken.id}`;
   const forensicScore = classificationReport?.tokenScores[forensicKey];
   const primaryLabel: string = forensicScore?.classification.primary_label ?? "SCANNED";
@@ -332,7 +349,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <div className="mb-1 flex flex-wrap items-center gap-2 font-mono text-[9px] uppercase tracking-[0.28em] text-og-cyan">
                     <Sparkles className="h-3 w-3" /> coin intelligence popup
                     {detailToken.isVerified ? <span className="rounded-full border border-og-lime/40 bg-og-lime/10 px-2 py-0.5 text-og-lime">verified</span> : null}
-                    {isFetchingPairs || isFetchingToken || isFetchingClassification ? <span className="rounded-full border border-og-cyan/35 bg-og-cyan/10 px-2 py-0.5 text-og-cyan">syncing</span> : null}
+                    {isFetchingPairs || isFetchingToken || isFetchingClassification || isFetchingDevIntel ? <span className="rounded-full border border-og-cyan/35 bg-og-cyan/10 px-2 py-0.5 text-og-cyan">syncing</span> : null}
                   </div>
                   <h2 className="truncate font-display text-4xl font-black uppercase tracking-tight text-foreground sm:text-6xl">
                     ${detailToken.symbol}
@@ -361,7 +378,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                 <IntelCard icon={Radar} label="Main Label" value={primaryLabel} sub={forensicScore ? `origin ${forensicScore.originScore}% · cto ${forensicScore.ctoScore}%` : "layered classifier"} tone={primaryTone} />
                 <IntelCard icon={CandlestickChart} label="Price" value={fmtUsd(detailToken.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined))} sub={<span className={isUp24 ? "text-og-lime" : "text-og-blood"}>24H {fmtPct(change24)}</span>} tone={isUp24 ? "lime" : "blood"} />
                 <IntelCard icon={Users} label="Market Cap" value={fmtUsd(detailToken.mcap ?? detailToken.fdv ?? pair?.marketCap ?? pair?.fdv)} sub={`holders ${fmtNum(detailToken.holderCount)}`} tone="gold" />
-                <IntelCard icon={BadgeDollarSign} label="DEX Paid" value={dexPaid} sub={`${fmtNum(detailToken.dexBoostActive ?? pair?.boosts?.active)} active boosts`} tone={dexPaid === "—" ? "muted" : "lime"} />
+                <IntelCard icon={BadgeDollarSign} label="DEX Paid" value={dexPaid} sub={`${fmtNum(detailToken.dexBoostActive ?? pair?.boosts?.active)} active · last ${shortDate(detailToken.dexLastPaidAt)}`} tone={dexPaid === "—" ? "muted" : "lime"} />
               </div>
 
               <div className="rounded-3xl border border-og-cyan/25 bg-white/[0.035] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
@@ -421,6 +438,11 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
               <div className="grid gap-4 lg:grid-cols-2">
                 <TapePanel pair={pair} token={detailToken} buyPct={buyPct} buys24={buys24} sells24={sells24} />
                 <MetadataPanel token={detailToken} pair={pair} createdAt={createdAt} migratedAt={migratedAt} pairCreated={pairCreated} />
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <DexPaidPanel token={detailToken} pair={pair} />
+                <DevLaunchPanel intel={devIntel} isLoading={isFetchingDevIntel} primaryLabel={primaryLabel} />
               </div>
             </div>
 
@@ -537,6 +559,75 @@ const MetadataPanel = ({ token, pair, createdAt, migratedAt, pairCreated }: { to
       <MetaLine label="Pair quote" value={pair?.quoteToken?.symbol ? `${pair.quoteToken.symbol} · ${pair.dexId ?? "DEX"}` : "—"} />
     </div>
   </div>
+);
+
+const DexPaidPanel = ({ token, pair }: { token: JupTokenInfo; pair?: DetailDexPair }) => {
+  const activeBoosts = token.dexBoostActive ?? pair?.boosts?.active ?? 0;
+  const boostPaid = token.dexBoostTotalAmount ?? token.dexPaidAmount ?? token.dexBoostAmount;
+  const hasDexSignal = tokenDexPaidLabel(token) !== "—" || activeBoosts > 0;
+
+  return (
+    <div className="rounded-3xl border border-og-gold/25 bg-white/[0.035] p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-gold">
+          <BadgeDollarSign className="h-3.5 w-3.5" /> DEX paid + boosts
+        </div>
+        <span className={cn("rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-widest", hasDexSignal ? "border-og-lime/45 bg-og-lime/10 text-og-lime" : "border-white/10 text-muted-foreground")}>{hasDexSignal ? "live signal" : "none public"}</span>
+      </div>
+      <div className="grid gap-2">
+        <MetaLine label="Paid status" value={tokenDexPaidLabel(token)} />
+        <MetaLine label="Active boosts" value={activeBoosts > 0 ? fmtNum(activeBoosts) : "0"} />
+        <MetaLine label="Boost total" value={boostPaid != null ? fmtNum(boostPaid) : "—"} />
+        <MetaLine label="DEX orders" value={`${fmtNum(token.dexApprovedOrderCount ?? 0)} approved / ${fmtNum(token.dexPaidOrderCount ?? 0)} total`} />
+        <MetaLine label="First paid" value={shortDate(token.dexFirstPaidAt)} />
+        <MetaLine label="Last paid" value={shortDate(token.dexLastPaidAt)} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1 font-mono text-[9px] uppercase tracking-widest">
+        <DexFlag active={token.dexProfilePaid === true} label="profile" />
+        <DexFlag active={token.dexCommunityTakeoverPaid === true} label="CTO" />
+        <DexFlag active={token.dexAdsPaid === true} label="ads" />
+        <DexFlag active={activeBoosts > 0} label="active boost" />
+      </div>
+    </div>
+  );
+};
+
+const DevLaunchPanel = ({ intel, isLoading, primaryLabel }: { intel?: TokenDevLaunchIntel; isLoading: boolean; primaryLabel: string }) => {
+  const isCto = intel?.launchType === "CTO / community support" || primaryLabel.includes("CTO");
+  return (
+    <div className="rounded-3xl border border-og-cyan/25 bg-white/[0.035] p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
+          <Wallet className="h-3.5 w-3.5" /> CTO / dev launch intel
+        </div>
+        {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-og-cyan" /> : <span className={cn("rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-widest", isCto ? "border-og-gold/50 bg-og-gold/10 text-og-gold" : "border-og-cyan/35 bg-og-cyan/10 text-og-cyan")}>{intel?.launchType ?? "scanning"}</span>}
+      </div>
+      <div className="grid gap-2">
+        <MetaLine label="Creator wallet" value={shortAddr(intel?.wallet ?? undefined, 6)} />
+        <MetaLine label="Confidence" value={intel?.confidence ?? "scanning"} />
+        <MetaLine label="Recent mints" value={fmtNum(intel?.recentTokenMints)} />
+        <MetaLine label="Bonded coins" value={fmtNum(intel?.bondedCoinCount)} />
+        <MetaLine label="DEX-paid coins" value={fmtNum(intel?.dexPaidCoinCount)} />
+        <MetaLine label="Boosted coins" value={fmtNum(intel?.activeBoostedCoinCount)} />
+        <MetaLine label="CTO orders" value={fmtNum(intel?.ctoOrderCount)} />
+        <MetaLine label="Last seen" value={shortDate(intel?.lastSeenAt)} />
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        {intel?.notes?.[0] ?? "Wallet history loads from early mint/pool fee-payer activity and public DEX pair/order data."}
+      </p>
+      {intel?.sampleMints.length ? (
+        <div className="mt-3 flex flex-wrap gap-1 font-mono text-[9px] uppercase tracking-widest">
+          {intel.sampleMints.slice(0, 5).map((mint) => (
+            <span key={mint} className="rounded-full border border-white/10 bg-white/[0.035] px-2 py-1 text-muted-foreground">{shortAddr(mint, 4)}</span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+const DexFlag = ({ active, label }: { active: boolean; label: string }) => (
+  <span className={cn("rounded-full border px-2 py-1", active ? "border-og-lime/35 bg-og-lime/10 text-og-lime" : "border-white/10 bg-white/[0.025] text-muted-foreground")}>{label}</span>
 );
 
 const TapeMetric = ({ label, value, tone }: { label: string; value: string; tone: "lime" | "blood" }) => (

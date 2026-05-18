@@ -138,6 +138,13 @@ type SnipeLaunch = {
   dexPaidAmount?: number;
   dexBoostTotalAmount?: number;
   dexBoostActive?: number;
+  dexPaidOrderCount?: number;
+  dexApprovedOrderCount?: number;
+  dexProfilePaid?: boolean;
+  dexCommunityTakeoverPaid?: boolean;
+  dexAdsPaid?: boolean;
+  dexFirstPaidAt?: string;
+  dexLastPaidAt?: string;
   allTimeHighUsd?: number;
   allTimeHighAt?: string;
   migrationCreatedAt?: string;
@@ -459,6 +466,13 @@ async function fetchSnipePayload(): Promise<SnipePayload> {
         dexPaidAmount: token?.dexPaidAmount ?? boost?.totalAmount ?? boost?.amount,
         dexBoostTotalAmount: token?.dexBoostTotalAmount ?? boost?.totalAmount,
         dexBoostActive: token?.dexBoostActive ?? pair.boosts?.active,
+        dexPaidOrderCount: token?.dexPaidOrderCount,
+        dexApprovedOrderCount: token?.dexApprovedOrderCount,
+        dexProfilePaid: token?.dexProfilePaid,
+        dexCommunityTakeoverPaid: token?.dexCommunityTakeoverPaid,
+        dexAdsPaid: token?.dexAdsPaid,
+        dexFirstPaidAt: token?.dexFirstPaidAt,
+        dexLastPaidAt: token?.dexLastPaidAt,
         allTimeHighUsd: token?.allTimeHighUsd,
         allTimeHighAt: token?.allTimeHighAt,
         migrationCreatedAt,
@@ -530,6 +544,13 @@ function launchToToken(launch: SnipeLaunch): JupTokenInfo {
     dexPaidAmount: launch.dexPaidAmount,
     dexBoostTotalAmount: launch.dexBoostTotalAmount,
     dexBoostActive: launch.dexBoostActive,
+    dexPaidOrderCount: launch.dexPaidOrderCount,
+    dexApprovedOrderCount: launch.dexApprovedOrderCount,
+    dexProfilePaid: launch.dexProfilePaid,
+    dexCommunityTakeoverPaid: launch.dexCommunityTakeoverPaid,
+    dexAdsPaid: launch.dexAdsPaid,
+    dexFirstPaidAt: launch.dexFirstPaidAt,
+    dexLastPaidAt: launch.dexLastPaidAt,
     dexUrl: launch.dexUrl,
     pairAddress: launch.pairAddress,
   };
@@ -782,6 +803,7 @@ const LaunchRow = ({
                 <span>DEV {shortAddr(launch.devWallet ?? undefined, 4)}</span>
                 <span>MIGR {shortDate(launch.migrationCreatedAt)}</span>
                 <span>DEX {dexPaid}</span>
+                {launch.dexCommunityTakeoverPaid ? <span className="text-og-gold">CTO paid</span> : null}
                 {watchedDev ? <span className="text-og-lime">dev watched</span> : null}
               </div>
             </div>
@@ -867,12 +889,18 @@ const LaunchAnalyzer = ({ launch, watched, onCopy, onScan, onWatchMint }: { laun
         <Metric label="DEX paid" value={tokenDexPaidLabel(launch)} className={tokenDexPaidLabel(launch) === "—" ? "text-foreground" : "text-og-lime"} />
       </div>
 
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Metric label="Orders" value={`${fmtNum(launch.dexApprovedOrderCount ?? 0)}/${fmtNum(launch.dexPaidOrderCount ?? 0)}`} className={(launch.dexApprovedOrderCount ?? 0) > 0 ? "text-og-lime" : "text-foreground"} />
+        <Metric label="Last paid" value={shortDate(launch.dexLastPaidAt)} className={launch.dexLastPaidAt ? "text-og-gold" : "text-foreground"} />
+      </div>
+
       <div className="mt-4 space-y-2">
         <SignalLine label="Mint authority" ok={Boolean(launch.audit?.mintAuthorityDisabled)} good="disabled" bad="open" />
         <SignalLine label="Freeze authority" ok={Boolean(launch.audit?.freezeAuthorityDisabled)} good="disabled" bad="open" />
         <SignalLine label="Social proof" ok={launch.hasSocials} good="links found" bad="missing" />
         <SignalLine label="Copycat check" ok={!launch.copycatSignal} good="clear" bad="watch" />
         <SignalLine label="DEX boost" ok={tokenDexPaidLabel(launch) !== "—"} good={tokenDexPaidLabel(launch)} bad="none public" />
+        <SignalLine label="CTO order" ok={launch.dexCommunityTakeoverPaid === true} good="paid / public" bad="not public" />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
