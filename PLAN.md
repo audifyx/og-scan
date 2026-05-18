@@ -40,6 +40,8 @@
 - [x] Add **quote-backed LP / LP-pulled exclusion** so dead-liquidity or pulled-pool scams cannot become TRUE OG even if they are first on-chain or show inflated market cap.
 - [x] Add **full frontend-only enrichment** using existing Helius, Birdeye, Pump.fun, and DexScreener APIs: mint/freeze authorities, token accounts, largest holders, creator/funding txs, ATH/ATL, holders, price, liquidity, MC/FDV, Pump.fun creator/bonding/migration duration, all DEX pools, pair dates, boosts, orders, and paid-promotion signals.
 - [x] Hard-block known LP-pulled/scam mint `5sNU6g1qVji5dEBnb6SWSX2Gu2rtDvvk7khKyujj6cuU` and apply the same dead-liquidity logic to future candidates.
+- [x] Add the V3.1 **Dominance Engine** so every same-ticker cluster separates immutable First Mint / Legacy OG proof from the current Primary token by market cap, liquidity depth, holder quality, social adoption, on-chain activity, creator strength, and earliest-mint bonus.
+- [x] Add new classification tiers: `REVIVED OFFICIAL`, `LEGACY OG`, and `CONTESTED`, while keeping LP-pulled/scam tokens excluded before any Primary/Legacy scoring.
 
 ## **Design**
 
@@ -66,6 +68,7 @@
 - [x] Replace internal/Birdeye-rendered chart panels with DexScreener chart embeds and full-chart links.
 - [x] Add a dedicated `/feed` workspace page with spotlight cards, runner board, full live feed rows, and a sticky coin analytics panel.
 - [x] Add Feed panels for viral news catalysts, matched meme coins, suspected bundlers, and dev farming/rug history.
+- [x] Update OG Finder and the shared Coin Intelligence Popup to show Primary Status, Dominance %, rank, First Mint / Legacy OG, mint authority wallet, and clear notes when a later token is dominant but not first on-chain.
 
 ## **Pages / Screens**
 
@@ -89,6 +92,7 @@
 - [x] **Bundle + Dev Risk Analytics**: Feed and coin popups now show holder-owner bundle tracking, suspected bundlers, dev farming scores, rug/dead-coin scores, low-liquidity linked coins, and average linked LP.
 - [x] **News / Viral Catalyst Feed**: Feed now watches RSS/news/X-style Elon, Trump, crypto, and breaking-news catalysts, explains why topics may go viral, and links matching live meme coins when detected.
 - [x] **Expanded Coin Intelligence Popup**: Popup now shows Helius authority truth, largest-holder owner rows, whale counts, creator/funding wallet inference, Pump.fun launch/migration timing, all DexScreener pools, DEX paid orders, boosts, Birdeye ATH/ATL, holders, liquidity, MC, and FDV.
+- [x] **Dominance Engine Output**: Forensic searches now return `primaryToken`, `firstMintToken`, `contestedTokens`, dominance score/rank, first mint authority wallet, and Primary/Legacy/Contested labels for fast memecoin provenance decisions.
 
 ## **Suggested build order**
 

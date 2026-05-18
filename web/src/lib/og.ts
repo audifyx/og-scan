@@ -130,6 +130,9 @@ export type JupTokenInfo = {
   audit?: { mintAuthorityDisabled?: boolean; freezeAuthorityDisabled?: boolean; topHoldersPercentage?: number };
   firstPool?: { createdAt?: string };
   onChainCreatedAt?: string;
+  firstMintAt?: string;
+  firstMintAuthorityWallet?: string | null;
+  firstMintSource?: "helius" | "birdeye" | "pump.fun" | "dex" | "unknown";
   creationSource?: TokenCreationSource;
   ctLikes?: number;
   smartCtLikes?: number;
@@ -360,7 +363,7 @@ function tokenPoolCreatedAtMs(token: JupTokenInfo): number {
 }
 
 function tokenCreatedAtMs(token: JupTokenInfo): number {
-  return isoToMs(token.onChainCreatedAt);
+  return isoToMs(token.firstMintAt ?? token.onChainCreatedAt);
 }
 
 export function tokenOgCreatedAtMs(token: JupTokenInfo): number {
@@ -368,7 +371,7 @@ export function tokenOgCreatedAtMs(token: JupTokenInfo): number {
 }
 
 export function tokenOgCreatedAtIso(token: JupTokenInfo): string | undefined {
-  return Number.isFinite(tokenCreatedAtMs(token)) ? token.onChainCreatedAt : undefined;
+  return Number.isFinite(tokenCreatedAtMs(token)) ? token.firstMintAt ?? token.onChainCreatedAt : undefined;
 }
 
 function createdAtIsoFromMs(createdAtMs: number): string | undefined {
@@ -491,6 +494,9 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
     audit: existing.audit ?? next.audit,
     firstPool: oldestPoolCreatedAtIso ? { createdAt: oldestPoolCreatedAtIso } : existing.firstPool ?? next.firstPool,
     onChainCreatedAt: oldestMintCreatedAtIso ?? existing.onChainCreatedAt ?? next.onChainCreatedAt,
+    firstMintAt: oldestMintCreatedAtIso ?? existing.firstMintAt ?? next.firstMintAt,
+    firstMintAuthorityWallet: existing.firstMintAuthorityWallet ?? next.firstMintAuthorityWallet,
+    firstMintSource: oldestMintCreatedAtIso ? existing.firstMintSource ?? next.firstMintSource ?? "helius" : existing.firstMintSource ?? next.firstMintSource,
     creationSource: oldestMintCreatedAtIso ? "chain" : existing.creationSource ?? next.creationSource,
     ctLikes: existing.ctLikes ?? next.ctLikes,
     smartCtLikes: existing.smartCtLikes ?? next.smartCtLikes,
@@ -1149,6 +1155,9 @@ export async function enrichTokensWithMarketIntel(
       holderCount: token.holderCount ?? marketPatch.holderCount,
       audit: authorityAudit,
       firstPool: oldestPoolCreatedAt ? { createdAt: oldestPoolCreatedAt } : migrationCreatedAt ? { createdAt: migrationCreatedAt } : token.firstPool,
+      firstMintAt: token.firstMintAt ?? token.onChainCreatedAt ?? pumpFun?.launchAt,
+      firstMintAuthorityWallet: token.firstMintAuthorityWallet ?? creatorFunding?.creatorWallet ?? pumpFun?.creator ?? null,
+      firstMintSource: token.firstMintSource ?? (token.onChainCreatedAt ? "helius" : pumpFun?.launchAt ? "pump.fun" : "unknown"),
       allTimeHighUsd: token.allTimeHighUsd ?? ath.price,
       allTimeHighAt: token.allTimeHighAt ?? ath.at,
       allTimeHighSource: token.allTimeHighSource ?? ath.source,
@@ -1372,20 +1381,36 @@ async function withOnChainCreationDates(tokens: JupTokenInfo[]): Promise<JupToke
   return mapWithConcurrency(tokens, 4, async (token) => {
     const chainId: string = token.chainId ?? SOLANA_CHAIN_ID;
     if (!isSolanaChainId(chainId)) {
-      return { ...token, creationSource: token.firstPool?.createdAt ? "pool" : "unknown" };
+      return { ...token, firstMintAt: token.firstMintAt ?? token.onChainCreatedAt, firstMintAuthorityWallet: token.firstMintAuthorityWallet ?? null, firstMintSource: token.firstMintSource ?? "unknown", creationSource: token.firstPool?.createdAt ? "pool" : "unknown" };
     }
-    if (Number.isFinite(tokenCreatedAtMs(token))) return { ...token, chainId, creationSource: "chain" };
+    if (Number.isFinite(tokenCreatedAtMs(token))) {
+      const creatorFunding = token.creatorFunding ?? await tokenCreatorFundingIntel(token.id);
+      return {
+        ...token,
+        chainId,
+        firstMintAt: token.firstMintAt ?? token.onChainCreatedAt,
+        firstMintAuthorityWallet: token.firstMintAuthorityWallet ?? creatorFunding.creatorWallet,
+        firstMintSource: token.firstMintSource ?? "helius",
+        creatorFunding,
+        creationSource: "chain",
+      };
+    }
 
     try {
       const onChainCreatedAt = await mintCreatedAt(token.id);
+      const creatorFunding = await tokenCreatorFundingIntel(token.id);
       return {
         ...token,
         chainId,
         onChainCreatedAt,
+        firstMintAt: token.firstMintAt ?? onChainCreatedAt,
+        firstMintAuthorityWallet: token.firstMintAuthorityWallet ?? creatorFunding.creatorWallet,
+        firstMintSource: token.firstMintSource ?? (onChainCreatedAt ? "helius" : "unknown"),
+        creatorFunding,
         creationSource: onChainCreatedAt ? "chain" : token.firstPool?.createdAt ? "pool" : "unknown",
       };
     } catch {
-      return { ...token, chainId, creationSource: token.firstPool?.createdAt ? "pool" : "unknown" };
+      return { ...token, chainId, firstMintAt: token.firstMintAt ?? token.onChainCreatedAt, firstMintAuthorityWallet: token.firstMintAuthorityWallet ?? token.creatorFunding?.creatorWallet ?? null, firstMintSource: token.firstMintSource ?? "unknown", creationSource: token.firstPool?.createdAt ? "pool" : "unknown" };
     }
   });
 }
@@ -1405,6 +1430,9 @@ export type TokenPrimaryLabel =
   | "TRUE OG"
   | "MIGRATED OG"
   | "OG WITH REVIVAL ACTIVITY"
+  | "REVIVED OFFICIAL"
+  | "LEGACY OG"
+  | "CONTESTED"
   | "LATER OFFICIAL"
   | "CTO"
   | "MIGRATION"
@@ -1436,6 +1464,8 @@ export type TokenLayeredClassification = {
     clone_probability: number;
     cto_probability: number;
     migration_probability: number;
+    dominance_score: number;
+    dominance_rank: number;
   };
   reasoning_summary: string;
   layers: {
@@ -1444,6 +1474,8 @@ export type TokenLayeredClassification = {
     lifecycle_status: string;
   };
 };
+
+export type DominanceTier = "TRUE OG" | "REVIVED OFFICIAL" | "LEGACY OG" | "COPYCAT / CLONE" | "CONTESTED";
 
 export type TokenForensicScores = {
   chainOriginScore: number;
@@ -1474,6 +1506,19 @@ export type TokenForensicScores = {
   deployerTrustScore: number;
   cloneConfidenceScore: number;
   liquidityAuthenticityScore: number;
+  dominanceScore: number;
+  dominanceRank: number;
+  dominanceTier: DominanceTier;
+  marketCapRankScore: number;
+  liquidityDepthPoolAgeScore: number;
+  holderDistributionScore: number;
+  socialNarrativeAdoptionScore: number;
+  onChainActivityScore: number;
+  creatorTeamStrengthScore: number;
+  earliestMintBonusScore: number;
+  isPrimaryToken: boolean;
+  isFirstMintToken: boolean;
+  primaryStatusNote: string;
   classification: TokenLayeredClassification;
   label: ForensicLabel;
   reasons: string[];
@@ -1489,6 +1534,7 @@ export type TokenForensicScores = {
     chronologicalRank: number;
     candidateCount: number;
     liquidityDelayHours?: number;
+    firstMintAuthorityWallet?: string | null;
   };
 };
 
@@ -1515,6 +1561,9 @@ export type ForensicOgReport = {
   narrativeFingerprintId: string;
   generatedAt: string;
   og: JupTokenInfo | null;
+  primaryToken: JupTokenInfo | null;
+  firstMintToken: JupTokenInfo | null;
+  contestedTokens: JupTokenInfo[];
   copycats: JupTokenInfo[];
   candidates: JupTokenInfo[];
   clusterAliases: string[];
@@ -1529,6 +1578,9 @@ export type ForensicOgReport = {
     cloneCount: number;
     migrationCount: number;
     highRiskCount: number;
+    primaryStatus?: DominanceTier;
+    primaryDominanceScore?: number;
+    firstMintAuthorityWallet?: string | null;
   };
 };
 
@@ -1708,7 +1760,100 @@ function scoreSocialAlignment(token: JupTokenInfo, normalizedQuery: string): num
   return clampScore(score);
 }
 
+type DominanceProfile = {
+  token: JupTokenInfo;
+  key: string;
+  dominanceScore: number;
+  marketCapRankScore: number;
+  liquidityDepthPoolAgeScore: number;
+  holderDistributionScore: number;
+  socialNarrativeAdoptionScore: number;
+  onChainActivityScore: number;
+  creatorTeamStrengthScore: number;
+  earliestMintBonusScore: number;
+};
+
+function tokenMarketCapUsd(token: JupTokenInfo): number {
+  return token.mcap ?? token.fdv ?? 0;
+}
+
+function relativeLogScore(value: number | undefined, maxValue: number): number {
+  const safeValue: number = Math.max(0, value ?? 0);
+  const safeMax: number = Math.max(0, maxValue);
+  if (safeMax <= 0) return 35;
+  return clampScore((Math.log10(safeValue + 1) / Math.log10(safeMax + 1)) * 100);
+}
+
+function poolAgeScore(token: JupTokenInfo): number {
+  const poolMs: number = tokenPoolCreatedAtMs(token);
+  if (!Number.isFinite(poolMs)) return 35;
+  const ageDays: number = Math.max(0, (Date.now() - poolMs) / 86_400_000);
+  if (ageDays >= 365) return 100;
+  if (ageDays >= 180) return 88;
+  if (ageDays >= 90) return 72;
+  if (ageDays >= 30) return 55;
+  if (ageDays >= 7) return 38;
+  return 20;
+}
+
+function activityVolumeUsd(token: JupTokenInfo): number {
+  return (token.stats24h?.buyVolume ?? 0) + (token.stats24h?.sellVolume ?? 0);
+}
+
+function creatorStrengthScore(token: JupTokenInfo, deployerTrustScore: number): number {
+  let score: number = deployerTrustScore * 0.72;
+  if (token.creatorFunding?.confidence === "high") score += 12;
+  else if (token.creatorFunding?.confidence === "medium") score += 7;
+  if (token.pumpFun?.creator) score += 6;
+  if (token.isVerified) score += 5;
+  return clampScore(score);
+}
+
+function buildDominanceProfiles(tokens: JupTokenInfo[], normalizedQuery: string, earliestChainMs: number): DominanceProfile[] {
+  const maxMarketCap: number = Math.max(0, ...tokens.map(tokenMarketCapUsd));
+  const maxLiquidity: number = Math.max(0, ...tokens.map(tokenEffectiveLiquidityUsd));
+  const maxHolders: number = Math.max(0, ...tokens.map((token) => token.holderCount ?? 0));
+  const maxActivity: number = Math.max(0, ...tokens.map((token) => activityVolumeUsd(token) + (token.stats24h?.numTraders ?? 0) * 50));
+
+  return tokens.map((token): DominanceProfile => {
+    const deployerTrustScore: number = clampScore(scoreDeployerAuthenticity(token) * 0.62 + scoreHolderDistribution(token) * 0.38);
+    const marketCapRankScore: number = relativeLogScore(tokenMarketCapUsd(token), maxMarketCap);
+    const liquidityDepthPoolAgeScore: number = clampScore(relativeLogScore(tokenEffectiveLiquidityUsd(token), maxLiquidity) * 0.68 + poolAgeScore(token) * 0.32);
+    const holderDistributionScore: number = clampScore(relativeLogScore(token.holderCount, maxHolders) * 0.62 + scoreHolderDistribution(token) * 0.38);
+    const socialNarrativeAdoptionScore: number = clampScore(scoreSocialAlignment(token, normalizedQuery) * 0.48 + scoreOrganicGrowth(token) * 0.28 + (token.isVerified ? 10 : 0) + Math.min(14, ((token.ctLikes ?? 0) + (token.smartCtLikes ?? 0) * 2) / 8));
+    const onChainActivityScore: number = relativeLogScore(activityVolumeUsd(token) + (token.stats24h?.numTraders ?? 0) * 50, maxActivity);
+    const creatorTeamStrengthScore: number = creatorStrengthScore(token, deployerTrustScore);
+    const earliestMintBonusScore: number = scoreByEarliest(tokenCreatedAtMs(token), earliestChainMs, 45);
+    const dominanceScore: number = clampScore(
+      marketCapRankScore * 0.25 +
+        liquidityDepthPoolAgeScore * 0.20 +
+        holderDistributionScore * 0.15 +
+        socialNarrativeAdoptionScore * 0.15 +
+        onChainActivityScore * 0.10 +
+        creatorTeamStrengthScore * 0.08 +
+        earliestMintBonusScore * 0.07 -
+        (hasPulledOrDeadLiquidity(token) ? 55 : 0) -
+        (hasUnsafeTokenAuthority(token) ? 18 : 0),
+    );
+
+    return {
+      token,
+      key: tokenKey(token),
+      dominanceScore,
+      marketCapRankScore,
+      liquidityDepthPoolAgeScore,
+      holderDistributionScore,
+      socialNarrativeAdoptionScore,
+      onChainActivityScore,
+      creatorTeamStrengthScore,
+      earliestMintBonusScore,
+    };
+  });
+}
+
 function classifyRelationship(token: JupTokenInfo, scores: TokenForensicScores, isOg: boolean): TokenLineageNode["relationship"] {
+  if (scores.classification.primary_label === "REVIVED OFFICIAL" || scores.classification.primary_label === "CONTESTED") return "later official";
+  if (scores.classification.primary_label === "LEGACY OG") return "TRUE OG";
   if (isOg) return "TRUE OG";
   if (scores.classification.primary_label === "LATER OFFICIAL") return "later official";
   if (scores.migrationProbability >= 70 && scores.migrationScore >= 65) return "migration";
@@ -1739,6 +1884,11 @@ type LayeredClassificationInput = {
   artificialTrendProbability: number;
   officialVerificationScore: number;
   isLaterOfficial: boolean;
+  dominanceScore: number;
+  dominanceRank: number;
+  dominanceTier: DominanceTier;
+  isPrimaryToken: boolean;
+  isFirstMintToken: boolean;
   firstOnChainProof?: string;
   firstLiquidity?: string;
 };
@@ -1768,12 +1918,23 @@ function buildLayeredClassification(input: LayeredClassificationInput): TokenLay
     artificialTrendProbability,
     officialVerificationScore,
     isLaterOfficial,
+    dominanceScore,
+    dominanceRank,
+    dominanceTier,
+    isPrimaryToken,
+    isFirstMintToken,
     firstOnChainProof,
     firstLiquidity,
   } = input;
 
   let primary_label: TokenPrimaryLabel = "UNKNOWN";
-  if (isOg && originScore >= 75 && ctoScore >= 60 && sameContractContinued) {
+  if (dominanceTier === "CONTESTED" && isPrimaryToken) {
+    primary_label = "CONTESTED";
+  } else if (isFirstMintToken && !isPrimaryToken) {
+    primary_label = "LEGACY OG";
+  } else if (isPrimaryToken && !isFirstMintToken) {
+    primary_label = "REVIVED OFFICIAL";
+  } else if (isOg && originScore >= 75 && ctoScore >= 60 && sameContractContinued) {
     primary_label = "TRUE OG CTO";
   } else if (isOg && originScore >= 68) {
     primary_label = "TRUE OG";
@@ -1798,7 +1959,12 @@ function buildLayeredClassification(input: LayeredClassificationInput): TokenLay
   }
 
   const secondary: string[] = [];
-  if (isOg) secondary.push("Original Contract", "Earliest Verified Origin");
+  if (isPrimaryToken) secondary.push("Primary Token", `Dominance Rank #${dominanceRank}`);
+  if (isFirstMintToken) secondary.push("First Mint", "Earliest Verified Origin");
+  if (isOg) secondary.push("Original Contract");
+  if (primary_label === "LEGACY OG") secondary.push("Surpassed By Dominance", "Still First On-Chain");
+  if (primary_label === "REVIVED OFFICIAL") secondary.push("Later Dominant Token", "Not First Mint");
+  if (dominanceTier === "CONTESTED") secondary.push("Contested Dominance");
   if (isLaterOfficial) secondary.push("Official/Verified Later Launch", "Not Original Mint");
   if (!isOg && cloneScore >= 50 && !isLaterOfficial) secondary.push("Later Copy", "No Origin Priority");
   if (!isOg && revivalScore >= 65) secondary.push("New Contract", "Recreated Narrative");
@@ -1813,9 +1979,13 @@ function buildLayeredClassification(input: LayeredClassificationInput): TokenLay
   if (riskScore >= 65) secondary.push("High Risk");
   if (artificialTrendProbability >= 60) secondary.push("Artificial Trend Risk");
 
-  const origin_identity: string = isOg
-    ? "Original Contract"
-    : isLaterOfficial
+  const origin_identity: string = isFirstMintToken && !isPrimaryToken
+    ? "Legacy First Mint"
+    : isPrimaryToken && !isFirstMintToken
+      ? "Dominant Later Token"
+      : isOg
+        ? "Original Contract"
+        : isLaterOfficial
       ? "Later Official/Verified Token"
       : revivalScore >= 65
         ? "New Contract for Older Narrative"
@@ -1827,7 +1997,13 @@ function buildLayeredClassification(input: LayeredClassificationInput): TokenLay
     : deployerTrustScore >= 65
       ? "Original/Trusted Control Likely"
       : "Control Unknown or Weak";
-  const lifecycle_status: string = migrationScore >= 72 && migrationProbability >= 70
+  const lifecycle_status: string = dominanceTier === "CONTESTED"
+    ? "Contested Primary Battle"
+    : primary_label === "REVIVED OFFICIAL"
+      ? "Revived / Upgraded Primary"
+      : primary_label === "LEGACY OG"
+        ? "Legacy Original Surpassed"
+        : migrationScore >= 72 && migrationProbability >= 70
     ? "Migrated Ecosystem"
     : isLaterOfficial
       ? "Official/Verified Later Launch"
@@ -1842,7 +2018,18 @@ function buildLayeredClassification(input: LayeredClassificationInput): TokenLay
   const proofBits: string[] = [];
   if (firstOnChainProof) proofBits.push(`mint proof ${shortDate(firstOnChainProof)}`);
   if (firstLiquidity) proofBits.push(`first LP ${shortDate(firstLiquidity)}`);
-  const reasoning_summary: string = `${primary_label}: ${isOg ? "earliest credible Solana origin in this narrative cluster" : isLaterOfficial ? "official/verified context detected, but it is not the first credible Solana origin" : "not the earliest credible Solana origin in this narrative cluster"}. ${proofBits.join(" · ") || "historical proof still incomplete"}. Origin ${originScore}%, official ${officialVerificationScore}%, CTO ${ctoScore}%, migration ${migrationScore}%, revival ${revivalScore}%, clone ${cloneScore}%.`;
+  const statusSummary: string = primary_label === "REVIVED OFFICIAL"
+    ? "later mint but now the dominant/primary version by market, liquidity, holder, social, and activity signals"
+    : primary_label === "LEGACY OG"
+      ? "earliest credible Solana mint, but currently surpassed by a stronger primary token"
+      : primary_label === "CONTESTED"
+        ? "multiple versions have similar dominance, so primary status is contested"
+        : isOg
+          ? "earliest credible Solana origin in this narrative cluster"
+          : isLaterOfficial
+            ? "official/verified context detected, but it is not the first credible Solana origin"
+            : "not the earliest credible Solana origin in this narrative cluster";
+  const reasoning_summary: string = `${primary_label}: ${statusSummary}. ${proofBits.join(" · ") || "historical proof still incomplete"}. Dominance ${dominanceScore}% (#${dominanceRank}), origin ${originScore}%, official ${officialVerificationScore}%, CTO ${ctoScore}%, migration ${migrationScore}%, revival ${revivalScore}%, clone ${cloneScore}%.`;
 
   return {
     primary_label,
@@ -1858,6 +2045,8 @@ function buildLayeredClassification(input: LayeredClassificationInput): TokenLay
       clone_probability: cloneProbability,
       cto_probability: ctoProbability,
       migration_probability: migrationProbability,
+      dominance_score: dominanceScore,
+      dominance_rank: dominanceRank,
     },
     reasoning_summary,
     layers: { origin_identity, control_status, lifecycle_status },
@@ -1876,6 +2065,11 @@ function buildForensicScores(
     candidateCount: number;
     isOg: boolean;
     trustedOriginOverride?: boolean;
+    dominanceProfile: DominanceProfile;
+    dominanceRank: number;
+    dominanceTier: DominanceTier;
+    isPrimaryToken: boolean;
+    isFirstMintToken: boolean;
   },
 ): TokenForensicScores {
   const chainCreatedAtMs: number = tokenCreatedAtMs(token);
@@ -1996,6 +2190,18 @@ function buildForensicScores(
       (hasExplicitMigrationSignal ? 7 : 0),
   );
   const isLaterOfficial: boolean = !context.isOg && officialVerificationScore >= 62 && context.chronologicalRank > 1;
+  const dominanceScore: number = context.dominanceProfile.dominanceScore;
+  const dominanceRank: number = context.dominanceRank;
+  const dominanceTier: DominanceTier = context.dominanceTier;
+  const isPrimaryToken: boolean = context.isPrimaryToken;
+  const isFirstMintToken: boolean = context.isFirstMintToken;
+  const primaryStatusNote: string = dominanceTier === "REVIVED OFFICIAL"
+    ? `Later mint (${shortDate(tokenOgCreatedAtIso(token))}) but now the dominant/primary version.`
+    : dominanceTier === "LEGACY OG"
+      ? "First on-chain mint, but a later version now has stronger dominance."
+      : dominanceTier === "CONTESTED"
+        ? "Multiple versions are close in dominance; verify before treating one as primary."
+        : "Earliest mint is also the dominant primary token.";
   const riskScore: number = clampScore(
     cloneScore * 0.24 +
       manipulatedRelaunchProbability * 0.18 +
@@ -2026,6 +2232,11 @@ function buildForensicScores(
     artificialTrendProbability,
     officialVerificationScore,
     isLaterOfficial,
+    dominanceScore,
+    dominanceRank,
+    dominanceTier,
+    isPrimaryToken,
+    isFirstMintToken,
     firstOnChainProof: tokenOgCreatedAtIso(token),
     firstLiquidity: token.firstPool?.createdAt,
   });
@@ -2059,6 +2270,19 @@ function buildForensicScores(
     deployerTrustScore,
     cloneConfidenceScore,
     liquidityAuthenticityScore,
+    dominanceScore,
+    dominanceRank,
+    dominanceTier,
+    marketCapRankScore: context.dominanceProfile.marketCapRankScore,
+    liquidityDepthPoolAgeScore: context.dominanceProfile.liquidityDepthPoolAgeScore,
+    holderDistributionScore: context.dominanceProfile.holderDistributionScore,
+    socialNarrativeAdoptionScore: context.dominanceProfile.socialNarrativeAdoptionScore,
+    onChainActivityScore: context.dominanceProfile.onChainActivityScore,
+    creatorTeamStrengthScore: context.dominanceProfile.creatorTeamStrengthScore,
+    earliestMintBonusScore: context.dominanceProfile.earliestMintBonusScore,
+    isPrimaryToken,
+    isFirstMintToken,
+    primaryStatusNote,
     classification,
     label: classification.primary_label,
     reasons: [] as string[],
@@ -2074,12 +2298,16 @@ function buildForensicScores(
       chronologicalRank: context.chronologicalRank,
       candidateCount: context.candidateCount,
       liquidityDelayHours,
+      firstMintAuthorityWallet: token.firstMintAuthorityWallet ?? token.creatorFunding?.creatorWallet ?? null,
     },
   };
 
   const reasons: string[] = [];
   const warnings: string[] = [];
-  if (context.isOg) reasons.push("Earliest provable candidate in the narrative cluster.");
+  if (isPrimaryToken) reasons.push(`Dominance score ${dominanceScore}% ranks #${dominanceRank} inside this ticker cluster.`);
+  if (isFirstMintToken) reasons.push("Earliest provable candidate in the narrative cluster.");
+  if (classification.primary_label === "REVIVED OFFICIAL") reasons.push("Later token is now primary by dominance engine, but first mint proof remains preserved separately.");
+  if (classification.primary_label === "LEGACY OG") reasons.push("This is the first mint, but another token now dominates the market/community layer.");
   if (classification.primary_label === "TRUE OG CTO") reasons.push("Original CA is still used while control/support appears community-led after deployer inactivity.");
   if (classification.primary_label === "MIGRATED OG") reasons.push("Newer contract has migration-style continuity signals connected to the older narrative.");
   if (classification.primary_label === "LATER OFFICIAL") reasons.push("Official/verified status is detected, but OG status still belongs to the first credible Solana mint in the narrative.");
@@ -2088,7 +2316,7 @@ function buildForensicScores(
   if (Number.isFinite(liquidityCreatedAtMs)) reasons.push(`First liquidity seen: ${shortDate(token.firstPool?.createdAt)}.`);
   if (metadataStability >= 80) reasons.push("Ticker/name metadata remains aligned with the searched narrative.");
   if (liquidityDelayHours != null && liquidityDelayHours > 720) warnings.push("Liquidity appeared long after mint creation; possible migration, revival, CTO rebuild, or delayed launch.");
-  if (classification.primary_label === "LATER OFFICIAL") warnings.push("Official does not mean OG; this token launched after an older credible origin contract.");
+  if (classification.primary_label === "LATER OFFICIAL" || classification.primary_label === "REVIVED OFFICIAL") warnings.push("Official/primary does not erase first-mint history; compare against the Legacy OG before trading.");
   if (cloneScore >= 65 && !context.isOg && classification.primary_label !== "LATER OFFICIAL") warnings.push("Newer than the origin cluster with high narrative overlap.");
   if ((token.audit?.topHoldersPercentage ?? token.topHoldersPercent ?? 0) > 45) warnings.push("Holder concentration is elevated.");
   if (hasPulledOrDeadLiquidity(token)) warnings.push(token.lpPullReason ?? "LP appears pulled/dead and cannot qualify as TRUE OG.");
@@ -2152,6 +2380,9 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     narrativeFingerprintId: narrativeId,
     generatedAt: new Date().toISOString(),
     og: null,
+    primaryToken: null,
+    firstMintToken: null,
+    contestedTokens: [],
     copycats: [],
     candidates: [],
     clusterAliases: [],
@@ -2214,13 +2445,13 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   const eventSorted: JupTokenInfo[] = canonicalCandidate
     ? [canonicalCandidate, ...eventSortedBase.filter((token) => tokenKey(token) !== tokenKey(canonicalCandidate))]
     : eventSortedBase;
-  const og: JupTokenInfo | null = canonicalCandidate ?? eventSorted[0] ?? chainSorted[0] ?? null;
+  const firstMintToken: JupTokenInfo | null = canonicalCandidate ?? eventSorted[0] ?? chainSorted[0] ?? null;
   const canonicalChainMs: number = canonicalCandidate ? tokenCreatedAtMs(canonicalCandidate) : Number.POSITIVE_INFINITY;
   const canonicalLiquidityMs: number = canonicalCandidate ? tokenPoolCreatedAtMs(canonicalCandidate) : Number.POSITIVE_INFINITY;
   const canonicalEventMs: number = canonicalCandidate ? earliestCandidateEventMs(canonicalCandidate) : Number.POSITIVE_INFINITY;
   const earliestChainMs: number = canonicalCandidate && Number.isFinite(canonicalChainMs)
     ? canonicalChainMs
-    : chainSorted.length ? tokenCreatedAtMs(chainSorted[0]) : earliestCandidateEventMs(og ?? candidates[0] ?? ({} as JupTokenInfo));
+    : chainSorted.length ? tokenCreatedAtMs(chainSorted[0]) : earliestCandidateEventMs(firstMintToken ?? candidates[0] ?? ({} as JupTokenInfo));
   const liquidityEvents: number[] = candidates.map(tokenPoolCreatedAtMs).filter((value) => Number.isFinite(value));
   const earliestLiquidityMs: number = canonicalCandidate && Number.isFinite(canonicalLiquidityMs)
     ? canonicalLiquidityMs
@@ -2233,28 +2464,92 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   const chronologicalRankByKey = new Map<string, number>();
   eventSorted.forEach((token: JupTokenInfo, index: number) => chronologicalRankByKey.set(tokenKey(token), index + 1));
 
+  const dominanceProfiles: DominanceProfile[] = buildDominanceProfiles(candidates, normalizedQuery, earliestChainMs).sort((a, b) => b.dominanceScore - a.dominanceScore);
+  const dominanceRankByKey = new Map<string, number>();
+  dominanceProfiles.forEach((profile, index) => dominanceRankByKey.set(profile.key, index + 1));
+  const dominanceProfileByKey = new Map<string, DominanceProfile>(dominanceProfiles.map((profile) => [profile.key, profile]));
+  const firstMintKey: string | undefined = firstMintToken ? tokenKey(firstMintToken) : undefined;
+  const firstMintProfile: DominanceProfile | undefined = firstMintKey ? dominanceProfileByKey.get(firstMintKey) : undefined;
+  const dominanceWinner: DominanceProfile | undefined = dominanceProfiles[0];
+  const contestedProfiles: DominanceProfile[] = dominanceWinner
+    ? dominanceProfiles.filter((profile) => profile.dominanceScore >= 50 && dominanceWinner.dominanceScore - profile.dominanceScore <= 7)
+    : [];
+  const isContestedCluster: boolean = contestedProfiles.length > 1;
+  const hasClearLaterDominance: boolean = Boolean(
+    dominanceWinner &&
+      firstMintProfile &&
+      dominanceWinner.key !== firstMintProfile.key &&
+      dominanceWinner.dominanceScore >= 65 &&
+      dominanceWinner.dominanceScore - firstMintProfile.dominanceScore >= 10 &&
+      !isContestedCluster,
+  );
+  const primaryProfile: DominanceProfile | undefined = isContestedCluster
+    ? dominanceWinner
+    : hasClearLaterDominance
+      ? dominanceWinner
+      : firstMintProfile ?? dominanceWinner;
+  const primaryToken: JupTokenInfo | null = primaryProfile?.token ?? firstMintToken;
+  const primaryKey: string | undefined = primaryToken ? tokenKey(primaryToken) : undefined;
+  const clusterDominanceTier: DominanceTier = isContestedCluster
+    ? "CONTESTED"
+    : hasClearLaterDominance
+      ? "REVIVED OFFICIAL"
+      : primaryKey && firstMintKey && primaryKey === firstMintKey
+        ? "TRUE OG"
+        : "COPYCAT / CLONE";
+
   const tokenScores: Record<string, TokenForensicScores> = {};
   for (const token of candidates) {
-    tokenScores[tokenKey(token)] = buildForensicScores(token, {
+    const key: string = tokenKey(token);
+    const dominanceProfile: DominanceProfile = dominanceProfileByKey.get(key) ?? {
+      token,
+      key,
+      dominanceScore: 0,
+      marketCapRankScore: 0,
+      liquidityDepthPoolAgeScore: 0,
+      holderDistributionScore: 0,
+      socialNarrativeAdoptionScore: 0,
+      onChainActivityScore: 0,
+      creatorTeamStrengthScore: 0,
+      earliestMintBonusScore: 0,
+    };
+    const isFirstMintToken: boolean = Boolean(firstMintKey && key === firstMintKey);
+    const isPrimaryToken: boolean = Boolean(primaryKey && key === primaryKey);
+    const tokenDominanceTier: DominanceTier = isContestedCluster && isPrimaryToken
+      ? "CONTESTED"
+      : isFirstMintToken && !isPrimaryToken
+        ? "LEGACY OG"
+        : isPrimaryToken && !isFirstMintToken
+          ? "REVIVED OFFICIAL"
+          : isPrimaryToken
+            ? "TRUE OG"
+            : "COPYCAT / CLONE";
+    tokenScores[key] = buildForensicScores(token, {
       normalizedQuery,
       narrativeId,
       earliestChainMs,
       earliestLiquidityMs,
       earliestEventMs,
-      chronologicalRank: chronologicalRankByKey.get(tokenKey(token)) ?? candidates.length,
+      chronologicalRank: chronologicalRankByKey.get(key) ?? candidates.length,
       candidateCount: candidates.length,
-      isOg: Boolean(og && tokenKey(token) === tokenKey(og)),
+      isOg: isFirstMintToken,
       trustedOriginOverride: isCanonicalSolanaOriginForQuery(token, clean),
+      dominanceProfile,
+      dominanceRank: dominanceRankByKey.get(key) ?? candidates.length,
+      dominanceTier: tokenDominanceTier,
+      isPrimaryToken,
+      isFirstMintToken,
     });
   }
 
-  const copycats: JupTokenInfo[] = candidates.filter((token) => !og || tokenKey(token) !== tokenKey(og));
+  const og: JupTokenInfo | null = primaryToken;
+  const copycats: JupTokenInfo[] = candidates.filter((token) => !primaryKey || tokenKey(token) !== primaryKey);
   const familyTree: TokenLineageNode[] = candidates.map((token) => {
     const scores: TokenForensicScores = tokenScores[tokenKey(token)];
     return {
       token,
       relationship: classifyRelationship(token, scores, Boolean(og && tokenKey(token) === tokenKey(og))),
-      score: scores.trueOgProbability,
+      score: scores.dominanceScore,
       createdAt: tokenOgCreatedAtIso(token),
       liquidityAt: token.firstPool?.createdAt,
     };
@@ -2271,6 +2566,9 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     narrativeFingerprintId: narrativeId,
     generatedAt: new Date().toISOString(),
     og,
+    primaryToken,
+    firstMintToken,
+    contestedTokens: contestedProfiles.map((profile) => profile.token),
     copycats,
     candidates,
     clusterAliases,
@@ -2280,11 +2578,14 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     summary: {
       candidateCount: candidates.length,
       chainCount: chains.size,
-      earliestProof: og ? tokenOgCreatedAtIso(og) ?? isoFromCandidateEvent(og) : undefined,
+      earliestProof: firstMintToken ? tokenOgCreatedAtIso(firstMintToken) ?? isoFromCandidateEvent(firstMintToken) : undefined,
       earliestLiquidity: createdAtIsoFromMs(earliestLiquidityMs),
-        cloneCount: scoreValues.filter((score) => (score.classification.primary_label === "CLONE" || score.classification.primary_label === "COPYCAT" || score.cloneScore >= 70) && score.classification.primary_label !== "LATER OFFICIAL").length,
+      cloneCount: scoreValues.filter((score) => (score.classification.primary_label === "CLONE" || score.classification.primary_label === "COPYCAT" || score.cloneScore >= 70) && score.classification.primary_label !== "LATER OFFICIAL" && score.classification.primary_label !== "REVIVED OFFICIAL" && score.classification.primary_label !== "LEGACY OG").length,
       migrationCount: scoreValues.filter((score) => score.classification.primary_label === "MIGRATED OG" || score.classification.primary_label === "MIGRATION" || score.classification.primary_label === "MIGRATION CANDIDATE").length,
       highRiskCount: scoreValues.filter((score) => score.riskScore >= 65 || score.walletBehaviorScore < 35).length,
+      primaryStatus: clusterDominanceTier,
+      primaryDominanceScore: primaryProfile?.dominanceScore,
+      firstMintAuthorityWallet: firstMintToken?.firstMintAuthorityWallet ?? firstMintToken?.creatorFunding?.creatorWallet ?? null,
     },
   };
 }

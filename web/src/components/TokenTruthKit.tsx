@@ -184,6 +184,9 @@ export function scoreBarClass(kind: ScoreKind, score: number): string {
 
 export function labelToneClass(label: string): string {
   if (label.includes("TRUE OG")) return "border-og-lime/45 bg-og-lime/10 text-og-lime shadow-[0_0_26px_rgba(0,229,255,0.12)]";
+  if (label.includes("REVIVED OFFICIAL")) return "border-og-cyan/55 bg-og-cyan/10 text-og-cyan shadow-[0_0_26px_rgba(0,229,255,0.12)]";
+  if (label.includes("LEGACY OG")) return "border-og-gold/50 bg-og-gold/10 text-og-gold";
+  if (label.includes("CONTESTED")) return "border-orange-300/55 bg-orange-400/10 text-orange-200";
   if (label.includes("LATER OFFICIAL")) return "border-og-gold/50 bg-og-gold/10 text-og-gold";
   if (label.includes("UNKNOWN") || label.includes("MID RISK")) return "border-orange-300/45 bg-orange-400/10 text-orange-200";
   if (label.includes("CLONE") || label.includes("COPY") || label.includes("RUG")) return "border-og-blood/50 bg-og-blood/10 text-og-blood";
@@ -295,11 +298,23 @@ export function buildTokenRiskAlerts(token: JupTokenInfo, forensic?: TokenForens
 
 export function buildClusterRiskAlerts(report: ForensicOgReport): TokenRiskAlert[] {
   const alerts: TokenRiskAlert[] = [];
-  const ogLiquidity: number = report.og?.liquidity ?? 0;
-  const richerCopycat = report.copycats.find((token) => tokenEffectiveLiquidityUsd(token) > Math.max(25_000, ogLiquidity * 2));
+  const primaryLiquidity: number = report.primaryToken?.liquidity ?? report.og?.liquidity ?? 0;
+  const richerCopycat = report.copycats.find((token) => tokenEffectiveLiquidityUsd(token) > Math.max(25_000, primaryLiquidity * 2));
   const authorityCopycat = report.copycats.find((token) => token.audit?.mintAuthorityDisabled !== true || token.audit?.freezeAuthorityDisabled !== true);
   const lpPulledCopycat = report.copycats.find(hasPulledOrDeadLiquidity);
-  const laterOfficial = report.copycats.find((token) => report.tokenScores[`${token.chainId ?? "solana"}:${token.id}`]?.classification.primary_label === "LATER OFFICIAL");
+  const laterOfficial = report.copycats.find((token) => {
+    const label: string | undefined = report.tokenScores[`${token.chainId ?? "solana"}:${token.id}`]?.classification.primary_label;
+    return label === "LATER OFFICIAL" || label === "REVIVED OFFICIAL";
+  });
+  const legacyOg = report.firstMintToken && report.primaryToken && report.firstMintToken.id !== report.primaryToken.id ? report.firstMintToken : null;
+
+  if (legacyOg) {
+    alerts.push({
+      level: "info",
+      title: "Primary differs from first mint",
+      text: `${shortAddr(report.primaryToken?.id, 5)} is currently primary by dominance score, while ${shortAddr(legacyOg.id, 5)} remains the earliest first-mint / Legacy OG.`,
+    });
+  }
 
   if (lpPulledCopycat) {
     alerts.push({
@@ -321,7 +336,7 @@ export function buildClusterRiskAlerts(report: ForensicOgReport): TokenRiskAlert
     alerts.push({
       level: "info",
       title: "Later official token detected",
-      text: `${shortAddr(laterOfficial.id, 5)} appears verified/official, but launched after the first credible Solana origin. Official status is shown as context, not as OG proof.`,
+      text: `${shortAddr(laterOfficial.id, 5)} appears verified/official or primary, but first-mint provenance is still shown separately so official status cannot erase origin history.`,
     });
   }
 

@@ -166,6 +166,9 @@ function mergeToken(primary: JupTokenInfo, fallback: JupTokenInfo): JupTokenInfo
     audit: primary.audit ?? fallback.audit,
     firstPool: primary.firstPool?.createdAt ? primary.firstPool : fallback.firstPool,
     onChainCreatedAt: primary.onChainCreatedAt ?? fallback.onChainCreatedAt,
+    firstMintAt: primary.firstMintAt ?? fallback.firstMintAt,
+    firstMintAuthorityWallet: primary.firstMintAuthorityWallet ?? fallback.firstMintAuthorityWallet,
+    firstMintSource: primary.firstMintSource ?? fallback.firstMintSource,
     creationSource: primary.creationSource ?? fallback.creationSource,
     allTimeHighUsd: primary.allTimeHighUsd ?? fallback.allTimeHighUsd,
     allTimeHighAt: primary.allTimeHighAt ?? fallback.allTimeHighAt,
@@ -290,7 +293,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const pair = useMemo(() => bestPair(dexPairs ?? []), [dexPairs]);
 
   const { data: enrichedTokens, isFetching: isFetchingToken } = useQuery({
-    queryKey: ["coin-detail-token-intel", token.id, pair?.pairAddress ?? "none", "v9-market-extremes"],
+    queryKey: ["coin-detail-token-intel", token.id, pair?.pairAddress ?? "none", "v10-dominance-engine"],
     queryFn: async (): Promise<JupTokenInfo[]> => {
       const jupTokens = await jupGetTokens([token.id]);
       const base = jupTokens[0] ? mergeToken(jupTokens[0], token) : token;
@@ -324,7 +327,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const pairCreated = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : migratedAt;
 
   const { data: classificationReport, isFetching: isFetchingClassification } = useQuery({
-    queryKey: ["coin-detail-layered-classification", detailToken.symbol, "v9-market-extremes"],
+    queryKey: ["coin-detail-layered-classification", detailToken.symbol, "v10-dominance-engine"],
     queryFn: () => forensicOgAttribution(detailToken.symbol),
     enabled: open && Boolean(detailToken.symbol),
     staleTime: 30_000,
@@ -351,11 +354,15 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const quoteBackedLiquidity: number = tokenEffectiveLiquidityUsd(detailToken);
   const primaryTone: "lime" | "gold" | "cyan" | "blood" | "muted" = primaryLabel.includes("TRUE OG")
     ? "lime"
-    : primaryLabel.includes("CLONE") || primaryLabel.includes("COPY")
-      ? "blood"
-      : primaryLabel.includes("MIGR") || primaryLabel.includes("LATER OFFICIAL")
+    : primaryLabel.includes("REVIVED OFFICIAL")
+      ? "cyan"
+      : primaryLabel.includes("LEGACY OG") || primaryLabel.includes("MIGR") || primaryLabel.includes("LATER OFFICIAL")
         ? "gold"
-        : "cyan";
+        : primaryLabel.includes("CLONE") || primaryLabel.includes("COPY")
+          ? "blood"
+          : primaryLabel.includes("CONTESTED")
+            ? "gold"
+            : "cyan";
 
   const links = useMemo(() => {
     const raw: { label: string; url: string }[] = [];
@@ -437,7 +444,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
           <div className="relative grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(330px,0.65fr)]">
             <div className="grid gap-4">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <IntelCard icon={Radar} label="Main Label" value={primaryLabel} sub={forensicScore ? `origin ${forensicScore.originScore}% · official ${forensicScore.officialVerificationScore}%` : "layered classifier"} tone={primaryTone} helpLabel="MAIN LABEL" />
+                <IntelCard icon={Radar} label="Primary Status" value={primaryLabel} sub={forensicScore ? `dom ${forensicScore.dominanceScore}% #${forensicScore.dominanceRank} · origin ${forensicScore.originScore}%` : "dominance classifier"} tone={primaryTone} helpLabel="MAIN LABEL" />
                 <IntelCard icon={CandlestickChart} label="Price" value={fmtUsd(detailToken.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined))} sub={<span className={isUp24 ? "text-og-lime" : "text-og-blood"}>24H {fmtPct(change24)}</span>} tone={isUp24 ? "lime" : "blood"} />
                 <IntelCard icon={Users} label="Quote-Backed LP" value={fmtUsd(quoteBackedLiquidity)} sub={lpPulled ? "LP pulled/dead liquidity blocked" : `reported ${fmtUsd(detailToken.reportedLiquidity ?? pair?.liquidity?.usd ?? quoteBackedLiquidity)}`} tone={lpPulled ? "blood" : "gold"} />
                 <IntelCard icon={BadgeDollarSign} label="DEX Paid" value={dexPaid} sub={`${fmtNum(detailToken.dexBoostActive ?? pair?.boosts?.active)} active · last ${shortDate(detailToken.dexLastPaidAt)}`} tone={dexPaid === "—" ? "muted" : "lime"} />
@@ -460,6 +467,9 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <MetaLine label="Origin identity" value={forensicScore?.classification.layers.origin_identity ?? "scanning"} />
                   <MetaLine label="Control status" value={forensicScore?.classification.layers.control_status ?? "scanning"} />
                   <MetaLine label="Lifecycle" value={forensicScore?.classification.layers.lifecycle_status ?? "scanning"} />
+                  <MetaLine label="Dominance" value={forensicScore ? `${forensicScore.dominanceScore}% · rank #${forensicScore.dominanceRank}` : "scanning"} />
+                  <MetaLine label="First mint" value={proofTimestampText(createdAt)} />
+                  <MetaLine label="Mint authority" value={shortAddr(detailToken.firstMintAuthorityWallet ?? detailToken.creatorFunding?.creatorWallet, 5)} />
                 </div>
                 {secondaryLabels.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-1 font-mono text-[9px] uppercase tracking-widest">
@@ -530,6 +540,8 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <MetaLine label="ATL MC" value={marketExtremeLine(detailToken.allTimeLowMarketCap, detailToken.allTimeLowMarketCapAt)} />
                   <MetaLine label="Migration" value={shortDate(migratedAt)} />
                   <MetaLine label="Mint proof" value={proofTimestampText(createdAt)} />
+                  <MetaLine label="First mint source" value={detailToken.firstMintSource ?? detailToken.creationSource ?? "unknown"} />
+                  <MetaLine label="First mint authority" value={shortAddr(detailToken.firstMintAuthorityWallet ?? detailToken.creatorFunding?.creatorWallet, 5)} />
                 </div>
               </div>
 
@@ -547,6 +559,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <MetaLine label="Top holders" value={detailToken.topHoldersPercent != null ? `${detailToken.topHoldersPercent.toFixed(1)}%` : detailToken.audit?.topHoldersPercentage != null ? `${detailToken.audit.topHoldersPercentage.toFixed(1)}%` : "—"} />
                   <MetaLine label="Whales" value={fmtNum(detailToken.whaleCount)} />
                   <MetaLine label="Organic score" value={detailToken.organicScore != null ? `${detailToken.organicScore.toFixed(0)} · ${detailToken.organicScoreLabel ?? ""}` : "—"} />
+                  <MetaLine label="Dominance" value={forensicScore ? `${forensicScore.dominanceScore}% · #${forensicScore.dominanceRank}` : "—"} />
                   <MetaLine label="Origin score" value={forensicScore ? `${forensicScore.originScore}%` : "—"} />
                   <MetaLine label="Official status" value={forensicScore ? `${forensicScore.officialVerificationScore}%` : "—"} />
                   <MetaLine label="Clone score" value={forensicScore ? `${forensicScore.cloneScore}%` : "—"} />

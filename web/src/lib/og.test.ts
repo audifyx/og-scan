@@ -283,7 +283,7 @@ describe("jupOgCopycats", () => {
     expect(report.candidates.map((token: JupTokenInfo) => token.id)).not.toContain("5sNU6g1qVji5dEBnb6SWSX2Gu2rtDvvk7khKyujj6cuU");
   });
 
-  it("keeps a two-year-old credible pool as OG over a newer high-liquidity pair", async () => {
+  it("preserves a two-year-old credible pool as Legacy OG while a newer token can become Primary", async () => {
     const olderOg = makeToken({
       id: "two-year-old-og",
       name: "Wojak",
@@ -348,12 +348,13 @@ describe("jupOgCopycats", () => {
 
     const report = await forensicOgAttribution("WOJAK");
 
-    expect(report.og?.id).toBe("two-year-old-og");
-    expect(report.tokenScores["solana:two-year-old-og"]?.classification.primary_label).toBe("TRUE OG");
-    expect(report.tokenScores["solana:five-month-newer-pair"]?.classification.primary_label).not.toBe("TRUE OG");
+    expect(report.firstMintToken?.id).toBe("two-year-old-og");
+    expect(report.og?.id).toBe("five-month-newer-pair");
+    expect(report.tokenScores["solana:two-year-old-og"]?.classification.primary_label).toBe("LEGACY OG");
+    expect(report.tokenScores["solana:five-month-newer-pair"]?.classification.primary_label).toBe("REVIVED OFFICIAL");
   });
 
-  it("uses the oldest credible pool for origin proof even when a newer pool has better liquidity", async () => {
+  it("uses the oldest credible pool for first-mint proof even when a newer pool has better liquidity", async () => {
     const olderOrigin = makeToken({
       id: "older-origin-multi-pool",
       name: "Wojak",
@@ -431,8 +432,9 @@ describe("jupOgCopycats", () => {
 
     const report = await forensicOgAttribution("WOJAK");
 
-    expect(report.og?.id).toBe("older-origin-multi-pool");
-    expect(report.og?.firstPool?.createdAt).toBe("2024-01-15T00:00:00.000Z");
+    expect(report.firstMintToken?.id).toBe("older-origin-multi-pool");
+    expect(report.firstMintToken?.firstPool?.createdAt).toBe("2024-01-15T00:00:00.000Z");
+    expect(report.og?.id).toBe("newer-copy-token");
     expect(report.summary.earliestLiquidity).toBe("2024-01-15T00:00:00.000Z");
   });
 
@@ -547,7 +549,7 @@ describe("jupOgCopycats", () => {
     expect(revivalScore.classification.secondary_labels).toContain("Recreated Narrative");
   });
 
-  it("keeps the first credible Trump mint as OG while labeling a later verified official token separately", async () => {
+  it("keeps the first credible Trump mint as Legacy OG while a later verified token becomes Primary", async () => {
     const firstTrumpMint = makeToken({
       id: "first-trump-mint",
       name: "Trump",
@@ -584,15 +586,17 @@ describe("jupOgCopycats", () => {
 
     const report = await forensicOgAttribution("TRUMP");
     const officialScore = report.tokenScores["solana:later-official-trump"];
+    const legacyScore = report.tokenScores["solana:first-trump-mint"];
 
-    expect(report.og?.id).toBe("first-trump-mint");
-    expect(report.tokenScores["solana:first-trump-mint"]?.classification.primary_label).toBe("TRUE OG");
-    expect(officialScore.classification.primary_label).toBe("LATER OFFICIAL");
-    expect(officialScore.reasons.join(" ")).toContain("Official/verified status is detected");
-    expect(officialScore.warnings.join(" ")).toContain("Official does not mean OG");
+    expect(report.firstMintToken?.id).toBe("first-trump-mint");
+    expect(report.og?.id).toBe("later-official-trump");
+    expect(legacyScore.classification.primary_label).toBe("LEGACY OG");
+    expect(officialScore.classification.primary_label).toBe("REVIVED OFFICIAL");
+    expect(officialScore.reasons.join(" ")).toContain("Later token is now primary by dominance engine");
+    expect(officialScore.warnings.join(" ")).toContain("Official/primary does not erase first-mint history");
   });
 
-  it("keeps a first YE narrative mint as OG even when a later Kanye-linked token is verified", async () => {
+  it("keeps a first YE narrative mint as Legacy OG even when a later Kanye-linked token becomes Primary", async () => {
     const firstYeMint = makeToken({
       id: "first-ye-mint",
       name: "Ye",
@@ -628,9 +632,10 @@ describe("jupOgCopycats", () => {
 
     const report = await forensicOgAttribution("YE");
 
-    expect(report.og?.id).toBe("first-ye-mint");
-    expect(report.tokenScores["solana:first-ye-mint"]?.classification.primary_label).toBe("TRUE OG");
-    expect(report.tokenScores["solana:later-official-ye"]?.classification.primary_label).toBe("LATER OFFICIAL");
+    expect(report.firstMintToken?.id).toBe("first-ye-mint");
+    expect(report.og?.id).toBe("later-official-ye");
+    expect(report.tokenScores["solana:first-ye-mint"]?.classification.primary_label).toBe("LEGACY OG");
+    expect(report.tokenScores["solana:later-official-ye"]?.classification.primary_label).toBe("REVIVED OFFICIAL");
     expect(report.familyTree.find((node) => node.token.id === "later-official-ye")?.relationship).toBe("later official");
   });
 });
