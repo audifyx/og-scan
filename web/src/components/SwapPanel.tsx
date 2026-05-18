@@ -140,7 +140,7 @@ export const SwapPanel = ({ ogMint, onSelectMint }: Props) => {
                   <input
                     value={solAmount}
                     onChange={(e) => setSolAmount(e.target.value.replace(/[^\d.]/g, ""))}
-                    className="w-full bg-transparent font-display text-3xl font-bold outline-none"
+                    className="og-plain-input w-full font-display text-3xl font-bold text-white"
                     placeholder="0.0"
                     inputMode="decimal"
                   />
@@ -212,13 +212,13 @@ export const SwapPanel = ({ ogMint, onSelectMint }: Props) => {
                     </div>
                     <TokenChip icon={og?.icon} symbol={og?.symbol ?? "OG"} />
                   </div>
-                  <div className="flex items-center border border-og-grid bg-og-ink focus-within:border-og-gold">
-                    <Search className="ml-3 h-4 w-4 text-og-gold" />
+                  <div className="og-search-box px-3">
+                    <Search className="h-4 w-4 text-og-gold" />
                     <input
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="WIF · BONK · POPCAT · mint address"
-                      className="w-full bg-transparent px-3 py-4 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                      className="og-search-input px-1 font-mono text-sm tracking-wide"
                     />
                     {isSearching && <Loader2 className="mr-3 h-4 w-4 animate-spin text-og-gold" />}
                   </div>

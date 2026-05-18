@@ -427,7 +427,7 @@ const Range = ({
       max={max}
       value={value}
       onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-      className="w-20 border-none bg-transparent text-right text-foreground outline-none"
+      className="og-filter-input w-24 px-2 py-1 text-right text-foreground outline-none"
     />
     {suffix && <span className="text-og-lime">{suffix}</span>}
   </label>

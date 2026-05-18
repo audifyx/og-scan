@@ -137,25 +137,25 @@ export const OgStats = ({ mint, onSelect }: Props) => {
                   event.preventDefault();
                   submitSearch(query);
                 }}
-                className="overflow-hidden border border-og-lime/40 bg-og-ink/90 shadow-[0_0_28px_rgba(188,255,0,0.10)] focus-within:border-og-lime"
+                className="space-y-3"
               >
-                <div className="flex items-center border-b border-og-grid/80">
-                  <Search className="ml-3 h-4 w-4 text-og-lime" />
+                <div className="og-search-box pl-3">
+                  <Search className="h-4 w-4 text-og-cyan" />
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search $OG, WIF, BONK, token name, or mint…"
-                    className="w-full bg-transparent px-3 py-4 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                    className="og-search-input px-1 font-mono text-sm tracking-wide"
                   />
                   {isSearching && <Loader2 className="mr-3 h-4 w-4 animate-spin text-og-lime" />}
                   <button
                     type="submit"
-                    className="border-l border-og-grid px-4 py-4 text-[11px] font-bold uppercase tracking-widest text-og-lime transition hover:bg-og-lime hover:text-og-ink"
+                    className="og-search-action px-5 text-[11px] font-bold uppercase tracking-widest text-og-cyan transition"
                   >
                     LOAD
                   </button>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2 px-1 py-1">
                   <span className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">quick scan</span>
                   {QUICK_SEARCHES.map((ticker) => (
                     <button

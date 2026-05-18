@@ -95,8 +95,8 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
         </div>
 
         <div className="relative">
-          <div className="flex items-center border border-og-grid bg-og-ink/80 focus-within:border-og-lime">
-            <Search className="ml-3 h-4 w-4 text-og-lime" />
+          <div className="og-search-box px-3">
+            <Search className="h-4 w-4 text-og-cyan" />
             <input
               value={q}
               onChange={(e) => {
@@ -105,7 +105,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
                 (window as unknown as { __og?: number }).__og = window.setTimeout(() => setDebounced(e.target.value.trim()), 300);
               }}
               placeholder="$BONK · WIF · So111…1112"
-              className="w-full bg-transparent px-3 py-4 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              className="og-search-input px-1 font-mono text-sm tracking-wide"
             />
             {isFetching && <Loader2 className="mr-3 h-4 w-4 animate-spin text-og-lime" />}
             <span className="mr-3 hidden text-[10px] uppercase tracking-widest text-muted-foreground sm:inline">
@@ -199,7 +199,7 @@ const FilterNum = ({
       step={step}
       value={value}
       onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-      className="w-20 bg-transparent text-right text-foreground outline-none"
+      className="og-filter-input w-24 px-2 py-1 text-right text-foreground outline-none"
     />
   </label>
 );

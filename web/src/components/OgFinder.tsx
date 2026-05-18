@@ -159,19 +159,19 @@ export const OgFinder = ({ onSelect }: Props) => {
             e.preventDefault();
             submit(q);
           }}
-          className="flex items-center border border-og-grid bg-og-ink/80 focus-within:border-og-gold"
+          className="og-search-box pl-3"
         >
-          <Crosshair className="ml-3 h-4 w-4 text-og-gold" />
+          <Crosshair className="h-4 w-4 text-og-gold" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="$OG · BONK · WIF · MOG"
-            className="w-full bg-transparent px-3 py-4 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            className="og-search-input px-1 font-mono text-sm tracking-wide"
           />
           {isFetching && <Loader2 className="mr-3 h-4 w-4 animate-spin text-og-gold" />}
           <button
             type="submit"
-            className="border-l border-og-grid px-4 py-4 text-[11px] font-bold uppercase tracking-widest text-og-gold transition hover:bg-og-gold hover:text-og-ink"
+            className="og-search-action px-5 text-[11px] font-bold uppercase tracking-widest text-og-gold transition"
           >
             SCAN
           </button>
@@ -301,7 +301,7 @@ const FilterNum = ({
       step={step}
       value={value}
       onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-      className="w-20 bg-transparent text-right text-foreground outline-none"
+      className="og-filter-input w-24 px-2 py-1 text-right text-foreground outline-none"
     />
   </label>
 );
