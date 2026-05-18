@@ -43,6 +43,7 @@
 - [x] Update the Tech page to describe the new attribution pipeline instead of a generic token scanner pipeline.
 - [x] Redesign the full tool workspace with a modern glass shell, stronger page boundaries, clearer tool start/end markers, premium route headers, and improved side navigation without changing routes.
 - [x] Replace the rough nested search/input boxes with a unified premium glass search system across Scanner, OG Finder, Vitals, Pairs, Swap, Migrations, and Trending filters.
+- [x] Rebuild the app workspace around a persistent left sidebar, mobile tool dock, focused top context bar, and single clean tool canvas while preserving every existing route.
 
 ## **Pages / Screens**
 
