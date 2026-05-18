@@ -25,6 +25,8 @@
 - [x] Add chronological origin timelines and token family tree relationships for TRUE OG, early clone, migration, CTO, revival, fake revival, community fork, and exploit copy labels.
 - [x] Keep price, market cap, holders, volume, trend status, and migration status out of OG selection logic.
 - [x] Add a reusable **Coin Intelligence Popup** across tools with image/banner, metadata, live chart, buys/sells, liquidity, DEX paid/boosts, audit data, links, and copy/scan actions.
+- [x] Add a global layered token classification model that returns `primary_label`, `secondary_labels`, `confidence_scores`, and `reasoning_summary` for every narrative cluster.
+- [x] Split classification into **Origin Identity**, **Control Status**, and **Lifecycle Status** so TRUE OG CTO, migrations, revivals, clones, and copycats can all show layered truth without forcing one flat label.
 
 ## **Design**
 
@@ -46,6 +48,7 @@
 - [x] Replace the rough nested search/input boxes with a unified premium glass search system across Scanner, OG Finder, Vitals, Pairs, Swap, Migrations, and Trending filters.
 - [x] Rebuild the app workspace around a persistent left sidebar, mobile tool dock, focused top context bar, and single clean tool canvas while preserving every existing route.
 - [x] Add premium responsive coin detail modals so every tool can inspect a token without leaving the current route or losing context.
+- [x] Surface layered labels and secondary badges across Scanner results, OG Finder cards, lineage reports, and the shared coin intelligence popup.
 
 ## **Pages / Screens**
 
@@ -61,6 +64,7 @@
 - [x] **Forensic OG Finder**: Search a token narrative and return TRUE OG probability, clone probability, migration/CTO/relaunch risk, earliest proof, family tree, and timeline reconstruction.
 - [x] **Forensic Scanner**: Every scan result now shows OG probability, clone probability, attribution label, ATH, migration date, DEX boost/paid status, and mint copy actions.
 - [x] **Coin Intelligence Popup**: Scanner, OG Finder, Vitals, Pairs, Migrations, Trending, Swap, Status Strip, and Snipe Feed now open a shared token detail popup with chart, metadata, buys/sells, links, and safety data.
+- [x] **Layered Classification Output**: Every forensic search now distinguishes TRUE OG CTO vs TRUE OG vs MIGRATED OG vs REVIVAL vs CLONE/COPYCAT using origin, control, lifecycle, confidence scores, and secondary badges.
 
 ## **Suggested build order**
 

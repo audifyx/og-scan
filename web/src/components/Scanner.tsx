@@ -231,9 +231,10 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
   const up = ch >= 0;
   const migrationDate: string = shortDate(tokenMigrationDateIso(t));
   const dexPaid: string = tokenDexPaidLabel(t);
-  const ogProbability: string = score ? `${score.trueOgProbability}%` : "—";
-  const cloneProbability: string = score ? `${score.cloneProbability}%` : "—";
-  const label: string = score?.label ?? "SCANNED";
+  const ogProbability: string = score ? `${score.originScore}%` : "—";
+  const cloneProbability: string = score ? `${score.cloneScore}%` : "—";
+  const label: string = score?.classification.primary_label ?? "SCANNED";
+  const secondaryLabels: string[] = score?.classification.secondary_labels.slice(0, 4) ?? [];
   return (
     <article className="group flex items-center gap-3 border border-og-grid bg-og-ink/70 p-3 text-left transition hover:border-og-lime hover:bg-og-lime/5">
       <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-4 text-left">
@@ -256,13 +257,22 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
             <span>· LQ {fmtUsd(t.liquidity)}</span>
           </div>
           <div className="mt-2 grid grid-cols-3 gap-1.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-            <MiniIntel icon={Fingerprint} label="OG" value={ogProbability} accent={score?.label === "TRUE OG" ? "text-og-lime" : "text-og-gold"} />
-            <MiniIntel icon={ShieldAlert} label="Clone" value={cloneProbability} accent={(score?.cloneProbability ?? 0) >= 58 ? "text-og-blood" : "text-foreground"} />
-            <MiniIntel icon={GitBranch} label="Label" value={label} accent={score?.label === "TRUE OG" ? "text-og-lime" : score ? "text-og-cyan" : undefined} />
+            <MiniIntel icon={Fingerprint} label="Origin" value={ogProbability} accent={label.includes("TRUE OG") ? "text-og-lime" : "text-og-gold"} />
+            <MiniIntel icon={ShieldAlert} label="Clone" value={cloneProbability} accent={(score?.cloneScore ?? 0) >= 70 ? "text-og-blood" : "text-foreground"} />
+            <MiniIntel icon={GitBranch} label="Label" value={label} accent={label.includes("TRUE OG") ? "text-og-lime" : score ? "text-og-cyan" : undefined} />
             <MiniIntel icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
             <MiniIntel icon={Calendar} label="Migrated" value={migrationDate} accent="text-og-cyan" />
             <MiniIntel icon={BadgeDollarSign} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
           </div>
+          {secondaryLabels.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1 font-mono text-[8px] uppercase tracking-widest">
+              {secondaryLabels.map((secondary) => (
+                <span key={secondary} className="border border-og-cyan/30 bg-og-cyan/10 px-1.5 py-0.5 text-og-cyan">
+                  {secondary}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="mt-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">CA {shortAddr(t.id, 5)}</div>
         </div>
       </button>

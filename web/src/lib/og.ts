@@ -705,16 +705,49 @@ function compareByOnChainAgeOnly(a: JupTokenInfo, b: JupTokenInfo): number {
   return normalizeTickerSymbol(a.symbol).localeCompare(normalizeTickerSymbol(b.symbol));
 }
 
-export type ForensicLabel =
+export type TokenPrimaryLabel =
+  | "TRUE OG CTO"
   | "TRUE OG"
+  | "MIGRATED OG"
+  | "OG WITH REVIVAL ACTIVITY"
+  | "CTO"
+  | "MIGRATION"
+  | "MIGRATION CANDIDATE"
+  | "REVIVAL"
+  | "CLONE"
+  | "COPYCAT"
+  | "UNKNOWN";
+
+export type ForensicLabel =
+  | TokenPrimaryLabel
   | "AUTHENTIC"
   | "LIKELY CLONE"
   | "CLONE FARM"
-  | "MIGRATION"
-  | "CTO"
-  | "REVIVAL"
   | "HIGH RISK"
   | "FAKE COMMUNITY TAKEOVER";
+
+export type TokenLayeredClassification = {
+  primary_label: TokenPrimaryLabel;
+  secondary_labels: string[];
+  confidence_scores: {
+    origin_score: number;
+    cto_score: number;
+    migration_score: number;
+    revival_score: number;
+    clone_score: number;
+    risk_score: number;
+    true_og_probability: number;
+    clone_probability: number;
+    cto_probability: number;
+    migration_probability: number;
+  };
+  reasoning_summary: string;
+  layers: {
+    origin_identity: string;
+    control_status: string;
+    lifecycle_status: string;
+  };
+};
 
 export type TokenForensicScores = {
   chainOriginScore: number;
@@ -729,6 +762,12 @@ export type TokenForensicScores = {
   walletBehaviorScore: number;
   liquiditySurvivalScore: number;
   narrativeContinuityScore: number;
+  originScore: number;
+  ctoScore: number;
+  migrationScore: number;
+  revivalScore: number;
+  cloneScore: number;
+  riskScore: number;
   trueOgProbability: number;
   cloneProbability: number;
   manipulatedRelaunchProbability: number;
@@ -738,6 +777,7 @@ export type TokenForensicScores = {
   deployerTrustScore: number;
   cloneConfidenceScore: number;
   liquidityAuthenticityScore: number;
+  classification: TokenLayeredClassification;
   label: ForensicLabel;
   reasons: string[];
   warnings: string[];
@@ -952,16 +992,137 @@ function classifyRelationship(token: JupTokenInfo, scores: TokenForensicScores, 
   return token.isVerified ? "revival" : "exploit copy";
 }
 
-function forensicLabelForScores(scores: Omit<TokenForensicScores, "label">, isOg: boolean): ForensicLabel {
-  if (isOg && scores.trueOgProbability >= 70) return "TRUE OG";
-  if (isOg) return "AUTHENTIC";
-  if (scores.cloneConfidenceScore >= 86) return "CLONE FARM";
-  if (scores.manipulatedRelaunchProbability >= 72) return "FAKE COMMUNITY TAKEOVER";
-  if (scores.migrationProbability >= 68) return "MIGRATION";
-  if (scores.ctoProbability >= 66) return "CTO";
-  if (scores.cloneProbability >= 58) return "LIKELY CLONE";
-  if (scores.deployerTrustScore < 35 || scores.walletBehaviorScore < 30) return "HIGH RISK";
-  return "REVIVAL";
+type LayeredClassificationInput = {
+  token: JupTokenInfo;
+  isOg: boolean;
+  sameContractContinued: boolean;
+  originScore: number;
+  ctoScore: number;
+  migrationScore: number;
+  revivalScore: number;
+  cloneScore: number;
+  riskScore: number;
+  trueOgProbability: number;
+  cloneProbability: number;
+  ctoProbability: number;
+  migrationProbability: number;
+  deployerInactive: number;
+  communityControlShift: number;
+  deployerTrustScore: number;
+  artificialTrendProbability: number;
+  firstOnChainProof?: string;
+  firstLiquidity?: string;
+};
+
+function uniqueLabels(labels: string[]): string[] {
+  return Array.from(new Set(labels.filter((label) => label.trim().length > 0)));
+}
+
+function buildLayeredClassification(input: LayeredClassificationInput): TokenLayeredClassification {
+  const {
+    token,
+    isOg,
+    sameContractContinued,
+    originScore,
+    ctoScore,
+    migrationScore,
+    revivalScore,
+    cloneScore,
+    riskScore,
+    trueOgProbability,
+    cloneProbability,
+    ctoProbability,
+    migrationProbability,
+    deployerInactive,
+    communityControlShift,
+    deployerTrustScore,
+    artificialTrendProbability,
+    firstOnChainProof,
+    firstLiquidity,
+  } = input;
+
+  let primary_label: TokenPrimaryLabel = "UNKNOWN";
+  if (originScore >= 75 && ctoScore >= 60 && sameContractContinued) {
+    primary_label = "TRUE OG CTO";
+  } else if (originScore >= 75) {
+    primary_label = "TRUE OG";
+  } else if (migrationScore >= 70) {
+    primary_label = "MIGRATED OG";
+  } else if (isOg && originScore >= 68 && revivalScore >= 65) {
+    primary_label = "OG WITH REVIVAL ACTIVITY";
+  } else if (ctoScore >= 60) {
+    primary_label = "CTO";
+  } else if (revivalScore >= 65 && migrationScore < 70) {
+    primary_label = "REVIVAL";
+  } else if (migrationScore >= 60) {
+    primary_label = "MIGRATION";
+  } else if (cloneScore >= 70) {
+    primary_label = "CLONE";
+  } else if (cloneScore >= 50) {
+    primary_label = "COPYCAT";
+  } else if (migrationScore >= 55) {
+    primary_label = "MIGRATION CANDIDATE";
+  }
+
+  const secondary: string[] = [];
+  if (isOg) secondary.push("Original Contract", "Earliest Verified Origin");
+  if (!isOg && cloneScore >= 50) secondary.push("Later Copy", "No Origin Priority");
+  if (!isOg && revivalScore >= 65) secondary.push("New Contract", "Recreated Narrative");
+  if (sameContractContinued) secondary.push("Same CA Continued");
+  if (ctoScore >= 60) secondary.push("Community Takeover");
+  if (deployerInactive >= 60) secondary.push("Dev Abandoned");
+  if (communityControlShift >= 60) secondary.push("Community Support Shift");
+  if (migrationScore >= 70) secondary.push("Provable Migration", "Ecosystem Moved");
+  if (migrationScore >= 55 && migrationScore < 70) secondary.push("Weak Migration Proof");
+  if (revivalScore >= 65 && isOg) secondary.push("Revival Activity Around OG");
+  if (riskScore >= 65) secondary.push("High Risk");
+  if (artificialTrendProbability >= 60) secondary.push("Artificial Trend Risk");
+
+  const origin_identity: string = isOg
+    ? "Original Contract"
+    : revivalScore >= 65
+      ? "New Contract for Older Narrative"
+      : cloneScore >= 50
+        ? "Later Copy"
+        : "Unverified Origin";
+  const control_status: string = ctoScore >= 60
+    ? "Community / CTO Controlled"
+    : deployerTrustScore >= 65
+      ? "Original/Trusted Control Likely"
+      : "Control Unknown or Weak";
+  const lifecycle_status: string = migrationScore >= 70
+    ? "Migrated Ecosystem"
+    : revivalScore >= 65
+      ? "Revival Activity"
+      : cloneScore >= 70
+        ? "Clone Lifecycle"
+        : isOg
+          ? "Original Live Contract"
+          : "Unresolved Lifecycle";
+
+  const proofBits: string[] = [];
+  if (firstOnChainProof) proofBits.push(`mint proof ${shortDate(firstOnChainProof)}`);
+  if (firstLiquidity) proofBits.push(`first LP ${shortDate(firstLiquidity)}`);
+  const reasoning_summary: string = `${primary_label}: ${isOg ? "earliest verified contract in this narrative cluster" : "not the earliest verified contract in this narrative cluster"}. ${proofBits.join(" · ") || "historical proof still incomplete"}. Origin ${originScore}%, CTO ${ctoScore}%, migration ${migrationScore}%, revival ${revivalScore}%, clone ${cloneScore}%.`;
+
+  return {
+    primary_label,
+    secondary_labels: uniqueLabels(secondary).slice(0, 8),
+    confidence_scores: {
+      origin_score: originScore,
+      cto_score: ctoScore,
+      migration_score: migrationScore,
+      revival_score: revivalScore,
+      clone_score: cloneScore,
+      risk_score: riskScore,
+      true_og_probability: trueOgProbability,
+      clone_probability: cloneProbability,
+      cto_probability: ctoProbability,
+      migration_probability: migrationProbability,
+    },
+    reasoning_summary,
+    layers: { origin_identity, control_status, lifecycle_status },
+  };
 }
 
 function buildForensicScores(
@@ -1016,15 +1177,110 @@ function buildForensicScores(
         : 16,
   );
   const manipulatedRelaunchProbability: number = clampScore((cloneConfidenceScore * 0.55) + (migrationProbability * 0.25) + ((100 - organicGrowthPattern) * 0.2));
-  const ctoProbability: number = clampScore((cloneConfidenceScore * 0.35) + ((token.isVerified ? 22 : 48)) + (metadataStability > 70 ? 10 : 0));
   const artificialTrendProbability: number = clampScore(((token.dexPaidAmount ?? token.dexBoostTotalAmount ?? 0) > 0 ? 42 : 10) + (100 - organicGrowthPattern) * 0.42 + ((token.stats24h?.numTraders ?? 0) > 800 ? 12 : 0));
   const liquidityAuthenticityScore: number = clampScore(earliestLiquidityScore * 0.35 + liquiditySurvivalScore * 0.4 + (migrationProbability > 65 ? 10 : 25));
   const deployerTrustScore: number = clampScore(deployerAuthenticity * 0.62 + walletBehaviorScore * 0.38);
   const liquidityDelayHours: number | undefined = Number.isFinite(chainCreatedAtMs) && Number.isFinite(liquidityCreatedAtMs)
     ? Math.max(0, (liquidityCreatedAtMs - chainCreatedAtMs) / 3_600_000)
     : undefined;
+  const socialActivityScore: number = clampScore(Math.min(35, ((token.ctLikes ?? 0) + (token.smartCtLikes ?? 0) * 2) / 2) + (token.dexUrl ? 16 : 0) + (token.isVerified ? 12 : 0) + Math.min(25, (token.stats24h?.numTraders ?? 0) / 20));
+  const deployerInactive: number = clampScore((100 - deployerAuthenticity) * 0.5 + (!token.isVerified ? 18 : 0) + (token.audit?.mintAuthorityDisabled ? 10 : 0) + (token.audit?.freezeAuthorityDisabled ? 8 : 0));
+  const communityControlShift: number = clampScore(socialActivityScore * 0.45 + liquiditySurvivalScore * 0.28 + organicGrowthPattern * 0.17 + (context.isOg && deployerInactive >= 55 ? 10 : 0));
+  const sameContractContinued: boolean = context.isOg;
+  const sameContractContinuedScore: number = sameContractContinued ? 100 : 0;
+  const newSocialsAfterAbandonment: number = clampScore(deployerInactive * 0.4 + socialActivityScore * 0.6);
+  const liquidityRebuiltByCommunity: number = clampScore((liquidityDelayHours != null && liquidityDelayHours > 720 ? 58 : 16) + Math.min(34, (token.liquidity ?? 0) / 750));
+  const holderBaseReactivated: number = clampScore(Math.min(72, (token.holderCount ?? 0) / 18) + Math.min(28, (token.stats24h?.numTraders ?? 0) / 12));
+  const originScore: number = clampScore(
+    chainOriginScore * 0.35 +
+      firstTransactionScore * 0.25 +
+      earliestLiquidityScore * 0.20 +
+      firstHolderDistribution * 0.10 +
+      metadataStability * 0.05 +
+      socialOriginAlignment * 0.05,
+  );
+  const ctoScore: number = clampScore(
+    deployerInactive * 0.25 +
+      communityControlShift * 0.25 +
+      sameContractContinuedScore * 0.20 +
+      newSocialsAfterAbandonment * 0.15 +
+      liquidityRebuiltByCommunity * 0.10 +
+      holderBaseReactivated * 0.05,
+  );
+  const ctoProbability: number = ctoScore;
+  const newerThanClusterOrigin: number = context.isOg ? 0 : clampScore(100 - chainOriginScore);
+  const metadataSimilarityToOlderToken: number = metadataStability;
+  const logoSimilarityToOlderToken: number = token.icon ? clampScore(metadataStability * 0.88 + 8) : clampScore(metadataStability * 0.62);
+  const socialSimilarityToOlderToken: number = socialOriginAlignment;
+  const deployerCloneHistory: number = clampScore(100 - deployerTrustScore);
+  const launchTimingNearHypeWave: number = clampScore(artificialTrendProbability * 0.7 + (context.chronologicalRank > 3 ? 18 : 0));
+  const cloneScore: number = clampScore(
+    newerThanClusterOrigin * 0.30 +
+      metadataSimilarityToOlderToken * 0.20 +
+      logoSimilarityToOlderToken * 0.15 +
+      socialSimilarityToOlderToken * 0.15 +
+      deployerCloneHistory * 0.10 +
+      launchTimingNearHypeWave * 0.10,
+  );
+  const newContractForOldNarrative: number = context.isOg ? 0 : clampScore((100 - chainOriginScore) * 0.72 + metadataStability * 0.28);
+  const oldSocialOrNameReused: number = clampScore((metadataStability + socialOriginAlignment) / 2);
+  const largeGapAfterOriginalDeath: number = Number.isFinite(chainCreatedAtMs) && Number.isFinite(context.earliestChainMs)
+    ? clampScore(Math.min(100, Math.max(0, (chainCreatedAtMs - context.earliestChainMs) / 86_400_000 / 3)))
+    : 0;
+  const communityRestartWithoutSameCa: number = context.isOg ? 0 : clampScore(communityControlShift * 0.65 + socialActivityScore * 0.35);
+  const noDirectMigrationProof: number = clampScore(100 - migrationProbability);
+  const revivalScore: number = clampScore(
+    newContractForOldNarrative * 0.35 +
+      oldSocialOrNameReused * 0.20 +
+      largeGapAfterOriginalDeath * 0.15 +
+      communityRestartWithoutSameCa * 0.20 +
+      noDirectMigrationProof * 0.10,
+  );
+  const oldCaToNewCaProof: number = context.isOg ? 0 : migrationProbability;
+  const officialSocialConfirmation: number = context.isOg ? 0 : clampScore((token.isVerified ? 45 : 0) + (token.dexUrl ? 20 : 0) + Math.min(20, (token.ctLikes ?? 0) / 3));
+  const holderMovementDetected: number = context.isOg ? 0 : clampScore(firstHolderDistribution * 0.45 + Math.min(55, (token.holderCount ?? 0) / 60));
+  const liquidityMovementDetected: number = context.isOg ? 0 : clampScore(earliestLiquidityScore * 0.35 + liquiditySurvivalScore * 0.35 + (token.migrationCreatedAt ? 30 : 0));
+  const metadataContinuity: number = metadataStability;
+  const deployerOrTeamContinuity: number = clampScore(deployerTrustScore * 0.55 + (token.isVerified ? 18 : 0));
+  const migrationScore: number = clampScore(
+    oldCaToNewCaProof * 0.35 +
+      officialSocialConfirmation * 0.20 +
+      holderMovementDetected * 0.15 +
+      liquidityMovementDetected * 0.15 +
+      metadataContinuity * 0.10 +
+      deployerOrTeamContinuity * 0.05,
+  );
+  const riskScore: number = clampScore(
+    cloneScore * 0.26 +
+      manipulatedRelaunchProbability * 0.20 +
+      artificialTrendProbability * 0.18 +
+      (100 - deployerTrustScore) * 0.18 +
+      (100 - liquidityAuthenticityScore) * 0.10 +
+      ((token.audit?.topHoldersPercentage ?? 0) > 45 ? 8 : 0),
+  );
+  const classification: TokenLayeredClassification = buildLayeredClassification({
+    token,
+    isOg: context.isOg,
+    sameContractContinued,
+    originScore,
+    ctoScore,
+    migrationScore,
+    revivalScore,
+    cloneScore,
+    riskScore,
+    trueOgProbability,
+    cloneProbability,
+    ctoProbability,
+    migrationProbability,
+    deployerInactive,
+    communityControlShift,
+    deployerTrustScore,
+    artificialTrendProbability,
+    firstOnChainProof: tokenOgCreatedAtIso(token),
+    firstLiquidity: token.firstPool?.createdAt,
+  });
 
-  const withoutLabel = {
+  const baseScore = {
     chainOriginScore,
     earliestLiquidityScore,
     firstTransactionScore,
@@ -1037,6 +1293,12 @@ function buildForensicScores(
     walletBehaviorScore,
     liquiditySurvivalScore,
     narrativeContinuityScore,
+    originScore,
+    ctoScore,
+    migrationScore,
+    revivalScore,
+    cloneScore,
+    riskScore,
     trueOgProbability,
     cloneProbability,
     manipulatedRelaunchProbability,
@@ -1046,6 +1308,8 @@ function buildForensicScores(
     deployerTrustScore,
     cloneConfidenceScore,
     liquidityAuthenticityScore,
+    classification,
+    label: classification.primary_label,
     reasons: [] as string[],
     warnings: [] as string[],
     evidence: {
@@ -1062,20 +1326,22 @@ function buildForensicScores(
     },
   };
 
-  const label: ForensicLabel = forensicLabelForScores(withoutLabel, context.isOg);
   const reasons: string[] = [];
   const warnings: string[] = [];
   if (context.isOg) reasons.push("Earliest provable candidate in the narrative cluster.");
+  if (classification.primary_label === "TRUE OG CTO") reasons.push("Original CA is still used while control/support appears community-led after deployer inactivity.");
+  if (classification.primary_label === "MIGRATED OG") reasons.push("Newer contract has migration-style continuity signals connected to the older narrative.");
+  if (classification.primary_label === "REVIVAL") reasons.push("Later contract appears to restart an older narrative without being the original CA.");
   if (Number.isFinite(chainCreatedAtMs)) reasons.push(`On-chain mint proof: ${shortDate(token.onChainCreatedAt)}.`);
   if (Number.isFinite(liquidityCreatedAtMs)) reasons.push(`First liquidity seen: ${shortDate(token.firstPool?.createdAt)}.`);
   if (metadataStability >= 80) reasons.push("Ticker/name metadata remains aligned with the searched narrative.");
-  if (liquidityDelayHours != null && liquidityDelayHours > 720) warnings.push("Liquidity appeared long after mint creation; possible migration, revival, or delayed launch.");
-  if (cloneConfidenceScore >= 65 && !context.isOg) warnings.push("Newer than the origin cluster with high narrative overlap.");
+  if (liquidityDelayHours != null && liquidityDelayHours > 720) warnings.push("Liquidity appeared long after mint creation; possible migration, revival, CTO rebuild, or delayed launch.");
+  if (cloneScore >= 65 && !context.isOg) warnings.push("Newer than the origin cluster with high narrative overlap.");
   if ((token.audit?.topHoldersPercentage ?? 0) > 45) warnings.push("Holder concentration is elevated.");
   if (!token.audit?.mintAuthorityDisabled || !token.audit?.freezeAuthorityDisabled) warnings.push("Mint/freeze authority is not fully disabled in registry data.");
   if (artificialTrendProbability >= 60) warnings.push("Boost/trend pattern may be artificial and is not used to decide OG status.");
 
-  return { ...withoutLabel, label, reasons, warnings };
+  return { ...baseScore, reasons, warnings };
 }
 
 function buildTimeline(candidates: JupTokenInfo[]): ForensicTimelineEvent[] {
@@ -1227,9 +1493,9 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
       chainCount: chains.size,
       earliestProof: og ? tokenOgCreatedAtIso(og) ?? isoFromCandidateEvent(og) : undefined,
       earliestLiquidity: createdAtIsoFromMs(earliestLiquidityMs),
-      cloneCount: scoreValues.filter((score) => score.cloneProbability >= 58).length,
-      migrationCount: scoreValues.filter((score) => score.migrationProbability >= 60).length,
-      highRiskCount: scoreValues.filter((score) => score.label === "HIGH RISK" || score.walletBehaviorScore < 35).length,
+        cloneCount: scoreValues.filter((score) => score.classification.primary_label === "CLONE" || score.classification.primary_label === "COPYCAT" || score.cloneScore >= 70).length,
+      migrationCount: scoreValues.filter((score) => score.classification.primary_label === "MIGRATED OG" || score.classification.primary_label === "MIGRATION" || score.classification.primary_label === "MIGRATION CANDIDATE").length,
+      highRiskCount: scoreValues.filter((score) => score.riskScore >= 65 || score.walletBehaviorScore < 35).length,
     },
   };
 }

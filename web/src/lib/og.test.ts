@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { jupOgCopycats, type JupTokenInfo } from "./og";
+import { forensicOgAttribution, jupOgCopycats, type JupTokenInfo } from "./og";
 
 const daysAgoIso = (days: number): string => new Date(Date.now() - days * 86_400_000).toISOString();
 
@@ -84,5 +84,89 @@ describe("jupOgCopycats", () => {
 
     expect(result.og?.id).toBe("original-mint-token");
     expect(result.copycats.map((token: JupTokenInfo) => token.id)).toContain("older-migrated-pool-token");
+  });
+
+  it("labels the original contract under community control as TRUE OG CTO instead of REVIVAL", async () => {
+    const trueOgCto = makeToken({
+      id: "true-og-cto-token",
+      liquidity: 120_000,
+      holderCount: 12_000,
+      organicScore: 10,
+      ctLikes: 240,
+      smartCtLikes: 80,
+      dexUrl: "https://dexscreener.com/solana/true-og-cto-token",
+      stats24h: { numBuys: 1_200, numSells: 900, numTraders: 1_800 },
+      firstPool: { createdAt: daysAgoIso(1) },
+      onChainCreatedAt: daysAgoIso(800),
+      audit: {
+        mintAuthorityDisabled: true,
+        freezeAuthorityDisabled: true,
+        topHoldersPercentage: 62,
+      },
+    });
+    const laterRecreated = makeToken({
+      id: "later-recreated-token",
+      liquidity: 2_000_000,
+      holderCount: 50_000,
+      organicScore: 9,
+      isVerified: true,
+      firstPool: { createdAt: daysAgoIso(20) },
+      onChainCreatedAt: daysAgoIso(20),
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => [laterRecreated, trueOgCto],
+      }))
+    );
+
+    const report = await forensicOgAttribution("WOJAK");
+    const score = report.tokenScores["solana:true-og-cto-token"];
+
+    expect(report.og?.id).toBe("true-og-cto-token");
+    expect(score.classification.primary_label).toBe("TRUE OG CTO");
+    expect(score.classification.secondary_labels).toContain("Original Contract");
+    expect(score.classification.secondary_labels).toContain("Community Takeover");
+    expect(score.classification.secondary_labels).toContain("Same CA Continued");
+  });
+
+  it("uses REVIVAL only for a later new contract that restarts an older narrative", async () => {
+    const original = makeToken({
+      id: "original-narrative-token",
+      firstPool: { createdAt: daysAgoIso(700) },
+      onChainCreatedAt: daysAgoIso(700),
+      liquidity: 14_000,
+      holderCount: 1_000,
+      isVerified: true,
+    });
+    const revival = makeToken({
+      id: "later-revival-token",
+      firstPool: { createdAt: daysAgoIso(30) },
+      onChainCreatedAt: daysAgoIso(30),
+      liquidity: 900_000,
+      holderCount: 30_000,
+      organicScore: 10,
+      isVerified: true,
+      dexUrl: "https://dexscreener.com/solana/later-revival-token",
+      stats24h: { numBuys: 900, numSells: 850, numTraders: 1_000 },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => [revival, original],
+      }))
+    );
+
+    const report = await forensicOgAttribution("WOJAK");
+    const revivalScore = report.tokenScores["solana:later-revival-token"];
+
+    expect(report.og?.id).toBe("original-narrative-token");
+    expect(revivalScore.classification.primary_label).toBe("REVIVAL");
+    expect(revivalScore.classification.secondary_labels).toContain("New Contract");
+    expect(revivalScore.classification.secondary_labels).toContain("Recreated Narrative");
   });
 });
