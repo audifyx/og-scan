@@ -1714,6 +1714,32 @@ export type TokenDevLaunchIntel = {
   sampleMints: string[];
   lastSeenAt?: string;
   notes: string[];
+  farmingRiskScore?: number;
+  rugRiskScore?: number;
+  devRiskLabel?: "low" | "watch" | "high" | "severe";
+  ruggedCoinCount?: number;
+  suspiciousCoinCount?: number;
+  lowLiquidityCoinCount?: number;
+  averageLiquidity?: number;
+  riskNotes?: string[];
+};
+
+export type TokenHolderBundleIntel = {
+  status: "Likely bundled" | "Bundle watch" | "No bundle signal";
+  score: number;
+  confidence: "high" | "medium" | "low";
+  bundleCount: number;
+  topHolderPercent: number;
+  top10Percent: number;
+  suspectedBundlers: {
+    owner: string;
+    tokenAccount: string;
+    uiAmount: number;
+    percent: number;
+    label: string;
+  }[];
+  evidence: string[];
+  trackingNotes: string[];
 };
 
 export async function heliusTxs(address: string, limit = 25): Promise<HeliusTx[]> {
@@ -1774,6 +1800,14 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
         ctoOrderCount: token.dexCommunityTakeoverPaid ? 1 : 0,
         sampleMints: [],
         notes: ["Dev wallet inference currently runs on Solana public transaction history."],
+        farmingRiskScore: 0,
+        rugRiskScore: 0,
+        devRiskLabel: "low",
+        ruggedCoinCount: 0,
+        suspiciousCoinCount: 0,
+        lowLiquidityCoinCount: 0,
+        averageLiquidity: 0,
+        riskNotes: ["No Solana dev-wallet farming graph was available for this chain."],
       };
     }
 
@@ -1804,6 +1838,14 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
         ctoOrderCount: tokenOrders.communityTakeoverPaid ? 1 : 0,
         sampleMints: [token.id],
         notes: ["Creator wallet could not be confidently inferred from early token transactions."],
+        farmingRiskScore: 18,
+        rugRiskScore: 12,
+        devRiskLabel: "low",
+        ruggedCoinCount: 0,
+        suspiciousCoinCount: 0,
+        lowLiquidityCoinCount: token.liquidity != null && token.liquidity < 1_000 ? 1 : 0,
+        averageLiquidity: token.liquidity ?? 0,
+        riskNotes: ["Creator wallet could not be confidently inferred, so farming/rug history is limited."],
       };
     }
 
@@ -1826,12 +1868,18 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
     const orderSummaries = orderResults.status === "fulfilled" ? orderResults.value : [];
     const bondedMints = new Set<string>();
     const activeBoostedMints = new Set<string>();
+    const liquidityByMint = new Map<string, number>();
+    const volumeByMint = new Map<string, number>();
 
     for (const pair of pairs) {
       const mint = pair.baseToken?.address;
       if (!mint) continue;
-      if (pair.pairAddress || pair.pairCreatedAt || (pair.liquidity?.usd ?? 0) > 0) bondedMints.add(mint);
+      const liquidity: number = pair.liquidity?.usd ?? 0;
+      const volume24h: number = pair.volume?.h24 ?? 0;
+      if (pair.pairAddress || pair.pairCreatedAt || liquidity > 0) bondedMints.add(mint);
       if ((pair.boosts?.active ?? 0) > 0) activeBoostedMints.add(mint);
+      liquidityByMint.set(mint, Math.max(liquidityByMint.get(mint) ?? 0, liquidity));
+      volumeByMint.set(mint, Math.max(volumeByMint.get(mint) ?? 0, volume24h));
     }
     for (const mint of sampleMints) {
       const boost = boostByMint.get(mint);
@@ -1843,6 +1891,26 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
       return (boost?.totalAmount ?? boost?.amount ?? 0) > 0;
     }).length;
     const ctoOrderCount = orderSummaries.filter((summary) => summary.communityTakeoverPaid).length;
+    const lowLiquidityCoinCount: number = sampleMints.filter((mint: string): boolean => (liquidityByMint.get(mint) ?? 0) > 0 && (liquidityByMint.get(mint) ?? 0) < 1_500).length;
+    const deadBondedCoinCount: number = sampleMints.filter((mint: string): boolean => bondedMints.has(mint) && (liquidityByMint.get(mint) ?? 0) < 400 && (volumeByMint.get(mint) ?? 0) < 1_000).length;
+    const suspiciousCoinCount: number = sampleMints.filter((mint: string, index: number): boolean => {
+      const liquidity: number = liquidityByMint.get(mint) ?? 0;
+      const volume: number = volumeByMint.get(mint) ?? 0;
+      const order = orderSummaries[index];
+      return (liquidity > 0 && liquidity < 1_500) || volume > Math.max(10_000, liquidity * 8) || (order?.approvedOrders ?? 0) > 0;
+    }).length;
+    const liquidityValues: number[] = sampleMints.map((mint: string): number => liquidityByMint.get(mint) ?? 0).filter((value: number): boolean => value > 0);
+    const averageLiquidity: number = liquidityValues.length ? liquidityValues.reduce((sum: number, value: number): number => sum + value, 0) / liquidityValues.length : 0;
+    const farmingRiskScore: number = clampScore(sampleMints.length * 4 + Math.max(0, sampleMints.length - bondedMints.size) * 3 + dexPaidCoinCount * 5 + lowLiquidityCoinCount * 7);
+    const rugRiskScore: number = clampScore(deadBondedCoinCount * 18 + lowLiquidityCoinCount * 10 + suspiciousCoinCount * 5 + (averageLiquidity > 0 && averageLiquidity < 2_000 ? 16 : 0));
+    const combinedDevRisk: number = clampScore(farmingRiskScore * 0.55 + rugRiskScore * 0.45);
+    const devRiskLabel: TokenDevLaunchIntel["devRiskLabel"] = combinedDevRisk >= 78 ? "severe" : combinedDevRisk >= 58 ? "high" : combinedDevRisk >= 34 ? "watch" : "low";
+    const riskNotes: string[] = [];
+    if (sampleMints.length >= 10) riskNotes.push(`${sampleMints.length} recent token mints linked to inferred creator wallet`);
+    if (deadBondedCoinCount > 0) riskNotes.push(`${deadBondedCoinCount} bonded coins look dead/thin-liquidity`);
+    if (lowLiquidityCoinCount > 0) riskNotes.push(`${lowLiquidityCoinCount} linked coins have low liquidity`);
+    if (dexPaidCoinCount > 2) riskNotes.push(`${Math.min(sampleMints.length, dexPaidCoinCount)} linked coins used DEX paid/boost orders`);
+    if (riskNotes.length === 0) riskNotes.push("No strong public farming/rug pattern in sampled wallet activity.");
     const notes: string[] = [
       "Dev history is inferred from early fee-payer and recent wallet token activity.",
       "Bonded means a public DexScreener pair/liquidity route was found for that mint.",
@@ -1861,6 +1929,14 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
       sampleMints,
       lastSeenAt: txLastSeenIso(devTxs),
       notes,
+      farmingRiskScore,
+      rugRiskScore,
+      devRiskLabel,
+      ruggedCoinCount: deadBondedCoinCount,
+      suspiciousCoinCount,
+      lowLiquidityCoinCount,
+      averageLiquidity,
+      riskNotes,
     };
   })();
 
@@ -1914,6 +1990,143 @@ export async function heliusTokenSupply(mint: string): Promise<{ amount: string;
   if (!res.ok) return null;
   const j = (await res.json()) as { result?: { value?: { amount: string; decimals: number; uiAmount: number } } };
   return j.result?.value ?? null;
+}
+
+type ParsedTokenAccountOwner = {
+  owner?: string;
+  tokenAmount?: { uiAmount?: number | null; decimals?: number; amount?: string };
+};
+
+type RpcParsedAccountValue = {
+  data?: { parsed?: { info?: ParsedTokenAccountOwner } };
+};
+
+async function heliusTokenAccountOwners(tokenAccounts: string[]): Promise<Map<string, string>> {
+  const cleanAccounts: string[] = Array.from(new Set(tokenAccounts.filter(Boolean))).slice(0, 100);
+  const owners = new Map<string, string>();
+  if (cleanAccounts.length === 0) return owners;
+
+  const body = {
+    jsonrpc: "2.0",
+    id: "og-token-account-owners",
+    method: "getMultipleAccounts",
+    params: [cleanAccounts, { encoding: "jsonParsed", commitment: "confirmed" }],
+  };
+  const res = await fetch(HELIUS_RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) return owners;
+  const json = (await res.json()) as { result?: { value?: (RpcParsedAccountValue | null)[] } };
+  const values = json.result?.value ?? [];
+  cleanAccounts.forEach((account: string, index: number): void => {
+    const owner: string | undefined = values[index]?.data?.parsed?.info?.owner;
+    if (owner) owners.set(account, owner);
+  });
+  return owners;
+}
+
+const holderBundleIntelCache = new Map<string, Promise<TokenHolderBundleIntel>>();
+
+export async function tokenHolderBundleIntel(token: JupTokenInfo): Promise<TokenHolderBundleIntel> {
+  const chainId: string = token.chainId ?? "solana";
+  const cacheKey = `${chainId}:${token.id}`;
+  const cached = holderBundleIntelCache.get(cacheKey);
+  if (cached) return cached;
+
+  const task = (async (): Promise<TokenHolderBundleIntel> => {
+    if (chainId !== "solana") {
+      return {
+        status: "No bundle signal",
+        score: 0,
+        confidence: "low",
+        bundleCount: 0,
+        topHolderPercent: 0,
+        top10Percent: 0,
+        suspectedBundlers: [],
+        evidence: ["Bundle owner tracking currently uses Solana token-account data."],
+        trackingNotes: ["No Solana holder owner graph was available for this chain."],
+      };
+    }
+
+    const [largestResult, supplyResult] = await Promise.allSettled([
+      heliusLargestAccounts(token.id),
+      heliusTokenSupply(token.id),
+    ]);
+    const largest: LargestAccount[] = largestResult.status === "fulfilled" ? largestResult.value.slice(0, 20) : [];
+    const supply = supplyResult.status === "fulfilled" ? supplyResult.value : null;
+    const supplyUi: number = supply?.uiAmount && Number.isFinite(supply.uiAmount) ? supply.uiAmount : largest.reduce((sum: number, account: LargestAccount): number => sum + (account.uiAmount ?? 0), 0);
+    const ownerByAccount: Map<string, string> = await heliusTokenAccountOwners(largest.map((account: LargestAccount): string => account.address));
+
+    const holders = largest.map((account: LargestAccount, index: number) => {
+      const uiAmount: number = account.uiAmount ?? 0;
+      const percent: number = supplyUi > 0 ? (uiAmount / supplyUi) * 100 : 0;
+      return {
+        owner: ownerByAccount.get(account.address) ?? account.address,
+        tokenAccount: account.address,
+        uiAmount,
+        percent,
+        label: index === 0 ? "largest holder" : percent >= 5 ? "major holder cluster" : percent >= 1.5 ? "bundle-sized wallet" : "tracked holder",
+      };
+    });
+
+    const topHolderPercent: number = holders[0]?.percent ?? token.audit?.topHoldersPercentage ?? 0;
+    const top10Percent: number = holders.slice(0, 10).reduce((sum: number, holder): number => sum + holder.percent, 0);
+    const suspectedBundlers = holders.filter((holder) => holder.percent >= 1.5).slice(0, 8);
+    const bundleCount: number = suspectedBundlers.length;
+    const evidence: string[] = [];
+    let score = 6;
+
+    if (topHolderPercent >= 20) {
+      score += 30;
+      evidence.push(`largest holder controls ${topHolderPercent.toFixed(1)}%`);
+    } else if (topHolderPercent >= 10) {
+      score += 16;
+      evidence.push(`largest holder controls ${topHolderPercent.toFixed(1)}%`);
+    }
+    if (top10Percent >= 55) {
+      score += 30;
+      evidence.push(`top 10 holders control ${top10Percent.toFixed(1)}%`);
+    } else if (top10Percent >= 35) {
+      score += 16;
+      evidence.push(`top 10 holders control ${top10Percent.toFixed(1)}%`);
+    }
+    if (bundleCount >= 8) {
+      score += 18;
+      evidence.push(`${bundleCount} bundle-sized wallets found`);
+    } else if (bundleCount >= 4) {
+      score += 10;
+      evidence.push(`${bundleCount} bundle-sized wallets found`);
+    }
+    if ((token.audit?.topHoldersPercentage ?? 0) >= 45) {
+      score += 16;
+      evidence.push(`registry top-holder concentration ${token.audit?.topHoldersPercentage?.toFixed(1)}%`);
+    }
+    if (evidence.length === 0) evidence.push("no major holder concentration signal in largest-account sample");
+
+    const safeScore: number = clampScore(score);
+    const status: TokenHolderBundleIntel["status"] = safeScore >= 65 ? "Likely bundled" : safeScore >= 35 ? "Bundle watch" : "No bundle signal";
+    const confidence: TokenHolderBundleIntel["confidence"] = largest.length >= 10 && ownerByAccount.size >= 5 ? "high" : largest.length >= 5 ? "medium" : "low";
+
+    return {
+      status,
+      score: safeScore,
+      confidence,
+      bundleCount,
+      topHolderPercent,
+      top10Percent,
+      suspectedBundlers,
+      evidence: evidence.slice(0, 5),
+      trackingNotes: [
+        "Bundler identity is inferred from largest token-account owners, not private exchange custody labels.",
+        "Use suspected wallet rows as a tracking shortlist for concentration, linked-wallet, and sell-pressure monitoring.",
+      ],
+    };
+  })();
+
+  holderBundleIntelCache.set(cacheKey, task);
+  return task;
 }
 
 export async function heliusSlot(): Promise<number | null> {

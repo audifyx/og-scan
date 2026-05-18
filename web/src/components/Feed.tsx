@@ -8,6 +8,7 @@ import {
   Crosshair,
   ExternalLink,
   Loader2,
+  Newspaper,
   Radio,
   RefreshCw,
   ShieldAlert,
@@ -34,17 +35,20 @@ import {
   jupTopOrganic,
   jupTopTraded,
   jupTrending,
+  normalizeNarrativeText,
   shortAddr,
   shortDate,
   timeAgo,
   tokenDevLaunchIntel,
   tokenDexPaidLabel,
+  tokenHolderBundleIntel,
   type DexBoostInfo,
   type DexSearchPair,
   type ForensicOgReport,
   type JupTokenInfo,
   type TokenDevLaunchIntel,
   type TokenForensicScores,
+  type TokenHolderBundleIntel,
 } from "@/lib/og";
 
 type Props = { onSelect: (mint: string) => void };
@@ -64,6 +68,9 @@ type BundleSignal = {
   score: number;
   tone: "blood" | "gold" | "lime";
   reasons: string[];
+  estimatedBundleCount: number;
+  suspectedBundlers: string[];
+  trackingSummary: string;
 };
 
 type FeedCoin = {
@@ -80,10 +87,23 @@ type FeedCoin = {
   bundle: BundleSignal;
 };
 
+type ViralCatalyst = {
+  id: string;
+  title: string;
+  source: string;
+  sourceKind: "rss" | "x" | "news";
+  link?: string;
+  publishedAt?: string;
+  keywords: string[];
+  whyViral: string;
+  matchedCoins: { mint: string; symbol: string; name: string; reason: string }[];
+};
+
 type FeedPayload = {
   coins: FeedCoin[];
   spotlights: FeedCoin[];
   runners: FeedCoin[];
+  catalysts: ViralCatalyst[];
   updatedAt: string;
   sourceCount: number;
 };
@@ -247,9 +267,19 @@ function bundleSignal(token: JupTokenInfo, pair: DexSearchPair | undefined): Bun
   }
 
   const safeScore: number = Math.max(0, Math.min(100, Math.round(score)));
-  if (safeScore >= 65) return { label: "Likely bundled", score: safeScore, tone: "blood", reasons: reasons.slice(0, 4) };
-  if (safeScore >= 35) return { label: "Bundle watch", score: safeScore, tone: "gold", reasons: reasons.slice(0, 4) };
-  return { label: "No bundle signal", score: safeScore, tone: "lime", reasons: reasons.length ? reasons.slice(0, 3) : ["no major concentration signal"] };
+  const estimatedBundleCount: number = Math.max(
+    topHolders >= 60 ? 8 : topHolders >= 42 ? 5 : topHolders >= 28 ? 3 : 0,
+    buyPressure5m >= 0.82 && txns5m >= 12 ? 4 : 0,
+  );
+  const suspectedBundlers: string[] = estimatedBundleCount > 0
+    ? Array.from({ length: Math.min(estimatedBundleCount, 6) }, (_, index: number): string => `holder cluster ${index + 1}`)
+    : [];
+  const trackingSummary: string = estimatedBundleCount > 0
+    ? `${estimatedBundleCount} inferred holder/tape clusters need wallet verification`
+    : "no bundle-sized clusters from public feed signals";
+  if (safeScore >= 65) return { label: "Likely bundled", score: safeScore, tone: "blood", reasons: reasons.slice(0, 4), estimatedBundleCount, suspectedBundlers, trackingSummary };
+  if (safeScore >= 35) return { label: "Bundle watch", score: safeScore, tone: "gold", reasons: reasons.slice(0, 4), estimatedBundleCount, suspectedBundlers, trackingSummary };
+  return { label: "No bundle signal", score: safeScore, tone: "lime", reasons: reasons.length ? reasons.slice(0, 3) : ["no major concentration signal"], estimatedBundleCount, suspectedBundlers, trackingSummary };
 }
 
 function buildReasons(token: JupTokenInfo, pair: DexSearchPair | undefined, boost: DexBoostInfo | undefined, profile: DexTokenProfile | undefined, forensic: TokenForensicScores | undefined): string[] {
@@ -310,6 +340,132 @@ function runnerScore(token: JupTokenInfo, pair: DexSearchPair | undefined, rankS
   const txScore: number = getPairTxns(pair, "m5") * 80;
   const liqBase: number = Math.log10((token.liquidity ?? pair?.liquidity?.usd ?? 0) + 1) * 120;
   return Math.max(0, Math.round(rankScore * 0.2 + changeScore + txScore + buyPressure * 900 + liqBase));
+}
+
+function extractCatalystKeywords(value: string): string[] {
+  const normalized: string = value.replace(/https?:\/\/\S+/gi, " ");
+  const words: string[] = normalized
+    .split(/[^A-Za-z0-9$]+/)
+    .map((word: string): string => word.replace(/^\$+/, "").trim())
+    .filter((word: string): boolean => word.length >= 3 && !/^(the|and|for|with|from|that|this|are|was|has|his|her|you|all|new|news|live|says|will|about|after|before)$/i.test(word));
+  return Array.from(new Set(words)).slice(0, 12);
+}
+
+function xmlText(parent: Element, selector: string): string | undefined {
+  return parent.querySelector(selector)?.textContent?.trim() || undefined;
+}
+
+async function fetchRssText(url: string): Promise<string> {
+  const direct = await fetch(url).catch((): Response | null => null);
+  if (direct?.ok) return direct.text();
+  const proxied = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`).catch((): Response | null => null);
+  if (proxied?.ok) return proxied.text();
+  throw new Error("RSS unavailable");
+}
+
+async function fetchRssItems(source: { label: string; url: string; kind: ViralCatalyst["sourceKind"] }): Promise<ViralCatalyst[]> {
+  try {
+    const xml: string = await fetchRssText(source.url);
+    const doc = new DOMParser().parseFromString(xml, "text/xml");
+    return Array.from(doc.querySelectorAll("item, entry"))
+      .slice(0, 8)
+      .map((item: Element, index: number): ViralCatalyst => {
+        const title: string = xmlText(item, "title") ?? "Untitled catalyst";
+        const link: string | undefined = xmlText(item, "link") ?? item.querySelector("link")?.getAttribute("href") ?? undefined;
+        const publishedAt: string | undefined = xmlText(item, "pubDate") ?? xmlText(item, "published") ?? xmlText(item, "updated");
+        const summary: string = xmlText(item, "description") ?? xmlText(item, "summary") ?? "";
+        const keywords: string[] = extractCatalystKeywords(`${title} ${summary}`);
+        return {
+          id: `${source.label}-${index}-${title}`,
+          title,
+          source: source.label,
+          sourceKind: source.kind,
+          link,
+          publishedAt: (() => {
+            if (!publishedAt) return undefined;
+            const parsedMs: number = new Date(publishedAt).getTime();
+            return Number.isFinite(parsedMs) ? new Date(parsedMs).toISOString() : undefined;
+          })(),
+          keywords,
+          whyViral: keywords.slice(0, 5).join(" / ") || "breaking topic velocity",
+          matchedCoins: [],
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+function fallbackCatalysts(): ViralCatalyst[] {
+  return [
+    {
+      id: "x-elon-watch",
+      title: "Elon / X watchlist: AI, rockets, Doge, Tesla, Grok and viral replies",
+      source: "X watch · Elon Musk",
+      sourceKind: "x",
+      link: "https://x.com/elonmusk",
+      keywords: ["elon", "musk", "doge", "tesla", "grok", "spacex", "xai"],
+      whyViral: "Elon posts can create instant meme-token narratives and copycat launches.",
+      matchedCoins: [],
+    },
+    {
+      id: "x-trump-watch",
+      title: "Trump / politics watchlist: election, tariffs, media clips, truth-social themes",
+      source: "X/news watch · Trump",
+      sourceKind: "x",
+      link: "https://x.com/realDonaldTrump",
+      keywords: ["trump", "maga", "election", "tariff", "president", "truth"],
+      whyViral: "Political headlines often trigger ticker swarms and short-lived meme runners.",
+      matchedCoins: [],
+    },
+    {
+      id: "news-viral-watch",
+      title: "Global viral news watch: celebrity, AI, sports, geopolitical and market shocks",
+      source: "News catalyst watch",
+      sourceKind: "news",
+      keywords: ["viral", "breaking", "ai", "celebrity", "sports", "crypto", "solana"],
+      whyViral: "Broad internet headlines are scanned for matching token names/symbols in the live feed.",
+      matchedCoins: [],
+    },
+  ];
+}
+
+function attachCatalystMatches(catalysts: ViralCatalyst[], coins: FeedCoin[]): ViralCatalyst[] {
+  return catalysts.map((catalyst: ViralCatalyst): ViralCatalyst => {
+    const normalizedKeywords: string[] = catalyst.keywords.map((keyword: string): string => normalizeNarrativeText(keyword)).filter(Boolean);
+    const matchedCoins = coins
+      .filter((coin: FeedCoin): boolean => {
+        const symbol: string = normalizeNarrativeText(coin.token.symbol);
+        const name: string = normalizeNarrativeText(coin.token.name);
+        return normalizedKeywords.some((keyword: string): boolean => keyword.length >= 3 && (symbol.includes(keyword) || keyword.includes(symbol) || name.includes(keyword)));
+      })
+      .slice(0, 5)
+      .map((coin: FeedCoin) => ({
+        mint: coin.token.id,
+        symbol: coin.token.symbol,
+        name: coin.token.name,
+        reason: `matches ${catalyst.keywords.slice(0, 4).join("/")}`,
+      }));
+    return { ...catalyst, matchedCoins };
+  });
+}
+
+async function fetchViralCatalysts(coins: FeedCoin[]): Promise<ViralCatalyst[]> {
+  const sources = [
+    { label: "Google News · viral memes", kind: "rss" as const, url: "https://news.google.com/rss/search?q=viral%20meme%20OR%20Elon%20OR%20Trump%20OR%20crypto%20when:1d&hl=en-US&gl=US&ceid=US:en" },
+    { label: "Google News · Elon", kind: "x" as const, url: "https://news.google.com/rss/search?q=Elon%20Musk%20OR%20Grok%20OR%20Tesla%20OR%20SpaceX%20when:1d&hl=en-US&gl=US&ceid=US:en" },
+    { label: "Google News · Trump", kind: "x" as const, url: "https://news.google.com/rss/search?q=Trump%20OR%20MAGA%20OR%20election%20when:1d&hl=en-US&gl=US&ceid=US:en" },
+    { label: "CoinDesk", kind: "news" as const, url: "https://www.coindesk.com/arc/outboundfeeds/rss/" },
+    { label: "CNBC Top News", kind: "news" as const, url: "https://www.cnbc.com/id/100003114/device/rss/rss.html" },
+  ];
+  const results = await Promise.allSettled(sources.map(fetchRssItems));
+  const liveItems: ViralCatalyst[] = results.flatMap((result): ViralCatalyst[] => result.status === "fulfilled" ? result.value : []);
+  const unique = new Map<string, ViralCatalyst>();
+  for (const catalyst of [...liveItems, ...fallbackCatalysts()]) {
+    const key: string = normalizeNarrativeText(catalyst.title).slice(0, 80) || catalyst.id;
+    if (!unique.has(key)) unique.set(key, catalyst);
+  }
+  return attachCatalystMatches(Array.from(unique.values()).slice(0, 14), coins);
 }
 
 async function fetchFeedPayload(): Promise<FeedPayload> {
@@ -388,10 +544,13 @@ async function fetchFeedPayload(): Promise<FeedPayload> {
     .sort((a: FeedCoin, b: FeedCoin): number => b.rankScore - a.rankScore)
     .slice(0, 32);
 
+  const catalysts: ViralCatalyst[] = await fetchViralCatalysts(coins);
+
   return {
     coins,
     spotlights: [...coins].sort((a: FeedCoin, b: FeedCoin): number => b.spotlightScore - a.spotlightScore).slice(0, 3),
     runners: [...coins].sort((a: FeedCoin, b: FeedCoin): number => b.runnerScore - a.runnerScore).slice(0, 10),
+    catalysts,
     updatedAt: new Date().toISOString(),
     sourceCount: seedMints.length,
   };
@@ -413,6 +572,13 @@ export const Feed = ({ onSelect }: Props) => {
   const { data: devIntel, isFetching: devIntelLoading } = useQuery({
     queryKey: ["feed-dev-intel", selectedCoin?.token.id],
     queryFn: (): Promise<TokenDevLaunchIntel> => tokenDevLaunchIntel(selectedCoin!.token),
+    enabled: Boolean(selectedCoin),
+    staleTime: 60_000,
+  });
+
+  const { data: bundleIntel, isFetching: bundleIntelLoading } = useQuery({
+    queryKey: ["feed-holder-bundle-intel", selectedCoin?.token.id],
+    queryFn: (): Promise<TokenHolderBundleIntel> => tokenHolderBundleIntel(selectedCoin!.token),
     enabled: Boolean(selectedCoin),
     staleTime: 60_000,
   });
@@ -441,7 +607,7 @@ export const Feed = ({ onSelect }: Props) => {
               Live market <span className="text-og-cyan text-glow">feed</span>
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-white/66">
-              A real-time command feed for what is moving now, why it is moving, spotlight coins, high-ranking runners, bundle-risk signals, paid boost status, CTO/dev-launch context, and scanner actions.
+              A real-time command feed for what is moving now, why it is moving, spotlight coins, high-ranking runners, bundle ownership, dev farming/rug history, news/X catalysts, paid boosts, and scanner actions.
             </p>
           </div>
 
@@ -456,11 +622,12 @@ export const Feed = ({ onSelect }: Props) => {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <FeedMetric Icon={Radio} label="Live coins" value={fmtNum(coins.length)} detail={`${fmtNum(data?.sourceCount)} source mints`} tone="cyan" />
           <FeedMetric Icon={Trophy} label="Spotlights" value={fmtNum(data?.spotlights.length)} detail="top narrative + tape" tone="lime" />
-          <FeedMetric Icon={ShieldAlert} label="Bundle watch" value={fmtNum(summary.bundled)} detail="inferred concentration" tone="blood" />
+          <FeedMetric Icon={ShieldAlert} label="Bundle watch" value={fmtNum(summary.bundled)} detail="holder owner graph" tone="blood" />
           <FeedMetric Icon={Wallet} label="CTO/dev signals" value={fmtNum(summary.ctos)} detail={`runner avg ${fmtNum(summary.avgRunner)}`} tone="gold" />
+          <FeedMetric Icon={Newspaper} label="Viral catalysts" value={fmtNum(data?.catalysts.length)} detail="RSS + X watch" tone="cyan" />
         </div>
 
         {error ? (
@@ -471,12 +638,13 @@ export const Feed = ({ onSelect }: Props) => {
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="space-y-4">
+            <CatalystPanel catalysts={data?.catalysts ?? []} onSelect={setSelectedMint} onOpenScanner={onSelect} />
             <SpotlightGrid spotlights={data?.spotlights ?? []} selectedMint={selectedCoin?.token.id} onSelect={setSelectedMint} onOpenScanner={onSelect} />
             <RunnerBoard runners={data?.runners ?? []} selectedMint={selectedCoin?.token.id} onSelect={setSelectedMint} onOpenScanner={onSelect} />
             <LiveFeedList coins={coins} selectedMint={selectedCoin?.token.id} onSelect={setSelectedMint} onOpenScanner={onSelect} loading={isFetching && coins.length === 0} />
           </div>
 
-          <FeedDetail coin={selectedCoin} devIntel={devIntel} devIntelLoading={devIntelLoading} updatedAt={dataUpdatedAt || (data?.updatedAt ? new Date(data.updatedAt).getTime() : 0)} onOpenScanner={onSelect} />
+          <FeedDetail coin={selectedCoin} devIntel={devIntel} devIntelLoading={devIntelLoading} bundleIntel={bundleIntel} bundleIntelLoading={bundleIntelLoading} updatedAt={dataUpdatedAt || (data?.updatedAt ? new Date(data.updatedAt).getTime() : 0)} onOpenScanner={onSelect} />
         </div>
       </div>
     </section>
@@ -497,6 +665,41 @@ const FeedMetric = memo(({ Icon, label, value, detail, tone }: { Icon: LucideIco
   );
 });
 FeedMetric.displayName = "FeedMetric";
+
+const CatalystPanel = memo(({ catalysts, onSelect, onOpenScanner }: { catalysts: ViralCatalyst[]; onSelect: (mint: string) => void; onOpenScanner: (mint: string) => void }) => (
+  <div className="overflow-hidden rounded-[1.8rem] border border-og-gold/20 bg-[#080a12]/82 backdrop-blur-xl">
+    <div className="border-b border-white/10 p-4">
+      <PanelHeader Icon={Newspaper} eyebrow="viral catalysts" title="News + X watch driving meme narratives" right={`${fmtNum(catalysts.length)} items`} />
+    </div>
+    <div className="grid gap-3 p-3 lg:grid-cols-2">
+      {catalysts.slice(0, 6).map((catalyst: ViralCatalyst) => (
+        <div key={catalyst.id} className="rounded-[1.35rem] border border-white/10 bg-white/[0.035] p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-widest">
+            <span className={cn("rounded-full border px-2 py-1", catalyst.sourceKind === "x" ? "border-og-cyan/35 bg-og-cyan/10 text-og-cyan" : "border-og-gold/35 bg-og-gold/10 text-og-gold")}>{catalyst.source}</span>
+            <span className="text-white/38">{catalyst.publishedAt ? `${timeAgo(Math.floor(new Date(catalyst.publishedAt).getTime() / 1000))} ago` : "watch"}</span>
+          </div>
+          <a href={catalyst.link} target="_blank" rel="noreferrer" className="line-clamp-2 text-sm font-bold leading-snug text-white transition hover:text-og-lime">
+            {catalyst.title}
+          </a>
+          <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-white/54">{catalyst.whyViral}</p>
+          <div className="mt-3 flex flex-wrap gap-1">
+            {catalyst.keywords.slice(0, 5).map((keyword: string) => <ReasonChip key={keyword} label={keyword} />)}
+          </div>
+          <div className="mt-3 rounded-2xl border border-white/10 bg-black/24 p-2">
+            <div className="mb-2 font-mono text-[8px] uppercase tracking-[0.22em] text-white/38">matching live meme coins</div>
+            {catalyst.matchedCoins.length ? catalyst.matchedCoins.map((match) => (
+              <button key={match.mint} type="button" onClick={() => { onSelect(match.mint); onOpenScanner(match.mint); }} className="mb-1 flex w-full items-center justify-between gap-2 rounded-xl border border-og-lime/20 bg-og-lime/5 px-2 py-1.5 text-left font-mono text-[9px] uppercase tracking-widest text-og-lime last:mb-0 hover:border-og-lime">
+                <span className="truncate">${match.symbol} · {match.reason}</span>
+                <ArrowUpRight className="h-3 w-3 shrink-0" />
+              </button>
+            )) : <div className="text-xs text-white/42">No current live-feed match yet — watching for new tickers.</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+));
+CatalystPanel.displayName = "CatalystPanel";
 
 const SpotlightGrid = memo(({ spotlights, selectedMint, onSelect, onOpenScanner }: { spotlights: FeedCoin[]; selectedMint?: string; onSelect: (mint: string) => void; onOpenScanner: (mint: string) => void }) => (
   <div className="rounded-[1.8rem] border border-white/10 bg-white/[0.045] p-4 backdrop-blur-xl">
@@ -662,7 +865,7 @@ const FeedRow = memo(({ coin, index, selected, onSelect, onOpenScanner }: { coin
 });
 FeedRow.displayName = "FeedRow";
 
-const FeedDetail = ({ coin, devIntel, devIntelLoading, updatedAt, onOpenScanner }: { coin: FeedCoin | null; devIntel?: TokenDevLaunchIntel; devIntelLoading: boolean; updatedAt: number; onOpenScanner: (mint: string) => void }) => {
+const FeedDetail = ({ coin, devIntel, devIntelLoading, bundleIntel, bundleIntelLoading, updatedAt, onOpenScanner }: { coin: FeedCoin | null; devIntel?: TokenDevLaunchIntel; devIntelLoading: boolean; bundleIntel?: TokenHolderBundleIntel; bundleIntelLoading: boolean; updatedAt: number; onOpenScanner: (mint: string) => void }) => {
   if (!coin) {
     return (
       <aside className="rounded-[1.8rem] border border-white/10 bg-white/[0.04] p-5 text-sm text-white/54">
@@ -675,6 +878,10 @@ const FeedDetail = ({ coin, devIntel, devIntelLoading, updatedAt, onOpenScanner 
   const embedUrl: string = dexScreenerEmbedUrl(chartUrl);
   const primaryLabel: string = coin.forensic?.classification.primary_label ?? (coin.token.dexCommunityTakeoverPaid ? "CTO SIGNAL" : "LIVE TOKEN");
   const isCto: boolean = primaryLabel.includes("CTO") || devIntel?.launchType === "CTO / community support";
+  const bundleStatus: string = bundleIntel?.status ?? coin.bundle.label;
+  const bundleScore: number = bundleIntel?.score ?? coin.bundle.score;
+  const bundleTone: "blood" | "gold" | "lime" = bundleStatus === "Likely bundled" ? "blood" : bundleStatus === "Bundle watch" ? "gold" : "lime";
+  const devRiskTone: "blood" | "gold" | "lime" = devIntel?.devRiskLabel === "severe" || devIntel?.devRiskLabel === "high" ? "blood" : devIntel?.devRiskLabel === "watch" ? "gold" : "lime";
 
   return (
     <aside className="sticky top-4 space-y-4 self-start">
@@ -723,11 +930,25 @@ const FeedDetail = ({ coin, devIntel, devIntelLoading, updatedAt, onOpenScanner 
               <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-og-gold">
                 <AlertTriangle className="h-3.5 w-3.5" /> bundle status
               </div>
-              <BundleBadge bundle={coin.bundle} />
+              {bundleIntelLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-og-gold" /> : <span className={cn("rounded-full border px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest", bundleTone === "blood" ? "border-og-blood/45 bg-og-blood/10 text-og-blood" : bundleTone === "gold" ? "border-og-gold/45 bg-og-gold/10 text-og-gold" : "border-og-lime/45 bg-og-lime/10 text-og-lime")}>{bundleStatus} · {bundleScore}</span>}
             </div>
             <div className="text-xs leading-relaxed text-white/58">
-              Score {coin.bundle.score}/100 · {coin.bundle.reasons.join(" · ")}. This is an inferred public-signal check from holders, tape, LP, boosts, and authority data.
+              Score {bundleScore}/100 · {(bundleIntel?.evidence ?? coin.bundle.reasons).join(" · ")}. This uses largest holder accounts, owner resolution, tape, LP, boosts, and authority data.
             </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <MetaLine label="Bundles" value={fmtNum(bundleIntel?.bundleCount ?? coin.bundle.estimatedBundleCount)} />
+              <MetaLine label="Top 10" value={bundleIntel ? `${bundleIntel.top10Percent.toFixed(1)}%` : "scanning"} />
+            </div>
+            {(bundleIntel?.suspectedBundlers.length ?? coin.bundle.suspectedBundlers.length) > 0 ? (
+              <div className="mt-3 grid gap-1.5">
+                {(bundleIntel?.suspectedBundlers ?? coin.bundle.suspectedBundlers.map((label: string) => ({ owner: label, tokenAccount: label, uiAmount: 0, percent: 0, label }))).slice(0, 4).map((holder) => (
+                  <div key={`${holder.owner}-${holder.tokenAccount}`} className="flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2 font-mono text-[9px] uppercase tracking-widest">
+                    <span className="truncate text-white/48">{holder.label}</span>
+                    <span className="shrink-0 text-og-gold">{shortAddr(holder.owner, 4)} {holder.percent ? `${holder.percent.toFixed(1)}%` : ""}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-4 rounded-3xl border border-og-cyan/20 bg-black/24 p-3">
@@ -735,7 +956,7 @@ const FeedDetail = ({ coin, devIntel, devIntelLoading, updatedAt, onOpenScanner 
               <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-og-cyan">
                 <Wallet className="h-3.5 w-3.5" /> CTO / dev launch
               </div>
-              {devIntelLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-og-cyan" /> : <span className={cn("rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-widest", isCto ? "border-og-gold/40 bg-og-gold/10 text-og-gold" : "border-og-cyan/35 bg-og-cyan/10 text-og-cyan")}>{devIntel?.launchType ?? "scanning"}</span>}
+              {devIntelLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-og-cyan" /> : <span className={cn("rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-widest", isCto ? "border-og-gold/40 bg-og-gold/10 text-og-gold" : devRiskTone === "blood" ? "border-og-blood/40 bg-og-blood/10 text-og-blood" : "border-og-cyan/35 bg-og-cyan/10 text-og-cyan")}>{devIntel?.launchType ?? "scanning"}</span>}
             </div>
             <div className="grid gap-2">
               <MetaLine label="Creator" value={shortAddr(devIntel?.wallet ?? undefined, 5)} />
@@ -744,6 +965,16 @@ const FeedDetail = ({ coin, devIntel, devIntelLoading, updatedAt, onOpenScanner 
               <MetaLine label="DEX-paid coins" value={fmtNum(devIntel?.dexPaidCoinCount)} />
               <MetaLine label="Boosted coins" value={fmtNum(devIntel?.activeBoostedCoinCount)} />
               <MetaLine label="CTO orders" value={fmtNum(devIntel?.ctoOrderCount)} />
+              <MetaLine label="Dev risk" value={devIntel?.devRiskLabel ? `${devIntel.devRiskLabel} · farm ${fmtNum(devIntel.farmingRiskScore)} / rug ${fmtNum(devIntel.rugRiskScore)}` : "scanning"} />
+              <MetaLine label="Rug/dead coins" value={`${fmtNum(devIntel?.ruggedCoinCount)} dead · ${fmtNum(devIntel?.lowLiquidityCoinCount)} low LP`} />
+              <MetaLine label="Avg linked LP" value={fmtUsd(devIntel?.averageLiquidity)} />
+            </div>
+            <div className="mt-3 grid gap-1.5">
+              {(devIntel?.riskNotes ?? ["Scanning inferred dev wallet for repeat-launch, rug, farm and low-liquidity history."]).slice(0, 3).map((note: string) => (
+                <div key={note} className="flex items-start gap-2 text-xs text-white/58">
+                  <AlertTriangle className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", devRiskTone === "blood" ? "text-og-blood" : devRiskTone === "gold" ? "text-og-gold" : "text-og-lime")} /> {note}
+                </div>
+              ))}
             </div>
           </div>
 

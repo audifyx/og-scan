@@ -32,6 +32,9 @@
 - [x] Make DexScreener the chart source across token popups, Vitals, chart actions, and chart/provider labels.
 - [x] Add ATH date plus ATH/ATL values across scanner results, Vitals, Snipe Feed, migrations, trending, pair cards, and coin popups.
 - [x] Add a live **Feed** tool that shows current trending tokens, why each token is trending, spotlight coins, high-ranking runners, bundle-risk status, DEX paid/boost analytics, and CTO/dev-launch intelligence.
+- [x] Upgrade Feed bundle tracking with largest-holder owner resolution, estimated bundle count, suspected bundler wallets, holder concentration, and tracking notes.
+- [x] Upgrade dev wallet analytics with farming risk, rug/dead-coin risk, low-liquidity linked coin counts, average linked liquidity, and dev risk labels.
+- [x] Add a viral catalyst/news feed that watches RSS/news/X-style Elon/Trump/news narratives and matches live meme coins to those topics.
 
 ## **Design**
 
@@ -57,6 +60,7 @@
 - [x] Add dedicated DEX paid/boost and CTO/dev launch intelligence sections to the shared coin popup and Snipe Feed analyzer.
 - [x] Replace internal/Birdeye-rendered chart panels with DexScreener chart embeds and full-chart links.
 - [x] Add a dedicated `/feed` workspace page with spotlight cards, runner board, full live feed rows, and a sticky coin analytics panel.
+- [x] Add Feed panels for viral news catalysts, matched meme coins, suspected bundlers, and dev farming/rug history.
 
 ## **Pages / Screens**
 
@@ -77,6 +81,8 @@
 - [x] **DexScreener Charts**: Every visible chart panel and chart action now uses DexScreener as the primary chart source.
 - [x] **ATH / ATL Market Extremes**: Token cards and popups now show ATH value, ATH date, and ATL value/date when historical market data is available.
 - [x] **Live Feed**: A standalone `/feed` and `/live-feed` tool showing trending tokens, why they are moving, spotlight coins, high-ranking runners, bundle status, buys/sells, DEX paid/boosts, DexScreener charts, and CTO/dev-launch bonded coin analytics.
+- [x] **Bundle + Dev Risk Analytics**: Feed and coin popups now show holder-owner bundle tracking, suspected bundlers, dev farming scores, rug/dead-coin scores, low-liquidity linked coins, and average linked LP.
+- [x] **News / Viral Catalyst Feed**: Feed now watches RSS/news/X-style Elon, Trump, crypto, and breaking-news catalysts, explains why topics may go viral, and links matching live meme coins when detected.
 
 ## **Suggested build order**
 

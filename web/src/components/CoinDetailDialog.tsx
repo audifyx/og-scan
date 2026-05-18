@@ -44,10 +44,12 @@ import {
   timeAgo,
   tokenDevLaunchIntel,
   tokenDexPaidLabel,
+  tokenHolderBundleIntel,
   tokenMigrationDateIso,
   tokenOgCreatedAtIso,
   type JupTokenInfo,
   type TokenDevLaunchIntel,
+  type TokenHolderBundleIntel,
 } from "@/lib/og";
 
 type DetailDexPair = {
@@ -266,6 +268,13 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
     enabled: open && Boolean(detailToken.id),
     staleTime: 60_000,
   });
+
+  const { data: bundleIntel, isFetching: isFetchingBundleIntel } = useQuery({
+    queryKey: ["coin-detail-holder-bundle-intel", detailToken.chainId ?? "solana", detailToken.id],
+    queryFn: (): Promise<TokenHolderBundleIntel> => tokenHolderBundleIntel(detailToken),
+    enabled: open && Boolean(detailToken.id),
+    staleTime: 60_000,
+  });
   const forensicKey = `${detailToken.chainId ?? "solana"}:${detailToken.id}`;
   const forensicScore = classificationReport?.tokenScores[forensicKey];
   const primaryLabel: string = forensicScore?.classification.primary_label ?? "SCANNED";
@@ -414,9 +423,10 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                 <MetadataPanel token={detailToken} pair={pair} createdAt={createdAt} migratedAt={migratedAt} pairCreated={pairCreated} />
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 xl:grid-cols-3">
                 <DexPaidPanel token={detailToken} pair={pair} />
                 <DevLaunchPanel intel={devIntel} isLoading={isFetchingDevIntel} primaryLabel={primaryLabel} />
+                <HolderBundlePanel intel={bundleIntel} isLoading={isFetchingBundleIntel} token={detailToken} />
               </div>
             </div>
 
@@ -570,13 +580,14 @@ const DexPaidPanel = ({ token, pair }: { token: JupTokenInfo; pair?: DetailDexPa
 
 const DevLaunchPanel = ({ intel, isLoading, primaryLabel }: { intel?: TokenDevLaunchIntel; isLoading: boolean; primaryLabel: string }) => {
   const isCto = intel?.launchType === "CTO / community support" || primaryLabel.includes("CTO");
+  const devRiskTone: "lime" | "gold" | "blood" = intel?.devRiskLabel === "severe" || intel?.devRiskLabel === "high" ? "blood" : intel?.devRiskLabel === "watch" ? "gold" : "lime";
   return (
     <div className="rounded-3xl border border-og-cyan/25 bg-white/[0.035] p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
           <Wallet className="h-3.5 w-3.5" /> CTO / dev launch intel
         </div>
-        {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-og-cyan" /> : <span className={cn("rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-widest", isCto ? "border-og-gold/50 bg-og-gold/10 text-og-gold" : "border-og-cyan/35 bg-og-cyan/10 text-og-cyan")}>{intel?.launchType ?? "scanning"}</span>}
+        {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-og-cyan" /> : <span className={cn("rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-widest", isCto ? "border-og-gold/50 bg-og-gold/10 text-og-gold" : devRiskTone === "blood" ? "border-og-blood/50 bg-og-blood/10 text-og-blood" : "border-og-cyan/35 bg-og-cyan/10 text-og-cyan")}>{intel?.launchType ?? "scanning"}</span>}
       </div>
       <div className="grid gap-2">
         <MetaLine label="Creator wallet" value={shortAddr(intel?.wallet ?? undefined, 6)} />
@@ -586,10 +597,13 @@ const DevLaunchPanel = ({ intel, isLoading, primaryLabel }: { intel?: TokenDevLa
         <MetaLine label="DEX-paid coins" value={fmtNum(intel?.dexPaidCoinCount)} />
         <MetaLine label="Boosted coins" value={fmtNum(intel?.activeBoostedCoinCount)} />
         <MetaLine label="CTO orders" value={fmtNum(intel?.ctoOrderCount)} />
+        <MetaLine label="Dev risk" value={intel?.devRiskLabel ? `${intel.devRiskLabel} · farm ${fmtNum(intel.farmingRiskScore)} / rug ${fmtNum(intel.rugRiskScore)}` : "scanning"} />
+        <MetaLine label="Rug/dead coins" value={`${fmtNum(intel?.ruggedCoinCount)} dead · ${fmtNum(intel?.lowLiquidityCoinCount)} low LP`} />
+        <MetaLine label="Avg linked LP" value={fmtUsd(intel?.averageLiquidity)} />
         <MetaLine label="Last seen" value={shortDate(intel?.lastSeenAt)} />
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        {intel?.notes?.[0] ?? "Wallet history loads from early mint/pool fee-payer activity and public DEX pair/order data."}
+        {(intel?.riskNotes?.[0] ?? intel?.notes?.[0]) ?? "Wallet history loads from early mint/pool fee-payer activity and public DEX pair/order data."}
       </p>
       {intel?.sampleMints.length ? (
         <div className="mt-3 flex flex-wrap gap-1 font-mono text-[9px] uppercase tracking-widest">
@@ -598,6 +612,44 @@ const DevLaunchPanel = ({ intel, isLoading, primaryLabel }: { intel?: TokenDevLa
           ))}
         </div>
       ) : null}
+    </div>
+  );
+};
+
+const HolderBundlePanel = ({ intel, isLoading, token }: { intel?: TokenHolderBundleIntel; isLoading: boolean; token: JupTokenInfo }) => {
+  const fallbackTop: number = token.audit?.topHoldersPercentage ?? 0;
+  const status: string = intel?.status ?? "scanning";
+  const toneClass: string = status === "Likely bundled"
+    ? "border-og-blood/50 bg-og-blood/10 text-og-blood"
+    : status === "Bundle watch"
+      ? "border-og-gold/50 bg-og-gold/10 text-og-gold"
+      : "border-og-lime/35 bg-og-lime/10 text-og-lime";
+
+  return (
+    <div className="rounded-3xl border border-og-gold/25 bg-white/[0.035] p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-gold">
+          <ShieldAlert className="h-3.5 w-3.5" /> holder bundle tracking
+        </div>
+        {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-og-gold" /> : <span className={cn("rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-widest", toneClass)}>{status}</span>}
+      </div>
+      <div className="grid gap-2">
+        <MetaLine label="Bundle score" value={intel ? `${fmtNum(intel.score)}/100 · ${intel.confidence}` : "scanning"} />
+        <MetaLine label="Bundle count" value={fmtNum(intel?.bundleCount)} />
+        <MetaLine label="Largest holder" value={intel ? `${intel.topHolderPercent.toFixed(1)}%` : fallbackTop ? `${fallbackTop.toFixed(1)}%` : "—"} />
+        <MetaLine label="Top 10 holders" value={intel ? `${intel.top10Percent.toFixed(1)}%` : "scanning"} />
+      </div>
+      <div className="mt-3 grid gap-1.5">
+        {(intel?.suspectedBundlers ?? []).slice(0, 4).map((holder) => (
+          <div key={`${holder.owner}-${holder.tokenAccount}`} className="flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2 font-mono text-[9px] uppercase tracking-widest">
+            <span className="truncate text-muted-foreground">{holder.label}</span>
+            <span className="shrink-0 text-og-gold">{shortAddr(holder.owner, 4)} · {holder.percent.toFixed(1)}%</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        {intel?.evidence?.[0] ?? "Resolves largest token accounts into owner wallets to estimate bundle count and suspected bundlers."}
+      </p>
     </div>
   );
 };
