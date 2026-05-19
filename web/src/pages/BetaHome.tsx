@@ -66,44 +66,44 @@ const splashToolLinks: SplashToolLink[] = [
   {
     title: "Truth Scan",
     href: "/scanner",
-    description: "Scanner + OG Finder merged into one origin, risk, dominance, and liquidity workspace.",
+    description: "Scan any mint for first-mint proof, dominance score, OG/Legacy status, LP safety, holder risk, and forensic quick actions.",
     Icon: Search,
     accent: "lime",
   },
   {
     title: "Launch Radar",
     href: "/snipe-feed",
-    description: "Snipe Feed + Pump.fun migration tracking grouped for new-launch intelligence.",
+    description: "Watch fresh Solana launches, Pump.fun migrations, repeat dev wallets, launch quality, CTO signals, and risk flags.",
     Icon: Target,
     accent: "cyan",
   },
   {
     title: "Market Feed",
     href: "/feed",
-    description: "Trending, vitals, pairs, whales, and transaction tape grouped into one market command center.",
+    description: "Track live runners, trending catalysts, whale pressure, pair liquidity, DEX boosts, bundle risk, and transaction flow.",
     Icon: Flame,
     accent: "gold",
   },
   {
     title: "Command Deck",
     href: "/app",
-    description: "Open the OGScan command dashboard with focused rooms for scanner, launch, market, and project intelligence.",
+    description: "Open the full OGScan dashboard with every scanner, launch, market, swap, roadmap, and token-intel tool.",
     Icon: Radar,
     accent: "cyan",
   },
 ];
 
 const issueTips: string[] = [
-  "Use Truth Scan first if you only need one decision",
-  "Launch Radar now contains both snipes and migrations",
-  "Market Feed now contains trending, vitals, pairs, whales, and tape",
+  "Paste a CA into Truth Scan for first mint, dominance, risk, holders, and LP safety",
+  "Use Launch Radar to catch Pump.fun migrations, repeat devs, CTO signals, and new-launch risk",
+  "Use Market Feed for live runners, catalysts, whales, DEX boosts, bundle risk, and transaction flow",
 ];
 
 const BetaHome = memo(() => {
   const [copied, setCopied] = useState<"coin" | null>(null);
 
   const launchNotes: string[] = useMemo<string[]>(
-    () => ["Truth Scan: scanner + OG finder", "Launch Radar: snipes + migrations", "Market Feed: pulse + pairs + tape"],
+    () => ["First mint + authority wallet proof", "Dominance / Legacy / Copycat scoring", "LP, holder, dev, boost, and migration intel"],
     [],
   );
 
@@ -138,7 +138,7 @@ const BetaHome = memo(() => {
               </div>
               <div className="min-w-0">
                 <p className="truncate font-display text-sm font-black uppercase tracking-[0.24em] text-white">OGScan</p>
-                <p className="truncate font-mono text-[9px] uppercase tracking-[0.25em] text-og-cyan">Layered token truth</p>
+                <p className="truncate font-mono text-[9px] uppercase tracking-[0.25em] text-og-cyan">Solana memecoin intelligence</p>
               </div>
             </div>
 
@@ -167,11 +167,11 @@ const BetaHome = memo(() => {
 
             <div className="relative">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-og-lime/40 bg-og-lime/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-lime">
-                <Sparkles className="h-3.5 w-3.5" /> Cleaner UI live
+                <Sparkles className="h-3.5 w-3.5" /> Forensic tools live
               </div>
 
               <h1 className="font-display text-5xl font-black uppercase leading-[0.86] tracking-tighter text-white text-glow sm:text-7xl lg:text-8xl">
-                Layered token truth, without tab chaos.
+                Find the real OG before the market does.
               </h1>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-[1.15fr_0.85fr]">
@@ -200,7 +200,7 @@ const BetaHome = memo(() => {
               </div>
 
               <p className="mt-5 max-w-2xl text-base leading-7 text-white/72 sm:text-lg">
-                The landing page now points traders into three clean command centers: Truth Scan for provenance, Launch Radar for fresh coins, and Market Feed for live Solana movement.
+                OGScan gives traders a Solana-only intelligence stack: scan any mint, prove first origin, rank dominance, detect copycats, inspect LP safety, follow migrations, watch dev wallets, and track live market catalysts.
               </p>
 
               <div className="mt-5 grid gap-2 sm:grid-cols-3">
@@ -240,9 +240,9 @@ const BetaHome = memo(() => {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <div className="mb-1 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-lime">
-                    <Flame className="h-4 w-4" /> Merged workspaces
+                    <Flame className="h-4 w-4" /> Tool stack
                   </div>
-                  <h2 className="font-display text-2xl font-black uppercase tracking-tight text-white">Pick your flow</h2>
+                  <h2 className="font-display text-2xl font-black uppercase tracking-tight text-white">Pick your tool</h2>
                 </div>
                 <Link to="/app" className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-2 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-white/70 transition hover:text-og-cyan">
                   Deck
@@ -283,7 +283,7 @@ const BetaHome = memo(() => {
 
             <section className="rounded-[1.6rem] border border-white/10 bg-white/[0.045] p-4">
               <div className="mb-3 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-cyan">
-                <Globe2 className="h-4 w-4" /> Quick note
+                <Globe2 className="h-4 w-4" /> What to check first
               </div>
               <ul className="space-y-2">
                 {issueTips.map((tip: string) => (
@@ -294,7 +294,7 @@ const BetaHome = memo(() => {
                 ))}
               </ul>
               <p className="mt-4 border-t border-white/10 pt-3 text-xs leading-5 text-white/60">
-                Legacy URLs like /og-finder, /migrations, /pairs, /whales, and /tx-feed still work, but the visible UI is now simplified for faster trading decisions.
+                Start with the mint scanner when you need a fast verdict, then open the live feeds when you want market context around the same coin.
               </p>
             </section>
           </aside>

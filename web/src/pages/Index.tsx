@@ -626,13 +626,13 @@ const OverviewPage = ({
         <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-end">
           <div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-og-cyan/40 bg-og-cyan/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-cyan">
-              <ShieldCheck className="h-3.5 w-3.5" /> Merged workspace live
+              <ShieldCheck className="h-3.5 w-3.5" /> Forensic tools live
             </div>
             <h2 className="max-w-4xl font-display text-5xl font-black uppercase leading-[0.88] tracking-tighter text-white text-glow sm:text-7xl">
-              Layered Token Truth
+              Solana token truth engine
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-white/70">
-              The command deck is built around focused intelligence rooms: Truth Scan for provenance, Launch Radar for fresh launches, Market Feed for live movement, Swap for routes, and Project pages for OGScan updates.
+              Run mint forensics, prove first origin, score dominance, inspect holder and LP risk, track Pump.fun migrations, watch repeat dev wallets, monitor live runners, and route swaps with token context still on-screen.
             </p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <button type="button" onClick={onScanClick} className="inline-flex min-h-14 flex-1 items-center justify-center gap-2 rounded-[1.25rem] border border-og-lime bg-og-lime px-5 font-display text-lg font-black uppercase text-og-ink shadow-[0_0_42px_-16px_hsl(var(--og-lime))] transition hover:bg-white active:scale-[0.985] sm:flex-none">
@@ -645,7 +645,7 @@ const OverviewPage = ({
           </div>
 
           <div className="rounded-[1.65rem] border border-white/10 bg-black/24 p-4">
-            <div className="mb-3 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-og-gold">Workspace rule</div>
+            <div className="mb-3 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-og-gold">Truth rule</div>
             <p className="text-sm font-semibold leading-6 text-white/76">
               OG status comes from earliest provable on-chain creation and origin history — not market cap, migration, volume, or whoever is trending.
             </p>
