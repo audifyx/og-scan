@@ -42,6 +42,8 @@
 - [x] Hard-block known LP-pulled/scam mint `5sNU6g1qVji5dEBnb6SWSX2Gu2rtDvvk7khKyujj6cuU` and apply the same dead-liquidity logic to future candidates.
 - [x] Add the V3.1 **Dominance Engine** so every same-ticker cluster separates immutable First Mint / Legacy OG proof from the current Primary token by market cap, liquidity depth, holder quality, social adoption, on-chain activity, creator strength, and earliest-mint bonus.
 - [x] Add new classification tiers: `REVIVED OFFICIAL`, `LEGACY OG`, and `CONTESTED`, while keeping LP-pulled/scam tokens excluded before any Primary/Legacy scoring.
+- [x] Upgrade **Scan Any Mint** with advanced forensic filters for dominance, origin, risk, liquidity, market cap, holders, clone status, LP safety, authority safety, ATH availability, DEX-paid signals, and sort modes.
+- [x] Add expanded scanner score cards showing Dominance, Origin, Risk, Clone, Authority, Holders, Top 10 concentration, Activity, Pools, First Mint, ATH, migration, and DEX paid/boost status.
 
 ## **Design**
 
@@ -71,6 +73,7 @@
 - [x] Update OG Finder and the shared Coin Intelligence Popup to show Primary Status, Dominance %, rank, First Mint / Legacy OG, mint authority wallet, and clear notes when a later token is dominant but not first on-chain.
 - [x] Refresh the root landing page around the simplified “Layered Token Truth” story with clear Truth Scan, Launch Radar, Market Feed, and Command Deck calls-to-action.
 - [x] Merge overlapping visible tabs into higher-signal workspace groups while preserving legacy direct routes for embeds and existing links.
+- [x] Add scanner preset filter packs, richer result-card density, visible risk counters, and primary/first-mint summary stats for faster token triage.
 
 ## **Pages / Screens**
 
@@ -96,6 +99,7 @@
 - [x] **Expanded Coin Intelligence Popup**: Popup now shows Helius authority truth, largest-holder owner rows, whale counts, creator/funding wallet inference, Pump.fun launch/migration timing, all DexScreener pools, DEX paid orders, boosts, Birdeye ATH/ATL, holders, liquidity, MC, and FDV.
 - [x] **Dominance Engine Output**: Forensic searches now return `primaryToken`, `firstMintToken`, `contestedTokens`, dominance score/rank, first mint authority wallet, and Primary/Legacy/Contested labels for fast memecoin provenance decisions.
 - [x] **Merged Command Workspaces**: The visible UI now groups Scanner + OG Finder into Truth Scan, Snipe Feed + Migrations into Launch Radar, and Feed + Vitals + Pairs + Trending + Whales + Tx Tape into Market Feed while keeping every old URL active.
+- [x] **Advanced Scan Any Mint**: Scanner now behaves like a full forensic triage board with preset filters, dominance/origin/risk sorting, authority/holder/liquidity controls, and quick actions to DexScreener, Solscan, Pump.fun, deep scan, copy mint, and the coin intelligence popup.
 
 ## **Suggested build order**
 
