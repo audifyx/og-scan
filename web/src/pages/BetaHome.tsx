@@ -87,7 +87,7 @@ const splashToolLinks: SplashToolLink[] = [
   {
     title: "Command Deck",
     href: "/app",
-    description: "Open the simplified dashboard with fewer tabs and every legacy route preserved.",
+    description: "Open the OGScan command dashboard with focused rooms for scanner, launch, market, and project intelligence.",
     Icon: Radar,
     accent: "cyan",
   },

@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Activity,
   ArrowUpRight,
-  CalendarClock,
   ChevronRight,
   Coins,
   Cpu,
@@ -106,7 +105,7 @@ const TABS: TabConfig[] = [
     slug: "og-finder",
     pageNumber: 7,
     eyebrow: "ORIGIN CHECK",
-    description: "Direct legacy route for the origin-finder module. It is now grouped under Truth Scan in the main navigation.",
+    description: "Origin-finder module grouped inside Truth Scan for first-mint proof, lineage, and dominance context.",
     Icon: Crosshair,
     accent: "white",
     group: "Forensics",
@@ -130,7 +129,7 @@ const TABS: TabConfig[] = [
     slug: "migrations",
     pageNumber: 9,
     eyebrow: "BREAKOUT WATCH",
-    description: "Direct legacy route for migration timing. It is now grouped under Launch Radar in the main navigation.",
+    description: "Migration timing module grouped inside Launch Radar for Pump.fun breakout and DEX arrival tracking.",
     Icon: Rocket,
     accent: "gold",
     group: "Forensics",
@@ -154,7 +153,7 @@ const TABS: TabConfig[] = [
     slug: "market-pulse",
     pageNumber: 4,
     eyebrow: "LIVE OVERVIEW",
-    description: "Direct legacy route for active-mint vitals. It is now grouped under Market Feed in the main navigation.",
+    description: "Active-mint vitals module grouped inside Market Feed for fast price, liquidity, and holder context.",
     Icon: Activity,
     accent: "blue",
     group: "Market",
@@ -167,7 +166,7 @@ const TABS: TabConfig[] = [
     slug: "pairs",
     pageNumber: 8,
     eyebrow: "NEW PAIR RADAR",
-    description: "Direct legacy route for pair discovery. It is now grouped under Market Feed in the main navigation.",
+    description: "Pair discovery module grouped inside Market Feed for new pool, liquidity, and routing intelligence.",
     Icon: Radar,
     accent: "cyan",
     group: "Market",
@@ -180,7 +179,7 @@ const TABS: TabConfig[] = [
     slug: "trending",
     pageNumber: 10,
     eyebrow: "MARKET HEAT",
-    description: "Direct legacy route for trending token heat. It is now grouped under Market Feed in the main navigation.",
+    description: "Trending heat module grouped inside Market Feed for live token momentum and catalyst discovery.",
     Icon: Flame,
     accent: "cyan",
     group: "Market",
@@ -193,7 +192,7 @@ const TABS: TabConfig[] = [
     slug: "whales",
     pageNumber: 11,
     eyebrow: "WALLET RADAR",
-    description: "Direct legacy route for whale concentration. It is now grouped under Market Feed in the main navigation.",
+    description: "Whale concentration module grouped inside Market Feed for holder pressure and concentration checks.",
     Icon: Wallet,
     accent: "white",
     group: "Market",
@@ -206,7 +205,7 @@ const TABS: TabConfig[] = [
     slug: "tx-feed",
     pageNumber: 12,
     eyebrow: "LIVE TRANSACTIONS",
-    description: "Direct legacy route for selected-mint transaction tape. It is now grouped under Market Feed in the main navigation.",
+    description: "Selected-mint transaction tape grouped inside Market Feed for live buy/sell and wallet flow context.",
     Icon: Activity,
     accent: "cyan",
     group: "Market",
@@ -260,7 +259,6 @@ const TABS: TabConfig[] = [
 ];
 
 const NAV_TABS: TabConfig[] = TABS.filter((tabConfig: TabConfig) => tabConfig.showInNav !== false);
-const MERGED_TABS: TabConfig[] = TABS.filter((tabConfig: TabConfig) => tabConfig.showInNav === false);
 
 const TAB_BY_ID: Record<TabId, TabConfig> = TABS.reduce(
   (acc: Record<TabId, TabConfig>, tabConfig: TabConfig): Record<TabId, TabConfig> => {
@@ -631,10 +629,10 @@ const OverviewPage = ({
               <ShieldCheck className="h-3.5 w-3.5" /> Merged workspace live
             </div>
             <h2 className="max-w-4xl font-display text-5xl font-black uppercase leading-[0.88] tracking-tighter text-white text-glow sm:text-7xl">
-              Fewer tabs. More signal.
+              Layered Token Truth
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-white/70">
-              The command deck now uses a smaller set of high-signal workspaces: Truth Scan, Launch Radar, Market Feed, Swap, and Project pages. Old standalone URLs still work.
+              The command deck is built around focused intelligence rooms: Truth Scan for provenance, Launch Radar for fresh launches, Market Feed for live movement, Swap for routes, and Project pages for OGScan updates.
             </p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <button type="button" onClick={onScanClick} className="inline-flex min-h-14 flex-1 items-center justify-center gap-2 rounded-[1.25rem] border border-og-lime bg-og-lime px-5 font-display text-lg font-black uppercase text-og-ink shadow-[0_0_42px_-16px_hsl(var(--og-lime))] transition hover:bg-white active:scale-[0.985] sm:flex-none">
@@ -671,37 +669,14 @@ const OverviewPage = ({
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl sm:p-5">
-          <PanelTitle icon={Target} eyebrow="Start here" title="Most used tools" />
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {priorityTabs.map((tool: TabConfig) => (
-              <ToolCard key={tool.id} tool={tool} onClick={() => onSwitchTab(tool.id)} featured />
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl sm:p-5">
-          <PanelTitle icon={CalendarClock} eyebrow="Tabs merged" title="Old routes still work" />
-          <div className="mt-4 space-y-2">
-            {MERGED_TABS.map((tool: TabConfig) => {
-              const parent: TabConfig | undefined = tool.mergedInto ? TAB_BY_ID[tool.mergedInto] : undefined;
-              return (
-                <button key={tool.id} type="button" onClick={() => onSwitchTab(tool.id)} className="group flex w-full items-center gap-3 rounded-[1.15rem] border border-white/10 bg-black/20 p-3 text-left transition hover:border-og-lime/60 hover:bg-og-lime/5 active:scale-[0.99]">
-                  <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl border", getAccentClass(tool.accent, "icon"))}>
-                    <tool.Icon className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-display text-sm font-black uppercase leading-none text-white">{tool.label}</span>
-                    <span className="mt-1 block truncate font-mono text-[8px] uppercase tracking-[0.18em] text-muted-foreground">/{tool.slug} · grouped under {parent?.label ?? "Workspace"}</span>
-                  </span>
-                  <ChevronRight className="h-4 w-4 text-og-cyan opacity-0 transition group-hover:translate-x-1 group-hover:opacity-100" />
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      </div>
+      <section className="rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl sm:p-5">
+        <PanelTitle icon={Target} eyebrow="Start here" title="Most used tools" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {priorityTabs.map((tool: TabConfig) => (
+            <ToolCard key={tool.id} tool={tool} onClick={() => onSwitchTab(tool.id)} featured />
+          ))}
+        </div>
+      </section>
     </section>
   );
 };
