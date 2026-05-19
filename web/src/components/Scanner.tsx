@@ -28,6 +28,7 @@ import {
   dexScreenerChartUrl,
   enrichTokensWithMarketIntel,
   forensicOgAttribution,
+  fmtHolderCount,
   fmtNum,
   fmtPct,
   fmtUsd,
@@ -66,7 +67,6 @@ type ScanFilters = {
   hideLpPulled: boolean;
   authoritySafeOnly: boolean;
   primaryOnly: boolean;
-  hasAth: boolean;
   dexPaidOnly: boolean;
   sortBy: ScanSortMode;
 };
@@ -84,7 +84,6 @@ const DEFAULT_FILTERS: ScanFilters = {
   hideLpPulled: true,
   authoritySafeOnly: false,
   primaryOnly: false,
-  hasAth: false,
   dexPaidOnly: false,
   sortBy: "dominance",
 };
@@ -165,7 +164,6 @@ function passesScanFilters(t: JupTokenInfo, filters: ScanFilters, score?: TokenF
   if (filters.hideLpPulled && hasPulledOrDeadLiquidity(t)) return false;
   if (filters.authoritySafeOnly && !tokenAuthoritySafe(t)) return false;
   if (filters.primaryOnly && score?.isPrimaryToken !== true) return false;
-  if (filters.hasAth && t.allTimeHighUsd == null) return false;
   if (filters.dexPaidOnly && tokenDexPaidLabel(t) === "—") return false;
   return true;
 }
@@ -219,7 +217,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
       if (report.candidates.length > 0) return report;
 
       const tokens: JupTokenInfo[] = await jupSearchToken(debounced);
-      const fallbackCandidates: JupTokenInfo[] = (await enrichTokensWithMarketIntel(tokens, { includeAth: true, maxAth: 12 }))
+      const fallbackCandidates: JupTokenInfo[] = (await enrichTokensWithMarketIntel(tokens, { includeAth: false, maxBirdeye: 12 }))
         .filter((token: JupTokenInfo): boolean => (token.chainId ?? "solana") === "solana")
         .filter(isTrustedOgScanCandidate);
       return { ...report, candidates: fallbackCandidates, copycats: fallbackCandidates.slice(1) };
@@ -322,7 +320,6 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <FilterToggle label="AUTH LOCKED" value={filters.authoritySafeOnly} onChange={(v) => setFilters({ ...filters, authoritySafeOnly: v })} />
             <FilterToggle label="VERIFIED" value={filters.verifiedOnly} onChange={(v) => setFilters({ ...filters, verifiedOnly: v })} />
             <FilterToggle label="GREEN 24H" value={filters.greenOnly} onChange={(v) => setFilters({ ...filters, greenOnly: v })} />
-            <FilterToggle label="HAS ATH" value={filters.hasAth} onChange={(v) => setFilters({ ...filters, hasAth: v })} />
             <FilterToggle label="DEX PAID" value={filters.dexPaidOnly} onChange={(v) => setFilters({ ...filters, dexPaidOnly: v })} />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -452,6 +449,7 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
   const migrationDate: string = shortDate(tokenMigrationDateIso(t));
   const firstMintDate: string = shortDate(tokenOgCreatedAtIso(t));
   const dexPaid: string = tokenDexPaidLabel(t);
+  const dexDisplay: string = dexPaid === "—" ? "No paid boost" : dexPaid;
   const originScore: number = score?.originScore ?? 0;
   const cloneScore: number = score?.cloneScore ?? 0;
   const riskScore: number = score?.riskScore ?? (hasPulledOrDeadLiquidity(t) ? 92 : 0);
@@ -498,9 +496,18 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
               {t.symbol?.slice(0, 1) ?? "?"}
             </div>
           )}
-          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest">
-            <span className="rounded-full bg-black/55 px-2 py-1 text-og-gold backdrop-blur">${t.symbol}</span>
-            {t.isVerified ? <span className="rounded-full bg-og-lime px-2 py-1 text-og-ink">verified</span> : null}
+          <div className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-black/55 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-og-cyan backdrop-blur">
+            LP {fmtUsd(tokenEffectiveLiquidityUsd(t))}
+          </div>
+          <div className="absolute bottom-3 left-3 right-3 grid gap-1 font-mono text-[10px] uppercase tracking-widest">
+            <div className="flex items-center justify-between gap-2">
+              <span className="rounded-full bg-black/60 px-2 py-1 text-og-gold backdrop-blur">${t.symbol}</span>
+              {t.isVerified ? <span className="rounded-full bg-og-lime px-2 py-1 text-og-ink">verified</span> : null}
+            </div>
+            <div className="flex items-center justify-between gap-2 text-[9px] text-foreground/80">
+              <span className="rounded-full bg-black/55 px-2 py-1 backdrop-blur">H {fmtHolderCount(t.holderCount)}</span>
+              <span className="truncate rounded-full bg-black/55 px-2 py-1 text-og-cyan backdrop-blur">DEX {dexDisplay}</span>
+            </div>
           </div>
         </div>
 
@@ -530,13 +537,12 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
           <div className="grid grid-cols-2 gap-1.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground xl:grid-cols-3">
             <MiniIntel icon={Target} label="Clone" value={score ? `${cloneScore}%` : "—"} accent={scoreTextClass("clone", cloneScore)} />
             <MiniIntel icon={ShieldCheck} label="Authority" value={tokenAuthorityLabel(t)} accent={tokenAuthoritySafe(t) ? "text-og-lime" : "text-og-gold"} />
-            <MiniIntel icon={Users} label="Holders" value={fmtNum(t.holderCount)} accent={(t.holderCount ?? 0) >= 1000 ? "text-og-lime" : "text-muted-foreground"} />
+            <MiniIntel icon={Users} label="Holders" value={fmtHolderCount(t.holderCount)} accent={(t.holderCount ?? 0) >= 1000 ? "text-og-lime" : "text-muted-foreground"} />
             <MiniIntel icon={Wallet} label="Top 10" value={holderConcentrationLabel} accent={(holderConcentration ?? 0) > 45 ? "text-og-blood" : holderConcentration != null ? "text-og-lime" : undefined} />
             <MiniIntel icon={Coins} label="Liquidity" value={fmtUsd(tokenEffectiveLiquidityUsd(t))} accent="text-og-cyan" />
-            <MiniIntel icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
             <MiniIntel icon={RadioTower} label="First Mint" value={firstMintDate} accent={score?.isFirstMintToken ? "text-og-lime" : "text-og-gold"} />
             <MiniIntel icon={Calendar} label="Migrated" value={migrationDate} accent="text-og-cyan" />
-            <MiniIntel icon={BadgeDollarSign} label="DEX" value={dexPaid} accent={dexPaid === "—" ? undefined : "text-og-lime"} />
+            <MiniIntel icon={BadgeDollarSign} label="DEX" value={dexDisplay} accent={dexPaid === "—" ? "text-muted-foreground" : "text-og-lime"} />
           </div>
         </div>
       </button>

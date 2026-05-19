@@ -45,6 +45,10 @@
 - [x] Upgrade **Scan Any Mint** with advanced forensic filters for dominance, origin, risk, liquidity, market cap, holders, clone status, LP safety, authority safety, ATH availability, DEX-paid signals, and sort modes.
 - [x] Add expanded scanner score cards showing Dominance, Origin, Risk, Clone, Authority, Holders, Top 10 concentration, Activity, Pools, First Mint, ATH, migration, and DEX paid/boost status.
 - [x] Redesign scanner token results into collectible forensic cards with holo rarity treatments, token art panels, Primary/Legacy/Clone/Danger badges, stat tiles, and quick action tools.
+- [x] Fix collector cards so the actual token image is the main card artwork, with key LP/holder/DEX data overlaid directly on the image.
+- [x] Remove ATH/ATL from OG scanner card surfaces and keep market-extreme data inside deeper intel views.
+- [x] Fix holder and whale display fallbacks so unknown or unreliable provider values like `1` no longer show as real holder/whale counts.
+- [x] Separate `og` back to first credible mint while keeping `primaryToken` as the current dominance leader, preventing later tokens from being shown as the OG.
 
 ## **Design**
 
@@ -76,6 +80,7 @@
 - [x] Keep the landing-page messaging focused on scanner, launch, market, swap, and token-intel capabilities instead of describing the UI layout changes.
 - [x] Add scanner preset filter packs, richer result-card density, visible risk counters, and primary/first-mint summary stats for faster token triage.
 - [x] Give OG Finder and Scan Any Mint Pokémon-style collector-card visuals with animated holo sweeps, rarity chips, safer mobile spacing, and clearer token status hierarchy.
+- [x] Improve collector-card readability with token-image art panels, overlay stats, DexScreener chart actions, and clearer First Mint vs Primary hierarchy.
 
 ## **Pages / Screens**
 
@@ -103,6 +108,7 @@
 - [x] **Tool-Focused Landing Page**: The root page now explains what each OGScan tool does: Truth Scan for mint forensics, Launch Radar for migrations/dev-wallet risk, Market Feed for runners/catalysts/whales, and Command Deck for the full intelligence suite.
 - [x] **Advanced Scan Any Mint**: Scanner now behaves like a full forensic triage board with preset filters, dominance/origin/risk sorting, authority/holder/liquidity controls, and quick actions to DexScreener, Solscan, Pump.fun, deep scan, copy mint, and the coin intelligence popup.
 - [x] **Collector Token Cards**: OG Finder and Scan Any Mint now present each token like a premium collectible card with large artwork, holo glow, rarity labels, dominance/origin/risk stat blocks, and bottom-row investigation tools.
+- [x] **Origin-Correct OG Cards**: Direct OG now leads with the first credible Solana mint, shows the current Primary separately, removes ATH/ATL from scanner cards, and avoids unreliable holder/whale `1` fallbacks.
 
 ## **Suggested build order**
 

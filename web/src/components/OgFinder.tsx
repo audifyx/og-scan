@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  BarChart3,
   Crosshair,
+  ExternalLink,
   ShieldCheck,
   ShieldAlert,
   Loader2,
   Crown,
   Copy,
   Skull,
-  Flame,
   Droplets,
   Users,
   Calendar,
@@ -25,10 +26,13 @@ import {
 import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 import { CopyMintButton } from "@/components/CopyMintButton";
 import {
+  dexScreenerChartUrl,
   forensicOgAttribution,
+  fmtHolderCount,
   fmtPct,
   fmtUsd,
   fmtNum,
+  fmtWhaleCount,
   shortAddr,
   timeAgo,
   tokenDexPaidLabel,
@@ -115,16 +119,17 @@ export const OgFinder = ({ onSelect }: Props) => {
   const [showAllCopycats, setShowAllCopycats] = useState<boolean>(false);
 
   const { data, isFetching, refetch, dataUpdatedAt } = useQuery({
-    queryKey: ["og-forensic-attribution", submitted, "v10-dominance-engine"],
+    queryKey: ["og-forensic-attribution", submitted, "v11-origin-primary-separated"],
     queryFn: (): Promise<ForensicOgReport> => forensicOgAttribution(submitted),
     enabled: submitted.length >= 1,
     staleTime: 30_000,
   });
 
   const report: ForensicOgReport | undefined = data;
-  const og = report?.primaryToken ?? report?.og ?? null;
-  const firstMint = report?.firstMintToken ?? null;
-  const cats = report?.copycats ?? [];
+  const og = report?.firstMintToken ?? report?.og ?? report?.primaryToken ?? null;
+  const currentPrimary = report?.primaryToken ?? report?.og ?? null;
+  const ogKey: string | undefined = og ? forensicKey(og) : undefined;
+  const cats = report?.candidates.filter((token) => forensicKey(token) !== ogKey) ?? [];
 
   const oldestTs = useMemo(() => {
     const all = [og, ...cats].filter(Boolean) as JupTokenInfo[];
@@ -167,8 +172,8 @@ export const OgFinder = ({ onSelect }: Props) => {
   const visibleCopycats: JupTokenInfo[] = showAllCopycats ? filteredCats : filteredCats.slice(0, 6);
   const reportAlerts = useMemo(() => {
     if (!report) return [];
-    const ogAlerts = report.og ? buildTokenRiskAlerts(report.og, report.tokenScores[forensicKey(report.og)]) : [];
-    return [...buildClusterRiskAlerts(report), ...ogAlerts].slice(0, 5);
+    const originAlerts = report.firstMintToken ? buildTokenRiskAlerts(report.firstMintToken, report.tokenScores[forensicKey(report.firstMintToken)]) : [];
+    return [...buildClusterRiskAlerts(report), ...originAlerts].slice(0, 5);
   }, [report]);
 
   const submit = (raw: string) => {
@@ -283,14 +288,14 @@ export const OgFinder = ({ onSelect }: Props) => {
             <div className="lg:col-span-1">
               <div className="mb-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.4em] text-og-gold">
                 <span className="flex items-center gap-2">
-                  <Crown className="h-3 w-3" /> PRIMARY TOKEN
+                  <Crown className="h-3 w-3" /> TRUE OG / FIRST MINT
                 </span>
                 <ScoreBar score={report?.tokenScores[forensicKey(og)]?.dominanceScore ?? ogS} />
               </div>
-              <CoinCard t={og} highlight score={report?.tokenScores[forensicKey(og)]?.dominanceScore ?? ogS} forensic={report?.tokenScores[forensicKey(og)]} onSelect={() => onSelect(og.id)} />
-              {firstMint && firstMint.id !== og.id ? (
-                <div className="mt-3 rounded-2xl border border-og-gold/35 bg-og-gold/10 p-3 font-mono text-[10px] uppercase tracking-widest text-og-gold">
-                  first mint / legacy og: <span className="text-foreground">${firstMint.symbol}</span> · {shortAddr(firstMint.id, 5)} · {proofTimestampText(tokenOgCreatedAtIso(firstMint))}
+              <CoinCard t={og} highlight score={report?.tokenScores[forensicKey(og)]?.originScore ?? ogS} forensic={report?.tokenScores[forensicKey(og)]} onSelect={() => onSelect(og.id)} />
+              {currentPrimary && currentPrimary.id !== og.id ? (
+                <div className="mt-3 rounded-2xl border border-og-cyan/35 bg-og-cyan/10 p-3 font-mono text-[10px] uppercase tracking-widest text-og-cyan">
+                  current primary / market leader: <span className="text-foreground">${currentPrimary.symbol}</span> · {shortAddr(currentPrimary.id, 5)} · dominance {report?.tokenScores[forensicKey(currentPrimary)]?.dominanceScore ?? "—"}% · not first mint
                 </div>
               ) : null}
             </div>
@@ -432,6 +437,8 @@ const CoinCard = ({
   const poolCreatedAt = t.firstPool?.createdAt;
   const migrationCreatedAt = tokenMigrationDateIso(t);
   const dexPaid = tokenDexPaidLabel(t);
+  const dexDisplay: string = dexPaid === "—" ? "No paid boost" : dexPaid;
+  const chartUrl: string = dexScreenerChartUrl(t);
   const primaryLabel: string = forensic?.classification.primary_label ?? (highlight ? "TRUE OG" : "COPYCAT");
   const secondaryLabels: string[] = forensic?.classification.secondary_labels.slice(0, 5) ?? [];
   const riskScore: number = forensic?.riskScore ?? (t.lpPulled ? 92 : rugRisk(t) === "high" ? 78 : 0);
@@ -439,18 +446,20 @@ const CoinCard = ({
   const dominanceScore: number = forensic?.dominanceScore ?? score;
   const rarityLabel: string = t.lpPulled || riskScore >= 70
     ? "Danger Foil"
-    : highlight || forensic?.isPrimaryToken
-      ? "Primary Holo"
+    : forensic?.isFirstMintToken && forensic?.isPrimaryToken
+      ? "True OG Holo"
       : forensic?.isFirstMintToken
         ? "Legacy OG"
-        : cloneScore >= 50
-          ? "Clone Card"
-          : dominanceScore >= 70
-            ? "Rare Runner"
-            : "Cluster Card";
+        : forensic?.isPrimaryToken
+          ? "Primary Holo"
+          : cloneScore >= 50
+            ? "Clone Card"
+            : dominanceScore >= 70
+              ? "Rare Runner"
+              : "Cluster Card";
   const cardTone: string = t.lpPulled || riskScore >= 70
     ? "collector-token-card--danger"
-    : highlight || forensic?.isPrimaryToken
+    : highlight || forensic?.isFirstMintToken || forensic?.isPrimaryToken
       ? "collector-token-card--primary"
       : "collector-token-card--copy";
 
@@ -465,8 +474,8 @@ const CoinCard = ({
       className={`collector-token-card ${cardTone} group flex cursor-pointer flex-col gap-3 p-3 text-left transition duration-200`}
     >
       <div className="flex items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-widest">
-        <span className={`collector-rarity-chip ${t.lpPulled || riskScore >= 70 ? "text-og-blood" : highlight || forensic?.isPrimaryToken ? "text-og-lime" : "text-og-cyan"}`}>
-          {highlight || forensic?.isPrimaryToken ? <Crown className="h-3 w-3" /> : t.lpPulled || riskScore >= 70 ? <ShieldAlert className="h-3 w-3" /> : <Fingerprint className="h-3 w-3" />}
+        <span className={`collector-rarity-chip ${t.lpPulled || riskScore >= 70 ? "text-og-blood" : forensic?.isFirstMintToken ? "text-og-gold" : highlight || forensic?.isPrimaryToken ? "text-og-lime" : "text-og-cyan"}`}>
+          {forensic?.isPrimaryToken ? <Crown className="h-3 w-3" /> : t.lpPulled || riskScore >= 70 ? <ShieldAlert className="h-3 w-3" /> : <Fingerprint className="h-3 w-3" />}
           {rarityLabel}
         </span>
         <span className="collector-rarity-chip text-muted-foreground">DOM #{forensic?.dominanceRank ?? "--"}</span>
@@ -481,9 +490,18 @@ const CoinCard = ({
               {t.symbol?.slice(0, 1) ?? "?"}
             </div>
           )}
-          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest">
-            <span className="rounded-full bg-black/55 px-2 py-1 text-og-gold backdrop-blur">${t.symbol}</span>
-            {t.isVerified ? <span className="rounded-full bg-og-lime px-2 py-1 text-og-ink">verified</span> : <RiskBadge t={t} />}
+          <div className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] rounded-full bg-black/55 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-og-cyan backdrop-blur">
+            LP {fmtUsd(tokenEffectiveLiquidityUsd(t))}
+          </div>
+          <div className="absolute bottom-3 left-3 right-3 grid gap-1 font-mono text-[10px] uppercase tracking-widest">
+            <div className="flex items-center justify-between gap-2">
+              <span className="rounded-full bg-black/60 px-2 py-1 text-og-gold backdrop-blur">${t.symbol}</span>
+              {t.isVerified ? <span className="rounded-full bg-og-lime px-2 py-1 text-og-ink">verified</span> : <RiskBadge t={t} />}
+            </div>
+            <div className="flex items-center justify-between gap-2 text-[9px] text-foreground/80">
+              <span className="rounded-full bg-black/55 px-2 py-1 backdrop-blur">H {fmtHolderCount(t.holderCount)}</span>
+              <span className="truncate rounded-full bg-black/55 px-2 py-1 text-og-cyan backdrop-blur">DEX {dexDisplay}</span>
+            </div>
           </div>
         </div>
 
@@ -500,7 +518,7 @@ const CoinCard = ({
               </div>
             </div>
             <div className="mt-2 flex items-center justify-between gap-3 border-y border-white/10 py-2">
-              <HelpLabel label={highlight ? "PRIMARY STATUS" : "CLASSIFICATION"} term="classification" className="font-mono text-[10px] uppercase tracking-widest text-og-gold/80" />
+              <HelpLabel label={forensic?.isFirstMintToken ? "FIRST MINT STATUS" : "CLASSIFICATION"} term="classification" className="font-mono text-[10px] uppercase tracking-widest text-og-gold/80" />
               <ScoreMeter score={dominanceScore} kind="origin" />
             </div>
             <div className={`mt-2 inline-flex max-w-full border px-2.5 py-1 font-display text-base font-black uppercase tracking-tight ${labelToneClass(primaryLabel)}`}>
@@ -515,8 +533,7 @@ const CoinCard = ({
             <Stat icon={ShieldAlert} label="CLONE" value={forensic ? `${cloneScore}%` : "—"} accent={scoreTextClass("clone", cloneScore)} />
             <Stat icon={Calendar} label="FIRST MINT" value={shortDate(onChainCreatedAt)} accent={forensic?.isFirstMintToken ? "text-og-lime" : "text-og-gold"} />
             <Stat icon={Droplets} label="QUOTE LP" value={fmtUsd(tokenEffectiveLiquidityUsd(t))} accent="text-og-cyan" />
-            <Stat icon={Flame} label="ATH" value={fmtUsd(t.allTimeHighUsd)} accent="text-og-gold" />
-            <Stat icon={Users} label="HOLDERS" value={fmtNum(t.holderCount)} accent="text-og-lime" />
+            <Stat icon={Users} label="HOLDERS" value={fmtHolderCount(t.holderCount)} accent="text-og-lime" />
             <Stat icon={Network} label="POOLS" value={fmtNum(t.poolCount ?? t.allPools?.length)} accent={(t.poolCount ?? t.allPools?.length ?? 0) > 0 ? "text-og-cyan" : undefined} />
           </div>
         </div>
@@ -551,8 +568,11 @@ const CoinCard = ({
           <AuditChip ok={!!t.audit?.mintAuthorityDisabled} label="MINT" OkIcon={Lock} BadIcon={Unlock} />
           <AuditChip ok={!!t.audit?.freezeAuthorityDisabled} label="FREEZE" OkIcon={Snowflake} BadIcon={Snowflake} />
           <span className="collector-rarity-chip text-muted-foreground">{shortAddr(t.id, 5)}</span>
-          <span className="collector-rarity-chip text-og-cyan">DEX {dexPaid}</span>
+          <span className={`collector-rarity-chip ${dexPaid === "—" ? "text-muted-foreground" : "text-og-cyan"}`}>DEX {dexDisplay}</span>
           <span className="ml-auto flex items-center gap-2">
+            <a href={chartUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="collector-action inline-flex items-center gap-1 px-2 py-1 text-og-cyan">
+              <BarChart3 className="h-3 w-3" /> Chart <ExternalLink className="h-2.5 w-2.5" />
+            </a>
             <CoinDetailDialog token={t} onOpenScanner={() => onSelect()} actionLabel="Intel" className="collector-action px-2 py-1" />
             <CopyMintButton mint={t.id} label="Copy" copiedLabel="Copied" className="collector-action px-2 py-1" iconClassName="h-3 w-3" />
           </span>
@@ -600,7 +620,7 @@ const TopRiskyCopycats = ({ tokens, report, onSelect }: { tokens: JupTokenInfo[]
                   <span><HelpLabel label="ORIGIN" /> <span className={scoreTextClass("origin", forensic?.originScore ?? 0)}>{forensic ? `${forensic.originScore}%` : "—"}</span></span>
                   <span><HelpLabel label="RISK" /> <span className={scoreTextClass("risk", forensic?.riskScore ?? 0)}>{forensic ? `${forensic.riskScore}%` : "—"}</span></span>
                   <span>LP <span className="text-foreground">{shortDate(token.firstPool?.createdAt)}</span></span>
-                  <span>WHALES <span className={(token.whaleCount ?? 0) >= 3 ? "text-og-blood" : "text-foreground"}>{fmtNum(token.whaleCount)}</span></span>
+                  <span>WHALES <span className={(token.whaleCount ?? 0) >= 3 ? "text-og-blood" : "text-foreground"}>{fmtWhaleCount(token.whaleCount)}</span></span>
                   <span><HelpLabel label="MINT" /> <span className={mintSafe ? "text-og-lime" : "text-og-blood"}>{mintSafe ? "OFF" : "ON/UNK"}</span></span>
                   <span><HelpLabel label="FREEZE" /> <span className={freezeSafe ? "text-og-lime" : "text-og-blood"}>{freezeSafe ? "OFF" : "ON/UNK"}</span></span>
                 </div>
@@ -618,7 +638,7 @@ const TopRiskyCopycats = ({ tokens, report, onSelect }: { tokens: JupTokenInfo[]
 };
 
 const ForensicReportPanel = ({ report, scanFreshness }: { report: ForensicOgReport; scanFreshness: string }) => {
-  const ogScore: TokenForensicScores | undefined = report.og ? report.tokenScores[forensicKey(report.og)] : undefined;
+  const ogScore: TokenForensicScores | undefined = report.primaryToken ? report.tokenScores[forensicKey(report.primaryToken)] : undefined;
   const firstMintScore: TokenForensicScores | undefined = report.firstMintToken ? report.tokenScores[forensicKey(report.firstMintToken)] : undefined;
   const mainAccent: string = ogScore?.classification.primary_label.includes("TRUE OG") || ogScore?.classification.primary_label.includes("REVIVED")
     ? "text-og-lime"
@@ -644,7 +664,7 @@ const ForensicReportPanel = ({ report, scanFreshness }: { report: ForensicOgRepo
 
       <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="grid gap-2 sm:grid-cols-3">
-          <ForensicMetric icon={Crown} label="PRIMARY STATUS" value={ogScore?.classification.primary_label ?? (report.og ? "PRIMARY" : "UNKNOWN")} accent={mainAccent} />
+          <ForensicMetric icon={Crown} label="PRIMARY STATUS" value={ogScore?.classification.primary_label ?? (report.primaryToken ? "PRIMARY" : "UNKNOWN")} accent={mainAccent} />
           <ForensicMetric icon={BrainCircuit} label="DOMINANCE" value={ogScore ? `${ogScore.dominanceScore}% · #${ogScore.dominanceRank}` : "—"} accent={scoreTextClass("origin", ogScore?.dominanceScore ?? 0)} />
           <ForensicMetric icon={Fingerprint} label="FIRST MINT" value={report.firstMintToken ? shortAddr(report.firstMintToken.id, 5) : "—"} accent={firstMintScore?.classification.primary_label === "LEGACY OG" ? "text-og-gold" : "text-og-lime"} />
           <ForensicMetric icon={ShieldAlert} label="CLONES" value={`${report.summary.cloneCount}/${report.summary.candidateCount}`} accent={report.summary.cloneCount > 0 ? "text-og-blood" : "text-og-lime"} />

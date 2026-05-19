@@ -409,6 +409,16 @@ export function tokenEffectiveLiquidityUsd(token: Pick<JupTokenInfo, "liquidity"
   return token.effectiveLiquidityUsd ?? token.liquidity ?? 0;
 }
 
+function reliableHolderCount(value: number | undefined): number | undefined {
+  if (value == null || !Number.isFinite(value) || value <= 1) return undefined;
+  return value;
+}
+
+function whaleWalletCountFromHolderIntel(holderIntel: TokenHolderBundleIntel | undefined): number | undefined {
+  if (!holderIntel) return undefined;
+  return holderIntel.topHolders.filter((holder, index) => index > 0 && holder.percent >= 5).length;
+}
+
 function tokenReportedLiquidityUsd(token: Pick<JupTokenInfo, "liquidity" | "reportedLiquidity">): number {
   return token.reportedLiquidity ?? token.liquidity ?? 0;
 }
@@ -1135,6 +1145,8 @@ export async function enrichTokensWithMarketIntel(
       : holderIntel
         ? { ...token.audit, topHoldersPercentage: holderIntel.top10Percent }
         : token.audit;
+    const resolvedHolderCount: number | undefined = reliableHolderCount(token.holderCount) ?? reliableHolderCount(marketPatch.holderCount);
+    const resolvedWhaleCount: number | undefined = whaleWalletCountFromHolderIntel(holderIntel) ?? token.whaleCount;
 
     return {
       ...token,
@@ -1152,7 +1164,7 @@ export async function enrichTokensWithMarketIntel(
         : pairLpPulled
           ? `LP appears pulled/dead: ${fmtUsd(pairReportedLiquidity)} reported liquidity but only ${fmtUsd(pairQuoteLiquidityUsd(pair))} quote-side depth.`
           : token.lpPullReason,
-      holderCount: token.holderCount ?? marketPatch.holderCount,
+      holderCount: resolvedHolderCount,
       audit: authorityAudit,
       firstPool: oldestPoolCreatedAt ? { createdAt: oldestPoolCreatedAt } : migrationCreatedAt ? { createdAt: migrationCreatedAt } : token.firstPool,
       firstMintAt: token.firstMintAt ?? token.onChainCreatedAt ?? pumpFun?.launchAt,
@@ -1186,7 +1198,7 @@ export async function enrichTokensWithMarketIntel(
       heliusAuthorities: authority ?? token.heliusAuthorities,
       topHolders: holderIntel?.topHolders ?? token.topHolders,
       topHoldersPercent: holderIntel?.top10Percent ?? token.topHoldersPercent,
-      whaleCount: holderIntel?.suspectedBundlers.filter((holder) => holder.percent >= 5).length ?? token.whaleCount,
+      whaleCount: resolvedWhaleCount,
       creatorFunding: creatorFunding ?? token.creatorFunding,
       pumpFun: pumpFun ?? token.pumpFun,
       allPools: pools.length > 0 ? pools : token.allPools,
@@ -1932,8 +1944,12 @@ function buildLayeredClassification(input: LayeredClassificationInput): TokenLay
     primary_label = "CONTESTED";
   } else if (isFirstMintToken && !isPrimaryToken) {
     primary_label = "LEGACY OG";
-  } else if (isPrimaryToken && !isFirstMintToken) {
+  } else if (isPrimaryToken && !isFirstMintToken && isLaterOfficial) {
     primary_label = "REVIVED OFFICIAL";
+  } else if (isPrimaryToken && !isFirstMintToken && (cloneScore >= 82 || riskScore >= 72)) {
+    primary_label = "CLONE";
+  } else if (isPrimaryToken && !isFirstMintToken) {
+    primary_label = "REVIVAL";
   } else if (isOg && originScore >= 75 && ctoScore >= 60 && sameContractContinued) {
     primary_label = "TRUE OG CTO";
   } else if (isOg && originScore >= 68) {
@@ -2542,13 +2558,14 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     });
   }
 
-  const og: JupTokenInfo | null = primaryToken;
-  const copycats: JupTokenInfo[] = candidates.filter((token) => !primaryKey || tokenKey(token) !== primaryKey);
+  const og: JupTokenInfo | null = firstMintToken;
+  const ogKey: string | undefined = og ? tokenKey(og) : undefined;
+  const copycats: JupTokenInfo[] = candidates.filter((token) => !ogKey || tokenKey(token) !== ogKey);
   const familyTree: TokenLineageNode[] = candidates.map((token) => {
     const scores: TokenForensicScores = tokenScores[tokenKey(token)];
     return {
       token,
-      relationship: classifyRelationship(token, scores, Boolean(og && tokenKey(token) === tokenKey(og))),
+      relationship: classifyRelationship(token, scores, Boolean(ogKey && tokenKey(token) === ogKey)),
       score: scores.dominanceScore,
       createdAt: tokenOgCreatedAtIso(token),
       liquidityAt: token.firstPool?.createdAt,
@@ -3177,6 +3194,17 @@ export function fmtNum(n: number | undefined | null): string {
   if (abs >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
   if (abs >= 1e3) return `${(n / 1e3).toFixed(2)}K`;
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+export function fmtHolderCount(n: number | undefined | null): string {
+  if (n == null || !isFinite(n) || n <= 1) return "—";
+  return fmtNum(n);
+}
+
+export function fmtWhaleCount(n: number | undefined | null): string {
+  if (n == null || !isFinite(n)) return "—";
+  if (n <= 1) return "0";
+  return fmtNum(n);
 }
 
 export function fmtPct(n: number | undefined | null): string {

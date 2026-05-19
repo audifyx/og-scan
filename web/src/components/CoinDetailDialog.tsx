@@ -36,9 +36,11 @@ import {
   dexScreenerEmbedUrl,
   enrichTokensWithMarketIntel,
   forensicOgAttribution,
+  fmtHolderCount,
   fmtNum,
   fmtPct,
   fmtUsd,
+  fmtWhaleCount,
   hasPulledOrDeadLiquidity,
   jupGetTokens,
   shortAddr,
@@ -454,7 +456,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                 <IntelCard icon={Flame} label="All-Time High" value={fmtUsd(detailToken.allTimeHighUsd)} sub={marketExtremeSub(detailToken.allTimeHighAt, detailToken.allTimeHighSource)} tone="gold" />
                 <IntelCard icon={Activity} label="All-Time Low" value={fmtUsd(detailToken.allTimeLowUsd)} sub={marketExtremeSub(detailToken.allTimeLowAt, detailToken.allTimeLowSource)} tone="cyan" />
                 <IntelCard icon={BadgeDollarSign} label="ATH Market Cap" value={fmtUsd(detailToken.allTimeHighMarketCap)} sub={detailToken.allTimeHighMarketCap ? `estimated ${shortDate(detailToken.allTimeHighMarketCapAt)}` : "needs price history + MC"} tone="gold" />
-                <IntelCard icon={Users} label="Holders" value={fmtNum(detailToken.holderCount)} sub={`top 10 ${detailToken.topHoldersPercent != null ? `${detailToken.topHoldersPercent.toFixed(1)}%` : "scanning"}`} tone="lime" />
+                <IntelCard icon={Users} label="Holders" value={fmtHolderCount(detailToken.holderCount)} sub={`top 10 ${detailToken.topHoldersPercent != null ? `${detailToken.topHoldersPercent.toFixed(1)}%` : "scanning"}`} tone="lime" />
               </div>
 
               <MarketExtremesPanel token={detailToken} />
@@ -557,7 +559,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                   <MetaLine label="Reported LP" value={fmtUsd(detailToken.reportedLiquidity ?? pair?.liquidity?.usd)} />
                   <MetaLine label="LP status" value={lpPulled ? "pulled / dead liquidity" : "quote-backed"} />
                   <MetaLine label="Top holders" value={detailToken.topHoldersPercent != null ? `${detailToken.topHoldersPercent.toFixed(1)}%` : detailToken.audit?.topHoldersPercentage != null ? `${detailToken.audit.topHoldersPercentage.toFixed(1)}%` : "—"} />
-                  <MetaLine label="Whales" value={fmtNum(detailToken.whaleCount)} />
+                  <MetaLine label="Whales" value={fmtWhaleCount(detailToken.whaleCount)} />
                   <MetaLine label="Organic score" value={detailToken.organicScore != null ? `${detailToken.organicScore.toFixed(0)} · ${detailToken.organicScoreLabel ?? ""}` : "—"} />
                   <MetaLine label="Dominance" value={forensicScore ? `${forensicScore.dominanceScore}% · #${forensicScore.dominanceRank}` : "—"} />
                   <MetaLine label="Origin score" value={forensicScore ? `${forensicScore.originScore}%` : "—"} />
@@ -804,7 +806,7 @@ const OnChainIntelPanel = ({ token }: { token: JupTokenInfo }) => {
         <MetaLine label="Creator" value={shortAddr(creator?.creatorWallet ?? token.pumpFun?.creator, 6)} />
         <MetaLine label="Funding tx" value={shortAddr(creator?.fundingWallet ?? undefined, 6)} />
         <MetaLine label="Largest holder" value={topHolders[0] ? `${shortAddr(topHolders[0].owner, 4)} · ${topHolders[0].percent.toFixed(1)}%` : "scanning"} />
-        <MetaLine label="Whale wallets" value={fmtNum(token.whaleCount)} />
+        <MetaLine label="Whale wallets" value={fmtWhaleCount(token.whaleCount)} />
       </div>
       <div className="mt-3 grid gap-1.5">
         {topHolders.slice(0, 3).map((holder) => (
