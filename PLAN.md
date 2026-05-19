@@ -69,6 +69,8 @@
 - [x] Add a dedicated `/feed` workspace page with spotlight cards, runner board, full live feed rows, and a sticky coin analytics panel.
 - [x] Add Feed panels for viral news catalysts, matched meme coins, suspected bundlers, and dev farming/rug history.
 - [x] Update OG Finder and the shared Coin Intelligence Popup to show Primary Status, Dominance %, rank, First Mint / Legacy OG, mint authority wallet, and clear notes when a later token is dominant but not first on-chain.
+- [x] Refresh the root landing page around the simplified “Layered Token Truth” story with clear Truth Scan, Launch Radar, Market Feed, and Command Deck calls-to-action.
+- [x] Merge overlapping visible tabs into higher-signal workspace groups while preserving legacy direct routes for embeds and existing links.
 
 ## **Pages / Screens**
 
@@ -93,6 +95,7 @@
 - [x] **News / Viral Catalyst Feed**: Feed now watches RSS/news/X-style Elon, Trump, crypto, and breaking-news catalysts, explains why topics may go viral, and links matching live meme coins when detected.
 - [x] **Expanded Coin Intelligence Popup**: Popup now shows Helius authority truth, largest-holder owner rows, whale counts, creator/funding wallet inference, Pump.fun launch/migration timing, all DexScreener pools, DEX paid orders, boosts, Birdeye ATH/ATL, holders, liquidity, MC, and FDV.
 - [x] **Dominance Engine Output**: Forensic searches now return `primaryToken`, `firstMintToken`, `contestedTokens`, dominance score/rank, first mint authority wallet, and Primary/Legacy/Contested labels for fast memecoin provenance decisions.
+- [x] **Merged Command Workspaces**: The visible UI now groups Scanner + OG Finder into Truth Scan, Snipe Feed + Migrations into Launch Radar, and Feed + Vitals + Pairs + Trending + Whales + Tx Tape into Market Feed while keeping every old URL active.
 
 ## **Suggested build order**
 
