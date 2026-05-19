@@ -349,7 +349,8 @@ describe("jupOgCopycats", () => {
     const report = await forensicOgAttribution("WOJAK");
 
     expect(report.firstMintToken?.id).toBe("two-year-old-og");
-    expect(report.og?.id).toBe("five-month-newer-pair");
+    expect(report.og?.id).toBe("two-year-old-og");
+    expect(report.primaryToken?.id).toBe("five-month-newer-pair");
     expect(report.tokenScores["solana:two-year-old-og"]?.classification.primary_label).toBe("LEGACY OG");
     expect(report.tokenScores["solana:five-month-newer-pair"]?.classification.primary_label).toBe("REVIVED OFFICIAL");
   });
@@ -434,7 +435,8 @@ describe("jupOgCopycats", () => {
 
     expect(report.firstMintToken?.id).toBe("older-origin-multi-pool");
     expect(report.firstMintToken?.firstPool?.createdAt).toBe("2024-01-15T00:00:00.000Z");
-    expect(report.og?.id).toBe("newer-copy-token");
+    expect(report.og?.id).toBe("older-origin-multi-pool");
+    expect(report.primaryToken?.id).toBe("newer-copy-token");
     expect(report.summary.earliestLiquidity).toBe("2024-01-15T00:00:00.000Z");
   });
 
@@ -589,7 +591,8 @@ describe("jupOgCopycats", () => {
     const legacyScore = report.tokenScores["solana:first-trump-mint"];
 
     expect(report.firstMintToken?.id).toBe("first-trump-mint");
-    expect(report.og?.id).toBe("later-official-trump");
+    expect(report.og?.id).toBe("first-trump-mint");
+    expect(report.primaryToken?.id).toBe("later-official-trump");
     expect(legacyScore.classification.primary_label).toBe("LEGACY OG");
     expect(officialScore.classification.primary_label).toBe("REVIVED OFFICIAL");
     expect(officialScore.reasons.join(" ")).toContain("Later token is now primary by dominance engine");
@@ -633,7 +636,8 @@ describe("jupOgCopycats", () => {
     const report = await forensicOgAttribution("YE");
 
     expect(report.firstMintToken?.id).toBe("first-ye-mint");
-    expect(report.og?.id).toBe("later-official-ye");
+    expect(report.og?.id).toBe("first-ye-mint");
+    expect(report.primaryToken?.id).toBe("later-official-ye");
     expect(report.tokenScores["solana:first-ye-mint"]?.classification.primary_label).toBe("LEGACY OG");
     expect(report.tokenScores["solana:later-official-ye"]?.classification.primary_label).toBe("REVIVED OFFICIAL");
     expect(report.familyTree.find((node) => node.token.id === "later-official-ye")?.relationship).toBe("later official");
