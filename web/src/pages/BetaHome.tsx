@@ -12,7 +12,6 @@ import {
   Radio,
   Radar,
   Search,
-  ShieldCheck,
   Sparkles,
   Target,
   type LucideIcon,
@@ -65,46 +64,46 @@ const communityCards: CommunityCard[] = [
 
 const splashToolLinks: SplashToolLink[] = [
   {
-    title: "OG Scanner",
+    title: "Truth Scan",
     href: "/scanner",
-    description: "Paste a mint or ticker and run the main origin check.",
+    description: "Scanner + OG Finder merged into one origin, risk, dominance, and liquidity workspace.",
     Icon: Search,
     accent: "lime",
   },
   {
-    title: "Snipe Feed",
+    title: "Launch Radar",
     href: "/snipe-feed",
-    description: "Watch new Solana launches and dev-wallet signals.",
+    description: "Snipe Feed + Pump.fun migration tracking grouped for new-launch intelligence.",
     Icon: Target,
     accent: "cyan",
   },
   {
-    title: "OG Finder",
-    href: "/og-finder",
-    description: "Find the earliest on-chain mint, not the loudest copy.",
-    Icon: Radar,
+    title: "Market Feed",
+    href: "/feed",
+    description: "Trending, vitals, pairs, whales, and transaction tape grouped into one market command center.",
+    Icon: Flame,
     accent: "gold",
   },
   {
-    title: "Migrations",
-    href: "/migrations",
-    description: "Track migration timing without confusing it for OG status.",
-    Icon: ShieldCheck,
+    title: "Command Deck",
+    href: "/app",
+    description: "Open the simplified dashboard with fewer tabs and every legacy route preserved.",
+    Icon: Radar,
     accent: "cyan",
   },
 ];
 
 const issueTips: string[] = [
-  "Use Scanner first if you only need one tool",
-  "Open All Tools if you want the full command dashboard",
-  "Join Telegram for fastest support while the next DEX update is prepared",
+  "Use Truth Scan first if you only need one decision",
+  "Launch Radar now contains both snipes and migrations",
+  "Market Feed now contains trending, vitals, pairs, whales, and tape",
 ];
 
 const BetaHome = memo(() => {
   const [copied, setCopied] = useState<"coin" | null>(null);
 
   const launchNotes: string[] = useMemo<string[]>(
-    () => ["Scanner is the fastest entry point", "Every tool has its own direct URL", "DEX updates will be announced in the community first"],
+    () => ["Truth Scan: scanner + OG finder", "Launch Radar: snipes + migrations", "Market Feed: pulse + pairs + tape"],
     [],
   );
 
@@ -139,7 +138,7 @@ const BetaHome = memo(() => {
               </div>
               <div className="min-w-0">
                 <p className="truncate font-display text-sm font-black uppercase tracking-[0.24em] text-white">OGScan</p>
-                <p className="truncate font-mono text-[9px] uppercase tracking-[0.25em] text-og-cyan">Origin tools · beta HQ</p>
+                <p className="truncate font-mono text-[9px] uppercase tracking-[0.25em] text-og-cyan">Layered token truth</p>
               </div>
             </div>
 
@@ -148,13 +147,13 @@ const BetaHome = memo(() => {
                 to="/app"
                 className="hidden min-h-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] px-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:border-og-cyan hover:text-og-cyan sm:inline-flex"
               >
-                All tools
+                Command deck
               </Link>
               <Link
                 to="/scanner"
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-og-lime bg-og-lime px-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-og-ink shadow-[0_0_34px_-10px_hsl(var(--og-lime))] transition hover:bg-white active:scale-[0.98]"
               >
-                Open scanner <ArrowRight className="h-3.5 w-3.5" />
+                Truth scan <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           </div>
@@ -168,11 +167,11 @@ const BetaHome = memo(() => {
 
             <div className="relative">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-og-lime/40 bg-og-lime/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-lime">
-                <Sparkles className="h-3.5 w-3.5" /> Start here
+                <Sparkles className="h-3.5 w-3.5" /> Cleaner UI live
               </div>
 
               <h1 className="font-display text-5xl font-black uppercase leading-[0.86] tracking-tighter text-white text-glow sm:text-7xl lg:text-8xl">
-                Find the real OG faster.
+                Layered token truth, without tab chaos.
               </h1>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-[1.15fr_0.85fr]">
@@ -183,8 +182,8 @@ const BetaHome = memo(() => {
                   <div className="absolute inset-y-0 right-0 w-24 bg-white/30 blur-2xl transition group-hover:translate-x-4" />
                   <div className="relative flex items-center justify-between gap-4">
                     <div>
-                      <p className="font-mono text-[10px] font-black uppercase tracking-[0.25em] opacity-70">Main action</p>
-                      <p className="mt-1 font-display text-2xl font-black uppercase leading-none sm:text-3xl">Open OG Scanner</p>
+                      <p className="font-mono text-[10px] font-black uppercase tracking-[0.25em] opacity-70">Main workspace</p>
+                      <p className="mt-1 font-display text-2xl font-black uppercase leading-none sm:text-3xl">Open Truth Scan</p>
                     </div>
                     <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-og-ink text-og-lime">
                       <Search className="h-6 w-6" />
@@ -196,12 +195,12 @@ const BetaHome = memo(() => {
                   to="/app"
                   className="inline-flex min-h-[88px] items-center justify-between gap-3 rounded-[1.4rem] border border-white/12 bg-white/[0.07] px-5 py-4 font-display text-xl font-black uppercase text-white transition hover:border-og-cyan hover:text-og-cyan active:scale-[0.985]"
                 >
-                  View all tools <ArrowRight className="h-5 w-5" />
+                  Open command deck <ArrowRight className="h-5 w-5" />
                 </Link>
               </div>
 
               <p className="mt-5 max-w-2xl text-base leading-7 text-white/72 sm:text-lg">
-                OGScan is being reorganized so users can find the scanner, snipe feed, migration tracker, and wallet tools without hunting through a messy page.
+                The landing page now points traders into three clean command centers: Truth Scan for provenance, Launch Radar for fresh coins, and Market Feed for live Solana movement.
               </p>
 
               <div className="mt-5 grid gap-2 sm:grid-cols-3">
@@ -241,12 +240,12 @@ const BetaHome = memo(() => {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <div className="mb-1 flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-lime">
-                    <Flame className="h-4 w-4" /> Tool shortcuts
+                    <Flame className="h-4 w-4" /> Merged workspaces
                   </div>
-                  <h2 className="font-display text-2xl font-black uppercase tracking-tight text-white">Pick your tool</h2>
+                  <h2 className="font-display text-2xl font-black uppercase tracking-tight text-white">Pick your flow</h2>
                 </div>
                 <Link to="/app" className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-2 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-white/70 transition hover:text-og-cyan">
-                  All
+                  Deck
                 </Link>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -295,7 +294,7 @@ const BetaHome = memo(() => {
                 ))}
               </ul>
               <p className="mt-4 border-t border-white/10 pt-3 text-xs leading-5 text-white/60">
-                We&apos;re updating the DEX experience as fast as possible. For now, Telegram and backup X are the best places for official updates.
+                Legacy URLs like /og-finder, /migrations, /pairs, /whales, and /tx-feed still work, but the visible UI is now simplified for faster trading decisions.
               </p>
             </section>
           </aside>
@@ -305,10 +304,10 @@ const BetaHome = memo(() => {
       <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#020814]/92 p-3 backdrop-blur-xl sm:hidden">
         <div className="mx-auto grid max-w-md grid-cols-[1fr_0.8fr] gap-2">
           <Link to="/scanner" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-og-lime px-4 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-og-ink shadow-og">
-            Open scanner <ArrowRight className="h-4 w-4" />
+            Truth scan <ArrowRight className="h-4 w-4" />
           </Link>
           <Link to="/app" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] px-4 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-white">
-            All tools
+            Deck
           </Link>
         </div>
       </div>

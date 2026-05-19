@@ -60,7 +60,7 @@ type TabId =
   | "swap"
   | "tech";
 
-type TabAccent = "blue" | "white" | "cyan" | "gold";
+type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Command" | "Forensics" | "Market" | "Project";
 
 type TabConfig = {
@@ -73,6 +73,8 @@ type TabConfig = {
   Icon: ComponentType<{ className?: string }>;
   accent: TabAccent;
   group: TabGroup;
+  showInNav?: boolean;
+  mergedInto?: TabId;
 };
 
 const TABS: TabConfig[] = [
@@ -89,11 +91,11 @@ const TABS: TabConfig[] = [
   },
   {
     id: "scanner",
-    label: "Scanner",
+    label: "Truth Scan",
     slug: "scanner",
     pageNumber: 6,
     eyebrow: "RUN THE CHAIN",
-    description: "Search tickers or paste a mint to inspect token signal, liquidity, holders, risk, and forensic probabilities.",
+    description: "Merged Scanner + OG Finder workspace for mint checks, origin proof, dominance status, liquidity risk, holders, and forensic probabilities.",
     Icon: Search,
     accent: "blue",
     group: "Forensics",
@@ -104,18 +106,20 @@ const TABS: TabConfig[] = [
     slug: "og-finder",
     pageNumber: 7,
     eyebrow: "ORIGIN CHECK",
-    description: "Find the earliest on-chain origin across clones, relaunches, CTOs, migrations, and ticker hijacks.",
+    description: "Direct legacy route for the origin-finder module. It is now grouped under Truth Scan in the main navigation.",
     Icon: Crosshair,
     accent: "white",
     group: "Forensics",
+    showInNav: false,
+    mergedInto: "scanner",
   },
   {
     id: "snipe-feed",
-    label: "Snipe Feed",
+    label: "Launch Radar",
     slug: "snipe-feed",
     pageNumber: 5,
     eyebrow: "DEV WALLET RADAR",
-    description: "Track brand-new launches, repeat creators, watch alerts, and launch quality scores.",
+    description: "Merged launch command center for new coins, repeat creators, watch alerts, migration timing, and launch quality scores.",
     Icon: Target,
     accent: "cyan",
     group: "Forensics",
@@ -126,20 +130,22 @@ const TABS: TabConfig[] = [
     slug: "migrations",
     pageNumber: 9,
     eyebrow: "BREAKOUT WATCH",
-    description: "Track migration timing separately from OG status so users do not confuse migrated pools with original mints.",
+    description: "Direct legacy route for migration timing. It is now grouped under Launch Radar in the main navigation.",
     Icon: Rocket,
     accent: "gold",
     group: "Forensics",
+    showInNav: false,
+    mergedInto: "snipe-feed",
   },
   {
     id: "feed",
-    label: "Feed",
+    label: "Market Feed",
     slug: "feed",
     pageNumber: 15,
     eyebrow: "LIVE TOKEN INTEL",
-    description: "A live token feed showing what is trending, why it is moving, spotlight coins, runners, bundle status, CTO/dev-launch context, and analytics.",
+    description: "Merged market command center for trending coins, pair discovery, whale/tx context, spotlight runners, bundle status, boosts, and CTO/dev-launch analytics.",
     Icon: Rss,
-    accent: "lime" as TabAccent,
+    accent: "lime",
     group: "Market",
   },
   {
@@ -148,10 +154,12 @@ const TABS: TabConfig[] = [
     slug: "market-pulse",
     pageNumber: 4,
     eyebrow: "LIVE OVERVIEW",
-    description: "A focused market pulse screen for the active mint with price, liquidity, holders, and signal stats.",
+    description: "Direct legacy route for active-mint vitals. It is now grouped under Market Feed in the main navigation.",
     Icon: Activity,
     accent: "blue",
     group: "Market",
+    showInNav: false,
+    mergedInto: "feed",
   },
   {
     id: "pairs",
@@ -159,10 +167,12 @@ const TABS: TabConfig[] = [
     slug: "pairs",
     pageNumber: 8,
     eyebrow: "NEW PAIR RADAR",
-    description: "Monitor fresh Solana pairs before they hit timeline hype.",
+    description: "Direct legacy route for pair discovery. It is now grouped under Market Feed in the main navigation.",
     Icon: Radar,
     accent: "cyan",
     group: "Market",
+    showInNav: false,
+    mergedInto: "feed",
   },
   {
     id: "trending",
@@ -170,10 +180,12 @@ const TABS: TabConfig[] = [
     slug: "trending",
     pageNumber: 10,
     eyebrow: "MARKET HEAT",
-    description: "See what is actually moving across Solana right now.",
+    description: "Direct legacy route for trending token heat. It is now grouped under Market Feed in the main navigation.",
     Icon: Flame,
     accent: "cyan",
     group: "Market",
+    showInNav: false,
+    mergedInto: "feed",
   },
   {
     id: "whales",
@@ -181,10 +193,12 @@ const TABS: TabConfig[] = [
     slug: "whales",
     pageNumber: 11,
     eyebrow: "WALLET RADAR",
-    description: "A standalone whale watch screen for holder concentration and largest token accounts.",
+    description: "Direct legacy route for whale concentration. It is now grouped under Market Feed in the main navigation.",
     Icon: Wallet,
     accent: "white",
     group: "Market",
+    showInNav: false,
+    mergedInto: "feed",
   },
   {
     id: "tx-feed",
@@ -192,10 +206,12 @@ const TABS: TabConfig[] = [
     slug: "tx-feed",
     pageNumber: 12,
     eyebrow: "LIVE TRANSACTIONS",
-    description: "A focused transaction tape for the selected mint, separated from every other tool.",
+    description: "Direct legacy route for selected-mint transaction tape. It is now grouped under Market Feed in the main navigation.",
     Icon: Activity,
     accent: "cyan",
     group: "Market",
+    showInNav: false,
+    mergedInto: "feed",
   },
   {
     id: "swap",
@@ -243,6 +259,9 @@ const TABS: TabConfig[] = [
   },
 ];
 
+const NAV_TABS: TabConfig[] = TABS.filter((tabConfig: TabConfig) => tabConfig.showInNav !== false);
+const MERGED_TABS: TabConfig[] = TABS.filter((tabConfig: TabConfig) => tabConfig.showInNav === false);
+
 const TAB_BY_ID: Record<TabId, TabConfig> = TABS.reduce(
   (acc: Record<TabId, TabConfig>, tabConfig: TabConfig): Record<TabId, TabConfig> => {
     acc[tabConfig.id] = tabConfig;
@@ -262,7 +281,8 @@ const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
   {
     app: "overview",
     home: "overview",
-    market: "market-pulse",
+    market: "feed",
+    "market-command": "feed",
     "live-feed": "feed",
     feed: "feed",
     tape: "tx-feed",
@@ -296,9 +316,9 @@ const renderTool = (tab: TabId, mint: string, updateMint: (nextMint: string) => 
   if (tab === "our-coin") return <OurCoin />;
   if (tab === "roadmap") return <SolToolsRoadmap />;
   if (tab === "market-pulse") return <OgStats mint={mint} onSelect={updateMint} />;
-  if (tab === "snipe-feed") return <SnipeFeed onSelect={updateMint} />;
-  if (tab === "feed") return <Feed onSelect={updateMint} />;
-  if (tab === "scanner") return <Scanner onSelect={updateMint} />;
+  if (tab === "snipe-feed") return <LaunchRadarSuite onSelect={updateMint} />;
+  if (tab === "feed") return <MarketFeedSuite mint={mint} onSelect={updateMint} />;
+  if (tab === "scanner") return <TruthScanSuite onSelect={updateMint} />;
   if (tab === "og-finder") return <OgFinder onSelect={updateMint} />;
   if (tab === "pairs") return <PairTracker onSelect={updateMint} />;
   if (tab === "migrations") return <Migrations onSelect={updateMint} />;
@@ -436,7 +456,7 @@ const WorkspaceSidebar = ({
           <span className="relative flex items-center justify-between gap-3">
             <span>
               <span className="block font-mono text-[9px] font-black uppercase tracking-[0.24em] opacity-70">Main action</span>
-              <span className="mt-1 block font-display text-2xl font-black uppercase leading-none">Open Scanner</span>
+              <span className="mt-1 block font-display text-2xl font-black uppercase leading-none">Truth Scan</span>
             </span>
             <Search className="h-6 w-6" />
           </span>
@@ -461,7 +481,7 @@ const WorkspaceSidebar = ({
                 <span className="h-px w-10 bg-white/10" />
               </div>
               <div className="space-y-1.5">
-                {TABS.filter((item: TabConfig) => item.group === group).map((item: TabConfig) => (
+                {NAV_TABS.filter((item: TabConfig) => item.group === group).map((item: TabConfig) => (
                   <SidebarButton key={item.id} item={item} activeId={activeId} onNavigate={onNavigate} />
                 ))}
               </div>
@@ -489,7 +509,7 @@ const SidebarButton = ({
   onNavigate: (nextTab: string) => void;
   featured?: boolean;
 }) => {
-  const isActive: boolean = activeId === item.id;
+  const isActive: boolean = activeId === item.id || TAB_BY_ID[activeId]?.mergedInto === item.id;
 
   return (
     <button
@@ -526,23 +546,26 @@ const MobileToolDock = ({ activeId, onNavigate }: { activeId: TabId; onNavigate:
         </span>
       </button>
       <button type="button" onClick={() => onNavigate("scanner")} className="rounded-full border border-og-lime bg-og-lime px-3 py-2 font-mono text-[9px] font-black uppercase tracking-[0.18em] text-og-ink">
-        Scanner
+        Truth Scan
       </button>
     </div>
     <nav className="ios-scroll flex gap-2 overflow-x-auto" aria-label="Mobile tool navigation">
-      {TABS.map((item: TabConfig) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onNavigate(item.id)}
-          className={cn(
-            "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 font-mono text-[9px] font-black uppercase tracking-[0.15em] transition",
-            activeId === item.id ? "border-og-lime bg-og-lime text-og-ink" : "border-white/10 bg-white/[0.055] text-white/62 hover:text-og-cyan",
-          )}
-        >
-          <item.Icon className="h-3.5 w-3.5" /> {item.label}
-        </button>
-      ))}
+      {NAV_TABS.map((item: TabConfig) => {
+        const isActive: boolean = activeId === item.id || TAB_BY_ID[activeId]?.mergedInto === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onNavigate(item.id)}
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 font-mono text-[9px] font-black uppercase tracking-[0.15em] transition",
+              isActive ? "border-og-lime bg-og-lime text-og-ink" : "border-white/10 bg-white/[0.055] text-white/62 hover:text-og-cyan",
+            )}
+          >
+            <item.Icon className="h-3.5 w-3.5" /> {item.label}
+          </button>
+        );
+      })}
     </nav>
   </div>
 );
@@ -587,11 +610,11 @@ const OverviewPage = ({
   onScanClick: () => void;
   onChangeMint: () => void;
 }) => {
-  const priorityTabs: TabConfig[] = [TAB_BY_ID.scanner, TAB_BY_ID.feed, TAB_BY_ID["og-finder"], TAB_BY_ID["snipe-feed"]];
+  const priorityTabs: TabConfig[] = [TAB_BY_ID.scanner, TAB_BY_ID["snipe-feed"], TAB_BY_ID.feed, TAB_BY_ID.swap];
   const metricCards: { label: string; value: string; note: string; Icon: ComponentType<{ className?: string }>; accent: TabAccent }[] = [
-    { label: "Primary flow", value: "Scanner", note: "Fastest start point", Icon: Search, accent: "blue" },
-    { label: "Attribution", value: "OG Finder", note: "Oldest on-chain proof", Icon: Crosshair, accent: "white" },
-    { label: "Launch radar", value: "Snipe", note: "Dev-wallet behavior", Icon: Target, accent: "cyan" },
+    { label: "Primary flow", value: "Truth Scan", note: "Scanner + OG Finder", Icon: Search, accent: "blue" },
+    { label: "Launch flow", value: "Radar", note: "Snipes + migrations", Icon: Target, accent: "cyan" },
+    { label: "Market flow", value: "Feed", note: "Pulse + trending + tape", Icon: Rss, accent: "lime" },
     { label: "Active mint", value: shortAddr(mint, 4), note: "Tap to replace", Icon: Layers3, accent: "gold" },
   ];
 
@@ -605,20 +628,20 @@ const OverviewPage = ({
         <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-end">
           <div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-og-cyan/40 bg-og-cyan/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-og-cyan">
-              <ShieldCheck className="h-3.5 w-3.5" /> Cleaner workspace live
+              <ShieldCheck className="h-3.5 w-3.5" /> Merged workspace live
             </div>
             <h2 className="max-w-4xl font-display text-5xl font-black uppercase leading-[0.88] tracking-tighter text-white text-glow sm:text-7xl">
-              Pick a tool. Work in one clean page.
+              Fewer tabs. More signal.
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-white/70">
-              OGScan is now organized like a real intelligence product: sidebar on the left, active tool on the right, and every direct route preserved.
+              The command deck now uses a smaller set of high-signal workspaces: Truth Scan, Launch Radar, Market Feed, Swap, and Project pages. Old standalone URLs still work.
             </p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <button type="button" onClick={onScanClick} className="inline-flex min-h-14 flex-1 items-center justify-center gap-2 rounded-[1.25rem] border border-og-lime bg-og-lime px-5 font-display text-lg font-black uppercase text-og-ink shadow-[0_0_42px_-16px_hsl(var(--og-lime))] transition hover:bg-white active:scale-[0.985] sm:flex-none">
                 Open Scanner <ArrowUpRight className="h-5 w-5" />
               </button>
-              <button type="button" onClick={() => onSwitchTab("og-finder")} className="inline-flex min-h-14 flex-1 items-center justify-center gap-2 rounded-[1.25rem] border border-white/10 bg-white/[0.075] px-5 font-display text-lg font-black uppercase text-white transition hover:border-og-cyan hover:text-og-cyan active:scale-[0.985] sm:flex-none">
-                Find True OG <Crosshair className="h-5 w-5" />
+              <button type="button" onClick={() => onSwitchTab("snipe-feed")} className="inline-flex min-h-14 flex-1 items-center justify-center gap-2 rounded-[1.25rem] border border-white/10 bg-white/[0.075] px-5 font-display text-lg font-black uppercase text-white transition hover:border-og-cyan hover:text-og-cyan active:scale-[0.985] sm:flex-none">
+                Launch Radar <Target className="h-5 w-5" />
               </button>
             </div>
           </div>
@@ -659,23 +682,202 @@ const OverviewPage = ({
         </section>
 
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl sm:p-5">
-          <PanelTitle icon={CalendarClock} eyebrow="Routes preserved" title="Every page still works" />
+          <PanelTitle icon={CalendarClock} eyebrow="Tabs merged" title="Old routes still work" />
           <div className="mt-4 space-y-2">
-            {TABS.filter((item: TabConfig) => item.id !== "overview").map((tool: TabConfig) => (
-              <button key={tool.id} type="button" onClick={() => onSwitchTab(tool.id)} className="group flex w-full items-center gap-3 rounded-[1.15rem] border border-white/10 bg-black/20 p-3 text-left transition hover:border-og-lime/60 hover:bg-og-lime/5 active:scale-[0.99]">
-                <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl border", getAccentClass(tool.accent, "icon"))}>
-                  <tool.Icon className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-display text-sm font-black uppercase leading-none text-white">{tool.label}</span>
-                  <span className="mt-1 block truncate font-mono text-[8px] uppercase tracking-[0.18em] text-muted-foreground">/{tool.slug} · /page/{tool.pageNumber} · page-{tool.pageNumber}</span>
-                </span>
-                <ChevronRight className="h-4 w-4 text-og-cyan opacity-0 transition group-hover:translate-x-1 group-hover:opacity-100" />
-              </button>
-            ))}
+            {MERGED_TABS.map((tool: TabConfig) => {
+              const parent: TabConfig | undefined = tool.mergedInto ? TAB_BY_ID[tool.mergedInto] : undefined;
+              return (
+                <button key={tool.id} type="button" onClick={() => onSwitchTab(tool.id)} className="group flex w-full items-center gap-3 rounded-[1.15rem] border border-white/10 bg-black/20 p-3 text-left transition hover:border-og-lime/60 hover:bg-og-lime/5 active:scale-[0.99]">
+                  <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl border", getAccentClass(tool.accent, "icon"))}>
+                    <tool.Icon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-display text-sm font-black uppercase leading-none text-white">{tool.label}</span>
+                    <span className="mt-1 block truncate font-mono text-[8px] uppercase tracking-[0.18em] text-muted-foreground">/{tool.slug} · grouped under {parent?.label ?? "Workspace"}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-og-cyan opacity-0 transition group-hover:translate-x-1 group-hover:opacity-100" />
+                </button>
+              );
+            })}
           </div>
         </section>
       </div>
+    </section>
+  );
+};
+
+type SuiteOption<T extends string> = {
+  id: T;
+  label: string;
+  eyebrow: string;
+  description: string;
+  Icon: ComponentType<{ className?: string }>;
+  accent: TabAccent;
+};
+
+const truthSuiteOptions: SuiteOption<"scanner" | "og-finder">[] = [
+  {
+    id: "scanner",
+    label: "Scanner",
+    eyebrow: "Mint or ticker scan",
+    description: "Fast risk, liquidity, holder, ATH/ATL, authority, dominance, and classification scan.",
+    Icon: Search,
+    accent: "blue",
+  },
+  {
+    id: "og-finder",
+    label: "OG Finder",
+    eyebrow: "Origin proof",
+    description: "Earliest credible Solana origin, lineage, legacy OG, revived official, contested, and clone checks.",
+    Icon: Crosshair,
+    accent: "white",
+  },
+];
+
+const launchSuiteOptions: SuiteOption<"snipe-feed" | "migrations">[] = [
+  {
+    id: "snipe-feed",
+    label: "Snipe Feed",
+    eyebrow: "Fresh launches",
+    description: "New Solana launches, repeat creators, watch alerts, and launch quality/rug signals.",
+    Icon: Target,
+    accent: "cyan",
+  },
+  {
+    id: "migrations",
+    label: "Migrations",
+    eyebrow: "Pump.fun → DEX",
+    description: "Migration timestamp, duration, bonding curve context, and breakout timing separated from OG status.",
+    Icon: Rocket,
+    accent: "gold",
+  },
+];
+
+const marketSuiteOptions: SuiteOption<"feed" | "market-pulse" | "pairs" | "trending" | "whales" | "tx-feed">[] = [
+  {
+    id: "feed",
+    label: "Live Feed",
+    eyebrow: "Narrative tape",
+    description: "Trending tokens, catalysts, runners, bundle flags, paid boosts, and dev-risk context.",
+    Icon: Rss,
+    accent: "lime",
+  },
+  {
+    id: "market-pulse",
+    label: "Vitals",
+    eyebrow: "Active mint",
+    description: "Price, liquidity, holders, market cap, DexScreener charting, and quick token retargeting.",
+    Icon: Activity,
+    accent: "blue",
+  },
+  {
+    id: "pairs",
+    label: "Pairs",
+    eyebrow: "Pool discovery",
+    description: "Fresh Solana pair radar for Raydium, Meteora, and other DEX pools before timeline hype.",
+    Icon: Radar,
+    accent: "cyan",
+  },
+  {
+    id: "trending",
+    label: "Trending",
+    eyebrow: "Market heat",
+    description: "The fastest-moving tokens and current Solana meme narratives in one scan lane.",
+    Icon: Flame,
+    accent: "cyan",
+  },
+  {
+    id: "whales",
+    label: "Whales",
+    eyebrow: "Holder power",
+    description: "Largest holders, concentration risk, and whale structure for the selected mint.",
+    Icon: Wallet,
+    accent: "white",
+  },
+  {
+    id: "tx-feed",
+    label: "Tx Tape",
+    eyebrow: "Live prints",
+    description: "Focused transaction tape for the currently selected token.",
+    Icon: Activity,
+    accent: "cyan",
+  },
+];
+
+const SuiteNav = <T extends string,>({
+  options,
+  activeId,
+  onChange,
+}: {
+  options: SuiteOption<T>[];
+  activeId: T;
+  onChange: (nextId: T) => void;
+}) => (
+  <div className="mb-4 rounded-[1.55rem] border border-white/10 bg-black/24 p-2">
+    <div className="ios-scroll flex gap-2 overflow-x-auto" role="tablist" aria-label="Merged workspace modules">
+      {options.map((option: SuiteOption<T>) => {
+        const isActive: boolean = option.id === activeId;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onChange(option.id)}
+            className={cn(
+              "group flex min-w-[210px] shrink-0 items-start gap-3 rounded-[1.25rem] border p-3 text-left transition active:scale-[0.99]",
+              isActive ? "border-og-lime bg-og-lime text-og-ink shadow-[0_0_34px_-18px_hsl(var(--og-lime))]" : "border-white/10 bg-white/[0.045] text-white/70 hover:border-og-cyan/60 hover:bg-white/[0.065] hover:text-white",
+            )}
+          >
+            <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl border", isActive ? "border-og-ink/15 bg-og-ink/10" : getAccentClass(option.accent, "icon"))}>
+              <option.Icon className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className={cn("block font-mono text-[8px] font-black uppercase tracking-[0.22em]", isActive ? "text-og-ink/65" : getAccentClass(option.accent, "text"))}>{option.eyebrow}</span>
+              <span className="mt-1 block font-display text-base font-black uppercase leading-none">{option.label}</span>
+              <span className={cn("mt-2 line-clamp-2 block text-[11px] font-semibold leading-4", isActive ? "text-og-ink/70" : "text-white/50")}>{option.description}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+);
+
+const TruthScanSuite = ({ onSelect }: { onSelect: (mint: string) => void }) => {
+  const [activeModule, setActiveModule] = useState<"scanner" | "og-finder">("scanner");
+
+  return (
+    <section>
+      <SuiteNav options={truthSuiteOptions} activeId={activeModule} onChange={setActiveModule} />
+      {activeModule === "scanner" ? <Scanner onSelect={onSelect} /> : <OgFinder onSelect={onSelect} />}
+    </section>
+  );
+};
+
+const LaunchRadarSuite = ({ onSelect }: { onSelect: (mint: string) => void }) => {
+  const [activeModule, setActiveModule] = useState<"snipe-feed" | "migrations">("snipe-feed");
+
+  return (
+    <section>
+      <SuiteNav options={launchSuiteOptions} activeId={activeModule} onChange={setActiveModule} />
+      {activeModule === "snipe-feed" ? <SnipeFeed onSelect={onSelect} /> : <Migrations onSelect={onSelect} />}
+    </section>
+  );
+};
+
+const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (mint: string) => void }) => {
+  const [activeModule, setActiveModule] = useState<"feed" | "market-pulse" | "pairs" | "trending" | "whales" | "tx-feed">("feed");
+
+  return (
+    <section>
+      <SuiteNav options={marketSuiteOptions} activeId={activeModule} onChange={setActiveModule} />
+      {activeModule === "feed" ? <Feed onSelect={onSelect} /> : null}
+      {activeModule === "market-pulse" ? <OgStats mint={mint} onSelect={onSelect} /> : null}
+      {activeModule === "pairs" ? <PairTracker onSelect={onSelect} /> : null}
+      {activeModule === "trending" ? <Trending onSelect={onSelect} /> : null}
+      {activeModule === "whales" ? <Whales mint={mint} /> : null}
+      {activeModule === "tx-feed" ? <TxFeed mint={mint} /> : null}
     </section>
   );
 };
