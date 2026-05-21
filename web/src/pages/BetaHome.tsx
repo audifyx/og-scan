@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   CheckCircle2,
+  Clipboard,
   Coins,
   Copy,
   ExternalLink,
@@ -12,8 +13,10 @@ import {
   Radio,
   Radar,
   Search,
+  ShieldCheck,
   Sparkles,
   Target,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { Scanlines } from "@/components/Scanlines";
@@ -99,11 +102,55 @@ const issueTips: string[] = [
   "Use Market Feed for live runners, catalysts, whales, DEX boosts, bundle risk, and transaction flow",
 ];
 
+type HowToStep = {
+  step: string;
+  title: string;
+  description: string;
+  Icon: LucideIcon;
+  accent: "lime" | "cyan" | "gold";
+};
+
+const howToSteps: HowToStep[] = [
+  {
+    step: "01",
+    title: "Paste any CA",
+    description: "Drop any Solana mint address into Truth Scan. No wallet connection required.",
+    Icon: Clipboard,
+    accent: "lime",
+  },
+  {
+    step: "02",
+    title: "Get the full picture",
+    description: "See on-chain OG status, first-mint proof, dominance score, LP safety, holder risk, and more — instantly.",
+    Icon: ShieldCheck,
+    accent: "cyan",
+  },
+  {
+    step: "03",
+    title: "Act before the market",
+    description: "Use Launch Radar and Market Feed to watch live launches, migrations, whale moves, and CTO signals in real time.",
+    Icon: Zap,
+    accent: "gold",
+  },
+];
+
+type StatBadge = {
+  label: string;
+  value: string;
+};
+
+const statBadges: StatBadge[] = [
+  { value: "4", label: "Intel tools" },
+  { value: "Solana", label: "Chain focus" },
+  { value: "On-chain", label: "OG verified" },
+  { value: "Live", label: "Real-time data" },
+];
+
 const BetaHome = memo(() => {
   const [copied, setCopied] = useState<"coin" | null>(null);
 
   const launchNotes: string[] = useMemo<string[]>(
-    () => ["First mint + authority wallet proof", "Dominance / Legacy / Copycat scoring", "LP, holder, dev, boost, and migration intel"],
+    () => ["No wallet needed", "First mint proof", "Real-time intel"],
     [],
   );
 
@@ -158,6 +205,16 @@ const BetaHome = memo(() => {
             </div>
           </div>
         </header>
+
+        {/* Stats bar */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+          {statBadges.map((s: StatBadge) => (
+            <div key={s.label} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2">
+              <span className="font-display text-sm font-black uppercase tracking-tight text-og-lime">{s.value}</span>
+              <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/50">{s.label}</span>
+            </div>
+          ))}
+        </div>
 
         <div className="grid flex-1 items-center gap-5 py-6 lg:grid-cols-[1.02fr_0.98fr] lg:gap-7 lg:py-8">
           <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.055] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_36px_130px_-78px_hsl(var(--og-cyan))] backdrop-blur-xl sm:p-7 lg:p-8">
@@ -298,6 +355,31 @@ const BetaHome = memo(() => {
               </p>
             </section>
           </aside>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="mx-auto w-full max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+        <div className="mb-6 text-center">
+          <p className="font-mono text-[10px] font-black uppercase tracking-[0.28em] text-og-cyan">How it works</p>
+          <h2 className="mt-2 font-display text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">Start in 3 steps</h2>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {howToSteps.map((s: HowToStep) => {
+            const accentBorder = s.accent === "gold" ? "border-og-gold/40" : s.accent === "cyan" ? "border-og-cyan/40" : "border-og-lime/40";
+            const accentText = s.accent === "gold" ? "text-og-gold" : s.accent === "cyan" ? "text-og-cyan" : "text-og-lime";
+            const accentBg = s.accent === "gold" ? "bg-og-gold/10" : s.accent === "cyan" ? "bg-og-cyan/10" : "bg-og-lime/10";
+            return (
+              <div key={s.step} className="relative rounded-[1.6rem] border border-white/10 bg-white/[0.045] p-5">
+                <div className={cn("mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full border", accentBorder, accentBg)}>
+                  <s.Icon className={cn("h-5 w-5", accentText)} />
+                </div>
+                <p className={cn("mb-1 font-mono text-[10px] font-black uppercase tracking-[0.24em]", accentText)}>{s.step}</p>
+                <h3 className="font-display text-xl font-black uppercase tracking-tight text-white">{s.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-white/60">{s.description}</p>
+              </div>
+            );
+          })}
         </div>
       </section>
 
