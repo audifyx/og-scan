@@ -17,10 +17,16 @@ export const SiteHeader = ({ navItems, activeId, onNavigate }: Props) => {
   const secondaryItems: NavItem[] = navItems.filter((item: NavItem) => !PRIMARY_NAV_IDS.includes(item.id));
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#020915]/92 shadow-[0_24px_80px_-58px_hsl(var(--og-cyan))] backdrop-blur-xl">
-      <div className="border-b border-og-gold/25 bg-og-gold/10 px-4 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-og-gold">
-        <span className="inline-flex items-center justify-center gap-2">
-          <Coins className="h-3.5 w-3.5" /> Token live · official CA {shortAddr(OGSCAN_TOKEN_MINT, 5)}
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#020915]/95 shadow-[0_24px_80px_-58px_hsl(var(--og-cyan))] backdrop-blur-xl">
+      {/* Token live announcement bar */}
+      <div className="relative overflow-hidden border-b border-og-gold/30 bg-gradient-to-r from-og-gold/[0.07] via-og-gold/[0.13] to-og-gold/[0.07] px-4 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-og-gold">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_50%,hsl(var(--og-gold)/0.08),transparent_70%)]" />
+        <span className="relative inline-flex items-center justify-center gap-2">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-og-gold opacity-75" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-og-gold" />
+          </span>
+          <Coins className="h-3 w-3" /> Token live · official CA {shortAddr(OGSCAN_TOKEN_MINT, 5)}
         </span>
       </div>
 

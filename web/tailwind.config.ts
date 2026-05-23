@@ -101,6 +101,8 @@ export default {
       boxShadow: {
         og: "0 0 0 1px hsl(var(--og-grid)), 0 0 28px -8px hsl(var(--og-lime) / 0.38)",
         "og-gold": "0 0 0 1px hsl(var(--og-gold) / 0.35), 0 0 28px -10px hsl(var(--og-cyan) / 0.42)",
+        "og-lime-glow": "0 0 60px -14px hsl(var(--og-lime) / 0.65)",
+        "og-cyan-glow": "0 0 60px -14px hsl(var(--og-cyan) / 0.55)",
       },
     },
   },

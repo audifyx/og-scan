@@ -408,7 +408,18 @@ const SplashToolCard = memo(({ tool }: { tool: SplashToolLink }) => {
         : "border-og-lime/45 bg-og-lime/10 text-og-lime";
 
   return (
-    <Link to={tool.href} className="group rounded-[1.25rem] border border-white/10 bg-black/24 p-3 transition hover:border-og-lime hover:bg-og-lime/5 active:scale-[0.985]">
+    <Link
+      to={tool.href}
+      className={cn(
+        "group relative overflow-hidden rounded-[1.25rem] border bg-black/20 p-3 transition hover:-translate-y-0.5 active:scale-[0.985]",
+        tool.accent === "gold" ? "border-og-gold/20 hover:border-og-gold/50 hover:bg-og-gold/5"
+          : tool.accent === "cyan" ? "border-og-cyan/20 hover:border-og-cyan/50 hover:bg-og-cyan/5"
+          : "border-og-lime/20 hover:border-og-lime/50 hover:bg-og-lime/5",
+      )}
+    >
+      <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent opacity-0 transition group-hover:opacity-100",
+        tool.accent === "gold" ? "via-og-gold/50" : tool.accent === "cyan" ? "via-og-cyan/50" : "via-og-lime/50"
+      )} />
       <div className="flex items-start gap-3">
         <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-full border", accentClass)}>
           <tool.Icon className="h-5 w-5" />
@@ -416,7 +427,9 @@ const SplashToolCard = memo(({ tool }: { tool: SplashToolLink }) => {
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-display text-lg font-black uppercase leading-none text-white">{tool.title}</h3>
-            <ArrowRight className="h-4 w-4 shrink-0 text-og-lime opacity-0 transition group-hover:translate-x-1 group-hover:opacity-100" />
+            <ArrowRight className={cn("h-4 w-4 shrink-0 opacity-0 transition group-hover:translate-x-1 group-hover:opacity-100",
+              tool.accent === "gold" ? "text-og-gold" : tool.accent === "cyan" ? "text-og-cyan" : "text-og-lime"
+            )} />
           </div>
           <p className="mt-2 text-sm leading-5 text-white/58">{tool.description}</p>
         </div>
