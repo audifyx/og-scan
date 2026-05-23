@@ -1,6 +1,7 @@
 import { Activity, AtSign, Coins, ExternalLink, Globe2, LayoutGrid, Newspaper, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OGSCAN_SITE_URL, OGSCAN_TECH_POST_URL, OGSCAN_TOKEN_MINT, OGSCAN_X_URL, shortAddr } from "@/lib/og";
+import { AuthButton } from "@/components/AuthButton";
 
 type NavItem = { id: string; label: string };
 
@@ -86,6 +87,7 @@ export const SiteHeader = ({ navItems, activeId, onNavigate }: Props) => {
           <a href={OGSCAN_X_URL} target="_blank" rel="noreferrer" className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.045] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/70 transition hover:border-og-lime hover:text-og-lime md:inline-flex" title="Follow ogscan.fun on X">
             <AtSign className="h-3.5 w-3.5" /> X <ExternalLink className="h-3 w-3" />
           </a>
+          <AuthButton />
         </div>
       </div>
 
