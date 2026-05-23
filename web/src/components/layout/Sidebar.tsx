@@ -1,40 +1,99 @@
-import { Wallet, Coins, LineChart, Wrench, Zap, Sparkles, LogOut, Bell, Radio, Users, User, Rocket, ChevronRight, MessageSquare, Webhook, Settings, Crown, Shield, Headphones, Globe2, ArrowLeftRight } from "lucide-react";
+import {
+  Activity, Bell, Bot, Coins, Crown, Home, LineChart, LogOut, Menu,
+  MessageSquare, Rocket, Search, Settings, Sparkles, Target, Trophy,
+  TrendingUp, User, Users, Wallet, Webhook, Wrench, X, Zap, Compass,
+  Globe2, Radio, Shield,
+} from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { CreditBalance } from "@/components/credits/CreditBalance";
+import { useState } from "react";
 
-const mainNavItems = [
-  { to: "/wallets", icon: Wallet, label: "Wallets", description: "Track wallets" },
-  { to: "/tokens", icon: Coins, label: "Tokens", description: "Monitor coins" },
-  { to: "/charts", icon: LineChart, label: "Charts", description: "Live charts" },
-  { to: "/tools", icon: Wrench, label: "Tools", description: "Analysis suite" },
-  { to: "/advanced-tools", icon: Rocket, label: "Advanced", description: "30+ pro tools" },
-  { to: "/official-token", icon: Zap, label: "Official Token", description: "$SOLTOOLS" },
-  { to: "/lobbies", icon: Headphones, label: "Trading Lobbies", description: "Voice + charts" },
-  { to: "/communities", icon: Globe2, label: "Communities", description: "Social hub" },
-  { to: "/pump-v5", icon: Sparkles, label: "Launch Pad", description: "Token listings" },
-  { to: "/live-trading", icon: ArrowLeftRight, label: "Live Trading", description: "Coming soon" },
+// ── nav sections ────────────────────────────────────────────────────────────
+
+type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; label: string; eyebrow: string };
+
+const scannerItems: NavItem[] = [
+  { to: "/app",          icon: Home,          label: "Dashboard",       eyebrow: "OGScan home" },
+  { to: "/scanner",      icon: Search,        label: "Truth Scan",      eyebrow: "Mint forensics" },
+  { to: "/snipe-feed",   icon: Target,        label: "Launch Radar",    eyebrow: "New launches" },
+  { to: "/feed",         icon: Activity,      label: "Market Feed",     eyebrow: "Live market" },
+  { to: "/swap",         icon: Zap,           label: "Swap",            eyebrow: "Jupiter route" },
+  { to: "/communities",  icon: Globe2,        label: "Communities",     eyebrow: "Social hub" },
+  { to: "/discover",     icon: Compass,       label: "Discover",        eyebrow: "Top traders" },
 ];
 
-const socialNavItems = [
-  { to: "/alpha-chat", icon: MessageSquare, label: "Alpha Chat" },
-  { to: "/live-feed", icon: Radio, label: "Live Feed" },
-  { to: "/discover", icon: Users, label: "Discover" },
-  { to: "/callouts", icon: Bell, label: "Callouts" },
-  { to: "/support", icon: Headphones, label: "Support" },
-  { to: "/credits", icon: Coins, label: "Credits" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+const solToolsItems: NavItem[] = [
+  { to: "/wallets",         icon: Wallet,        label: "Wallets",         eyebrow: "Tracked wallets" },
+  { to: "/tokens",          icon: Coins,         label: "Tokens",          eyebrow: "Token tracker" },
+  { to: "/charts",          icon: LineChart,     label: "Charts",          eyebrow: "Live charts" },
+  { to: "/alpha-chat",      icon: Bot,           label: "Alpha Chat",      eyebrow: "AI assistant" },
+  { to: "/live-trading",    icon: TrendingUp,    label: "Live Trading",    eyebrow: "P&L · Signals" },
+  { to: "/callouts",        icon: Bell,          label: "Callouts",        eyebrow: "Trade alerts" },
+  { to: "/trading-lobbies", icon: MessageSquare, label: "Trading Lobbies", eyebrow: "Voice + charts" },
+  { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
+  { to: "/advanced-tools",  icon: Wrench,        label: "Advanced Tools",  eyebrow: "30+ pro tools" },
+  { to: "/pumpv5",          icon: Rocket,        label: "Launch Pad",      eyebrow: "Token listings" },
 ];
+
+const communityItems: NavItem[] = [
+  { to: "/live-feed-page",  icon: Radio,         label: "Live Feed",       eyebrow: "Tape stream" },
+  { to: "/notifications",   icon: Bell,          label: "Notifications",   eyebrow: "Your alerts" },
+];
+
+// ── NavRow ────────────────────────────────────────────────────────────────
+
+const NavRow = ({ item }: { item: NavItem }) => (
+  <NavLink
+    to={item.to}
+    className={({ isActive }) =>
+      cn(
+        "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
+        isActive
+          ? "bg-white/[0.09] text-white"
+          : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
+      )
+    }
+  >
+    {({ isActive }) => (
+      <>
+        <span
+          className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition",
+            isActive
+              ? "border-og-lime/40 bg-og-lime/10 text-og-lime"
+              : "border-white/10 bg-white/[0.04]",
+          )}
+        >
+          <item.icon className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-semibold leading-tight">{item.label}</span>
+          <span className="block truncate text-[10px] text-white/35">{item.eyebrow}</span>
+        </span>
+        {isActive && (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-lime" />
+        )}
+      </>
+    )}
+  </NavLink>
+);
+
+// ── Section label ─────────────────────────────────────────────────────────
+
+const SectionLabel = ({ label }: { label: string }) => (
+  <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">{label}</p>
+);
+
+// ── Sidebar ───────────────────────────────────────────────────────────────
 
 export const Sidebar = () => {
   const { user, profile, signOut } = useAuth();
-  const { isAdmin, isOwner } = useAdmin();
+  const { isAdmin } = useAdmin();
   const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -42,130 +101,174 @@ export const Sidebar = () => {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col w-[280px] border-r border-border/60 bg-gradient-to-b from-card via-background to-card relative overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
-      <div className="absolute top-0 right-0 bottom-0 w-px bg-gradient-to-b from-primary/20 via-transparent to-primary/10" />
-      
-      <div className="relative p-6 border-b border-border/40">
-        <NavLink to="/wallets" className="flex items-center gap-3.5 group">
-          <div className="relative">
-            <div className="absolute inset-0 bg-primary/30 blur-xl opacity-60 group-hover:opacity-80 transition-opacity" />
-            <div className="relative w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg border border-primary/30">
-              <Zap className="h-5.5 w-5.5 text-primary-foreground" />
+    <>
+      {/* Mobile hamburger (only inside the AppLayout header area) */}
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        className="fixed left-4 top-3.5 z-50 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/60 transition hover:bg-white/[0.08] hover:text-white lg:hidden"
+      >
+        <Menu className="h-4 w-4" />
+      </button>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar panel */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-white/[0.07] bg-[#060c13] transition-transform duration-300 lg:translate-x-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        )}
+      >
+        {/* Logo */}
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-4">
+          <NavLink to="/app" className="flex items-center gap-3 text-left">
+            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-og-lime/50 bg-og-lime/10">
+              <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-og-lime shadow-[0_0_6px_#bef264]" />
             </div>
-          </div>
-          <div>
-            <h1 className="font-bold text-lg tracking-wide font-display gradient-text">SOL TOOLS</h1>
-            <p className="text-[10px] text-muted-foreground font-mono tracking-wider">PRO TRADING SUITE</p>
-          </div>
-        </NavLink>
-      </div>
-
-      <ScrollArea className="flex-1 py-4">
-        <div className="px-3 space-y-0.5">
-          <p className="px-4 py-2 text-[10px] font-semibold text-primary/50 uppercase tracking-[0.2em] font-mono">Main</p>
-          {mainNavItems.map(({ to, icon: Icon, label, description }) => (
-            <NavLink key={to} to={to} className={({ isActive }) => cn(
-              "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group relative",
-              isActive ? "bg-primary/8 text-primary border border-primary/15" : "text-muted-foreground hover:text-foreground hover:bg-muted/30 border border-transparent"
-            )}>
-              {({ isActive }) => (
-                <>
-                  {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-gradient-to-b from-primary to-accent rounded-r-full" />}
-                  <div className={cn("p-1.5 rounded-lg transition-colors", isActive ? "bg-primary/15" : "bg-muted/20 group-hover:bg-muted/40")}>
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1">
-                    <span className="font-medium text-[13px]">{label}</span>
-                    <p className="text-[9px] text-muted-foreground/60">{description}</p>
-                  </div>
-                  <ChevronRight className={cn("h-3.5 w-3.5 transition-opacity", isActive ? "opacity-80 text-primary" : "opacity-0 group-hover:opacity-30")} />
-                </>
-              )}
-            </NavLink>
-          ))}
-        </div>
-
-        <div className="px-3 mt-4 space-y-1">
-          <p className="px-4 py-2 text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-[0.2em] font-mono">Community</p>
-          <div className="grid grid-cols-2 gap-1.5 px-1">
-            {socialNavItems.map(({ to, icon: Icon, label }) => (
-              <NavLink key={to} to={to} className={({ isActive }) => cn(
-                "flex flex-col items-center gap-1.5 p-3 rounded-lg transition-all duration-200 group",
-                isActive ? "bg-primary/8 text-primary border border-primary/15" : "bg-muted/15 hover:bg-muted/30 text-muted-foreground hover:text-foreground border border-border/20 hover:border-border/40"
-              )}>
-                <Icon className="h-4 w-4" />
-                <span className="text-[9px] font-medium tracking-wide">{label}</span>
-              </NavLink>
-            ))}
-            {isOwner && (
-              <NavLink to="/webhooks" className={({ isActive }) => cn(
-                "flex flex-col items-center gap-1.5 p-3 rounded-lg transition-all duration-200 group",
-                isActive ? "bg-primary/8 text-primary border border-primary/15" : "bg-muted/15 hover:bg-muted/30 text-muted-foreground hover:text-foreground border border-border/20 hover:border-border/40"
-              )}>
-                <Webhook className="h-4 w-4" />
-                <span className="text-[9px] font-medium tracking-wide">Webhooks</span>
-              </NavLink>
-            )}
-          </div>
-        </div>
-
-        <div className="px-4 mt-4 space-y-2">
-          <NavLink to="/premium" className={({ isActive }) => cn(
-            "flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group relative overflow-hidden",
-            isActive ? "bg-primary/10 border border-primary/20" : "bg-primary/5 border border-primary/10 hover:bg-primary/8"
-          )}>
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-primary/30 via-accent/20 to-transparent" />
-            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent"><Crown className="h-4 w-4 text-primary-foreground" /></div>
-            <div className="flex-1">
-              <span className="font-semibold text-xs gradient-text font-display">PRO FEATURES</span>
-              <p className="text-[9px] text-muted-foreground">AI, Alerts, P&L</p>
+            <div>
+              <div className="text-sm font-black uppercase tracking-wide text-white">OGScan</div>
+              <div className="text-[10px] font-semibold tracking-widest text-[#22d3ee]/80">PRO TRADING SUITE</div>
             </div>
-            <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
           </NavLink>
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 transition hover:bg-white/5 hover:text-white lg:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-          {isAdmin && (
-            <NavLink to="/admin" className={({ isActive }) => cn(
-              "flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
-              isActive ? "bg-destructive/10 border border-destructive/20 text-destructive" : "bg-muted/15 border border-border/20 hover:bg-muted/30 text-muted-foreground hover:text-foreground"
-            )}>
-              <Shield className="h-4 w-4" />
-              <span className="font-medium text-xs">Admin Panel</span>
+        {/* Nav scrollable area */}
+        <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
+          {/* Scanner / OGScan tools */}
+          <div className="mb-1">
+            <SectionLabel label="OGScan" />
+            <div className="space-y-0.5">
+              {scannerItems.map((item) => <NavRow key={item.to} item={item} />)}
+            </div>
+          </div>
+
+          {/* SolTools features */}
+          <div className="mb-1 mt-5">
+            <SectionLabel label="SolTools Features" />
+            <div className="space-y-0.5">
+              {solToolsItems.map((item) => <NavRow key={item.to} item={item} />)}
+            </div>
+          </div>
+
+          {/* Community */}
+          <div className="mb-1 mt-5">
+            <SectionLabel label="Community" />
+            <div className="space-y-0.5">
+              {communityItems.map((item) => <NavRow key={item.to} item={item} />)}
+            </div>
+          </div>
+
+          {/* Premium callout */}
+          <div className="mt-5 px-1">
+            <NavLink
+              to="/premium"
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 rounded-xl border px-3 py-3 transition",
+                  isActive
+                    ? "border-og-lime/40 bg-og-lime/10"
+                    : "border-og-lime/25 bg-og-lime/8 hover:border-og-lime/40 hover:bg-og-lime/12",
+                )
+              }
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-og-lime/40 bg-og-lime/15">
+                <Sparkles className="h-4 w-4 text-og-lime" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-black uppercase tracking-wide text-white">Pro Features</div>
+                <div className="text-[10px] text-white/50">AI · Alerts · P&L</div>
+              </div>
+              <Crown className="h-3.5 w-3.5 text-og-lime" />
             </NavLink>
+          </div>
+
+          {/* Admin */}
+          {isAdmin && (
+            <div className="mt-2 px-1">
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 rounded-xl border px-3 py-2.5 transition",
+                    isActive
+                      ? "border-red-500/30 bg-red-500/10 text-red-400"
+                      : "border-white/10 bg-white/[0.03] text-white/45 hover:bg-white/[0.06] hover:text-white",
+                  )
+                }
+              >
+                <Shield className="h-4 w-4" />
+                <span className="text-[12px] font-semibold">Admin Panel</span>
+              </NavLink>
+            </div>
           )}
 
-          {/* Legal Links */}
-          <div className="flex gap-2 px-1 pt-2">
-            <NavLink to="/privacy" className="text-[9px] text-muted-foreground/40 hover:text-muted-foreground">Privacy</NavLink>
-            <span className="text-[9px] text-muted-foreground/20">•</span>
-            <NavLink to="/terms" className="text-[9px] text-muted-foreground/40 hover:text-muted-foreground">Terms</NavLink>
+          {/* Legal */}
+          <div className="mt-4 flex gap-3 px-3 pb-2">
+            <NavLink to="/privacy" className="text-[9px] text-white/25 hover:text-white/50">Privacy</NavLink>
+            <span className="text-[9px] text-white/15">·</span>
+            <NavLink to="/terms" className="text-[9px] text-white/25 hover:text-white/50">Terms</NavLink>
           </div>
-        </div>
-      </ScrollArea>
+        </nav>
 
-      <div className="relative p-4 border-t border-border/40 bg-gradient-to-t from-card/50 to-transparent">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-        {user ? (
-          <div className="space-y-2.5">
-            <CreditBalance compact className="mb-2" />
-            <div className="flex items-center gap-3 p-2.5 rounded-lg cursor-pointer bg-muted/15 hover:bg-muted/30 border border-border/20 hover:border-primary/15 transition-all group" onClick={() => navigate("/profile")}>
-              <div className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-xs">
-                {profile?.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
+        {/* User footer */}
+        <div className="border-t border-white/[0.07] p-3">
+          {user ? (
+            <div className="space-y-2">
+              <div
+                className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-2.5 transition hover:border-og-lime/25 hover:bg-white/[0.07]"
+                onClick={() => navigate("/profile")}
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-og-lime/20 text-sm font-black text-og-lime">
+                  {profile?.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[12px] font-semibold text-white">{profile?.username || "User"}</p>
+                  <p className="truncate text-[10px] text-white/40">{user.email}</p>
+                </div>
+                <User className="h-3.5 w-3.5 text-white/30" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-xs truncate">{profile?.username || "User"}</p>
-                <p className="text-[9px] text-muted-foreground/50 truncate">{user.email}</p>
+              <div className="flex gap-2">
+                <NavLink
+                  to="/settings"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] py-2 text-[11px] text-white/40 transition hover:bg-white/[0.06] hover:text-white"
+                >
+                  <Settings className="h-3.5 w-3.5" /> Settings
+                </NavLink>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="flex-1 justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] text-[11px] text-white/40 hover:border-red-500/30 hover:bg-red-500/8 hover:text-red-400"
+                >
+                  <LogOut className="h-3.5 w-3.5" /> Sign Out
+                </Button>
               </div>
-              <User className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
-            <Button variant="ghost" size="sm" onClick={handleSignOut} className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/8 rounded-lg text-xs">
-              <LogOut className="h-3.5 w-3.5" /> Sign Out
+          ) : (
+            <Button
+              onClick={() => navigate("/auth")}
+              className="w-full rounded-xl bg-og-lime py-2.5 text-sm font-black text-[#060c13] shadow-[0_0_24px_-8px_#bef264] transition hover:bg-white"
+            >
+              Sign In
             </Button>
-          </div>
-        ) : (
-          <Button onClick={() => navigate("/auth")} className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground font-semibold rounded-lg h-10 shadow-lg shadow-primary/20 text-sm">Sign In</Button>
-        )}
-      </div>
-    </aside>
+          )}
+        </div>
+      </aside>
+    </>
   );
 };

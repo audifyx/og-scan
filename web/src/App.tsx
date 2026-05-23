@@ -13,11 +13,12 @@ import Setup from "./pages/Setup";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Wallets from "./pages/Wallets";
+import Tokens from "./pages/Tokens";
+import Tools from "./pages/Tools";
 import AdvancedTools from "./pages/AdvancedTools";
 import AlphaChat from "./pages/AlphaChat";
 import Credits from "./pages/Credits";
 import Webhooks from "./pages/Webhooks";
-import Communities from "./pages/Communities";
 import TradingLobbies from "./pages/TradingLobbies";
 import Leaderboard from "./pages/Leaderboard";
 import Notifications from "./pages/Notifications";
@@ -26,7 +27,6 @@ import OfficialToken from "./pages/OfficialToken";
 import PumpV5 from "./pages/PumpV5";
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
-import Discover from "./pages/Discover";
 import LiveFeed from "./pages/LiveFeed";
 import LiveTrading from "./pages/LiveTrading";
 import SupportCenter from "./pages/SupportCenter";
@@ -96,6 +96,8 @@ const App = () => (
             <Route path="/credits" element={<ProtectedRoute><Credits /></ProtectedRoute>} />
 
             {/* ── Protected: Tools & Features ── */}
+            <Route path="/tokens" element={<ProtectedRoute><Tokens /></ProtectedRoute>} />
+            <Route path="/tools" element={<ProtectedRoute><Tools /></ProtectedRoute>} />
             <Route path="/advanced-tools" element={<ProtectedRoute><AdvancedTools /></ProtectedRoute>} />
             <Route path="/ai-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
             <Route path="/alpha-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
@@ -103,10 +105,8 @@ const App = () => (
             <Route path="/callouts" element={<ProtectedRoute><Callouts /></ProtectedRoute>} />
 
             {/* ── Protected: Community ── */}
-            <Route path="/communities" element={<ProtectedRoute><Communities /></ProtectedRoute>} />
             <Route path="/trading-lobbies" element={<ProtectedRoute><TradingLobbies /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
-            <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
 
             {/* ── Protected: Premium ── */}
             <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />

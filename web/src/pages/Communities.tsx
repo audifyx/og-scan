@@ -368,7 +368,7 @@ const Communities = () => {
                   <div className="p-4 border-b border-border/20">
                     <div className="flex gap-3">
                       <Avatar className="h-10 w-10 shrink-0">
-                        <AvatarImage src={profile?.avatar_url || ""} />
+                        <AvatarImage src={profile?.avatar_url || undefined} />
                         <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-sm font-bold">
                           {(profile?.username || "U")[0].toUpperCase()}
                         </AvatarFallback>
@@ -409,7 +409,7 @@ const Communities = () => {
                     <article key={post.id} className="p-4 hover:bg-muted/5 transition-colors">
                       <div className="flex gap-3">
                         <Avatar className="h-10 w-10 shrink-0">
-                          <AvatarImage src={post.avatar_url || ""} />
+                          <AvatarImage src={post.avatar_url || undefined} />
                           <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-xs font-bold">
                             {(post.username || "?")[0].toUpperCase()}
                           </AvatarFallback>
@@ -428,7 +428,7 @@ const Communities = () => {
                           </div>
                           <p className="text-sm leading-relaxed mt-1 whitespace-pre-wrap break-words">{post.content}</p>
                           {post.image_url && (
-                            <img src={post.image_url} alt="" className="mt-3 rounded-2xl max-h-80 object-cover w-full border border-border/20" />
+                            <img src={post.image_url} alt="" className="mt-3 rounded-2xl max-h-80 object-cover w-full border border-border/20" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                           )}
 
                           {/* Post Actions - X.com style */}
@@ -492,7 +492,7 @@ const Communities = () => {
                   {messages.map(msg => (
                     <div key={msg.id} className={`flex gap-2.5 ${msg.user_id === user?.id ? "flex-row-reverse" : ""}`}>
                       <Avatar className="h-8 w-8 shrink-0">
-                        <AvatarImage src={msg.avatar_url || ""} />
+                        <AvatarImage src={msg.avatar_url || undefined} />
                         <AvatarFallback className="bg-muted text-xs">{(msg.username || "?")[0].toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div className={`max-w-[75%] ${msg.user_id === user?.id ? "items-end" : ""}`}>
@@ -545,7 +545,7 @@ const Communities = () => {
                   return (
                     <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/10 transition-colors group">
                       <Avatar className="h-11 w-11">
-                        <AvatarImage src={m.avatar_url || ""} />
+                        <AvatarImage src={m.avatar_url || undefined} />
                         <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-sm font-bold">
                           {(m.username || "?")[0].toUpperCase()}
                         </AvatarFallback>
@@ -616,7 +616,7 @@ const Communities = () => {
                     </div>
                     <div className="flex items-center gap-3 pt-2 border-t border-border/20">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={selected.creator_avatar || ""} />
+                        <AvatarImage src={selected.creator_avatar || undefined} />
                         <AvatarFallback className="bg-muted text-xs">{(selected.creator_name || "?")[0].toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div>

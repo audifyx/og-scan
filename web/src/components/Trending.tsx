@@ -439,7 +439,7 @@ const TrendingRow = ({
         <div className="flex min-w-0 flex-1 items-center gap-3 md:col-span-4">
           <div className="relative h-10 w-10 shrink-0 overflow-hidden border border-og-grid bg-og-ink md:h-8 md:w-8">
             {imageUrl ? (
-              <img src={imageUrl} alt={pair.baseToken.symbol} className="h-full w-full object-cover" loading="lazy" />
+              <img src={imageUrl} alt={pair.baseToken.symbol} className="h-full w-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             ) : (
               <div className="grid h-full w-full place-items-center text-[10px] text-og-lime">
                 {pair.baseToken.symbol?.[0] ?? "?"}
