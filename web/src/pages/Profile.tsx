@@ -49,6 +49,17 @@ interface UserProfile {
   reputation_score?: number | null;
   current_level?: number | null;
   daily_streak?: number | null;
+  total_xp?: number | null;
+  xp?: number | null;
+  is_pioneer?: boolean;
+  referral_code?: string | null;
+  holder_streak?: number | null;
+  longest_streak?: number | null;
+  sol_wallet?: string | null;
+  website_url?: string | null;
+  display_name?: string | null;
+  verified?: boolean;
+  location?: string | null;
   created_at?: string;
 }
 
@@ -333,7 +344,7 @@ const Profile = () => {
   const checkFollowStatus = async () => {
     if (!user) return;
     const { data } = await supabase.from("followers").select("id")
-      .eq("follower_id", user.id).eq("following_id", targetUserId).single();
+      .eq("follower_id", user.id).eq("followee_id", targetUserId).single();
     setIsFollowing(!!data);
   };
 
@@ -341,11 +352,11 @@ const Profile = () => {
     if (!user) { navigate("/auth"); return; }
     try {
       if (isFollowing) {
-        await supabase.from("followers").delete().eq("follower_id", user.id).eq("following_id", targetUserId);
+        await supabase.from("followers").delete().eq("follower_id", user.id).eq("followee_id", targetUserId);
         setIsFollowing(false);
         toast.success("Unfollowed");
       } else {
-        await supabase.from("followers").insert({ follower_id: user.id, following_id: targetUserId });
+        await supabase.from("followers").insert({ follower_id: user.id, followee_id: targetUserId });
         setIsFollowing(true);
         toast.success("Following!");
       }
@@ -517,7 +528,7 @@ const Profile = () => {
                     </div>
 
                     {/* Level + XP */}
-                    <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <Badge variant="secondary" className="text-xs gap-1">
                         <Zap className="h-3 w-3 text-yellow-400" />
                         Lv {level} · {getLevelTitle(level)}
@@ -525,6 +536,21 @@ const Profile = () => {
                       {profile.daily_streak && profile.daily_streak > 0 && (
                         <Badge variant="outline" className="text-xs gap-1 text-orange-400 border-orange-400/30">
                           <Flame className="h-3 w-3" /> {profile.daily_streak}d streak
+                        </Badge>
+                      )}
+                      {profile.holder_streak && profile.holder_streak > 0 && (
+                        <Badge variant="outline" className="text-xs gap-1 text-emerald-400 border-emerald-400/30">
+                          💎 {profile.holder_streak}d holder
+                        </Badge>
+                      )}
+                      {profile.is_pioneer && (
+                        <Badge className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/20">
+                          ⭐ OG Pioneer
+                        </Badge>
+                      )}
+                      {profile.verified && (
+                        <Badge className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/20">
+                          ✓ Verified
                         </Badge>
                       )}
                     </div>
@@ -545,11 +571,16 @@ const Profile = () => {
                           {profile.discord_handle}
                         </span>
                       )}
-                      {profile.website && (
-                        <a href={profile.website} target="_blank" rel="noopener noreferrer"
+                      {(profile.website_url || profile.website) && (
+                        <a href={profile.website_url || profile.website} target="_blank" rel="noopener noreferrer"
                           className="text-muted-foreground hover:text-primary transition-colors">
                           <Globe className="h-4 w-4" />
                         </a>
+                      )}
+                      {profile.location && (
+                        <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                          📍 {profile.location}
+                        </span>
                       )}
                       {profile.created_at && (
                         <span className="text-muted-foreground flex items-center gap-1 text-xs">
@@ -619,6 +650,12 @@ const Profile = () => {
                 <p className="text-lg font-bold">{communities.length}</p>
                 <p className="text-[11px] text-muted-foreground">Communities</p>
               </div>
+              {(profile.longest_streak || 0) > 0 && (
+                <div className="text-center p-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                  <p className="text-lg font-bold text-orange-400">🔥 {profile.longest_streak}d</p>
+                  <p className="text-[11px] text-muted-foreground">Best Streak</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1264,10 +1301,10 @@ const SocialTab = ({ targetUserId, isOwnProfile }: { targetUserId: string; isOwn
   }, [targetUserId, isOwnProfile]);
 
   const fetchOtherSocial = async () => {
-    const { data: fRows } = await supabase.from("followers").select("follower_id").eq("following_id", targetUserId);
-    const { data: gRows } = await supabase.from("followers").select("following_id").eq("follower_id", targetUserId);
+    const { data: fRows } = await supabase.from("followers").select("follower_id").eq("followee_id", targetUserId);
+    const { data: gRows } = await supabase.from("followers").select("followee_id").eq("follower_id", targetUserId);
     const fIds = fRows?.map((r: any) => r.follower_id) || [];
-    const gIds = gRows?.map((r: any) => r.following_id) || [];
+    const gIds = gRows?.map((r: any) => r.followee_id) || [];
     const allIds = [...new Set([...fIds, ...gIds])];
     if (!allIds.length) return;
     const { data: profiles } = await supabase.from("profiles").select("user_id, username, avatar_url, bio, badge").in("user_id", allIds);

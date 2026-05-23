@@ -2,7 +2,7 @@ import {
   Activity, Bell, Bot, Coins, Crown, Home, LineChart, LogOut, Menu,
   MessageSquare, Rocket, Search, Settings, Sparkles, Target, Trophy,
   TrendingUp, User, Users, Wallet, Webhook, Wrench, X, Zap, Compass,
-  Globe2, Radio, Shield,
+  Globe2, Radio, Shield, Palette,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ const scannerItems: NavItem[] = [
   { to: "/swap",         icon: Zap,           label: "Swap",            eyebrow: "Jupiter route" },
   { to: "/communities",  icon: Globe2,        label: "Communities",     eyebrow: "Social hub" },
   { to: "/discover",     icon: Compass,       label: "Discover",        eyebrow: "Top traders" },
+  { to: "/art",          icon: Palette,       label: "Art",             eyebrow: "Memes & vibes" },
 ];
 
 const solToolsItems: NavItem[] = [

@@ -387,7 +387,7 @@ const Discover = () => {
                         </div>
                         <h3 className="font-bold mb-1">AI Insights</h3>
                         <p className="text-xs text-muted-foreground mb-3">AI-powered market analysis and token recommendations</p>
-                        <Badge className="bg-primary/20 text-primary border-primary/30">Coming Soon</Badge>
+                        <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Active — Premium</Badge>
                       </CardContent>
                     </Card>
                     <Card className="og-glass-card">

@@ -1,118 +1,98 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
-import { Zap, RefreshCw, AlertTriangle, Bot } from "lucide-react";
+import { Zap, RefreshCw, AlertTriangle, Bot, Shield } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export const MEVTracker = () => {
   const [walletAddress, setWalletAddress] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mevAnalysis, setMevAnalysis] = useState<any>(null);
+  const [analysis, setAnalysis] = useState<any>(null);
 
-  const trackMEV = async () => {
+  const track = async () => {
     if (!walletAddress) return;
     setLoading(true);
     try {
       const { data } = await supabase.functions.invoke("solana-tracker", {
         body: { action: "getTransactions", walletAddress, limit: 100 },
       });
-
       const txs = data?.transactions || [];
-      
-      // Analyze for MEV patterns
-      let jitoCount = 0;
-      let highPriorityCount = 0;
-      let sandwichSuspect = 0;
-
-      txs.forEach((tx: any) => {
-        // Check for Jito bundles (would need specific program detection)
-        if (tx.fee && tx.fee > 5000) {
-          highPriorityCount++;
-        }
-        // Simplified sandwich detection
-        if (tx.type?.toLowerCase().includes("swap") && tx.fee > 10000) {
-          sandwichSuspect++;
-        }
-      });
-
-      setMevAnalysis({
-        totalTxs: txs.length,
-        jitoCount,
-        highPriorityCount,
-        sandwichSuspect,
-        mevScore: Math.min(((highPriorityCount + sandwichSuspect) / txs.length) * 100, 100),
-        isLikelyBot: highPriorityCount > txs.length * 0.3,
-      });
-
+      const highPriority = txs.filter((t: any) => t.fee && t.fee > 5000).length;
+      const sandwich = txs.filter((t: any) => t.type?.toLowerCase().includes("swap") && t.fee > 10000).length;
+      const jito = txs.filter((t: any) => t.fee && t.fee > 100000).length;
+      const mevScore = txs.length > 0 ? Math.min(((highPriority + sandwich) / txs.length) * 100, 100) : 0;
+      const isBot = highPriority > txs.length * 0.3;
+      setAnalysis({ total: txs.length, highPriority, sandwich, jito, mevScore, isBot });
       toast({ title: "MEV analysis complete" });
-    } catch (error) {
-      toast({ title: "Error", variant: "destructive" });
+    } catch {
+      toast({ title: "Error analyzing MEV activity", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card className="p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 rounded-lg bg-yellow-500/10">
-          <Zap className="h-5 w-5 text-yellow-500" />
+    <div className="glass-card p-5 rounded-2xl border border-white/[0.07] space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="p-2.5 rounded-xl bg-[#eab308]/10 border border-[#eab308]/20">
+          <Zap className="h-5 w-5 text-[#eab308]" />
         </div>
         <div>
-          <h3 className="font-semibold">MEV Tracker</h3>
-          <p className="text-sm text-muted-foreground">Detect Jito bundles & MEV techniques</p>
+          <h3 className="font-bold text-white">MEV Tracker</h3>
+          <p className="text-xs text-white/40">Detect Jito bundles, sandwich attacks & MEV</p>
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
-        <Input
-          placeholder="Enter wallet address..."
-          value={walletAddress}
-          onChange={(e) => setWalletAddress(e.target.value)}
-        />
-        <Button onClick={trackMEV} disabled={loading} className="bg-yellow-500 hover:bg-yellow-600 text-black">
-          {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Track"}
+      <div className="flex gap-2">
+        <Input placeholder="Enter wallet address..." value={walletAddress} onChange={(e) => setWalletAddress(e.target.value)}
+          className="flex-1 font-mono text-xs bg-white/[0.04] border-white/10" />
+        <Button onClick={track} disabled={loading} className="btn-3d shrink-0 gap-1.5">
+          {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+          Track
         </Button>
       </div>
 
-      {mevAnalysis && (
-        <div className="space-y-4">
-          {mevAnalysis.isLikelyBot && (
-            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-2">
-              <Bot className="h-4 w-4 text-yellow-500" />
-              <span className="text-sm font-medium text-yellow-500">Likely Bot/MEV Wallet</span>
+      {analysis && (
+        <div className="space-y-3">
+          {analysis.isBot ? (
+            <div className="p-3 rounded-xl bg-[#eab308]/10 border border-[#eab308]/20 flex items-center gap-2">
+              <Bot className="h-4 w-4 text-[#eab308]" />
+              <span className="text-sm font-bold text-[#eab308]">Likely Bot / MEV Wallet</span>
+            </div>
+          ) : (
+            <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center gap-2">
+              <Shield className="h-4 w-4 text-green-400" />
+              <span className="text-sm font-bold text-green-400">No Significant MEV Activity</span>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-white/[0.04]">
-              <p className="text-xs text-muted-foreground">High Priority TXs</p>
-              <p className="text-xl font-bold">{mevAnalysis.highPriorityCount}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-3 rounded-xl bg-[#eab308]/5 border border-[#eab308]/10 text-center">
+              <p className="text-2xl font-black text-[#eab308]">{analysis.mevScore.toFixed(0)}%</p>
+              <p className="text-[10px] text-white/30">MEV Score</p>
             </div>
-            <div className="p-3 rounded-lg bg-white/[0.04]">
-              <p className="text-xs text-muted-foreground">MEV Score</p>
-              <p className="text-xl font-bold">{mevAnalysis.mevScore.toFixed(1)}%</p>
+            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center">
+              <p className="text-2xl font-black text-white">{analysis.total}</p>
+              <p className="text-[10px] text-white/30">Txs Analyzed</p>
             </div>
           </div>
 
-          <div className="p-3 rounded-lg bg-white/[0.04]">
-            <p className="text-xs text-muted-foreground mb-2">Analysis Details</p>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span>Total Transactions</span>
-                <span>{mevAnalysis.totalTxs}</span>
+          <div className="space-y-1.5">
+            {[
+              { label: "High Priority Fees", val: analysis.highPriority, color: "text-orange-400" },
+              { label: "Sandwich Suspects", val: analysis.sandwich, color: "text-red-400" },
+              { label: "Jito Bundle (est.)", val: analysis.jito, color: "text-[#eab308]" },
+            ].map((s) => (
+              <div key={s.label} className="flex justify-between items-center py-1.5 border-b border-white/[0.04] last:border-0">
+                <span className="text-xs text-white/40">{s.label}</span>
+                <span className={`text-sm font-bold ${s.color}`}>{s.val}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Sandwich Suspects</span>
-                <span>{mevAnalysis.sandwichSuspect}</span>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 };

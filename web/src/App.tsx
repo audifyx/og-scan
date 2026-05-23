@@ -34,6 +34,7 @@ import SupportCenter from "./pages/SupportCenter";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Admin from "./pages/Admin";
+import ArtFeed from "./pages/ArtFeed";
 
 const queryClient = new QueryClient();
 
@@ -121,6 +122,7 @@ const App = () => (
 
             {/* ── Protected: Admin ── */}
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            <Route path="/art" element={<ProtectedRoute><ArtFeed /></ProtectedRoute>} />
 
             {/* ── Public: Project/legal ── */}
             <Route path="/official-token" element={<OfficialToken />} />

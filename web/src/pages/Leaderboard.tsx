@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Trophy, TrendingUp, Target, BarChart3, Crown, Medal, Award } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Trophy, TrendingUp, Target, Crown, Medal, Award, UserCircle, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { safeAvatarUrl } from "@/lib/utils";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -10,18 +11,22 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 type SortKey = "pnl" | "winrate" | "trades";
 
 const rankIcons = [Crown, Medal, Award];
 const rankColors = [
-  "text-[#eab308]",   // gold
-  "text-muted-foreground",  // silver
-  "text-accent",       // bronze
+  "text-[#eab308]",
+  "text-slate-400",
+  "text-amber-600",
 ];
 
 const Leaderboard = () => {
   const [sortBy, setSortBy] = useState<SortKey>("pnl");
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const { data: traders, isLoading } = useQuery({
     queryKey: ["leaderboard"],
@@ -33,6 +38,21 @@ const Leaderboard = () => {
         .limit(50);
       if (error) throw error;
       return data || [];
+    },
+  });
+
+  // Also fetch follower counts
+  const { data: followCounts } = useQuery({
+    queryKey: ["leaderboard-followers"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("followers")
+        .select("following_id");
+      const counts: Record<string, number> = {};
+      (data || []).forEach((row: any) => {
+        counts[row.following_id] = (counts[row.following_id] || 0) + 1;
+      });
+      return counts;
     },
   });
 
@@ -48,42 +68,46 @@ const Leaderboard = () => {
     if (!v) return "$0";
     const abs = Math.abs(v);
     const str = abs >= 1_000_000 ? `$${(abs / 1_000_000).toFixed(1)}M` : abs >= 1_000 ? `$${(abs / 1_000).toFixed(1)}K` : `$${abs.toFixed(0)}`;
-    return v >= 0 ? `+${str}` : `-${str}`;
+    return (v < 0 ? "-" : "+") + str;
+  };
+
+  const goToProfile = (trader: any) => {
+    if (trader.user_id === user?.id) {
+      navigate("/profile");
+    } else {
+      navigate(`/profile?uid=${trader.user_id}`);
+    }
   };
 
   return (
     <AppLayout>
-      <PageHeader title="Leaderboard" description="Top traders ranked by performance" />
-
-      <div className="p-4 lg:p-6 space-y-4">
-        {/* Sort tabs */}
+      <PageHeader title="Leaderboard" description="Top traders ranked by performance">
         <Tabs value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-          <TabsList className="bg-white/[0.04] border border-white/[0.07]">
-            <TabsTrigger value="pnl" className="gap-1.5 text-xs font-mono">
-              <TrendingUp className="h-3.5 w-3.5" /> PNL
+          <TabsList className="bg-white/[0.04]">
+            <TabsTrigger value="pnl" className="flex items-center gap-1.5 text-xs">
+              <TrendingUp className="h-3.5 w-3.5" /> PnL
             </TabsTrigger>
-            <TabsTrigger value="winrate" className="gap-1.5 text-xs font-mono">
-              <Target className="h-3.5 w-3.5" /> WIN RATE
+            <TabsTrigger value="winrate" className="flex items-center gap-1.5 text-xs">
+              <Target className="h-3.5 w-3.5" /> Win Rate
             </TabsTrigger>
-            <TabsTrigger value="trades" className="gap-1.5 text-xs font-mono">
-              <BarChart3 className="h-3.5 w-3.5" /> VOLUME
+            <TabsTrigger value="trades" className="flex items-center gap-1.5 text-xs">
+              <Trophy className="h-3.5 w-3.5" /> Trades
             </TabsTrigger>
           </TabsList>
         </Tabs>
+      </PageHeader>
 
+      <div className="p-4 lg:p-6 space-y-4">
         {/* Top 3 podium */}
         {!isLoading && sorted.length >= 3 && (
           <div className="grid grid-cols-3 gap-3">
-            {[1, 0, 2].map((idx) => {
-              const t = sorted[idx];
+            {sorted.slice(0, 3).map((t, idx) => {
               const RankIcon = rankIcons[idx];
-              const isFirst = idx === 0;
               return (
                 <Card
                   key={t.user_id}
-                  className={`relative overflow-hidden border-white/[0.07] ${
-                    isFirst ? "bg-gradient-to-b from-secondary/10 to-card row-span-1 -mt-2" : "bg-[hsl(var(--og-ink))/90]"
-                  }`}
+                  className={`bg-[hsl(var(--og-ink))/90] border-border/40 hover:border-primary/40 transition-all cursor-pointer hover:-translate-y-0.5 active:scale-95 ${idx === 0 ? "ring-1 ring-[#eab308]/30" : ""}`}
+                  onClick={() => goToProfile(t)}
                 >
                   <CardContent className="flex flex-col items-center text-center p-4 pt-5">
                     <RankIcon className={`h-5 w-5 mb-2 ${rankColors[idx]}`} />
@@ -105,6 +129,12 @@ const Leaderboard = () => {
                     <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
                       {t.win_rate ?? 0}% WR · {t.trades_count ?? 0} trades
                     </p>
+                    {(followCounts?.[t.user_id] ?? 0) > 0 && (
+                      <p className="text-[10px] text-white/30 mt-1 flex items-center gap-1">
+                        <Users className="h-2.5 w-2.5" />
+                        {followCounts![t.user_id]} followers
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -119,7 +149,11 @@ const Leaderboard = () => {
                 <Skeleton key={i} className="h-16 w-full rounded-lg" />
               ))
             : sorted.slice(3).map((t, i) => (
-                <Card key={t.user_id} className="bg-[hsl(var(--og-ink))/90] border-border/40 hover:border-primary/30 transition-colors">
+                <Card
+                  key={t.user_id}
+                  className="bg-[hsl(var(--og-ink))/90] border-border/40 hover:border-primary/30 transition-all cursor-pointer hover:bg-white/[0.03] active:scale-[0.99]"
+                  onClick={() => goToProfile(t)}
+                >
                   <CardContent className="flex items-center gap-3 p-3">
                     <span className="w-7 text-center text-sm font-mono text-muted-foreground font-bold">
                       {i + 4}
@@ -141,11 +175,22 @@ const Leaderboard = () => {
                       </div>
                       <p className="text-[10px] text-muted-foreground font-mono">
                         {t.win_rate ?? 0}% WR · {t.trades_count ?? 0} trades
+                        {(followCounts?.[t.user_id] ?? 0) > 0 && ` · ${followCounts![t.user_id]} followers`}
                       </p>
                     </div>
-                    <p className={`font-bold font-mono text-sm ${(t.total_pnl ?? 0) >= 0 ? "text-green-400" : "text-destructive"}`}>
-                      {formatPnL(t.total_pnl)}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className={`font-bold font-mono text-sm ${(t.total_pnl ?? 0) >= 0 ? "text-green-400" : "text-destructive"}`}>
+                        {formatPnL(t.total_pnl)}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-white/20 hover:text-white/60 shrink-0"
+                        onClick={(e) => { e.stopPropagation(); goToProfile(t); }}
+                      >
+                        <UserCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

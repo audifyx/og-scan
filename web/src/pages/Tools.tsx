@@ -43,7 +43,7 @@ const TOOL_CARDS = [
   { id: "liquidity-scanner", name: "Liquidity Scanner", description: "Check pool liquidity depth and LP token status", icon: Droplets, color: "text-[#eab308]", bg: "bg-[#eab308]/10 border-[#eab308]/20", active: true },
   { id: "staking-calc", name: "Staking Calculator", description: "Calculate staking rewards and APY estimates", icon: Calculator, color: "text-[#22d3ee]", bg: "bg-[#22d3ee]/10 border-[#22d3ee]/20", active: true },
   { id: "token-sniper", name: "Token Sniper", description: "Detect and snipe new token launches in real-time", icon: Crosshair, color: "text-[#eab308]", bg: "bg-[#eab308]/10 border-[#eab308]/20", active: true },
-  { id: "mev-tracker", name: "MEV Tracker", description: "Detect MEV activity and sandwich attacks", icon: Cpu, color: "text-white/50", bg: "bg-white/5 border-white/10", comingSoon: true },
+  { id: "mev-tracker", name: "MEV Tracker", description: "Detect MEV activity and sandwich attacks", icon: Cpu, color: "text-[#22d3ee]", bg: "bg-[#22d3ee]/10 border-[#22d3ee]/20", active: true },
 ];
 
 const Tools = () => {
@@ -133,18 +133,15 @@ const Tools = () => {
           {TOOL_CARDS.map((tool) => (
             <button
               key={tool.id}
-              onClick={() => !tool.comingSoon && setActiveTool(tool.id)}
+              onClick={() => setActiveTool(tool.id)}
               className={[
-                "relative group flex flex-col items-center gap-2.5 p-4 rounded-2xl border transition-all duration-200 text-left",
-                tool.comingSoon ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:-translate-y-0.5",
+                "relative group flex flex-col items-center gap-2.5 p-4 rounded-2xl border transition-all duration-200 text-left cursor-pointer hover:-translate-y-0.5",
                 activeTool === tool.id
                   ? "border-[#22d3ee]/40 bg-[#22d3ee]/8 shadow-[0_0_24px_-8px_rgba(34,211,238,0.6)]"
                   : "border-white/[0.07] bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]",
               ].join(" ")}
             >
-              {tool.comingSoon && (
-                <span className="absolute top-2 right-2 text-[9px] font-black uppercase tracking-widest text-white/30 bg-white/5 rounded-full px-1.5 py-0.5">Soon</span>
-              )}
+
               <div className={`p-2.5 rounded-xl border ${tool.bg}`}>
                 <tool.icon className={`h-4 w-4 ${tool.color}`} />
               </div>
