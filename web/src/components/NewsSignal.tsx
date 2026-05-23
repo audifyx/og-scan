@@ -131,6 +131,21 @@ const INFLUENCERS: Influencer[] = [
     dotColor: "bg-og-cyan/80",
     themes: ["eth", "ethereum", "vitalik", "merge", "blob", "shiba", "floki"],
   },
+  {
+    id: "worldcup",
+    name: "World Cup 2026",
+    handle: "FIFA/Soccer",
+    tier: "A",
+    rssUrl:
+      "https://news.google.com/rss/search?q=world+cup+2026+crypto+OR+soccer+coin+OR+football+token+OR+FIFA+memecoin+OR+messi+crypto+OR+ronaldo+token+when:3d&hl=en-US&gl=US&ceid=US:en",
+    color: "border-yellow-400/40 bg-yellow-400/8",
+    dotColor: "bg-yellow-400",
+    themes: [
+      "worldcup","soccer","football","fifa","messi","ronaldo","goal","striker",
+      "champion","trophy","stadium","pitch","kick","ball","fan","ultras",
+      "brazil","argentina","france","england","germany","spain","neymar","mbappe",
+    ],
+  },
 ];
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -172,14 +187,32 @@ type SignalPayload = {
 // ── Keyword extraction ──────────────────────────────────────────────────────
 
 const PUMP_KEYWORDS = new Set<string>([
-  "doge","dogecoin","shib","shiba","floki","pepe","trump","maga","elon","musk",
-  "tesla","spacex","grok","mars","moon","rocket","freedom","america","usa","patriot",
-  "bitcoin","btc","crypto","solana","sol","token","coin","memecoin","meme","pump",
-  "launch","viral","trending","hype","fire","bullish","bull","ath","gains","moon",
-  "whale","buy","snoop","vitalik","ai","robot","dog","cat","frog","chad","based",
-  "bonk","wif","dogwifhat","popcat","fart","fartcoin","official","announcement",
-  "executive","order","strategic","reserve","whitehouse","senate","congress",
-  "approval","etf","spot","sec","regulation","partnership","integration",
+  // Elon / X meta
+  "doge","dogecoin","shib","shiba","floki","elon","musk","tesla","spacex","grok","xai",
+  "mars","rocket","x","twitter","elonmusk",
+  // Trump / MAGA meta
+  "trump","maga","donald","usa","america","freedom","liberty","patriot","official","eagle",
+  "whitehouse","senate","congress","executive","order","republican",
+  // AI meta
+  "ai","agi","gpt","llm","neural","robot","agent","turbo","render","fetch","near","goat",
+  "virtual","arc","bittensor","tao","worldcoin","wld","mind","brain","chip","compute","gpu",
+  "openai","claude","gemini","deepseek","chatgpt","ai16z",
+  // World Cup / Soccer meta
+  "worldcup","soccer","football","fifa","messi","ronaldo","goal","striker","champion",
+  "trophy","stadium","pitch","kick","ball","fan","ultras","brazil","argentina","france",
+  "england","germany","spain","italy","portugal","neymar","mbappe","cup","league","match",
+  "halftime","penalty","offside","goalkeeper","referee","bootleg","2026",
+  // Pump.fun / degen meta
+  "pump","fun","pumpfun","degen","bonk","wif","dogwifhat","popcat","fart","fartcoin",
+  "moo","cope","cat","frog","chad","based","wojak","pepe","launch","bonding","curve",
+  "migration","viral","cto","community","takeover",
+  // Political / Regulation meta
+  "btc","bitcoin","eth","ethereum","strategic","reserve","whitehouse","approval","etf",
+  "spot","sec","regulation","partnership","integration","senate","congress","crypto","law",
+  // General meme
+  "moon","rocket","diamond","hands","lambo","1000x","100x","ape","gem","wagmi","ngmi",
+  "whale","buy","snoop","vitalik","sol","solana","token","coin","memecoin","meme",
+  "trending","hype","fire","bullish","bull","ath","gains","announcement",
 ]);
 
 function extractKeywords(text: string): string[] {
@@ -213,35 +246,55 @@ function scoreCatalyst(keywords: string[], influencer: Influencer): number {
 
 // ── Coin matching engine ────────────────────────────────────────────────────
 
+// Map influencer IDs to their twitter handle for labels
+const INFLUENCER_HANDLE_MAP: Record<string, string> = {
+  elon: "@elonmusk",
+  trump: "@realDonaldTrump",
+  whitehouse: "@WhiteHouse",
+  saylor: "@saylor",
+  pumpfun: "pump.fun",
+  snoopdog: "@SnoopDogg",
+  vitalik: "@VitalikButerin",
+  worldcup: "⚽ World Cup 2026",
+};
+
 function coinMatchReason(
   coin: JupTokenInfo,
   keywords: string[],
-  influencer: Influencer
+  influencer: Influencer,
+  articleTitle: string = "",
 ): { reason: string; score: number } {
   const sym = normalizeNarrativeText(coin.symbol);
   const name = normalizeNarrativeText(coin.name);
   let score = 0;
   const reasons: string[] = [];
+  const handle = INFLUENCER_HANDLE_MAP[influencer.id] ?? influencer.handle;
 
-  // Direct keyword match
+  // 1. Direct keyword match from the article text
   for (const kw of keywords) {
     if (kw.length < 3) continue;
-    if (sym === kw) { score += 40; reasons.push(`symbol matches "${kw}"`); break; }
-    if (name === kw) { score += 35; reasons.push(`name matches "${kw}"`); break; }
-    if (name.includes(kw) || kw.includes(sym)) { score += 20; reasons.push(`name/kw overlap "${kw}"`); break; }
-    if (sym.includes(kw) || kw.includes(sym.slice(0, 4))) { score += 10; reasons.push(`partial match "${kw}"`); break; }
+    if (sym === kw) {
+      score += 40;
+      // If the article is from this influencer's feed, say "tweeted by"
+      reasons.push(`${handle} mentioned $${coin.symbol.toUpperCase()}`);
+      break;
+    }
+    if (name === kw) { score += 35; reasons.push(`${handle} mentioned "${coin.name}"`); break; }
+    if (name.includes(kw) || kw.includes(sym)) { score += 20; reasons.push(`${handle} pumps ${kw}`); break; }
+    if (sym.includes(kw) || kw.includes(sym.slice(0, 4))) { score += 10; reasons.push(`${handle} pumps ${kw}`); break; }
   }
 
-  // Theme match with influencer themes
+  // 2. Theme match — this coin is in the influencer's known coin universe
   for (const theme of influencer.themes) {
-    if (sym.includes(theme) || name.includes(theme)) {
+    const t = normalizeNarrativeText(theme);
+    if (sym.includes(t) || name.includes(t) || t.includes(sym)) {
       score += 25;
-      reasons.push(`${influencer.name} pumps ${theme}`);
+      if (reasons.length === 0) reasons.push(`${handle} pumps ${theme}`);
       break;
     }
   }
 
-  // Tier bonus
+  // 3. Tier bonus
   if (score > 0) {
     score += influencer.tier === "S" ? 15 : influencer.tier === "A" ? 8 : 3;
   }
@@ -266,8 +319,8 @@ function attachCoinMatches(
     const influencer = INFLUENCERS.find((i) => i.id === item.influencerId)!;
     const matched: SignalCoin[] = [];
 
-    for (const coin of coins.slice(0, 80)) {
-      const { reason, score } = coinMatchReason(coin, item.keywords, influencer);
+    for (const coin of coins.slice(0, 120)) {
+      const { reason, score } = coinMatchReason(coin, item.keywords, influencer, item.title);
       if (score < 10) continue;
 
       const pair = pairByMint.get(coin.id);
@@ -405,6 +458,12 @@ function buildFallbackSignals(influencer: Influencer): SignalItem[] {
       { title: "Vitalik posts about memecoin culture and Solana ecosystem", keywords: ["vitalik","meme","solana","shiba","coin","eth"] },
       { title: "Ethereum founder comments on Solana DeFi momentum", keywords: ["vitalik","ethereum","solana","defi","token"] },
     ],
+    worldcup: [
+      { title: "World Cup 2026 crypto meta heating up — soccer meme coins surge", keywords: ["worldcup","soccer","football","fifa","messi","goal","champion","trophy"] },
+      { title: "FIFA World Cup 2026: Brazil vs Argentina hype spawns new meme tokens", keywords: ["brazil","argentina","worldcup","soccer","meme","coin","token","goal"] },
+      { title: "Mbappe and Ronaldo fan tokens rally ahead of World Cup 2026", keywords: ["mbappe","ronaldo","worldcup","football","token","fan","coin","champion"] },
+      { title: "World Cup 2026 kicks off — stadium, goal, and trophy meme coins viral", keywords: ["worldcup","stadium","trophy","goal","kick","fan","soccer","viral","meme"] },
+    ],
   };
 
   const templates = fallbackByInfluencer[influencer.id] ?? [
@@ -469,31 +528,55 @@ async function fetchSignalPayload(): Promise<SignalPayload> {
     coins = coins.filter((c) => { if (seen.has(c.id)) return false; seen.add(c.id); return true; });
   }
 
-  // ── Meta-detection: keyword→DexScreener search ──────────────────────────
-  // Extract top keywords from all signals, search DexScreener for matching coins.
-  // This is what makes alien coins surface when Elon talks aliens, MAGA coins
-  // when Trump posts politics, pump.fun coins when that's trending, etc.
-  const keywordFreq = new Map<string, number>();
+  // ── Per-influencer/meta DexScreener search ──────────────────────────────
+  // Each influencer/meta drives its own DexScreener queries using its themes.
+  // This ensures:
+  //   - Elon meta searches "doge", "grok", "xai", "spacex", "tesla"
+  //   - Trump meta searches "trump", "maga", "usa", "freedom", "america", "patriot"
+  //   - World Cup meta searches "worldcup", "soccer", "messi", "ronaldo", "goal", "brazil"
+  //   - AI meta searches "ai", "agi", "neural", "robot", "agent", "turbo", "goat"
+  //   - Pump.fun searches "pump", "degen", "bonk", "wif", "popcat", "viral"
+  //   - Saylor searches "bitcoin", "btc", "saylor", "microstrategy", "hodl"
+  //   - Snoop searches "snoop", "dog", "weed", "420", "rap", "nft"
+  //   - Vitalik searches "eth", "ethereum", "shiba", "floki", "vitalik"
+  // Plus supplement with top article keywords per influencer signal batch.
+
+  // Build per-influencer search term lists
+  const perInfluencerTerms = new Map<string, Set<string>>();
+  for (const inf of INFLUENCERS) {
+    perInfluencerTerms.set(inf.id, new Set(inf.themes.slice(0, 6)));
+  }
+  // Also add the top article-level keywords per influencer
   for (const sig of rawSignals) {
-    for (const kw of sig.keywords) {
-      keywordFreq.set(kw, (keywordFreq.get(kw) ?? 0) + (PUMP_KEYWORDS.has(kw) ? 3 : 1));
+    const termSet = perInfluencerTerms.get(sig.influencerId);
+    if (!termSet) continue;
+    for (const kw of sig.keywords.slice(0, 4)) {
+      if (PUMP_KEYWORDS.has(kw)) termSet.add(kw);
     }
   }
-  const topSearchTerms = Array.from(keywordFreq.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([k]) => k)
-    .slice(0, 8);
+
+  // Flatten to unique search terms (cap per influencer at 4, total at 16)
+  const allSearchTerms: string[] = [];
+  for (const [, terms] of perInfluencerTerms) {
+    const list = Array.from(terms).slice(0, 4);
+    for (const t of list) {
+      if (!allSearchTerms.includes(t)) allSearchTerms.push(t);
+    }
+    if (allSearchTerms.length >= 16) break;
+  }
 
   const dexSearchResults = await Promise.allSettled(
-    topSearchTerms.map((kw) => dexSearchByKeyword(kw))
+    allSearchTerms.map((kw) => dexSearchByKeyword(kw))
   );
 
-  // Merge DexScreener results into a synthetic JupTokenInfo pool
+  // Merge DexScreener results into coin pool, tagged by which meta found them
+  const coinIdSet = new Set(coins.map((c) => c.id));
   for (const r of dexSearchResults) {
     if (r.status !== "fulfilled") continue;
-    for (const p of r.value.slice(0, 6)) {
+    for (const p of r.value.slice(0, 8)) {
       const addr = p.baseToken?.address;
-      if (!addr || coins.some((c) => c.id === addr)) continue;
+      if (!addr || coinIdSet.has(addr)) continue;
+      coinIdSet.add(addr);
       coins.push({
         id: addr,
         symbol: p.baseToken?.symbol ?? "???",
@@ -507,9 +590,9 @@ async function fetchSignalPayload(): Promise<SignalPayload> {
     }
   }
 
-  // Fetch DEX pairs for matched mints
+  // Fetch DEX pairs for the expanded coin pool
   const potentialMints = new Set<string>();
-  for (const coin of coins.slice(0, 80)) potentialMints.add(coin.id);
+  for (const coin of coins.slice(0, 120)) potentialMints.add(coin.id);
 
   const pairs = await dexPairsForMints(Array.from(potentialMints));
 
