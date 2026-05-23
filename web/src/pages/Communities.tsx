@@ -173,6 +173,68 @@ function safeIcon(icon: string | null | undefined): string | null {
   return s;
 }
 
+// ─── User Profile Modal ───────────────────────────────────────────────────────
+
+interface UserProfileData {
+  user_id: string;
+  username?: string | null;
+  avatar_url?: string | null;
+  bio?: string | null;
+  created_at?: string | null;
+}
+
+const UserProfileModal = ({ userId, onClose }: { userId: string; onClose: () => void }) => {
+  const [profile, setProfile] = useState<UserProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.from("profiles").select("user_id, username, avatar_url, bio, created_at").eq("user_id", userId).maybeSingle().then(({ data }) => {
+      setProfile(data as UserProfileData ?? { user_id: userId });
+      setLoading(false);
+    });
+  }, [userId]);
+
+  const gradient = avatarGradient(userId);
+  const displayName = profile?.username || "User";
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
+      <div className="relative w-full sm:max-w-sm bg-[#0d1117] rounded-3xl border border-white/10 shadow-2xl overflow-hidden">
+        {/* Banner */}
+        <div className={`h-24 bg-gradient-to-br ${gradient} opacity-60`} />
+        {/* Close */}
+        <button onClick={onClose} className="absolute top-3 right-3 p-2 rounded-full bg-black/50 backdrop-blur-sm hover:bg-black/70 z-10">
+          <XIcon className="h-4 w-4 text-white/70" />
+        </button>
+        {/* Avatar */}
+        <div className="px-5 -mt-10 pb-5">
+          <div className="mb-3">
+            <GradientAvatar src={profile?.avatar_url} name={profile?.username} id={userId} size="lg" className="border-4 border-[#0d1117] shadow-xl" />
+          </div>
+          {loading ? (
+            <div className="space-y-2">
+              <div className="h-5 w-32 rounded-full bg-white/10 animate-pulse" />
+              <div className="h-3 w-20 rounded-full bg-white/[0.05] animate-pulse" />
+            </div>
+          ) : (
+            <>
+              <h3 className="text-lg font-black text-white">{displayName}</h3>
+              {profile?.username && <p className="text-sm text-white/40">@{profile.username}</p>}
+              {profile?.bio && <p className="text-sm text-white/60 mt-3 leading-relaxed">{profile.bio}</p>}
+              {profile?.created_at && (
+                <p className="text-xs text-white/30 mt-3 flex items-center gap-1">
+                  <Clock className="h-3 w-3" /> Joined {formatDistanceToNow(new Date(profile.created_at), { addSuffix: true })}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Gradient Avatar ─────────────────────────────────────────────────────────
 
 interface GradientAvatarProps {
@@ -724,6 +786,7 @@ const Communities = () => {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [inviteCodeInput, setInviteCodeInput] = useState("");
+  const [viewProfileId, setViewProfileId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -800,6 +863,17 @@ const Communities = () => {
     q = feedSort === "latest" ? q.order("created_at", { ascending: false }) : q.order("likes_count", { ascending: false });
     const { data } = await q;
     const postsData = (data || []) as Post[];
+    // Enrich with real profile data so usernames are always up-to-date
+    const uniqueUserIds = [...new Set(postsData.map(p => p.user_id).filter(Boolean))];
+    if (uniqueUserIds.length > 0) {
+      const { data: profiles } = await supabase.from("profiles").select("user_id, username, avatar_url").in("user_id", uniqueUserIds);
+      const pm = new Map(profiles?.map(p => [p.user_id, p]) || []);
+      postsData.forEach(p => {
+        const prof = pm.get(p.user_id);
+        if (prof?.username) p.username = prof.username;
+        if (prof?.avatar_url) p.avatar_url = prof.avatar_url;
+      });
+    }
     if (user) {
       const { data: likes } = await supabase.from("community_post_likes").select("post_id").eq("user_id", user.id);
       const likedIds = new Set(likes?.map(l => l.post_id));
@@ -810,7 +884,19 @@ const Communities = () => {
 
   const fetchMessages = async (cid: string) => {
     const { data } = await supabase.from("community_messages").select("*").eq("community_id", cid).order("created_at", { ascending: true }).limit(100);
-    setMessages((data as ChatMsg[]) || []);
+    const msgsData = (data || []) as ChatMsg[];
+    // Enrich with real profile data
+    const uniqueUserIds = [...new Set(msgsData.map(m => m.user_id).filter(Boolean))];
+    if (uniqueUserIds.length > 0) {
+      const { data: profiles } = await supabase.from("profiles").select("user_id, username, avatar_url").in("user_id", uniqueUserIds);
+      const pm = new Map(profiles?.map(p => [p.user_id, p]) || []);
+      msgsData.forEach(m => {
+        const prof = pm.get(m.user_id);
+        if (prof?.username) m.username = prof.username;
+        if (prof?.avatar_url) m.avatar_url = prof.avatar_url;
+      });
+    }
+    setMessages(msgsData);
   };
 
   const fetchMembers = async (cid: string) => {
@@ -1050,10 +1136,14 @@ const Communities = () => {
               {posts.map(post => (
                 <article key={post.id} className="px-4 py-4 hover:bg-white/[0.02] transition-colors">
                   <div className="flex gap-3">
-                    <GradientAvatar src={post.avatar_url} name={post.username} id={post.user_id} />
+                    <button onClick={() => setViewProfileId(post.user_id)} className="shrink-0 focus:outline-none">
+                      <GradientAvatar src={post.avatar_url} name={post.username} id={post.user_id} />
+                    </button>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm text-white">{post.username || <span className="text-white/30">Anonymous</span>}</span>
+                        <button onClick={() => setViewProfileId(post.user_id)} className="font-bold text-sm text-white hover:underline">
+                          {post.username ? `@${post.username}` : <span className="text-white/30 no-underline">Unknown</span>}
+                        </button>
                         {post.user_id === selected.created_by && (
                           <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20 flex items-center gap-0.5"><Crown className="h-2.5 w-2.5" />Admin</span>
                         )}
@@ -1108,12 +1198,14 @@ const Communities = () => {
               )}
               {messages.map(msg => (
                 <div key={msg.id} className={`flex gap-2.5 ${msg.user_id === user?.id ? "flex-row-reverse" : ""}`}>
-                  <GradientAvatar src={msg.avatar_url} name={msg.username} id={msg.user_id} size="sm" />
+                  <button onClick={() => setViewProfileId(msg.user_id)} className="shrink-0 focus:outline-none">
+                    <GradientAvatar src={msg.avatar_url} name={msg.username} id={msg.user_id} size="sm" />
+                  </button>
                   <div className={`max-w-[75%] ${msg.user_id === user?.id ? "items-end flex flex-col" : ""}`}>
-                    <p className="text-[10px] text-white/30 mb-0.5 flex items-center gap-1">
-                      {msg.username}
+                    <button onClick={() => setViewProfileId(msg.user_id)} className="text-[10px] text-white/30 mb-0.5 flex items-center gap-1 hover:text-white/60">
+                      {msg.username ? `@${msg.username}` : "User"}
                       {msg.user_id === selected.created_by && <Crown className="h-2.5 w-2.5 text-primary" />}
-                    </p>
+                    </button>
                     <div className={`px-3 py-2 rounded-2xl text-sm ${msg.user_id === user?.id ? "bg-primary text-white rounded-br-md" : "bg-white/[0.06] text-white rounded-bl-md"}`}>
                       {msg.content}
                     </div>
@@ -1147,22 +1239,20 @@ const Communities = () => {
             {members.map(m => {
               const mIsAdmin = m.user_id === selected.created_by;
               return (
-                <div key={m.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] group">
+                <div key={m.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] group cursor-pointer" onClick={() => setViewProfileId(m.user_id)}>
                   <div className="relative">
                     <GradientAvatar src={m.avatar_url} name={m.username} id={m.user_id} />
                     <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#070d14]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-sm text-white">{m.username || <span className="text-white/30 italic">unknown</span>}</span>
+                      <span className="font-bold text-sm text-white">{m.username ? `@${m.username}` : <span className="text-white/30 italic">unknown</span>}</span>
                       {mIsAdmin && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20 flex items-center gap-0.5"><Crown className="h-2.5 w-2.5" />Admin</span>}
                       {m.role === "moderator" && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/20 flex items-center gap-0.5"><Shield className="h-2.5 w-2.5" />Mod</span>}
                     </div>
                     {m.bio && <p className="text-xs text-white/40 truncate">{m.bio}</p>}
                   </div>
-                  {m.user_id !== user?.id && (
-                    <Button variant="outline" size="sm" className="rounded-full text-xs h-7 px-3 opacity-0 group-hover:opacity-100 transition-opacity border-white/10">Follow</Button>
-                  )}
+                  <ChevronRight className="h-4 w-4 text-white/20 group-hover:text-primary/50 transition-colors shrink-0" />
                 </div>
               );
             })}
@@ -1219,6 +1309,7 @@ const Communities = () => {
         )}
 
         {showInviteModal && <InviteModal community={selected} onClose={() => setShowInviteModal(false)} />}
+        {viewProfileId && <UserProfileModal userId={viewProfileId} onClose={() => setViewProfileId(null)} />}
       </div>
     );
   }
@@ -1300,6 +1391,7 @@ const Communities = () => {
           profile={profile}
         />
       )}
+      {viewProfileId && <UserProfileModal userId={viewProfileId} onClose={() => setViewProfileId(null)} />}
     </div>
   );
 };

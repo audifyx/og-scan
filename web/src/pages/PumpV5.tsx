@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useLivePrices } from "@/hooks/useLivePrices";
+import { safeAvatarUrl } from "@/lib/utils";
 
 interface Submission {
   id: string;
@@ -970,8 +971,8 @@ const PumpV5 = () => {
                         onClick={() => openTokenDetail(token)}
                       >
                         <div className="h-24 bg-gradient-to-br from-yellow-500/20 to-orange-500/10 relative">
-                          {token.banner_url && (
-                            <img src={token.banner_url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0"; }} />
+                          {safeAvatarUrl(token.banner_url) && (
+                            <img src={safeAvatarUrl(token.banner_url)} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0"; }} />
                           )}
                           <Badge className="absolute top-2 right-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
                             <Star className="h-3 w-3 mr-1" />
@@ -980,8 +981,8 @@ const PumpV5 = () => {
                         </div>
                         <CardContent className="p-4">
                           <div className="flex items-center gap-3 mb-3">
-                            {token.logo_url ? (
-                              <img src={token.logo_url} alt={token.symbol} className="h-12 w-12 rounded-xl object-cover ring-2 ring-yellow-500/30" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            {safeAvatarUrl(token.logo_url) ? (
+                              <img src={safeAvatarUrl(token.logo_url)} alt={token.symbol} className="h-12 w-12 rounded-xl object-cover ring-2 ring-yellow-500/30" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                             ) : (
                               <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center font-bold text-white">
                                 {token.symbol.slice(0, 2)}
@@ -1146,13 +1147,13 @@ const PumpV5 = () => {
                     >
                       {/* Header with Live Price */}
                       <div className={`relative p-4 ${
-                        token.banner_url 
+                        safeAvatarUrl(token.banner_url)
                           ? '' 
                           : 'bg-gradient-to-br from-primary/15 via-secondary/10 to-accent/10'
                       }`}>
-                        {token.banner_url && (
+                        {safeAvatarUrl(token.banner_url) && (
                           <>
-                            <img src={token.banner_url} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0"; }} />
+                            <img src={safeAvatarUrl(token.banner_url)} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0"; }} />
                             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-card" />
                           </>
                         )}
@@ -1160,9 +1161,9 @@ const PumpV5 = () => {
                         <div className="relative flex items-start justify-between">
                           {/* Token Logo & Name */}
                           <div className="flex items-center gap-3">
-                            {token.logo_url ? (
+                            {safeAvatarUrl(token.logo_url) ? (
                               <img 
-                                src={token.logo_url} 
+                                src={safeAvatarUrl(token.logo_url)} 
                                 alt={token.symbol} 
                                 className="h-14 w-14 rounded-2xl object-cover ring-2 ring-white/20 shadow-lg"
                               />
