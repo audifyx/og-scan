@@ -42,7 +42,7 @@ export const ImpermanentLossCalculator = () => {
   }, [initialInvestment, priceChange]);
 
   return (
-    <Card className="glass-card h-full">
+    <Card className="og-glass-card h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-yellow-500" />
@@ -102,7 +102,7 @@ export const ImpermanentLossCalculator = () => {
           </div>
           
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-muted/30">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <TrendingUp className="h-4 w-4" />
                 <span className="text-xs">If Holding</span>
@@ -110,7 +110,7 @@ export const ImpermanentLossCalculator = () => {
               <p className="font-bold">${results.holdValue.toFixed(2)}</p>
             </div>
             
-            <div className="p-3 rounded-lg bg-muted/30">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <TrendingDown className="h-4 w-4" />
                 <span className="text-xs">LP Value</span>

@@ -8,7 +8,7 @@ interface PageHeaderProps {
 
 export const PageHeader = ({ title, description, children }: PageHeaderProps) => {
   return (
-    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
+    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-white/[0.07]">
       <div className="px-4 py-4 lg:px-6">
         <div className="flex items-center justify-between gap-4">
           <div>

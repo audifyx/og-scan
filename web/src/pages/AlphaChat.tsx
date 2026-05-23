@@ -262,7 +262,7 @@ const AlphaChat = () => {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between text-base">
                 <span className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-primary" />
+                  <Users className="h-4 w-4 text-[#22d3ee]" />
                   Online Now
                 </span>
                 <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
@@ -276,7 +276,7 @@ const AlphaChat = () => {
                   {onlineUsers.map((u) => (
                     <div 
                       key={u.id} 
-                      className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                      className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/30 hover:bg-white/[0.04] transition-colors cursor-pointer"
                       onClick={() => navigate(`/profile/${u.id}`)}
                     >
                       <div className="relative">
@@ -308,14 +308,14 @@ const AlphaChat = () => {
           {/* Main Chat Area */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Header */}
-            <Card className="glass-card-premium mb-4 border-primary/10">
+            <Card className="og-glass-card-premium mb-4 border-primary/10">
               <CardContent className="p-4 lg:p-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary blur-xl opacity-40" />
                       <div className="relative p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20">
-                        <MessageSquare className="h-6 w-6 text-primary" />
+                        <MessageSquare className="h-6 w-6 text-[#22d3ee]" />
                       </div>
                     </div>
                     <div>
@@ -357,7 +357,7 @@ const AlphaChat = () => {
             </Card>
 
             {/* Wallet Tracking Input */}
-            <Card className="glass-card mb-4 border-accent/10">
+            <Card className="og-glass-card mb-4 border-accent/10">
               <CardContent className="p-3">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-accent/10">
@@ -367,7 +367,7 @@ const AlphaChat = () => {
                     value={walletInput}
                     onChange={(e) => setWalletInput(e.target.value)}
                     placeholder="Track a wallet address..."
-                    className="flex-1 h-10 rounded-xl bg-muted/30 border-border/50"
+                    className="flex-1 h-10 rounded-xl bg-muted/30 border-white/[0.07]"
                     onKeyDown={(e) => e.key === "Enter" && addWalletToTrack()}
                   />
                   <Button onClick={addWalletToTrack} size="sm" className="rounded-xl gap-1.5 h-10 px-4">
@@ -379,7 +379,7 @@ const AlphaChat = () => {
             </Card>
 
             {/* Messages Area */}
-            <Card className="glass-card flex-1 overflow-hidden border-border/50">
+            <Card className="og-glass-card flex-1 overflow-hidden border-white/[0.07]">
               <ScrollArea className="h-full" ref={scrollRef}>
                 <div className="p-4 lg:p-5 space-y-4">
                   {messages.length === 0 && (
@@ -395,7 +395,7 @@ const AlphaChat = () => {
                   {messages.map((msg) => (
                     <div key={msg.id} className="animate-fade-in">
                       <div className={`flex items-start gap-3 ${msg.user_id === user?.id ? "flex-row-reverse" : ""}`}>
-                        <Avatar className="w-9 h-9 border-2 border-border/50 shadow-sm shrink-0">
+                        <Avatar className="w-9 h-9 border-2 border-white/[0.07] shadow-sm shrink-0">
                           <AvatarImage src={safeAvatarUrl(msg.avatar_url)} />
                           <AvatarFallback className={`text-xs ${msg.message_type === "bot" ? "bg-gradient-to-br from-accent to-secondary" : "bg-gradient-to-br from-primary to-secondary"} text-primary-foreground`}>
                             {msg.message_type === "bot" ? <Bot className="h-4 w-4" /> : msg.username?.charAt(0).toUpperCase() || "?"}
@@ -430,7 +430,7 @@ const AlphaChat = () => {
                               ? "bg-gradient-to-r from-accent/10 to-accent/5 border border-accent/20" 
                               : msg.user_id === user?.id 
                                 ? "bg-gradient-to-r from-primary/20 to-primary/10 border border-primary/20" 
-                                : "bg-muted/50 border border-border/50"
+                                : "bg-white/[0.04] border border-white/[0.07]"
                           }`}>
                             <p className="text-sm leading-relaxed break-words">{msg.content}</p>
                           </div>
@@ -450,7 +450,7 @@ const AlphaChat = () => {
             </Card>
 
             {/* Message Input */}
-            <Card className="glass-card mt-4 border-primary/10">
+            <Card className="og-glass-card mt-4 border-primary/10">
               <CardContent className="p-3">
                 <form
                   onSubmit={(e) => {
@@ -467,7 +467,7 @@ const AlphaChat = () => {
                     }}
                     placeholder={user ? "Share your alpha..." : "Sign in to chat"}
                     disabled={isLoading || !user}
-                    className="flex-1 h-12 rounded-xl bg-muted/30 border-border/50 text-base px-4"
+                    className="flex-1 h-12 rounded-xl bg-muted/30 border-white/[0.07] text-base px-4"
                   />
                   <Button 
                     type="submit" 

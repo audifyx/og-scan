@@ -189,7 +189,7 @@ export const ChatMessage = ({ message, onWalletClick, isOwnMessage }: ChatMessag
 
     // Default bot message (wallet_added)
     return (
-      <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border border-border/50">
+      <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.07]">
         <div className="p-2 rounded-lg bg-primary/10">
           <Bot className="h-4 w-4 text-primary" />
         </div>
@@ -234,7 +234,7 @@ export const ChatMessage = ({ message, onWalletClick, isOwnMessage }: ChatMessag
   if (isSystem) {
     return (
       <div className="text-center py-2">
-        <span className="text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
+        <span className="text-xs text-muted-foreground bg-white/[0.04] px-3 py-1 rounded-full">
           {message.content}
         </span>
       </div>

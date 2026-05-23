@@ -214,7 +214,7 @@ export const TokenDetailPopup = ({
 
                 <TabsContent value="overview" className="space-y-4">
                   {/* Price & Change */}
-                  <Card className="glass-card">
+                  <Card className="og-glass-card">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
@@ -243,7 +243,7 @@ export const TokenDetailPopup = ({
                       { icon: Activity, label: "24h Volume", value: formatNumber(tokenData?.volume24h) },
                       { icon: Users, label: "Holders", value: tokenData?.holderCount?.toLocaleString() || "—" },
                     ].map((stat, i) => (
-                      <Card key={i} className="bg-muted/30">
+                      <Card key={i} className="bg-white/[0.04]">
                         <CardContent className="p-3">
                           <div className="flex items-center gap-2 mb-1">
                             <stat.icon className="h-4 w-4 text-muted-foreground" />
@@ -257,7 +257,7 @@ export const TokenDetailPopup = ({
 
                   {/* Description */}
                   {tokenData?.description && (
-                    <Card className="bg-muted/30">
+                    <Card className="bg-white/[0.04]">
                       <CardContent className="p-4">
                         <p className="text-sm text-muted-foreground leading-relaxed">{tokenData.description}</p>
                       </CardContent>
@@ -316,7 +316,7 @@ export const TokenDetailPopup = ({
 
                 <TabsContent value="ai" className="space-y-4">
                   {!aiAnalysis ? (
-                    <Card className="glass-card">
+                    <Card className="og-glass-card">
                       <CardContent className="p-8 text-center">
                         <Brain className="h-12 w-12 text-primary mx-auto mb-4" />
                         <h3 className="font-bold text-lg mb-2">AI Token Analysis</h3>
@@ -366,7 +366,7 @@ export const TokenDetailPopup = ({
                       </Card>
 
                       {/* Summary */}
-                      <Card className="bg-muted/30">
+                      <Card className="bg-white/[0.04]">
                         <CardContent className="p-4">
                           <h4 className="font-semibold mb-2 flex items-center gap-2">
                             <Target className="h-4 w-4 text-primary" />
@@ -413,7 +413,7 @@ export const TokenDetailPopup = ({
                       </div>
 
                       {/* Recommendation */}
-                      <Card className="glass-card-premium">
+                      <Card className="og-glass-card-premium">
                         <CardContent className="p-4">
                           <h4 className="font-semibold mb-2 flex items-center gap-2">
                             <Brain className="h-4 w-4 text-primary" />

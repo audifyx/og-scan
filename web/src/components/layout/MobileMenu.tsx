@@ -79,7 +79,7 @@ export const MobileMenu = () => {
                   {({ isActive }) => (
                     <>
                       {isActive && <div className="absolute left-0 w-0.5 h-5 bg-primary rounded-r-full" />}
-                      <div className={cn("p-1.5 rounded-md transition-all", isActive ? "bg-primary/15" : "bg-muted/30")}>
+                      <div className={cn("p-1.5 rounded-md transition-all", isActive ? "bg-primary/15" : "bg-white/[0.04]")}>
                         <Icon className="h-4 w-4" />
                       </div>
                       <span className="font-semibold text-xs font-display tracking-wider">{label.toUpperCase()}</span>
@@ -97,7 +97,7 @@ export const MobileMenu = () => {
               <SheetClose asChild key={to}>
                 <NavLink to={to} className={({ isActive }) => cn(
                   "flex flex-col items-center gap-1 py-2.5 rounded-lg transition-all active:scale-[0.95]",
-                  isActive ? "bg-primary/10 text-primary border border-primary/15" : "bg-muted/15 text-muted-foreground active:bg-muted/30 border border-border/20"
+                  isActive ? "bg-primary/10 text-primary border border-primary/15" : "bg-muted/15 text-muted-foreground active:bg-white/[0.04] border border-border/20"
                 )}>
                   <Icon className="h-3.5 w-3.5" />
                   <span className="text-[8px] font-mono tracking-wider font-semibold">{label.toUpperCase()}</span>
@@ -123,7 +123,7 @@ export const MobileMenu = () => {
               <SheetClose asChild>
                 <NavLink to="/admin" className={({ isActive }) => cn(
                   "flex items-center gap-3 p-2.5 rounded-lg transition-all",
-                  isActive ? "bg-destructive/10 border border-destructive/20 text-destructive" : "bg-muted/15 border border-border/20 text-muted-foreground active:bg-muted/30"
+                  isActive ? "bg-destructive/10 border border-destructive/20 text-destructive" : "bg-muted/15 border border-border/20 text-muted-foreground active:bg-white/[0.04]"
                 )}>
                   <Shield className="h-3.5 w-3.5" />
                   <span className="font-semibold text-[10px] font-display tracking-wider">ADMIN</span>
@@ -135,7 +135,7 @@ export const MobileMenu = () => {
               <SheetClose asChild>
                 <NavLink to="/webhooks" className={({ isActive }) => cn(
                   "flex items-center gap-3 p-2.5 rounded-lg transition-all",
-                  isActive ? "bg-secondary/10 border border-secondary/20 text-secondary" : "bg-muted/15 border border-border/20 text-muted-foreground active:bg-muted/30"
+                  isActive ? "bg-secondary/10 border border-secondary/20 text-secondary" : "bg-muted/15 border border-border/20 text-muted-foreground active:bg-white/[0.04]"
                 )}>
                   <Webhook className="h-3.5 w-3.5" />
                   <span className="font-semibold text-[10px] font-display tracking-wider">WEBHOOKS</span>
@@ -152,7 +152,7 @@ export const MobileMenu = () => {
           <div className="space-y-2">
             <CreditBalance compact className="mb-1" />
             <SheetClose asChild>
-              <div className="flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer bg-muted/15 active:bg-muted/30 border border-border/20 transition-all" onClick={() => navigate("/profile")}>
+              <div className="flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer bg-muted/15 active:bg-white/[0.04] border border-border/20 transition-all" onClick={() => navigate("/profile")}>
                 <div className="w-8 h-8 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground font-bold text-[10px] font-mono">
                   {profile?.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
                 </div>

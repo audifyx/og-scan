@@ -4,7 +4,7 @@ export function LoadingSkeleton() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Main card skeleton */}
-      <div className="glass-card p-6 md:p-8">
+      <div className="og-glass-card p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-3">
             <Skeleton className="h-4 w-24 bg-muted" />
@@ -22,7 +22,7 @@ export function LoadingSkeleton() {
       {/* Stats grid skeleton */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="glass-card p-4 md:p-5">
+          <div key={i} className="og-glass-card p-4 md:p-5">
             <Skeleton className="h-10 w-10 rounded-lg mb-3 bg-muted" />
             <Skeleton className="h-3 w-16 mb-2 bg-muted" />
             <Skeleton className="h-6 w-20 mb-1 bg-muted" />
@@ -33,7 +33,7 @@ export function LoadingSkeleton() {
 
       {/* Lists skeleton */}
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="glass-card">
+        <div className="og-glass-card">
           <div className="p-4 md:p-6 border-b border-border">
             <Skeleton className="h-6 w-32 bg-muted" />
           </div>
@@ -56,7 +56,7 @@ export function LoadingSkeleton() {
           </div>
         </div>
 
-        <div className="glass-card">
+        <div className="og-glass-card">
           <div className="p-4 md:p-6 border-b border-border">
             <Skeleton className="h-6 w-40 bg-muted" />
           </div>

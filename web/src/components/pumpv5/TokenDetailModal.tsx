@@ -201,7 +201,7 @@ export function TokenDetailModal({
                   {token.launch_platform}
                 </Badge>
                 {tokenLiveData?.dexId && (
-                  <Badge variant="outline" className="bg-muted/50">
+                  <Badge variant="outline" className="bg-white/[0.04]">
                     {tokenLiveData.dexId}
                   </Badge>
                 )}
@@ -243,7 +243,7 @@ export function TokenDetailModal({
               {/* Price & Stats */}
               <div className="lg:col-span-2 space-y-4">
                 {/* Price Card */}
-                <Card className="glass-card">
+                <Card className="og-glass-card">
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between mb-4">
                       <div>
@@ -269,14 +269,14 @@ export function TokenDetailModal({
                     
                     {/* Stats Grid */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                      <div className="p-3 rounded-xl bg-muted/30">
+                      <div className="p-3 rounded-xl bg-white/[0.04]">
                         <div className="flex items-center gap-2 text-muted-foreground mb-1">
                           <DollarSign className="h-4 w-4" />
                           <span className="text-xs">Market Cap</span>
                         </div>
                         <p className="font-semibold">{formatNumber(tokenLiveData?.marketCap)}</p>
                       </div>
-                      <div className="p-3 rounded-xl bg-muted/30">
+                      <div className="p-3 rounded-xl bg-white/[0.04]">
                         <div className="flex items-center gap-2 text-muted-foreground mb-1">
                           <Droplets className="h-4 w-4" />
                           <span className="text-xs">Liquidity</span>
@@ -288,7 +288,7 @@ export function TokenDetailModal({
                           </p>
                         )}
                       </div>
-                      <div className="p-3 rounded-xl bg-muted/30">
+                      <div className="p-3 rounded-xl bg-white/[0.04]">
                         <div className="flex items-center gap-2 text-muted-foreground mb-1">
                           <BarChart3 className="h-4 w-4" />
                           <span className="text-xs">24h Volume</span>
@@ -300,7 +300,7 @@ export function TokenDetailModal({
                           </p>
                         )}
                       </div>
-                      <div className="p-3 rounded-xl bg-muted/30">
+                      <div className="p-3 rounded-xl bg-white/[0.04]">
                         <div className="flex items-center gap-2 text-muted-foreground mb-1">
                           <Zap className="h-4 w-4" />
                           <span className="text-xs">FDV</span>
@@ -329,7 +329,7 @@ export function TokenDetailModal({
                               {tokenLiveData?.sells24h || tokenLiveData?.txns24h?.sells || 0}
                             </p>
                           </div>
-                          <div className="text-center p-2 rounded-lg bg-muted/30">
+                          <div className="text-center p-2 rounded-lg bg-white/[0.04]">
                             <p className="text-xs text-muted-foreground">B/S Ratio</p>
                             <p className="font-semibold">
                               {(() => {
@@ -346,7 +346,7 @@ export function TokenDetailModal({
                 </Card>
 
                 {/* Chart Embed */}
-                <Card className="glass-card overflow-hidden">
+                <Card className="og-glass-card overflow-hidden">
                   <CardContent className="p-0">
                     <iframe
                       src={`https://dexscreener.com/solana/${token.contract_address}?embed=1&theme=dark&trades=0&info=0`}
@@ -357,7 +357,7 @@ export function TokenDetailModal({
                 </Card>
 
                 {/* About Section */}
-                <Card className="glass-card">
+                <Card className="og-glass-card">
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-primary" />
@@ -376,7 +376,7 @@ export function TokenDetailModal({
               {/* Sidebar */}
               <div className="space-y-4">
                 {/* AI Analysis */}
-                <Card className="glass-card">
+                <Card className="og-glass-card">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between text-lg">
                       <span className="flex items-center gap-2">
@@ -451,7 +451,7 @@ export function TokenDetailModal({
                 </Card>
 
                 {/* Links */}
-                <Card className="glass-card">
+                <Card className="og-glass-card">
                   <CardHeader>
                     <CardTitle className="text-lg">Links</CardTitle>
                   </CardHeader>
@@ -463,7 +463,7 @@ export function TokenDetailModal({
                         href={website.url} 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                        className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors"
                       >
                         <Globe className="h-4 w-4 text-primary" />
                         <span className="text-sm">{website.label || "Website"}</span>
@@ -478,7 +478,7 @@ export function TokenDetailModal({
                         href={social.url} 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                        className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors"
                       >
                         {social.type === 'twitter' ? (
                           <Twitter className="h-4 w-4 text-primary" />
@@ -498,7 +498,7 @@ export function TokenDetailModal({
                         href={`https://twitter.com/${token.twitter.replace("@", "")}`} 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                        className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors"
                       >
                         <Twitter className="h-4 w-4 text-primary" />
                         <span className="text-sm">Twitter</span>
@@ -511,7 +511,7 @@ export function TokenDetailModal({
                         href={token.telegram.startsWith("http") ? token.telegram : `https://t.me/${token.telegram}`} 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                        className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors"
                       >
                         <Send className="h-4 w-4 text-primary" />
                         <span className="text-sm">Telegram</span>
@@ -520,22 +520,22 @@ export function TokenDetailModal({
                     )}
                     
                     {/* Explorer Links */}
-                    <a href={`https://dexscreener.com/solana/${token.contract_address}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <a href={`https://dexscreener.com/solana/${token.contract_address}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors">
                       <BarChart3 className="h-4 w-4 text-primary" />
                       <span className="text-sm">DexScreener</span>
                       <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
                     </a>
-                    <a href={`https://birdeye.so/token/${token.contract_address}?chain=solana`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <a href={`https://birdeye.so/token/${token.contract_address}?chain=solana`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors">
                       <TrendingUp className="h-4 w-4 text-primary" />
                       <span className="text-sm">Birdeye</span>
                       <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
                     </a>
-                    <a href={`https://solscan.io/token/${token.contract_address}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <a href={`https://solscan.io/token/${token.contract_address}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors">
                       <Search className="h-4 w-4 text-primary" />
                       <span className="text-sm">Solscan</span>
                       <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
                     </a>
-                    <a href={`https://pump.fun/${token.contract_address}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <a href={`https://pump.fun/${token.contract_address}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors">
                       <Zap className="h-4 w-4 text-primary" />
                       <span className="text-sm">Pump.fun</span>
                       <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
@@ -544,12 +544,12 @@ export function TokenDetailModal({
                 </Card>
 
                 {/* Contract */}
-                <Card className="glass-card">
+                <Card className="og-glass-card">
                   <CardHeader>
                     <CardTitle className="text-lg">Contract</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="p-3 rounded-lg bg-muted/30">
+                    <div className="p-3 rounded-lg bg-white/[0.04]">
                       <code className="text-xs break-all">{token.contract_address}</code>
                     </div>
                     <Button 
@@ -565,7 +565,7 @@ export function TokenDetailModal({
 
                 {/* Holder Info */}
                 {tokenLiveData?.holderCount && (
-                  <Card className="glass-card">
+                  <Card className="og-glass-card">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
                         <Users className="h-5 w-5 text-primary" />

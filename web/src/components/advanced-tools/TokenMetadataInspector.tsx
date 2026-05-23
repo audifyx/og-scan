@@ -55,19 +55,19 @@ export const TokenMetadataInspector = () => {
       {metadata && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground">Name</p>
               <p className="font-medium">{metadata.name || "Unknown"}</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground">Symbol</p>
               <p className="font-medium">{metadata.symbol || "???"}</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground">Decimals</p>
               <p className="font-medium">{metadata.decimals ?? "N/A"}</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground">Total Supply</p>
               <p className="font-medium">{metadata.supply?.toLocaleString() || "N/A"}</p>
             </div>
@@ -88,7 +88,7 @@ export const TokenMetadataInspector = () => {
           </div>
 
           {metadata.riskScore !== undefined && (
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground mb-1">Risk Score</p>
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">

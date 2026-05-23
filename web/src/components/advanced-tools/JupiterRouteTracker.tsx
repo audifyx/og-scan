@@ -69,7 +69,7 @@ export const JupiterRouteTracker = () => {
         <div className="space-y-2">
           <p className="text-sm font-medium">{routes.length} Swap Routes Found</p>
           {routes.slice(0, 10).map((route, i) => (
-            <div key={i} className="p-3 rounded-lg bg-muted/50 flex items-center justify-between">
+            <div key={i} className="p-3 rounded-lg bg-white/[0.04] flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">{route.type}</p>
                 <p className="text-xs text-muted-foreground">{route.description?.slice(0, 50)}...</p>

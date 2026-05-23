@@ -9,7 +9,7 @@ interface TransactionListProps {
 export function TransactionList({ transactions, walletAddress }: TransactionListProps) {
   if (transactions.length === 0) {
     return (
-      <div className="glass-card p-8 text-center">
+      <div className="og-glass-card p-8 text-center">
         <RefreshCw className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <p className="text-muted-foreground">No recent transactions found</p>
       </div>
@@ -17,7 +17,7 @@ export function TransactionList({ transactions, walletAddress }: TransactionList
   }
 
   return (
-    <div className="glass-card overflow-hidden animate-fade-in" style={{ animationDelay: '0.2s' }}>
+    <div className="og-glass-card overflow-hidden animate-fade-in" style={{ animationDelay: '0.2s' }}>
       <div className="p-4 md:p-6 border-b border-border">
         <h3 className="text-xl font-semibold flex items-center gap-2">
           <RefreshCw className="h-5 w-5 text-secondary" />
@@ -79,7 +79,7 @@ function TransactionRow({ transaction, walletAddress, index }: TransactionRowPro
     : null;
 
   return (
-    <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors group">
+    <div className="flex items-center justify-between p-4 hover:bg-white/[0.04] transition-colors group">
       <div className="flex items-center gap-3">
         <div className={`p-2 rounded-lg bg-muted ${getTypeColor()}`}>
           {getIcon()}

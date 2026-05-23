@@ -217,11 +217,11 @@ export const WhaleTracker = () => {
 
               {whale.overview && (
                 <div className="grid grid-cols-2 gap-2 mb-3">
-                  <div className="p-2 rounded bg-muted/50">
+                  <div className="p-2 rounded bg-white/[0.04]">
                     <p className="text-xs text-muted-foreground">Portfolio</p>
                     <p className="font-semibold text-primary">{formatUsd(whale.overview.totalUsdValue)}</p>
                   </div>
-                  <div className="p-2 rounded bg-muted/50">
+                  <div className="p-2 rounded bg-white/[0.04]">
                     <p className="text-xs text-muted-foreground">SOL Balance</p>
                     <p className="font-semibold">{whale.overview.balance.toFixed(2)} SOL</p>
                   </div>
@@ -233,7 +233,7 @@ export const WhaleTracker = () => {
                   <p className="text-xs text-muted-foreground mb-2">Recent Activity</p>
                   <div className="space-y-1">
                     {whale.recentTx.slice(0, 3).map((tx, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs p-2 rounded bg-muted/30">
+                      <div key={i} className="flex items-center justify-between text-xs p-2 rounded bg-white/[0.04]">
                         <div className="flex items-center gap-2">
                           {tx.type?.includes('SWAP') || tx.type?.includes('BUY') ? (
                             <TrendingUp className="h-3 w-3 text-green-500" />

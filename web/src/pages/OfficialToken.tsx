@@ -78,7 +78,7 @@ const OfficialToken = () => {
       <ScrollArea className="h-[calc(100vh-120px)]">
         <div className="p-4 lg:p-6 space-y-6">
           {/* Hero */}
-          <Card className="glass-card-premium overflow-hidden relative">
+          <Card className="og-glass-card-premium overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/5" />
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
             <CardContent className="relative p-6 lg:p-8">
@@ -90,7 +90,7 @@ const OfficialToken = () => {
                 <div className="text-center sm:text-left flex-1">
                   <h1 className="text-3xl font-bold gradient-text font-display mb-1">Sol Tools Token</h1>
                   <p className="text-xl text-muted-foreground mb-3">$SOLTOOLS</p>
-                  <button onClick={copyCA} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted/50 border border-border/50 hover:border-primary/30 transition-all text-sm font-mono">
+                  <button onClick={copyCA} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.07] hover:border-primary/30 transition-all text-sm font-mono">
                     <span className="text-muted-foreground">{CONTRACT_ADDRESS.slice(0, 8)}...{CONTRACT_ADDRESS.slice(-6)}</span>
                     {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-muted-foreground" />}
                   </button>
@@ -103,12 +103,12 @@ const OfficialToken = () => {
           {tokenData && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { icon: DollarSign, label: "Price", value: `$${parseFloat(tokenData.priceUsd || 0) < 0.01 ? parseFloat(tokenData.priceUsd).toExponential(2) : parseFloat(tokenData.priceUsd).toFixed(6)}`, color: "text-primary" },
+                { icon: DollarSign, label: "Price", value: `$${parseFloat(tokenData.priceUsd || 0) < 0.01 ? parseFloat(tokenData.priceUsd).toExponential(2) : parseFloat(tokenData.priceUsd).toFixed(6)}`, color: "text-[#22d3ee]" },
                 { icon: BarChart3, label: "Market Cap", value: formatNumber(tokenData.fdv || 0), color: "text-blue-500" },
                 { icon: TrendingUp, label: "24h Volume", value: formatNumber(tokenData.volume?.h24 || 0), color: "text-green-500" },
                 { icon: Users, label: "Liquidity", value: formatNumber(tokenData.liquidity?.usd || 0), color: "text-accent" },
               ].map((s, i) => (
-                <Card key={i} className="glass-card">
+                <Card key={i} className="og-glass-card">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1"><s.icon className={`h-4 w-4 ${s.color}`} /><span className="text-xs">{s.label}</span></div>
                     <p className="text-xl font-bold">{s.value}</p>
@@ -140,7 +140,7 @@ const OfficialToken = () => {
           </div>
 
           {/* DEX Chart */}
-          <Card className="glass-card overflow-hidden">
+          <Card className="og-glass-card overflow-hidden">
             <CardContent className="p-0">
               <iframe
                 src={`https://dexscreener.com/solana/${CONTRACT_ADDRESS}?embed=1&theme=dark&info=0`}
@@ -151,9 +151,9 @@ const OfficialToken = () => {
           </Card>
 
           {/* What is Sol Tools */}
-          <Card className="glass-card-premium border-primary/20">
+          <Card className="og-glass-card-premium border-primary/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> What is Sol Tools?</CardTitle>
+              <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#22d3ee]" /> What is Sol Tools?</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm leading-relaxed text-muted-foreground">
@@ -169,8 +169,8 @@ const OfficialToken = () => {
                   { icon: Zap, label: "Token sniping tools" },
                   { icon: Coins, label: "Free credit system" },
                 ].map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 p-3 rounded-xl bg-muted/30 border border-border/30">
-                    <f.icon className="h-4 w-4 text-primary" />
+                  <div key={i} className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.04] border border-border/30">
+                    <f.icon className="h-4 w-4 text-[#22d3ee]" />
                     <span className="text-xs font-medium">{f.label}</span>
                   </div>
                 ))}
@@ -179,9 +179,9 @@ const OfficialToken = () => {
           </Card>
 
           {/* Announcement */}
-          <Card className="glass-card-premium border-primary/20">
+          <Card className="og-glass-card-premium border-primary/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Rocket className="h-5 w-5 text-primary" /> Launch Announcement</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Rocket className="h-5 w-5 text-[#22d3ee]" /> Launch Announcement</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm leading-relaxed text-muted-foreground">
@@ -208,22 +208,22 @@ const OfficialToken = () => {
           </Card>
 
           {/* Fee Breakdown */}
-          <Card className="glass-card">
+          <Card className="og-glass-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><PieChart className="h-5 w-5 text-primary" /> Fee Distribution</CardTitle>
+              <CardTitle className="flex items-center gap-2"><PieChart className="h-5 w-5 text-[#22d3ee]" /> Fee Distribution</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {FEE_BREAKDOWN.map((fee, i) => (
-                <div key={i} className="p-4 rounded-2xl bg-muted/30 border border-border/30">
+                <div key={i} className="p-4 rounded-2xl bg-white/[0.04] border border-border/30">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <fee.icon className="h-4 w-4 text-primary" />
+                      <fee.icon className="h-4 w-4 text-[#22d3ee]" />
                       <span className="font-semibold text-sm">{fee.label}</span>
                     </div>
                     <Badge className={`bg-gradient-to-r ${fee.color} text-white border-0 font-bold`}>{fee.percent}%</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">{fee.desc}</p>
-                  <div className="mt-3 h-2 rounded-full bg-muted/50 overflow-hidden">
+                  <div className="mt-3 h-2 rounded-full bg-white/[0.04] overflow-hidden">
                     <div className={`h-full bg-gradient-to-r ${fee.color} rounded-full`} style={{ width: `${fee.percent}%` }} />
                   </div>
                 </div>
@@ -232,14 +232,14 @@ const OfficialToken = () => {
           </Card>
 
           {/* Roadmap */}
-          <Card className="glass-card">
+          <Card className="og-glass-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> Roadmap</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#22d3ee]" /> Roadmap</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {ROADMAP.map((phase, i) => (
-                  <div key={i} className={`p-4 rounded-2xl border ${phase.done ? 'border-green-500/30 bg-green-500/5' : 'border-border/30 bg-muted/20'}`}>
+                  <div key={i} className={`p-4 rounded-2xl border ${phase.done ? 'border-green-500/30 bg-green-500/5' : 'border-border/30 bg-white/[0.03]'}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant={phase.done ? "default" : "outline"} className={phase.done ? "bg-green-500/20 text-green-500 border-0" : ""}>{phase.phase}</Badge>
                       {phase.done && <Check className="h-4 w-4 text-green-500" />}
@@ -260,9 +260,9 @@ const OfficialToken = () => {
           </Card>
 
           {/* FAQ */}
-          <Card className="glass-card">
+          <Card className="og-glass-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><MessageCircle className="h-5 w-5 text-primary" /> FAQ</CardTitle>
+              <CardTitle className="flex items-center gap-2"><MessageCircle className="h-5 w-5 text-[#22d3ee]" /> FAQ</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {[
@@ -272,7 +272,7 @@ const OfficialToken = () => {
                 { q: "How do I get started?", a: "Simply create an account, and you'll have instant access to 30+ Solana trading tools, social lobbies, and analytics." },
                 { q: "Is my data safe?", a: "Yes. We use enterprise-grade encryption and never store private keys. Your wallet address is used only for read-only tracking." },
               ].map((faq, i) => (
-                <div key={i} className="p-4 rounded-2xl bg-muted/30 border border-border/30">
+                <div key={i} className="p-4 rounded-2xl bg-white/[0.04] border border-border/30">
                   <h4 className="font-semibold text-sm mb-1">{faq.q}</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">{faq.a}</p>
                 </div>

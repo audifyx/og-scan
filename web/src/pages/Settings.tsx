@@ -24,7 +24,7 @@ const Settings = () => {
       <PageHeader title="Settings" description="Manage your account and preferences" />
       <div className="p-4 lg:p-6 relative z-10">
         <Tabs defaultValue="themes" className="w-full">
-          <TabsList className="grid w-full max-w-2xl grid-cols-5 bg-muted/50 mb-6">
+          <TabsList className="grid w-full max-w-2xl grid-cols-5 bg-white/[0.04] mb-6">
             <TabsTrigger value="themes" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <Palette className="h-4 w-4" />
               <span className="hidden sm:inline">Themes</span>
@@ -60,7 +60,7 @@ const Settings = () => {
           <TabsContent value="notifications">
             <Card className="p-6 max-w-2xl glass-card">
               <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" /> Notification Preferences
+                <Bell className="h-5 w-5 text-[#22d3ee]" /> Notification Preferences
               </h3>
               <div className="space-y-4">
                 {[
@@ -87,7 +87,7 @@ const Settings = () => {
           <TabsContent value="webhooks">
             <Card className="p-6 max-w-2xl glass-card">
               <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Webhook className="h-5 w-5 text-primary" /> Discord Webhook
+                <Webhook className="h-5 w-5 text-[#22d3ee]" /> Discord Webhook
               </h3>
               <div className="space-y-4">
                 <div>
@@ -103,7 +103,7 @@ const Settings = () => {
           <TabsContent value="account">
             <Card className="p-6 max-w-2xl glass-card">
               <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" /> Account Security
+                <Shield className="h-5 w-5 text-[#22d3ee]" /> Account Security
               </h3>
               <div className="space-y-4">
                 <div>

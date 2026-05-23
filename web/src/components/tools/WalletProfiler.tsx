@@ -50,7 +50,7 @@ export const WalletProfiler = () => {
   };
 
   return (
-    <Card className="glass-card h-full">
+    <Card className="og-glass-card h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Wallet className="h-5 w-5 text-primary" />
@@ -78,7 +78,7 @@ export const WalletProfiler = () => {
         {stats && (
           <div className="space-y-4 animate-fade-in">
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-muted/30">
+              <div className="p-3 rounded-lg bg-white/[0.04]">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
                   <DollarSign className="h-4 w-4" />
                   <span className="text-xs">Portfolio Value</span>
@@ -86,7 +86,7 @@ export const WalletProfiler = () => {
                 <p className="text-xl font-bold">{formatNumber(stats.currentValue)}</p>
               </div>
               
-              <div className="p-3 rounded-lg bg-muted/30">
+              <div className="p-3 rounded-lg bg-white/[0.04]">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
                   <Coins className="h-4 w-4" />
                   <span className="text-xs">SOL Balance</span>
@@ -94,7 +94,7 @@ export const WalletProfiler = () => {
                 <p className="text-xl font-bold">{stats.solBalance.toFixed(4)}</p>
               </div>
               
-              <div className="p-3 rounded-lg bg-muted/30">
+              <div className="p-3 rounded-lg bg-white/[0.04]">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
                   <Activity className="h-4 w-4" />
                   <span className="text-xs">Trades</span>
@@ -102,7 +102,7 @@ export const WalletProfiler = () => {
                 <p className="text-xl font-bold">{stats.tradeCount}</p>
               </div>
               
-              <div className="p-3 rounded-lg bg-muted/30">
+              <div className="p-3 rounded-lg bg-white/[0.04]">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
                   <TrendingUp className="h-4 w-4" />
                   <span className="text-xs">Win Rate</span>

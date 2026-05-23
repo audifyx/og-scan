@@ -66,7 +66,7 @@ export const LobbyWatchlist = ({ lobbyId }: { lobbyId: string }) => {
   };
 
   return (
-    <div className="glass-card rounded-xl overflow-hidden flex flex-col h-full">
+    <div className="og-glass-card rounded-xl overflow-hidden flex flex-col h-full">
       <div className="px-3 py-2 border-b border-primary/10 flex items-center gap-2">
         <Coins className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-semibold font-display">SHARED WATCHLIST</span>
@@ -77,7 +77,7 @@ export const LobbyWatchlist = ({ lobbyId }: { lobbyId: string }) => {
 
       {showAdd && (
         <div className="p-2 border-b border-border/20">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search Solana tokens..." className="w-full bg-muted/20 border border-border/30 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search Solana tokens..." className="w-full bg-white/[0.03] border border-border/30 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30" />
           {searchResults.length > 0 && (
             <div className="mt-1 max-h-40 overflow-y-auto space-y-0.5">
               {searchResults.map((pair: any, i: number) => (
@@ -99,7 +99,7 @@ export const LobbyWatchlist = ({ lobbyId }: { lobbyId: string }) => {
           <p className="text-xs text-muted-foreground/50 text-center py-6">No tokens added yet</p>
         )}
         {items.map((item) => (
-          <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/10 hover:bg-muted/20 border border-border/10 group transition-colors">
+          <div key={item.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/10 hover:bg-white/[0.03] border border-border/10 group transition-colors">
             <img src={`https://api.dicebear.com/7.x/shapes/svg?seed=${item.token_symbol}`} className="w-7 h-7 rounded-full border border-primary/20" alt="" />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold truncate">{item.token_symbol}</p>

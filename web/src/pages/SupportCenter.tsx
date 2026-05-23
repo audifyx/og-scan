@@ -195,7 +195,7 @@ const SupportCenter = () => {
         <div className="flex flex-col h-[calc(100vh-60px)] lg:h-screen">
           {/* Header */}
           <div className="shrink-0 border-b border-border/40 bg-card/80 backdrop-blur-xl p-4 flex items-center gap-3">
-            <button onClick={() => { setActiveTicket(null); setMessages([]); }} className="p-2 rounded-xl bg-muted/20 hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors">
+            <button onClick={() => { setActiveTicket(null); setMessages([]); }} className="p-2 rounded-xl bg-white/[0.03] hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div className="flex-1 min-w-0">
@@ -336,7 +336,7 @@ const SupportCenter = () => {
 
         {/* Create Ticket Form */}
         {creating && (
-          <Card className="glass-card border-primary/20">
+          <Card className="og-glass-card border-primary/20">
             <CardContent className="p-5 space-y-3">
               <h3 className="font-bold text-sm">New Support Request</h3>
               <Input
@@ -358,7 +358,7 @@ const SupportCenter = () => {
         {/* Admin Tabs */}
         {isAdminUser ? (
           <Tabs defaultValue="open">
-            <TabsList className="grid w-full max-w-md grid-cols-3 bg-muted/30 rounded-xl">
+            <TabsList className="grid w-full max-w-md grid-cols-3 bg-white/[0.04] rounded-xl">
               <TabsTrigger value="open" className="rounded-lg text-xs gap-1">
                 <AlertCircle className="h-3.5 w-3.5" /> Open ({tickets.filter(t => t.status === "open").length})
               </TabsTrigger>

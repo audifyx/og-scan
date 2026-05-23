@@ -27,7 +27,7 @@ export const MobileHeader = () => {
                 <Menu className="h-[18px] w-[18px]" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[300px] p-0 border-border/50 bg-card">
+            <SheetContent side="left" className="w-[300px] p-0 border-white/[0.07] bg-card">
               <MobileMenu />
             </SheetContent>
           </Sheet>

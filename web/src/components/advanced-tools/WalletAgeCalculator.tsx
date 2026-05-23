@@ -72,14 +72,14 @@ export const WalletAgeCalculator = () => {
       {walletInfo && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <div className="flex items-center gap-2 mb-1">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <p className="text-xs text-muted-foreground">First Activity</p>
               </div>
               <p className="font-medium text-sm">{format(walletInfo.firstActivity, "PPP")}</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <div className="flex items-center gap-2 mb-1">
                 <Activity className="h-4 w-4 text-muted-foreground" />
                 <p className="text-xs text-muted-foreground">Last Activity</p>

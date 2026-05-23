@@ -35,7 +35,7 @@ export const ProfitCurveGenerator = () => {
         <Input placeholder="Wallet address..." value={walletAddress} onChange={(e) => setWalletAddress(e.target.value)} />
         <Button onClick={generate} disabled={loading}>{loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Generate"}</Button>
       </div>
-      {pnl && <div className="p-4 rounded-lg bg-muted/50"><p className={`text-xl font-bold ${pnl.totalPnL >= 0 ? "text-green-500" : "text-red-500"}`}>{pnl.totalPnL >= 0 ? "+" : ""}{pnl.totalPnL?.toFixed(2)} SOL</p></div>}
+      {pnl && <div className="p-4 rounded-lg bg-white/[0.04]"><p className={`text-xl font-bold ${pnl.totalPnL >= 0 ? "text-green-500" : "text-red-500"}`}>{pnl.totalPnL >= 0 ? "+" : ""}{pnl.totalPnL?.toFixed(2)} SOL</p></div>}
     </Card>
   );
 };

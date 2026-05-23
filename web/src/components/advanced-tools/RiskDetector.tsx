@@ -107,7 +107,7 @@ export const RiskDetector = () => {
 
       {riskAnalysis && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+          <div className="flex items-center justify-between p-4 rounded-lg bg-white/[0.04]">
             <div>
               <p className="text-xs text-muted-foreground">Risk Score</p>
               <p className="text-3xl font-bold">{riskAnalysis.riskScore}</p>
@@ -124,7 +124,7 @@ export const RiskDetector = () => {
               return (
                 <div 
                   key={flag.id} 
-                  className={`p-3 rounded-lg flex items-center gap-3 ${isActive ? "bg-red-500/10 border border-red-500/20" : "bg-muted/30"}`}
+                  className={`p-3 rounded-lg flex items-center gap-3 ${isActive ? "bg-red-500/10 border border-red-500/20" : "bg-white/[0.04]"}`}
                 >
                   {isActive ? (
                     <AlertTriangle className="h-4 w-4 text-red-500" />

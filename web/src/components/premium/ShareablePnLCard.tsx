@@ -178,7 +178,7 @@ export const ShareablePnLCard = () => {
   };
 
   return (
-    <Card className="glass-card">
+    <Card className="og-glass-card">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -211,7 +211,7 @@ export const ShareablePnLCard = () => {
 
         {/* Loaded Data Preview */}
         {dataLoaded && (
-          <div className="p-4 rounded-lg bg-muted/30 space-y-3">
+          <div className="p-4 rounded-lg bg-white/[0.04] space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Portfolio Value</span>
               <span className="text-xl font-bold text-primary">${portfolioValue.toFixed(2)}</span>

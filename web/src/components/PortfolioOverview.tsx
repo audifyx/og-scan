@@ -103,7 +103,7 @@ export function PortfolioOverview({ data, walletAddress, onRefresh }: PortfolioO
       <div className="space-y-6 animate-fade-in">
         {/* Main Balance Card */}
         <div 
-          className="glass-card p-6 md:p-8 cursor-pointer hover:border-primary/50 transition-all"
+          className="og-glass-card p-6 md:p-8 cursor-pointer hover:border-primary/50 transition-all"
           onClick={() => setActiveModal('portfolio')}
         >
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -206,21 +206,21 @@ export function PortfolioOverview({ data, walletAddress, onRefresh }: PortfolioO
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-4 rounded-lg bg-muted/50">
+              <div className="p-4 rounded-lg bg-white/[0.04]">
                 <p className="text-xs text-muted-foreground">Total Value</p>
                 <p className="text-2xl font-bold text-primary">{formatUsd(data.totalUsdValue)}</p>
               </div>
-              <div className="p-4 rounded-lg bg-muted/50">
+              <div className="p-4 rounded-lg bg-white/[0.04]">
                 <p className="text-xs text-muted-foreground">SOL Price</p>
                 <p className="text-2xl font-bold">{formatUsd(data.solPrice)}</p>
               </div>
-              <div className="p-4 rounded-lg bg-muted/50">
+              <div className="p-4 rounded-lg bg-white/[0.04]">
                 <p className="text-xs text-muted-foreground">24h Change</p>
                 <p className={`text-2xl font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
                   {isPositive ? '+' : ''}{data.priceChange24h.toFixed(2)}%
                 </p>
               </div>
-              <div className="p-4 rounded-lg bg-muted/50">
+              <div className="p-4 rounded-lg bg-white/[0.04]">
                 <p className="text-xs text-muted-foreground">Wallet</p>
                 <p className="font-mono text-sm truncate">{formatAddress(walletAddress, 6)}</p>
               </div>
@@ -258,15 +258,15 @@ export function PortfolioOverview({ data, walletAddress, onRefresh }: PortfolioO
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-4 rounded-lg bg-muted/50">
+              <div className="p-4 rounded-lg bg-white/[0.04]">
                 <p className="text-xs text-muted-foreground">SOL Balance</p>
                 <p className="text-2xl font-bold">{formatNumber(data.balance, 6)} SOL</p>
               </div>
-              <div className="p-4 rounded-lg bg-muted/50">
+              <div className="p-4 rounded-lg bg-white/[0.04]">
                 <p className="text-xs text-muted-foreground">USD Value</p>
                 <p className="text-2xl font-bold text-primary">{formatUsd(data.usdValue)}</p>
               </div>
-              <div className="p-4 rounded-lg bg-muted/50 col-span-2">
+              <div className="p-4 rounded-lg bg-white/[0.04] col-span-2">
                 <p className="text-xs text-muted-foreground">Current SOL Price</p>
                 <p className="text-xl font-bold">{formatUsd(data.solPrice)}</p>
                 <p className={`text-sm ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
@@ -298,16 +298,16 @@ export function PortfolioOverview({ data, walletAddress, onRefresh }: PortfolioO
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="p-6 rounded-lg bg-muted/50 text-center">
+            <div className="p-6 rounded-lg bg-white/[0.04] text-center">
               <p className="text-5xl font-bold text-secondary">{data.tokenCount}</p>
               <p className="text-muted-foreground">Different Tokens Held</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-4 rounded-lg bg-muted/30">
+              <div className="p-4 rounded-lg bg-white/[0.04]">
                 <p className="text-xs text-muted-foreground">Portfolio Value</p>
                 <p className="font-bold text-primary">{formatUsd(data.totalUsdValue)}</p>
               </div>
-              <div className="p-4 rounded-lg bg-muted/30">
+              <div className="p-4 rounded-lg bg-white/[0.04]">
                 <p className="text-xs text-muted-foreground">SOL Balance</p>
                 <p className="font-bold">{formatNumber(data.balance, 2)} SOL</p>
               </div>
@@ -339,7 +339,7 @@ export function PortfolioOverview({ data, walletAddress, onRefresh }: PortfolioO
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="p-6 rounded-lg bg-muted/50 text-center">
+            <div className="p-6 rounded-lg bg-white/[0.04] text-center">
               <p className="text-5xl font-bold text-primary">{data.nftCount}</p>
               <p className="text-muted-foreground">NFTs Owned</p>
             </div>
@@ -362,20 +362,20 @@ export function PortfolioOverview({ data, walletAddress, onRefresh }: PortfolioO
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="p-6 rounded-lg bg-muted/50 text-center">
+            <div className="p-6 rounded-lg bg-white/[0.04] text-center">
               <p className="text-5xl font-bold text-secondary">{data.totalAssets}</p>
               <p className="text-muted-foreground">Total Assets</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-4 rounded-lg bg-muted/30 text-center">
+              <div className="p-4 rounded-lg bg-white/[0.04] text-center">
                 <p className="text-2xl font-bold">{data.tokenCount}</p>
                 <p className="text-xs text-muted-foreground">Tokens</p>
               </div>
-              <div className="p-4 rounded-lg bg-muted/30 text-center">
+              <div className="p-4 rounded-lg bg-white/[0.04] text-center">
                 <p className="text-2xl font-bold">{data.nftCount}</p>
                 <p className="text-xs text-muted-foreground">NFTs</p>
               </div>
-              <div className="p-4 rounded-lg bg-muted/30 text-center">
+              <div className="p-4 rounded-lg bg-white/[0.04] text-center">
                 <p className="text-2xl font-bold">1</p>
                 <p className="text-xs text-muted-foreground">SOL</p>
               </div>
@@ -407,7 +407,7 @@ interface StatCardProps {
 function StatCard({ icon, label, value, subValue, color, onClick }: StatCardProps) {
   return (
     <div 
-      className="glass-card p-4 md:p-5 group hover:scale-[1.02] hover:border-primary/50 transition-all duration-300 cursor-pointer"
+      className="og-glass-card p-4 md:p-5 group hover:scale-[1.02] hover:border-primary/50 transition-all duration-300 cursor-pointer"
       onClick={onClick}
     >
       <div className={`inline-flex p-2 rounded-lg mb-3 ${color === 'green' ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'}`}>

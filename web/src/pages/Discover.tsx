@@ -220,7 +220,7 @@ const Discover = () => {
             
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {(loadingTrending ? Array(4).fill(null) : trendingTokens.slice(0, 8)).map((token, i) => (
-                <Card key={i} className="glass-card hover:border-primary/20 transition-all hover:scale-[1.02] cursor-pointer group"
+                <Card key={i} className="og-glass-card hover:border-primary/20 transition-all hover:scale-[1.02] cursor-pointer group"
                   onClick={() => token && navigate(`/charts?token=${token.address}`)}>
                   <CardContent className="p-4">
                     {!token ? (
@@ -281,7 +281,7 @@ const Discover = () => {
           </div>
 
           <Tabs defaultValue="leaderboard">
-            <TabsList className="grid w-full max-w-lg grid-cols-3 bg-muted/30 p-1 rounded-xl">
+            <TabsList className="grid w-full max-w-lg grid-cols-3 bg-white/[0.04] p-1 rounded-xl">
               <TabsTrigger value="leaderboard" className="rounded-lg gap-1.5">
                 <Trophy className="h-4 w-4" /> Leaderboard
               </TabsTrigger>
@@ -312,7 +312,7 @@ const Discover = () => {
                 </Select>
               </div>
 
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardContent className="p-0">
                   <ScrollArea className="h-[500px]">
                     {loading ? (
@@ -327,7 +327,7 @@ const Discover = () => {
                     ) : (
                       <div className="divide-y divide-border/30">
                         {displayList.map((trader, index) => (
-                          <div key={trader.user_id} className="p-4 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => navigate(`/profile/${trader.user_id}`)}>
+                          <div key={trader.user_id} className="p-4 hover:bg-white/[0.03] transition-colors cursor-pointer" onClick={() => navigate(`/profile/${trader.user_id}`)}>
                             <div className="flex items-center gap-3">
                               <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
                                 index === 0 ? "bg-yellow-500 text-black" : index === 1 ? "bg-gray-400 text-black" : index === 2 ? "bg-amber-700 text-white" : "bg-muted text-muted-foreground"
@@ -362,15 +362,15 @@ const Discover = () => {
             </TabsContent>
 
             <TabsContent value="whale" className="mt-4">
-              <Card className="glass-card-premium">
+              <Card className="og-glass-card-premium">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Eye className="h-5 w-5 text-primary" /> Whale Tracking
+                    <Eye className="h-5 w-5 text-[#22d3ee]" /> Whale Tracking
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <Card className="glass-card">
+                    <Card className="og-glass-card">
                       <CardContent className="p-5 text-center">
                         <div className="p-4 rounded-2xl bg-blue-500/10 inline-flex mb-3">
                           <span className="text-4xl">🐋</span>
@@ -380,7 +380,7 @@ const Discover = () => {
                         <Badge className="bg-accent/20 text-accent border-accent/30">Active Monitoring</Badge>
                       </CardContent>
                     </Card>
-                    <Card className="glass-card">
+                    <Card className="og-glass-card">
                       <CardContent className="p-5 text-center">
                         <div className="p-4 rounded-2xl bg-purple-500/10 inline-flex mb-3">
                           <Sparkles className="h-10 w-10 text-purple-400" />
@@ -390,7 +390,7 @@ const Discover = () => {
                         <Badge className="bg-primary/20 text-primary border-primary/30">Coming Soon</Badge>
                       </CardContent>
                     </Card>
-                    <Card className="glass-card">
+                    <Card className="og-glass-card">
                       <CardContent className="p-5 text-center">
                         <div className="p-4 rounded-2xl bg-orange-500/10 inline-flex mb-3">
                           <AlertTriangle className="h-10 w-10 text-orange-400" />
@@ -400,7 +400,7 @@ const Discover = () => {
                         <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">Active</Badge>
                       </CardContent>
                     </Card>
-                    <Card className="glass-card">
+                    <Card className="og-glass-card">
                       <CardContent className="p-5 text-center">
                         <div className="p-4 rounded-2xl bg-green-500/10 inline-flex mb-3">
                           <BarChart3 className="h-10 w-10 text-green-400" />
@@ -416,7 +416,7 @@ const Discover = () => {
             </TabsContent>
 
             <TabsContent value="feed" className="mt-4">
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Zap className="h-5 w-5 text-primary animate-pulse" /> Live Activity
@@ -433,7 +433,7 @@ const Discover = () => {
                     ) : (
                       <div className="space-y-2">
                         {activities.map(activity => (
-                          <div key={activity.id} className="p-3 rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => navigate(`/profile/${activity.user_id}`)}>
+                          <div key={activity.id} className="p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.04] transition-colors cursor-pointer" onClick={() => navigate(`/profile/${activity.user_id}`)}>
                             <div className="flex items-center gap-3">
                               <div className="shrink-0">{renderAvatar(activity.avatar_url, activity.username, "sm")}</div>
                               <div className="flex-1 min-w-0">

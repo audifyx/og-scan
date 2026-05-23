@@ -42,7 +42,7 @@ export const StakingCalculator = () => {
   }, [amount, apy, duration]);
 
   return (
-    <Card className="glass-card h-full">
+    <Card className="og-glass-card h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calculator className="h-5 w-5 text-primary" />
@@ -107,7 +107,7 @@ export const StakingCalculator = () => {
           <h4 className="font-medium">Estimated Rewards</h4>
           
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-muted/30">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground mb-1">Daily</p>
               <p className="font-bold text-primary">{rewards.daily.toFixed(4)} SOL</p>
               <p className="text-xs text-muted-foreground">
@@ -115,7 +115,7 @@ export const StakingCalculator = () => {
               </p>
             </div>
             
-            <div className="p-3 rounded-lg bg-muted/30">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground mb-1">Monthly</p>
               <p className="font-bold text-primary">{rewards.monthly.toFixed(4)} SOL</p>
               <p className="text-xs text-muted-foreground">
@@ -123,7 +123,7 @@ export const StakingCalculator = () => {
               </p>
             </div>
             
-            <div className="p-3 rounded-lg bg-muted/30">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground mb-1">Yearly</p>
               <p className="font-bold text-primary">{rewards.yearly.toFixed(4)} SOL</p>
               <p className="text-xs text-muted-foreground">

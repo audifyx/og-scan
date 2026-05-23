@@ -99,7 +99,7 @@ export function TokenList({ tokens }: TokenListProps) {
 
   if (fungibleTokens.length === 0) {
     return (
-      <div className="glass-card p-8 text-center">
+      <div className="og-glass-card p-8 text-center">
         <Coins className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <p className="text-muted-foreground">No tokens found in this wallet</p>
       </div>
@@ -108,7 +108,7 @@ export function TokenList({ tokens }: TokenListProps) {
 
   return (
     <>
-      <div className="glass-card overflow-hidden animate-fade-in" style={{ animationDelay: '0.1s' }}>
+      <div className="og-glass-card overflow-hidden animate-fade-in" style={{ animationDelay: '0.1s' }}>
         <div className="p-4 md:p-6 border-b border-border">
           <h3 className="text-xl font-semibold flex items-center gap-2">
             <Coins className="h-5 w-5 text-primary" />
@@ -165,7 +165,7 @@ export function TokenList({ tokens }: TokenListProps) {
               <TabsContent value="overview" className="mt-4 space-y-4">
                 {/* Main Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+                  <div className="p-4 rounded-xl bg-white/[0.04] border border-white/[0.07]">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Coins className="h-4 w-4" />
                       <span className="text-xs">Balance</span>
@@ -178,7 +178,7 @@ export function TokenList({ tokens }: TokenListProps) {
                       )}
                     </p>
                   </div>
-                  <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+                  <div className="p-4 rounded-xl bg-white/[0.04] border border-white/[0.07]">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <DollarSign className="h-4 w-4" />
                       <span className="text-xs">Price</span>
@@ -196,7 +196,7 @@ export function TokenList({ tokens }: TokenListProps) {
                       {formatUsd(selectedToken?.token_info?.price_info?.total_price || 0)}
                     </p>
                   </div>
-                  <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+                  <div className="p-4 rounded-xl bg-white/[0.04] border border-white/[0.07]">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Shield className="h-4 w-4" />
                       <span className="text-xs">Decimals</span>
@@ -208,7 +208,7 @@ export function TokenList({ tokens }: TokenListProps) {
                 </div>
 
                 {/* Contract Info */}
-                <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+                <div className="p-4 rounded-xl bg-white/[0.04] border border-white/[0.07]">
                   <p className="text-xs text-muted-foreground mb-2">Contract Address</p>
                   <div className="flex items-center gap-2">
                     <code className="text-sm font-mono bg-background/50 px-2 py-1 rounded flex-1 truncate">
@@ -280,7 +280,7 @@ export function TokenList({ tokens }: TokenListProps) {
                     <span className="text-muted-foreground">Analyzing token on-chain data...</span>
                   </div>
                 ) : analysis ? (
-                  <div className="prose prose-invert prose-sm max-w-none bg-muted/30 rounded-xl p-4">
+                  <div className="prose prose-invert prose-sm max-w-none bg-white/[0.04] rounded-xl p-4">
                     <ReactMarkdown
                       components={{
                         h1: ({ children }) => <h1 className="text-lg font-bold text-foreground mt-4 mb-2">{children}</h1>,
@@ -308,7 +308,7 @@ export function TokenList({ tokens }: TokenListProps) {
                   href={`https://dexscreener.com/solana/${selectedToken?.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                  className="flex items-center justify-between p-4 rounded-xl bg-white/[0.04] hover:bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <TrendingUp className="h-5 w-5 text-primary" />
@@ -323,7 +323,7 @@ export function TokenList({ tokens }: TokenListProps) {
                   href={`https://solscan.io/token/${selectedToken?.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                  className="flex items-center justify-between p-4 rounded-xl bg-white/[0.04] hover:bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <Shield className="h-5 w-5 text-secondary" />
@@ -338,7 +338,7 @@ export function TokenList({ tokens }: TokenListProps) {
                   href={`https://birdeye.so/token/${selectedToken?.id}?chain=solana`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                  className="flex items-center justify-between p-4 rounded-xl bg-white/[0.04] hover:bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <Users className="h-5 w-5 text-primary" />
@@ -353,7 +353,7 @@ export function TokenList({ tokens }: TokenListProps) {
                   href={`https://rugcheck.xyz/tokens/${selectedToken?.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                  className="flex items-center justify-between p-4 rounded-xl bg-white/[0.04] hover:bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <Droplets className="h-5 w-5 text-amber-500" />

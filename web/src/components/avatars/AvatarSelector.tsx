@@ -161,7 +161,7 @@ export const AvatarSelector = ({ currentAvatar, userId, onSelect, trigger }: Ava
         </div>
 
         <Tabs defaultValue={categories[0]}>
-          <TabsList className="grid w-full grid-cols-3 bg-muted/30">
+          <TabsList className="grid w-full grid-cols-3 bg-white/[0.04]">
             {categories.map(cat => (
               <TabsTrigger key={cat} value={cat} className="text-xs">{cat}</TabsTrigger>
             ))}
@@ -178,7 +178,7 @@ export const AvatarSelector = ({ currentAvatar, userId, onSelect, trigger }: Ava
                       className={`relative flex flex-col items-center gap-1.5 p-3 rounded-2xl border transition-all hover:scale-105 active:scale-95 ${
                         selected === avatar.id 
                           ? "border-primary bg-primary/10" 
-                          : `border-border/50 bg-card/50 hover:border-primary/30 ${RARITY_GLOW[avatar.rarity]}`
+                          : `border-white/[0.07] bg-card/50 hover:border-primary/30 ${RARITY_GLOW[avatar.rarity]}`
                       }`}
                     >
                       <span className="text-3xl">{avatar.emoji}</span>

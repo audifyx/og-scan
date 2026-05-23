@@ -272,7 +272,7 @@ export const PriceAlerts = () => {
           </div>
 
           {/* Discord Integration */}
-          <div className="p-4 rounded-xl bg-muted/30 border border-border/50 space-y-4">
+          <div className="p-4 rounded-xl bg-white/[0.04] border border-white/[0.07] space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Send className="h-4 w-4 text-secondary" />

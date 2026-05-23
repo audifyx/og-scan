@@ -88,17 +88,17 @@ export const MEVTracker = () => {
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground">High Priority TXs</p>
               <p className="text-xl font-bold">{mevAnalysis.highPriorityCount}</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground">MEV Score</p>
               <p className="text-xl font-bold">{mevAnalysis.mevScore.toFixed(1)}%</p>
             </div>
           </div>
 
-          <div className="p-3 rounded-lg bg-muted/50">
+          <div className="p-3 rounded-lg bg-white/[0.04]">
             <p className="text-xs text-muted-foreground mb-2">Analysis Details</p>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">

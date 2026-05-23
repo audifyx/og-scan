@@ -127,7 +127,7 @@ export const TransferProfiler = () => {
             </div>
           </div>
 
-          <div className="p-3 rounded-lg bg-muted/50 text-center">
+          <div className="p-3 rounded-lg bg-white/[0.04] text-center">
             <p className="text-sm text-muted-foreground">{profile.total} transactions analyzed</p>
           </div>
         </div>

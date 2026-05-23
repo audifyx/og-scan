@@ -145,7 +145,7 @@ export const PortfolioComparison = () => {
   return (
     <div className="space-y-6">
       {/* Add Wallet Section */}
-      <Card className="glass-card-premium overflow-hidden relative">
+      <Card className="og-glass-card-premium overflow-hidden relative">
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
         <CardContent className="p-5">
           <div className="flex flex-col sm:flex-row gap-3">
@@ -184,7 +184,7 @@ export const PortfolioComparison = () => {
         <>
           {/* Summary Stats */}
           <div className="grid grid-cols-2 gap-4">
-            <Card className="glass-card-premium col-span-2 lg:col-span-1">
+            <Card className="og-glass-card-premium col-span-2 lg:col-span-1">
               <CardContent className="p-5">
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
@@ -198,7 +198,7 @@ export const PortfolioComparison = () => {
               </CardContent>
             </Card>
 
-            <Card className="glass-card">
+            <Card className="og-glass-card">
               <CardContent className="p-5">
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-xl bg-secondary/20">
@@ -212,7 +212,7 @@ export const PortfolioComparison = () => {
               </CardContent>
             </Card>
 
-            <Card className="glass-card">
+            <Card className="og-glass-card">
               <CardContent className="p-5">
                 <div className="flex items-center gap-3">
                   <div className={`p-3 rounded-xl ${totalPnl >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
@@ -228,7 +228,7 @@ export const PortfolioComparison = () => {
               </CardContent>
             </Card>
 
-            <Card className="glass-card">
+            <Card className="og-glass-card">
               <CardContent className="p-5">
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-xl bg-green-500/20">
@@ -247,7 +247,7 @@ export const PortfolioComparison = () => {
               </CardContent>
             </Card>
 
-            <Card className="glass-card">
+            <Card className="og-glass-card">
               <CardContent className="p-5">
                 <div className="flex items-center gap-3">
                   <div className="p-3 rounded-xl bg-red-500/20">
@@ -304,7 +304,7 @@ export const PortfolioComparison = () => {
           </div>
 
           {/* Visual Comparison Bar Chart */}
-          <Card className="glass-card">
+          <Card className="og-glass-card">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <BarChart3 className="h-5 w-5 text-primary" />
@@ -318,7 +318,7 @@ export const PortfolioComparison = () => {
                     <span className="font-medium truncate max-w-[150px]">{wallet.label}</span>
                     <span className="font-bold">{formatCurrency(wallet.totalValue)}</span>
                   </div>
-                  <div className="relative h-8 rounded-lg bg-muted/30 overflow-hidden">
+                  <div className="relative h-8 rounded-lg bg-white/[0.04] overflow-hidden">
                     <div 
                       className={`absolute left-0 top-0 h-full rounded-lg transition-all duration-500 flex items-center justify-end pr-3 ${
                         index === 0 ? 'bg-gradient-to-r from-primary to-primary/60' :
@@ -344,7 +344,7 @@ export const PortfolioComparison = () => {
           {/* Wallet Cards Grid */}
           <div className="grid grid-cols-1 gap-4">
             {wallets.map((wallet, index) => (
-              <Card key={wallet.address} className="glass-card overflow-hidden relative group">
+              <Card key={wallet.address} className="og-glass-card overflow-hidden relative group">
                 {/* Rank Badge */}
                 <div className="absolute top-3 left-3 z-10">
                   <Badge 
@@ -397,21 +397,21 @@ export const PortfolioComparison = () => {
 
                   {/* Stats */}
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 rounded-xl bg-muted/30">
+                    <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.04]">
                       <span className="text-xs text-muted-foreground flex items-center gap-2">
                         <DollarSign className="h-3.5 w-3.5" />
                         Total Value
                       </span>
                       <span className="font-bold">{formatCurrency(wallet.totalValue)}</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 rounded-xl bg-muted/30">
+                    <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.04]">
                       <span className="text-xs text-muted-foreground flex items-center gap-2">
                         <Wallet className="h-3.5 w-3.5" />
                         SOL Balance
                       </span>
                       <span className="font-semibold">{wallet.balance.toFixed(4)} SOL</span>
                     </div>
-                    <div className="flex justify-between items-center p-3 rounded-xl bg-muted/30">
+                    <div className="flex justify-between items-center p-3 rounded-xl bg-white/[0.04]">
                       <span className="text-xs text-muted-foreground flex items-center gap-2">
                         <Coins className="h-3.5 w-3.5" />
                         Tokens
@@ -432,7 +432,7 @@ export const PortfolioComparison = () => {
 
                   {/* Top Tokens */}
                   {wallet.topTokens.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-border/50">
+                    <div className="mt-4 pt-4 border-t border-white/[0.07]">
                       <p className="text-xs text-muted-foreground mb-2">Top Holdings</p>
                       <div className="space-y-2">
                         {wallet.topTokens.map((token, i) => (
@@ -452,7 +452,7 @@ export const PortfolioComparison = () => {
 
                   {/* Win Rate */}
                   {wallet.winRate && (
-                    <div className="mt-4 pt-4 border-t border-border/50">
+                    <div className="mt-4 pt-4 border-t border-white/[0.07]">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs text-muted-foreground">Win Rate</span>
                         <span className="text-sm font-semibold">{wallet.winRate.toFixed(1)}%</span>
@@ -468,9 +468,9 @@ export const PortfolioComparison = () => {
       )}
 
       {wallets.length === 0 && (
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-16 text-center">
-            <div className="w-20 h-20 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-6">
+            <div className="w-20 h-20 rounded-full bg-white/[0.04] flex items-center justify-center mx-auto mb-6">
               <Users className="h-10 w-10 text-muted-foreground" />
             </div>
             <h3 className="text-xl font-semibold mb-2">No Wallets Added</h3>

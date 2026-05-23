@@ -177,7 +177,7 @@ export const WebhookDashboard = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Send className="h-4 w-4 text-[#5865F2]" />
@@ -186,7 +186,7 @@ export const WebhookDashboard = () => {
             <p className="text-2xl font-bold">{stats.sentToday}</p>
           </CardContent>
         </Card>
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Check className="h-4 w-4 text-green-500" />
@@ -195,7 +195,7 @@ export const WebhookDashboard = () => {
             <p className="text-2xl font-bold">{stats.successRate.toFixed(0)}%</p>
           </CardContent>
         </Card>
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Wallet className="h-4 w-4 text-primary" />
@@ -204,7 +204,7 @@ export const WebhookDashboard = () => {
             <p className="text-2xl font-bold">{stats.trackedWallets}</p>
           </CardContent>
         </Card>
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Coins className="h-4 w-4 text-secondary" />
@@ -213,7 +213,7 @@ export const WebhookDashboard = () => {
             <p className="text-2xl font-bold">{stats.trackedTokens}</p>
           </CardContent>
         </Card>
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Bell className="h-4 w-4 text-yellow-500" />
@@ -222,7 +222,7 @@ export const WebhookDashboard = () => {
             <p className="text-2xl font-bold">{stats.activeAlerts}</p>
           </CardContent>
         </Card>
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Globe className="h-4 w-4 text-green-500" />
@@ -251,7 +251,7 @@ export const WebhookDashboard = () => {
               {loading ? (
                 <div className="space-y-3">
                   {[...Array(3)].map((_, i) => (
-                    <div key={i} className="p-4 rounded-lg bg-muted/50 animate-pulse">
+                    <div key={i} className="p-4 rounded-lg bg-white/[0.04] animate-pulse">
                       <div className="h-4 bg-muted rounded w-1/3 mb-2" />
                       <div className="h-6 bg-muted rounded w-1/2" />
                     </div>
@@ -268,7 +268,7 @@ export const WebhookDashboard = () => {
                   {wallets.map((wallet, i) => (
                     <div 
                       key={i} 
-                      className="p-4 rounded-lg bg-muted/30 border hover:border-primary/30 transition-colors"
+                      className="p-4 rounded-lg bg-white/[0.04] border hover:border-primary/30 transition-colors"
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -381,7 +381,7 @@ export const WebhookDashboard = () => {
                     {activities.map((activity) => (
                       <div 
                         key={activity.id} 
-                        className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-sm"
+                        className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.04] text-sm"
                       >
                         {activity.success ? (
                           <Check className="h-3 w-3 text-green-500 flex-shrink-0" />

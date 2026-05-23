@@ -88,9 +88,9 @@ const getActivityIcon = (type: string) => {
     return <ArrowDownRight className="h-4 w-4 text-red-500" />;
   }
   if (typeLower.includes('transfer')) {
-    return <Repeat className="h-4 w-4 text-secondary" />;
+    return <Repeat className="h-4 w-4 text-[#eab308]" />;
   }
-  return <Zap className="h-4 w-4 text-primary" />;
+  return <Zap className="h-4 w-4 text-[#22d3ee]" />;
 };
 
 const getActivityColor = (type: string) => {
@@ -312,12 +312,12 @@ const LiveFeed = () => {
 
           {/* Tracked Wallet Activity */}
           <TabsContent value="tracked" className="space-y-5 mt-5">
-            <Card className="glass-card-premium overflow-hidden">
+            <Card className="og-glass-card-premium overflow-hidden">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20">
-                      <Zap className="h-5 w-5 text-primary" />
+                      <Zap className="h-5 w-5 text-[#22d3ee]" />
                     </div>
                     <div>
                       <h3 className="font-bold">Tracked Wallet Activity</h3>
@@ -351,14 +351,14 @@ const LiveFeed = () => {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { icon: Zap, value: trackedWallets.length, label: "Tracked Wallets", color: "text-primary" },
+                { icon: Zap, value: trackedWallets.length, label: "Tracked Wallets", color: "text-[#22d3ee]" },
                 { icon: TrendingUp, value: activities.filter(a => a.type.toLowerCase().includes('buy')).length, label: "Buys", color: "text-green-500" },
                 { icon: ArrowDownRight, value: activities.filter(a => a.type.toLowerCase().includes('sell')).length, label: "Sells", color: "text-red-500" },
-                { icon: Clock, value: "10s", label: "Refresh Rate", color: "text-secondary" },
+                { icon: Clock, value: "10s", label: "Refresh Rate", color: "text-[#eab308]" },
               ].map((stat, i) => (
-                <Card key={i} className="glass-card">
+                <Card key={i} className="og-glass-card">
                   <CardContent className="p-4 flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-muted/50">
+                    <div className="p-2.5 rounded-xl bg-white/[0.04]">
                       <stat.icon className={`h-5 w-5 ${stat.color}`} />
                     </div>
                     <div>
@@ -371,11 +371,11 @@ const LiveFeed = () => {
             </div>
 
             {/* Activity Feed */}
-            <Card className="glass-card overflow-hidden">
-              <CardHeader className="border-b border-border/50">
+            <Card className="og-glass-card overflow-hidden">
+              <CardHeader className="border-b border-white/[0.07]">
                 <CardTitle className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20">
-                    <Zap className="h-5 w-5 text-primary" />
+                    <Zap className="h-5 w-5 text-[#22d3ee]" />
                   </div>
                   Live Activity
                   <Badge variant="outline" className="ml-2">{activities.length} transactions</Badge>
@@ -398,7 +398,7 @@ const LiveFeed = () => {
                       {activities.map((activity, index) => (
                         <div
                           key={`${activity.signature}-${index}`}
-                          className="p-4 hover:bg-muted/20 transition-all group animate-fade-in"
+                          className="p-4 hover:bg-white/[0.03] transition-all group animate-fade-in"
                           style={{ animationDelay: `${index * 30}ms` }}
                         >
                           <div className="flex items-center justify-between gap-4">
@@ -471,13 +471,13 @@ const LiveFeed = () => {
           {/* New Token Launches */}
           <TabsContent value="launches" className="space-y-5 mt-5">
             {/* Controls */}
-            <Card className="glass-card-premium overflow-hidden">
+            <Card className="og-glass-card-premium overflow-hidden">
               <CardContent className="p-5">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex flex-wrap items-center gap-3">
                     <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                      <SelectTrigger className="w-[160px] h-10 rounded-xl bg-muted/50">
-                        <Rocket className="h-4 w-4 mr-2 text-primary" />
+                      <SelectTrigger className="w-[160px] h-10 rounded-xl bg-white/[0.04]">
+                        <Rocket className="h-4 w-4 mr-2 text-[#22d3ee]" />
                         <SelectValue placeholder="Platform" />
                       </SelectTrigger>
                       <SelectContent>
@@ -490,7 +490,7 @@ const LiveFeed = () => {
                     </Select>
 
                     <Select value={filter} onValueChange={setFilter}>
-                      <SelectTrigger className="w-[140px] h-10 rounded-xl bg-muted/50">
+                      <SelectTrigger className="w-[140px] h-10 rounded-xl bg-white/[0.04]">
                         <Filter className="h-4 w-4 mr-2" />
                         <SelectValue placeholder="Filter" />
                       </SelectTrigger>
@@ -503,7 +503,7 @@ const LiveFeed = () => {
                     </Select>
 
                     <Select value={minLiquidity} onValueChange={setMinLiquidity}>
-                      <SelectTrigger className="w-[160px] h-10 rounded-xl bg-muted/50">
+                      <SelectTrigger className="w-[160px] h-10 rounded-xl bg-white/[0.04]">
                         <SelectValue placeholder="Min Liquidity" />
                       </SelectTrigger>
                       <SelectContent>
@@ -544,14 +544,14 @@ const LiveFeed = () => {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { icon: Sparkles, value: tokens.length, label: "New Tokens", color: "text-primary" },
+                { icon: Sparkles, value: tokens.length, label: "New Tokens", color: "text-[#22d3ee]" },
                 { icon: TrendingUp, value: tokens.filter((t) => t.priceChange24h > 0).length, label: "Gainers", color: "text-green-500" },
-                { icon: Clock, value: "10s", label: "Refresh Rate", color: "text-secondary" },
+                { icon: Clock, value: "10s", label: "Refresh Rate", color: "text-[#eab308]" },
                 { icon: Zap, value: filteredTokens.length, label: "Filtered", color: "text-accent" },
               ].map((stat, i) => (
-                <Card key={i} className="glass-card">
+                <Card key={i} className="og-glass-card">
                   <CardContent className="p-4 flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-muted/50">
+                    <div className="p-2.5 rounded-xl bg-white/[0.04]">
                       <stat.icon className={`h-5 w-5 ${stat.color}`} />
                     </div>
                     <div>
@@ -564,11 +564,11 @@ const LiveFeed = () => {
             </div>
 
             {/* Token Feed */}
-            <Card className="glass-card overflow-hidden">
-              <CardHeader className="border-b border-border/50">
+            <Card className="og-glass-card overflow-hidden">
+              <CardHeader className="border-b border-white/[0.07]">
                 <CardTitle className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20">
-                    <Rocket className="h-5 w-5 text-primary" />
+                    <Rocket className="h-5 w-5 text-[#22d3ee]" />
                   </div>
                   New Token Launches
                   <Badge variant="outline" className="ml-2 bg-primary/10 text-primary border-primary/30">
@@ -592,7 +592,7 @@ const LiveFeed = () => {
                       {filteredTokens.map((token, index) => (
                         <div
                           key={token.id}
-                          className="p-4 hover:bg-muted/20 transition-all group animate-fade-in"
+                          className="p-4 hover:bg-white/[0.03] transition-all group animate-fade-in"
                           style={{ animationDelay: `${index * 30}ms` }}
                         >
                           <div className="flex items-center justify-between gap-4">
