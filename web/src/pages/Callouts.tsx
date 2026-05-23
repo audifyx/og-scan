@@ -14,6 +14,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { isValidSolanaAddress } from "@/lib/solana-api";
+import { safeAvatarUrl } from "@/lib/utils";
 
 interface Callout {
   id: string;
@@ -326,8 +327,8 @@ const Callouts = () => {
                         <div className="flex items-start gap-3">
                           {/* Avatar */}
                           <div className="flex-shrink-0">
-                            {callout.avatar ? (
-                              <img src={callout.avatar} alt={callout.username} className="h-10 w-10 rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            {safeAvatarUrl(callout.avatar) ? (
+                              <img src={safeAvatarUrl(callout.avatar)} alt={callout.username} className="h-10 w-10 rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                             ) : (
                               <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-sm font-bold text-primary-foreground">
                                 {callout.username[0]?.toUpperCase()}

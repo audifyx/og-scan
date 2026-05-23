@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { safeAvatarUrl } from "@/lib/utils";
 
 interface Submission {
   id: string;
@@ -163,8 +164,8 @@ export function TokenDetailModal({
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-auto p-0">
         {/* Banner */}
         <div className="h-32 lg:h-44 bg-gradient-to-br from-primary/20 to-secondary/10 relative">
-          {token.banner_url && (
-            <img src={token.banner_url} alt="" className="w-full h-full object-cover" />
+          {safeAvatarUrl(token.banner_url) && (
+            <img src={safeAvatarUrl(token.banner_url)} alt="" className="w-full h-full object-cover" onError={e => (e.target as HTMLImageElement).style.display = "none"} />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
         </div>
@@ -172,11 +173,12 @@ export function TokenDetailModal({
         <div className="p-6 -mt-16 relative">
           {/* Header */}
           <div className="flex items-end gap-4 mb-6">
-            {token.logo_url || tokenLiveData?.imageUrl ? (
+            {safeAvatarUrl(token.logo_url) || safeAvatarUrl(tokenLiveData?.imageUrl) ? (
               <img 
-                src={token.logo_url || tokenLiveData?.imageUrl} 
+                src={safeAvatarUrl(token.logo_url) || safeAvatarUrl(tokenLiveData?.imageUrl)} 
                 alt={token.symbol} 
-                className="h-20 w-20 rounded-2xl object-cover ring-4 ring-background shadow-lg" 
+                className="h-20 w-20 rounded-2xl object-cover ring-4 ring-background shadow-lg"
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
             ) : (
               <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center font-bold text-2xl ring-4 ring-background shadow-lg">
