@@ -24,7 +24,6 @@ import {
 import { CopyMintButton } from "@/components/CopyMintButton";
 import { cn } from "@/lib/utils";
 import {
-  BIRDEYE_API_KEY,
   SOLANA_CHAIN_ID,
   dexPairsForMints,
   fmtPct,
@@ -98,6 +97,17 @@ const INFLUENCERS: Influencer[] = [
     color: "border-white/25 bg-white/5",
     dotColor: "bg-white/70",
     themes: ["bitcoin", "btc", "microstrategy", "mstr", "hodl", "digital", "gold", "saylor"],
+  },
+  {
+    id: "pumpfun",
+    name: "Pump.fun",
+    handle: "pump.fun",
+    tier: "A",
+    rssUrl:
+      "https://news.google.com/rss/search?q=pump.fun+new+coin+launch+solana+viral+trending+when:6h&hl=en-US&gl=US&ceid=US:en",
+    color: "border-og-lime/40 bg-og-lime/8",
+    dotColor: "bg-og-lime",
+    themes: ["pump", "fun", "pumpfun", "launch", "sol", "solana", "degen", "meme", "memecoin", "bonding", "curve", "migration", "viral", "trending"],
   },
   {
     id: "snoopdog",
@@ -311,6 +321,7 @@ async function fetchRssViaProxy(url: string): Promise<string | null> {
   const proxies = [
     `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
   ];
   for (const proxy of proxies) {
     try {
@@ -378,6 +389,10 @@ function buildFallbackSignals(influencer: Influencer): SignalItem[] {
       { title: "Saylor announces MicroStrategy adds more Bitcoin to reserves", keywords: ["bitcoin","btc","saylor","microstrategy","hodl","digital"] },
       { title: "Michael Saylor: Bitcoin is the only pristine collateral", keywords: ["bitcoin","btc","saylor","gold","digital","hodl"] },
     ],
+    pumpfun: [
+      { title: "New Pump.fun coin migrates to Raydium — whale alert", keywords: ["pump","fun","launch","solana","migration","degen","new"] },
+      { title: "Viral Pump.fun token trends across CT — 100x potential", keywords: ["pump","viral","trending","sol","meme","launch","degen"] },
+    ],
     snoopdog: [
       { title: "Snoop Dogg drops new NFT collection on Solana", keywords: ["snoop","dogg","nft","solana","rap","dog"] },
       { title: "Snoop partners with meme coin project, community pumps", keywords: ["snoop","dog","meme","coin","pump","nft"] },
@@ -402,6 +417,25 @@ function buildFallbackSignals(influencer: Influencer): SignalItem[] {
     catalystScore: scoreCatalyst(t.keywords, influencer),
     matchedCoins: [],
   }));
+}
+
+// ── DexScreener keyword search (free, no API key) ────────────────────────
+
+async function dexSearchByKeyword(query: string): Promise<DexSearchPair[]> {
+  if (!query || query.trim().length < 2) return [];
+  try {
+    const res = await fetch(
+      `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`,
+      { signal: AbortSignal.timeout(10_000) }
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as { pairs?: DexSearchPair[] | null };
+    return (data.pairs ?? []).filter(
+      (p) => p.chainId === SOLANA_CHAIN_ID && Boolean(p.baseToken?.address)
+    );
+  } catch {
+    return [];
+  }
 }
 
 // ── Main fetch function ────────────────────────────────────────────────────
@@ -430,9 +464,47 @@ async function fetchSignalPayload(): Promise<SignalPayload> {
     coins = coins.filter((c) => { if (seen.has(c.id)) return false; seen.add(c.id); return true; });
   }
 
+  // ── Meta-detection: keyword→DexScreener search ──────────────────────────
+  // Extract top keywords from all signals, search DexScreener for matching coins.
+  // This is what makes alien coins surface when Elon talks aliens, MAGA coins
+  // when Trump posts politics, pump.fun coins when that's trending, etc.
+  const keywordFreq = new Map<string, number>();
+  for (const sig of rawSignals) {
+    for (const kw of sig.keywords) {
+      keywordFreq.set(kw, (keywordFreq.get(kw) ?? 0) + (PUMP_KEYWORDS.has(kw) ? 3 : 1));
+    }
+  }
+  const topSearchTerms = Array.from(keywordFreq.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([k]) => k)
+    .slice(0, 8);
+
+  const dexSearchResults = await Promise.allSettled(
+    topSearchTerms.map((kw) => dexSearchByKeyword(kw))
+  );
+
+  // Merge DexScreener results into a synthetic JupTokenInfo pool
+  for (const r of dexSearchResults) {
+    if (r.status !== "fulfilled") continue;
+    for (const p of r.value.slice(0, 6)) {
+      const addr = p.baseToken?.address;
+      if (!addr || coins.some((c) => c.id === addr)) continue;
+      coins.push({
+        id: addr,
+        symbol: p.baseToken?.symbol ?? "???",
+        name: p.baseToken?.name ?? "",
+        logoURI: p.info?.imageUrl,
+        mcap: p.marketCap ?? p.fdv,
+        stats5m: { priceChange: p.priceChange?.m5 ?? 0, volume: p.volume?.m5 },
+        stats1h: { priceChange: p.priceChange?.h1 ?? 0 },
+        stats24h: { priceChange: p.priceChange?.h24 ?? 0, volume: p.volume?.h24 },
+      } as JupTokenInfo);
+    }
+  }
+
   // Fetch DEX pairs for matched mints
   const potentialMints = new Set<string>();
-  for (const coin of coins.slice(0, 60)) potentialMints.add(coin.id);
+  for (const coin of coins.slice(0, 80)) potentialMints.add(coin.id);
 
   const pairs = await dexPairsForMints(Array.from(potentialMints));
 
