@@ -12,7 +12,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       <Sidebar />
 
       {/* Main content — offset by sidebar width on desktop */}
-      <main className="flex-1 lg:ml-[260px] overflow-auto min-h-screen pt-14 lg:pt-0">
+      <main className="flex-1 lg:ml-[260px] overflow-auto min-h-screen">
         {children}
       </main>
     </div>

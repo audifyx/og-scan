@@ -1,5 +1,5 @@
 import {
-  Activity, Bell, Bot, Coins, Crown, Home, LineChart, LogOut, Menu,
+  Activity, Bell, Bot, Coins, Crown, Home, LineChart, LogOut,
   MessageSquare, Rocket, Search, Settings, Sparkles, Target, Trophy,
   TrendingUp, User, Users, Wallet, Webhook, Wrench, X, Zap, Compass,
   Globe2, Radio, Shield, Palette,
@@ -103,15 +103,6 @@ export const Sidebar = () => {
 
   return (
     <>
-      {/* Mobile hamburger (only inside the AppLayout header area) */}
-      <button
-        type="button"
-        onClick={() => setMobileOpen(true)}
-        className="fixed left-4 top-3.5 z-50 flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/60 transition hover:bg-white/[0.08] hover:text-white lg:hidden"
-      >
-        <Menu className="h-4 w-4" />
-      </button>
-
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
