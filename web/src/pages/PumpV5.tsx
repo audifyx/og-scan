@@ -629,7 +629,7 @@ const PumpV5 = () => {
                             className="mt-1 h-24 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-colors bg-muted/20"
                           >
                             {formData.logo_url ? (
-                              <img src={formData.logo_url} alt="Logo" className="h-16 w-16 rounded-xl object-cover" />
+                              <img src={formData.logo_url} alt="Logo" className="h-16 w-16 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                             ) : uploadingLogo ? (
                               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                             ) : (
@@ -654,7 +654,7 @@ const PumpV5 = () => {
                             className="mt-1 h-24 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-colors overflow-hidden bg-muted/20"
                           >
                             {formData.banner_url ? (
-                              <img src={formData.banner_url} alt="Banner" className="w-full h-full object-cover" />
+                              <img src={formData.banner_url} alt="Banner" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                             ) : uploadingBanner ? (
                               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                             ) : (
@@ -914,7 +914,7 @@ const PumpV5 = () => {
                               {index + 1}
                             </div>
                             {token.imageUrl ? (
-                              <img src={token.imageUrl} alt={token.symbol} className="h-12 w-12 rounded-xl object-cover" />
+                              <img src={token.imageUrl} alt={token.symbol} className="h-12 w-12 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                             ) : (
                               <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center font-bold">
                                 {token.symbol.slice(0, 2)}
@@ -971,7 +971,7 @@ const PumpV5 = () => {
                       >
                         <div className="h-24 bg-gradient-to-br from-yellow-500/20 to-orange-500/10 relative">
                           {token.banner_url && (
-                            <img src={token.banner_url} alt="" className="w-full h-full object-cover" />
+                            <img src={token.banner_url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0"; }} />
                           )}
                           <Badge className="absolute top-2 right-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
                             <Star className="h-3 w-3 mr-1" />
@@ -981,7 +981,7 @@ const PumpV5 = () => {
                         <CardContent className="p-4">
                           <div className="flex items-center gap-3 mb-3">
                             {token.logo_url ? (
-                              <img src={token.logo_url} alt={token.symbol} className="h-12 w-12 rounded-xl object-cover ring-2 ring-yellow-500/30" />
+                              <img src={token.logo_url} alt={token.symbol} className="h-12 w-12 rounded-xl object-cover ring-2 ring-yellow-500/30" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                             ) : (
                               <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center font-bold text-white">
                                 {token.symbol.slice(0, 2)}
@@ -1152,7 +1152,7 @@ const PumpV5 = () => {
                       }`}>
                         {token.banner_url && (
                           <>
-                            <img src={token.banner_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                            <img src={token.banner_url} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0"; }} />
                             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-card" />
                           </>
                         )}

@@ -163,7 +163,17 @@ export const renderAvatar = (avatarUrl: string | null | undefined, username?: st
 
   if (avatarUrl) {
     return (
-      <img src={avatarUrl} alt="" className={`${sizeClasses[size]} rounded-2xl object-cover`} />
+      <img
+        src={avatarUrl}
+        alt=""
+        className={`${sizeClasses[size]} rounded-2xl object-cover`}
+        onError={(e) => {
+          const el = e.target as HTMLImageElement;
+          el.style.display = "none";
+          const fallback = el.nextElementSibling as HTMLElement | null;
+          if (fallback) fallback.style.display = "flex";
+        }}
+      />
     );
   }
 

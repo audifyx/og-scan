@@ -196,7 +196,7 @@ const Charts = () => {
                       >
                         <div className="flex items-center gap-3">
                           {pair.image ? (
-                            <img src={pair.image} alt={pair.symbol} className="w-9 h-9 rounded-xl object-cover bg-muted" />
+                            <img src={pair.image} alt={pair.symbol} className="w-9 h-9 rounded-xl object-cover bg-muted" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
                           ) : (
                             <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold ${pair.category === "official" ? "bg-gradient-to-br from-primary to-secondary text-primary-foreground" : "bg-muted"}`}>{pair.symbol.slice(0, 2)}</div>
                           )}
@@ -237,7 +237,7 @@ const Charts = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {selectedToken.image ? (
-                    <img src={selectedToken.image} alt={selectedToken.symbol} className="w-10 h-10 rounded-xl object-cover bg-muted" />
+                    <img src={selectedToken.image} alt={selectedToken.symbol} className="w-10 h-10 rounded-xl object-cover bg-muted" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
                   ) : (
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${selectedToken.category === "official" ? "bg-gradient-to-br from-primary to-secondary text-primary-foreground" : "bg-muted"}`}>{selectedToken.symbol.slice(0, 2)}</div>
                   )}

@@ -439,7 +439,7 @@ const Wallets = () => {
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
                                     {token.image ? (
-                                      <img src={token.image} alt={token.symbol} className="h-10 w-10 rounded-xl object-cover" />
+                                      <img src={token.image} alt={token.symbol} className="h-10 w-10 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                                     ) : (
                                       <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-xs font-bold text-primary-foreground">{token.symbol.slice(0, 2)}</div>
                                     )}
@@ -506,7 +506,7 @@ const Wallets = () => {
                                     {/* Token Image or Type Icon */}
                                     <div className="relative shrink-0">
                                       {tx.tokenImage ? (
-                                        <img src={tx.tokenImage} alt="" className="h-10 w-10 rounded-xl object-cover" />
+                                        <img src={tx.tokenImage} alt="" className="h-10 w-10 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                                       ) : (
                                         <div className={`p-2.5 rounded-xl ${getTypeBg(tx)}`}>
                                           {getTypeIcon(tx)}

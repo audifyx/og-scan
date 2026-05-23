@@ -419,7 +419,7 @@ const Tokens = () => {
                           <div className="flex items-center gap-3">
                             <div className="relative">
                               {token.image ? (
-                                <img src={token.image} alt={token.symbol} className="w-11 h-11 rounded-xl object-cover" />
+                                <img src={token.image} alt={token.symbol} className="w-11 h-11 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                               ) : (
                                 <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center font-bold text-sm">{token.symbol.slice(0, 2)}</div>
                               )}

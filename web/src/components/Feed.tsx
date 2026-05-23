@@ -1177,7 +1177,7 @@ const FeedItemCard = memo(({ item, onSelectCoin }: { item: FeedItem; onSelectCoi
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     {coin.imageUrl && (
-                      <img src={coin.imageUrl} alt={coin.symbol} className="h-6 w-6 shrink-0 rounded-full object-cover" loading="lazy" />
+                      <img src={coin.imageUrl} alt={coin.symbol} className="h-6 w-6 shrink-0 rounded-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                     )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">

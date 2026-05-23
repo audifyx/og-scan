@@ -460,7 +460,7 @@ const Admin = () => {
                           <TableRow key={s.id}>
                             <TableCell>
                               <div className="flex items-center gap-3">
-                                {s.logo_url ? <img src={s.logo_url} alt="" className="h-8 w-8 rounded-lg object-cover" /> : <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-xs font-bold">{s.symbol.slice(0, 2)}</div>}
+                                {s.logo_url ? <img src={s.logo_url} alt="" className="h-8 w-8 rounded-lg object-cover" onError={(e) => { const el = e.target as HTMLImageElement; el.style.display = "none"; }} /> : <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-xs font-bold">{s.symbol.slice(0, 2)}</div>}
                                 <div><p className="font-medium">{s.token_name}</p><p className="text-xs text-muted-foreground">${s.symbol}</p></div>
                               </div>
                             </TableCell>

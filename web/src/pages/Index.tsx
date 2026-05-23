@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Activity,
   ArrowUpRight,
+  Bell,
+  Bot,
   ChevronRight,
   Coins,
   Compass,
   Cpu,
+  Crown,
   Crosshair,
   Flame,
   Gauge,
@@ -14,20 +17,27 @@ import {
   Home,
   Layers3,
   LayoutGrid,
+  LineChart,
   Map,
   Menu,
+  MessageSquare,
   Radar,
   Radio,
   Rocket,
   Rss,
   Search,
+  Settings,
   ShieldCheck,
   Sparkles,
   Star,
   Target,
   TrendingUp,
+  Trophy,
   Users,
+  User,
   Wallet,
+  Webhook,
+  Wrench,
   X,
   Zap,
 } from "lucide-react";
@@ -494,6 +504,40 @@ const Index = () => {
   );
 };
 
+/* ─── External nav link (navigates to a proper route, not a tab) ─── */
+type ExternalNavItem = {
+  to: string;
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  eyebrow: string;
+};
+
+const ExternalNavLink = ({ item, currentPath, onClose }: { item: ExternalNavItem; currentPath: string; onClose: () => void }) => {
+  const isActive = currentPath === item.to || currentPath.startsWith(item.to + "/");
+  return (
+    <Link
+      to={item.to}
+      onClick={onClose}
+      className={cn(
+        "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
+        isActive ? "bg-white/[0.09] text-white" : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
+      )}
+    >
+      <span className={cn(
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition",
+        isActive ? "border-og-cyan/40 bg-og-cyan/10 text-og-cyan" : "border-white/10 bg-white/[0.04]",
+      )}>
+        <item.icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-semibold leading-tight">{item.label}</span>
+        <span className="block truncate text-[10px] text-white/35">{item.eyebrow}</span>
+      </span>
+      {isActive && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-cyan" />}
+    </Link>
+  );
+};
+
 /* ─── Sidebar ─── */
 const AppSidebar = ({
   activeId,
@@ -510,10 +554,33 @@ const AppSidebar = ({
   onChangeMint: () => void;
   onNavigate: (t: string) => void;
 }) => {
+  const location = useLocation();
   const groups: { key: TabGroup; label: string }[] = [
     { key: "Forensics", label: "Forensics" },
     { key: "Market", label: "Market" },
     { key: "Project", label: "Project" },
+  ];
+
+  const solToolsItems: ExternalNavItem[] = [
+    { to: "/wallets",        icon: Wallet,       label: "Wallets",         eyebrow: "Tracked wallets" },
+    { to: "/tokens",         icon: Coins,        label: "Tokens",          eyebrow: "Token tracker" },
+    { to: "/charts",         icon: LineChart,    label: "Charts",          eyebrow: "Live charts" },
+    { to: "/alpha-chat",     icon: Bot,          label: "Alpha Chat",      eyebrow: "AI assistant" },
+    { to: "/live-trading",   icon: TrendingUp,   label: "Live Trading",    eyebrow: "P&L · Signals" },
+    { to: "/callouts",       icon: Bell,         label: "Callouts",        eyebrow: "Trade alerts" },
+    { to: "/trading-lobbies",icon: MessageSquare,label: "Trading Lobbies", eyebrow: "Voice + charts" },
+    { to: "/leaderboard",    icon: Trophy,       label: "Leaderboard",     eyebrow: "Top traders" },
+    { to: "/advanced-tools", icon: Wrench,       label: "Advanced Tools",  eyebrow: "30+ pro tools" },
+    { to: "/pumpv5",         icon: Rocket,       label: "Launch Pad",      eyebrow: "Token listings" },
+    { to: "/webhooks",       icon: Webhook,      label: "Webhooks",        eyebrow: "Push alerts" },
+    { to: "/notifications",  icon: Bell,         label: "Notifications",   eyebrow: "Your alerts" },
+    { to: "/premium",        icon: Crown,        label: "Premium",         eyebrow: "Pro · AI · P&L" },
+  ];
+
+  const accountItems: ExternalNavItem[] = [
+    { to: "/profile",        icon: User,         label: "Profile",         eyebrow: "Your account" },
+    { to: "/settings",       icon: Settings,     label: "Settings",        eyebrow: "Preferences" },
+    { to: "/credits",        icon: Coins,        label: "Credits",         eyebrow: "Balance" },
   ];
 
   return (
@@ -568,6 +635,26 @@ const AppSidebar = ({
             </div>
           );
         })}
+
+        {/* SolTools Features */}
+        <div className="mb-1 mt-4">
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">SolTools Features</p>
+          <div className="space-y-0.5">
+            {solToolsItems.map((item) => (
+              <ExternalNavLink key={item.to} item={item} currentPath={location.pathname} onClose={onClose} />
+            ))}
+          </div>
+        </div>
+
+        {/* Account */}
+        <div className="mb-4 mt-4">
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Account</p>
+          <div className="space-y-0.5">
+            {accountItems.map((item) => (
+              <ExternalNavLink key={item.to} item={item} currentPath={location.pathname} onClose={onClose} />
+            ))}
+          </div>
+        </div>
       </nav>
 
       {/* Active mint */}
@@ -587,7 +674,11 @@ const AppSidebar = ({
 
       {/* Pro features callout */}
       <div className="border-t border-white/[0.07] px-3 pb-4 pt-3">
-        <div className="flex items-center gap-3 rounded-xl border border-og-lime/25 bg-og-lime/8 px-3 py-3">
+        <Link
+          to="/premium"
+          onClick={onClose}
+          className="flex items-center gap-3 rounded-xl border border-og-lime/25 bg-og-lime/8 px-3 py-3 transition hover:border-og-lime/40 hover:bg-og-lime/12"
+        >
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-og-lime/40 bg-og-lime/15">
             <Sparkles className="h-4 w-4 text-og-lime" />
           </div>
@@ -598,7 +689,7 @@ const AppSidebar = ({
           <div className="h-4 w-4 shrink-0">
             <div className="h-2 w-2 rounded-full bg-og-lime shadow-[0_0_8px_hsl(var(--og-lime))]" />
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Token CA */}

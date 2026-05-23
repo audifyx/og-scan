@@ -244,7 +244,7 @@ const TradingLobbies = () => {
               {activeMembers.slice(0, 5).map(m => (
                 <div key={m.id} className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-accent border-2 border-card flex items-center justify-center text-primary-foreground text-[8px] font-bold">
                   {m.avatar_url ? (
-                    <img src={m.avatar_url} className="w-full h-full rounded-full object-cover" alt="" />
+                    <img src={m.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${m.user_id}`} className="w-full h-full rounded-full object-cover" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=fallback`; }} />
                   ) : (
                     m.username?.charAt(0).toUpperCase() || "?"
                   )}
@@ -470,7 +470,7 @@ const TradingLobbies = () => {
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-primary/20 via-accent/10 to-transparent" />
               <div className="flex items-start gap-3">
                 <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/15 flex items-center justify-center shrink-0">
-                  <img src={lobby.creator_avatar || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${lobby.name}`} className="w-8 h-8 rounded-lg" alt="" />
+                  <img src={lobby.creator_avatar || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${lobby.name}`} className="w-8 h-8 rounded-lg" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(lobby.name)}`; }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -530,7 +530,7 @@ const MembersPanel = ({ members, creatorId }: { members: LobbyMember[]; creatorI
         <div key={m.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground text-xs font-bold">
             {m.avatar_url ? (
-              <img src={m.avatar_url} className="w-full h-full rounded-full object-cover" alt="" />
+              <img src={m.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${m.user_id}`} className="w-full h-full rounded-full object-cover" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=fallback`; }} />
             ) : (
               m.username?.charAt(0).toUpperCase() || "?"
             )}

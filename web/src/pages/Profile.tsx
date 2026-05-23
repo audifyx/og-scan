@@ -1225,7 +1225,7 @@ const SocialTab = ({ targetUserId, isOwnProfile }: { targetUserId: string; isOwn
               <div key={person.user_id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/10 transition-colors group">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground text-sm font-bold overflow-hidden shrink-0">
                   {person.avatar_url ? (
-                    <img src={person.avatar_url} className="w-full h-full rounded-full object-cover" alt="" />
+                    <img src={person.avatar_url} className="w-full h-full rounded-full object-cover" alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   ) : (
                     (person.username || "?")[0].toUpperCase()
                   )}

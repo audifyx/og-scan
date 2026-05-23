@@ -233,7 +233,7 @@ const Discover = () => {
                       <>
                         <div className="flex items-center gap-2 mb-3">
                           {token.imageUrl ? (
-                            <img src={token.imageUrl} alt="" className="h-8 w-8 rounded-xl object-cover" />
+                            <img src={token.imageUrl} alt="" className="h-8 w-8 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                           ) : (
                             <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xs font-bold">
                               {token.symbol?.charAt(0)}
