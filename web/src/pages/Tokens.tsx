@@ -256,16 +256,16 @@ const Tokens = () => {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { icon: Eye, value: trackedTokens.length, label: "Watching", color: "text-primary", bg: "from-primary/20 to-primary/5" },
+            { icon: Eye, value: trackedTokens.length, label: "Watching", color: "text-[#22d3ee]", bg: "from-primary/20 to-primary/5" },
             { icon: Star, value: trackedTokens.filter(t => t.isFavorite).length, label: "Favorites", color: "text-yellow-500", bg: "from-yellow-500/20 to-yellow-500/5" },
             { icon: TrendingUp, value: trendingTokens.filter(t => t.priceChange24h > 0).length, label: "Gainers", color: "text-green-500", bg: "from-green-500/20 to-green-500/5" },
-            { icon: BarChart3, value: trendingTokens.length, label: "Trending", color: "text-secondary", bg: "from-secondary/20 to-secondary/5" },
+            { icon: BarChart3, value: trendingTokens.length, label: "Trending", color: "text-[#eab308]", bg: "from-secondary/20 to-secondary/5" },
           ].map((s, i) => (
-            <Card key={i} className="glass-card-premium overflow-hidden">
+            <Card key={i} className="og-glass-card-premium overflow-hidden">
               <CardContent className="p-5">
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-2xl bg-gradient-to-br ${s.bg}`}><s.icon className={`h-6 w-6 ${s.color}`} /></div>
-                  <div><p className="text-3xl font-bold">{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
+                  <div><p className="text-3xl font-bold">{s.value}</p><p className="text-xs text-white/40">{s.label}</p></div>
                 </div>
               </CardContent>
             </Card>
@@ -273,17 +273,17 @@ const Tokens = () => {
         </div>
 
         {/* Controls */}
-        <Card className="glass-card-premium overflow-hidden border-primary/10">
+        <Card className="og-glass-card-premium overflow-hidden border-primary/10">
           <CardContent className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20"><Search className="h-5 w-5 text-primary" /></div>
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20"><Search className="h-5 w-5 text-[#22d3ee]" /></div>
                 <Input
                   placeholder="Search or paste token address..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
-                  className="flex-1 bg-muted/30 border-border/50 rounded-xl"
+                  className="flex-1 bg-muted/30 border-white/[0.07] rounded-xl"
                 />
                 {searchQuery.length >= 32 && (
                   <Button size="sm" onClick={handleSearchSubmit} className="rounded-xl"><Plus className="h-4 w-4 mr-1" />Add</Button>
@@ -291,7 +291,7 @@ const Tokens = () => {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <Select value={filter} onValueChange={setFilter}>
-                  <SelectTrigger className="w-[130px] rounded-xl bg-muted/50"><Filter className="h-4 w-4 mr-2" /><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[130px] rounded-xl bg-white/[0.04]"><Filter className="h-4 w-4 mr-2" /><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Tokens</SelectItem>
                     <SelectItem value="gainers">Gainers</SelectItem>
@@ -300,7 +300,7 @@ const Tokens = () => {
                   </SelectContent>
                 </Select>
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[140px] rounded-xl bg-muted/50"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[140px] rounded-xl bg-white/[0.04]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="marketCap">Market Cap</SelectItem>
                     <SelectItem value="volume">Volume</SelectItem>
@@ -321,16 +321,16 @@ const Tokens = () => {
         </Card>
 
         <Tabs defaultValue="trending" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 bg-muted/50">
+          <TabsList className="grid w-full max-w-md grid-cols-2 bg-white/[0.04]">
             <TabsTrigger value="trending" className="gap-2"><TrendingUp className="h-4 w-4" />Trending</TabsTrigger>
             <TabsTrigger value="watchlist" className="gap-2"><Star className="h-4 w-4" />Watchlist ({trackedTokens.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="trending" className="mt-4">
-            <Card className="glass-card overflow-hidden">
-              <CardHeader className="border-b border-border/50 pb-4">
+            <Card className="og-glass-card overflow-hidden">
+              <CardHeader className="border-b border-white/[0.07] pb-4">
                 <CardTitle className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20"><Coins className="h-5 w-5 text-primary" /></div>
+                  <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20"><Coins className="h-5 w-5 text-[#22d3ee]" /></div>
                   Live Token Feed
                   <Badge variant="outline" className="ml-2 bg-primary/10 text-primary border-primary/30">{filteredTrending.length} tokens</Badge>
                 </CardTitle>
@@ -340,11 +340,11 @@ const Tokens = () => {
                   {loadingTrending ? (
                     <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent" /></div>
                   ) : filteredTrending.length === 0 ? (
-                    <div className="text-center py-16"><Coins className="h-12 w-12 text-muted-foreground mx-auto mb-4" /><p className="text-muted-foreground">No tokens match your filters</p></div>
+                    <div className="text-center py-16"><Coins className="h-12 w-12 text-muted-foreground mx-auto mb-4" /><p className="text-white/40">No tokens match your filters</p></div>
                   ) : (
                     <div className="divide-y divide-border/50">
                       {filteredTrending.map((token) => (
-                        <div key={token.address} className="p-4 hover:bg-muted/20 transition-all cursor-pointer group" onClick={() => handleTokenClick(token.address)}>
+                        <div key={token.address} className="p-4 hover:bg-white/[0.04] transition-all cursor-pointer group" onClick={() => handleTokenClick(token.address)}>
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               {token.image ? (
@@ -374,11 +374,11 @@ const Tokens = () => {
                               </div>
                               <div className="hidden md:block text-right min-w-[80px]">
                                 <p className="text-sm font-medium">{formatNumber(token.marketCap)}</p>
-                                <p className="text-xs text-muted-foreground">MCap</p>
+                                <p className="text-xs text-white/40">MCap</p>
                               </div>
                               <div className="hidden md:block text-right min-w-[80px]">
                                 <p className="text-sm font-medium">{formatNumber(token.liquidity)}</p>
-                                <p className="text-xs text-muted-foreground">Liq</p>
+                                <p className="text-xs text-white/40">Liq</p>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); addToken({ address: token.address, name: token.name, symbol: token.symbol }); }}>
@@ -401,11 +401,11 @@ const Tokens = () => {
 
           <TabsContent value="watchlist" className="mt-4">
             {trackedTokens.length === 0 ? (
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardContent className="py-16 text-center">
                   <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="font-semibold mb-2">No tokens in watchlist</h3>
-                  <p className="text-sm text-muted-foreground">Add tokens from the trending tab or paste a token address above</p>
+                  <p className="text-sm text-white/40">Add tokens from the trending tab or paste a token address above</p>
                 </CardContent>
               </Card>
             ) : (
@@ -413,7 +413,7 @@ const Tokens = () => {
                 {trackedTokens
                   .sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0))
                   .map((token) => (
-                    <Card key={token.address} className="glass-card group hover:border-primary/30 transition-all cursor-pointer" onClick={() => handleTokenClick(token.address)}>
+                    <Card key={token.address} className="og-glass-card group hover:border-primary/30 transition-all cursor-pointer" onClick={() => handleTokenClick(token.address)}>
                       <CardContent className="p-5">
                         <div className="flex items-start justify-between gap-3 mb-4">
                           <div className="flex items-center gap-3">
@@ -437,16 +437,16 @@ const Tokens = () => {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">Price</span><span className="font-semibold">{token.price !== undefined ? formatPrice(token.price) : <span className="text-muted-foreground text-xs">Loading...</span>}</span></div>
-                          <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">24h</span>
+                          <div className="flex items-center justify-between"><span className="text-xs text-white/40">Price</span><span className="font-semibold">{token.price !== undefined ? formatPrice(token.price) : <span className="text-muted-foreground text-xs">Loading...</span>}</span></div>
+                          <div className="flex items-center justify-between"><span className="text-xs text-white/40">24h</span>
                             {token.priceChange24h !== undefined ? (
                               <Badge className={(token.priceChange24h || 0) >= 0 ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"}>
                                 {(token.priceChange24h || 0) >= 0 ? "+" : ""}{(token.priceChange24h || 0).toFixed(2)}%
                               </Badge>
-                            ) : <span className="text-xs text-muted-foreground">Loading...</span>}
+                            ) : <span className="text-xs text-white/40">Loading...</span>}
                           </div>
-                          <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">MCap</span><span className="text-sm">{token.marketCap !== undefined ? formatNumber(token.marketCap) : <span className="text-muted-foreground text-xs">Loading...</span>}</span></div>
-                          <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">Liq</span><span className="text-sm">{token.liquidity !== undefined ? formatNumber(token.liquidity) : <span className="text-muted-foreground text-xs">Loading...</span>}</span></div>
+                          <div className="flex items-center justify-between"><span className="text-xs text-white/40">MCap</span><span className="text-sm">{token.marketCap !== undefined ? formatNumber(token.marketCap) : <span className="text-muted-foreground text-xs">Loading...</span>}</span></div>
+                          <div className="flex items-center justify-between"><span className="text-xs text-white/40">Liq</span><span className="text-sm">{token.liquidity !== undefined ? formatNumber(token.liquidity) : <span className="text-muted-foreground text-xs">Loading...</span>}</span></div>
                         </div>
                         <div className="flex gap-2 mt-4">
                           <Button variant="default" size="sm" className="flex-1 rounded-xl h-9"><Shield className="h-4 w-4 mr-2" />Analyze</Button>

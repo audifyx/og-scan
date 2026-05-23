@@ -46,8 +46,8 @@ const Credits = () => {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center h-full gap-4">
-          <Wallet className="h-16 w-16 text-muted-foreground" />
-          <p className="text-muted-foreground">Please sign in to view credits</p>
+          <Wallet className="h-16 w-16 text-white/40" />
+          <p className="text-white/40">Please sign in to view credits</p>
         </div>
       </AppLayout>
     );
@@ -66,11 +66,11 @@ const Credits = () => {
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'AI Tasks': return <Zap className="h-4 w-4 text-primary" />;
-      case 'Visual & Media': return <Image className="h-4 w-4 text-secondary" />;
-      case 'Discovery & Tracking': return <Search className="h-4 w-4 text-accent" />;
+      case 'AI Tasks': return <Zap className="h-4 w-4 text-[#22d3ee]" />;
+      case 'Visual & Media': return <Image className="h-4 w-4 text-[#eab308]" />;
+      case 'Discovery & Tracking': return <Search className="h-4 w-4 text-[#22d3ee]" />;
       case 'Trading': return <BarChart3 className="h-4 w-4 text-purple-500" />;
-      default: return <Coins className="h-4 w-4 text-muted-foreground" />;
+      default: return <Coins className="h-4 w-4 text-white/40" />;
     }
   };
 
@@ -104,7 +104,7 @@ const Credits = () => {
 
       <div className="p-4 lg:p-6 space-y-6">
         {/* Hero Balance Card */}
-        <Card className="glass-card-premium overflow-hidden relative">
+        <Card className="og-glass-card-premium overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/5 to-transparent" />
           <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-[150px]" />
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
@@ -145,7 +145,7 @@ const Credits = () => {
                   </span>
                 )}
               </div>
-              <div className="h-4 rounded-full bg-muted/50 overflow-hidden">
+              <div className="h-4 rounded-full bg-white/[0.04] overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-primary via-secondary to-accent rounded-full transition-all duration-700 relative overflow-hidden"
                   style={{ width: `${percentage}%` }}
@@ -159,14 +159,14 @@ const Credits = () => {
 
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="glass-card hover:border-primary/30 transition-colors">
+          <Card className="og-glass-card hover:border-primary/30 transition-colors">
             <CardContent className="p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2.5 rounded-xl bg-accent/20">
-                  <Clock className="h-5 w-5 text-accent" />
+                  <Clock className="h-5 w-5 text-[#22d3ee]" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground">Usable Cap Left</p>
+                  <p className="text-xs text-white/40">Usable Cap Left</p>
                   <p className="text-2xl font-bold">{formatBalance(dailyRemaining)}</p>
                 </div>
               </div>
@@ -174,16 +174,16 @@ const Credits = () => {
             </CardContent>
           </Card>
 
-          <Card className="glass-card hover:border-secondary/30 transition-colors">
+          <Card className="og-glass-card hover:border-secondary/30 transition-colors">
             <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-secondary/20">
-                  <Calendar className="h-5 w-5 text-secondary" />
+                  <Calendar className="h-5 w-5 text-[#eab308]" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Renews In</p>
+                  <p className="text-xs text-white/40">Renews In</p>
                   <p className="text-2xl font-bold">{daysUntilReset} days</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-white/40">
                     {credits.next_reset_at ? format(new Date(credits.next_reset_at), 'MMM d') : ''}
                   </p>
                 </div>
@@ -191,28 +191,28 @@ const Credits = () => {
             </CardContent>
           </Card>
 
-          <Card className="glass-card hover:border-destructive/30 transition-colors">
+          <Card className="og-glass-card hover:border-destructive/30 transition-colors">
             <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-destructive/20">
                   <TrendingDown className="h-5 w-5 text-destructive" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Used This Month</p>
+                  <p className="text-xs text-white/40">Used This Month</p>
                   <p className="text-2xl font-bold font-mono">{formatBalance(credits.used_credits)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="glass-card hover:border-purple-500/30 transition-colors">
+          <Card className="og-glass-card hover:border-purple-500/30 transition-colors">
             <CardContent className="p-5">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-purple-500/20">
                   <Flame className="h-5 w-5 text-purple-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Weekly Usage</p>
+                  <p className="text-xs text-white/40">Weekly Usage</p>
                   <p className="text-2xl font-bold font-mono">{formatBalance(weeklyTotal)}</p>
                 </div>
               </div>
@@ -238,10 +238,10 @@ const Credits = () => {
           </TabsList>
 
           <TabsContent value="history" className="mt-6">
-            <Card className="glass-card">
+            <Card className="og-glass-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-primary" />
+                  <History className="h-5 w-5 text-[#22d3ee]" />
                   Transaction History
                 </CardTitle>
                 <CardDescription>{transactions.length} transactions this month</CardDescription>
@@ -249,7 +249,7 @@ const Credits = () => {
               <CardContent>
                 <ScrollArea className="h-[500px]">
                   {transactions.length === 0 ? (
-                    <div className="text-center py-16 text-muted-foreground">
+                    <div className="text-center py-16 text-white/40">
                       <Clock className="h-12 w-12 mx-auto mb-3 opacity-40" />
                       <p className="font-medium">No transactions yet</p>
                       <p className="text-sm mt-1">Your usage history will appear here</p>
@@ -259,7 +259,7 @@ const Credits = () => {
                       {transactions.map((tx) => (
                         <div 
                           key={tx.id}
-                          className="flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors group"
+                          className="flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-white/[0.04] transition-colors group"
                         >
                           <div className="flex items-center gap-4">
                             <div className="p-2.5 rounded-xl bg-destructive/10">
@@ -269,7 +269,7 @@ const Credits = () => {
                               <p className="font-medium">{tx.tool_name}</p>
                               <div className="flex items-center gap-2 mt-1">
                                 <Badge variant="secondary" className="text-[10px] px-2">{tx.tool_category}</Badge>
-                                <span className="text-xs text-muted-foreground">{format(new Date(tx.created_at), 'MMM d, h:mm a')}</span>
+                                <span className="text-xs text-white/40">{format(new Date(tx.created_at), 'MMM d, h:mm a')}</span>
                               </div>
                             </div>
                           </div>
@@ -287,10 +287,10 @@ const Credits = () => {
 
           <TabsContent value="breakdown" className="mt-6">
             <div className="grid lg:grid-cols-2 gap-6">
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Award className="h-5 w-5 text-primary" />
+                    <Award className="h-5 w-5 text-[#22d3ee]" />
                     Top Tools by Usage
                   </CardTitle>
                 </CardHeader>
@@ -313,7 +313,7 @@ const Credits = () => {
                             <div className="flex-1">
                               <div className="flex items-center justify-between mb-1">
                                 <span className="font-medium">{name}</span>
-                                <span className="text-sm font-mono text-muted-foreground">
+                                <span className="text-sm font-mono text-white/40">
                                   {formatCreditCost(data.cost)} ({data.count}x)
                                 </span>
                               </div>
@@ -327,10 +327,10 @@ const Credits = () => {
                 </CardContent>
               </Card>
 
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-primary" />
+                    <Calendar className="h-5 w-5 text-[#22d3ee]" />
                     Daily Usage
                   </CardTitle>
                 </CardHeader>
@@ -342,13 +342,13 @@ const Credits = () => {
                       return (
                         <div key={day} className={`flex items-center justify-between p-3 rounded-xl ${isToday ? 'bg-primary/10 border border-primary/20' : 'bg-muted/30'}`}>
                           <div className="flex items-center gap-3">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <Calendar className="h-4 w-4 text-white/40" />
                             <span className="text-sm font-medium">
                               {isToday ? 'Today' : format(new Date(day), 'MMM d')}
                             </span>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-xs text-muted-foreground">{txs.length} txns</span>
+                            <span className="text-xs text-white/40">{txs.length} txns</span>
                             <Badge variant={isToday ? "default" : "outline"} className="font-mono">
                               {formatCreditCost(dayTotal)}
                             </Badge>
@@ -363,10 +363,10 @@ const Credits = () => {
           </TabsContent>
 
           <TabsContent value="pricing" className="mt-6">
-            <Card className="glass-card">
+            <Card className="og-glass-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Coins className="h-5 w-5 text-primary" />
+                  <Coins className="h-5 w-5 text-[#22d3ee]" />
                   Credit Pricing
                 </CardTitle>
                 <CardDescription>Cost breakdown for all tools and features</CardDescription>
@@ -383,9 +383,9 @@ const Credits = () => {
                         </div>
                         <div className="grid gap-2">
                           {tools.map((tool) => (
-                            <div key={tool.key} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
+                            <div key={tool.key} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-white/[0.04] transition-colors">
                               <div className="flex items-center gap-3">
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                <ChevronRight className="h-4 w-4 text-white/40" />
                                 <p className="font-medium">{tool.name}</p>
                               </div>
                               <Badge className="font-mono bg-primary/10 text-primary border-primary/20">

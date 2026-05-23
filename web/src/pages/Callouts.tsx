@@ -284,14 +284,14 @@ const Callouts = () => {
 
       <div className="flex flex-col h-[calc(100vh-180px)]">
         {/* Stats Bar */}
-        <div className="p-4 lg:px-6 border-b border-border/50">
+        <div className="p-4 lg:px-6 border-b border-white/[0.07]">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Coins className="h-4 w-4 text-primary" />
+              <Coins className="h-4 w-4 text-[#22d3ee]" />
               <span className="text-sm font-medium">{tokenCount} Tokens</span>
             </div>
             <div className="flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-secondary" />
+              <Wallet className="h-4 w-4 text-[#eab308]" />
               <span className="text-sm font-medium">{walletCount} Wallets</span>
             </div>
             <div className="flex-1" />
@@ -307,13 +307,13 @@ const Callouts = () => {
 
         {/* Callouts Feed */}
         <div className="flex-1 p-4 lg:p-6 overflow-hidden">
-          <Card className="glass-card h-full">
+          <Card className="og-glass-card h-full">
             <CardContent className="p-0 h-full">
               <ScrollArea className="h-full" ref={scrollRef}>
                 {filteredCallouts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-center">
                     <div className="p-5 rounded-full bg-primary/10 mb-4">
-                      <Sparkles className="h-10 w-10 text-primary" />
+                      <Sparkles className="h-10 w-10 text-[#22d3ee]" />
                     </div>
                     <h3 className="text-lg font-semibold mb-2">No callouts yet</h3>
                     <p className="text-sm text-muted-foreground max-w-sm">
@@ -356,9 +356,9 @@ const Callouts = () => {
                                   <div className="flex items-center gap-3">
                                     <div className={`p-2.5 rounded-xl ${callout.type === 'token' ? 'bg-primary/20' : 'bg-secondary/20'}`}>
                                       {callout.type === 'token' ? (
-                                        <Coins className="h-5 w-5 text-primary" />
+                                        <Coins className="h-5 w-5 text-[#22d3ee]" />
                                       ) : (
-                                        <Wallet className="h-5 w-5 text-secondary" />
+                                        <Wallet className="h-5 w-5 text-[#eab308]" />
                                       )}
                                     </div>
                                     <div>
@@ -451,7 +451,7 @@ const Callouts = () => {
         </div>
 
         {/* Input Area */}
-        <div className="p-4 lg:px-6 border-t border-border/50 bg-card/50 backdrop-blur-xl">
+        <div className="p-4 lg:px-6 border-t border-white/[0.07] bg-card/50 backdrop-blur-xl">
           <div className="flex gap-3 max-w-4xl mx-auto">
             <div className="flex-1 relative">
               <Zap className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -460,7 +460,7 @@ const Callouts = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && analyzeAndPost()}
-                className="pl-12 h-12 text-base rounded-xl bg-muted/30 border-border/50 focus:border-primary"
+                className="pl-12 h-12 text-base rounded-xl bg-muted/30 border-white/[0.07] focus:border-primary"
                 disabled={analyzing}
               />
             </div>

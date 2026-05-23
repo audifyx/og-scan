@@ -142,16 +142,16 @@ const Charts = () => {
 
       <div className="p-4 lg:p-6 space-y-5">
         {/* Search */}
-        <Card className="glass-card-premium overflow-hidden">
+        <Card className="og-glass-card-premium overflow-hidden">
           <CardContent className="p-5">
             <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/10 border border-primary/10"><BarChart3 className="h-5 w-5 text-primary" /></div>
-              <div><h3 className="font-bold text-lg">Token Charts</h3><p className="text-sm text-muted-foreground">Enter any Solana token address for live chart</p></div>
+              <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/10 border border-primary/10"><BarChart3 className="h-5 w-5 text-[#22d3ee]" /></div>
+              <div><h3 className="font-bold text-lg">Token Charts</h3><p className="text-sm text-white/40">Enter any Solana token address for live chart</p></div>
             </div>
             <div className="flex gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search by name or paste contract address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} className="pl-11 h-12 bg-muted/40 border-border/50 rounded-xl text-base" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Input placeholder="Search by name or paste contract address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} className="pl-11 h-12 bg-muted/40 border-white/[0.07] rounded-xl text-base" />
               </div>
               <Button onClick={handleSearch} className="h-12 px-6 rounded-xl font-medium btn-premium">Load Chart</Button>
             </div>
@@ -162,18 +162,18 @@ const Charts = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { icon: Activity, value: "Real-time", label: "Data", color: "text-accent" },
-            { icon: Sparkles, value: pairs.length, label: "Pairs", color: "text-primary" },
+            { icon: Sparkles, value: pairs.length, label: "Pairs", color: "text-[#22d3ee]" },
             { icon: Star, value: favorites.length, label: "Favorites", color: "text-yellow-500" },
             { icon: Zap, value: customPairs.length, label: "Custom", color: "text-secondary" },
           ].map((stat, i) => (
-            <Card key={i} className="glass-card"><CardContent className="p-4 flex items-center gap-3"><div className="p-2.5 rounded-xl bg-muted/50"><stat.icon className={`h-5 w-5 ${stat.color}`} /></div><div><p className="text-xl font-bold">{stat.value}</p><p className="text-xs text-muted-foreground">{stat.label}</p></div></CardContent></Card>
+            <Card key={i} className="og-glass-card"><CardContent className="p-4 flex items-center gap-3"><div className="p-2.5 rounded-xl bg-white/[0.04]"><stat.icon className={`h-5 w-5 ${stat.color}`} /></div><div><p className="text-xl font-bold">{stat.value}</p><p className="text-xs text-white/40">{stat.label}</p></div></CardContent></Card>
           ))}
         </div>
 
         {/* Main Layout - Stack on mobile */}
         <div className="flex flex-col lg:grid lg:grid-cols-[280px_1fr] gap-5">
           {/* Pairs Sidebar */}
-          <Card className="glass-card">
+          <Card className="og-glass-card">
             <CardHeader className="pb-3"><CardTitle className="text-base">Trading Pairs</CardTitle></CardHeader>
             <CardContent className="p-0">
               <Tabs value={category} onValueChange={setCategory}>
@@ -191,7 +191,7 @@ const Charts = () => {
                     {filteredPairs.map((pair) => (
                       <div
                         key={pair.address}
-                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${selectedToken.address === pair.address ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50"}`}
+                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${selectedToken.address === pair.address ? "bg-primary/10 border border-primary/30" : "hover:bg-white/[0.04]"}`}
                         onClick={() => setSelectedToken(pair)}
                       >
                         <div className="flex items-center gap-3">
@@ -203,7 +203,7 @@ const Charts = () => {
                           <div>
                             <p className="font-medium text-sm">{pair.symbol}</p>
                             <div className="flex items-center gap-1">
-                              {pair.price && <p className="text-[10px] text-muted-foreground">${parseFloat(pair.price) < 0.01 ? parseFloat(pair.price).toExponential(1) : parseFloat(pair.price).toFixed(2)}</p>}
+                              {pair.price && <p className="text-[10px] text-white/40">${parseFloat(pair.price) < 0.01 ? parseFloat(pair.price).toExponential(1) : parseFloat(pair.price).toFixed(2)}</p>}
                               {pair.priceChange24h !== undefined && pair.priceChange24h !== 0 && (
                                 <span className={`text-[10px] ${pair.priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                                   {pair.priceChange24h >= 0 ? '+' : ''}{pair.priceChange24h.toFixed(1)}%
@@ -232,8 +232,8 @@ const Charts = () => {
           </Card>
 
           {/* Chart */}
-          <Card className="glass-card overflow-hidden">
-            <CardHeader className="border-b border-border/50 py-3">
+          <Card className="og-glass-card overflow-hidden">
+            <CardHeader className="border-b border-white/[0.07] py-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {selectedToken.image ? (

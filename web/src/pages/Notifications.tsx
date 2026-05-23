@@ -122,7 +122,7 @@ const Notifications = () => {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "wallet_sell": return <TrendingDown className="h-5 w-5 text-destructive" />;
-      case "wallet_buy": return <TrendingUp className="h-5 w-5 text-primary" />;
+      case "wallet_buy": return <TrendingUp className="h-5 w-5 text-[#22d3ee]" />;
       case "price_alert": return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
       case "new_token": return <Coins className="h-5 w-5 text-secondary" />;
       case "whale_alert": return <Zap className="h-5 w-5 text-accent" />;
@@ -141,10 +141,10 @@ const Notifications = () => {
       <div className="p-4 lg:p-6 space-y-4">
         {/* Push Notification Settings */}
         {supported && (
-          <Card className="glass-card border-primary/20">
+          <Card className="og-glass-card border-primary/20">
             <CardContent className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">{permission === "granted" ? <BellRing className="h-5 w-5 text-primary" /> : <BellOff className="h-5 w-5 text-muted-foreground" />}</div>
+                <div className="p-2 rounded-lg bg-primary/10">{permission === "granted" ? <BellRing className="h-5 w-5 text-[#22d3ee]" /> : <BellOff className="h-5 w-5 text-muted-foreground" />}</div>
                 <div>
                   <p className="font-semibold text-sm">Push Notifications</p>
                   <p className="text-xs text-muted-foreground">{permission === "granted" ? "Active — alerts for price changes & whales" : permission === "denied" ? "Blocked — enable in browser" : "Enable for real-time alerts"}</p>
@@ -159,7 +159,7 @@ const Notifications = () => {
         )}
 
         <Tabs defaultValue="notifications" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 bg-muted/50">
+          <TabsList className="grid w-full max-w-md grid-cols-2 bg-white/[0.04]">
             <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" />Notifications</TabsTrigger>
             <TabsTrigger value="alerts" className="gap-2"><AlertTriangle className="h-4 w-4" />Price Alerts ({priceAlerts.length})</TabsTrigger>
           </TabsList>
@@ -173,7 +173,7 @@ const Notifications = () => {
               </div>
             </div>
 
-            <Card className="glass-card">
+            <Card className="og-glass-card">
               <CardContent className="p-0">
                 <ScrollArea className="h-[500px]">
                   {loading ? (
@@ -186,7 +186,7 @@ const Notifications = () => {
                         <div key={n.id} className={`p-4 ${n.is_read ? "bg-transparent" : "bg-primary/5"}`}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-start gap-3">
-                              <div className="p-2 rounded-lg bg-muted/50">{getNotificationIcon(n.type)}</div>
+                              <div className="p-2 rounded-lg bg-white/[0.04]">{getNotificationIcon(n.type)}</div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <p className="font-medium">{n.title}</p>
@@ -218,7 +218,7 @@ const Notifications = () => {
                   <Button size="sm" className="gap-2 rounded-xl"><Plus className="h-4 w-4" />Create Alert</Button>
                 </DialogTrigger>
                 <DialogContent>
-                  <DialogHeader><DialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-primary" />Create Price Alert</DialogTitle></DialogHeader>
+                  <DialogHeader><DialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-[#22d3ee]" />Create Price Alert</DialogTitle></DialogHeader>
                   <div className="space-y-4">
                     <div>
                       <Label>Token Address</Label>
@@ -253,7 +253,7 @@ const Notifications = () => {
             </div>
 
             {priceAlerts.length === 0 ? (
-              <Card className="glass-card"><CardContent className="py-16 text-center">
+              <Card className="og-glass-card"><CardContent className="py-16 text-center">
                 <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-semibold mb-2">No price alerts</h3>
                 <p className="text-sm text-muted-foreground">Create alerts to get notified when tokens hit your target price</p>
@@ -266,7 +266,7 @@ const Notifications = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className={`p-2 rounded-lg ${alert.triggered_at ? 'bg-yellow-500/10' : 'bg-primary/10'}`}>
-                            {alert.triggered_at ? <Check className="h-5 w-5 text-yellow-500" /> : <AlertTriangle className="h-5 w-5 text-primary" />}
+                            {alert.triggered_at ? <Check className="h-5 w-5 text-yellow-500" /> : <AlertTriangle className="h-5 w-5 text-[#22d3ee]" />}
                           </div>
                           <div>
                             <div className="flex items-center gap-2">

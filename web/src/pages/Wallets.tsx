@@ -295,12 +295,12 @@ const Wallets = () => {
 
   const getTypeIcon = (tx: EnrichedTransaction) => {
     const t = tx.type?.toUpperCase() || '';
-    if (t === 'SWAP') return <RefreshCw className="h-4 w-4 text-secondary" />;
+    if (t === 'SWAP') return <RefreshCw className="h-4 w-4 text-[#eab308]" />;
     if (t === 'TRANSFER' && tx.isIncoming) return <ArrowDownLeft className="h-4 w-4 text-green-500" />;
     if (t === 'TRANSFER' && tx.isOutgoing) return <ArrowUpRight className="h-4 w-4 text-red-500" />;
     if (t.includes('BUY')) return <ArrowDownLeft className="h-4 w-4 text-green-500" />;
     if (t.includes('SELL')) return <ArrowUpRight className="h-4 w-4 text-red-500" />;
-    return <Coins className="h-4 w-4 text-muted-foreground" />;
+    return <Coins className="h-4 w-4 text-white/40" />;
   };
 
   const getTypeLabel = (tx: EnrichedTransaction) => {
@@ -325,8 +325,8 @@ const Wallets = () => {
         <div className="flex items-center gap-2">
           <CreditBalance compact />
           {activeWallet && (
-            <Badge className={`gap-1.5 ${autoRefresh ? "bg-accent/20 text-accent border-accent/30" : "bg-muted"}`}>
-              <div className={`w-2 h-2 rounded-full ${autoRefresh ? "bg-accent animate-pulse" : "bg-muted-foreground"}`} />
+            <Badge className={`gap-1.5 ${autoRefresh ? "bg-[#22d3ee]/15 text-[#22d3ee] border-[#22d3ee]/25" : "bg-white/[0.05]"}`}>
+              <div className={`w-2 h-2 rounded-full ${autoRefresh ? "bg-[#22d3ee] animate-pulse" : "bg-white/30"}`} />
               {autoRefresh ? "Live" : "Paused"}
             </Badge>
           )}
@@ -338,10 +338,10 @@ const Wallets = () => {
 
         {trackedWallets.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-muted-foreground">Tracked Wallets</h3>
+            <h3 className="text-sm font-medium text-white/40">Tracked Wallets</h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {trackedWallets.map((wallet) => (
-                <Card key={wallet.address} className={`glass-card cursor-pointer transition-all hover:border-primary/50 ${activeWallet === wallet.address ? 'border-primary bg-primary/5' : ''}`} onClick={() => loadWalletData(wallet.address)}>
+                <Card key={wallet.address} className={`glass-card cursor-pointer transition-all hover:border-primary/50 ${activeWallet === wallet.address ? 'border-[#22d3ee]/40 bg-[#22d3ee]/8' : ''}`} onClick={() => loadWalletData(wallet.address)}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
@@ -366,14 +366,14 @@ const Wallets = () => {
         {!isLoading && overview && activeWallet && (
           <div className="space-y-6 animate-fade-in">
             {/* Live Tracking Controls */}
-            <Card className="glass-card-premium">
+            <Card className="og-glass-frame">
               <CardContent className="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-primary/10"><Zap className="h-5 w-5 text-primary" /></div>
+                    <div className="p-2 rounded-xl bg-[#22d3ee]/10"><Zap className="h-5 w-5 text-[#22d3ee]" /></div>
                     <div>
                       <p className="font-semibold">Live Tracking</p>
-                      {lastRefresh && <p className="text-xs text-muted-foreground">Last updated {formatDistanceToNow(lastRefresh, { addSuffix: true })}</p>}
+                      {lastRefresh && <p className="text-xs text-white/40">Last updated {formatDistanceToNow(lastRefresh, { addSuffix: true })}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -391,18 +391,18 @@ const Wallets = () => {
             {/* Wallet Metrics Summary */}
             <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
               {[
-                { icon: BarChart3, label: "Portfolio", value: formatUsd(overview.totalUsdValue), color: "text-primary" },
-                { icon: Coins, label: "SOL", value: `${(overview.balance || 0).toFixed(2)}`, color: "text-accent" },
+                { icon: BarChart3, label: "Portfolio", value: formatUsd(overview.totalUsdValue), color: "text-[#22d3ee]" },
+                { icon: Coins, label: "SOL", value: `${(overview.balance || 0).toFixed(2)}`, color: "text-[#22d3ee]" },
                 { icon: TrendingUp, label: "24h", value: `${overview.priceChange24h >= 0 ? '+' : ''}${overview.priceChange24h.toFixed(1)}%`, color: overview.priceChange24h >= 0 ? "text-green-500" : "text-red-500" },
-                { icon: Coins, label: "Tokens", value: String(overview.tokenCount), color: "text-secondary" },
-                { icon: Shield, label: "NFTs", value: String(overview.nftCount), color: "text-primary" },
-                { icon: Users, label: "Assets", value: String(overview.totalAssets), color: "text-accent" },
+                { icon: Coins, label: "Tokens", value: String(overview.tokenCount), color: "text-[#eab308]" },
+                { icon: Shield, label: "NFTs", value: String(overview.nftCount), color: "text-[#22d3ee]" },
+                { icon: Users, label: "Assets", value: String(overview.totalAssets), color: "text-[#22d3ee]" },
               ].map((s, i) => (
-                <Card key={i} className="glass-card">
+                <Card key={i} className="og-glass-card">
                   <CardContent className="p-3 text-center">
                     <s.icon className={`h-4 w-4 mx-auto mb-1 ${s.color}`} />
                     <p className={`text-sm font-bold ${s.color}`}>{s.value}</p>
-                    <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                    <p className="text-[10px] text-white/40">{s.label}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -412,7 +412,7 @@ const Wallets = () => {
 
             <Tabs defaultValue="tokens" className="w-full">
               <div className="overflow-x-auto">
-                <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 bg-muted/50">
+                <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 bg-white/[0.04] border border-white/[0.07] rounded-2xl">
                   <TabsTrigger value="tokens" className="gap-1"><Coins className="h-4 w-4" />Tokens</TabsTrigger>
                   <TabsTrigger value="links" className="gap-1"><LinkIcon className="h-4 w-4" />Links</TabsTrigger>
                   <TabsTrigger value="nfts">NFTs</TabsTrigger>
@@ -424,24 +424,24 @@ const Wallets = () => {
                 <TabsContent value="tokens"><TokenList tokens={assets} /></TabsContent>
 
                 <TabsContent value="links">
-                  <Card className="glass-card">
+                  <Card className="og-glass-card">
                     <CardContent className="p-0">
                       <ScrollArea className="h-[500px]">
                         {tokensWithLinks.length === 0 ? (
                           <div className="text-center py-12">
                             <LinkIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">No tokens with links found</p>
+                            <p className="text-white/40">No tokens with links found</p>
                           </div>
                         ) : (
                           <div className="divide-y divide-border/50">
                             {tokensWithLinks.map((token) => (
-                              <div key={token.address} className="p-4 hover:bg-muted/20 transition-colors">
+                              <div key={token.address} className="p-4 hover:bg-white/[0.04] transition-colors">
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
                                     {token.image ? (
                                       <img src={token.image} alt={token.symbol} className="h-10 w-10 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                                     ) : (
-                                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-xs font-bold text-primary-foreground">{token.symbol.slice(0, 2)}</div>
+                                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#22d3ee] to-[#eab308] flex items-center justify-center text-xs font-bold text-[hsl(var(--og-ink))]">{token.symbol.slice(0, 2)}</div>
                                     )}
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-center gap-2">
@@ -451,7 +451,7 @@ const Wallets = () => {
                                         </Badge>
                                       </div>
                                       <p className="text-xs text-muted-foreground truncate">{token.name}</p>
-                                      <p className="text-xs font-mono text-primary">${token.price < 0.01 ? token.price.toExponential(2) : token.price.toFixed(4)} • {token.balance.toFixed(2)} held • ${token.value.toFixed(2)}</p>
+                                      <p className="text-xs font-mono text-[#22d3ee]">${token.price < 0.01 ? token.price.toExponential(2) : token.price.toFixed(4)} • {token.balance.toFixed(2)} held • ${token.value.toFixed(2)}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1 flex-wrap justify-end">
@@ -477,11 +477,11 @@ const Wallets = () => {
 
                 {/* Enhanced History Tab */}
                 <TabsContent value="history">
-                  <Card className="glass-card">
+                  <Card className="og-glass-card">
                     <CardContent className="p-0">
-                      <div className="p-4 border-b border-border/50 flex items-center justify-between">
+                      <div className="p-4 border-b border-white/[0.07] flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Clock className="h-5 w-5 text-primary" />
+                          <Clock className="h-5 w-5 text-[#22d3ee]" />
                           <h3 className="font-semibold">Transaction History</h3>
                           <Badge variant="outline">{enrichedTxs.length} txns</Badge>
                         </div>
@@ -490,7 +490,7 @@ const Wallets = () => {
                         {enrichedTxs.length === 0 ? (
                           <div className="text-center py-12">
                             <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                            <p className="text-muted-foreground">No recent transactions found</p>
+                            <p className="text-white/40">No recent transactions found</p>
                           </div>
                         ) : (
                           <div className="divide-y divide-border/50">
@@ -501,7 +501,7 @@ const Wallets = () => {
                               const fullDate = tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleString() : '';
 
                               return (
-                                <div key={tx.signature} className="p-4 hover:bg-muted/20 transition-colors">
+                                <div key={tx.signature} className="p-4 hover:bg-white/[0.04] transition-colors">
                                   <div className="flex items-center gap-3">
                                     {/* Token Image or Type Icon */}
                                     <div className="relative shrink-0">
@@ -526,7 +526,7 @@ const Wallets = () => {
                                         )}
                                         <Badge variant="secondary" className="text-[10px]">{tx.type}</Badge>
                                       </div>
-                                      <p className="text-xs text-muted-foreground" title={fullDate}>{timestamp}</p>
+                                      <p className="text-xs text-white/40" title={fullDate}>{timestamp}</p>
                                       {tx.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{tx.description}</p>}
                                     </div>
 
@@ -537,7 +537,7 @@ const Wallets = () => {
                                           {tx.isIncoming ? '+' : tx.isOutgoing ? '-' : ''}{tx.amount}
                                         </p>
                                       )}
-                                      {tx.fee && <p className="text-[10px] text-muted-foreground">Fee: {(tx.fee / 1e9).toFixed(5)} SOL</p>}
+                                      {tx.fee && <p className="text-[10px] text-white/40">Fee: {(tx.fee / 1e9).toFixed(5)} SOL</p>}
                                     </div>
 
                                     {/* Actions - always visible on mobile */}
@@ -568,7 +568,7 @@ const Wallets = () => {
 
         {!isLoading && !activeWallet && trackedWallets.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="p-4 rounded-full bg-muted/50 mb-4"><Eye className="h-8 w-8 text-muted-foreground" /></div>
+            <div className="p-4 rounded-full bg-white/[0.06] mb-4"><Eye className="h-8 w-8 text-white/40" /></div>
             <h3 className="text-lg font-medium mb-2">No wallets tracked</h3>
             <p className="text-sm text-muted-foreground max-w-sm">Search for a Solana wallet address above to start tracking holdings and transactions.</p>
           </div>
