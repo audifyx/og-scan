@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { User, Settings, Twitter, Globe, MessageCircle, Trophy, TrendingUp, Users, Activity, Copy, Check, UserPlus, UserMinus, Wallet, Coins, ArrowUpRight, ArrowDownRight, RefreshCw, ExternalLink, Percent, Clock, Flame, Heart } from "lucide-react";
+import { User, Settings, Twitter, Globe, MessageCircle, Trophy, TrendingUp, Users, Activity, Copy, Check, UserPlus, UserMinus, Wallet, Coins, ArrowUpRight, ArrowDownRight, RefreshCw, ExternalLink, Percent, Clock, Flame, Heart, Camera } from "lucide-react";
 import { AvatarSelector, renderAvatar } from "@/components/avatars/AvatarSelector";
+import { safeAvatarUrl } from "@/lib/utils";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ interface UserProfile {
   user_id: string;
   username: string | null;
   avatar_url: string | null;
+  banner_url: string | null;
   bio: string | null;
   twitter_handle: string | null;
   discord_handle: string | null;
@@ -117,6 +119,8 @@ const Profile = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
   const [transactionCount, setTransactionCount] = useState(0);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const bannerFileRef = useRef<HTMLInputElement>(null);
 
   const isOwnProfile = !userId || userId === user?.id;
   const targetUserId = userId || user?.id;
@@ -344,6 +348,29 @@ const Profile = () => {
     }
   };
 
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("Banner must be under 5 MB"); return; }
+    setUploadingBanner(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${user.id}/banner-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("profile-media").upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("profile-media").getPublicUrl(path);
+      await supabase.from("profiles").update({ banner_url: publicUrl }).eq("user_id", user.id);
+      setProfile(prev => prev ? { ...prev, banner_url: publicUrl } : prev);
+      toast.success("Banner updated!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to upload banner");
+    } finally {
+      setUploadingBanner(false);
+      if (bannerFileRef.current) bannerFileRef.current.value = "";
+    }
+  };
+
   const copyProfileLink = () => {
     const url = `${window.location.origin}/profile/${targetUserId}`;
     navigator.clipboard.writeText(url);
@@ -398,8 +425,21 @@ const Profile = () => {
       <div className="p-4 lg:p-6 space-y-6">
         {/* Profile Header */}
         <Card className="glass-card overflow-hidden">
-          <div className="h-32 bg-gradient-to-r from-primary/30 via-secondary/20 to-primary/30 relative">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHoiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIvPjwvZz48L3N2Zz4=')] opacity-30" />
+          <div className="h-40 bg-gradient-to-r from-primary/30 via-secondary/20 to-primary/30 relative overflow-hidden">
+            {safeAvatarUrl(profile.banner_url) && (
+              <img src={safeAvatarUrl(profile.banner_url)} alt="" className="absolute inset-0 w-full h-full object-cover" onError={e => (e.target as HTMLImageElement).style.display = "none"} />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            {isOwnProfile && (
+              <button
+                onClick={() => bannerFileRef.current?.click()}
+                className="absolute bottom-2 right-3 flex items-center gap-1.5 bg-black/50 hover:bg-black/70 text-white/80 hover:text-white text-[11px] px-2.5 py-1 rounded-lg backdrop-blur-sm border border-white/10 transition-all"
+              >
+                {uploadingBanner ? <span className="animate-spin">⟳</span> : <Camera className="h-3 w-3" />}
+                {uploadingBanner ? "Uploading…" : "Edit banner"}
+              </button>
+            )}
+            <input ref={bannerFileRef} type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} />
           </div>
           <CardContent className="relative pt-0">
             <div className="flex flex-col md:flex-row gap-4 -mt-12">
@@ -1225,8 +1265,8 @@ const SocialTab = ({ targetUserId, isOwnProfile }: { targetUserId: string; isOwn
             {currentList.map((person: any) => (
               <div key={person.user_id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/10 transition-colors group">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground text-sm font-bold overflow-hidden shrink-0">
-                  {person.avatar_url ? (
-                    <img src={person.avatar_url} className="w-full h-full rounded-full object-cover" alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  {safeAvatarUrl(person.avatar_url) ? (
+                    <img src={safeAvatarUrl(person.avatar_url)} className="w-full h-full rounded-full object-cover" alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   ) : (
                     (person.username || "?")[0].toUpperCase()
                   )}
