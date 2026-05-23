@@ -405,12 +405,13 @@ function isScamOrDeadPool(token: JupTokenInfo): boolean {
 export function findOriginalOgToken(searchName: string, candidates: JupTokenInfo[]): JupTokenInfo | null {
   const canonicalMint: string | undefined = canonicalSolanaOriginMintForQuery(searchName);
 
-  // If there is a canonical mint for this query, return it directly (if it
-  // passes basic scam checks).  This prevents popular searches like FARCOIN or
-  // BONK from being shadowed by high-volume copycats.
+  // Canonical mints are ALWAYS returned as the OG — we never let scam-checks
+  // or liquidity gates override a hardcoded authoritative mint.  For example,
+  // the real Fartcoin (9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump, launched
+  // 2024) must win over any 2025 pump.fun token that happens to be liquid.
   if (canonicalMint) {
     const canonical = candidates.find((token) => token.id === canonicalMint);
-    if (canonical && !isScamOrDeadPool(canonical)) return canonical;
+    if (canonical) return canonical; // canonical always wins — no scam gate
   }
 
   // Otherwise find the true OG by on-chain age among exact-name matches.
@@ -1218,7 +1219,7 @@ export async function enrichTokensWithMarketIntel(
   const birdeyeMints = new Set<string>(tokens.slice(0, maxBirdeye).map((token) => token.id));
   const onChainMints = new Set<string>(tokens.slice(0, maxOnChain).map((token) => token.id));
 
-  return mapWithConcurrency(tokens, 4, async (token) => {
+  return mapWithConcurrency(tokens, 8, async (token) => {
     const isSolanaToken: boolean = isSolanaChainId(token.chainId);
     const pair: DexSearchPair | undefined = isSolanaToken ? pairByMint.get(token.id) : undefined;
     const oldestPair: DexSearchPair | undefined = isSolanaToken ? oldestPairByMint.get(token.id) : undefined;
@@ -1573,7 +1574,7 @@ async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper:
 }
 
 async function withOnChainCreationDates(tokens: JupTokenInfo[]): Promise<JupTokenInfo[]> {
-  return mapWithConcurrency(tokens, 4, async (token) => {
+  return mapWithConcurrency(tokens, 8, async (token) => {
     const chainId: string = token.chainId ?? SOLANA_CHAIN_ID;
     if (!isSolanaChainId(chainId)) {
       return { ...token, firstMintAt: token.firstMintAt ?? token.onChainCreatedAt, firstMintAuthorityWallet: token.firstMintAuthorityWallet ?? null, firstMintSource: token.firstMintSource ?? "unknown", creationSource: token.firstPool?.createdAt ? "pool" : "unknown" };
@@ -2625,9 +2626,20 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     .slice(0, 64)
     .map((item) => item.token);
   const exactMatches: JupTokenInfo[] = similar.filter((token) => normalizeTickerSymbol(token.symbol) === normalizedQuery);
-  const pool: JupTokenInfo[] = exactMatches.length > 0 ? exactMatches : similar.length > 0 ? similar : merged.slice(0, 32);
+  const rawPool: JupTokenInfo[] = exactMatches.length > 0 ? exactMatches : similar.length > 0 ? similar : merged.slice(0, 32);
+  // Sort the pool so canonical and exact-ticker matches come first — this
+  // ensures the on-chain date concurrency budget hits the most important tokens
+  // first and the canonical is never lost when pool is large.
+  const pool: JupTokenInfo[] = [...rawPool].sort((a, b) => {
+    const aCanon = isCanonicalSolanaOriginForQuery(a, clean) ? 0 : 1;
+    const bCanon = isCanonicalSolanaOriginForQuery(b, clean) ? 0 : 1;
+    if (aCanon !== bCanon) return aCanon - bCanon;
+    const aExact = normalizeTickerSymbol(a.symbol) === normalizedQuery ? 0 : 1;
+    const bExact = normalizeTickerSymbol(b.symbol) === normalizedQuery ? 0 : 1;
+    return aExact - bExact;
+  });
   const chainDatedPool: JupTokenInfo[] = await withOnChainCreationDates(pool);
-  const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: false, includeOnChainIntel: true, maxOnChain: 14, maxBirdeye: 24 });
+  const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: false, includeOnChainIntel: true, maxOnChain: 8, maxBirdeye: 16 });
 
   // ── Safety filtering ────────────────────────────────────────────────────
   // A token must have real liquidity to be shown.  LP-rug/scam tokens are
