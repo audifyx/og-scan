@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 import { CopyMintButton } from "@/components/CopyMintButton";
+import { ScanProgress } from "@/components/ScanProgress";
 import {
   dexScreenerChartUrl,
   forensicOgAttribution,
@@ -248,8 +249,11 @@ export const OgFinder = ({ onSelect }: Props) => {
           )}
         </div>
 
+        {/* Animated scan progress — shown while fetching */}
+        <ScanProgress active={isFetching} query={submitted} className="mt-4" />
+
         {submitted && (
-          <div className="mt-4 border border-og-grid bg-og-ink/70 p-3">
+          <div className={`mt-4 border border-og-grid bg-og-ink/70 p-3 transition-opacity duration-300 ${isFetching ? "pointer-events-none opacity-40" : "opacity-100"}`}>
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.3em] text-og-gold">
                 <Filter className="h-3 w-3" /> filters
@@ -284,7 +288,7 @@ export const OgFinder = ({ onSelect }: Props) => {
         )}
 
         {submitted && og && (
-          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+          <div className={`mt-8 grid gap-4 lg:grid-cols-3 transition-opacity duration-500 ${isFetching ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
             <div className="lg:col-span-1">
               <div className="mb-2 flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.4em] text-og-gold">
                 <span className="flex items-center gap-2">
