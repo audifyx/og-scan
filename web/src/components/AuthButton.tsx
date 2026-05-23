@@ -9,9 +9,8 @@ export const AuthButton = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  if (loading) return null;
-
-  if (!user) {
+  // Show Sign In button optimistically while loading (unauthenticated is the safe default)
+  if (loading || !user) {
     return (
       <button
         type="button"
