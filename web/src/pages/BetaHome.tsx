@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Scanlines } from "@/components/Scanlines";
+import { AuthButton } from "@/components/AuthButton";
 import { OGSCAN_DEV_WALLET, OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
 import { cn } from "@/lib/utils";
 
@@ -197,6 +198,7 @@ const BetaHome = memo(() => {
               >
                 Command deck
               </Link>
+              <AuthButton />
               <Link
                 to="/scanner"
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-og-lime bg-og-lime px-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-og-ink shadow-[0_0_34px_-10px_hsl(var(--og-lime))] transition hover:bg-white active:scale-[0.98]"

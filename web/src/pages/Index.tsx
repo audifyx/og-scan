@@ -45,6 +45,7 @@ import { NewsSignal } from "@/components/NewsSignal";
 import { SolToolsRoadmap } from "@/components/SolToolsRoadmap";
 import { cn } from "@/lib/utils";
 import { DEFAULT_OG_MINT, OGSCAN_DEV_WALLET, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr } from "@/lib/og";
+import { AuthButton } from "@/components/AuthButton";
 
 const LEGACY_DEFAULT_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
 const STORAGE_TAB = "og_scanner.active_site_tab";
@@ -660,6 +661,7 @@ const AppTopBar = ({
         <Layers3 className="h-3.5 w-3.5" />
         {shortAddr(mint, 4)}
       </button>
+      <AuthButton />
       <div className="flex items-center gap-1.5 rounded-xl border border-og-lime/25 bg-og-lime/10 px-3 py-2">
         <span className="h-1.5 w-1.5 rounded-full bg-og-lime shadow-[0_0_6px_hsl(var(--og-lime))]" />
         <span className="text-[11px] font-bold text-og-lime">Live</span>
