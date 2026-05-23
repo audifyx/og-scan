@@ -58,7 +58,7 @@ const Leaderboard = () => {
       <div className="p-4 lg:p-6 space-y-4">
         {/* Sort tabs */}
         <Tabs value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-          <TabsList className="bg-muted/50 border border-border/50">
+          <TabsList className="bg-white/[0.04] border border-white/[0.07]">
             <TabsTrigger value="pnl" className="gap-1.5 text-xs font-mono">
               <TrendingUp className="h-3.5 w-3.5" /> PNL
             </TabsTrigger>
@@ -81,7 +81,7 @@ const Leaderboard = () => {
               return (
                 <Card
                   key={t.user_id}
-                  className={`relative overflow-hidden border-border/50 ${
+                  className={`relative overflow-hidden border-white/[0.07] ${
                     isFirst ? "bg-gradient-to-b from-secondary/10 to-card row-span-1 -mt-2" : "bg-card"
                   }`}
                 >
@@ -95,7 +95,7 @@ const Leaderboard = () => {
                     </Avatar>
                     <p className="font-semibold text-sm truncate max-w-full">{t.username ?? "Anon"}</p>
                     {t.badge && (
-                      <Badge variant="outline" className="text-[10px] mt-1 border-primary/30 text-primary">
+                      <Badge variant="outline" className="text-[10px] mt-1 border-primary/30 text-[#22d3ee]">
                         {t.badge}
                       </Badge>
                     )}
@@ -134,7 +134,7 @@ const Leaderboard = () => {
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-sm truncate">{t.username ?? "Anon"}</p>
                         {t.badge && (
-                          <Badge variant="outline" className="text-[9px] border-primary/30 text-primary">
+                          <Badge variant="outline" className="text-[9px] border-primary/30 text-[#22d3ee]">
                             {t.badge}
                           </Badge>
                         )}

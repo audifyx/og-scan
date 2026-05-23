@@ -407,7 +407,7 @@ const TradingLobbies = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold font-display gradient-text flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
+              <Users className="h-5 w-5 text-[#22d3ee]" />
               TRADING LOBBIES
             </h1>
             <p className="text-xs text-muted-foreground mt-1">Trade together. Watch together. Win together.</p>
@@ -428,7 +428,7 @@ const TradingLobbies = () => {
         </div>
 
         {showCreate && (
-          <div className="glass-card rounded-2xl p-5 border border-primary/15 space-y-4">
+          <div className="og-glass-card rounded-2xl p-5 border border-primary/15 space-y-4">
             <h3 className="text-sm font-bold font-display gradient-text">CREATE NEW LOBBY</h3>
             <div className="space-y-3">
               <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Lobby name..." className="w-full bg-muted/15 border border-border/30 rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30" />
@@ -466,7 +466,7 @@ const TradingLobbies = () => {
             <button
               key={lobby.id}
               onClick={() => joinLobby(lobby)}
-              className="glass-card rounded-2xl p-4 text-left hover:border-primary/30 transition-all group relative overflow-hidden"
+              className="og-glass-card rounded-2xl p-4 text-left hover:border-primary/30 transition-all group relative overflow-hidden"
             >
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-primary/20 via-accent/10 to-transparent" />
               <div className="flex items-start gap-3">
@@ -521,9 +521,9 @@ const TradingLobbies = () => {
 };
 
 const MembersPanel = ({ members, creatorId }: { members: LobbyMember[]; creatorId: string }) => (
-  <div className="glass-card rounded-xl p-4 h-full overflow-auto">
+  <div className="og-glass-card rounded-xl p-4 h-full overflow-auto">
     <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-      <Users className="h-4 w-4 text-primary" />
+      <Users className="h-4 w-4 text-[#22d3ee]" />
       Active Members ({members.length})
     </h3>
     <div className="space-y-2">

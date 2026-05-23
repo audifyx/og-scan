@@ -391,6 +391,7 @@ const CreateCommunityWizard = ({ onClose, onCreated, user, profile }: CreateWiza
         creator_avatar: safeAvatar(profile?.avatar_url) ?? null,
         icon,
         banner_url: bannerUrl,
+        avatar_url: avatarUrl,
         is_active: true,
         member_count: 1,
       };
@@ -491,32 +492,63 @@ const CreateCommunityWizard = ({ onClose, onCreated, user, profile }: CreateWiza
                 ))}
               </div>
 
-              {/* Banner upload */}
-              <div>
-                <label className="text-xs font-bold text-white/50 mb-2 block uppercase tracking-wider">Banner Image <span className="text-white/20 normal-case font-normal">(optional)</span></label>
-                <div
-                  className="relative h-20 rounded-xl border border-dashed border-white/15 bg-white/[0.03] overflow-hidden cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
-                  onClick={() => bannerFileRef.current?.click()}
-                >
-                  {bannerUrl ? (
-                    <>
-                      <img src={bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-70" />
-                      <button
-                        className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 text-white/70 hover:text-white z-10"
-                        onClick={e => { e.stopPropagation(); setBannerUrl(null); }}
-                      >
-                        <XIcon className="h-3 w-3" />
-                      </button>
-                    </>
-                  ) : uploadingBanner ? (
-                    <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                  ) : (
-                    <>
-                      <Camera className="h-4 w-4 text-white/30" />
-                      <span className="text-xs text-white/30">Upload banner · max 5 MB</span>
-                    </>
-                  )}
-                  <input ref={bannerFileRef} type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} />
+              {/* Logo + Banner upload row */}
+              <div className="flex gap-3">
+                {/* Logo / Avatar */}
+                <div className="flex-1">
+                  <label className="text-xs font-bold text-white/50 mb-2 block uppercase tracking-wider">Logo <span className="text-white/20 normal-case font-normal">(optional)</span></label>
+                  <div
+                    className="relative h-20 rounded-xl border border-dashed border-white/15 bg-white/[0.03] overflow-hidden cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
+                    onClick={() => avatarFileRef.current?.click()}
+                  >
+                    {avatarUrl ? (
+                      <>
+                        <img src={avatarUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                        <button
+                          className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 text-white/70 hover:text-white z-10"
+                          onClick={e => { e.stopPropagation(); setAvatarUrl(null); }}
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </button>
+                      </>
+                    ) : uploadingAvatar ? (
+                      <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                    ) : (
+                      <>
+                        <Camera className="h-4 w-4 text-white/30" />
+                        <span className="text-xs text-white/30">Logo · 5MB</span>
+                      </>
+                    )}
+                    <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                  </div>
+                </div>
+                {/* Banner */}
+                <div className="flex-[2]">
+                  <label className="text-xs font-bold text-white/50 mb-2 block uppercase tracking-wider">Banner <span className="text-white/20 normal-case font-normal">(optional)</span></label>
+                  <div
+                    className="relative h-20 rounded-xl border border-dashed border-white/15 bg-white/[0.03] overflow-hidden cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
+                    onClick={() => bannerFileRef.current?.click()}
+                  >
+                    {bannerUrl ? (
+                      <>
+                        <img src={bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-70" />
+                        <button
+                          className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 text-white/70 hover:text-white z-10"
+                          onClick={e => { e.stopPropagation(); setBannerUrl(null); }}
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </button>
+                      </>
+                    ) : uploadingBanner ? (
+                      <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                    ) : (
+                      <>
+                        <Camera className="h-4 w-4 text-white/30" />
+                        <span className="text-xs text-white/30">Banner · 5MB</span>
+                      </>
+                    )}
+                    <input ref={bannerFileRef} type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} />
+                  </div>
                 </div>
               </div>
 
