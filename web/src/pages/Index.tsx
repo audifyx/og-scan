@@ -1137,33 +1137,9 @@ const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: strin
 /* ─── Inline wrappers: render Communities / Discover without their own AppLayout ─── */
 
 /**
- * CommunitiesInline — mounts the Communities page in a sandboxed container.
- * AppLayout renders a sidebar + flex wrapper; we use CSS to collapse the sidebar
- * and unwrap the layout padding so the content fits cleanly inside the OGScan tool shell.
+ * CommunitiesInline — Communities renders inline (no AppLayout), drop in directly.
  */
-const CommunitiesInline = () => (
-  <div
-    className="og-inline-page"
-    style={{ minHeight: "70vh" }}
-  >
-    <style>{`
-      .og-inline-page > div.min-h-screen {
-        min-height: unset !important;
-        background: transparent !important;
-        backdrop-filter: none !important;
-      }
-      .og-inline-page > div.min-h-screen > div.hidden {
-        display: none !important;
-      }
-      .og-inline-page > div.min-h-screen > main {
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        overflow: visible !important;
-      }
-    `}</style>
-    <CommunitiesPage />
-  </div>
-);
+const CommunitiesInline = () => <CommunitiesPage />;
 
 const DiscoverInline = () => (
   <div

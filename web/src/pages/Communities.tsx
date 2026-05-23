@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Users, Plus, Search, MessageSquare, Heart, Send, Trash2, ArrowLeft,
   Globe, Lock, TrendingUp, Sparkles, Image as ImageIcon,
@@ -569,7 +568,7 @@ const InviteModal = ({ community, onClose }: { community: Community; onClose: ()
               const { data: prof } = await supabase.from("profiles").select("user_id").eq("username", username.trim()).maybeSingle();
               if (!prof) { toast.error("User not found"); setSending(false); return; }
               await supabase.from("community_invites").insert({ community_id: community.id, invited_by: user.id, invited_user_id: prof.user_id, invite_code: community.invite_code, status: "pending" });
-              toast('Sent invite to @${username}! ✉️');
+              toast(`Sent invite to @${username}! ✉️`);
               setUsername("");
               setSending(false);
             }} className="rounded-xl btn-3d">
@@ -695,7 +694,7 @@ const Communities = () => {
     const { data: comm } = await supabase.from("communities").select("*").eq("invite_code", inviteCodeInput.trim().toUpperCase()).maybeSingle();
     if (!comm) { toast.error("Invalid invite code"); return; }
     await supabase.from("community_members").insert({ community_id: comm.id, user_id: user.id, role: "member" });
-    toast('Joined ${comm.name}! 🎉');
+    toast(`Joined ${comm.name}! 🎉`);
     setInviteCodeInput("");
     fetchCommunities();
     fetchJoinedIds();
