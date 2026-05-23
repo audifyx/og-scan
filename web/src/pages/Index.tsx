@@ -617,7 +617,7 @@ const OverviewPage = ({
   return (
     <section className="space-y-5">
       <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_30px_120px_-88px_hsl(var(--og-cyan))] backdrop-blur-xl sm:p-7">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-og-cyan via-og-lime to-white" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-og-cyan via-og-lime to-og-cyan/40" />
         <div className="pointer-events-none absolute -right-28 -top-24 h-80 w-80 rounded-full bg-og-lime/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 left-20 h-80 w-80 rounded-full bg-og-cyan/10 blur-3xl" />
 
@@ -655,16 +655,27 @@ const OverviewPage = ({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {metricCards.map((card) => (
-          <button key={card.label} type="button" onClick={card.label === "Active mint" ? onChangeMint : () => undefined} className="group rounded-[1.55rem] border border-white/10 bg-white/[0.055] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl transition hover:border-og-cyan/60 hover:bg-white/[0.075] active:scale-[0.99]">
-            <span className={cn("mb-4 grid h-11 w-11 place-items-center rounded-xl border", getAccentClass(card.accent, "icon"))}>
-              <card.Icon className="h-5 w-5" />
-            </span>
-            <span className="block font-mono text-[9px] font-black uppercase tracking-[0.24em] text-muted-foreground">{card.label}</span>
-            <span className="mt-1 block font-display text-2xl font-black uppercase leading-none text-white">{card.value}</span>
-            <span className="mt-2 block text-xs font-bold text-white/52">{card.note}</span>
-          </button>
-        ))}
+        {metricCards.map((card) => {
+          const hoverBorder = card.accent === "cyan" ? "hover:border-og-cyan/50 hover:shadow-[0_0_32px_-16px_hsl(var(--og-cyan))]"
+            : card.accent === "gold" ? "hover:border-og-gold/50 hover:shadow-[0_0_32px_-16px_hsl(var(--og-gold))]"
+            : card.accent === "lime" ? "hover:border-og-lime/50 hover:shadow-[0_0_32px_-16px_hsl(var(--og-lime))]"
+            : "hover:border-white/25";
+          return (
+            <button key={card.label} type="button" onClick={card.label === "Active mint" ? onChangeMint : () => undefined}
+              className={cn("group relative overflow-hidden rounded-[1.55rem] border border-white/10 bg-white/[0.045] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/[0.07] active:scale-[0.99]", hoverBorder)}
+            >
+              <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent opacity-0 transition group-hover:opacity-100",
+                card.accent === "cyan" ? "via-og-cyan/50" : card.accent === "gold" ? "via-og-gold/50" : card.accent === "lime" ? "via-og-lime/50" : "via-white/30"
+              )} />
+              <span className={cn("mb-4 grid h-11 w-11 place-items-center rounded-xl border", getAccentClass(card.accent, "icon"))}>
+                <card.Icon className="h-5 w-5" />
+              </span>
+              <span className="block font-mono text-[9px] font-black uppercase tracking-[0.24em] text-muted-foreground">{card.label}</span>
+              <span className="mt-1 block font-display text-2xl font-black uppercase leading-none text-white">{card.value}</span>
+              <span className="mt-2 block text-xs font-bold text-white/52">{card.note}</span>
+            </button>
+          );
+        })}
       </div>
 
       <section className="rounded-[2rem] border border-white/10 bg-white/[0.055] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-xl sm:p-5">
@@ -861,7 +872,7 @@ const ToolPage = ({ tab, children }: { tab: TabConfig; children: ReactNode }) =>
   return (
     <section className="space-y-4">
       <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_30px_120px_-88px_hsl(var(--og-cyan))] backdrop-blur-xl sm:p-5">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-og-cyan via-og-lime to-white" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-og-cyan via-og-lime to-og-cyan/40" />
         <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 gap-4">
             <div className={cn("grid h-14 w-14 shrink-0 place-items-center rounded-[1.25rem] border", getAccentClass(tab.accent, "icon"))}>
@@ -919,30 +930,49 @@ const PanelTitle = ({ icon: Icon, eyebrow, title }: { icon: ComponentType<{ clas
   </div>
 );
 
-const ToolCard = ({ tool, onClick, featured = false }: { tool: TabConfig; onClick: () => void; featured?: boolean }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={cn(
-      "group relative min-h-[172px] overflow-hidden rounded-[1.55rem] border border-white/10 bg-white/[0.055] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_18px_64px_-52px_hsl(var(--og-cyan))] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-og-lime hover:bg-og-lime/[0.07] active:scale-[0.99]",
-      featured && "border-og-lime/35 bg-og-lime/10 shadow-[0_0_48px_-28px_hsl(var(--og-lime))]",
-    )}
-  >
-    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-og-lime/60 to-transparent opacity-0 transition group-hover:opacity-100" />
-    <div className={cn("mb-3 grid h-11 w-11 place-items-center rounded-xl border", getAccentClass(tool.accent, "icon"))}>
-      <tool.Icon className="h-5 w-5" />
-    </div>
-    <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">{tool.eyebrow}</div>
-    <div className="mt-1 flex items-center justify-between gap-3">
-      <span className="font-display text-xl font-black uppercase tracking-tight text-foreground">{tool.label}</span>
-      <ChevronRight className="h-4 w-4 text-og-lime opacity-0 transition group-hover:translate-x-1 group-hover:opacity-100" />
-    </div>
-    <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{tool.description}</p>
-    <div className="absolute bottom-3 left-4 right-4 border-t border-white/10 pt-2 font-mono text-[8px] uppercase tracking-[0.22em] text-og-cyan">
-      /{tool.slug} · page {tool.pageNumber}
-    </div>
-  </button>
-);
+const ToolCard = ({ tool, onClick, featured = false }: { tool: TabConfig; onClick: () => void; featured?: boolean }) => {
+  const accentBorder = tool.accent === "cyan" ? "border-og-cyan/35 bg-og-cyan/8 hover:border-og-cyan/70 hover:bg-og-cyan/10"
+    : tool.accent === "gold" ? "border-og-gold/35 bg-og-gold/8 hover:border-og-gold/70 hover:bg-og-gold/10"
+    : tool.accent === "white" ? "border-white/25 bg-white/8 hover:border-white/40 hover:bg-white/10"
+    : "border-og-lime/35 bg-og-lime/8 hover:border-og-lime/70 hover:bg-og-lime/10";
+  const accentGlow = tool.accent === "cyan" ? "shadow-[0_0_48px_-28px_hsl(var(--og-cyan))]"
+    : tool.accent === "gold" ? "shadow-[0_0_48px_-28px_hsl(var(--og-gold))]"
+    : tool.accent === "white" ? "shadow-[0_0_48px_-28px_rgba(255,255,255,0.3)]"
+    : "shadow-[0_0_48px_-28px_hsl(var(--og-lime))]";
+  const accentTopBar = tool.accent === "cyan" ? "via-og-cyan/60"
+    : tool.accent === "gold" ? "via-og-gold/60"
+    : tool.accent === "white" ? "via-white/40"
+    : "via-og-lime/60";
+  const accentChevron = tool.accent === "cyan" ? "text-og-cyan"
+    : tool.accent === "gold" ? "text-og-gold"
+    : tool.accent === "white" ? "text-white"
+    : "text-og-lime";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "group relative min-h-[172px] overflow-hidden rounded-[1.55rem] border bg-white/[0.04] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-[0.99]",
+        featured ? `${accentBorder} ${accentGlow}` : "border-white/10 hover:border-white/20 hover:bg-white/[0.065]",
+      )}
+    >
+      <div className={cn("absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent opacity-0 transition group-hover:opacity-100", accentTopBar)} />
+      <div className={cn("mb-3 grid h-11 w-11 place-items-center rounded-xl border", getAccentClass(tool.accent, "icon"))}>
+        <tool.Icon className="h-5 w-5" />
+      </div>
+      <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">{tool.eyebrow}</div>
+      <div className="mt-1 flex items-center justify-between gap-3">
+        <span className="font-display text-xl font-black uppercase tracking-tight text-foreground">{tool.label}</span>
+        <ChevronRight className={cn("h-4 w-4 opacity-0 transition group-hover:translate-x-1 group-hover:opacity-100", accentChevron)} />
+      </div>
+      <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{tool.description}</p>
+      <div className="absolute bottom-3 left-4 right-4 border-t border-white/10 pt-2 font-mono text-[8px] uppercase tracking-[0.22em] text-og-cyan/70">
+        /{tool.slug} · page {tool.pageNumber}
+      </div>
+    </button>
+  );
+};
 
 const getAccentClass = (accent: TabAccent, part: "icon" | "text"): string => {
   if (part === "text") {
