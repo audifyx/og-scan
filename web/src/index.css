@@ -2,46 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-/* OG SCANNER — blue / black / white Solana signal theme */
+/* OG SCANNER — blue / black / white / gold theme */
 
 @layer base {
   :root {
-    --background: 220 58% 3%;
-    --foreground: 210 40% 98%;
+    --background: 220 60% 4%;
+    --foreground: 0 0% 96%;
 
-    --card: 222 52% 6%;
-    --card-foreground: 210 40% 98%;
+    --card: 222 55% 7%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 222 52% 5%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 55% 5%;
+    --popover-foreground: 0 0% 96%;
 
-    --primary: 150 62% 64%;
-    --primary-foreground: 220 58% 3%;
+    --primary: 43 96% 56%;
+    --primary-foreground: 220 60% 4%;
 
-    --secondary: 210 40% 98%;
-    --secondary-foreground: 220 58% 3%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 220 60% 4%;
 
-    --muted: 222 30% 12%;
-    --muted-foreground: 214 22% 68%;
+    --muted: 220 30% 13%;
+    --muted-foreground: 214 18% 65%;
 
-    --accent: 188 100% 57%;
-    --accent-foreground: 220 58% 3%;
+    --accent: 213 90% 58%;
+    --accent-foreground: 220 60% 4%;
 
     --destructive: 0 92% 62%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 96%;
 
-    --border: 214 42% 20%;
-    --input: 222 30% 12%;
-    --ring: 150 62% 64%;
+    --border: 218 45% 22%;
+    --input: 220 30% 13%;
+    --ring: 43 96% 56%;
 
     --radius: 22px;
 
-    --og-lime: 150 62% 64%;
-    --og-gold: 210 40% 98%;
-    --og-cyan: 188 100% 57%;
-    --og-blood: 0 92% 62%;
-    --og-ink: 220 58% 3%;
-    --og-grid: 214 42% 20%;
+    /* gold = accent pop, blue = interactive/signal, white = text/highlight */
+    --og-lime: 43 96% 56%;       /* gold — replaces lime as primary accent */
+    --og-gold: 43 96% 56%;       /* gold */
+    --og-cyan: 213 90% 58%;      /* royal blue — replaces cyan */
+    --og-blood: 0 92% 62%;       /* red — keeps danger red */
+    --og-ink: 220 60% 4%;        /* near-black background */
+    --og-grid: 218 45% 22%;      /* blue-tinted grid lines */
   }
 }
 
@@ -60,7 +61,7 @@
     overscroll-behavior-y: none;
   }
   ::selection {
-    background: hsl(var(--og-lime));
+    background: hsl(var(--og-gold));
     color: hsl(var(--og-ink));
   }
 }
@@ -96,8 +97,8 @@
 
 .grid-bg {
   background-image:
-    linear-gradient(hsl(var(--og-lime) / 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--og-cyan) / 0.06) 1px, transparent 1px);
+    linear-gradient(hsl(var(--og-cyan) / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--og-gold) / 0.05) 1px, transparent 1px);
   background-size: 36px 36px;
 }
 
@@ -139,8 +140,8 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--og-lime) / 0.45); }
-  50%      { box-shadow: 0 0 28px 5px hsl(var(--og-lime) / 0.28); }
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--og-gold) / 0.45); }
+  50%      { box-shadow: 0 0 28px 5px hsl(var(--og-gold) / 0.28); }
 }
 .pulse-glow { animation: pulse-glow 2.4s ease-in-out infinite; }
 
@@ -149,13 +150,13 @@
 
 .text-glow {
   text-shadow:
-    0 0 6px hsl(var(--og-lime) / 0.65),
-    0 0 18px hsl(var(--og-lime) / 0.28);
+    0 0 6px hsl(var(--og-gold) / 0.7),
+    0 0 18px hsl(var(--og-gold) / 0.35);
 }
 .text-glow-gold {
   text-shadow:
-    0 0 8px hsl(var(--og-gold) / 0.5),
-    0 0 22px hsl(var(--og-cyan) / 0.22);
+    0 0 8px hsl(var(--og-gold) / 0.65),
+    0 0 22px hsl(var(--og-gold) / 0.32);
 }
 
 @layer components {
@@ -182,7 +183,7 @@
     pointer-events: none;
     background:
       radial-gradient(circle at 12% 0%, hsl(var(--og-cyan) / 0.14), transparent 34%),
-      radial-gradient(circle at 92% 6%, hsl(var(--og-lime) / 0.1), transparent 30%),
+      radial-gradient(circle at 92% 6%, hsl(var(--og-gold) / 0.1), transparent 30%),
       linear-gradient(90deg, transparent, rgb(255 255 255 / 0.035), transparent);
   }
 
@@ -562,7 +563,7 @@
 .og-workspace .og-tool-shell-redesign .border-dashed {
   border-style: solid;
   background:
-    radial-gradient(circle at 12% 0%, hsl(var(--og-cyan) / 0.1), transparent 32%),
+    radial-gradient(circle at 12% 0%, hsl(var(--og-gold) / 0.1), transparent 32%),
     rgb(255 255 255 / 0.035) !important;
 }
 
@@ -588,7 +589,7 @@
 
 @keyframes collector-pulse-ring {
   0%, 100% { box-shadow: 0 0 0 1px rgb(255 255 255 / 0.14), 0 0 28px -18px hsl(var(--og-cyan)); }
-  50% { box-shadow: 0 0 0 1px rgb(255 255 255 / 0.24), 0 0 42px -14px hsl(var(--og-lime)); }
+  50% { box-shadow: 0 0 0 1px hsl(var(--og-gold) / 0.55), 0 0 42px -14px hsl(var(--og-gold)); }
 }
 
 .collector-token-card,
@@ -600,7 +601,7 @@
   border: 1px solid rgb(255 255 255 / 0.16) !important;
   background:
     radial-gradient(circle at 18% 0%, hsl(var(--og-cyan) / 0.22), transparent 30%),
-    radial-gradient(circle at 85% 10%, hsl(var(--og-lime) / 0.16), transparent 26%),
+    radial-gradient(circle at 85% 10%, hsl(var(--og-gold) / 0.14), transparent 26%),
     linear-gradient(145deg, rgb(255 255 255 / 0.13), rgb(255 255 255 / 0.035) 42%, rgb(0 0 0 / 0.28)),
     hsl(var(--og-ink) / 0.92) !important;
   box-shadow:
@@ -647,11 +648,11 @@
 .collector-token-card--primary,
 .og-tool-shell article.collector-token-card--primary,
 .og-workspace .og-tool-shell-redesign article.collector-token-card--primary {
-  border-color: hsl(var(--og-lime) / 0.62) !important;
+  border-color: hsl(var(--og-gold) / 0.62) !important;
   background:
-    radial-gradient(circle at 18% 0%, hsl(var(--og-lime) / 0.26), transparent 32%),
+    radial-gradient(circle at 18% 0%, hsl(var(--og-gold) / 0.22), transparent 32%),
     radial-gradient(circle at 86% 8%, hsl(var(--og-cyan) / 0.2), transparent 28%),
-    linear-gradient(145deg, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0.045) 46%, hsl(var(--og-lime) / 0.055)),
+    linear-gradient(145deg, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0.045) 46%, hsl(var(--og-gold) / 0.055)),
     hsl(var(--og-ink) / 0.94) !important;
   animation: collector-pulse-ring 4.8s ease-in-out infinite;
 }
