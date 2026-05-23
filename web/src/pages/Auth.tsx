@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Eye, EyeOff, Loader2, Mail, Lock, ArrowLeft, AtSign, KeyRound } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Lock, ArrowLeft, AtSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,8 +30,7 @@ const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [betaCode, setBetaCode] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; username?: string; password?: string; confirm?: string; betaCode?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; username?: string; password?: string; confirm?: string }>({});
 
   useEffect(() => {
     if (!loading && user && mode !== "signup") {
@@ -51,7 +50,6 @@ const Auth = () => {
       try { passwordSchema.parse(password); } catch (e) { if (e instanceof z.ZodError) newErrors.password = e.errors[0].message; }
     }
     if (mode === "signup" && password !== confirmPassword) newErrors.confirm = "Passwords do not match";
-    if (mode === "signup" && betaCode.trim().toUpperCase() !== "OG") newErrors.betaCode = "Invalid beta access code";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -196,24 +194,6 @@ const Auth = () => {
                   />
                 </div>
                 {errors.confirm && <p className="font-mono text-[10px] text-og-blood">{errors.confirm}</p>}
-              </div>
-            )}
-
-            {mode === "signup" && (
-              <div className="space-y-1.5">
-                <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Beta Access Code</Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Enter your code"
-                    value={betaCode}
-                    onChange={(e) => setBetaCode(e.target.value)}
-                    autoComplete="off"
-                    className="pl-10 h-12 rounded-xl border-white/10 bg-white/[0.04] font-mono text-sm uppercase tracking-widest focus:border-og-gold focus:ring-og-gold/20"
-                  />
-                </div>
-                {errors.betaCode && <p className="font-mono text-[10px] text-og-blood">{errors.betaCode}</p>}
               </div>
             )}
 

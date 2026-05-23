@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Scanlines } from "@/components/Scanlines";
-import { Shield, Lock, Wrench } from "lucide-react";
+import { Shield, Lock, Wrench, KeyRound } from "lucide-react";
 
 const ADMIN_CODE = "0129";
+const BETA_CODE = "OG";
 const SESSION_KEY = "ogscan_admin_unlocked";
 
 export function MaintenanceLock({ children }: { children: React.ReactNode }) {
@@ -14,77 +15,56 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const [digits, setDigits] = useState(["", "", "", ""]);
+  const [code, setCode] = useState("");
   const [error, setError] = useState(false);
   const [shaking, setShaking] = useState(false);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Auto-focus first input on mount
+  // Auto-focus input on mount
   useEffect(() => {
     if (!unlocked) {
-      setTimeout(() => inputRefs.current[0]?.focus(), 100);
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [unlocked]);
 
-  const handleDigit = (index: number, value: string) => {
-    const v = value.replace(/\D/g, "").slice(-1);
-    const next = [...digits];
-    next[index] = v;
-    setDigits(next);
-    setError(false);
-
-    if (v && index < 3) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    // Check if all 4 filled
-    const code = next.join("");
-    if (code.length === 4) {
-      if (code === ADMIN_CODE) {
-        sessionStorage.setItem(SESSION_KEY, "true");
-        setUnlocked(true);
-      } else {
-        setError(true);
-        setShaking(true);
-        setTimeout(() => {
-          setShaking(false);
-          setDigits(["", "", "", ""]);
-          inputRefs.current[0]?.focus();
-        }, 600);
-      }
+  const tryUnlock = (value: string) => {
+    const upper = value.trim().toUpperCase();
+    if (upper === BETA_CODE || upper === ADMIN_CODE) {
+      sessionStorage.setItem(SESSION_KEY, "true");
+      setUnlocked(true);
+    } else {
+      setError(true);
+      setShaking(true);
+      setTimeout(() => {
+        setShaking(false);
+        setCode("");
+        setError(false);
+        inputRef.current?.focus();
+      }, 600);
     }
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace") {
-      if (digits[index]) {
-        const next = [...digits];
-        next[index] = "";
-        setDigits(next);
-      } else if (index > 0) {
-        inputRefs.current[index - 1]?.focus();
-      }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCode(val);
+    setError(false);
+    // Auto-submit when they type "OG" (2 chars)
+    if (val.trim().toUpperCase() === BETA_CODE) {
+      tryUnlock(val);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      tryUnlock(code);
     }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
-    if (pasted.length === 4) {
-      setDigits(pasted.split(""));
-      if (pasted === ADMIN_CODE) {
-        sessionStorage.setItem(SESSION_KEY, "true");
-        setUnlocked(true);
-      } else {
-        setError(true);
-        setShaking(true);
-        setTimeout(() => {
-          setShaking(false);
-          setDigits(["", "", "", ""]);
-          inputRefs.current[0]?.focus();
-        }, 600);
-      }
-    }
+    const pasted = e.clipboardData.getData("text");
+    setCode(pasted);
+    tryUnlock(pasted);
   };
 
   if (unlocked) return <>{children}</>;
@@ -155,54 +135,53 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
         {/* Divider */}
         <div className="w-full max-w-xs border-t border-white/5" />
 
-        {/* Admin access section */}
+        {/* Beta access section */}
         <div className="flex flex-col items-center gap-4 w-full max-w-xs">
           <div className="flex items-center gap-2 text-slate-500 text-xs font-mono">
             <Lock className="w-3 h-3" />
-            <span>Admin Access</span>
+            <span>Have a beta code?</span>
           </div>
 
-          {/* PIN inputs */}
+          {/* Code input */}
           <div
-            className={`flex gap-3 transition-transform duration-100 ${shaking ? "animate-[shake_0.5s_ease-in-out]" : ""}`}
+            className={`w-full transition-transform duration-100 ${shaking ? "animate-[shake_0.5s_ease-in-out]" : ""}`}
             style={shaking ? { animation: "shake 0.5s ease-in-out" } : {}}
           >
-            {digits.map((d, i) => (
+            <div className="relative">
+              <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
-                key={i}
-                ref={(el) => (inputRefs.current[i] = el)}
-                type="password"
-                inputMode="numeric"
-                maxLength={1}
-                value={d}
-                onChange={(e) => handleDigit(i, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(i, e)}
+                ref={inputRef}
+                type="text"
+                placeholder="Enter code"
+                value={code}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
+                autoComplete="off"
+                autoCapitalize="characters"
                 className={`
-                  w-12 h-14 text-center text-2xl font-bold rounded-xl
+                  w-full h-12 pl-10 pr-4 rounded-xl text-center font-mono text-sm uppercase tracking-widest
                   bg-white/5 border-2 transition-all duration-200 outline-none
-                  caret-transparent
                   ${error
-                    ? "border-red-500/60 bg-red-500/10 text-red-400"
-                    : d
-                    ? "border-blue-500/60 bg-blue-500/10 text-white"
-                    : "border-white/10 text-white focus:border-blue-500/40 focus:bg-white/8"
+                    ? "border-red-500/60 bg-red-500/10 text-red-400 placeholder-red-400/40"
+                    : code
+                    ? "border-blue-500/60 bg-blue-500/10 text-white placeholder-slate-600"
+                    : "border-white/10 text-white placeholder-slate-600 focus:border-blue-500/40 focus:bg-white/8"
                   }
                 `}
-                autoComplete="off"
               />
-            ))}
+            </div>
           </div>
 
           {error && (
             <p className="text-red-400 text-xs font-mono animate-pulse">
-              ✗ Incorrect code — try again
+              ✗ Invalid code — try again
             </p>
           )}
 
           {!error && (
             <p className="text-slate-600 text-xs font-mono">
-              Enter 4-digit code to access
+              Press Enter or type your beta code
             </p>
           )}
         </div>
