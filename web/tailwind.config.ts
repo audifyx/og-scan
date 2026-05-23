@@ -78,25 +78,57 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        shimmer: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
+        ticker: {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" },
+        },
+        "scan-line": {
+          "0%": { transform: "translateY(-100%)" },
+          "100%": { transform: "translateY(2000%)" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--og-gold) / 0.45)" },
+          "50%": { boxShadow: "0 0 28px 5px hsl(var(--og-gold) / 0.28)" },
+        },
+        "collector-holo-sweep": {
+          "0%": { transform: "translateX(-45%) rotate(8deg)", opacity: "0.18" },
+          "45%": { opacity: "0.42" },
+          "100%": { transform: "translateX(45%) rotate(8deg)", opacity: "0.18" },
+        },
+        "collector-pulse-ring": {
+          "0%, 100%": { boxShadow: "0 0 0 1px rgb(255 255 255 / 0.14), 0 0 28px -18px hsl(var(--og-cyan))" },
+          "50%": { boxShadow: "0 0 0 1px hsl(var(--og-gold) / 0.55), 0 0 42px -14px hsl(var(--og-gold))" },
+        },
+        flicker: {
+          "0%, 19%, 21%, 23%, 25%, 54%, 56%, 100%": { opacity: "1" },
+          "20%, 24%, 55%": { opacity: "0.55" },
+        },
+        blink: {
+          "50%": { opacity: "0" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        shimmer: "shimmer 1.6s ease-in-out infinite",
+        ticker: "ticker 40s linear infinite",
+        "scan-line": "scan-line 3.5s linear infinite",
+        "pulse-glow": "pulse-glow 2.4s ease-in-out infinite",
+        "collector-holo-sweep": "collector-holo-sweep 7.5s ease-in-out infinite alternate",
+        "collector-pulse-ring": "collector-pulse-ring 4.8s ease-in-out infinite",
+        flicker: "flicker 6s infinite",
+        blink: "blink 1s steps(2) infinite",
       },
       boxShadow: {
         og: "0 0 0 1px hsl(var(--og-grid)), 0 0 28px -8px hsl(var(--og-gold) / 0.38)",

@@ -409,7 +409,7 @@ const Index = () => {
           <MobileToolDock activeId={tab} onNavigate={switchTab} />
           <WorkspaceTopBar tab={activeTab} mint={mint} onChangeMint={promptMint} />
 
-          <main className="px-3 pb-24 pt-3 sm:px-5 lg:px-7 lg:pb-10">
+          <main className="px-3 pb-28 pt-3 sm:px-5 sm:pb-24 lg:px-7 lg:pb-10">
             {tab === "overview" ? (
               <OverviewPage mint={mint} onSwitchTab={(nextTab: TabId) => switchTab(nextTab)} onScanClick={() => switchTab("scanner")} onChangeMint={promptMint} />
             ) : (
@@ -542,8 +542,8 @@ const MobileToolDock = ({ activeId, onNavigate }: { activeId: TabId; onNavigate:
     { id: "swap" as TabId, label: "Swap", Icon: Zap },
   ];
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#03101f]/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl lg:hidden">
-      <nav className="flex items-center justify-around gap-1 px-2 pb-3 pt-2" aria-label="Mobile bottom navigation">
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#03101f]/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-2xl lg:hidden">
+      <nav className="flex items-center justify-around gap-0.5 px-1 pb-2 pt-1.5" aria-label="Mobile bottom navigation">
         {bottomTabs.map((item) => {
           const isActive = activeId === item.id || TAB_BY_ID[activeId]?.mergedInto === item.id;
           return (
@@ -552,12 +552,12 @@ const MobileToolDock = ({ activeId, onNavigate }: { activeId: TabId; onNavigate:
               type="button"
               onClick={() => onNavigate(item.id)}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-2xl px-1 py-2 transition active:scale-95",
-                isActive ? "text-og-lime" : "text-white/50 hover:text-white/80",
+                "flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5 transition active:scale-95",
+                isActive ? "text-og-lime" : "text-white/45 hover:text-white/80",
               )}
             >
-              <item.Icon className={cn("h-6 w-6", isActive && "text-og-lime")} strokeWidth={isActive ? 2.5 : 1.5} />
-              <span className="truncate font-mono text-[9px] font-black uppercase tracking-wider">{item.label}</span>
+              <item.Icon className={cn("h-5 w-5", isActive && "text-og-lime")} strokeWidth={isActive ? 2.5 : 1.5} />
+              <span className="truncate font-mono text-[8px] font-black uppercase tracking-wider">{item.label}</span>
             </button>
           );
         })}

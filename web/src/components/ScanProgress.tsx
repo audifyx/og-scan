@@ -130,7 +130,7 @@ function ProgressBar({ progress }: { progress: number }) {
         className="absolute inset-y-0 left-0 w-full rounded-full"
         style={{ width: `${progress}%` }}
       >
-        <div className="h-full w-full animate-[shimmer_1.6s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+        <div className="h-full w-full animate-shimmer bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       </div>
     </div>
   );
@@ -208,7 +208,7 @@ export function ScanProgress({ active, query, className }: Props) {
 
       {/* Bottom shimmer line */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px overflow-hidden rounded-b-2xl">
-        <div className="h-full w-full animate-[ticker_3s_linear_infinite] bg-gradient-to-r from-transparent via-og-gold/60 to-transparent" />
+        <div className="h-full w-full animate-ticker bg-gradient-to-r from-transparent via-og-gold/60 to-transparent" />
       </div>
     </div>
   );

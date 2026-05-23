@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Flame,
   Globe2,
+  LayoutGrid,
   MessageCircle,
   Radio,
   Radar,
@@ -227,7 +228,7 @@ const BetaHome = memo(() => {
                 <Sparkles className="h-3.5 w-3.5" /> Forensic tools live
               </div>
 
-              <h1 className="font-display text-5xl font-black uppercase leading-[0.86] tracking-tighter text-white text-glow sm:text-7xl lg:text-8xl">
+              <h1 className="font-display text-[2.4rem] font-black uppercase leading-[0.86] tracking-tighter text-white text-glow sm:text-7xl lg:text-8xl">
                 Find the real OG before the market does.
               </h1>
 
@@ -383,13 +384,13 @@ const BetaHome = memo(() => {
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#020814]/92 p-3 backdrop-blur-xl sm:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#020814]/95 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] backdrop-blur-2xl sm:hidden">
         <div className="mx-auto grid max-w-md grid-cols-[1fr_0.8fr] gap-2">
-          <Link to="/scanner" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-og-lime px-4 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-og-ink shadow-og">
-            Truth scan <ArrowRight className="h-4 w-4" />
+          <Link to="/scanner" className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full bg-og-lime px-4 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-og-ink shadow-[0_0_32px_-10px_hsl(var(--og-lime))] active:scale-95">
+            <Search className="h-4 w-4" /> Truth scan
           </Link>
-          <Link to="/app" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] px-4 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-white">
-            Deck
+          <Link to="/app" className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.09] px-4 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-white active:scale-95">
+            <LayoutGrid className="h-4 w-4" /> Deck
           </Link>
         </div>
       </div>
