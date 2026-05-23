@@ -3763,7 +3763,10 @@ export function fmtUsd(n: number | undefined | null): string {
   if (abs >= 1e3) return `$${(n / 1e3).toFixed(2)}K`;
   if (abs >= 1) return `$${n.toFixed(4)}`;
   if (abs >= 0.01) return `$${n.toFixed(4)}`;
-  return `$${n.toExponential(3)}`;
+  // Very small prices (e.g. 0.000009669) — show in fixed notation with enough decimals
+  // for 4 significant figures (never use scientific notation in the UI)
+  const decimals = Math.max(4, -Math.floor(Math.log10(abs)) + 3);
+  return `$${n.toFixed(Math.min(decimals, 20))}`;
 }
 
 export function fmtNum(n: number | undefined | null): string {
