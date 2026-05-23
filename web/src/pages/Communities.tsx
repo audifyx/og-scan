@@ -36,6 +36,7 @@ interface Community {
   post_count?: number;
   created_at: string;
   icon: string | null;
+  avatar_url?: string | null;
   banner_url: string | null;
   rules?: string[] | null;
   required_token?: string | null;
@@ -274,6 +275,16 @@ const CommunityIcon = ({ community, size = "md" }: { community: Community; size?
   const sizeClass = size === "sm" ? "w-10 h-10 text-xl" : size === "lg" ? "w-16 h-16 text-4xl" : "w-12 h-12 text-2xl";
   const emoji = safeIcon(community.icon);
   const gradient = avatarGradient(community.id || community.name);
+  const avatarSrc = safeAvatar(community.avatar_url);
+
+  // Real image avatar — highest priority
+  if (avatarSrc) {
+    return (
+      <div className={`${sizeClass} rounded-2xl overflow-hidden shrink-0 border border-white/10 bg-gradient-to-br ${gradient}`}>
+        <img src={avatarSrc} alt={community.name} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+      </div>
+    );
+  }
 
   if (emoji) {
     return (
@@ -314,8 +325,11 @@ const CreateCommunityWizard = ({ onClose, onCreated, user, profile }: CreateWiza
   const [newRule, setNewRule] = useState("");
   const [creating, setCreating] = useState(false);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const bannerFileRef = useRef<HTMLInputElement>(null);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -336,6 +350,28 @@ const CreateCommunityWizard = ({ onClose, onCreated, user, profile }: CreateWiza
     } finally {
       setUploadingBanner(false);
       if (bannerFileRef.current) bannerFileRef.current.value = "";
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("Logo must be under 5 MB"); return; }
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("community-images").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("community-images").getPublicUrl(path);
+      setAvatarUrl(data.publicUrl);
+      toast.success("Logo uploaded!");
+    } catch (err: unknown) {
+      toast.error("Failed to upload logo");
+      console.error(err);
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarFileRef.current) avatarFileRef.current.value = "";
     }
   };
 
@@ -710,20 +746,24 @@ const CommunityCard = ({ c, onClick, isMember }: { c: Community; onClick: () => 
       onClick={onClick}
       className="w-full text-left rounded-xl border border-white/[0.07] bg-white/[0.02] active:bg-white/[0.05] hover:bg-white/[0.04] hover:border-primary/25 transition-all group overflow-hidden flex items-center gap-3 px-3 py-3"
     >
-      {/* Icon — compact square with optional banner as tinted bg */}
+      {/* Icon — avatar image > emoji icon > gradient initial */}
       <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-2xl shrink-0 overflow-hidden relative border border-white/[0.08]`}>
-        {safeAvatar(c.banner_url) && (
-          <img src={safeAvatar(c.banner_url)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" onError={e => (e.target as HTMLImageElement).remove()} />
+        {safeAvatar(c.avatar_url) ? (
+          <img src={safeAvatar(c.avatar_url)!} alt={c.name} className="absolute inset-0 w-full h-full object-cover" onError={e => (e.target as HTMLImageElement).remove()} />
+        ) : safeAvatar(c.banner_url) ? (
+          <img src={safeAvatar(c.banner_url)!} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" onError={e => (e.target as HTMLImageElement).remove()} />
+        ) : null}
+        {!safeAvatar(c.avatar_url) && (
+          <span className="relative z-10">
+            {safeIcon(c.icon) ? (
+              safeIcon(c.icon)
+            ) : (
+              <span className={`flex items-center justify-center bg-gradient-to-br ${avatarGradient(c.id)} font-black text-white text-base w-full h-full`}>
+                {c.name[0]?.toUpperCase() ?? "C"}
+              </span>
+            )}
+          </span>
         )}
-        <span className="relative z-10">
-          {safeIcon(c.icon) ? (
-            safeIcon(c.icon)
-          ) : (
-            <span className={`flex items-center justify-center bg-gradient-to-br ${avatarGradient(c.id)} font-black text-white text-base w-full h-full`}>
-              {c.name[0]?.toUpperCase() ?? "C"}
-            </span>
-          )}
-        </span>
       </div>
 
       {/* Text content */}
@@ -1007,7 +1047,7 @@ const Communities = () => {
           {/* Banner */}
           <div className={`relative h-28 bg-gradient-to-br ${grad} overflow-hidden`}>
             {safeAvatar(selected.banner_url) && (
-              <img src={safeAvatar(selected.banner_url)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50" onError={e => (e.target as HTMLImageElement).remove()} />
+              <img src={safeAvatar(selected.banner_url)!} alt="" className="absolute inset-0 w-full h-full object-cover" onError={e => (e.target as HTMLImageElement).remove()} />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-[#070d14] via-transparent to-transparent" />
             <button onClick={() => setSelected(null)} className="absolute top-3 left-3 p-2 rounded-full bg-black/50 backdrop-blur-sm hover:bg-black/70 transition-colors z-10">
@@ -1023,7 +1063,9 @@ const Communities = () => {
           <div className="px-4 -mt-7 pb-3 flex items-end justify-between gap-3">
             <div className="flex items-end gap-3">
               <div className="w-16 h-16 rounded-2xl bg-[#070d14] border-4 border-[#070d14] flex items-center justify-center text-4xl shadow-xl shrink-0 overflow-hidden">
-                {safeIcon(selected.icon) ? (
+                {safeAvatar(selected.avatar_url) ? (
+                  <img src={safeAvatar(selected.avatar_url)!} alt={selected.name} className="w-full h-full object-cover" onError={e => (e.target as HTMLImageElement).style.display = "none"} />
+                ) : safeIcon(selected.icon) ? (
                   safeIcon(selected.icon)
                 ) : (
                   <span className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${avatarGradient(selected.id)} font-black text-white text-2xl`}>

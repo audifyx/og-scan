@@ -202,6 +202,16 @@ export const AvatarSelector = ({ currentAvatar, userId, onSelect, trigger }: Ava
 };
 
 // Helper to render an avatar from the stored string
+// Strip invalid avatar URLs (empty, "default", "null", non-http)
+function safeRenderUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const s = url.trim();
+  if (!s || s === "default" || s === "null" || s === "undefined") return null;
+  if (s.startsWith("emoji:")) return s; // handled separately
+  if (!s.startsWith("http") && !s.startsWith("/") && !s.startsWith("blob:") && !s.startsWith("data:")) return null;
+  return s;
+}
+
 export const renderAvatar = (avatarUrl: string | null | undefined, username?: string | null, size: "sm" | "md" | "lg" = "md") => {
   const sizeClasses = {
     sm: "h-8 w-8 text-lg",
@@ -209,8 +219,10 @@ export const renderAvatar = (avatarUrl: string | null | undefined, username?: st
     lg: "h-24 w-24 text-5xl",
   };
 
-  if (avatarUrl?.startsWith("emoji:")) {
-    const parts = avatarUrl.split(":");
+  const safeUrl = safeRenderUrl(avatarUrl);
+
+  if (safeUrl?.startsWith("emoji:")) {
+    const parts = safeUrl.split(":");
     const emoji = parts[1];
     const rarity = parts[3] as keyof typeof RARITY_GLOW || "common";
     return (
@@ -220,19 +232,27 @@ export const renderAvatar = (avatarUrl: string | null | undefined, username?: st
     );
   }
 
-  if (avatarUrl) {
+  if (safeUrl) {
     return (
-      <img
-        src={avatarUrl}
-        alt=""
-        className={`${sizeClasses[size]} rounded-2xl object-cover`}
-        onError={(e) => {
-          const el = e.target as HTMLImageElement;
-          el.style.display = "none";
-          const fallback = el.nextElementSibling as HTMLElement | null;
-          if (fallback) fallback.style.display = "flex";
-        }}
-      />
+      <div className={`${sizeClasses[size]} rounded-2xl overflow-hidden relative`}>
+        <img
+          src={safeUrl}
+          alt=""
+          className={`${sizeClasses[size]} rounded-2xl object-cover`}
+          onError={(e) => {
+            const el = e.target as HTMLImageElement;
+            el.style.display = "none";
+            const fallback = el.nextElementSibling as HTMLElement | null;
+            if (fallback) fallback.style.display = "flex";
+          }}
+        />
+        <div
+          className={`${sizeClasses[size]} rounded-2xl bg-gradient-to-br from-primary to-secondary items-center justify-center font-bold text-primary-foreground`}
+          style={{ display: "none", position: "absolute", inset: 0 }}
+        >
+          {username?.charAt(0).toUpperCase() || "?"}
+        </div>
+      </div>
     );
   }
 
