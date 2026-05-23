@@ -414,7 +414,8 @@ const Profile = () => {
                 {isOwnProfile && (
                   <div className="absolute -top-2 -left-2">
                     <AvatarSelector 
-                      currentAvatar={profile.avatar_url} 
+                      currentAvatar={profile.avatar_url}
+                      userId={user?.id}
                       onSelect={async (url) => {
                         await supabase.from("profiles").update({ avatar_url: url }).eq("user_id", user!.id);
                         setProfile({ ...profile, avatar_url: url });

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { safeAvatarUrl } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -243,8 +244,8 @@ const TradingLobbies = () => {
             <div className="hidden lg:flex items-center -space-x-2">
               {activeMembers.slice(0, 5).map(m => (
                 <div key={m.id} className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-accent border-2 border-card flex items-center justify-center text-primary-foreground text-[8px] font-bold">
-                  {m.avatar_url ? (
-                    <img src={m.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${m.user_id}`} className="w-full h-full rounded-full object-cover" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=fallback`; }} />
+                  {safeAvatarUrl(m.avatar_url) ? (
+                    <img src={safeAvatarUrl(m.avatar_url) || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${m.user_id}`} className="w-full h-full rounded-full object-cover" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=fallback`; }} />
                   ) : (
                     m.username?.charAt(0).toUpperCase() || "?"
                   )}
@@ -529,8 +530,8 @@ const MembersPanel = ({ members, creatorId }: { members: LobbyMember[]; creatorI
       {members.map(m => (
         <div key={m.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground text-xs font-bold">
-            {m.avatar_url ? (
-              <img src={m.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${m.user_id}`} className="w-full h-full rounded-full object-cover" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=fallback`; }} />
+            {safeAvatarUrl(m.avatar_url) ? (
+              <img src={safeAvatarUrl(m.avatar_url) || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${m.user_id}`} className="w-full h-full rounded-full object-cover" alt="" onError={(e) => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=fallback`; }} />
             ) : (
               m.username?.charAt(0).toUpperCase() || "?"
             )}

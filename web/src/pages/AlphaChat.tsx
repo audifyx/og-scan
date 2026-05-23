@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase";
+import { safeAvatarUrl } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { 
@@ -280,7 +281,7 @@ const AlphaChat = () => {
                     >
                       <div className="relative">
                         <Avatar className="h-9 w-9 border-2 border-background">
-                          <AvatarImage src={u.avatar_url || undefined} />
+                          <AvatarImage src={safeAvatarUrl(u.avatar_url)} />
                           <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-secondary text-primary-foreground">
                             {u.username?.charAt(0).toUpperCase() || "?"}
                           </AvatarFallback>
@@ -334,7 +335,7 @@ const AlphaChat = () => {
                     <div className="flex -space-x-2">
                       {onlineUsers.slice(0, 5).map((u) => (
                         <Avatar key={u.id} className="w-8 h-8 border-2 border-background ring-1 ring-primary/20">
-                          <AvatarImage src={u.avatar_url || undefined} />
+                          <AvatarImage src={safeAvatarUrl(u.avatar_url)} />
                           <AvatarFallback className="text-[10px] bg-gradient-to-br from-primary to-secondary text-primary-foreground">
                             {u.username?.charAt(0).toUpperCase() || "?"}
                           </AvatarFallback>
@@ -395,7 +396,7 @@ const AlphaChat = () => {
                     <div key={msg.id} className="animate-fade-in">
                       <div className={`flex items-start gap-3 ${msg.user_id === user?.id ? "flex-row-reverse" : ""}`}>
                         <Avatar className="w-9 h-9 border-2 border-border/50 shadow-sm shrink-0">
-                          <AvatarImage src={msg.avatar_url || undefined} />
+                          <AvatarImage src={safeAvatarUrl(msg.avatar_url)} />
                           <AvatarFallback className={`text-xs ${msg.message_type === "bot" ? "bg-gradient-to-br from-accent to-secondary" : "bg-gradient-to-br from-primary to-secondary"} text-primary-foreground`}>
                             {msg.message_type === "bot" ? <Bot className="h-4 w-4" /> : msg.username?.charAt(0).toUpperCase() || "?"}
                           </AvatarFallback>

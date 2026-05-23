@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Trophy, TrendingUp, Target, BarChart3, Crown, Medal, Award } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { safeAvatarUrl } from "@/lib/utils";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -87,7 +88,7 @@ const Leaderboard = () => {
                   <CardContent className="flex flex-col items-center text-center p-4 pt-5">
                     <RankIcon className={`h-5 w-5 mb-2 ${rankColors[idx]}`} />
                     <Avatar className="h-12 w-12 mb-2 border-2 border-border">
-                      <AvatarImage src={t.avatar_url ?? undefined} />
+                      <AvatarImage src={safeAvatarUrl(t.avatar_url)} />
                       <AvatarFallback className="bg-muted text-xs font-mono">
                         {(t.username ?? "?")[0]?.toUpperCase()}
                       </AvatarFallback>
@@ -124,7 +125,7 @@ const Leaderboard = () => {
                       {i + 4}
                     </span>
                     <Avatar className="h-9 w-9 border border-border">
-                      <AvatarImage src={t.avatar_url ?? undefined} />
+                      <AvatarImage src={safeAvatarUrl(t.avatar_url)} />
                       <AvatarFallback className="bg-muted text-xs font-mono">
                         {(t.username ?? "?")[0]?.toUpperCase()}
                       </AvatarFallback>

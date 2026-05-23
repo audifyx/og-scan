@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sparkles, Crown, Star, Zap, Upload } from "lucide-react";
+import { Sparkles, Crown, Star, Zap, Upload, Camera, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface Avatar {
   id: string;
@@ -60,21 +61,55 @@ const RARITY_GLOW = {
 
 interface AvatarSelectorProps {
   currentAvatar?: string | null;
+  userId?: string;
   onSelect: (avatarUrl: string) => void;
   trigger?: React.ReactNode;
 }
 
-export const AvatarSelector = ({ currentAvatar, onSelect, trigger }: AvatarSelectorProps) => {
+export const AvatarSelector = ({ currentAvatar, userId, onSelect, trigger }: AvatarSelectorProps) => {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const categories = [...new Set(MEME_AVATARS.map(a => a.category))];
 
   const handleSelect = (avatar: Avatar) => {
     setSelected(avatar.id);
-    // Store as a data URI-like identifier 
     onSelect(`emoji:${avatar.emoji}:${avatar.name}:${avatar.rarity}`);
     setOpen(false);
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("File must be under 5 MB");
+      return;
+    }
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const uid = userId || user?.id;
+      if (!uid) throw new Error("Not signed in");
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${uid}/avatar-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("profile-media")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("profile-media").getPublicUrl(path);
+      onSelect(data.publicUrl);
+      setOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setUploadError(msg.includes("Bucket not found") ? "Storage not configured yet" : msg);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
 
   return (
@@ -86,7 +121,7 @@ export const AvatarSelector = ({ currentAvatar, onSelect, trigger }: AvatarSelec
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-md max-h-[80vh]">
+      <DialogContent className="max-w-md max-h-[85vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -94,7 +129,31 @@ export const AvatarSelector = ({ currentAvatar, onSelect, trigger }: AvatarSelec
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-center gap-2 mb-4">
+        {/* Photo upload section */}
+        <div
+          className="flex items-center gap-3 p-3 rounded-xl border border-dashed border-border/40 bg-muted/10 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all"
+          onClick={() => fileRef.current?.click()}
+        >
+          {uploading ? (
+            <Loader2 className="h-8 w-8 text-primary animate-spin shrink-0" />
+          ) : (
+            <Camera className="h-8 w-8 text-muted-foreground shrink-0" />
+          )}
+          <div>
+            <p className="text-sm font-semibold">{uploading ? "Uploading…" : "Upload a photo"}</p>
+            <p className="text-xs text-muted-foreground">JPG, PNG or GIF · max 5 MB</p>
+            {uploadError && <p className="text-xs text-destructive mt-0.5">{uploadError}</p>}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+        </div>
+
+        <div className="flex items-center gap-2 mb-1">
+          <div className="h-px flex-1 bg-border/30" />
+          <span className="text-[10px] text-muted-foreground uppercase tracking-widest">or pick an avatar</span>
+          <div className="h-px flex-1 bg-border/30" />
+        </div>
+
+        <div className="flex items-center gap-2 mb-3">
           <Badge variant="outline" className={RARITY_COLORS.common}>Common</Badge>
           <Badge variant="outline" className={RARITY_COLORS.rare}>Rare</Badge>
           <Badge variant="outline" className={RARITY_COLORS.epic}>Epic</Badge>
@@ -110,7 +169,7 @@ export const AvatarSelector = ({ currentAvatar, onSelect, trigger }: AvatarSelec
 
           {categories.map(cat => (
             <TabsContent key={cat} value={cat}>
-              <ScrollArea className="h-[300px]">
+              <ScrollArea className="h-[240px]">
                 <div className="grid grid-cols-4 gap-3 p-2">
                   {MEME_AVATARS.filter(a => a.category === cat).map(avatar => (
                     <button

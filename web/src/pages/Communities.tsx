@@ -14,7 +14,7 @@ import {
   Repeat2, Bookmark, Share, Shield, Crown, Clock,
   Hash, Flame, Eye, UserPlus, Volume2, ChevronRight,
   BarChart3, Gem, Check, X as XIcon,
-  ChevronLeft, Copy, Mail, Dot
+  ChevronLeft, Copy, Mail, Dot, Camera, Loader2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -251,6 +251,31 @@ const CreateCommunityWizard = ({ onClose, onCreated, user, profile }: CreateWiza
   const [rules, setRules] = useState<string[]>([...DEFAULT_RULES]);
   const [newRule, setNewRule] = useState("");
   const [creating, setCreating] = useState(false);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const bannerFileRef = useRef<HTMLInputElement>(null);
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("Banner must be under 5 MB"); return; }
+    setUploadingBanner(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${user.id}/banner-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("community-images").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("community-images").getPublicUrl(path);
+      setBannerUrl(data.publicUrl);
+      toast.success("Banner uploaded!");
+    } catch (err: unknown) {
+      toast.error("Failed to upload banner");
+      console.error(err);
+    } finally {
+      setUploadingBanner(false);
+      if (bannerFileRef.current) bannerFileRef.current.value = "";
+    }
+  };
 
   const TOTAL = 4;
 
@@ -267,6 +292,7 @@ const CreateCommunityWizard = ({ onClose, onCreated, user, profile }: CreateWiza
         creator_name: profile?.username || "Member",
         creator_avatar: safeAvatar(profile?.avatar_url) ?? null,
         icon,
+        banner_url: bannerUrl,
         is_active: true,
         member_count: 1,
       };
@@ -365,6 +391,35 @@ const CreateCommunityWizard = ({ onClose, onCreated, user, profile }: CreateWiza
                     {ic}
                   </button>
                 ))}
+              </div>
+
+              {/* Banner upload */}
+              <div>
+                <label className="text-xs font-bold text-white/50 mb-2 block uppercase tracking-wider">Banner Image <span className="text-white/20 normal-case font-normal">(optional)</span></label>
+                <div
+                  className="relative h-20 rounded-xl border border-dashed border-white/15 bg-white/[0.03] overflow-hidden cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
+                  onClick={() => bannerFileRef.current?.click()}
+                >
+                  {bannerUrl ? (
+                    <>
+                      <img src={bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-70" />
+                      <button
+                        className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 text-white/70 hover:text-white z-10"
+                        onClick={e => { e.stopPropagation(); setBannerUrl(null); }}
+                      >
+                        <XIcon className="h-3 w-3" />
+                      </button>
+                    </>
+                  ) : uploadingBanner ? (
+                    <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                  ) : (
+                    <>
+                      <Camera className="h-4 w-4 text-white/30" />
+                      <span className="text-xs text-white/30">Upload banner · max 5 MB</span>
+                    </>
+                  )}
+                  <input ref={bannerFileRef} type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} />
+                </div>
               </div>
 
               <div>
@@ -657,6 +712,9 @@ const Communities = () => {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [members, setMembers] = useState<MemberData[]>([]);
   const [newPost, setNewPost] = useState("");
+  const [postImageUrl, setPostImageUrl] = useState<string | null>(null);
+  const [uploadingPostImg, setUploadingPostImg] = useState(false);
+  const postImgRef = useRef<HTMLInputElement>(null);
   const [chatMsg, setChatMsg] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [isMember, setIsMember] = useState(false);
@@ -778,6 +836,27 @@ const Communities = () => {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
+  const handlePostImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("Image must be under 5 MB"); return; }
+    setUploadingPostImg(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${user.id}/post-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("community-images").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("community-images").getPublicUrl(path);
+      setPostImageUrl(data.publicUrl);
+    } catch (err) {
+      toast.error("Failed to upload image");
+      console.error(err);
+    } finally {
+      setUploadingPostImg(false);
+      if (postImgRef.current) postImgRef.current.value = "";
+    }
+  };
+
   const submitPost = async () => {
     if (!user || !selected || !newPost.trim()) return;
     await supabase.from("community_posts").insert({
@@ -786,8 +865,10 @@ const Communities = () => {
       username: profile?.username || null,
       avatar_url: safeAvatar(profile?.avatar_url) ?? null,
       content: newPost.trim(),
+      image_url: postImageUrl || null,
     });
     setNewPost("");
+    setPostImageUrl(null);
   };
 
   const sendChat = async () => {
@@ -933,9 +1014,28 @@ const Communities = () => {
                       onChange={e => setNewPost(e.target.value)}
                       className="min-h-[52px] bg-transparent border-0 shadow-none resize-none text-[15px] placeholder:text-white/25 focus-visible:ring-0 p-0 text-white"
                     />
+                    {/* Post image preview */}
+                    {postImageUrl && (
+                      <div className="relative rounded-xl overflow-hidden">
+                        <img src={postImageUrl} alt="" className="w-full max-h-48 object-cover rounded-xl" />
+                        <button
+                          onClick={() => setPostImageUrl(null)}
+                          className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/60 text-white/80 hover:text-white"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between border-t border-white/[0.07] pt-2.5">
                       <div className="flex gap-0.5">
-                        <button className="p-2 rounded-full text-primary/50 hover:bg-primary/10 hover:text-primary transition-colors"><ImageIcon className="h-4 w-4" /></button>
+                        <button
+                          className="p-2 rounded-full text-primary/50 hover:bg-primary/10 hover:text-primary transition-colors relative"
+                          onClick={() => postImgRef.current?.click()}
+                          title="Attach image"
+                        >
+                          {uploadingPostImg ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                          <input ref={postImgRef} type="file" accept="image/*" className="hidden" onChange={handlePostImageUpload} />
+                        </button>
                         <button className="p-2 rounded-full text-primary/50 hover:bg-primary/10 hover:text-primary transition-colors"><BarChart3 className="h-4 w-4" /></button>
                       </div>
                       <Button onClick={submitPost} disabled={!newPost.trim()} size="sm" className="rounded-full px-5 btn-3d text-sm h-8 font-bold">Post</Button>
