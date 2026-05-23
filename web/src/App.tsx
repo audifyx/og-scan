@@ -84,6 +84,9 @@ const App = () => (
             <Route path="/transactions" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/transaction-feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/swap" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/news-signal" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/memes" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/art-feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tech" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/page/:pageNumber" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/page-:pageNumber" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -93,6 +96,7 @@ const App = () => (
 
             {/* ── Protected: User pages ── */}
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/wallets" element={<ProtectedRoute><Wallets /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />

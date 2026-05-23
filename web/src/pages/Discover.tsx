@@ -51,7 +51,7 @@ interface SocialActivity {
   avatar_url?: string | null;
 }
 
-const Discover = () => {
+const Discover = ({ inline = false }: { inline?: boolean }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
@@ -195,8 +195,8 @@ const Discover = () => {
 
   const displayList = searchQuery && searchResults.length > 0 ? searchResults : leaderboard;
 
-  return (
-    <AppLayout>
+  const content = (
+    <>
       <PageHeader title="Discover" description="Trending tokens, top traders & live activity">
         <div className="flex items-center gap-2">
           <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
@@ -455,8 +455,9 @@ const Discover = () => {
           </Tabs>
         </div>
       </ScrollArea>
-    </AppLayout>
+    </>
   );
+  return inline ? content : <AppLayout>{content}</AppLayout>;
 };
 
 export default Discover;

@@ -329,7 +329,6 @@ const TABS: TabConfig[] = [
     Icon: Palette,
     accent: "lime",
     group: "Main",
-    showInNav: false,
   },
 ];
 
@@ -405,7 +404,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void): 
   if (tab === "news-signal") return <NewsSignal onSelect={updateMint} />;
   if (tab === "communities") return <CommunitiesInline />;
   if (tab === "discover") return <DiscoverInline />;
-  if (tab === "memes") return <ArtFeed />;
+  if (tab === "memes") return <ArtFeed inline />;
   return null;
 };
 
@@ -779,15 +778,6 @@ const AppTopBar = ({
   onChangeMint: () => void;
 }) => (
   <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/[0.07] bg-[#060c13]/90 px-4 py-3 backdrop-blur-xl sm:px-5 lg:px-6">
-    {/* Mobile menu button */}
-    <button
-      type="button"
-      onClick={onOpenSidebar}
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/60 transition hover:bg-white/[0.08] hover:text-white lg:hidden"
-    >
-      <Menu className="h-4 w-4" />
-    </button>
-
     {/* Title */}
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
@@ -863,10 +853,10 @@ const OverviewPage = ({
   onChangeMint: () => void;
 }) => {
   const statsCards = [
-    { label: "Watching", value: "3", Icon: Search, accent: "cyan" as TabAccent },
-    { label: "Favorites", value: "0", Icon: Star, accent: "gold" as TabAccent },
-    { label: "Gainers", value: "8", Icon: TrendingUp, accent: "lime" as TabAccent },
-    { label: "Trending", value: "15", Icon: Flame, accent: "cyan" as TabAccent },
+    { label: "Forensic Tools", value: "30+", Icon: Search, accent: "cyan" as TabAccent },
+    { label: "Chain", value: "Solana", Icon: Star, accent: "gold" as TabAccent },
+    { label: "OG Verified", value: "On-chain", Icon: TrendingUp, accent: "lime" as TabAccent },
+    { label: "Data", value: "Live", Icon: Flame, accent: "cyan" as TabAccent },
   ];
 
   const quickTools: TabConfig[] = [
@@ -1163,13 +1153,6 @@ const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: strin
  */
 const CommunitiesInline = () => <CommunitiesPage />;
 
-const DiscoverInline = () => (
-  <div
-    className="og-inline-page"
-    style={{ minHeight: "70vh" }}
-  >
-    <DiscoverPage />
-  </div>
-);
+const DiscoverInline = () => <DiscoverPage inline />;
 
 export default Index;

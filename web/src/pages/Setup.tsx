@@ -27,7 +27,7 @@ const Setup = () => {
     }
     // Skip setup if already has username
     if (!loading && profile?.username) {
-      navigate("/wallets");
+      navigate("/app");
     }
   }, [user, profile, loading, navigate]);
 
@@ -101,8 +101,8 @@ const Setup = () => {
     if (error) {
       toast({ title: "Failed to set username", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Welcome to SolanaHub!" });
-      navigate("/wallets");
+      toast({ title: "Welcome to OGScan!" });
+      navigate("/app");
     }
 
     setIsSubmitting(false);
@@ -145,7 +145,7 @@ const Setup = () => {
             <div className="w-12 h-12 rounded-xl bg-solana-gradient flex items-center justify-center">
               <Zap className="h-6 w-6 text-background" />
             </div>
-            <span className="text-2xl font-bold gradient-text">SolanaHub</span>
+            <span className="text-2xl font-bold gradient-text">OGScan</span>
           </div>
 
           {/* Title */}

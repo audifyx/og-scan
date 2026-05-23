@@ -127,7 +127,7 @@ const TelegramPost = ({
 
 // ─── Main Feed Component ───────────────────────────────────────────────────────
 
-const ArtFeed = () => {
+const ArtFeed = ({ inline = false }: { inline?: boolean }) => {
   const [posts, setPosts] = useState<TgPost[]>([]);
   const [channel, setChannel] = useState("ogmemesroom");
   const [loading, setLoading] = useState(true);
@@ -179,8 +179,8 @@ const ArtFeed = () => {
     loadFresh();
   }, [loadFresh]);
 
-  return (
-    <AppLayout>
+  const content = (
+    <>
       <PageHeader
         title="Art & Memes"
         description={`Live feed from @${channel} on Telegram`}
@@ -323,8 +323,9 @@ const ArtFeed = () => {
           </>
         )}
       </div>
-    </AppLayout>
+    </>
   );
+  return inline ? content : <AppLayout>{content}</AppLayout>;
 };
 
 export default ArtFeed;

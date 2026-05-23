@@ -142,7 +142,7 @@ type StatBadge = {
 };
 
 const statBadges: StatBadge[] = [
-  { value: "4", label: "Intel tools" },
+  { value: "30+", label: "Intel tools" },
   { value: "Solana", label: "Chain focus" },
   { value: "On-chain", label: "OG verified" },
   { value: "Live", label: "Real-time data" },
