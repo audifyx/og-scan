@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   Sparkles,
   TrendingUp,
+  Trophy,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 import { CopyMintButton } from "@/components/CopyMintButton";
 import { cn } from "@/lib/utils";
 import {
+  SOLANA_CHAIN_ID,
   dexPairsForMints,
   fmtNum,
   fmtPct,
@@ -53,6 +55,8 @@ type FeedItem = {
   memeRelevance: number;
   viralScore: number;
   matchedCoins: MatchedCoin[];
+  /** Meta theme IDs this item belongs to (e.g. ["elon","ai"]) */
+  metaIds: string[];
   engagement?: { likes?: number; reposts?: number; replies?: number };
   imageUrl?: string;
 };
@@ -61,9 +65,12 @@ type MatchedCoin = {
   mint: string;
   symbol: string;
   name: string;
+  imageUrl?: string;
   priceChange5m?: number;
   volume1h?: number;
   relevance: number;
+  /** Human-readable reason why this coin is matched (e.g. "mentioned by @elonmusk") */
+  matchReason?: string;
 };
 
 type ViralTrend = {
@@ -141,6 +148,121 @@ const NARRATIVE_COLORS: Record<string, string> = {
   culture: "border-white/20 bg-white/[0.06] text-white/70",
 };
 
+// ── Meta themes — curated keyword sets for each major narrative ─────────────
+// Each meta has: keywords that appear in news/articles, coin symbols/names that
+// belong to the meta, a display label, and a color scheme.
+
+type MetaTheme = {
+  id: string;
+  label: string;
+  emoji: string;
+  color: string; // tailwind border+bg+text class
+  /** Words that must appear in article title/summary to match this meta */
+  triggerKeywords: string[];
+  /** Coin symbol/name fragments that belong to this meta */
+  coinKeywords: string[];
+  /** DexScreener search terms for this meta */
+  dexSearchTerms: string[];
+};
+
+const META_THEMES: MetaTheme[] = [
+  {
+    id: "elon",
+    label: "Elon Musk",
+    emoji: "⚡",
+    color: "border-og-lime/40 bg-og-lime/10 text-og-lime",
+    triggerKeywords: ["elon","musk","elonmusk","tesla","spacex","grok","xai","twitter","x.com","dogecoin","doge","mars"],
+    coinKeywords: ["doge","dogecoin","shib","shiba","floki","elon","musk","tesla","spacex","grok","xai","mars","rocket","dog","x","twitter"],
+    dexSearchTerms: ["doge","elon","grok","xai","spacex","tesla"],
+  },
+  {
+    id: "trump",
+    label: "Trump / MAGA",
+    emoji: "🇺🇸",
+    color: "border-og-gold/40 bg-og-gold/10 text-og-gold",
+    triggerKeywords: ["trump","maga","donald","whitehouse","white house","republican","patriot","america","usa","freedom","liberty","executive order","crypto bill"],
+    coinKeywords: ["trump","maga","usa","america","freedom","liberty","patriot","official","usd","dollar","eagle","red","republican","based"],
+    dexSearchTerms: ["trump","maga","usa","freedom","america","patriot"],
+  },
+  {
+    id: "worldcup",
+    label: "World Cup",
+    emoji: "🏆",
+    color: "border-yellow-400/40 bg-yellow-400/10 text-yellow-300",
+    triggerKeywords: ["world cup","fifa","soccer","football","2026","worldcup","premier league","champions league","messi","ronaldo","neymar","mbappé","mbappe","goal","striker","stadium","match","kickoff","penalty","halftime","offside"],
+    coinKeywords: ["worldcup","soccer","football","fifa","messi","ronaldo","goal","striker","champion","trophy","stadium","pitch","kick","ball","fan","ultras","brazil","argentina","france","england","germany","spain","italy","portugal","neymar","mbappe","cup","league"],
+    dexSearchTerms: ["worldcup","soccer","football","fifa","messi","ronaldo","goal","trophy","brazil","argentina"],
+  },
+  {
+    id: "ai",
+    label: "AI / Tech",
+    emoji: "🤖",
+    color: "border-og-cyan/40 bg-og-cyan/10 text-og-cyan",
+    triggerKeywords: ["ai","artificial intelligence","gpt","llm","openai","claude","gemini","deepseek","chatgpt","neural","machine learning","robot","agent","autonomous","ai16z","render","fetch","near","agi"],
+    coinKeywords: ["ai","agi","gpt","llm","neural","robot","agent","turbo","render","fetch","near","goat","virtual","arc","io","bittensor","tao","worldcoin","wld","mind","brain","chip","compute","gpu"],
+    dexSearchTerms: ["ai","agi","neural","robot","agent","gpt","chatbot","turbo","goat"],
+  },
+  {
+    id: "pump",
+    label: "Pump.fun",
+    emoji: "🔥",
+    color: "border-og-blood/40 bg-og-blood/10 text-og-blood",
+    triggerKeywords: ["pump.fun","pumpfun","pump fun","bonding curve","migration","raydium","degen","viral launch","new token","solana meme","rug","graduation"],
+    coinKeywords: ["pump","fun","degen","bonk","wif","dogwifhat","popcat","fart","fartcoin","moo","cope","gme","cat","frog","pepe","chad","based","wojak","sol","migrat"],
+    dexSearchTerms: ["pump","bonk","wif","popcat","fartcoin","degen","viral","solana"],
+  },
+  {
+    id: "political",
+    label: "Political",
+    emoji: "🗳️",
+    color: "border-purple-400/40 bg-purple-400/10 text-purple-300",
+    triggerKeywords: ["senate","congress","election","vote","bill","regulation","sec","cftc","crypto law","legislation","etf","bitcoin reserve","strategic reserve","federal","white house","president","crypto friendly"],
+    coinKeywords: ["usa","vote","senate","congress","bill","fed","reserve","freedom","liberty","democracy","republican","democrat","capitol","government","whitehouse"],
+    dexSearchTerms: ["senate","crypto","election","vote","congress","bitcoin","reserve"],
+  },
+  {
+    id: "viral",
+    label: "Viral / Culture",
+    emoji: "📱",
+    color: "border-pink-400/40 bg-pink-400/10 text-pink-300",
+    triggerKeywords: ["viral","trending","tiktok","youtube","meme","celebrity","influencer","twitter","x post","reddit","4chan","discord","telegram","community","ct","crypto twitter"],
+    coinKeywords: ["viral","meme","trend","tiktok","reddit","chad","based","cope","wojak","pepe","moon","ape","gem","100x","1000x","ct","community","cto"],
+    dexSearchTerms: ["viral","meme","trending","pepe","wojak","chad","moon","ape"],
+  },
+];
+
+/** Returns the best matching meta(s) for a given feed item */
+function detectItemMetas(item: { keywords: string[]; title: string; summary: string }): string[] {
+  const text = normalizeNarrativeText(`${item.title} ${item.summary} ${item.keywords.join(" ")}`);
+  const matched: Array<{ id: string; score: number }> = [];
+  for (const meta of META_THEMES) {
+    let score = 0;
+    for (const kw of meta.triggerKeywords) {
+      if (text.includes(normalizeNarrativeText(kw))) score += 2;
+    }
+    for (const kw of item.keywords) {
+      if (meta.triggerKeywords.some((t) => normalizeNarrativeText(t) === kw)) score += 3;
+    }
+    if (score > 0) matched.push({ id: meta.id, score });
+  }
+  return matched.sort((a, b) => b.score - a.score).map((m) => m.id);
+}
+
+/** Score how well a coin belongs to a meta */
+function scoreCoinForMeta(symbol: string, name: string, meta: MetaTheme): number {
+  const sym = normalizeNarrativeText(symbol);
+  const nm = normalizeNarrativeText(name);
+  let score = 0;
+  for (const ck of meta.coinKeywords) {
+    const k = normalizeNarrativeText(ck);
+    if (sym === k) { score += 50; break; }
+    if (nm === k) { score += 40; break; }
+    if (sym.includes(k) || k.includes(sym)) { score += 25; break; }
+    if (nm.includes(k)) { score += 18; break; }
+  }
+  return Math.min(100, score);
+}
+
 const FEED_REFRESH_MS = 30_000;
 
 async function fetchRssViaProxy(url: string): Promise<string | null> {
@@ -187,7 +309,7 @@ async function fetchRssItems(url: string, label: string, kind: FeedItemKind): Pr
         "";
       const words = extractKeywords(`${title} ${desc}`);
       const memeRelevance = scoreMemeRelevance(words);
-      return {
+      const partial = {
         id: `${label}-${index}-${title.slice(0, 40)}`,
         kind,
         title,
@@ -198,9 +320,10 @@ async function fetchRssItems(url: string, label: string, kind: FeedItemKind): Pr
         keywords: words.slice(0, 8),
         memeRelevance,
         viralScore: Math.round(memeRelevance * (1 + words.length * 0.05)),
-        matchedCoins: [],
+        matchedCoins: [] as FeedItem["matchedCoins"],
       };
-    });
+      return { ...partial, metaIds: detectItemMetas(partial) };
+      });
   } catch {
     return [];
   }
@@ -281,32 +404,63 @@ function attachCoinMatches(items: FeedItem[], coins: JupTokenInfo[], pairs: DexS
   const pairByMint = new Map<string, DexSearchPair>();
   for (const p of pairs) {
     const mint = p.baseToken?.address;
-    if (!mint || p.chainId !== "solana") continue;
+    if (!mint || p.chainId !== SOLANA_CHAIN_ID) continue;
     const prev = pairByMint.get(mint);
     if (!prev || (p.volume?.h24 ?? 0) > (prev.volume?.h24 ?? 0)) pairByMint.set(mint, p);
   }
   return items.map((item) => {
     const matched: MatchedCoin[] = [];
-    for (const coin of coins.slice(0, 60)) {
+    // Get the metas this item belongs to
+    const itemMetas = META_THEMES.filter((m) => item.metaIds.includes(m.id));
+    // Detect if an influencer is mentioned for labeling
+    const elonMentioned = item.keywords.some((k) => ["elon","musk","elonmusk"].includes(k)) ||
+      normalizeNarrativeText(item.title).includes("elon");
+    const trumpMentioned = item.keywords.some((k) => ["trump","maga","donald"].includes(k)) ||
+      normalizeNarrativeText(item.title).includes("trump");
+
+    for (const coin of coins.slice(0, 80)) {
       const sym = normalizeNarrativeText(coin.symbol);
       const name = normalizeNarrativeText(coin.name);
       let relevance = 0;
+      const reasons: string[] = [];
+
+      // 1. Direct keyword match from article text
       for (const kw of item.keywords) {
         if (kw.length < 3) continue;
-        if (sym === kw || name.includes(kw) || kw.includes(sym)) relevance += 25;
-        else if (sym.includes(kw) || kw.includes(sym.slice(0, 4))) relevance += 12;
+        if (sym === kw) { relevance += 40; reasons.push(`symbol matches "${kw.toUpperCase()}"`); break; }
+        if (name === kw) { relevance += 35; reasons.push(`name matches "${kw}"`); break; }
+        if (name.includes(kw) || kw.includes(sym)) { relevance += 22; reasons.push(`related to "${kw}"`); break; }
+        if (sym.includes(kw) || kw.includes(sym.slice(0, 4))) { relevance += 12; reasons.push(`partial match "${kw}"`); break; }
       }
-      if (relevance > 0) {
-        const pair = pairByMint.get(coin.id);
-        matched.push({
-          mint: coin.id,
-          symbol: coin.symbol,
-          name: coin.name,
-          priceChange5m: coin.stats5m?.priceChange ?? pair?.priceChange?.m5,
-          volume1h: pair?.volume?.h1,
-          relevance: Math.min(100, relevance),
-        });
+
+      // 2. Meta theme match — only include coins that belong to item's meta
+      let metaBonus = 0;
+      for (const meta of itemMetas) {
+        const s = scoreCoinForMeta(coin.symbol, coin.name, meta);
+        if (s > metaBonus) metaBonus = s;
+        if (s >= 25 && reasons.length === 0) {
+          // Build a smart label
+          if (elonMentioned) reasons.push(`${meta.emoji} tweeted by @elonmusk`);
+          else if (trumpMentioned) reasons.push(`${meta.emoji} in Trump's orbit`);
+          else reasons.push(`${meta.emoji} ${meta.label} meta`);
+        }
       }
+      relevance += Math.round(metaBonus * 0.6);
+
+      // 3. Must pass a minimum bar — prevents unrelated coin noise
+      if (relevance < 15) continue;
+
+      const pair = pairByMint.get(coin.id);
+      matched.push({
+        mint: coin.id,
+        symbol: coin.symbol,
+        name: coin.name,
+        imageUrl: coin.logoURI ?? pair?.info?.imageUrl,
+        priceChange5m: coin.stats5m?.priceChange ?? pair?.priceChange?.m5,
+        volume1h: pair?.volume?.h1,
+        relevance: Math.min(100, relevance),
+        matchReason: reasons[0],
+      });
     }
     matched.sort((a, b) => b.relevance - a.relevance);
     return { ...item, matchedCoins: matched.slice(0, 4) };
@@ -317,7 +471,7 @@ function attachTrendCoinMatches(trends: ViralTrend[], coins: JupTokenInfo[], pai
   const pairByMint = new Map<string, DexSearchPair>();
   for (const p of pairs) {
     const mint = p.baseToken?.address;
-    if (!mint || p.chainId !== "solana") continue;
+    if (!mint || p.chainId !== SOLANA_CHAIN_ID) continue;
     pairByMint.set(mint, p);
   }
   return trends.map((trend) => {
@@ -335,6 +489,7 @@ function attachTrendCoinMatches(trends: ViralTrend[], coins: JupTokenInfo[], pai
           mint: coin.id,
           symbol: coin.symbol,
           name: coin.name,
+          imageUrl: coin.logoURI ?? pair?.info?.imageUrl,
           priceChange5m: coin.stats5m?.priceChange ?? pair?.priceChange?.m5,
           volume1h: pair?.volume?.h1,
           relevance: Math.min(100, relevance),
@@ -344,6 +499,24 @@ function attachTrendCoinMatches(trends: ViralTrend[], coins: JupTokenInfo[], pai
     matched.sort((a, b) => b.relevance - a.relevance);
     return { ...trend, matchedCoins: matched.slice(0, 4) };
   });
+}
+
+// ── DexScreener keyword search ────────────────────────────────────────────────
+async function dexSearchByKeyword(query: string): Promise<DexSearchPair[]> {
+  if (!query || query.trim().length < 2) return [];
+  try {
+    const res = await fetch(
+      `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`,
+      { signal: AbortSignal.timeout(10_000) }
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as { pairs?: DexSearchPair[] | null };
+    return (data.pairs ?? []).filter(
+      (p) => p.chainId === SOLANA_CHAIN_ID && Boolean(p.baseToken?.address)
+    );
+  } catch {
+    return [];
+  }
 }
 
 async function fetchFeedPayload(): Promise<FeedPayload> {
@@ -379,6 +552,32 @@ async function fetchFeedPayload(): Promise<FeedPayload> {
       kind: "viral" as FeedItemKind,
       url: "https://news.google.com/rss/search?q=crypto+viral+OR+pump.fun+OR+DEX+screener+OR+Solana+trending+when:1d&hl=en-US&gl=US&ceid=US:en",
     },
+    // Meta-specific feeds
+    {
+      label: "Elon Watch",
+      kind: "x_post" as FeedItemKind,
+      url: "https://news.google.com/rss/search?q=elon+musk+crypto+OR+doge+OR+coin+OR+token+OR+grok+when:6h&hl=en-US&gl=US&ceid=US:en",
+    },
+    {
+      label: "Trump Crypto",
+      kind: "x_post" as FeedItemKind,
+      url: "https://news.google.com/rss/search?q=trump+crypto+OR+maga+coin+OR+token+OR+bitcoin+when:6h&hl=en-US&gl=US&ceid=US:en",
+    },
+    {
+      label: "World Cup Crypto",
+      kind: "viral" as FeedItemKind,
+      url: "https://news.google.com/rss/search?q=world+cup+2026+crypto+OR+soccer+coin+OR+football+token+OR+FIFA+crypto+when:3d&hl=en-US&gl=US&ceid=US:en",
+    },
+    {
+      label: "AI Tokens",
+      kind: "viral" as FeedItemKind,
+      url: "https://news.google.com/rss/search?q=AI+token+OR+AI+memecoin+OR+ai16z+OR+grok+token+OR+artificial+intelligence+crypto+when:1d&hl=en-US&gl=US&ceid=US:en",
+    },
+    {
+      label: "Pump.fun Launches",
+      kind: "viral" as FeedItemKind,
+      url: "https://news.google.com/rss/search?q=pump.fun+OR+solana+meme+launch+OR+bonding+curve+OR+degen+token+when:1d&hl=en-US&gl=US&ceid=US:en",
+    },
   ];
 
   const [rssResults, coins] = await Promise.allSettled([
@@ -413,12 +612,67 @@ async function fetchFeedPayload(): Promise<FeedPayload> {
     return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
   });
 
+  // ── Per-meta DexScreener search — proactive, always-on ──────────────────
+  // Every meta always runs its own DexSearch, not just when articles mention it.
+  // This ensures the coin pool is always populated for each meta filter:
+  //   Elon → searches "doge","grok","xai","elon","spacex","tesla"
+  //   Trump → searches "trump","maga","usa","freedom","america","patriot"
+  //   World Cup → searches "worldcup","soccer","messi","ronaldo","goal","brazil","argentina"
+  //   AI → searches "ai","agi","neural","robot","agent","turbo","goat"
+  //   Pump.fun → searches "pump","degen","bonk","wif","popcat","viral"
+  //   Political → searches "senate","crypto","election","bitcoin","reserve"
+  //   Viral → searches "viral","meme","trending","pepe","moon","ape"
+  // Plus supplement with top article keywords.
+  const dexSearchTerms: string[] = [];
+  // Always include all meta search terms (2-3 per meta)
+  for (const meta of META_THEMES) {
+    dexSearchTerms.push(...meta.dexSearchTerms.slice(0, 2));
+  }
+  // Supplement with top article keywords (deduped)
+  const keywordFreq = new Map<string, number>();
+  for (const item of items) {
+    for (const kw of item.keywords) keywordFreq.set(kw, (keywordFreq.get(kw) ?? 0) + 1);
+  }
+  const topKws = Array.from(keywordFreq.entries()).sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 6);
+  dexSearchTerms.push(...topKws);
+
+  // Deduplicate
+  const uniqueSearchTerms = Array.from(new Set(dexSearchTerms));
+
+  const trendingCoins = coins.status === "fulfilled" ? coins.value : [];
+
+  const dexSearchResults = await Promise.allSettled(
+    uniqueSearchTerms.map((kw) => dexSearchByKeyword(kw))
+  );
+
+  // Merge DexScreener search results into coin pool
+  const allCoins = [...trendingCoins];
+  const coinIds = new Set(allCoins.map((c) => c.id));
+  for (const r of dexSearchResults) {
+    if (r.status !== "fulfilled") continue;
+    for (const p of r.value.slice(0, 8)) {
+      const addr = p.baseToken?.address;
+      if (!addr || coinIds.has(addr)) continue;
+      coinIds.add(addr);
+      allCoins.push({
+        id: addr,
+        symbol: p.baseToken?.symbol ?? "???",
+        name: p.baseToken?.name ?? "",
+        logoURI: p.info?.imageUrl,
+        mcap: p.marketCap ?? p.fdv,
+        stats5m: { priceChange: p.priceChange?.m5 ?? 0, volume: p.volume?.m5 },
+        stats1h: { priceChange: p.priceChange?.h1 ?? 0 },
+        stats24h: { priceChange: p.priceChange?.h24 ?? 0, volume: p.volume?.h24 },
+      } as JupTokenInfo);
+    }
+  }
+
   const topMints = items.flatMap((it) => it.matchedCoins.map((c) => c.mint));
-  const seedMints = Array.from(new Set([...coins.map((c) => c.id), ...topMints])).slice(0, 70);
+  const seedMints = Array.from(new Set([...allCoins.map((c) => c.id), ...topMints])).slice(0, 100);
   const pairs = seedMints.length ? await dexPairsForMints(seedMints) : [];
 
-  const enrichedItems = attachCoinMatches(items.slice(0, 40), coins, pairs);
-  const trends = attachTrendCoinMatches(buildViralTrends(enrichedItems), coins, pairs);
+  const enrichedItems = attachCoinMatches(items.slice(0, 40), allCoins, pairs);
+  const trends = attachTrendCoinMatches(buildViralTrends(enrichedItems), allCoins, pairs);
 
   return {
     items: enrichedItems,
@@ -497,22 +751,26 @@ function buildFallbackFeedItems(): FeedItem[] {
     },
   ];
 
-  return narratives.map((n, i): FeedItem => ({
-    id: `fallback-${i}`,
-    kind: n.kind,
-    title: n.title,
-    summary: n.summary,
-    source: n.source,
-    publishedAt: new Date(Date.now() - i * 18_000_000).toISOString(),
-    keywords: n.keywords,
-    memeRelevance: scoreMemeRelevance(n.keywords),
-    viralScore: 65 + i * 3,
-    matchedCoins: [],
-  }));
+  return narratives.map((n, i): FeedItem => {
+    const partial = {
+      id: `fallback-${i}`,
+      kind: n.kind,
+      title: n.title,
+      summary: n.summary,
+      source: n.source,
+      publishedAt: new Date(Date.now() - i * 18_000_000).toISOString(),
+      keywords: n.keywords,
+      memeRelevance: scoreMemeRelevance(n.keywords),
+      viralScore: 65 + i * 3,
+      matchedCoins: [],
+    };
+    return { ...partial, metaIds: detectItemMetas(partial) };
+  });
 }
 
 export const Feed = ({ onSelect }: Props) => {
   const [filterKind, setFilterKind] = useState<"all" | FeedItemKind>("all");
+  const [filterMeta, setFilterMeta] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data, isFetching, error, refetch, dataUpdatedAt } = useQuery({
@@ -528,6 +786,7 @@ export const Feed = ({ onSelect }: Props) => {
   const filteredItems = useMemo(() => {
     let list = items;
     if (filterKind !== "all") list = list.filter((it) => it.kind === filterKind);
+    if (filterMeta !== "all") list = list.filter((it) => it.metaIds.includes(filterMeta));
     if (searchQuery.trim()) {
       const q = normalizeNarrativeText(searchQuery);
       list = list.filter(
@@ -538,7 +797,7 @@ export const Feed = ({ onSelect }: Props) => {
       );
     }
     return list;
-  }, [items, filterKind, searchQuery]);
+  }, [items, filterKind, filterMeta, searchQuery]);
 
   const handleSelectCoin = useCallback(
     (mint: string) => {
@@ -582,33 +841,75 @@ export const Feed = ({ onSelect }: Props) => {
         </div>
 
         {/* Search + Filters */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter by keyword, ticker, or narrative..."
-              className="w-full rounded-[1.2rem] border border-white/10 bg-white/[0.055] py-2.5 pl-10 pr-4 font-mono text-sm text-white placeholder-white/30 outline-none transition focus:border-og-cyan/50 focus:bg-white/[0.08]"
-            />
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Filter by keyword, ticker, or narrative..."
+                className="w-full rounded-[1.2rem] border border-white/10 bg-white/[0.055] py-2.5 pl-10 pr-4 font-mono text-sm text-white placeholder-white/30 outline-none transition focus:border-og-cyan/50 focus:bg-white/[0.08]"
+              />
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {(["all","news","viral","x_post"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setFilterKind(k)}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-2 font-mono text-[10px] font-black uppercase tracking-widest transition",
+                    filterKind === k
+                      ? "border-og-lime bg-og-lime text-og-ink"
+                      : "border-white/10 bg-white/[0.055] text-white/60 hover:border-og-cyan/40 hover:text-og-cyan",
+                  )}
+                >
+                  {k === "all" ? "All" : k === "x_post" ? "X / Social" : k === "viral" ? "Viral" : "News"}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Meta theme filters */}
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {(["all","news","viral","x_post"] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setFilterKind(k)}
-                className={cn(
-                  "shrink-0 rounded-full border px-3 py-2 font-mono text-[10px] font-black uppercase tracking-widest transition",
-                  filterKind === k
-                    ? "border-og-lime bg-og-lime text-og-ink"
-                    : "border-white/10 bg-white/[0.055] text-white/60 hover:border-og-cyan/40 hover:text-og-cyan",
-                )}
-              >
-                {k === "all" ? "All" : k === "x_post" ? "X / Social" : k === "viral" ? "Viral" : "News"}
-              </button>
-            ))}
+            <button
+              type="button"
+              onClick={() => setFilterMeta("all")}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1.5 font-mono text-[9px] font-black uppercase tracking-widest transition",
+                filterMeta === "all"
+                  ? "border-white/40 bg-white/10 text-white"
+                  : "border-white/10 bg-white/[0.03] text-white/40 hover:border-white/25 hover:text-white/70",
+              )}
+            >
+              All metas
+            </button>
+            {META_THEMES.map((meta) => {
+              const count = items.filter((it) => it.metaIds.includes(meta.id)).length;
+              return (
+                <button
+                  key={meta.id}
+                  type="button"
+                  onClick={() => setFilterMeta(filterMeta === meta.id ? "all" : meta.id)}
+                  className={cn(
+                    "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[9px] font-black uppercase tracking-widest transition",
+                    filterMeta === meta.id
+                      ? meta.color
+                      : "border-white/10 bg-white/[0.03] text-white/40 hover:border-white/25 hover:text-white/70",
+                  )}
+                >
+                  <span>{meta.emoji}</span>
+                  {meta.label}
+                  {count > 0 && (
+                    <span className={cn("rounded-full px-1.5 py-0.5 text-[8px]", filterMeta === meta.id ? "bg-black/20" : "bg-white/10")}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -732,7 +1033,7 @@ export const Feed = ({ onSelect }: Props) => {
                           </span>
                         </div>
                         <div className="mt-0.5 truncate font-mono text-[9px] uppercase tracking-wider text-white/40">
-                          {shortAddr(coin.mint, 4)}
+                          {coin.matchReason || shortAddr(coin.mint, 4)}
                         </div>
                       </div>
                       <div className="shrink-0 text-right font-mono text-[10px] uppercase tracking-wider">
@@ -801,7 +1102,7 @@ const FeedItemCard = memo(({ item, onSelectCoin }: { item: FeedItem; onSelectCoi
       <div className="relative">
         {/* Header row */}
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <FeedKindIcon kind={item.kind} />
             <span className="font-mono text-[9px] font-black uppercase tracking-[0.24em] text-white/50">{item.source}</span>
             {isHot && (
@@ -809,6 +1110,16 @@ const FeedItemCard = memo(({ item, onSelectCoin }: { item: FeedItem; onSelectCoi
                 meme-hot
               </span>
             )}
+            {/* Meta theme badges */}
+            {item.metaIds.slice(0, 2).map((metaId) => {
+              const meta = META_THEMES.find((m) => m.id === metaId);
+              if (!meta) return null;
+              return (
+                <span key={metaId} className={cn("rounded-full border px-2 py-0.5 font-mono text-[8px] uppercase tracking-wider", meta.color)}>
+                  {meta.emoji} {meta.label}
+                </span>
+              );
+            })}
           </div>
           <span className="font-mono text-[9px] uppercase tracking-widest text-white/38">{timeAgo(publishedSeconds)} ago</span>
         </div>
@@ -864,12 +1175,18 @@ const FeedItemCard = memo(({ item, onSelectCoin }: { item: FeedItem; onSelectCoi
                   onClick={() => onSelectCoin(coin.mint)}
                   className="flex items-center justify-between gap-2 rounded-xl border border-og-lime/15 bg-og-lime/5 px-2.5 py-1.5 text-left transition hover:border-og-lime/40"
                 >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-display text-xs font-black uppercase text-white">${coin.symbol}</span>
-                      <span className="truncate font-mono text-[8px] uppercase tracking-wider text-white/40">{shortAddr(coin.mint, 3)}</span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    {coin.imageUrl && (
+                      <img src={coin.imageUrl} alt={coin.symbol} className="h-6 w-6 shrink-0 rounded-full object-cover" loading="lazy" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-display text-xs font-black uppercase text-white">${coin.symbol}</span>
+                      </div>
+                      <div className="mt-0.5 truncate font-mono text-[8px] uppercase tracking-wider text-white/50">
+                        {coin.matchReason || coin.name}
+                      </div>
                     </div>
-                    <div className="mt-0.5 truncate text-[10px] text-white/50">{coin.name}</div>
                   </div>
                   <div className="shrink-0 text-right font-mono text-[9px] uppercase tracking-wider">
                     <div className={cn("font-black", (coin.priceChange5m ?? 0) >= 0 ? "text-og-lime" : "text-og-blood")}>
