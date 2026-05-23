@@ -34,9 +34,34 @@ const STABLE_QUOTE_SYMBOLS = new Set<string>(["USDC", "USDT", "USDH", "USDS", "P
 export const DEFAULT_OG_MINT = OGSCAN_TOKEN_MINT;
 export const MIN_OGSCAN_LIQUIDITY_USD = 1_000;
 
+// ── Canonical OG mints ──────────────────────────────────────────────────────
+// These are the definitive TRUE OG mints for well-known Solana tickers.
+// Keyed by the normalised ticker (no $, lowercase, leet-mapped) so any variant
+// of the search string resolves to the same authoritative mint.
+//
+// Only add entries here when the mint address is publicly verified and
+// indisputably the first/official token for that ticker.
+const BONK_MINT   = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
+const WIF_MINT    = "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm";   // dogwifhat
+const POPCAT_MINT = "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr";
+// TRUMP / OFFICIAL TRUMP (Pump.fun launch Jan 2025)
+const TRUMP_MINT  = "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN";
+
 const CANONICAL_SOLANA_ORIGINS: Record<string, string> = {
-  fartcoin: FARTCOIN_CANONICAL_MINT,
-  fart: FARTCOIN_CANONICAL_MINT,
+  // fartcoin
+  fartcoin:      FARTCOIN_CANONICAL_MINT,
+  fart:          FARTCOIN_CANONICAL_MINT,
+  // bonk
+  bonk:          BONK_MINT,
+  // wif / dogwifhat
+  wif:           WIF_MINT,
+  dogwifhat:     WIF_MINT,
+  dogwifhatcoin: WIF_MINT,
+  // popcat
+  popcat:        POPCAT_MINT,
+  // trump / official trump
+  trump:         TRUMP_MINT,
+  officialtrump: TRUMP_MINT,
 };
 
 const KNOWN_LP_PULLED_OR_SCAM_MINTS = new Set<string>([
@@ -355,17 +380,40 @@ function isExactNameMatch(token: JupTokenInfo, searchName: string): boolean {
 
 function isScamOrDeadPool(token: JupTokenInfo): boolean {
   if (!token.id) return true;
+  // LP-pulled check comes first — definitive indicator of a rug/scam
+  if (hasPulledOrDeadLiquidity(token)) return true;
   const liq = tokenEffectiveLiquidityUsd(token);
-  if (liq < 5000) return true;
+  // Require at least $500 real liquidity (lowered from $5k so old OG tokens
+  // with thin but real pools aren't wrongly excluded)
   if (liq <= 0) return true;
-  const vol24 = (token.stats24h?.buyVolume ?? 0) + (token.stats24h?.sellVolume ?? 0);
-  if (vol24 <= 0) return true;
-  if ((token.holderCount ?? 0) < 10) return true;
+  if (liq < 500) return true;
+  // Holder count check — real tokens have at least a handful of holders.
+  // Skip the check when data is absent (holderCount === undefined) so we
+  // don't accidentally discard tokens the API didn't enrich yet.
+  const holders = token.holderCount;
+  if (holders != null && holders < 5) return true;
+  // Active mint/freeze authority is a genuine scam signal
+  if (token.audit?.mintAuthorityDisabled === false) return true;
   if (token.audit?.freezeAuthorityDisabled === false) return true;
+  // NOTE: We deliberately do NOT filter on 24h volume.
+  // Many legitimate OG tokens have low daily volume but are still the true
+  // first-ever mint.  Volume should be used as a secondary signal, not as a
+  // hard gate for OG status.
   return false;
 }
 
 export function findOriginalOgToken(searchName: string, candidates: JupTokenInfo[]): JupTokenInfo | null {
+  const canonicalMint: string | undefined = canonicalSolanaOriginMintForQuery(searchName);
+
+  // If there is a canonical mint for this query, return it directly (if it
+  // passes basic scam checks).  This prevents popular searches like FARCOIN or
+  // BONK from being shadowed by high-volume copycats.
+  if (canonicalMint) {
+    const canonical = candidates.find((token) => token.id === canonicalMint);
+    if (canonical && !isScamOrDeadPool(canonical)) return canonical;
+  }
+
+  // Otherwise find the true OG by on-chain age among exact-name matches.
   const cleanCandidates = candidates
     .filter((token) => isExactNameMatch(token, searchName))
     .filter((token) => !isScamOrDeadPool(token));
@@ -384,24 +432,26 @@ export function findOriginalOgToken(searchName: string, candidates: JupTokenInfo
 
   const validTokens = Array.from(byMint.values());
   validTokens.sort((a, b) => {
-    const aPool = tokenPoolCreatedAtMs(a);
-    const bPool = tokenPoolCreatedAtMs(b);
-    if (Number.isFinite(aPool) && Number.isFinite(bPool)) {
-      if (aPool !== bPool) return aPool - bPool;
-    } else if (Number.isFinite(aPool)) {
-      return -1;
-    } else if (Number.isFinite(bPool)) {
-      return 1;
-    }
+    // Safe tokens rank above unsafe ones
+    const aUnsafe = hasUnsafeTokenAuthority(a);
+    const bUnsafe = hasUnsafeTokenAuthority(b);
+    if (aUnsafe !== bUnsafe) return aUnsafe ? 1 : -1;
+
+    // Primary sort: on-chain mint date (oldest = true OG)
     const aMint = tokenCreatedAtMs(a);
     const bMint = tokenCreatedAtMs(b);
-    if (Number.isFinite(aMint) && Number.isFinite(bMint)) {
-      if (aMint !== bMint) return aMint - bMint;
-    } else if (Number.isFinite(aMint)) {
-      return -1;
-    } else if (Number.isFinite(bMint)) {
-      return 1;
-    }
+    if (Number.isFinite(aMint) && Number.isFinite(bMint) && aMint !== bMint) return aMint - bMint;
+    if (Number.isFinite(aMint) && !Number.isFinite(bMint)) return -1;
+    if (!Number.isFinite(aMint) && Number.isFinite(bMint)) return 1;
+
+    // Secondary sort: first pool date (oldest pool = first to trade)
+    const aPool = tokenPoolCreatedAtMs(a);
+    const bPool = tokenPoolCreatedAtMs(b);
+    if (Number.isFinite(aPool) && Number.isFinite(bPool) && aPool !== bPool) return aPool - bPool;
+    if (Number.isFinite(aPool)) return -1;
+    if (Number.isFinite(bPool)) return 1;
+
+    // Tiebreak: liquidity depth (deeper pool = more credible)
     return tokenEffectiveLiquidityUsd(b) - tokenEffectiveLiquidityUsd(a);
   });
 
@@ -492,10 +542,23 @@ export function hasPulledOrDeadLiquidity(token: Pick<JupTokenInfo, "liquidity" |
   const quoteLiquidity: number | undefined = token.quoteLiquidityUsd;
   const marketCap: number = token.mcap ?? token.fdv ?? 0;
 
+  // Definitive: explicitly flagged as LP pulled and liquidity is gone
   if (token.lpPulled === true && effectiveLiquidity < MIN_OGSCAN_LIQUIDITY_USD) return true;
+
+  // Definitive: quote-side liquidity is tiny despite high reported liquidity
+  // (classic rug: reported liq includes a worthless base token)
   if (quoteLiquidity != null && quoteLiquidity < 500 && reportedLiquidity >= 10_000) return true;
-  if (effectiveLiquidity < MIN_OGSCAN_LIQUIDITY_USD && reportedLiquidity >= 25_000) return true;
-  if (effectiveLiquidity < MIN_OGSCAN_LIQUIDITY_USD && marketCap >= 100_000) return true;
+
+  // Strong signal: reported liquidity is large but effective is almost zero —
+  // the LP backing has been removed.
+  if (effectiveLiquidity < MIN_OGSCAN_LIQUIDITY_USD && reportedLiquidity >= 50_000) return true;
+
+  // REMOVED the "effectiveLiquidity < 1000 && marketCap >= 100_000" rule.
+  // This rule incorrectly disqualifies legitimate older OG tokens that have a
+  // very high market cap but a naturally thin pool — e.g. historical mints
+  // that were never heavily traded.  A large MC with thin LP does NOT mean the
+  // LP was pulled; it can simply mean the token is old and illiquid.
+
   return false;
 }
 
@@ -1378,12 +1441,58 @@ async function heliusTokenAuthorityIntel(mint: string): Promise<TokenAuthorityIn
   return task;
 }
 
+// Helius DAS getAsset — returns the mint's on-chain creation time directly,
+// much faster than walking thousands of tx signatures.
+type HeliusAssetResponse = {
+  result?: {
+    id?: string;
+    created_at?: number | null;
+    compression?: { created_at?: number | null };
+  };
+  error?: { message?: string };
+};
+
+async function heliusAssetMintCreatedAt(mint: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(HELIUS_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "og-get-asset",
+        method: "getAsset",
+        params: { id: mint },
+      }),
+    });
+    if (!res.ok) return undefined;
+    const json = (await res.json()) as HeliusAssetResponse;
+    const r = json.result;
+    if (!r) return undefined;
+    const raw = r.created_at ?? r.compression?.created_at;
+    return unixSecondsToIso(typeof raw === "number" ? raw : undefined);
+  } catch {
+    return undefined;
+  }
+}
+
 async function heliusMintCreatedAt(mint: string): Promise<string | undefined> {
+  // First try the fast DAS getAsset path — avoids walking thousands of sigs.
+  try {
+    const dasDate = await heliusAssetMintCreatedAt(mint);
+    if (dasDate) return dasDate;
+  } catch {
+    /* fall through to signature scan */
+  }
+
+  // Fall back: walk getSignaturesForAddress.  Cap at 8 pages (8 000 sigs)
+  // instead of 25 000 — popular tokens have hundreds of thousands of txs
+  // and we'll never reach the creation sig that way anyway.  Birdeye already
+  // ran first and we only land here as a last resort.
   const limit = 1000;
   let before: string | undefined;
   let oldestBlockTime: number | undefined;
 
-  for (let page = 0; page < 25; page += 1) {
+  for (let page = 0; page < 8; page += 1) {
     const params = before ? [mint, { limit, before }] : [mint, { limit }];
     const res = await fetch(HELIUS_RPC, {
       method: "POST",
@@ -1420,13 +1529,25 @@ async function mintCreatedAt(mint: string): Promise<string | undefined> {
   if (cached) return cached;
 
   const task = (async (): Promise<string | undefined> => {
-    try {
-      const birdeyeCreatedAt = await birdeyeMintCreatedAt(mint);
-      if (birdeyeCreatedAt) return birdeyeCreatedAt;
-    } catch {
-      /* fall back to RPC scan */
+    // Run Birdeye + Helius DAS in parallel — both are fast single-request calls.
+    // Take the *earliest* valid result so we never accidentally use a recycled
+    // or inaccurate later date.
+    const [birdeyeResult, dasResult] = await Promise.allSettled([
+      birdeyeMintCreatedAt(mint),
+      heliusAssetMintCreatedAt(mint),
+    ]);
+
+    const dates: string[] = [
+      birdeyeResult.status === "fulfilled" ? birdeyeResult.value : undefined,
+      dasResult.status === "fulfilled" ? dasResult.value : undefined,
+    ].filter((d): d is string => Boolean(d) && new Date(d!).getTime() > 0 && new Date(d!).getTime() <= Date.now());
+
+    if (dates.length > 0) {
+      // Return the earliest (oldest) confirmed date
+      return dates.reduce((a, b) => (new Date(a).getTime() < new Date(b).getTime() ? a : b));
     }
 
+    // Last resort: walk tx signatures
     return heliusMintCreatedAt(mint);
   })();
 
@@ -2508,8 +2629,25 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   const chainDatedPool: JupTokenInfo[] = await withOnChainCreationDates(pool);
   const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: false, includeOnChainIntel: true, maxOnChain: 14, maxBirdeye: 24 });
 
-  const liquidCandidates: JupTokenInfo[] = enriched.filter(hasMinimumOgScanLiquidity);
-  const originPool: JupTokenInfo[] = liquidCandidates.filter((token) => !hasPulledOrDeadLiquidity(token) && (isCanonicalSolanaOriginForQuery(token, clean) || !hasUnsafeTokenAuthority(token)));
+  // ── Safety filtering ────────────────────────────────────────────────────
+  // A token must have real liquidity to be shown.  LP-rug/scam tokens are
+  // rejected unless they are the pinned canonical mint (in which case we keep
+  // them for informational display but mark them clearly).
+  const liquidCandidates: JupTokenInfo[] = enriched.filter((token) => {
+    // Canonical mint always passes the liquidity gate — we never hide it
+    if (isCanonicalSolanaOriginForQuery(token, clean)) return true;
+    return hasMinimumOgScanLiquidity(token);
+  });
+
+  const originPool: JupTokenInfo[] = liquidCandidates.filter((token) => {
+    // Canonical mint always passes the authority gate
+    if (isCanonicalSolanaOriginForQuery(token, clean)) return true;
+    // Skip tokens with LP pulled (scam/rug) unless canonical
+    if (hasPulledOrDeadLiquidity(token)) return false;
+    // Skip tokens with active mint/freeze authority (rug risk)
+    if (hasUnsafeTokenAuthority(token)) return false;
+    return true;
+  });
 
   const candidates: JupTokenInfo[] = originPool
     .filter((token) => isCanonicalSolanaOriginForQuery(token, clean) || Number.isFinite(tokenCreatedAtMs(token)) || Number.isFinite(tokenPoolCreatedAtMs(token)))
