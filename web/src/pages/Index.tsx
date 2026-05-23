@@ -15,6 +15,7 @@ import {
   Map,
   Menu,
   Radar,
+  Radio,
   Rocket,
   Rss,
   Search,
@@ -40,6 +41,7 @@ import { TechStack } from "@/components/TechStack";
 import { OurCoin } from "@/components/OurCoin";
 import { SnipeFeed } from "@/components/SnipeFeed";
 import { Feed } from "@/components/Feed";
+import { NewsSignal } from "@/components/NewsSignal";
 import { SolToolsRoadmap } from "@/components/SolToolsRoadmap";
 import { cn } from "@/lib/utils";
 import { DEFAULT_OG_MINT, OGSCAN_DEV_WALLET, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr } from "@/lib/og";
@@ -62,7 +64,8 @@ type TabId =
   | "whales"
   | "tx-feed"
   | "swap"
-  | "tech";
+  | "tech"
+  | "news-signal";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
@@ -261,6 +264,17 @@ const TABS: TabConfig[] = [
     accent: "white",
     group: "Project",
   },
+  {
+    id: "news-signal",
+    label: "News Signal",
+    slug: "news-signal",
+    pageNumber: 16,
+    eyebrow: "Influencer Intel",
+    description: "Elon, Trump, White House & more — find the coins before the market reacts.",
+    Icon: Radio,
+    accent: "lime",
+    group: "Market",
+  },
 ];
 
 const NAV_TABS: TabConfig[] = TABS.filter((t: TabConfig) => t.showInNav !== false);
@@ -329,6 +343,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void): 
   if (tab === "tx-feed") return <TxFeed mint={mint} />;
   if (tab === "swap") return <SwapPanel ogMint={mint} onSelectMint={updateMint} />;
   if (tab === "tech") return <TechStack />;
+  if (tab === "news-signal") return <NewsSignal onSelect={updateMint} />;
   return null;
 };
 
@@ -947,8 +962,9 @@ const launchSuiteOptions: SuiteOption<"snipe-feed" | "migrations">[] = [
   { id: "migrations", label: "Migrations", eyebrow: "Pump.fun → DEX", description: "Migration timing and breakouts.", Icon: Rocket, accent: "gold" },
 ];
 
-const marketSuiteOptions: SuiteOption<"feed" | "market-pulse" | "pairs" | "trending" | "whales" | "tx-feed">[] = [
+const marketSuiteOptions: SuiteOption<"feed" | "market-pulse" | "pairs" | "trending" | "news-signal" | "whales" | "tx-feed">[] = [
   { id: "feed", label: "Live Feed", eyebrow: "Narrative tape", description: "Trending, runners, bundles, boosts.", Icon: Rss, accent: "lime" },
+  { id: "news-signal", label: "News Signal", eyebrow: "Influencer intel", description: "Elon, Trump, White House — find coins early.", Icon: Radio, accent: "lime" },
   { id: "market-pulse", label: "Vitals", eyebrow: "Active mint", description: "Price, liquidity, holders, chart.", Icon: Activity, accent: "blue" },
   { id: "pairs", label: "Pairs", eyebrow: "Pool discovery", description: "Fresh Solana DEX pair radar.", Icon: Radar, accent: "cyan" },
   { id: "trending", label: "Trending", eyebrow: "Market heat", description: "Fastest-moving tokens now.", Icon: Flame, accent: "cyan" },
@@ -977,11 +993,12 @@ const LaunchRadarSuite = ({ onSelect }: { onSelect: (m: string) => void }) => {
 };
 
 const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: string) => void }) => {
-  const [active, setActive] = useState<"feed" | "market-pulse" | "pairs" | "trending" | "whales" | "tx-feed">("feed");
+  const [active, setActive] = useState<"feed" | "market-pulse" | "pairs" | "trending" | "news-signal" | "whales" | "tx-feed">("feed");
   return (
     <section>
       <SuiteNav options={marketSuiteOptions} activeId={active} onChange={setActive} />
       {active === "feed" && <Feed onSelect={onSelect} />}
+      {active === "news-signal" && <NewsSignal onSelect={onSelect} />}
       {active === "market-pulse" && <OgStats mint={mint} onSelect={onSelect} />}
       {active === "pairs" && <PairTracker onSelect={onSelect} />}
       {active === "trending" && <Trending onSelect={onSelect} />}
