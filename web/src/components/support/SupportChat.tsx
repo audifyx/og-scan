@@ -115,7 +115,7 @@ export const SupportChat = () => {
       )}
 
       {open && (
-        <div className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-[100] w-[340px] max-h-[480px] rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card flex flex-col">
+        <div className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-[100] w-[340px] max-h-[480px] rounded-2xl overflow-hidden border border-white/[0.07] shadow-2xl bg-card flex flex-col">
           {/* Header */}
           <div className="p-3 bg-gradient-to-r from-primary to-accent text-primary-foreground flex items-center justify-between">
             <div>
@@ -152,7 +152,7 @@ export const SupportChat = () => {
                   )}
                   {messages.map(m => (
                     <div key={m.id} className={`flex ${m.is_admin ? '' : 'justify-end'}`}>
-                      <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${m.is_admin ? 'bg-muted/50 rounded-bl-md' : 'bg-primary text-primary-foreground rounded-br-md'}`}>
+                      <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${m.is_admin ? 'bg-white/[0.04] rounded-bl-md' : 'bg-primary text-primary-foreground rounded-br-md'}`}>
                         {m.is_admin && <p className="text-[9px] text-primary font-bold mb-0.5">Admin Support</p>}
                         <p>{m.content}</p>
                         <p className="text-[9px] opacity-50 mt-0.5">{formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}</p>

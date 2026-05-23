@@ -348,7 +348,7 @@ export const WalletRelationshipGraph = () => {
                 {connections.map((conn, i) => (
                   <div 
                     key={i} 
-                    className="p-3 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer border border-transparent hover:border-primary/30"
+                    className="p-3 rounded-lg bg-white/[0.04] hover:bg-muted/80 transition-colors cursor-pointer border border-transparent hover:border-primary/30"
                     onClick={() => fetchWalletDetails(conn.address)}
                   >
                     <div className="flex items-center justify-between">
@@ -412,7 +412,7 @@ export const WalletRelationshipGraph = () => {
           ) : walletDetails ? (
             <div className="space-y-4">
               {/* Address Bar */}
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.04]">
                 <code className="text-sm font-mono">{walletDetails.address}</code>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyAddress(walletDetails.address)}>
@@ -470,7 +470,7 @@ export const WalletRelationshipGraph = () => {
                       walletDetails.tokens.map((token, i) => (
                         <div 
                           key={i}
-                          className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors border border-transparent hover:border-primary/30"
+                          className="p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] cursor-pointer transition-colors border border-transparent hover:border-primary/30"
                           onClick={() => fetchTokenDetails(token.address, token.name, token.symbol)}
                         >
                           <div className="flex items-center justify-between">
@@ -536,7 +536,7 @@ export const WalletRelationshipGraph = () => {
                 </div>
 
                 {/* Contract Address */}
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-white/[0.04]">
                   <code className="text-xs font-mono flex-1 truncate">{tokenDetails.address}</code>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyAddress(tokenDetails.address)}>
                     <Copy className="h-3 w-3" />

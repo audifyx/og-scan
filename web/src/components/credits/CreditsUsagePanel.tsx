@@ -149,7 +149,7 @@ export const CreditsUsagePanel = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="pricing" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-muted/30 p-1 rounded-xl">
+        <TabsList className="grid w-full grid-cols-2 bg-white/[0.04] p-1 rounded-xl">
           <TabsTrigger value="pricing" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">
             Cost Breakdown
           </TabsTrigger>
@@ -177,7 +177,7 @@ export const CreditsUsagePanel = () => {
                       {tools.map((tool) => (
                         <div 
                           key={tool.key}
-                          className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border/50"
+                          className="flex items-center justify-between p-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.04] transition-colors border border-transparent hover:border-white/[0.07]"
                         >
                           <span className="text-sm">{tool.name}</span>
                           <Badge variant="outline" className="font-mono text-xs border-primary/30 text-primary">
@@ -207,7 +207,7 @@ export const CreditsUsagePanel = () => {
                   {transactions.map((tx) => (
                     <div 
                       key={tx.id}
-                      className="flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
+                      className="flex items-center justify-between p-4 rounded-xl bg-white/[0.04] hover:bg-white/[0.04] transition-colors"
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{tx.tool_name}</p>

@@ -89,7 +89,7 @@ export const LobbyChat = ({ lobbyId }: { lobbyId: string }) => {
               <div className={`px-2.5 py-1.5 rounded-xl text-xs ${
                 msg.user_id === user?.id 
                   ? "bg-primary/15 text-primary-foreground border border-primary/20" 
-                  : "bg-muted/30 border border-border/30"
+                  : "bg-white/[0.04] border border-border/30"
               }`}>
                 {msg.content}
               </div>
@@ -103,7 +103,7 @@ export const LobbyChat = ({ lobbyId }: { lobbyId: string }) => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message..."
-          className="flex-1 bg-muted/20 border border-border/30 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30"
+          className="flex-1 bg-white/[0.03] border border-border/30 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30"
         />
         <button type="submit" disabled={sending || !input.trim()} className="p-2 rounded-lg bg-primary/15 text-primary hover:bg-primary/25 transition-colors disabled:opacity-40">
           <Send className="h-3.5 w-3.5" />

@@ -50,7 +50,7 @@ export const CreditConfirmDialog = ({
                 This action will use credits from your account:
               </p>
               
-              <div className="p-4 rounded-lg bg-muted/50 space-y-3">
+              <div className="p-4 rounded-lg bg-white/[0.04] space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-foreground">{toolInfo.name}</span>
                   <span className="font-mono font-bold text-primary">

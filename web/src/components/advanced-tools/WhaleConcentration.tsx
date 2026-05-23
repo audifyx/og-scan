@@ -74,11 +74,11 @@ export const WhaleConcentration = () => {
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground">Total Holders</p>
               <p className="text-xl font-bold">{holders.totalHolders.toLocaleString()}</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground">Top 10 Hold</p>
               <p className="text-xl font-bold">{holders.top10Percent.toFixed(1)}%</p>
             </div>

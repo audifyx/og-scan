@@ -72,7 +72,7 @@ export const InsiderDetector = () => {
       {results && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-muted/50">
+            <div className="p-3 rounded-lg bg-white/[0.04]">
               <p className="text-xs text-muted-foreground">Total Holders</p>
               <p className="text-xl font-bold">{results.totalHolders}</p>
             </div>
@@ -85,7 +85,7 @@ export const InsiderDetector = () => {
           <div className="space-y-2">
             <p className="text-sm font-medium">Early Buyers</p>
             {results.earlyBuyers?.slice(0, 5).map((buyer: any, i: number) => (
-              <div key={i} className={`p-3 rounded-lg flex items-center justify-between ${buyer.isInsider ? "bg-red-500/10 border border-red-500/20" : "bg-muted/30"}`}>
+              <div key={i} className={`p-3 rounded-lg flex items-center justify-between ${buyer.isInsider ? "bg-red-500/10 border border-red-500/20" : "bg-white/[0.04]"}`}>
                 <div className="flex items-center gap-2">
                   {buyer.isInsider && <AlertTriangle className="h-4 w-4 text-red-500" />}
                   <span className="text-sm font-mono">{buyer.address.slice(0, 8)}...</span>

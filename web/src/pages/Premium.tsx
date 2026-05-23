@@ -59,7 +59,7 @@ const Premium = () => {
 
       <div className="p-4 lg:p-6 space-y-6">
         {/* Credits Overview - Enhanced */}
-        <Card className="glass-card-premium overflow-hidden relative">
+        <Card className="og-glass-card-premium overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5" />
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
           
@@ -68,7 +68,7 @@ const Premium = () => {
               {/* Main Balance */}
               <div className="col-span-2 lg:col-span-1 flex items-center gap-4">
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
-                  <Sparkles className="h-6 w-6 text-primary" />
+                  <Sparkles className="h-6 w-6 text-[#22d3ee]" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Available</p>
@@ -90,7 +90,7 @@ const Premium = () => {
               {/* Usage Percentage */}
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-secondary/10">
-                  <BarChart3 className="h-5 w-5 text-secondary" />
+                  <BarChart3 className="h-5 w-5 text-[#eab308]" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Available</p>
@@ -131,10 +131,10 @@ const Premium = () => {
             { icon: Bell, label: "Price Alerts", desc: "Never miss" },
             { icon: Users, label: "Compare", desc: "Multi-wallet" },
           ].map((feature, i) => (
-            <Card key={i} className="glass-card hover:border-primary/30 transition-all hover:scale-[1.02] cursor-pointer group">
+            <Card key={i} className="og-glass-card hover:border-primary/30 transition-all hover:scale-[1.02] cursor-pointer group">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                  <feature.icon className="h-5 w-5 text-primary" />
+                  <feature.icon className="h-5 w-5 text-[#22d3ee]" />
                 </div>
                 <div>
                   <p className="font-semibold text-sm">{feature.label}</p>
@@ -148,12 +148,12 @@ const Premium = () => {
         {/* Main Tools Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="overflow-x-auto pb-3 -mx-4 px-4">
-            <TabsList className="inline-flex h-auto gap-1.5 bg-muted/30 p-2 rounded-2xl min-w-max">
+            <TabsList className="inline-flex h-auto gap-1.5 bg-white/[0.04] p-2 rounded-2xl min-w-max">
               {tabItems.map((tab) => (
                 <TabsTrigger 
                   key={tab.value}
                   value={tab.value} 
-                  className="flex items-center gap-2 px-4 py-3 rounded-xl data-[state=active]:bg-card data-[state=active]:shadow-md data-[state=active]:text-primary whitespace-nowrap transition-all text-sm"
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl data-[state=active]:bg-[hsl(var(--og-ink))/90] data-[state=active]:shadow-md data-[state=active]:text-primary whitespace-nowrap transition-all text-sm"
                 >
                   <tab.icon className="h-4 w-4" />
                   <span className="font-medium">{tab.label}</span>

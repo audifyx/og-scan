@@ -68,7 +68,7 @@ export const LPPositionScanner = () => {
       {positions.length > 0 ? (
         <div className="space-y-2">
           {positions.map((pos, i) => (
-            <div key={i} className="p-3 rounded-lg bg-muted/50 flex items-center justify-between">
+            <div key={i} className="p-3 rounded-lg bg-white/[0.04] flex items-center justify-between">
               <div>
                 <p className="font-medium text-sm">{pos.name}</p>
                 <p className="text-xs text-muted-foreground">{pos.balance.toFixed(6)} {pos.symbol}</p>

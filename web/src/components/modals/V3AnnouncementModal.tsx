@@ -61,7 +61,7 @@ export const V3AnnouncementModal = () => {
         <ScrollArea className="max-h-[50vh] px-6 pb-2">
           <div className="space-y-2">
             {ALL_FEATURES.map((f, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-2xl bg-muted/20 border border-border/30 hover:border-primary/20 transition-colors animate-fade-in" style={{ animationDelay: `${i * 40}ms` }}>
+              <div key={i} className="flex items-start gap-3 p-3 rounded-2xl bg-white/[0.03] border border-border/30 hover:border-primary/20 transition-colors animate-fade-in" style={{ animationDelay: `${i * 40}ms` }}>
                 <div className="p-2 rounded-xl bg-primary/10 shrink-0">
                   <f.icon className="h-4 w-4 text-primary" />
                 </div>

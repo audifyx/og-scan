@@ -253,7 +253,7 @@ const Admin = () => {
     setSendingAnnouncement(false);
   };
 
-  if (loading) return <AppLayout><div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div></AppLayout>;
+  if (loading) return <AppLayout><div className="flex items-center justify-center h-full"><Loader2 className="h-12 w-12 animate-spin text-[#22d3ee]" /></div></AppLayout>;
   if (!isAdmin) return <AppLayout><div className="flex flex-col items-center justify-center h-full gap-4"><Shield className="h-16 w-16 text-destructive" /><h1 className="text-2xl font-bold">Access Denied</h1><p className="text-muted-foreground">You don't have permission to view this page.</p><Button onClick={() => navigate("/wallets")}>Go Home</Button></div></AppLayout>;
 
   const pendingCount = submissions.filter(s => s.status === "pending").length;
@@ -265,7 +265,7 @@ const Admin = () => {
     const isBoolean = setting.value?.hasOwnProperty?.('enabled');
     const hasValue = setting.value?.hasOwnProperty?.('value');
     return (
-      <div key={setting.key} className="flex items-center justify-between py-4 border-b border-border/50 last:border-0">
+      <div key={setting.key} className="flex items-center justify-between py-4 border-b border-white/[0.07] last:border-0">
         <div className="flex-1">
           <Label className="text-sm font-medium">{setting.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Label>
           <p className="text-xs text-muted-foreground mt-0.5">{setting.description}</p>
@@ -280,7 +280,7 @@ const Admin = () => {
   };
 
   const StatCard = ({ icon: Icon, label, value, color, sub }: { icon: any; label: string; value: string | number; color: string; sub?: string }) => (
-    <Card className="glass-card">
+    <Card className="og-glass-card">
       <CardContent className="p-4 flex items-center gap-3">
         <div className={`p-2.5 rounded-xl ${color}`}><Icon className="h-5 w-5" /></div>
         <div>
@@ -299,7 +299,7 @@ const Admin = () => {
           {/* Header */}
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-destructive/20"><Shield className="h-8 w-8 text-primary" /></div>
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-destructive/20"><Shield className="h-8 w-8 text-[#22d3ee]" /></div>
               <div>
                 <h1 className="text-2xl font-bold">Admin Dashboard</h1>
                 <p className="text-muted-foreground text-sm">Platform Management & Analytics</p>
@@ -310,7 +310,7 @@ const Admin = () => {
 
           {/* Tabs */}
           <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-            <TabsList className="bg-muted/50 p-1 rounded-xl flex overflow-x-auto w-full gap-1 h-auto flex-wrap">
+            <TabsList className="bg-white/[0.04] p-1 rounded-xl flex overflow-x-auto w-full gap-1 h-auto flex-wrap">
               {[
                 { val: "overview", icon: BarChart3, label: "Overview" },
                 { val: "users", icon: Users, label: "Users" },
@@ -333,7 +333,7 @@ const Admin = () => {
             {/* OVERVIEW */}
             <TabsContent value="overview" className="mt-6 space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-                <StatCard icon={Users} label="Total Users" value={stats.totalUsers} color="bg-primary/20 text-primary" />
+                <StatCard icon={Users} label="Total Users" value={stats.totalUsers} color="bg-primary/20 text-[#22d3ee]" />
                 <StatCard icon={Clock} label="Pending" value={pendingCount} color="bg-yellow-500/20 text-yellow-500" />
                 <StatCard icon={Rocket} label="Tokens" value={stats.totalSubmissions} color="bg-green-500/20 text-green-500" />
                 <StatCard icon={Activity} label="Actions" value={auditLogs.length} color="bg-secondary/20 text-secondary" />
@@ -342,9 +342,9 @@ const Admin = () => {
               </div>
 
               {/* Recent Activity */}
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardHeader className="flex flex-row items-center justify-between pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> Recent Activity</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2"><Activity className="h-5 w-5 text-[#22d3ee]" /> Recent Activity</CardTitle>
                   <Badge variant="outline" className="gap-1.5"><div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Live</Badge>
                 </CardHeader>
                 <CardContent>
@@ -365,7 +365,7 @@ const Admin = () => {
 
               {/* Quick Stats Cards */}
               <div className="grid sm:grid-cols-2 gap-4">
-                <Card className="glass-card">
+                <Card className="og-glass-card">
                   <CardHeader className="pb-3"><CardTitle className="text-lg">Top Credit Users</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-2">
@@ -381,7 +381,7 @@ const Admin = () => {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="glass-card">
+                <Card className="og-glass-card">
                   <CardHeader className="pb-3"><CardTitle className="text-lg">Recent Submissions</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-2">
@@ -402,9 +402,9 @@ const Admin = () => {
 
             {/* USERS */}
             <TabsContent value="users" className="mt-6">
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
-                  <div><CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> User Accounts</CardTitle><CardDescription>{users.length} registered users</CardDescription></div>
+                  <div><CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-[#22d3ee]" /> User Accounts</CardTitle><CardDescription>{users.length} registered users</CardDescription></div>
                   <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search users..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 w-64" /></div>
                 </CardHeader>
                 <CardContent>
@@ -426,7 +426,7 @@ const Admin = () => {
                               <TableCell>
                                 <div className="flex items-center gap-3">
                                   <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-xs font-bold">{(p.username || p.user_id).charAt(0).toUpperCase()}</div>
-                                  <code className="text-xs bg-muted/50 px-2 py-1 rounded">{p.user_id.slice(0, 8)}...</code>
+                                  <code className="text-xs bg-white/[0.04] px-2 py-1 rounded">{p.user_id.slice(0, 8)}...</code>
                                 </div>
                               </TableCell>
                               <TableCell><span className="font-medium">{p.username || "—"}</span></TableCell>
@@ -446,9 +446,9 @@ const Admin = () => {
 
             {/* SUBMISSIONS */}
             <TabsContent value="submissions" className="mt-6">
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
-                  <div><CardTitle className="flex items-center gap-2"><Rocket className="h-5 w-5 text-primary" /> Token Submissions</CardTitle><CardDescription>Manage PUMP V5 token listings</CardDescription></div>
+                  <div><CardTitle className="flex items-center gap-2"><Rocket className="h-5 w-5 text-[#22d3ee]" /> Token Submissions</CardTitle><CardDescription>Manage PUMP V5 token listings</CardDescription></div>
                   <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search tokens..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 w-64" /></div>
                 </CardHeader>
                 <CardContent>
@@ -464,7 +464,7 @@ const Admin = () => {
                                 <div><p className="font-medium">{s.token_name}</p><p className="text-xs text-muted-foreground">${s.symbol}</p></div>
                               </div>
                             </TableCell>
-                            <TableCell><code className="text-xs bg-muted/50 px-2 py-1 rounded">{s.contract_address.slice(0, 8)}...</code></TableCell>
+                            <TableCell><code className="text-xs bg-white/[0.04] px-2 py-1 rounded">{s.contract_address.slice(0, 8)}...</code></TableCell>
                             <TableCell><Badge variant="outline">{s.launch_platform}</Badge></TableCell>
                             <TableCell><Badge className={s.status === "pending" ? "bg-yellow-500/20 text-yellow-500" : s.status === "approved" || s.status === "live" ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"}>{s.status}</Badge></TableCell>
                             <TableCell><Switch checked={s.is_featured} onCheckedChange={(c) => updateSubmission(s.id, { is_featured: c })} /></TableCell>
@@ -486,9 +486,9 @@ const Admin = () => {
 
             {/* LOBBIES */}
             <TabsContent value="lobbies" className="mt-6">
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Headphones className="h-5 w-5 text-primary" /> Trading Lobbies</CardTitle>
+                  <CardTitle className="flex items-center gap-2"><Headphones className="h-5 w-5 text-[#22d3ee]" /> Trading Lobbies</CardTitle>
                   <CardDescription>{lobbies.length} lobbies total, {lobbies.filter(l => l.is_active).length} active</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -497,7 +497,7 @@ const Admin = () => {
                       {lobbies.map(lobby => (
                         <div key={lobby.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/30">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="p-2.5 rounded-xl bg-primary/20"><Headphones className="h-5 w-5 text-primary" /></div>
+                            <div className="p-2.5 rounded-xl bg-primary/20"><Headphones className="h-5 w-5 text-[#22d3ee]" /></div>
                             <div className="min-w-0">
                               <p className="font-semibold text-sm truncate">{lobby.name}</p>
                               <p className="text-xs text-muted-foreground truncate">{lobby.description || "No description"}</p>
@@ -525,11 +525,11 @@ const Admin = () => {
             <TabsContent value="credits" className="mt-6 space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard icon={Coins} label="Total Credits Used" value={`$${stats.totalCreditsUsed.toLocaleString()}`} color="bg-accent/20 text-accent" />
-                <StatCard icon={Users} label="Users w/ Credits" value={Object.keys(userCredits).length} color="bg-primary/20 text-primary" />
+                <StatCard icon={Users} label="Users w/ Credits" value={Object.keys(userCredits).length} color="bg-primary/20 text-[#22d3ee]" />
                 <StatCard icon={TrendingUp} label="Avg Usage" value={`$${Object.keys(userCredits).length ? Math.round(stats.totalCreditsUsed / Object.keys(userCredits).length).toLocaleString() : 0}`} color="bg-green-500/20 text-green-500" />
                 <StatCard icon={AlertTriangle} label="Low Balance" value={Object.values(userCredits).filter(c => (c.total_credits - c.used_credits) < 5000).length} color="bg-yellow-500/20 text-yellow-500" />
               </div>
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardHeader><CardTitle className="text-lg">Credit Leaderboard</CardTitle></CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[400px]">
@@ -554,17 +554,17 @@ const Admin = () => {
 
             {/* LOGS */}
             <TabsContent value="logs" className="mt-6">
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <div><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> Audit Logs</CardTitle><CardDescription>Real-time admin activity (auto-refreshes 30s)</CardDescription></div>
+                  <div><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-[#22d3ee]" /> Audit Logs</CardTitle><CardDescription>Real-time admin activity (auto-refreshes 30s)</CardDescription></div>
                   <Badge variant="outline" className="gap-1.5"><div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Live</Badge>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[500px]">
                     <div className="space-y-3">
                       {auditLogs.map(log => (
-                        <div key={log.id} className="flex items-start gap-4 p-4 rounded-xl bg-muted/30 border border-border/50">
-                          <div className="p-2 rounded-lg bg-primary/10"><Activity className="h-4 w-4 text-primary" /></div>
+                        <div key={log.id} className="flex items-start gap-4 p-4 rounded-xl bg-muted/30 border border-white/[0.07]">
+                          <div className="p-2 rounded-lg bg-primary/10"><Activity className="h-4 w-4 text-[#22d3ee]" /></div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium text-sm">{log.action}</span>
@@ -575,7 +575,7 @@ const Admin = () => {
                               <span>•</span>
                               <span>Admin: {log.admin_user_id.slice(0, 8)}...</span>
                             </div>
-                            {log.new_values && <div className="mt-2 p-2 rounded-lg bg-muted/50 text-xs font-mono overflow-x-auto max-h-20">{JSON.stringify(log.new_values, null, 2)}</div>}
+                            {log.new_values && <div className="mt-2 p-2 rounded-lg bg-white/[0.04] text-xs font-mono overflow-x-auto max-h-20">{JSON.stringify(log.new_values, null, 2)}</div>}
                           </div>
                         </div>
                       ))}
@@ -587,9 +587,9 @@ const Admin = () => {
 
             {/* ANNOUNCEMENTS */}
             <TabsContent value="announcements" className="mt-6 space-y-6">
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary" /> Send Announcement</CardTitle>
+                  <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-[#22d3ee]" /> Send Announcement</CardTitle>
                   <CardDescription>Broadcast a notification to all users</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -615,8 +615,8 @@ const Admin = () => {
             {/* SECURITY */}
             <TabsContent value="security" className="mt-6 space-y-6">
               <div className="grid sm:grid-cols-2 gap-4">
-                <Card className="glass-card">
-                  <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ShieldAlert className="h-5 w-5 text-primary" /> Security Overview</CardTitle></CardHeader>
+                <Card className="og-glass-card">
+                  <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ShieldAlert className="h-5 w-5 text-[#22d3ee]" /> Security Overview</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
                       <span className="text-sm">RLS Policies Active</span>
@@ -636,7 +636,7 @@ const Admin = () => {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="glass-card">
+                <Card className="og-glass-card">
                   <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Ban className="h-5 w-5 text-destructive" /> Moderation</CardTitle></CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-sm text-muted-foreground">User moderation tools are available in the Users tab. Click any user to view details and manage credits.</p>
@@ -656,7 +656,7 @@ const Admin = () => {
             {/* SETTINGS */}
             <TabsContent value="settings" className="mt-6">
               <div className="grid lg:grid-cols-4 gap-6">
-                <Card className="glass-card lg:col-span-1">
+                <Card className="og-glass-card lg:col-span-1">
                   <CardHeader><CardTitle className="text-lg">Categories</CardTitle></CardHeader>
                   <CardContent className="p-2">
                     <div className="space-y-1">
@@ -668,9 +668,9 @@ const Admin = () => {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="glass-card lg:col-span-3">
+                <Card className="og-glass-card lg:col-span-3">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-primary" /> {SETTING_CATEGORIES.find(c => c.id === settingsCategory)?.name} Settings</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-[#22d3ee]" /> {SETTING_CATEGORIES.find(c => c.id === settingsCategory)?.name} Settings</CardTitle>
                     <CardDescription>Configure platform behavior and features</CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -696,12 +696,12 @@ const Admin = () => {
               {selectedUser && (
                 <div className="space-y-6">
                   <div className="grid grid-cols-3 gap-4">
-                    <Card className="glass-card"><CardContent className="p-4 text-center"><Coins className="h-6 w-6 text-accent mx-auto mb-2" /><p className="text-2xl font-bold">${(userCredits[selectedUser.user_id]?.used_credits || 0).toLocaleString()}</p><p className="text-xs text-muted-foreground">Used</p></CardContent></Card>
-                    <Card className="glass-card"><CardContent className="p-4 text-center"><Zap className="h-6 w-6 text-green-500 mx-auto mb-2" /><p className="text-2xl font-bold">${((userCredits[selectedUser.user_id]?.total_credits || 50000) - (userCredits[selectedUser.user_id]?.used_credits || 0)).toLocaleString()}</p><p className="text-xs text-muted-foreground">Left</p></CardContent></Card>
-                    <Card className="glass-card"><CardContent className="p-4 text-center"><Activity className="h-6 w-6 text-primary mx-auto mb-2" /><p className="text-2xl font-bold">{userTransactions.length}</p><p className="text-xs text-muted-foreground">Txns</p></CardContent></Card>
+                    <Card className="og-glass-card"><CardContent className="p-4 text-center"><Coins className="h-6 w-6 text-accent mx-auto mb-2" /><p className="text-2xl font-bold">${(userCredits[selectedUser.user_id]?.used_credits || 0).toLocaleString()}</p><p className="text-xs text-muted-foreground">Used</p></CardContent></Card>
+                    <Card className="og-glass-card"><CardContent className="p-4 text-center"><Zap className="h-6 w-6 text-green-500 mx-auto mb-2" /><p className="text-2xl font-bold">${((userCredits[selectedUser.user_id]?.total_credits || 50000) - (userCredits[selectedUser.user_id]?.used_credits || 0)).toLocaleString()}</p><p className="text-xs text-muted-foreground">Left</p></CardContent></Card>
+                    <Card className="og-glass-card"><CardContent className="p-4 text-center"><Activity className="h-6 w-6 text-primary mx-auto mb-2" /><p className="text-2xl font-bold">{userTransactions.length}</p><p className="text-xs text-muted-foreground">Txns</p></CardContent></Card>
                   </div>
-                  <Card className="glass-card border-primary/30">
-                    <CardHeader className="pb-3"><CardTitle className="text-lg flex items-center gap-2"><Coins className="h-5 w-5 text-primary" /> Manage Credits</CardTitle></CardHeader>
+                  <Card className="og-glass-card border-primary/30">
+                    <CardHeader className="pb-3"><CardTitle className="text-lg flex items-center gap-2"><Coins className="h-5 w-5 text-[#22d3ee]" /> Manage Credits</CardTitle></CardHeader>
                     <CardContent>
                       {!editingCredits ? (
                         <Button onClick={() => setEditingCredits(true)} className="w-full"><Settings className="h-4 w-4 mr-2" /> Edit Credit Balance</Button>
@@ -721,7 +721,7 @@ const Admin = () => {
                       )}
                     </CardContent>
                   </Card>
-                  <Card className="glass-card">
+                  <Card className="og-glass-card">
                     <CardHeader className="pb-3"><CardTitle className="text-lg">Transaction History</CardTitle></CardHeader>
                     <CardContent>
                       <ScrollArea className="h-[200px]">

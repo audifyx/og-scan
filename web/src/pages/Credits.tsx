@@ -104,31 +104,31 @@ const Credits = () => {
 
       <div className="p-4 lg:p-6 space-y-6">
         {/* Hero Balance Card */}
-        <Card className="og-glass-card-premium overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/5 to-transparent" />
-          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-[150px]" />
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+        <Card className="og-glass-frame overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#22d3ee]/8 via-transparent to-transparent" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-[#22d3ee]/10 rounded-full blur-[150px]" />
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#22d3ee]/40 to-transparent" />
           
           <CardContent className="relative p-6 lg:p-8">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               <div className="flex items-center gap-5">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary blur-xl opacity-60" />
-                  <div className="relative p-5 rounded-2xl bg-gradient-to-br from-primary to-secondary shadow-2xl shadow-primary/40">
-                    <Sparkles className="h-10 w-10 text-primary-foreground" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#22d3ee] to-[#eab308] blur-xl opacity-40" />
+                  <div className="relative p-5 rounded-2xl bg-gradient-to-br from-[#22d3ee] to-[#eab308] shadow-2xl shadow-[#22d3ee]/25">
+                    <Sparkles className="h-10 w-10 text-[hsl(var(--og-ink))]" />
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground font-medium mb-1">Available Credits</p>
+                  <p className="text-sm text-white/40 font-medium mb-1">Available Credits</p>
                   <p className="text-5xl font-bold font-mono gradient-text">{formatBalance(remaining)}</p>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm text-white/35 mt-1">
                     of <span className="font-mono text-foreground">{formatBalance(MONTHLY_CREDIT_ALLOWANCE)}</span> monthly credits • <span className="font-mono text-foreground">{formatBalance(DAILY_USAGE_ALLOWANCE)}</span> usable cap
                   </p>
                 </div>
               </div>
               
               <div className="flex items-center gap-3">
-                <Badge className="bg-primary/20 text-primary border-primary/30 gap-1.5 px-3 py-1.5">
+                <Badge className="bg-[#eab308]/10 text-[#eab308] border-[#eab308]/20 gap-1.5 px-3 py-1.5">
                   <Crown className="h-3.5 w-3.5" />
                   Pro Plan
                 </Badge>
@@ -137,7 +137,7 @@ const Credits = () => {
             
             <div className="mt-8 space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-primary font-medium">{percentage.toFixed(0)}% remaining</span>
+                <span className="text-[#22d3ee] font-medium">{percentage.toFixed(0)}% remaining</span>
                 {percentage < 20 && (
                   <span className="text-amber-500 flex items-center gap-1.5">
                     <AlertTriangle className="h-3.5 w-3.5" />
@@ -147,7 +147,7 @@ const Credits = () => {
               </div>
               <div className="h-4 rounded-full bg-white/[0.04] overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-primary via-secondary to-accent rounded-full transition-all duration-700 relative overflow-hidden"
+                  className="h-full bg-gradient-to-r from-[#22d3ee] via-[#eab308] to-[#22d3ee] rounded-full transition-all duration-700 relative overflow-hidden"
                   style={{ width: `${percentage}%` }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent" />
@@ -222,16 +222,16 @@ const Credits = () => {
 
         {/* Tabs Section */}
         <Tabs defaultValue="history" className="w-full">
-          <TabsList className="grid w-full max-w-lg grid-cols-3 bg-muted/30 p-1.5 rounded-xl">
-            <TabsTrigger value="history" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm gap-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3 bg-white/[0.04] p-1.5 rounded-xl">
+            <TabsTrigger value="history" className="rounded-lg data-[state=active]:bg-[hsl(var(--og-ink))/90] data-[state=active]:shadow-sm gap-2">
               <History className="h-4 w-4" />
               History
             </TabsTrigger>
-            <TabsTrigger value="breakdown" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm gap-2">
+            <TabsTrigger value="breakdown" className="rounded-lg data-[state=active]:bg-[hsl(var(--og-ink))/90] data-[state=active]:shadow-sm gap-2">
               <PieChart className="h-4 w-4" />
               Breakdown
             </TabsTrigger>
-            <TabsTrigger value="pricing" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm gap-2">
+            <TabsTrigger value="pricing" className="rounded-lg data-[state=active]:bg-[hsl(var(--og-ink))/90] data-[state=active]:shadow-sm gap-2">
               <Coins className="h-4 w-4" />
               Pricing
             </TabsTrigger>
@@ -259,7 +259,7 @@ const Credits = () => {
                       {transactions.map((tx) => (
                         <div 
                           key={tx.id}
-                          className="flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-white/[0.04] transition-colors group"
+                          className="flex items-center justify-between p-4 rounded-xl bg-white/[0.04] hover:bg-white/[0.04] transition-colors group"
                         >
                           <div className="flex items-center gap-4">
                             <div className="p-2.5 rounded-xl bg-destructive/10">
@@ -296,7 +296,7 @@ const Credits = () => {
                 </CardHeader>
                 <CardContent>
                   {topTools.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">No usage data yet</p>
+                    <p className="text-sm text-white/35 text-center py-8">No usage data yet</p>
                   ) : (
                     <div className="space-y-4">
                       {topTools.map(([name, data], index) => (
@@ -340,7 +340,7 @@ const Credits = () => {
                       const dayTotal = txs.reduce((sum, tx) => sum + tx.cost, 0);
                       const isToday = day === format(new Date(), 'yyyy-MM-dd');
                       return (
-                        <div key={day} className={`flex items-center justify-between p-3 rounded-xl ${isToday ? 'bg-primary/10 border border-primary/20' : 'bg-muted/30'}`}>
+                        <div key={day} className={`flex items-center justify-between p-3 rounded-xl ${isToday ? 'bg-primary/10 border border-primary/20' : 'bg-white/[0.04]'}`}>
                           <div className="flex items-center gap-3">
                             <Calendar className="h-4 w-4 text-white/40" />
                             <span className="text-sm font-medium">
@@ -376,14 +376,14 @@ const Credits = () => {
                   <div className="space-y-6 pr-3">
                     {Object.entries(pricingByCategory).map(([category, tools]) => (
                       <div key={category} className="space-y-3">
-                        <div className="flex items-center gap-2 sticky top-0 bg-card py-2">
+                        <div className="flex items-center gap-2 sticky top-0 bg-[hsl(var(--og-ink))/90] py-2">
                           {getCategoryIcon(category)}
                           <h3 className="font-semibold text-lg">{category}</h3>
                           <Badge variant="outline" className="ml-auto text-xs">{tools.length} tools</Badge>
                         </div>
                         <div className="grid gap-2">
                           {tools.map((tool) => (
-                            <div key={tool.key} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-white/[0.04] transition-colors">
+                            <div key={tool.key} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.04] transition-colors">
                               <div className="flex items-center gap-3">
                                 <ChevronRight className="h-4 w-4 text-white/40" />
                                 <p className="font-medium">{tool.name}</p>

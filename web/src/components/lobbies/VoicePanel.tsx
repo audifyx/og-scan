@@ -194,7 +194,7 @@ export const VoicePanel = ({ lobbyId, lobbyName, autoJoin = true }: VoicePanelPr
 
   if (error) {
     return (
-      <div className="glass-card rounded-xl p-3">
+      <div className="og-glass-card rounded-xl p-3">
         <div className="flex items-center gap-2 mb-2">
           <Volume2 className="h-4 w-4 text-primary" />
           <span className="text-[10px] font-semibold font-display tracking-wider">VOICE CHAT</span>
@@ -208,7 +208,7 @@ export const VoicePanel = ({ lobbyId, lobbyName, autoJoin = true }: VoicePanelPr
   }
 
   return (
-    <div className="glass-card rounded-xl overflow-hidden">
+    <div className="og-glass-card rounded-xl overflow-hidden">
       {/* Header */}
       <div className="px-3 py-2 border-b border-primary/10 flex items-center gap-2">
         <div className="relative">
@@ -225,7 +225,7 @@ export const VoicePanel = ({ lobbyId, lobbyName, autoJoin = true }: VoicePanelPr
           </Badge>
         )}
         {connected && (
-          <button onClick={() => setShowSettings(!showSettings)} className="p-1 rounded-lg hover:bg-muted/30 text-muted-foreground transition-colors">
+          <button onClick={() => setShowSettings(!showSettings)} className="p-1 rounded-lg hover:bg-white/[0.04] text-muted-foreground transition-colors">
             <Settings2 className="h-3.5 w-3.5" />
           </button>
         )}
@@ -238,13 +238,13 @@ export const VoicePanel = ({ lobbyId, lobbyName, autoJoin = true }: VoicePanelPr
           <div className="flex gap-2">
             <button
               onClick={() => { setMode("auto"); setShowSettings(false); }}
-              className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${mode === "auto" ? "bg-primary/15 text-primary border border-primary/30" : "bg-muted/20 text-muted-foreground border border-border/20"}`}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${mode === "auto" ? "bg-primary/15 text-primary border border-primary/30" : "bg-white/[0.03] text-muted-foreground border border-border/20"}`}
             >
               Auto Detect
             </button>
             <button
               onClick={() => { setMode("push"); setMuted(true); streamRef.current?.getAudioTracks().forEach(t => (t.enabled = false)); setShowSettings(false); }}
-              className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${mode === "push" ? "bg-primary/15 text-primary border border-primary/30" : "bg-muted/20 text-muted-foreground border border-border/20"}`}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${mode === "push" ? "bg-primary/15 text-primary border border-primary/30" : "bg-white/[0.03] text-muted-foreground border border-border/20"}`}
             >
               Push to Talk
             </button>
@@ -313,7 +313,7 @@ export const VoicePanel = ({ lobbyId, lobbyName, autoJoin = true }: VoicePanelPr
                   className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
                     pushActive
                       ? "bg-green-500/20 text-green-400 border border-green-500/30 shadow-[0_0_15px_rgba(34,197,94,0.2)]"
-                      : "bg-muted/20 text-muted-foreground border border-border/30"
+                      : "bg-white/[0.03] text-muted-foreground border border-border/30"
                   }`}
                 >
                   <Mic className="h-4 w-4" />

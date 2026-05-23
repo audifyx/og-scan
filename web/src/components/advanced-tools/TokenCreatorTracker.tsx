@@ -68,7 +68,7 @@ export const TokenCreatorTracker = () => {
 
       {creatorInfo && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.04]">
             <div>
               <p className="text-xs text-muted-foreground">Token Deployments</p>
               <p className="text-xl font-bold">{creatorInfo.totalDeployments}</p>
@@ -96,7 +96,7 @@ export const TokenCreatorTracker = () => {
             <div className="space-y-2">
               <p className="text-sm font-medium">Recent Deployments</p>
               {creatorInfo.recentDeployments.map((tx: any, i: number) => (
-                <div key={i} className="p-2 rounded bg-muted/30 text-xs">
+                <div key={i} className="p-2 rounded bg-white/[0.04] text-xs">
                   <p className="font-mono">{formatAddress(tx.signature, 8)}</p>
                   <p className="text-muted-foreground">{tx.type}</p>
                 </div>

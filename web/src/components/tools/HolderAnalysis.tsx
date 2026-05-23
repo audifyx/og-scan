@@ -60,7 +60,7 @@ export const HolderAnalysis = () => {
   const top10Percent = holders.slice(0, 10).reduce((sum, h) => sum + parseFloat(h.percent), 0);
 
   return (
-    <Card className="glass-card h-full">
+    <Card className="og-glass-card h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" />
@@ -87,7 +87,7 @@ export const HolderAnalysis = () => {
 
         {holders.length > 0 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.04]">
               <span className="text-sm">Top 10 Holders Control</span>
               <span className={`font-bold ${top10Percent > 50 ? 'text-red-500' : 'text-green-500'}`}>
                 {top10Percent.toFixed(1)}%
@@ -99,7 +99,7 @@ export const HolderAnalysis = () => {
                 {holders.map((holder) => (
                   <div 
                     key={holder.address}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${

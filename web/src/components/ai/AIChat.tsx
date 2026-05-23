@@ -102,7 +102,7 @@ export const AIChat = () => {
   return (
     <Card className="flex flex-col h-[500px] max-h-[65vh]">
       {/* Header */}
-      <div className="p-3 border-b border-border/50 flex items-center justify-between">
+      <div className="p-3 border-b border-white/[0.07] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-primary/10">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -180,7 +180,7 @@ export const AIChat = () => {
       )}
 
       {/* Input */}
-      <div className="p-3 border-t border-border/50">
+      <div className="p-3 border-t border-white/[0.07]">
         <form
           onSubmit={(e) => {
             e.preventDefault();

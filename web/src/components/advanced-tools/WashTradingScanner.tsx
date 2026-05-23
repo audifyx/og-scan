@@ -25,7 +25,7 @@ export const WashTradingScanner = () => {
         <Input placeholder="Token address..." value={tokenAddress} onChange={(e) => setTokenAddress(e.target.value)} />
         <Button disabled={loading}><Search className="h-4 w-4" /></Button>
       </div>
-      <div className="p-4 rounded-lg bg-muted/30 text-center text-sm text-muted-foreground">
+      <div className="p-4 rounded-lg bg-white/[0.04] text-center text-sm text-muted-foreground">
         Analyzes trading patterns to identify wash trading
       </div>
     </Card>

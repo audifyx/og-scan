@@ -12,7 +12,7 @@ export function NFTGallery({ assets }: NFTGalleryProps) {
 
   if (nfts.length === 0) {
     return (
-      <div className="glass-card p-8 text-center">
+      <div className="og-glass-card p-8 text-center">
         <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <p className="text-muted-foreground">No NFTs found in this wallet</p>
       </div>
@@ -20,7 +20,7 @@ export function NFTGallery({ assets }: NFTGalleryProps) {
   }
 
   return (
-    <div className="glass-card overflow-hidden animate-fade-in" style={{ animationDelay: '0.3s' }}>
+    <div className="og-glass-card overflow-hidden animate-fade-in" style={{ animationDelay: '0.3s' }}>
       <div className="p-4 md:p-6 border-b border-border">
         <h3 className="text-xl font-semibold flex items-center gap-2">
           <ImageIcon className="h-5 w-5 text-primary" />

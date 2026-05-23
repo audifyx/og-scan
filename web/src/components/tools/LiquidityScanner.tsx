@@ -56,7 +56,7 @@ export const LiquidityScanner = () => {
   const totalVolume = pools.reduce((sum, p) => sum + p.volume24h, 0);
 
   return (
-    <Card className="glass-card h-full">
+    <Card className="og-glass-card h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Droplets className="h-5 w-5 text-primary" />
@@ -84,14 +84,14 @@ export const LiquidityScanner = () => {
         {pools.length > 0 && (
           <div className="space-y-4 animate-fade-in">
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-muted/30">
+              <div className="p-3 rounded-lg bg-white/[0.04]">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
                   <DollarSign className="h-4 w-4" />
                   <span className="text-xs">Total Liquidity</span>
                 </div>
                 <p className="text-xl font-bold text-primary">{formatNumber(totalLiquidity)}</p>
               </div>
-              <div className="p-3 rounded-lg bg-muted/30">
+              <div className="p-3 rounded-lg bg-white/[0.04]">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
                   <Activity className="h-4 w-4" />
                   <span className="text-xs">24h Volume</span>
@@ -105,7 +105,7 @@ export const LiquidityScanner = () => {
                 {pools.map((pool, index) => (
                   <div 
                     key={pool.pairAddress}
-                    className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                    className="p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors cursor-pointer"
                     onClick={() => window.open(pool.url, '_blank')}
                   >
                     <div className="flex items-center justify-between mb-2">

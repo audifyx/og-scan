@@ -15,7 +15,7 @@ type SortKey = "pnl" | "winrate" | "trades";
 
 const rankIcons = [Crown, Medal, Award];
 const rankColors = [
-  "text-secondary",   // gold
+  "text-[#eab308]",   // gold
   "text-muted-foreground",  // silver
   "text-accent",       // bronze
 ];
@@ -82,7 +82,7 @@ const Leaderboard = () => {
                 <Card
                   key={t.user_id}
                   className={`relative overflow-hidden border-white/[0.07] ${
-                    isFirst ? "bg-gradient-to-b from-secondary/10 to-card row-span-1 -mt-2" : "bg-card"
+                    isFirst ? "bg-gradient-to-b from-secondary/10 to-card row-span-1 -mt-2" : "bg-[hsl(var(--og-ink))/90]"
                   }`}
                 >
                   <CardContent className="flex flex-col items-center text-center p-4 pt-5">
@@ -119,7 +119,7 @@ const Leaderboard = () => {
                 <Skeleton key={i} className="h-16 w-full rounded-lg" />
               ))
             : sorted.slice(3).map((t, i) => (
-                <Card key={t.user_id} className="bg-card border-border/40 hover:border-primary/30 transition-colors">
+                <Card key={t.user_id} className="bg-[hsl(var(--og-ink))/90] border-border/40 hover:border-primary/30 transition-colors">
                   <CardContent className="flex items-center gap-3 p-3">
                     <span className="w-7 text-center text-sm font-mono text-muted-foreground font-bold">
                       {i + 4}

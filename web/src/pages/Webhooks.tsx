@@ -275,7 +275,7 @@ const Webhooks = () => {
       <div className="p-4 lg:p-6 space-y-6">
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="glass-card">
+          <Card className="og-glass-card">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="p-2 rounded-lg bg-[#5865F2]/20">
                 <Webhook className="h-5 w-5 text-[#5865F2]" />
@@ -286,7 +286,7 @@ const Webhooks = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="glass-card">
+          <Card className="og-glass-card">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="p-2 rounded-lg bg-green-500/20">
                 <Check className="h-5 w-5 text-green-500" />
@@ -297,10 +297,10 @@ const Webhooks = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="glass-card">
+          <Card className="og-glass-card">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/20">
-                <Wallet className="h-5 w-5 text-primary" />
+                <Wallet className="h-5 w-5 text-[#22d3ee]" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{alerts.filter(a => a.type === 'wallet').length}</p>
@@ -308,7 +308,7 @@ const Webhooks = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="glass-card">
+          <Card className="og-glass-card">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="p-2 rounded-lg bg-secondary/20">
                 <Coins className="h-5 w-5 text-secondary" />
@@ -374,7 +374,7 @@ const Webhooks = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Wallet className="h-4 w-4 text-primary" />
+                    <Wallet className="h-4 w-4 text-[#22d3ee]" />
                     Wallet Alert
                   </CardTitle>
                 </CardHeader>
@@ -512,7 +512,7 @@ const Webhooks = () => {
                         <div key={alert.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                           <div className="flex items-center gap-3">
                             {alert.type === "wallet" ? (
-                              <Wallet className="h-4 w-4 text-primary" />
+                              <Wallet className="h-4 w-4 text-[#22d3ee]" />
                             ) : (
                               <Coins className="h-4 w-4 text-secondary" />
                             )}

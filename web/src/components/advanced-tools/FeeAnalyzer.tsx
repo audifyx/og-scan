@@ -89,17 +89,17 @@ export const FeeAnalyzer = () => {
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div className="p-3 rounded-lg bg-muted/50 text-center">
+            <div className="p-3 rounded-lg bg-white/[0.04] text-center">
               <p className="text-xs text-muted-foreground">Avg Fee</p>
               <p className="font-bold">{(feeAnalysis.avgFee / 1e9).toFixed(6)}</p>
               <p className="text-xs text-muted-foreground">SOL</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50 text-center">
+            <div className="p-3 rounded-lg bg-white/[0.04] text-center">
               <p className="text-xs text-muted-foreground">Max Fee</p>
               <p className="font-bold">{(feeAnalysis.maxFee / 1e9).toFixed(6)}</p>
               <p className="text-xs text-muted-foreground">SOL</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50 text-center">
+            <div className="p-3 rounded-lg bg-white/[0.04] text-center">
               <p className="text-xs text-muted-foreground">Min Fee</p>
               <p className="font-bold">{(feeAnalysis.minFee / 1e9).toFixed(6)}</p>
               <p className="text-xs text-muted-foreground">SOL</p>

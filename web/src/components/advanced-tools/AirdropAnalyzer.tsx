@@ -47,7 +47,7 @@ export const AirdropAnalyzer = () => {
         <Button onClick={analyze} disabled={loading}>{loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Analyze"}</Button>
       </div>
       {analysis && (
-        <div className="p-4 rounded-lg bg-muted/50">
+        <div className="p-4 rounded-lg bg-white/[0.04]">
           <p className="text-sm">Airdrop-related: <Badge>{analysis.airdropCount}</Badge></p>
         </div>
       )}

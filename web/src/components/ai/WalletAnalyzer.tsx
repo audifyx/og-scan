@@ -148,15 +148,15 @@ export const WalletAnalyzer = () => {
 
       {!analysis && !isAnalyzing && (
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="p-4 rounded-lg bg-muted/50 text-center">
+          <div className="p-4 rounded-lg bg-white/[0.04] text-center">
             <TrendingUp className="h-5 w-5 mx-auto mb-2 text-green-500" />
             <p className="text-xs text-muted-foreground">Trading Patterns</p>
           </div>
-          <div className="p-4 rounded-lg bg-muted/50 text-center">
+          <div className="p-4 rounded-lg bg-white/[0.04] text-center">
             <AlertTriangle className="h-5 w-5 mx-auto mb-2 text-yellow-500" />
             <p className="text-xs text-muted-foreground">Risk Assessment</p>
           </div>
-          <div className="p-4 rounded-lg bg-muted/50 text-center">
+          <div className="p-4 rounded-lg bg-white/[0.04] text-center">
             <Target className="h-5 w-5 mx-auto mb-2 text-primary" />
             <p className="text-xs text-muted-foreground">Strategy Insights</p>
           </div>

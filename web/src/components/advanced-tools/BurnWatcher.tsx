@@ -59,7 +59,7 @@ export const BurnWatcher = () => {
         </Button>
       </div>
 
-      <div className="p-4 rounded-lg bg-muted/50">
+      <div className="p-4 rounded-lg bg-white/[0.04]">
         <p className="text-sm text-muted-foreground">
           Monitor token burn events. Burned tokens are sent to null addresses and permanently removed from circulation.
         </p>

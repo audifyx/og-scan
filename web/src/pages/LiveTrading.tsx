@@ -1,35 +1,23 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import {
-  Wallet, ArrowLeftRight, Copy, Users, Zap, Bell, Sparkles,
-  TrendingUp, Shield, Rocket, Clock, Play, Eye, ChevronRight,
-  Mail, CheckCircle, Star
+  Wallet, ArrowLeftRight, Copy, Users, Zap, Sparkles,
+  TrendingUp, Shield, Rocket, Clock, Eye, CheckCircle,
 } from "lucide-react";
 
 const UPCOMING_FEATURES = [
-  { icon: Wallet, title: "Wallet Creation", desc: "Create secure Solana wallets directly in-app", status: "In Development", progress: 45 },
-  { icon: ArrowLeftRight, title: "Live Buy & Sell", desc: "Trade any Solana token pair directly from Sol Tools", status: "Planned", progress: 15 },
-  { icon: Copy, title: "Copy Trading", desc: "Auto-mirror top traders' moves in real-time", status: "Planned", progress: 10 },
-  { icon: Users, title: "Lobby Trading", desc: "Trade together with friends in voice lobbies", status: "Planned", progress: 20 },
-  { icon: Shield, title: "Phantom Export", desc: "Export wallet for use with Phantom and other wallets", status: "Planned", progress: 5 },
-  { icon: TrendingUp, title: "Advanced Orders", desc: "Limit orders, stop loss, and take profit automation", status: "Planned", progress: 8 },
-];
-
-const PREVIEW_MOCKUPS = [
-  { title: "Swap Interface", desc: "Quick token swaps with best route finding", icon: ArrowLeftRight },
-  { title: "Portfolio View", desc: "Track all positions in real-time", icon: Eye },
-  { title: "Order Book", desc: "See live buy/sell pressure", icon: TrendingUp },
-  { title: "Trade History", desc: "Complete record of all trades", icon: Clock },
+  { icon: Wallet, title: "Wallet Creation", desc: "Create secure Solana wallets directly in-app", status: "In Dev", progress: 45, accent: "#22d3ee" },
+  { icon: ArrowLeftRight, title: "Live Buy & Sell", desc: "Trade any Solana token pair directly from the platform", status: "Planned", progress: 15, accent: "#eab308" },
+  { icon: Copy, title: "Copy Trading", desc: "Auto-mirror top traders' moves in real-time", status: "Planned", progress: 10, accent: "#22d3ee" },
+  { icon: Users, title: "Lobby Trading", desc: "Trade together with friends in voice lobbies", status: "Planned", progress: 20, accent: "#eab308" },
+  { icon: Shield, title: "Phantom Export", desc: "Export wallet for use with Phantom and other wallets", status: "Planned", progress: 5, accent: "#22d3ee" },
+  { icon: TrendingUp, title: "Advanced Orders", desc: "Limit orders, stop loss, and take profit automation", status: "Planned", progress: 8, accent: "#eab308" },
 ];
 
 const LiveTrading = () => {
@@ -58,121 +46,137 @@ const LiveTrading = () => {
 
   return (
     <AppLayout>
-      <PageHeader title="Live Trading" description="Coming Soon — Trade directly on Sol Tools">
-        <Badge className="bg-accent/20 text-accent border-accent/30 gap-1.5">
-          <Clock className="h-3.5 w-3.5" /> Coming Soon
+      <PageHeader title="Live Trading" description="Coming Soon — Trade directly on the platform">
+        <Badge className="bg-[#eab308]/10 text-[#eab308] border-[#eab308]/20 gap-1.5 text-xs font-bold">
+          <Clock className="h-3 w-3" /> Coming Soon
         </Badge>
       </PageHeader>
 
-      <ScrollArea className="h-[calc(100vh-120px)]">
-        <div className="p-4 lg:p-6 space-y-6 max-w-4xl mx-auto">
-          {/* Hero Banner */}
-          <Card className="glass-card-premium overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-accent/5 to-transparent" />
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
-            <CardContent className="relative p-8 text-center">
-              <div className="relative inline-flex mb-6">
-                <div className="absolute inset-0 bg-primary/30 blur-3xl opacity-50" />
-                <div className="relative p-6 rounded-3xl bg-gradient-to-br from-primary to-accent shadow-2xl">
-                  <Rocket className="h-12 w-12 text-primary-foreground" />
+      <div className="p-4 lg:p-6 space-y-6 max-w-4xl mx-auto">
+
+        {/* ── Hero Card ── */}
+        <div className="og-glass-frame rounded-3xl overflow-hidden relative">
+          {/* Glow layer */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#22d3ee]/8 via-transparent to-[#eab308]/6 pointer-events-none" />
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#22d3ee]/40 to-transparent" />
+
+          <div className="relative p-8 md:p-12 text-center">
+            {/* Icon */}
+            <div className="relative inline-flex mb-6">
+              <div className="absolute inset-0 bg-[#eab308]/20 blur-3xl rounded-full" />
+              <div className="relative p-5 rounded-3xl bg-gradient-to-br from-[#eab308] to-[#22d3ee] shadow-2xl">
+                <Rocket className="h-10 w-10 text-[hsl(var(--og-ink))]" />
+              </div>
+            </div>
+
+            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">
+              Live <span className="gradient-text">Trading</span>
+            </h2>
+            <p className="text-white/45 max-w-md mx-auto leading-relaxed text-sm">
+              Full trading capabilities are coming. Buy, sell, copy trade, and manage your entire portfolio — all from one platform.
+            </p>
+
+            {/* Waitlist */}
+            <div className="mt-8 max-w-sm mx-auto">
+              {joined ? (
+                <div className="flex items-center justify-center gap-2.5 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-bold text-sm">You're on the early access list!</span>
+                </div>
+              ) : (
+                <div className="og-search-box px-3">
+                  <input
+                    className="og-search-input text-sm"
+                    placeholder={user ? user.email || "Your email" : "Enter your email…"}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && joinWaitlist()}
+                  />
+                  <button
+                    onClick={joinWaitlist}
+                    className="og-search-action flex items-center gap-2 px-5 text-sm font-bold text-white/80 hover:text-[hsl(var(--og-ink))] transition-colors"
+                  >
+                    <Zap className="h-4 w-4" />
+                    <span className="hidden sm:inline">Join</span>
+                  </button>
+                </div>
+              )}
+              <p className="text-[11px] text-white/25 mt-3">Early access members get priority onboarding & trading fee discounts</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Upcoming Features ── */}
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-widest text-white/30 mb-4 flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 text-[#eab308]" /> In Development
+          </h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {UPCOMING_FEATURES.map((f, i) => (
+              <div
+                key={i}
+                className="p-4 rounded-2xl border border-white/[0.07] bg-white/[0.03] space-y-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl border border-white/10" style={{ background: `${f.accent}18` }}>
+                    <f.icon className="h-4 w-4" style={{ color: f.accent }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-white leading-tight">{f.title}</p>
+                    <Badge
+                      className="text-[9px] font-bold mt-0.5 uppercase tracking-wide"
+                      style={{
+                        background: f.status === "In Dev" ? `${f.accent}18` : "rgba(255,255,255,0.06)",
+                        color: f.status === "In Dev" ? f.accent : "rgba(255,255,255,0.35)",
+                        borderColor: f.status === "In Dev" ? `${f.accent}28` : "rgba(255,255,255,0.08)",
+                      }}
+                    >
+                      {f.status}
+                    </Badge>
+                  </div>
+                </div>
+                <p className="text-xs text-white/35 leading-relaxed">{f.desc}</p>
+                {/* Progress bar */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-white/25 uppercase tracking-wider">Progress</span>
+                    <span className="text-[10px] font-mono font-bold" style={{ color: f.accent }}>{f.progress}%</span>
+                  </div>
+                  <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${f.progress}%`, background: f.accent }}
+                    />
+                  </div>
                 </div>
               </div>
-              <h2 className="text-3xl font-black font-display gradient-text mb-3">Live Trading</h2>
-              <p className="text-muted-foreground max-w-md mx-auto leading-relaxed">
-                Full trading capabilities are coming to Sol Tools. Buy, sell, copy trade, and manage your portfolio — all from one platform.
-              </p>
-
-              {/* Waitlist */}
-              <div className="mt-6 max-w-sm mx-auto">
-                {joined ? (
-                  <div className="flex items-center justify-center gap-2 p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400">
-                    <CheckCircle className="h-5 w-5" />
-                    <span className="text-sm font-semibold">You're on the waitlist!</span>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder={user ? user.email || "Your email" : "Enter your email"}
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      className="rounded-xl"
-                    />
-                    <Button onClick={joinWaitlist} className="rounded-xl gap-1.5 shrink-0">
-                      <Bell className="h-4 w-4" /> Join Waitlist
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Feature Cards with Progress */}
-          <div>
-            <h3 className="text-lg font-bold font-display mb-4 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" /> Planned Features
-            </h3>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {UPCOMING_FEATURES.map((f, i) => (
-                <Card key={i} className="glass-card hover:border-primary/20 transition-colors group">
-                  <CardContent className="p-5">
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 shrink-0 group-hover:scale-110 transition-transform">
-                        <f.icon className="h-6 w-6 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-bold text-sm">{f.title}</h3>
-                          <Badge variant="outline" className="text-[9px]">{f.status}</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">{f.desc}</p>
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className="text-muted-foreground">Progress</span>
-                            <span className="text-primary font-mono">{f.progress}%</span>
-                          </div>
-                          <Progress value={f.progress} className="h-1.5" />
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            ))}
           </div>
-
-          {/* Preview Mockups */}
-          <div>
-            <h3 className="text-lg font-bold font-display mb-4 flex items-center gap-2">
-              <Eye className="h-5 w-5 text-primary" /> Interface Preview
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {PREVIEW_MOCKUPS.map((m, i) => (
-                <Card key={i} className="glass-card group hover:border-primary/20 transition-colors">
-                  <CardContent className="p-5 text-center">
-                    <div className="p-4 rounded-2xl bg-muted/20 border border-border/20 mb-3 group-hover:border-primary/20 transition-colors">
-                      <m.icon className="h-10 w-10 text-muted-foreground/30 mx-auto group-hover:text-primary/40 transition-colors" />
-                    </div>
-                    <h4 className="font-bold text-xs mb-0.5">{m.title}</h4>
-                    <p className="text-[10px] text-muted-foreground">{m.desc}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          {/* Demo Section */}
-          <Card className="glass-card">
-            <CardContent className="p-8 text-center">
-              <Play className="h-12 w-12 text-primary/30 mx-auto mb-4" />
-              <h3 className="font-bold text-lg mb-2">Demo Walkthrough</h3>
-              <p className="text-sm text-muted-foreground mb-4">A full video walkthrough will be available before launch.</p>
-              <Button variant="outline" className="rounded-xl gap-1.5" disabled>
-                <Play className="h-4 w-4" /> Watch Demo (Coming Soon)
-              </Button>
-            </CardContent>
-          </Card>
         </div>
-      </ScrollArea>
+
+        {/* ── Preview cards ── */}
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-widest text-white/30 mb-4 flex items-center gap-2">
+            <Eye className="h-3.5 w-3.5 text-[#22d3ee]" /> Preview
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { title: "Swap Interface", desc: "Best-route token swaps", icon: ArrowLeftRight, accent: "#22d3ee" },
+              { title: "Portfolio View", desc: "Real-time positions", icon: Eye, accent: "#eab308" },
+              { title: "Order Book", desc: "Live buy/sell pressure", icon: TrendingUp, accent: "#22d3ee" },
+              { title: "Trade History", desc: "Full trade record", icon: Clock, accent: "#eab308" },
+            ].map((p, i) => (
+              <div key={i} className="p-4 rounded-2xl border border-white/[0.07] bg-white/[0.03] text-center space-y-2.5 opacity-60">
+                <div className="p-2.5 rounded-xl border border-white/10 inline-block" style={{ background: `${p.accent}18` }}>
+                  <p.icon className="h-4 w-4" style={{ color: p.accent }} />
+                </div>
+                <p className="font-bold text-xs text-white">{p.title}</p>
+                <p className="text-[10px] text-white/30">{p.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </AppLayout>
   );
 };

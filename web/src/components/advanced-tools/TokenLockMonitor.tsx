@@ -16,7 +16,7 @@ export const TokenLockMonitor = () => {
         <Input placeholder="Token address..." value={tokenAddress} onChange={(e) => setTokenAddress(e.target.value)} />
         <Button><RefreshCw className="h-4 w-4" /></Button>
       </div>
-      <div className="p-4 rounded-lg bg-muted/30 text-center text-sm text-muted-foreground">Monitor token vesting schedules</div>
+      <div className="p-4 rounded-lg bg-white/[0.04] text-center text-sm text-muted-foreground">Monitor token vesting schedules</div>
     </Card>
   );
 };

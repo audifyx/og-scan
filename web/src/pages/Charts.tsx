@@ -126,7 +126,7 @@ const Charts = () => {
     return (
       <div className="fixed inset-0 z-[200] bg-background">
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-          <Badge className="bg-accent/20 text-accent border-accent/30">{selectedToken.symbol}</Badge>
+          <Badge className="bg-[#22d3ee]/12 text-[#22d3ee] border-[#22d3ee]/20">{selectedToken.symbol}</Badge>
           <Button variant="outline" size="icon" className="rounded-xl bg-background/80 backdrop-blur-sm" onClick={() => setIsFullscreen(false)}><X className="h-4 w-4" /></Button>
         </div>
         <iframe src={getDexScreenerUrl(selectedToken.address)} className="w-full h-full" title={`${selectedToken.name} Chart`} allow="clipboard-write" />
@@ -137,23 +137,23 @@ const Charts = () => {
   return (
     <AppLayout>
       <PageHeader title="Live Charts" description="Real-time DEX charts powered by DexScreener">
-        <Badge className="bg-accent/20 text-accent border-accent/30 gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />Live</Badge>
+        <Badge className="bg-[#22d3ee]/12 text-[#22d3ee] border-[#22d3ee]/20 gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-[#22d3ee] animate-pulse" />Live</Badge>
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-5">
         {/* Search */}
-        <Card className="og-glass-card-premium overflow-hidden">
+        <Card className="og-glass-frame overflow-hidden">
           <CardContent className="p-5">
             <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/10 border border-primary/10"><BarChart3 className="h-5 w-5 text-[#22d3ee]" /></div>
+              <div className="p-3 rounded-xl bg-gradient-to-br from-[#22d3ee]/15 to-[#eab308]/8 border border-[#22d3ee]/15"><BarChart3 className="h-5 w-5 text-[#22d3ee]" /></div>
               <div><h3 className="font-bold text-lg">Token Charts</h3><p className="text-sm text-white/40">Enter any Solana token address for live chart</p></div>
             </div>
             <div className="flex gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
-                <Input placeholder="Search by name or paste contract address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} className="pl-11 h-12 bg-muted/40 border-white/[0.07] rounded-xl text-base" />
+                <Input placeholder="Search by name or paste contract address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} className="pl-11 h-12 bg-white/[0.05] border-white/[0.07] rounded-xl text-base" />
               </div>
-              <Button onClick={handleSearch} className="h-12 px-6 rounded-xl font-medium btn-premium">Load Chart</Button>
+              <Button onClick={handleSearch} className="h-12 px-6 rounded-xl font-medium ios-primary-button">Load Chart</Button>
             </div>
           </CardContent>
         </Card>
@@ -161,10 +161,10 @@ const Charts = () => {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { icon: Activity, value: "Real-time", label: "Data", color: "text-accent" },
+            { icon: Activity, value: "Real-time", label: "Data", color: "text-[#22d3ee]" },
             { icon: Sparkles, value: pairs.length, label: "Pairs", color: "text-[#22d3ee]" },
             { icon: Star, value: favorites.length, label: "Favorites", color: "text-yellow-500" },
-            { icon: Zap, value: customPairs.length, label: "Custom", color: "text-secondary" },
+            { icon: Zap, value: customPairs.length, label: "Custom", color: "text-[#eab308]" },
           ].map((stat, i) => (
             <Card key={i} className="og-glass-card"><CardContent className="p-4 flex items-center gap-3"><div className="p-2.5 rounded-xl bg-white/[0.04]"><stat.icon className={`h-5 w-5 ${stat.color}`} /></div><div><p className="text-xl font-bold">{stat.value}</p><p className="text-xs text-white/40">{stat.label}</p></div></CardContent></Card>
           ))}
@@ -191,14 +191,14 @@ const Charts = () => {
                     {filteredPairs.map((pair) => (
                       <div
                         key={pair.address}
-                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${selectedToken.address === pair.address ? "bg-primary/10 border border-primary/30" : "hover:bg-white/[0.04]"}`}
+                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${selectedToken.address === pair.address ? "bg-[#22d3ee]/10 border border-[#22d3ee]/30" : "hover:bg-white/[0.04]"}`}
                         onClick={() => setSelectedToken(pair)}
                       >
                         <div className="flex items-center gap-3">
                           {pair.image ? (
-                            <img src={pair.image} alt={pair.symbol} className="w-9 h-9 rounded-xl object-cover bg-muted" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
+                            <img src={pair.image} alt={pair.symbol} className="w-9 h-9 rounded-xl object-cover bg-white/[0.08]" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
                           ) : (
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold ${pair.category === "official" ? "bg-gradient-to-br from-primary to-secondary text-primary-foreground" : "bg-muted"}`}>{pair.symbol.slice(0, 2)}</div>
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold ${pair.category === "official" ? "bg-gradient-to-br from-[#22d3ee] to-[#eab308] text-[hsl(var(--og-ink))]" : "bg-white/[0.08]"}`}>{pair.symbol.slice(0, 2)}</div>
                           )}
                           <div>
                             <p className="font-medium text-sm">{pair.symbol}</p>
@@ -237,9 +237,9 @@ const Charts = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {selectedToken.image ? (
-                    <img src={selectedToken.image} alt={selectedToken.symbol} className="w-10 h-10 rounded-xl object-cover bg-muted" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
+                    <img src={selectedToken.image} alt={selectedToken.symbol} className="w-10 h-10 rounded-xl object-cover bg-white/[0.08]" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
                   ) : (
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${selectedToken.category === "official" ? "bg-gradient-to-br from-primary to-secondary text-primary-foreground" : "bg-muted"}`}>{selectedToken.symbol.slice(0, 2)}</div>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${selectedToken.category === "official" ? "bg-gradient-to-br from-[#22d3ee] to-[#eab308] text-[hsl(var(--og-ink))]" : "bg-white/[0.08]"}`}>{selectedToken.symbol.slice(0, 2)}</div>
                   )}
                   <div>
                     <CardTitle className="text-lg">{selectedToken.name}</CardTitle>

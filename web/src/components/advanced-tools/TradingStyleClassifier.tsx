@@ -106,7 +106,7 @@ export const TradingStyleClassifier = () => {
 
       {classification && styleInfo && (
         <div className="space-y-4">
-          <div className="p-4 rounded-lg bg-muted/50 flex items-center gap-4">
+          <div className="p-4 rounded-lg bg-white/[0.04] flex items-center gap-4">
             <div className={`p-3 rounded-xl bg-background ${styleInfo.color}`}>
               <styleInfo.icon className="h-6 w-6" />
             </div>
@@ -118,15 +118,15 @@ export const TradingStyleClassifier = () => {
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div className="p-3 rounded-lg bg-muted/50 text-center">
+            <div className="p-3 rounded-lg bg-white/[0.04] text-center">
               <p className="text-xs text-muted-foreground">Swaps</p>
               <p className="font-bold">{classification.stats.swaps}</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50 text-center">
+            <div className="p-3 rounded-lg bg-white/[0.04] text-center">
               <p className="text-xs text-muted-foreground">Transfers</p>
               <p className="font-bold">{classification.stats.transfers}</p>
             </div>
-            <div className="p-3 rounded-lg bg-muted/50 text-center">
+            <div className="p-3 rounded-lg bg-white/[0.04] text-center">
               <p className="text-xs text-muted-foreground">LP Actions</p>
               <p className="font-bold">{classification.stats.lpActions}</p>
             </div>

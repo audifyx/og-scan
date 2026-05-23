@@ -51,7 +51,7 @@ export const ThemePicker = () => {
         </div>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
         {customWallpaper && (
-          <div className="mt-3 rounded-2xl overflow-hidden border border-border/50 h-20">
+          <div className="mt-3 rounded-2xl overflow-hidden border border-white/[0.07] h-20">
             <img src={customWallpaper} alt="Custom wallpaper" className="w-full h-full object-cover" />
           </div>
         )}

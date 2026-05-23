@@ -277,7 +277,7 @@ export const PnLTracker = () => {
                       {walletStats.trades.map((trade, i) => (
                         <div 
                           key={trade.signature} 
-                          className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                          className="flex items-center justify-between p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors"
                         >
                           <div className="flex items-center gap-3">
                             <div className={`p-2 rounded-lg ${

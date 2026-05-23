@@ -207,7 +207,7 @@ export const RugDetector = () => {
   };
 
   return (
-    <Card className="glass-card-premium overflow-hidden">
+    <Card className="og-glass-card-premium overflow-hidden">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-gradient-to-br from-red-500/20 to-orange-500/20">
@@ -228,7 +228,7 @@ export const RugDetector = () => {
               placeholder="Enter Solana token address..."
               value={tokenAddress}
               onChange={(e) => setTokenAddress(e.target.value)}
-              className="h-12 pr-10 rounded-xl bg-muted/30 border-border/50"
+              className="h-12 pr-10 rounded-xl bg-white/[0.04] border-white/[0.07]"
             />
             {tokenAddress && (
               <Button
@@ -291,28 +291,28 @@ export const RugDetector = () => {
 
             {/* Token Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+              <div className="p-4 rounded-xl bg-white/[0.04] border border-white/[0.07]">
                 <div className="flex items-center gap-2 mb-2">
                   <Zap className="h-4 w-4 text-primary" />
                   <span className="text-xs text-muted-foreground">Price</span>
                 </div>
                 <p className="text-lg font-bold">${analysis.price?.toFixed(8) || 'N/A'}</p>
               </div>
-              <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+              <div className="p-4 rounded-xl bg-white/[0.04] border border-white/[0.07]">
                 <div className="flex items-center gap-2 mb-2">
                   <Droplets className="h-4 w-4 text-blue-500" />
                   <span className="text-xs text-muted-foreground">Liquidity</span>
                 </div>
                 <p className="text-lg font-bold">${analysis.liquidity?.toLocaleString() || 'N/A'}</p>
               </div>
-              <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+              <div className="p-4 rounded-xl bg-white/[0.04] border border-white/[0.07]">
                 <div className="flex items-center gap-2 mb-2">
                   <Users className="h-4 w-4 text-green-500" />
                   <span className="text-xs text-muted-foreground">Holders</span>
                 </div>
                 <p className="text-lg font-bold">{analysis.holders?.toLocaleString() || 'N/A'}</p>
               </div>
-              <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+              <div className="p-4 rounded-xl bg-white/[0.04] border border-white/[0.07]">
                 <div className="flex items-center gap-2 mb-2">
                   <Eye className="h-4 w-4 text-secondary" />
                   <span className="text-xs text-muted-foreground">Market Cap</span>

@@ -583,7 +583,7 @@ const PumpV5 = () => {
 
               <div className="flex items-center gap-3">
                 {/* Live feed indicator */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/30 border border-border/50">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/30 border border-white/[0.07]">
                   <div className={`h-2 w-2 rounded-full ${liveFeedConnected ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground'}`} />
                   <span className="text-[10px] font-mono text-muted-foreground tracking-wider">
                     {liveFeedConnected ? 'LIVE' : 'CONNECTING'}
@@ -810,11 +810,11 @@ const PumpV5 = () => {
 
             {/* Stats Bar */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <Card className="glass-card border-primary/20">
+              <Card className="og-glass-card border-primary/20">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-xl bg-primary/20">
-                      <Rocket className="h-5 w-5 text-primary" />
+                      <Rocket className="h-5 w-5 text-[#22d3ee]" />
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Listed Tokens</p>
@@ -823,7 +823,7 @@ const PumpV5 = () => {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="glass-card border-green-500/20">
+              <Card className="og-glass-card border-green-500/20">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-xl bg-green-500/20">
@@ -836,7 +836,7 @@ const PumpV5 = () => {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="glass-card border-blue-500/20">
+              <Card className="og-glass-card border-blue-500/20">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-xl bg-blue-500/20">
@@ -849,7 +849,7 @@ const PumpV5 = () => {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="glass-card border-yellow-500/20">
+              <Card className="og-glass-card border-yellow-500/20">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-xl bg-yellow-500/20">
@@ -889,7 +889,7 @@ const PumpV5 = () => {
               <div className="flex gap-4 pb-4">
                 {loadingTrending ? (
                   Array(5).fill(0).map((_, i) => (
-                    <Card key={i} className="glass-card min-w-[280px] animate-pulse">
+                    <Card key={i} className="og-glass-card min-w-[280px] animate-pulse">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
                           <div className="h-12 w-12 rounded-xl bg-muted" />
@@ -905,7 +905,7 @@ const PumpV5 = () => {
                   trendingTokens.map((token, index) => (
                     <Card 
                       key={token.address} 
-                      className="glass-card min-w-[300px] cursor-pointer hover:border-primary/50 transition-all hover:scale-[1.02]"
+                      className="og-glass-card min-w-[300px] cursor-pointer hover:border-primary/50 transition-all hover:scale-[1.02]"
                       onClick={() => window.open(`https://dexscreener.com/solana/${token.address}`, "_blank")}
                     >
                       <CardContent className="p-4">
@@ -1092,7 +1092,7 @@ const PumpV5 = () => {
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {Array(8).fill(0).map((_, i) => (
-                  <Card key={i} className="glass-card animate-pulse">
+                  <Card key={i} className="og-glass-card animate-pulse">
                     <div className="h-20 bg-muted" />
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-center gap-3">
@@ -1108,9 +1108,9 @@ const PumpV5 = () => {
                 ))}
               </div>
             ) : filteredSubmissions.length === 0 ? (
-              <Card className="glass-card">
+              <Card className="og-glass-card">
                 <CardContent className="p-16 text-center">
-                  <div className="inline-flex p-4 rounded-full bg-muted/50 mb-4">
+                  <div className="inline-flex p-4 rounded-full bg-white/[0.04] mb-4">
                     <Rocket className="h-12 w-12 text-muted-foreground" />
                   </div>
                   <p className="text-lg font-medium text-muted-foreground">No tokens found</p>
@@ -1141,7 +1141,7 @@ const PumpV5 = () => {
                       className={`group overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl border-2 ${
                         token.is_featured 
                           ? "border-yellow-500/50 bg-gradient-to-br from-yellow-500/5 via-card to-orange-500/5 shadow-lg shadow-yellow-500/10" 
-                          : "border-border/50 bg-card hover:border-primary/50 hover:shadow-primary/20"
+                          : "border-white/[0.07] bg-card hover:border-primary/50 hover:shadow-primary/20"
                       }`}
                       onClick={() => openTokenDetail(token)}
                     >
@@ -1206,7 +1206,7 @@ const PumpV5 = () => {
                       
                       <CardContent className="p-4 pt-0">
                         {/* Price Display - Large & Prominent */}
-                        <div className="py-3 mb-3 border-b border-border/50">
+                        <div className="py-3 mb-3 border-b border-white/[0.07]">
                           <div className="flex items-baseline justify-between">
                             <div>
                               <div className="flex items-center gap-1.5">
@@ -1268,7 +1268,7 @@ const PumpV5 = () => {
                         )}
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                        <div className="flex items-center justify-between pt-2 border-t border-white/[0.07]">
                           <div className="flex items-center gap-1">
                             {token.website && (
                               <Button 

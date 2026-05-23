@@ -53,7 +53,7 @@ export const TokenSniper = () => {
   };
 
   return (
-    <Card className="glass-card h-full">
+    <Card className="og-glass-card h-full">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -77,7 +77,7 @@ export const TokenSniper = () => {
               {pairs.map((pair, index) => (
                 <div 
                   key={pair.tokenAddress}
-                  className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                  className="p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors cursor-pointer"
                   onClick={() => window.open(pair.url, '_blank')}
                 >
                   <div className="flex items-start gap-3">

@@ -96,7 +96,7 @@ export const V2WelcomeModal = ({ open, onOpenChange }: V2WelcomeModalProps) => {
             {v2Updates.map((update, index) => (
               <div
                 key={update.title}
-                className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 border border-border/50 hover:border-primary/30 transition-colors animate-fade-in"
+                className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.07] hover:border-primary/30 transition-colors animate-fade-in"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -117,7 +117,7 @@ export const V2WelcomeModal = ({ open, onOpenChange }: V2WelcomeModalProps) => {
         </ScrollArea>
 
         {/* Footer */}
-        <div className="p-6 pt-4 border-t border-border/50 bg-muted/20">
+        <div className="p-6 pt-4 border-t border-white/[0.07] bg-white/[0.03]">
           <Button 
             onClick={() => onOpenChange(false)} 
             className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary via-primary to-secondary text-primary-foreground rounded-xl shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-shadow"

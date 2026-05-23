@@ -66,7 +66,7 @@ export const TrackedWalletsSidebar = ({ wallets, onWalletClick }: TrackedWallets
 
   return (
     <Card className="h-full flex flex-col">
-      <div className="p-4 border-b border-border/50">
+      <div className="p-4 border-b border-white/[0.07]">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-primary" />
           <h3 className="font-semibold">Tracked Wallets</h3>
@@ -92,7 +92,7 @@ export const TrackedWalletsSidebar = ({ wallets, onWalletClick }: TrackedWallets
             return (
               <div
                 key={wallet.id}
-                className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
+                className="p-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.04] transition-colors cursor-pointer group"
                 onClick={() => onWalletClick(wallet.wallet_address)}
               >
                 <div className="flex items-center justify-between mb-2">
@@ -134,7 +134,7 @@ export const TrackedWalletsSidebar = ({ wallets, onWalletClick }: TrackedWallets
                 )}
 
                 {!data && (
-                  <div className="h-4 bg-muted/50 rounded animate-pulse" />
+                  <div className="h-4 bg-white/[0.04] rounded animate-pulse" />
                 )}
               </div>
             );

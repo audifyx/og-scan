@@ -128,7 +128,7 @@ export const TradeHistory = () => {
 
   if (!user) {
     return (
-      <Card className="glass-card">
+      <Card className="og-glass-card">
         <CardContent className="p-8 text-center">
           <p className="text-muted-foreground">Sign in to view your trade history</p>
         </CardContent>
@@ -140,7 +140,7 @@ export const TradeHistory = () => {
     <div className="space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-xl bg-primary/20">
@@ -156,7 +156,7 @@ export const TradeHistory = () => {
           </CardContent>
         </Card>
 
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-xl bg-accent/20">
@@ -170,7 +170,7 @@ export const TradeHistory = () => {
           </CardContent>
         </Card>
 
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-xl bg-green-500/20">
@@ -184,7 +184,7 @@ export const TradeHistory = () => {
           </CardContent>
         </Card>
 
-        <Card className="glass-card">
+        <Card className="og-glass-card">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-xl bg-red-500/20">
@@ -200,7 +200,7 @@ export const TradeHistory = () => {
       </div>
 
       {/* P&L Chart */}
-      <Card className="glass-card-premium">
+      <Card className="og-glass-card-premium">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-primary" />
@@ -257,7 +257,7 @@ export const TradeHistory = () => {
       </Card>
 
       {/* Trade List */}
-      <Card className="glass-card">
+      <Card className="og-glass-card">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -284,7 +284,7 @@ export const TradeHistory = () => {
                 {trades.map((trade) => (
                   <div
                     key={trade.id}
-                    className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50"
+                    className="flex items-center justify-between p-4 rounded-xl bg-white/[0.04] border border-white/[0.07]"
                   >
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${trade.trade_type === "buy" ? "bg-green-500/20" : "bg-red-500/20"}`}>

@@ -84,7 +84,7 @@ export const LiquiditySniper = () => {
       {pairs.length > 0 && (
         <div className="space-y-2">
           {pairs.map((pair, i) => (
-            <div key={i} className="p-3 rounded-xl bg-muted/30 border border-border/30 hover:border-primary/20 transition-colors">
+            <div key={i} className="p-3 rounded-xl bg-white/[0.04] border border-border/30 hover:border-primary/20 transition-colors">
               <div className="flex items-center gap-3">
                 {pair.imageUrl ? (
                   <img src={pair.imageUrl} alt={pair.symbol} className="h-9 w-9 rounded-xl object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
