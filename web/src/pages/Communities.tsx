@@ -264,8 +264,18 @@ function HomeFeed({
   onSelectCommunity: (c: Community) => void;
 }) {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<FeedSort>("latest");
+
+  // Fetch communities for the horizontal scroll
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("communities").select("*")
+        .eq("is_active", true).order("member_count", { ascending: false }).limit(20);
+      setCommunities((data || []) as Community[]);
+    })();
+  }, []);
 
   const fetchHomeFeed = useCallback(async () => {
     setLoading(true);
@@ -309,6 +319,21 @@ function HomeFeed({
 
   return (
     <div>
+      {/* Your Communities — horizontal scroll */}
+      {communities.length > 0 && (
+        <div className="py-3 border-b border-white/[0.04]">
+          <div className="flex items-center justify-between px-4 mb-2.5">
+            <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Your Communities</p>
+            <button onClick={() => onSelectCommunity(communities[0])} className="text-[10px] text-primary font-medium">See all</button>
+          </div>
+          <div className="flex gap-3 px-4 overflow-x-auto scrollbar-hide pb-1">
+            {communities.map(c => (
+              <CommunityCard key={c.id} community={c} onClick={() => onSelectCommunity(c)} variant="compact" />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Sort tabs */}
       <div className="flex gap-1 px-4 py-2 border-b border-white/[0.04]">
         {(["latest", "top", "trending"] as FeedSort[]).map(s => (
@@ -365,6 +390,7 @@ function ExploreCommunities({
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string>("all");
 
   useEffect(() => {
     (async () => {
@@ -377,17 +403,22 @@ function ExploreCommunities({
     })();
   }, []);
 
-  const filtered = search
-    ? communities.filter(c =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.description?.toLowerCase().includes(search.toLowerCase())
-      )
-    : communities;
+  const categories = ["all", ...Array.from(new Set(communities.map(c => c.category).filter(Boolean)))];
+
+  const filtered = communities.filter(c => {
+    const matchSearch = !search ||
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.description?.toLowerCase().includes(search.toLowerCase());
+    const matchCategory = activeCategory === "all" || c.category === activeCategory;
+    return matchSearch && matchCategory;
+  });
+
+  const featured = communities.slice(0, 3);
 
   return (
     <div>
       {/* Search */}
-      <div className="p-4">
+      <div className="p-4 pb-2">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20" />
           <input
@@ -400,39 +431,142 @@ function ExploreCommunities({
         </div>
       </div>
 
-      {/* Create new */}
-      <button
-        onClick={onCreateNew}
-        className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors"
-      >
-        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-          <Plus className="h-5 w-5 text-primary" />
+      {/* Category pills */}
+      {categories.length > 1 && (
+        <div className="flex gap-1.5 px-4 pb-3 overflow-x-auto scrollbar-hide">
+          {categories.map(cat => (
+            <button
+              key={cat || "all"}
+              onClick={() => setActiveCategory(cat || "all")}
+              className={cn("shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
+                activeCategory === cat
+                  ? "bg-primary text-white"
+                  : "bg-white/[0.04] text-white/30 hover:text-white/50"
+              )}
+            >
+              {cat === "all" ? "All" : cat}
+            </button>
+          ))}
         </div>
-        <div className="text-left">
-          <p className="text-sm font-bold text-white">Create a Community</p>
-          <p className="text-xs text-white/30">Start your own crypto community</p>
-        </div>
-      </button>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 text-white/10 animate-spin" />
         </div>
       ) : (
-        <div className="divide-y divide-white/[0.04]">
-          {filtered.map(c => (
-            <CommunityCard key={c.id} community={c} onClick={() => onSelect(c)} />
-          ))}
-        </div>
+        <>
+          {/* Featured — large cards */}
+          {!search && featured.length > 0 && (
+            <div className="px-4 pb-4">
+              <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-3">Featured</p>
+              <div className="space-y-3">
+                {featured.map(c => (
+                  <CommunityCard key={c.id} community={c} onClick={() => onSelect(c)} variant="grid" />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Create new */}
+          <button
+            onClick={onCreateNew}
+            className="w-full flex items-center gap-3 px-4 py-3 border-y border-white/[0.04] hover:bg-white/[0.02] transition-colors"
+          >
+            <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Plus className="h-5 w-5 text-primary" />
+            </div>
+            <div className="text-left flex-1">
+              <p className="text-sm font-bold text-white">Create a Community</p>
+              <p className="text-[11px] text-white/25">Start your own crypto community</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-white/10" />
+          </button>
+
+          {/* All communities list */}
+          <div className="px-4 pt-3 pb-1">
+            <p className="text-xs font-bold text-white/40 uppercase tracking-wider">All Communities ({filtered.length})</p>
+          </div>
+          <div className="divide-y divide-white/[0.04]">
+            {filtered.map(c => (
+              <CommunityCard key={c.id} community={c} onClick={() => onSelect(c)} variant="list" />
+            ))}
+          </div>
+          {filtered.length === 0 && (
+            <EmptyState
+              icon={<Search className="h-8 w-8" />}
+              title="No communities found"
+              subtitle="Try a different search or create one"
+            />
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function CommunityCard({ community: c, onClick }: { community: Community; onClick: () => void }) {
+function CommunityCard({ community: c, onClick, variant = "list" }: { community: Community; onClick: () => void; variant?: "list" | "grid" | "compact" }) {
+  // Deterministic gradient based on community name
+  const gradients = [
+    "from-blue-600/40 via-purple-600/30 to-pink-600/20",
+    "from-emerald-600/40 via-teal-600/30 to-cyan-600/20",
+    "from-amber-600/40 via-orange-600/30 to-red-600/20",
+    "from-violet-600/40 via-fuchsia-600/30 to-pink-600/20",
+    "from-cyan-600/40 via-blue-600/30 to-indigo-600/20",
+    "from-rose-600/40 via-pink-600/30 to-purple-600/20",
+  ];
+  const gradIdx = c.name.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % gradients.length;
+
+  if (variant === "compact") {
+    return (
+      <button onClick={onClick} className="flex flex-col items-center gap-1.5 shrink-0 w-[72px]">
+        <div className={cn("w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center text-xl shadow-lg", gradients[gradIdx])}>
+          {c.icon || c.name.charAt(0).toUpperCase()}
+        </div>
+        <span className="text-[10px] text-white/50 font-medium truncate w-full text-center">{c.name}</span>
+      </button>
+    );
+  }
+
+  if (variant === "grid") {
+    return (
+      <button onClick={onClick} className="group rounded-2xl overflow-hidden border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-all hover:border-white/[0.12] w-full text-left">
+        {/* Banner */}
+        <div className={cn("h-20 w-full bg-gradient-to-br relative", gradients[gradIdx])}>
+          {c.banner_url && (
+            <img src={c.banner_url} className="w-full h-full object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          )}
+          <div className="absolute -bottom-5 left-3">
+            <div className={cn("w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center text-base border-2 border-black shadow-lg", gradients[gradIdx])}>
+              {c.icon || c.name.charAt(0).toUpperCase()}
+            </div>
+          </div>
+        </div>
+        <div className="pt-7 px-3 pb-3">
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-bold text-white truncate">{c.name}</p>
+            {c.privacy === "private" && <span className="text-[9px] text-white/30">🔒</span>}
+          </div>
+          {c.description && (
+            <p className="text-[11px] text-white/30 line-clamp-2 mt-1 leading-relaxed">{c.description}</p>
+          )}
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[10px] text-white/20 flex items-center gap-1">
+              <Users className="h-3 w-3" /> {c.member_count || 0}
+            </span>
+            {c.category && (
+              <span className="text-[9px] text-primary/50 bg-primary/5 px-1.5 py-0.5 rounded-full">{c.category}</span>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  // Default: list variant
   return (
     <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors text-left">
-      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center text-lg shrink-0">
+      <div className={cn("w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center text-lg shrink-0", gradients[gradIdx])}>
         {c.icon || c.name.charAt(0).toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">
@@ -447,6 +581,9 @@ function CommunityCard({ community: c, onClick }: { community: Community; onClic
           <span className="text-[10px] text-white/20 flex items-center gap-1">
             <Users className="h-3 w-3" /> {c.member_count || 0} members
           </span>
+          {c.category && (
+            <span className="text-[9px] text-primary/40">{c.category}</span>
+          )}
         </div>
       </div>
       <ChevronRight className="h-4 w-4 text-white/10 shrink-0" />
@@ -592,21 +729,60 @@ function CommunityFeed({
 
   return (
     <div>
-      {/* Community header */}
-      <div className="p-4 border-b border-white/[0.06]">
-        <div className="flex items-center gap-3">
-          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center text-xl shrink-0">
-            {community.icon || community.name.charAt(0)}
+      {/* Community header — X-style with banner */}
+      {(() => {
+        const gradients = [
+          "from-blue-600/60 via-purple-600/40 to-pink-600/30",
+          "from-emerald-600/60 via-teal-600/40 to-cyan-600/30",
+          "from-amber-600/60 via-orange-600/40 to-red-600/30",
+          "from-violet-600/60 via-fuchsia-600/40 to-pink-600/30",
+        ];
+        const gIdx = community.name.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % gradients.length;
+        return (
+          <div className="border-b border-white/[0.06]">
+            {/* Banner */}
+            <div className={cn("h-28 w-full bg-gradient-to-br relative", gradients[gIdx])}>
+              {community.banner_url && (
+                <img src={community.banner_url} className="w-full h-full object-cover" alt=""
+                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              )}
+              <div className="absolute -bottom-7 left-4">
+                <div className={cn("w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center text-2xl border-[3px] border-black shadow-xl", gradients[gIdx])}>
+                  {community.icon || community.name.charAt(0)}
+                </div>
+              </div>
+            </div>
+            {/* Info */}
+            <div className="pt-9 px-4 pb-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-bold text-white">{community.name}</h2>
+                  {community.description && (
+                    <p className="text-[13px] text-white/40 mt-1 leading-relaxed">{community.description}</p>
+                  )}
+                </div>
+                <button
+                  onClick={onCompose}
+                  className="shrink-0 ml-3 px-4 py-1.5 rounded-full bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors"
+                >
+                  Post
+                </button>
+              </div>
+              <div className="flex items-center gap-4 mt-3">
+                <span className="text-xs text-white/25 flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" /> <span className="font-bold text-white/60">{community.member_count || 0}</span> members
+                </span>
+                {community.category && (
+                  <span className="text-[10px] text-primary/50 bg-primary/5 px-2 py-0.5 rounded-full">{community.category}</span>
+                )}
+                {community.privacy === "private" && (
+                  <span className="text-[10px] text-white/20">🔒 Private</span>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="flex-1">
-            <h2 className="text-lg font-bold text-white">{community.name}</h2>
-            {community.description && (
-              <p className="text-xs text-white/30 mt-0.5">{community.description}</p>
-            )}
-            <span className="text-[10px] text-white/20">{community.member_count || 0} members</span>
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Filter tabs */}
       <div className="flex border-b border-white/[0.04]">
@@ -1356,14 +1532,30 @@ function ComposeModal({
             />
           )}
 
-          {/* Image URL */}
+          {/* Image URL + preview */}
           <input
             type="text"
-            placeholder="Image URL (optional)..."
+            placeholder="Image URL (paste link to image)..."
             value={imageUrl}
             onChange={e => setImageUrl(e.target.value)}
             className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white/50 placeholder-white/15 outline-none"
           />
+          {imageUrl && (
+            <div className="relative rounded-xl overflow-hidden border border-white/[0.08]">
+              <img
+                src={imageUrl}
+                alt="Preview"
+                className="w-full max-h-48 object-cover"
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+              <button
+                onClick={() => setImageUrl("")}
+                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Tags */}
           <input

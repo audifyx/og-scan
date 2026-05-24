@@ -22,7 +22,7 @@ interface CallerStats {
 }
 
 interface Props {
-  callers: CallerStats[];
+  callers?: CallerStats[];
 }
 
 const RANK_BADGES: Record<number, { emoji: string; color: string }> = {
@@ -31,7 +31,7 @@ const RANK_BADGES: Record<number, { emoji: string; color: string }> = {
   3: { emoji: "🥉", color: "text-amber-600" },
 };
 
-export const CalloutLeaderboard: React.FC<Props> = ({ callers }) => {
+export const CalloutLeaderboard: React.FC<Props> = ({ callers = [] }) => {
   const [expanded, setExpanded] = useState(false);
   const [sortBy, setSortBy] = useState<"hitRate" | "total" | "streak">("hitRate");
 
