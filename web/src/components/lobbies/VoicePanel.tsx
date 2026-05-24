@@ -21,6 +21,7 @@ export type VoiceRole = "speaker" | "listener";
 
 export interface VoicePanelHandle {
   leaveVoice: () => Promise<void>;
+  saveRecording: () => Promise<void>;
   getParticipants: () => VoiceParticipant[];
   promoteToSpeaker: (userId: string) => void;
   demoteToListener: (userId: string) => void;
@@ -131,6 +132,7 @@ export const VoicePanel = forwardRef<VoicePanelHandle, VoicePanelProps>(({
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     leaveVoice,
+    saveRecording: stopAndSaveRecording,
     getParticipants: () => participantsRef.current,
     promoteToSpeaker: (userId: string) => sendCommand("promote", userId),
     demoteToListener: (userId: string) => sendCommand("demote", userId),

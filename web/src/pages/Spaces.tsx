@@ -607,15 +607,16 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
    PERSON CARD — avatar card for people grid
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-const PersonCard = ({ username, avatarUrl, isYou, isSpeaking, online = true }: {
+const PersonCard = ({ username, avatarUrl, isYou, isSpeaking, isHost, online = true }: {
   username: string | null;
   avatarUrl: string | null;
   isYou?: boolean;
   isSpeaking?: boolean;
+  isHost?: boolean;
   online?: boolean;
 }) => (
   <div className={cn(
-    "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all",
+    "flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all",
     isSpeaking ? "border-emerald-500/30 bg-emerald-500/[0.04]" : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]"
   )}>
     <div className="relative">
@@ -632,10 +633,18 @@ const PersonCard = ({ username, avatarUrl, isYou, isSpeaking, online = true }: {
       {online && (
         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0f18]" />
       )}
+      {isHost && (
+        <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center">
+          <Crown className="h-2.5 w-2.5 text-amber-400" />
+        </div>
+      )}
     </div>
-    <span className="text-[11px] font-bold text-white/60 truncate max-w-[100px]">
-      {isYou ? `${username || "You"} (You)` : username || "User"}
-    </span>
+    <div className="flex flex-col items-center gap-0.5">
+      <span className="text-[11px] font-bold text-white/60 truncate max-w-[100px]">
+        {isYou ? `${username || "You"} (You)` : username || "User"}
+      </span>
+      {isHost && <span className="text-[8px] font-black uppercase tracking-wider text-amber-400/60">Host</span>}
+    </div>
     {isSpeaking && <AudioEQ active bars={3} color="bg-emerald-400" />}
   </div>
 );
@@ -995,10 +1004,11 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
 
   const endSpace = async () => {
     if (!isHost) return;
-    // Save recording BEFORE ending (leaveVoice triggers upload)
+    // 1. Save recording first (without tearing down connections)
     if (voicePanelRef.current) {
-      try { await voicePanelRef.current.leaveVoice(); } catch {}
+      try { await voicePanelRef.current.saveRecording(); } catch {}
     }
+    // 2. Update DB to mark space as ended
     const duration = Math.round((Date.now() - new Date(space.created_at).getTime()) / 1000);
     await supabase.from("spaces").update({
       is_live: false,
@@ -1126,33 +1136,63 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
         </div>
       )}
 
-      {/* ── Main content: IN ROOM grid ── */}
+      {/* ── Main content: Speakers + Listeners ── */}
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
         <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0" style={{ scrollbarWidth: "none" }}>
-          {/* Section header */}
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-white/[0.06]">
-            <Users className="h-4 w-4 text-white/30" />
-            <span className="text-[12px] font-black text-white/40 uppercase tracking-widest">In Room ({totalInRoom})</span>
+
+          {/* ── SPEAKERS / HOST section ── */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/[0.06]">
+              <Mic className="h-4 w-4 text-emerald-400/60" />
+              <span className="text-[11px] font-black text-emerald-400/50 uppercase tracking-widest">
+                Speakers ({voiceParticipants.filter(p => p.role === "speaker").length})
+              </span>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+              {voiceParticipants.filter(p => p.role === "speaker").map(p => (
+                <PersonCard
+                  key={p.id}
+                  username={p.username}
+                  avatarUrl={p.avatar_url}
+                  isYou={p.user_id === user?.id}
+                  isSpeaking={!p.is_muted}
+                  isHost={p.user_id === space.host_id}
+                />
+              ))}
+              {voiceParticipants.filter(p => p.role === "speaker").length === 0 && (
+                <div className="col-span-full text-center py-6">
+                  <Mic className="h-6 w-6 mx-auto text-white/[0.06] mb-1.5" />
+                  <p className="text-[10px] text-white/15">No speakers yet</p>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Avatar grid — matching SocialHub style */}
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {/* All participants as PersonCards */}
-            {voiceParticipants.map((p, i) => (
-              <PersonCard
-                key={p.id}
-                username={p.username}
-                avatarUrl={p.avatar_url}
-                isYou={p.user_id === user?.id}
-                isSpeaking={p.role === "speaker" && !p.is_muted}
-              />
-            ))}
-            {voiceParticipants.length === 0 && (
-              <div className="col-span-full text-center py-8">
-                <Users className="h-8 w-8 mx-auto text-white/[0.06] mb-2" />
-                <p className="text-[11px] text-white/15">Waiting for people to join...</p>
-              </div>
-            )}
+          {/* ── LISTENERS section ── */}
+          <div>
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/[0.06]">
+              <Headphones className="h-4 w-4 text-blue-400/50" />
+              <span className="text-[11px] font-black text-blue-400/40 uppercase tracking-widest">
+                Listeners ({voiceParticipants.filter(p => p.role === "listener").length})
+              </span>
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2.5">
+              {voiceParticipants.filter(p => p.role === "listener").map(p => (
+                <PersonCard
+                  key={p.id}
+                  username={p.username}
+                  avatarUrl={p.avatar_url}
+                  isYou={p.user_id === user?.id}
+                  isSpeaking={false}
+                />
+              ))}
+              {voiceParticipants.filter(p => p.role === "listener").length === 0 && (
+                <div className="col-span-full text-center py-6">
+                  <Headphones className="h-6 w-6 mx-auto text-white/[0.06] mb-1.5" />
+                  <p className="text-[10px] text-white/15">No listeners yet — share the link!</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Hidden VoicePanel — provides WebRTC functionality */}
