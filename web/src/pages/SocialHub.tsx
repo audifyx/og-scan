@@ -27,6 +27,7 @@ import {
   RemoteParticipant,
   ConnectionState,
 } from "livekit-client";
+import VoiceToolkit from "@/components/lobbies/VoiceToolkit";
 
 /* ═══════════════════════════════════════════════════════════════
    Types
@@ -1035,6 +1036,9 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
           </div>
         </div>
       )}
+
+      {/* Voice Toolkit — shown when connected to any voice room */}
+      <VoiceToolkit room={roomRef.current} connected={connected} muted={muted} />
 
       {/* Sub-tab content */}
       <div className="flex-1 overflow-y-auto p-4">
