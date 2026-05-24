@@ -115,27 +115,7 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
       onCreated(data as Space);
       onClose();
     } catch (err: any) {
-      // If table doesn't exist, create a local space to demo
-      const mockSpace: Space = {
-        id: `local-${Date.now()}`,
-        title: title.trim(),
-        description: description.trim() || null,
-        host_id: user.id,
-        host_username: profile?.username || "You",
-        host_avatar: profile?.avatar_url || null,
-        topic,
-        is_live: true,
-        is_private: isPrivate,
-        listener_count: 1,
-        speaker_count: 1,
-        created_at: new Date().toISOString(),
-        scheduled_for: null,
-        ended_at: null,
-        tags: null,
-      };
-      toast.success("Space started! 🎙️");
-      onCreated(mockSpace);
-      onClose();
+      toast.error(err?.message || "Failed to start space. Please try again.");
     } finally {
       setCreating(false);
     }
@@ -390,77 +370,8 @@ const Spaces = () => {
         .limit(30);
       setSpaces((data as Space[]) || []);
     } catch {
-      // Table may not exist yet — show demo spaces
-      setSpaces([
-        {
-          id: "demo-1",
-          title: "🚀 Solana Alpha Call — New Launches This Week",
-          description: "Breaking down the top 5 new launches and what's worth watching",
-          host_id: "demo",
-          host_username: "OGScanner",
-          host_avatar: null,
-          topic: "Alpha",
-          is_live: true,
-          is_private: false,
-          listener_count: 124,
-          speaker_count: 3,
-          created_at: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
-          scheduled_for: null,
-          ended_at: null,
-          tags: null,
-        },
-        {
-          id: "demo-2",
-          title: "💎 NFT Floor Hunting — Hidden Gems Right Now",
-          description: "Looking for undervalued NFTs with strong communities",
-          host_id: "demo2",
-          host_username: "NFT_Degen",
-          host_avatar: null,
-          topic: "NFTs",
-          is_live: true,
-          is_private: false,
-          listener_count: 67,
-          speaker_count: 2,
-          created_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-          scheduled_for: null,
-          ended_at: null,
-          tags: null,
-        },
-        {
-          id: "demo-3",
-          title: "📈 DeFi Yield Strategies for Q2",
-          description: "Best APY sources on Solana right now with real risk analysis",
-          host_id: "demo3",
-          host_username: "DeFiPro",
-          host_avatar: null,
-          topic: "DeFi",
-          is_live: true,
-          is_private: false,
-          listener_count: 38,
-          speaker_count: 1,
-          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          scheduled_for: null,
-          ended_at: null,
-          tags: null,
-        },
-        {
-          id: "demo-4",
-          title: "🎭 Meme Coin Round Table — What's Pumping",
-          description: "Casual discussion on trending memes and what has legs",
-          host_id: "demo4",
-          host_username: "MemeLord",
-          host_avatar: null,
-          topic: "Memes",
-          is_live: false,
-          is_private: false,
-          listener_count: 0,
-          speaker_count: 1,
-          created_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-          scheduled_for: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-          ended_at: null,
-          tags: null,
-        },
-      ]);
+      // DB error — show empty list so users can start fresh
+      setSpaces([]);
     }
     setLoading(false);
   };
