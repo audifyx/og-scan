@@ -1712,9 +1712,9 @@ const Spaces = () => {
 
       {/* ═══ TAB BAR + ACTIONS ═══ */}
       <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 space-y-3">
+        {/* Row 1: Tabs */}
         <div className="flex items-center gap-2">
-          {/* Tabs */}
-          <div className="flex items-center gap-1 flex-1 min-w-0">
+          <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: "none" }}>
             {(["live", "upcoming", "replay"] as const).map(t => {
               const isActive = tab === t;
               const label = t === "live" ? "Live" : t === "upcoming" ? "Upcoming" : "Replay";
@@ -1722,10 +1722,10 @@ const Spaces = () => {
               return (
                 <button key={t} onClick={() => setTab(t)}
                   className={cn(
-                    "px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
+                    "px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap shrink-0",
                     isActive
                       ? "bg-blue-500/15 text-blue-400 border border-blue-500/25"
-                      : "text-white/35 hover:text-white/60 hover:bg-white/[0.03]"
+                      : "text-white/35 hover:text-white/60 hover:bg-white/[0.03] border border-transparent"
                   )}>
                   {label}
                   {count !== undefined && count > 0 && (
@@ -1749,13 +1749,13 @@ const Spaces = () => {
             )}>
             <Search className="h-4 w-4" />
           </button>
-
-          {/* + New Space */}
-          <button onClick={() => setShowCreate(true)}
-            className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-sm font-black flex items-center gap-1.5 transition-all shadow-lg shadow-amber-400/10 shrink-0">
-            <Plus className="h-4 w-4" /> New Space
-          </button>
         </div>
+
+        {/* Row 2: New Space button (full width on mobile) */}
+        <button onClick={() => setShowCreate(true)}
+          className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-sm font-black flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-400/10">
+          <Plus className="h-4 w-4" /> New Space
+        </button>
 
         {/* Search input (expandable) */}
         {showSearch && (
