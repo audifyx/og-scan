@@ -44,6 +44,10 @@ export function useLiveKit(options: UseLiveKitOptions) {
 
   // Get token from Supabase edge function
   const getToken = useCallback(async (): Promise<string | null> => {
+    if (!identity || !roomName) {
+      setError("Sign in to use voice features");
+      return null;
+    }
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch(
@@ -61,12 +65,16 @@ export function useLiveKit(options: UseLiveKitOptions) {
           }),
         }
       );
+      if (!resp.ok) throw new Error(`Server error (${resp.status})`);
       const data = await resp.json();
       if (data.token) return data.token;
       if (data.error) throw new Error(data.error);
       throw new Error("No token received");
     } catch (e: any) {
-      setError(`Token error: ${e.message}`);
+      const msg = e.message === "Failed to fetch"
+        ? "Unable to reach voice server — check your connection"
+        : `Token error: ${e.message}`;
+      setError(msg);
       return null;
     }
   }, [roomName, identity, displayName]);

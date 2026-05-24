@@ -756,6 +756,9 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
   const [rooms, setRooms] = useState<VoiceRoom[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [activeRoomName, setActiveRoomName] = useState<string>("social-voice-lobby");
+  const [showCreateRoom, setShowCreateRoom] = useState(false);
+  const [newRoomName, setNewRoomName] = useState("");
+  const [creatingRoom, setCreatingRoom] = useState(false);
 
   /* LiveKit for voice (one instance, switches between lobby and rooms) */
   const voice = useLiveKit({
@@ -792,6 +795,7 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
   }, []);
 
   const joinLobby = async () => {
+    if (!user) { toast.error("Sign in to join voice"); return; }
     if (isInLobby) {
       await voice.leave();
       setActiveRoomId(null);
@@ -806,6 +810,7 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
   };
 
   const joinRoom = async (room: VoiceRoom) => {
+    if (!user) { toast.error("Sign in to join voice"); return; }
     if (voice.connected) await voice.leave();
     setActiveRoomId(room.id);
     setActiveRoomName(`social-room-${room.id}`);
@@ -820,17 +825,27 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
   };
 
   const createRoom = async () => {
-    if (!user) return;
-    const name = window.prompt("Room name:");
-    if (!name?.trim()) return;
+    if (!user || !newRoomName.trim()) return;
+    setCreatingRoom(true);
     const { error } = await supabase.from("social_voice_rooms").insert({
-      name: name.trim(),
+      name: newRoomName.trim(),
       created_by: user.id,
       creator_username: profile?.username || "Anon",
       participant_count: 0,
     });
+    setCreatingRoom(false);
     if (error) toast.error("Failed to create room");
-    else toast.success("Room created!");
+    else {
+      toast.success("Room created!");
+      setNewRoomName("");
+      setShowCreateRoom(false);
+    }
+  };
+
+  const deleteRoom = async (roomId: string) => {
+    const { error } = await supabase.from("social_voice_rooms").delete().eq("id", roomId);
+    if (error) toast.error("Failed to delete room");
+    else toast.success("Room deleted");
   };
 
   const VOICE_SUB_TABS: { id: VoiceSubTab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
@@ -1089,17 +1104,14 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
                       </p>
                     </div>
                   </div>
-                  <button
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-full transition",
-                      m.is_online
-                        ? "border border-og-lime/20 bg-og-lime/10 text-og-lime hover:bg-og-lime/20"
-                        : "border border-white/[0.06] bg-white/[0.03] text-white/15",
-                    )}
-                    disabled={!m.is_online}
-                  >
-                    <Phone className="h-3.5 w-3.5" />
-                  </button>
+                  <span className={cn(
+                    "rounded-full px-2.5 py-1 text-[9px] font-bold",
+                    m.is_online
+                      ? "bg-og-lime/10 text-og-lime"
+                      : "bg-white/[0.03] text-white/20",
+                  )}>
+                    {m.is_online ? "Online" : "Offline"}
+                  </span>
                 </div>
               ))}
             </div>
@@ -1115,16 +1127,57 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
                 </h4>
                 <p className="mt-0.5 text-[10px] text-white/25">{rooms.length} rooms</p>
               </div>
-              <button
-                onClick={createRoom}
-                className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-og-lime/80 to-og-gold/60 px-3 py-1.5 text-[10px] font-bold text-black transition hover:shadow-[0_0_16px_hsl(var(--og-lime)/0.3)]"
-              >
-                <Plus className="h-3 w-3" />
-                New Room
-              </button>
+              {!showCreateRoom && (
+                <button
+                  onClick={() => { if (!user) { toast.error("Sign in to create a room"); return; } setShowCreateRoom(true); }}
+                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-og-lime/80 to-og-gold/60 px-3 py-1.5 text-[10px] font-bold text-black transition hover:shadow-[0_0_16px_hsl(var(--og-lime)/0.3)]"
+                >
+                  <Plus className="h-3 w-3" />
+                  New Room
+                </button>
+              )}
             </div>
 
-            {rooms.length === 0 ? (
+            {/* Inline Create Room Form */}
+            {showCreateRoom && (
+              <div className="mb-4 rounded-xl border border-og-lime/20 bg-og-lime/[0.04] p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-xs font-black text-white">CREATE VOICE ROOM</h4>
+                  <button onClick={() => { setShowCreateRoom(false); setNewRoomName(""); }} className="rounded-full p-1 text-white/30 transition hover:bg-white/[0.06] hover:text-white/60">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+                    <Headphones className="h-4 w-4 flex-shrink-0 text-white/20" />
+                    <input
+                      type="text"
+                      value={newRoomName}
+                      onChange={(e) => setNewRoomName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") createRoom(); }}
+                      placeholder="Room name (e.g. Trading Talk)"
+                      className="min-w-0 flex-1 bg-transparent text-[12px] text-white/80 placeholder:text-white/20 outline-none"
+                      autoFocus
+                      maxLength={50}
+                    />
+                  </div>
+                  <button
+                    onClick={createRoom}
+                    disabled={!newRoomName.trim() || creatingRoom}
+                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-og-lime/80 to-og-gold/60 px-4 py-2.5 text-[11px] font-bold text-black transition hover:shadow-[0_0_16px_hsl(var(--og-lime)/0.3)] disabled:opacity-40"
+                  >
+                    {creatingRoom ? (
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black/30 border-t-black" />
+                    ) : (
+                      <Plus className="h-3.5 w-3.5" />
+                    )}
+                    Create
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {rooms.length === 0 && !showCreateRoom ? (
               <div className="flex flex-col items-center justify-center py-16">
                 <Headphones className="mb-3 h-10 w-10 text-white/10" />
                 <p className="text-sm font-bold text-white/25">NO ROOMS YET</p>
@@ -1134,6 +1187,7 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
               <div className="space-y-2">
                 {rooms.map((room) => {
                   const isInThisRoom = activeRoomId === room.id && voice.connected;
+                  const isOwner = room.created_by === user?.id;
                   return (
                     <div
                       key={room.id}
@@ -1160,22 +1214,33 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
                             </p>
                           </div>
                         </div>
-                        {isInThisRoom ? (
-                          <button
-                            onClick={leaveVoice}
-                            className="rounded-lg bg-red-500/15 px-3.5 py-1.5 text-[10px] font-bold text-red-400 transition hover:bg-red-500/25"
-                          >
-                            Leave
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => joinRoom(room)}
-                            disabled={voice.connecting}
-                            className="rounded-lg bg-og-lime/15 px-3.5 py-1.5 text-[10px] font-bold text-og-lime transition hover:bg-og-lime/25 disabled:opacity-50"
-                          >
-                            Join
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {isOwner && !isInThisRoom && (
+                            <button
+                              onClick={() => deleteRoom(room.id)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/20 transition hover:bg-red-500/15 hover:text-red-400"
+                              title="Delete room"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {isInThisRoom ? (
+                            <button
+                              onClick={leaveVoice}
+                              className="rounded-lg bg-red-500/15 px-3.5 py-1.5 text-[10px] font-bold text-red-400 transition hover:bg-red-500/25"
+                            >
+                              Leave
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => joinRoom(room)}
+                              disabled={voice.connecting}
+                              className="rounded-lg bg-og-lime/15 px-3.5 py-1.5 text-[10px] font-bold text-og-lime transition hover:bg-og-lime/25 disabled:opacity-50"
+                            >
+                              Join
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {/* Show participants when in room */}
                       {isInThisRoom && voice.participants.length > 0 && (
