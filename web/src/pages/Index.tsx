@@ -62,6 +62,7 @@ import CommunitiesPage from "./Communities";
 import DiscoverPage from "./Discover";
 import ArtFeed from "./ArtFeed";
 import SpacesPage from "./Spaces";
+import SocialHub from "./SocialHub";
 import { cn } from "@/lib/utils";
 import { DEFAULT_OG_MINT, OGSCAN_DEV_WALLET, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr } from "@/lib/og";
 import { AuthButton } from "@/components/AuthButton";
@@ -137,7 +138,8 @@ type TabId =
   | "communities"
   | "discover"
   | "memes"
-  | "spaces";
+  | "spaces"
+  | "social";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
@@ -391,6 +393,17 @@ const TABS: TabConfig[] = [
     accent: "cyan",
     group: "Main",
   },
+  {
+    id: "social",
+    label: "Social",
+    slug: "social",
+    pageNumber: 21,
+    eyebrow: "Social Hub",
+    description: "Discord-style community hub — chat, voice lobby, rooms, and live streams.",
+    Icon: MessageSquare,
+    accent: "lime",
+    group: "Main",
+  },
 ];
 
 const NAV_TABS: TabConfig[] = TABS.filter((t: TabConfig) => t.showInNav !== false);
@@ -433,6 +446,9 @@ const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
     spaces: "spaces",
     "voice-rooms": "spaces",
     "live-rooms": "spaces",
+    social: "social",
+    "social-hub": "social",
+    socialhub: "social",
   },
 );
 
@@ -481,6 +497,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void): 
   if (tab === "discover") return <DiscoverInline />;
   if (tab === "memes") return <ArtFeed inline />;
   if (tab === "spaces") return <SpacesPage />;
+  if (tab === "social") return <SocialHub />;
   return null;
 };
 
@@ -716,6 +733,7 @@ const AppSidebar = ({
           <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Main</p>
           <NavItem item={TAB_BY_ID.overview} activeId={activeId} onNavigate={onNavigate} />
           <NavItem item={TAB_BY_ID.communities} activeId={activeId} onNavigate={onNavigate} />
+          <NavItem item={TAB_BY_ID.social} activeId={activeId} onNavigate={onNavigate} />
           <NavItem item={TAB_BY_ID.spaces} activeId={activeId} onNavigate={onNavigate} />
           <NavItem item={TAB_BY_ID.discover} activeId={activeId} onNavigate={onNavigate} />
           <NavItem item={TAB_BY_ID.memes} activeId={activeId} onNavigate={onNavigate} />
@@ -933,7 +951,7 @@ const MobileNav = ({ activeId, onNavigate }: { activeId: TabId; onNavigate: (t: 
   const items = [
     { id: "overview" as TabId, label: "Home", Icon: Home },
     { id: "scanner" as TabId, label: "Scan", Icon: Search },
-    { id: "communities" as TabId, label: "Social", Icon: Users },
+    { id: "social" as TabId, label: "Social", Icon: MessageSquare },
     { id: "spaces" as TabId, label: "Spaces", Icon: Radio },
     { id: "memes" as TabId, label: "Memes", Icon: Palette },
   ];
