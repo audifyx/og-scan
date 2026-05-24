@@ -143,7 +143,8 @@ type TabId =
   | "spaces"
   | "social"
   | "community"
-  | "tools";
+  | "tools"
+  | "profile";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
@@ -440,6 +441,17 @@ const TABS: TabConfig[] = [
     accent: "gold",
     group: "Main",
   },
+  {
+    id: "profile",
+    label: "Profile",
+    slug: "profile",
+    pageNumber: 24,
+    eyebrow: "Your Account",
+    description: "View your profile, settings, and account preferences.",
+    Icon: User,
+    accent: "cyan",
+    group: "Main",
+  },
 ];
 
 const NAV_TABS: TabConfig[] = TABS.filter((t: TabConfig) => t.showInNav !== false);
@@ -535,6 +547,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "spaces") return <SpacesPage />;
   if (tab === "social") return <SocialHub />;
   if (tab === "tools") return <ToolsHub onNavigate={onNavigate || (() => {})} />;
+  if (tab === "profile") return <UserProfile />;
   return null;
 };
 
@@ -995,7 +1008,7 @@ const MobileNav = ({ activeId, onNavigate }: { activeId: TabId; onNavigate: (t: 
     { id: "scanner" as TabId, label: "Scan", Icon: Search },
     { id: "community" as TabId, label: "Community", Icon: Users },
     { id: "tools" as TabId, label: "Tools", Icon: Wrench },
-    { id: "swap" as TabId, label: "Swap", Icon: Zap },
+    { id: "profile" as TabId, label: "Profile", Icon: User },
   ];
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-white/[0.07] bg-[#060c13]/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-xl lg:hidden">
@@ -1037,7 +1050,7 @@ const OverviewPage = ({
   const quickActions = [
     { label: "Scan Token", Icon: Search, accent: "lime" as TabAccent, tab: "scanner" as TabId },
     { label: "Launch Radar", Icon: Target, accent: "cyan" as TabAccent, tab: "snipe-feed" as TabId },
-    { label: "Swap", Icon: Zap, accent: "gold" as TabAccent, tab: "swap" as TabId },
+    { label: "Profile", Icon: User, accent: "gold" as TabAccent, tab: "profile" as TabId },
     { label: "Community", Icon: MessageSquare, accent: "cyan" as TabAccent, tab: "community" as TabId },
   ];
 
@@ -1062,7 +1075,6 @@ const OverviewPage = ({
       title: "Trading",
       accent: "gold" as TabAccent,
       items: [
-        { ...TAB_BY_ID.swap, shortDesc: "Jupiter route + scanner context" },
         { ...TAB_BY_ID.trending, shortDesc: "Live momentum & catalysts" },
       ],
     },
