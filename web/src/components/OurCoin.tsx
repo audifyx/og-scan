@@ -1,10 +1,9 @@
 import { memo, useCallback, useState, type ComponentType } from "react";
-import { Bell, Check, Coins, Copy, ExternalLink, Flame, Megaphone, RadioTower, ShieldAlert, Sparkles, Wallet } from "lucide-react";
-import { OGSCAN_DEXSCREENER_URL, OGSCAN_DEV_WALLET, OGSCAN_PUMPFUN_URL, OGSCAN_SITE_URL, OGSCAN_TOKEN_MINT, OGSCAN_X_URL, shortAddr } from "@/lib/og";
+import { Bell, Check, Coins, Copy, ExternalLink, Flame, Megaphone, RadioTower, ShieldAlert, Sparkles } from "lucide-react";
+import { OGSCAN_DEXSCREENER_URL, OGSCAN_PUMPFUN_URL, OGSCAN_SITE_URL, OGSCAN_TOKEN_MINT, OGSCAN_X_URL, shortAddr } from "@/lib/og";
 
 const launchSignals: { label: string; value: string; tone: "cyan" | "gold" | "lime" }[] = [
   { label: "Official CA", value: shortAddr(OGSCAN_TOKEN_MINT, 6), tone: "gold" },
-  { label: "Dev wallet", value: shortAddr(OGSCAN_DEV_WALLET, 6), tone: "cyan" },
   { label: "Launch status", value: "Live", tone: "lime" },
 ];
 
@@ -22,7 +21,7 @@ const safetyNotes: { Icon: ComponentType<{ className?: string }>; title: string;
   {
     Icon: Bell,
     title: "Holder tech next",
-    detail: "Reward mechanics and creator-fee ideas can now be built around the live mint and dev wallet.",
+    detail: "Reward mechanics and creator-fee ideas can now be built around the live mint.",
   },
 ];
 
@@ -95,12 +94,11 @@ export const OurCoin = memo(() => {
               OGScan is live on Solana. Copy the official coin address below before opening charts, swapping, or sharing it with the community.
             </p>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
-              Dev wallet and coin mint are now pinned here as the single source of truth for the beta community.
+              The official coin mint is pinned here as the single source of truth for the beta community.
             </p>
 
             <div className="mt-7 grid max-w-2xl gap-3">
               <AddressCard label="Official coin CA" value={OGSCAN_TOKEN_MINT} copied={copied === "coin"} onCopy={() => copyValue("coin", OGSCAN_TOKEN_MINT)} Icon={Coins} />
-              <AddressCard label="Dev wallet" value={OGSCAN_DEV_WALLET} copied={copied === "dev"} onCopy={() => copyValue("dev", OGSCAN_DEV_WALLET)} Icon={Wallet} />
             </div>
 
             <div className="mt-7 flex flex-wrap gap-3">

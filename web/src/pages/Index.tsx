@@ -26,7 +26,6 @@ import {
   Rocket,
   Rss,
   Search,
-  Settings,
   ShieldCheck,
   Sparkles,
   Star,
@@ -66,7 +65,7 @@ import SocialHub from "./SocialHub";
 import CommunityHub from "./CommunityHub";
 import ToolsHub from "./ToolsHub";
 import { cn } from "@/lib/utils";
-import { DEFAULT_OG_MINT, OGSCAN_DEV_WALLET, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr } from "@/lib/og";
+import { DEFAULT_OG_MINT, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr } from "@/lib/og";
 import { AuthButton } from "@/components/AuthButton";
 
 /* ─── 20x Feature imports ─── */
@@ -763,10 +762,7 @@ const AppSidebar = ({
     { to: "/premium",         icon: Crown,        label: "Premium",         eyebrow: "Pro · AI · P&L" },
   ];
 
-  const accountItems: ExternalNavItem[] = [
-    { to: "/profile",        icon: User,         label: "Profile",         eyebrow: "Your account" },
-    { to: "/settings",       icon: Settings,     label: "Settings",        eyebrow: "Preferences" },
-  ];
+
 
   return (
     <aside
@@ -798,13 +794,7 @@ const AppSidebar = ({
 
       {/* Nav — consolidated into 4 tight sections */}
       <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
-        {/* Core */}
-        <div className="mb-1">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Core</p>
-          <NavItem item={TAB_BY_ID.overview} activeId={activeId} onNavigate={onNavigate} />
-          <NavItem item={TAB_BY_ID.community} activeId={activeId} onNavigate={onNavigate} />
-          <NavItem item={TAB_BY_ID.tools} activeId={activeId} onNavigate={onNavigate} />
-        </div>
+
 
         {/* Trading */}
         <div className="mb-1 mt-3">
@@ -826,15 +816,7 @@ const AppSidebar = ({
           </div>
         </div>
 
-        {/* Account */}
-        <div className="mb-4 mt-3">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Account</p>
-          <div className="space-y-0.5">
-            {accountItems.map((item) => (
-              <ExternalNavLink key={item.to} item={item} currentPath={location.pathname} onClose={onClose} />
-            ))}
-          </div>
-        </div>
+
       </nav>
 
       {/* Active mint */}
@@ -857,7 +839,7 @@ const AppSidebar = ({
         <Link
           to="/premium"
           onClick={onClose}
-          className="flex items-center gap-3 rounded-xl border border-og-lime/25 bg-og-lime/8 px-3 py-3 transition hover:border-og-lime/40 hover:bg-og-lime/12"
+          className="flex items-center gap-3 rounded-xl border border-og-lime/25 bg-og-lime/[0.08] px-3 py-3 transition hover:border-og-lime/40 hover:bg-og-lime/[0.12]"
         >
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-og-lime/40 bg-og-lime/15">
             <Sparkles className="h-4 w-4 text-og-lime" />
@@ -876,7 +858,7 @@ const AppSidebar = ({
       <div className="border-t border-white/[0.07] px-3 pb-4 pt-2">
         <div className="text-[9px] font-bold uppercase tracking-widest text-white/30">Official Token</div>
         <div className="mt-1 font-mono text-[10px] text-white/50">
-          CA {shortAddr(OGSCAN_TOKEN_MINT, 5)} · Dev {shortAddr(OGSCAN_DEV_WALLET, 5)}
+          CA {shortAddr(OGSCAN_TOKEN_MINT, 5)}
         </div>
       </div>
     </aside>
@@ -1012,7 +994,6 @@ const AppTopBar = ({
 const MobileNav = ({ activeId, onNavigate }: { activeId: TabId; onNavigate: (t: string) => void }) => {
   const items = [
     { id: "overview" as TabId, label: "Home", Icon: Home },
-    { id: "scanner" as TabId, label: "Scan", Icon: Search },
     { id: "community" as TabId, label: "Community", Icon: Users },
     { id: "tools" as TabId, label: "Tools", Icon: Wrench },
     { id: "profile" as TabId, label: "Profile", Icon: User },
@@ -1096,7 +1077,7 @@ const OverviewPage = ({
         <div className="relative px-5 py-5 sm:px-7 sm:py-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-og-lime/25 bg-og-lime/8 px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest text-og-lime">
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-og-lime/25 bg-og-lime/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest text-og-lime">
                 <div className="h-1.5 w-1.5 rounded-full bg-og-lime animate-pulse" /> Live
               </div>
               <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
@@ -1256,7 +1237,7 @@ const AllToolRow = ({ tool, onClick }: { tool: TabConfig; onClick: () => void })
       <div className="flex items-center gap-2">
         <span className="text-[13px] font-bold text-white">{tool.label}</span>
         <span className={cn("rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest", accentText(tool.accent),
-          tool.accent === "gold" ? "border-og-gold/25 bg-og-gold/8" : tool.accent === "cyan" ? "border-og-cyan/25 bg-og-cyan/8" : tool.accent === "white" ? "border-white/15 bg-white/5" : "border-og-lime/25 bg-og-lime/8"
+          tool.accent === "gold" ? "border-og-gold/25 bg-og-gold/[0.08]" : tool.accent === "cyan" ? "border-og-cyan/25 bg-og-cyan/[0.08]" : tool.accent === "white" ? "border-white/15 bg-white/5" : "border-og-lime/25 bg-og-lime/[0.08]"
         )}>
           {tool.group}
         </span>

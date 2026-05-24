@@ -66,32 +66,9 @@ export const useCredits = () => {
     setTodayUsed((data ?? []).filter(tx => new Date(tx.created_at) >= today).reduce((s, tx) => s + tx.cost, 0));
   }, [user?.id]);
 
-  const spendCredits = useCallback(async (toolKey: CreditToolKey, description?: string): Promise<boolean> => {
-    if (!user || !credits) { toast.error("Please sign in to use this feature"); return false; }
-    const info = CREDIT_PRICING[toolKey];
-    if (!info) return false;
-    if (info.cost === 0) return true;
-    const remaining = credits.total_credits - credits.used_credits;
-    if (info.cost > remaining) { toast.error("Insufficient Credits", { description: `Costs ${formatCreditCost(info.cost)}, you have ${formatCreditCost(remaining)}` }); return false; }
-    if (todayUsed + info.cost > DAILY_USAGE_ALLOWANCE) { toast.error("Daily Cap Reached"); return false; }
-    try {
-      const { data: updated } = await supabase.from("user_credits").update({ used_credits: credits.used_credits + info.cost }).eq("user_id", user.id).select().single();
-      await supabase.from("credit_transactions").insert({ user_id: user.id, tool_name: info.name, tool_category: info.category, cost: info.cost, description: description ?? null });
-      setCredits(updated);
-      setTodayUsed(p => p + info.cost);
-      toast.success(`Spent ${formatCreditCost(info.cost)} on ${info.name}`, { description: `Remaining: ${formatCreditCost(remaining - info.cost)}` });
-      void fetchTransactions();
-      return true;
-    } catch { toast.error("Failed to process credit transaction"); return false; }
-  }, [user?.id, credits, todayUsed, fetchTransactions]);
+  const spendCredits = useCallback(async (_toolKey: CreditToolKey, _description?: string): Promise<boolean> => { return true; }, []);
 
-  const canAfford = useCallback((toolKey: CreditToolKey): boolean => {
-    if (!credits) return false;
-    const info = CREDIT_PRICING[toolKey];
-    if (!info) return false;
-    if (info.cost === 0) return true;
-    return (credits.total_credits - credits.used_credits) >= info.cost && (todayUsed + info.cost) <= DAILY_USAGE_ALLOWANCE;
-  }, [credits, todayUsed]);
+  const canAfford = useCallback((_toolKey: CreditToolKey): boolean => { return true; }, []);
 
   const getRemainingCredits = useCallback(() => credits ? credits.total_credits - credits.used_credits : 0, [credits]);
   const getDailyRemaining = useCallback(() => Math.max(0, DAILY_USAGE_ALLOWANCE - todayUsed), [todayUsed]);

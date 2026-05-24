@@ -69,7 +69,7 @@ const CommunityHub: React.FC = () => {
         )}
         {sub === "discover" && (
           <div className="h-full overflow-y-auto px-3 py-4 sm:px-5 lg:px-6 pb-4">
-            <DiscoverPage />
+            <DiscoverPage inline />
           </div>
         )}
       </div>

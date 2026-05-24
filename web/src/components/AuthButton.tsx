@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, LogOut, Settings, Wallet, Coins, ChevronDown } from "lucide-react";
+import { User, LogOut, Settings, Wallet, ChevronDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
@@ -9,7 +9,6 @@ export const AuthButton = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  // Show Sign In button optimistically while loading (unauthenticated is the safe default)
   if (loading || !user) {
     return (
       <button
@@ -47,7 +46,6 @@ export const AuthButton = () => {
             <div className="py-1">
               {[
                 { icon: Wallet, label: "Wallets", path: "/wallets" },
-                { icon: Coins, label: "Credits", path: "/credits" },
                 { icon: Settings, label: "Settings", path: "/settings" },
               ].map(({ icon: Icon, label, path }) => (
                 <button

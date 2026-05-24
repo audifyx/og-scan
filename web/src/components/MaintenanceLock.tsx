@@ -126,7 +126,7 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
               rel="noopener noreferrer"
               className="text-blue-400 hover:text-blue-300 transition-colors"
             >
-              @ogscanner
+              @ogscanbackup
             </a>{" "}
             for live updates.
           </p>

@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Scanlines } from "@/components/Scanlines";
 import { AuthButton } from "@/components/AuthButton";
-import { OGSCAN_DEV_WALLET, OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
+import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
 import { cn } from "@/lib/utils";
 
 const OGSCAN_TELEGRAM_URL = "https://t.me/ogscanner";
@@ -322,9 +322,7 @@ const BetaHome = memo(() => {
               <p className="text-sm font-semibold leading-6 text-white/86">
                 Official CA: <span className="font-mono text-og-gold">{shortAddr(OGSCAN_TOKEN_MINT, 6)}</span>
               </p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                Dev wallet: <span className="font-mono text-og-cyan">{shortAddr(OGSCAN_DEV_WALLET, 5)}</span>
-              </p>
+              
               <button
                 type="button"
                 onClick={copyCoinCa}

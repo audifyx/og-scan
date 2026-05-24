@@ -18,7 +18,7 @@ import Tokens from "./pages/Tokens";
 import Tools from "./pages/Tools";
 import AdvancedTools from "./pages/AdvancedTools";
 import AlphaChat from "./pages/AlphaChat";
-import Credits from "./pages/Credits";
+// Credits page removed
 import Webhooks from "./pages/Webhooks";
 import TradingLobbies from "./pages/TradingLobbies";
 import Leaderboard from "./pages/Leaderboard";
@@ -105,7 +105,7 @@ const App = () => (
             <Route path="/settings" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/wallets" element={<ProtectedRoute><Wallets /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-            <Route path="/credits" element={<ProtectedRoute><Credits /></ProtectedRoute>} />
+            {/* Credits removed */}
 
             {/* ── Protected: Tools & Features ── */}
             <Route path="/tokens" element={<ProtectedRoute><Tokens /></ProtectedRoute>} />

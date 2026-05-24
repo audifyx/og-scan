@@ -236,7 +236,7 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
         </PageHeader>
       )}
 
-      <ScrollArea className={inline ? "max-h-[80vh]" : "h-[calc(100vh-120px)]"}>
+      <div className={inline ? "" : "h-[calc(100vh-120px)] overflow-y-auto"}>
         <div className="p-4 lg:p-6 space-y-6">
           {/* Trending Tokens Section */}
           <div>
@@ -252,7 +252,7 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {(loadingTrending ? Array(4).fill(null) : trendingTokens.slice(0, 8)).map((token, i) => (
                 <Card key={i} className="og-glass-card hover:border-primary/20 transition-all hover:scale-[1.02] cursor-pointer group"
-                  onClick={() => token && navigate(`/charts?token=${token.address}`)}>
+                  onClick={() => { if (token) { try { localStorage.setItem("og_active_mint", token.address); } catch {} navigate(`/scanner`); } }}>
                   <CardContent className="p-4">
                     {!token ? (
                       <div className="animate-pulse space-y-2">
@@ -493,7 +493,7 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
             </TabsContent>
           </Tabs>
         </div>
-      </ScrollArea>
+      </div>
     </>
   );
   return inline ? content : <AppLayout>{content}</AppLayout>;
