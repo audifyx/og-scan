@@ -306,10 +306,12 @@ const SocialHub = () => {
             />
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
-            {activeChannel === "general-chat" && <GeneralChat />}
-            {activeChannel === "voice-rooms" && <VoiceRooms members={sortedMembers} />}
-            {activeChannel === "live-stream" && <LiveStream />}
+          <div className="relative min-h-0 flex-1">
+            <div className="absolute inset-0 flex flex-col">
+              {activeChannel === "general-chat" && <GeneralChat />}
+              {activeChannel === "voice-rooms" && <VoiceRooms members={sortedMembers} />}
+              {activeChannel === "live-stream" && <LiveStream />}
+            </div>
           </div>
         )}
       </div>
@@ -963,11 +965,11 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
         </div>
       )}
 
-      {/* Error display */}
-      {voice.error && (
-        <div className="mx-4 mt-2 rounded-lg border border-red-500/20 bg-red-500/10 p-2.5">
+      {/* Error display — only show when user has attempted to connect */}
+      {voice.error && (voice.connected || voice.connecting || voice.participantCount > 0) && (
+        <div className="mx-4 mt-2 flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/10 p-2.5">
           <p className="text-[10px] text-red-400">{voice.error}</p>
-          <button onClick={() => voice.join()} className="mt-1 text-[9px] font-bold text-og-lime underline">
+          <button onClick={() => { if (user) voice.join(); else toast.error("Sign in to join voice"); }} className="ml-3 text-[9px] font-bold text-og-lime underline">
             Retry
           </button>
         </div>
@@ -1274,132 +1276,49 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
    Live Stream — LiveKit streaming
    ═══════════════════════════════════════════════════════════════ */
 
-const LiveStream = () => {
-  const { user, profile } = useAuth();
-  const [streams, setStreams] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchStreams = async () => {
-      const { data } = await supabase
-        .from("social_streams")
-        .select("*")
-        .eq("is_live", true)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (data) setStreams(data);
-    };
-    fetchStreams();
-
-    // Realtime updates
-    const channel = supabase
-      .channel("social-streams-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "social_streams" },
-        () => fetchStreams(),
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  const goLive = async () => {
-    if (!user) return toast.error("Sign in to go live");
-    const title = window.prompt("Stream title:");
-    if (!title?.trim()) return;
-
-    const { error } = await supabase.from("social_streams").insert({
-      host_id: user.id,
-      host_username: profile?.username || "Anon",
-      title: title.trim(),
-      is_live: true,
-      viewer_count: 0,
-    });
-    if (error) toast.error("Failed to start stream");
-    else toast.success("You're live! 🔴");
-  };
-
-  const endStream = async (streamId: string) => {
-    await supabase.from("social_streams").update({ is_live: false }).eq("id", streamId);
-    toast.success("Stream ended");
-  };
-
-  return (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="border-b border-white/[0.07] px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Radio className="h-4 w-4 text-white/40" />
-            <span className="text-sm font-black tracking-wide text-white">live-stream</span>
-          </div>
-          <span className="flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-[10px] font-bold text-red-400">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-            {streams.length} live
-          </span>
+const LiveStream = () => (
+  <div className="flex h-full flex-col">
+    {/* Header */}
+    <div className="border-b border-white/[0.07] px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <Radio className="h-4 w-4 text-white/40" />
+          <span className="text-sm font-black tracking-wide text-white">live-stream</span>
         </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-black text-white">LIVE STREAMS</h3>
-            <p className="text-[10px] text-white/30">{streams.length} active</p>
-          </div>
-          <button
-            onClick={goLive}
-            className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-red-500/80 to-red-600/80 px-4 py-2 text-[10px] font-bold text-white shadow-lg transition hover:shadow-[0_0_16px_rgba(239,68,68,0.3)]"
-          >
-            <Radio className="h-3 w-3" />
-            Go Live
-          </button>
-        </div>
-
-        {streams.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Radio className="mb-3 h-12 w-12 text-white/[0.06]" />
-            <p className="text-sm font-bold text-white/20">NO LIVE STREAMS</p>
-            <p className="mt-1 text-[11px] text-white/12">Be the first to go live!</p>
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {streams.map((s: any) => {
-              const isHost = s.host_id === user?.id;
-              return (
-                <div
-                  key={s.id}
-                  className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-4 transition hover:bg-red-500/[0.08]"
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                      </span>
-                      <span className="text-[10px] font-bold uppercase text-red-400">Live</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[9px] text-white/25">
-                      <Eye className="h-3 w-3" />
-                      {s.viewer_count || 0}
-                    </div>
-                  </div>
-                  <p className="text-sm font-bold text-white">{s.title || "Untitled Stream"}</p>
-                  <p className="mt-1 text-[10px] text-white/30">by @{s.host_username || "Anon"}</p>
-                  {isHost && (
-                    <button
-                      onClick={() => endStream(s.id)}
-                      className="mt-3 w-full rounded-lg bg-red-500/20 py-1.5 text-[10px] font-bold text-red-400 transition hover:bg-red-500/30"
-                    >
-                      End Stream
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <span className="flex items-center gap-1.5 rounded-full bg-og-gold/10 px-2.5 py-1 text-[10px] font-bold text-og-gold">
+          Coming Soon
+        </span>
       </div>
     </div>
-  );
-};
+
+    <div className="flex flex-1 flex-col items-center justify-center p-6">
+      <div className="relative mb-6">
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.03]">
+          <Radio className="h-10 w-10 text-white/[0.08]" />
+        </div>
+        <div className="absolute -right-1 -top-1 rounded-full bg-og-gold/20 px-2 py-0.5 text-[8px] font-bold uppercase text-og-gold">
+          Soon
+        </div>
+      </div>
+      <h3 className="mb-2 text-lg font-black text-white">LIVE STREAMING</h3>
+      <p className="mb-1 text-[12px] text-white/40">Stream live to the OG Scan community</p>
+      <p className="max-w-xs text-center text-[11px] leading-relaxed text-white/20">
+        Go live, share your screen, and broadcast to the community. Currently under development — stay tuned!
+      </p>
+      <div className="mt-6 grid grid-cols-3 gap-3">
+        {[
+          { icon: Video, label: "Go Live" },
+          { icon: Monitor, label: "Screen Share" },
+          { icon: Eye, label: "Watch Streams" },
+        ].map((f) => (
+          <div key={f.label} className="flex flex-col items-center gap-2 rounded-xl border border-white/[0.05] bg-white/[0.02] p-3.5 opacity-40">
+            <f.icon className="h-5 w-5 text-white/20" />
+            <span className="text-[9px] font-bold text-white/25">{f.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
 export default SocialHub;
