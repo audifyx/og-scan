@@ -63,6 +63,8 @@ import DiscoverPage from "./Discover";
 import ArtFeed from "./ArtFeed";
 import SpacesPage from "./Spaces";
 import SocialHub from "./SocialHub";
+import CommunityHub from "./CommunityHub";
+import ToolsHub from "./ToolsHub";
 import { cn } from "@/lib/utils";
 import { DEFAULT_OG_MINT, OGSCAN_DEV_WALLET, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr } from "@/lib/og";
 import { AuthButton } from "@/components/AuthButton";
@@ -139,7 +141,9 @@ type TabId =
   | "discover"
   | "memes"
   | "spaces"
-  | "social";
+  | "social"
+  | "community"
+  | "tools";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
@@ -359,6 +363,8 @@ const TABS: TabConfig[] = [
     Icon: Users,
     accent: "cyan",
     group: "Main",
+    showInNav: false,
+    mergedInto: "community",
   },
   {
     id: "discover",
@@ -370,6 +376,8 @@ const TABS: TabConfig[] = [
     Icon: Compass,
     accent: "gold",
     group: "Main",
+    showInNav: false,
+    mergedInto: "community",
   },
   {
     id: "memes",
@@ -381,6 +389,8 @@ const TABS: TabConfig[] = [
     Icon: Palette,
     accent: "lime",
     group: "Main",
+    showInNav: false,
+    mergedInto: "tools",
   },
   {
     id: "spaces",
@@ -392,6 +402,8 @@ const TABS: TabConfig[] = [
     Icon: Radio,
     accent: "cyan",
     group: "Main",
+    showInNav: false,
+    mergedInto: "community",
   },
   {
     id: "social",
@@ -402,6 +414,30 @@ const TABS: TabConfig[] = [
     description: "Discord-style community hub — chat, voice lobby, rooms, and live streams.",
     Icon: MessageSquare,
     accent: "lime",
+    group: "Main",
+    showInNav: false,
+    mergedInto: "community",
+  },
+  {
+    id: "community",
+    label: "Community",
+    slug: "community",
+    pageNumber: 22,
+    eyebrow: "Social & Voice",
+    description: "Chat, voice spaces, communities, and discovery — all in one hub.",
+    Icon: Users,
+    accent: "cyan",
+    group: "Main",
+  },
+  {
+    id: "tools",
+    label: "Tools",
+    slug: "tools",
+    pageNumber: 23,
+    eyebrow: "All Tools",
+    description: "Every forensic, market, and trading tool — organized by category.",
+    Icon: Wrench,
+    accent: "gold",
     group: "Main",
   },
 ];
@@ -466,7 +502,7 @@ const getTabPath = (id: TabId): string => {
   return `/${TAB_BY_ID[id].slug}`;
 };
 
-const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void): ReactNode => {
+const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, onNavigate?: (t: string) => void): ReactNode => {
   if (tab === "our-coin") return <OurCoin />;
   if (tab === "roadmap") return <SolToolsRoadmap />;
   if (tab === "market-pulse") return <OgStats mint={mint} onSelect={updateMint} />;
@@ -498,6 +534,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void): 
   if (tab === "memes") return <ArtFeed inline />;
   if (tab === "spaces") return <SpacesPage />;
   if (tab === "social") return <SocialHub />;
+  if (tab === "tools") return <ToolsHub onNavigate={onNavigate || (() => {})} />;
   return null;
 };
 
@@ -598,11 +635,11 @@ const Index = () => {
         />
 
         {/* Page content */}
-        {tab === "social" ? (
-          /* SocialHub needs full height — skip ToolShell wrapper and padding.
+        {tab === "community" || tab === "social" ? (
+          /* CommunityHub / SocialHub need full height — skip ToolShell wrapper and padding.
              pb-[4.5rem] on mobile accounts for fixed MobileNav (lg:pb-0 on desktop). */
           <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
-            <SocialHub />
+            <CommunityHub />
           </main>
         ) : (
           <main className="min-h-0 flex-1 overflow-x-hidden px-3 pb-28 pt-4 sm:px-5 lg:px-6 lg:pb-8">
@@ -614,7 +651,7 @@ const Index = () => {
                 onChangeMint={promptMint}
               />
             ) : (
-              <ToolShell tab={activeTab}>{renderTool(tab, mint, updateMint)}</ToolShell>
+              <ToolShell tab={activeTab}>{renderTool(tab, mint, updateMint, switchTab)}</ToolShell>
             )}
           </main>
         )}
@@ -740,11 +777,8 @@ const AppSidebar = ({
         <div className="mb-1">
           <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Main</p>
           <NavItem item={TAB_BY_ID.overview} activeId={activeId} onNavigate={onNavigate} />
-          <NavItem item={TAB_BY_ID.communities} activeId={activeId} onNavigate={onNavigate} />
-          <NavItem item={TAB_BY_ID.social} activeId={activeId} onNavigate={onNavigate} />
-          <NavItem item={TAB_BY_ID.spaces} activeId={activeId} onNavigate={onNavigate} />
-          <NavItem item={TAB_BY_ID.discover} activeId={activeId} onNavigate={onNavigate} />
-          <NavItem item={TAB_BY_ID.memes} activeId={activeId} onNavigate={onNavigate} />
+          <NavItem item={TAB_BY_ID.community} activeId={activeId} onNavigate={onNavigate} />
+          <NavItem item={TAB_BY_ID.tools} activeId={activeId} onNavigate={onNavigate} />
         </div>
 
         {groups.map(({ key, label }) => {
@@ -959,9 +993,9 @@ const MobileNav = ({ activeId, onNavigate }: { activeId: TabId; onNavigate: (t: 
   const items = [
     { id: "overview" as TabId, label: "Home", Icon: Home },
     { id: "scanner" as TabId, label: "Scan", Icon: Search },
-    { id: "social" as TabId, label: "Social", Icon: MessageSquare },
-    { id: "spaces" as TabId, label: "Spaces", Icon: Radio },
-    { id: "memes" as TabId, label: "Memes", Icon: Palette },
+    { id: "community" as TabId, label: "Community", Icon: Users },
+    { id: "tools" as TabId, label: "Tools", Icon: Wrench },
+    { id: "swap" as TabId, label: "Swap", Icon: Zap },
   ];
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-white/[0.07] bg-[#060c13]/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-xl lg:hidden">
@@ -1000,141 +1034,172 @@ const OverviewPage = ({
   onScanClick: () => void;
   onChangeMint: () => void;
 }) => {
-  const statsCards = [
-    { label: "Forensic Tools", value: "30+", Icon: Search, accent: "cyan" as TabAccent },
-    { label: "Chain", value: "Solana", Icon: Star, accent: "gold" as TabAccent },
-    { label: "OG Verified", value: "On-chain", Icon: TrendingUp, accent: "lime" as TabAccent },
-    { label: "Data", value: "Live", Icon: Flame, accent: "cyan" as TabAccent },
+  const quickActions = [
+    { label: "Scan Token", Icon: Search, accent: "lime" as TabAccent, tab: "scanner" as TabId },
+    { label: "Launch Radar", Icon: Target, accent: "cyan" as TabAccent, tab: "snipe-feed" as TabId },
+    { label: "Swap", Icon: Zap, accent: "gold" as TabAccent, tab: "swap" as TabId },
+    { label: "Community", Icon: MessageSquare, accent: "cyan" as TabAccent, tab: "community" as TabId },
   ];
 
-  const quickTools: TabConfig[] = [
-    TAB_BY_ID.scanner,
-    TAB_BY_ID["snipe-feed"],
-    TAB_BY_ID.feed,
-    TAB_BY_ID.swap,
-    TAB_BY_ID["market-pulse"],
-    TAB_BY_ID.trending,
+  const toolSections = [
+    {
+      title: "Forensics",
+      accent: "lime" as TabAccent,
+      items: [
+        { ...TAB_BY_ID.scanner, shortDesc: "Rug score, dev wallet, holder risk" },
+        { ...TAB_BY_ID["snipe-feed"], shortDesc: "New coins, repeat creators, alerts" },
+      ],
+    },
+    {
+      title: "Market",
+      accent: "cyan" as TabAccent,
+      items: [
+        { ...TAB_BY_ID.feed, shortDesc: "Trending, pairs, whale activity" },
+        { ...TAB_BY_ID["news-signal"], shortDesc: "Influencer mentions, early signals" },
+      ],
+    },
+    {
+      title: "Trading",
+      accent: "gold" as TabAccent,
+      items: [
+        { ...TAB_BY_ID.swap, shortDesc: "Jupiter route + scanner context" },
+        { ...TAB_BY_ID.trending, shortDesc: "Live momentum & catalysts" },
+      ],
+    },
   ];
 
   return (
-    <div className="space-y-4">
-      {/* Stats row */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {statsCards.map((card) => (
-          <div
-            key={card.label}
-            className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-4 transition hover:bg-white/[0.05]"
-          >
-            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border", accentIcon(card.accent))}>
-              <card.Icon className="h-5 w-5" />
-            </div>
+    <div className="space-y-5">
+      {/* ─── Hero ─── */}
+      <div className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-br from-og-lime/[0.04] via-white/[0.03] to-og-cyan/[0.03]">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-og-lime/[0.06] blur-[80px]" />
+        <div className="pointer-events-none absolute -bottom-12 left-0 h-44 w-44 rounded-full bg-og-cyan/[0.05] blur-[60px]" />
+        <div className="relative px-5 py-5 sm:px-7 sm:py-6">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-2xl font-black leading-none text-white">{card.value}</div>
-              <div className="mt-0.5 text-[11px] text-white/45">{card.label}</div>
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-og-lime/25 bg-og-lime/8 px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest text-og-lime">
+                <div className="h-1.5 w-1.5 rounded-full bg-og-lime animate-pulse" /> Live
+              </div>
+              <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+                OG Scan
+              </h1>
+              <p className="mt-1.5 max-w-md text-[13px] leading-relaxed text-white/45">
+                Solana token intelligence — forensics, market data, and community in one place.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onChangeMint}
+              className="mt-1 shrink-0 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-mono text-white/40 transition hover:bg-white/[0.08] hover:text-white/60"
+            >
+              {shortAddr(mint, 4)}
+            </button>
+          </div>
+
+          {/* Quick action buttons */}
+          <div className="mt-4 grid grid-cols-4 gap-2 sm:flex sm:gap-3">
+            {quickActions.map((action) => (
+              <button
+                key={action.tab}
+                type="button"
+                onClick={() => action.tab === "scanner" ? onScanClick() : onSwitchTab(action.tab)}
+                className="group flex flex-col items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] px-2 py-3 transition hover:border-white/[0.12] hover:bg-white/[0.06] active:scale-[0.97] sm:flex-row sm:gap-2 sm:px-4 sm:py-2.5"
+              >
+                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg border sm:h-7 sm:w-7", accentIcon(action.accent))}>
+                  <action.Icon className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                </div>
+                <span className="text-[10px] font-bold text-white/50 group-hover:text-white/80 sm:text-[11px]">{action.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Intelligence Row ─── */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <OGDaily onSelectMint={() => { onSwitchTab("scanner"); }} />
+        <SmartWatchlist onSelectMint={() => { onSwitchTab("scanner"); }} />
+      </div>
+
+      {/* ─── Tool Sections ─── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-black text-white">Quick Tools</h2>
+          <button
+            type="button"
+            onClick={() => onSwitchTab("tools")}
+            className="flex items-center gap-1 text-[11px] font-semibold text-white/35 transition hover:text-white/60"
+          >
+            All tools <ChevronRight className="h-3 w-3" />
+          </button>
+        </div>
+        {toolSections.map((section) => (
+          <div key={section.title}>
+            <p className={cn("mb-1.5 text-[9px] font-bold uppercase tracking-widest", accentText(section.accent))}>{section.title}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {section.items.map((tool) => (
+                <button
+                  key={tool.id}
+                  type="button"
+                  onClick={() => onSwitchTab(tool.id)}
+                  className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 text-left transition hover:border-white/[0.1] hover:bg-white/[0.04] active:scale-[0.99]"
+                >
+                  <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", accentIcon(tool.accent))}>
+                    <tool.Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[13px] font-bold text-white group-hover:text-og-lime transition-colors">{tool.label}</span>
+                    <p className="text-[11px] text-white/30 truncate">{(tool as any).shortDesc}</p>
+                  </div>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/10 group-hover:text-white/30 transition" />
+                </button>
+              ))}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Hero banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-br from-white/[0.055] to-white/[0.02] px-5 py-6 sm:px-7">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-og-lime/8 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 left-8 h-48 w-48 rounded-full bg-og-cyan/6 blur-3xl" />
-        <div className="relative max-w-2xl">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-og-lime/30 bg-og-lime/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-og-lime">
-            <ShieldCheck className="h-3 w-3" /> Forensic Tools Live
-          </div>
-          <h2 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl">
-            Solana Token<br />Truth Engine
-          </h2>
-          <p className="mt-3 max-w-lg text-sm leading-6 text-white/55">
-            Run mint forensics, prove first origin, score dominance, inspect holder and LP risk, track migrations, watch dev wallets, and monitor live runners.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-3">
+      {/* ─── Community & Activity ─── */}
+      <div className="space-y-3">
+        <h2 className="text-[15px] font-black text-white">Community & Activity</h2>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[
+            { label: "Chat & Voice", desc: "Join conversations", Icon: MessageSquare, accent: "lime" as TabAccent, tab: "community" as TabId },
+            { label: "Spaces", desc: "Live voice rooms", Icon: Radio, accent: "cyan" as TabAccent, tab: "community" as TabId },
+            { label: "Alpha Calls", desc: "Community picks", Icon: TrendingUp, accent: "gold" as TabAccent, tab: "community" as TabId },
+          ].map((item) => (
             <button
+              key={item.label}
               type="button"
-              onClick={onScanClick}
-              className="inline-flex items-center gap-2 rounded-xl border border-og-lime bg-og-lime px-5 py-2.5 text-sm font-black text-[#060c13] shadow-[0_0_28px_-10px_hsl(var(--og-lime))] transition hover:bg-white active:scale-[0.98]"
+              onClick={() => onSwitchTab(item.tab)}
+              className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5 text-left transition hover:border-white/[0.1] hover:bg-white/[0.04]"
             >
-              Open Scanner <ArrowUpRight className="h-4 w-4" />
+              <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", accentIcon(item.accent))}>
+                <item.Icon className="h-4 w-4" />
+              </div>
+              <div>
+                <span className="text-[12px] font-bold text-white">{item.label}</span>
+                <p className="text-[10px] text-white/30">{item.desc}</p>
+              </div>
             </button>
-            <button
-              type="button"
-              onClick={() => onSwitchTab("snipe-feed")}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-5 py-2.5 text-sm font-bold text-white/80 transition hover:border-og-cyan/40 hover:text-white active:scale-[0.98]"
-            >
-              Launch Radar <Target className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={onChangeMint}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-white/50 transition hover:text-white/80 active:scale-[0.98]"
-            >
-              Mint: {shortAddr(mint, 4)}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick tools grid */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-og-cyan">Quick Access</p>
-            <h3 className="text-lg font-black text-white">Most Used Tools</h3>
-          </div>
-          <button
-            type="button"
-            onClick={() => onSwitchTab("scanner")}
-            className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-semibold text-white/50 transition hover:text-white"
-          >
-            View all <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {quickTools.map((tool) => (
-            <QuickToolCard key={tool.id} tool={tool} onClick={() => onSwitchTab(tool.id)} />
           ))}
         </div>
       </div>
 
-      {/* ─── 20x Features Dashboard ─── */}
-      <div>
-        <div className="mb-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-og-lime">Daily Intelligence</p>
-          <h3 className="text-lg font-black text-white">OG Scan 20x</h3>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <OGDaily onSelectMint={(m) => { onSwitchTab("scanner"); }} />
-          <SmartWatchlist onSelectMint={(m) => { onSwitchTab("scanner"); }} />
-        </div>
+      {/* ─── Advanced: charts, alpha, leaderboard ─── */}
+      <MultiChartView onSelectMint={() => { onSwitchTab("scanner"); }} />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <AlphaCallouts onSelectMint={() => { onSwitchTab("scanner"); }} />
+        <PlatformLeaderboard />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <PaperTrading onSelectMint={(m) => { onSwitchTab("scanner"); }} />
+        <PaperTrading onSelectMint={() => { onSwitchTab("scanner"); }} />
         <CryptoCalendar />
       </div>
 
-      <MultiChartView onSelectMint={(m) => { onSwitchTab("scanner"); }} />
-
-      {/* Phase 29: Alpha + Leaderboard + Calculator */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <AlphaCallouts onSelectMint={(m) => { onSwitchTab("scanner"); }} />
-        <PlatformLeaderboard />
-      </div>
       <QuickCalc />
-
-      {/* All tools list */}
-      <div>
-        <div className="mb-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/35">All Tools</p>
-        </div>
-        <div className="divide-y divide-white/[0.05] rounded-2xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
-          {NAV_TABS.filter((t) => t.id !== "overview").map((tool) => (
-            <AllToolRow key={tool.id} tool={tool} onClick={() => onSwitchTab(tool.id)} />
-          ))}
-        </div>
-      </div>
     </div>
   );
 };
