@@ -146,7 +146,7 @@ const SpaceStyles = () => (
 );
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   AUDIO EQUALIZER (visual)
+   AUDIO EQUALIZER (visual, CSS-only animation)
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 const AudioEQ = ({ active = true, color = "bg-emerald-400", bars = 4 }: { active?: boolean; color?: string; bars?: number }) => (
@@ -166,6 +166,150 @@ const AudioEQ = ({ active = true, color = "bg-emerald-400", bars = 4 }: { active
     ))}
   </div>
 );
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LIVE MIC VISUALIZER — real-time waveform from actual mic input
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+const MicVisualizer = ({ active, barCount = 24 }: { active: boolean; barCount?: number }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef = useRef<number>(0);
+  const streamRef = useRef<MediaStream | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    if (!active) {
+      // Cleanup when deactivated
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (streamRef.current) {
+        // Don't stop tracks — the VoicePanel owns the stream
+      }
+      // Draw flat bars
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          const barW = canvas.width / barCount;
+          for (let i = 0; i < barCount; i++) {
+            ctx.fillStyle = "rgba(255,255,255,0.06)";
+            ctx.beginPath();
+            const x = i * barW + 1;
+            const h = 3;
+            const y = canvas.height / 2 - h / 2;
+            ctx.roundRect(x, y, barW - 2, h, 1);
+            ctx.fill();
+          }
+        }
+      }
+      return;
+    }
+
+    let mounted = true;
+
+    const setup = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        const audioCtx = new AudioContext();
+        audioCtxRef.current = audioCtx;
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        analyser.smoothingTimeConstant = 0.75;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+        draw();
+      } catch {
+        // Mic not available — just show flat bars
+      }
+    };
+
+    const draw = () => {
+      if (!mounted) return;
+      const canvas = canvasRef.current;
+      const analyser = analyserRef.current;
+      if (!canvas || !analyser) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(data);
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const barW = w / barCount;
+      const maxH = h * 0.85;
+      const minH = 3;
+
+      for (let i = 0; i < barCount; i++) {
+        // Map frequency bins to bar count
+        const dataIdx = Math.floor((i / barCount) * data.length);
+        const val = data[dataIdx] / 255;
+        const barH = Math.max(val * maxH, minH);
+
+        // Gradient color: emerald for low bars, cyan for peaks
+        const intensity = val;
+        const r = Math.round(16 + intensity * 34);
+        const g = Math.round(185 + intensity * 60);
+        const b = Math.round(129 + intensity * 126);
+        const alpha = 0.4 + intensity * 0.6;
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+        // Centered bars
+        const x = i * barW + 1;
+        const y = (h - barH) / 2;
+        ctx.beginPath();
+        ctx.roundRect(x, y, Math.max(barW - 2, 1), barH, 2);
+        ctx.fill();
+
+        // Glow effect for loud bars
+        if (val > 0.6) {
+          ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
+          ctx.shadowBlur = 6;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      }
+
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    setup();
+
+    return () => {
+      mounted = false;
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
+      }
+    };
+  }, [active, barCount]);
+
+  return (
+    <div className={cn(
+      "rounded-xl border overflow-hidden transition-all duration-300",
+      active
+        ? "bg-emerald-500/[0.04] border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.08)]"
+        : "bg-white/[0.02] border-white/[0.06]"
+    )}>
+      <canvas
+        ref={canvasRef}
+        width={240}
+        height={40}
+        className="w-full h-10 block"
+      />
+    </div>
+  );
+};
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    FLOATING REACTIONS OVERLAY
@@ -473,54 +617,72 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
 
 const TrendingBanner = ({ spaces, onJoin }: { spaces: Space[]; onJoin: (s: Space) => void }) => {
   if (spaces.length === 0) return null;
+  const top = spaces[0];
+  const ttm = topicOf(top.topic);
+  const topTotal = (top.listener_count || 0) + (top.speaker_count || 0);
   return (
     <div className="mb-5">
-      <div className="flex items-center gap-2 mb-2.5">
-        <div className="p-1 rounded-md bg-red-500/10"><Flame className="h-3 w-3 text-red-400" /></div>
-        <span className="text-[11px] font-black text-white/50 uppercase tracking-wider">Happening Now</span>
-        <div className="flex-1 h-px bg-gradient-to-r from-white/[0.06] to-transparent" />
-      </div>
-      <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-        {spaces.slice(0, 5).map((s, idx) => {
-          const tm = topicOf(s.topic);
-          const total = (s.listener_count || 0) + (s.speaker_count || 0);
-          return (
-            <button key={s.id} onClick={() => onJoin(s)}
-              className={cn(
-                "shrink-0 w-64 rounded-2xl border p-4 text-left transition-all group relative overflow-hidden",
-                "bg-gradient-to-br", cardGrad(s.id),
-                idx === 0 ? "border-primary/25 shadow-lg shadow-primary/5" : "border-white/[0.08] hover:border-white/[0.15]"
-              )}
-              style={{ animationDelay: `${idx * 0.05}s` }}>
-              {/* Decorative orb */}
-              <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-primary/5 blur-2xl group-hover:bg-primary/10 transition-colors" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-2">
-                  <span className={cn("inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border", tm.color)}>
-                    {tm.icon} {s.topic}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
-                    <span className="text-[9px] font-bold text-red-400">LIVE</span>
-                  </div>
+      {/* Featured / top space — full width hero card */}
+      <button onClick={() => onJoin(top)} className="w-full text-left rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.06] via-violet-900/[0.04] to-transparent p-5 relative overflow-hidden group transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/[0.05] mb-3">
+        <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-primary/[0.06] blur-3xl opacity-60 group-hover:opacity-100 transition-opacity" />
+        <div className="relative flex items-start gap-4">
+          <div className="shrink-0 w-14 h-14 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-2xl">
+            {ttm.icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/25">
+                <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
+                <span className="text-[9px] font-bold text-red-400">LIVE</span>
+              </span>
+              <span className={cn("inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border", ttm.color)}>
+                {top.topic}
+              </span>
+              {top.is_recording && <span className="inline-flex items-center gap-1 text-[8px] font-bold text-red-400/60 px-1.5 py-0.5 rounded-full bg-red-500/5 border border-red-500/10">● REC</span>}
+            </div>
+            <h3 className="font-black text-base text-white leading-snug line-clamp-1">{top.title}</h3>
+            {top.description && <p className="text-[11px] text-white/30 mt-0.5 line-clamp-1">{top.description}</p>}
+            <div className="flex items-center gap-4 mt-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center overflow-hidden">
+                  {safAvatar(top.host_avatar) ? <img src={safAvatar(top.host_avatar)} alt="" className="w-full h-full object-cover" /> : <Crown className="h-2.5 w-2.5 text-primary" />}
                 </div>
-                <h4 className="font-bold text-sm text-white leading-snug line-clamp-1">{s.title}</h4>
-                <div className="flex items-center justify-between mt-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-5 h-5 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center overflow-hidden">
-                      {safAvatar(s.host_avatar) ? <img src={safAvatar(s.host_avatar)} alt="" className="w-full h-full object-cover" /> : <Crown className="h-2.5 w-2.5 text-primary" />}
-                    </div>
-                    <span className="text-[10px] text-white/40 font-medium">{s.host_username ? `@${s.host_username}` : "Host"}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-[10px] text-white/25">
-                    <Headphones className="h-2.5 w-2.5" />{total.toLocaleString()}
-                  </div>
-                </div>
+                <span className="text-[10px] text-white/40 font-medium">@{top.host_username || "host"}</span>
               </div>
-            </button>
-          );
-        })}
-      </div>
+              <span className="flex items-center gap-1 text-[10px] text-white/25"><Headphones className="h-3 w-3" />{topTotal.toLocaleString()} listening</span>
+              <AudioEQ active bars={4} color="bg-emerald-400/80" />
+            </div>
+          </div>
+          <div className="shrink-0 self-center px-4 py-2 rounded-full bg-primary/15 border border-primary/30 text-primary text-[11px] font-bold group-hover:bg-primary/25 transition-colors">
+            Join
+          </div>
+        </div>
+      </button>
+
+      {/* More live — smaller horizontal cards */}
+      {spaces.length > 1 && (
+        <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+          {spaces.slice(1, 6).map((s) => {
+            const tm = topicOf(s.topic);
+            const total = (s.listener_count || 0) + (s.speaker_count || 0);
+            return (
+              <button key={s.id} onClick={() => onJoin(s)}
+                className="shrink-0 w-56 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-left transition-all hover:border-white/[0.12] hover:bg-white/[0.04] group">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-sm">{tm.icon}</span>
+                  <span className="text-[9px] font-bold text-white/30 uppercase">{s.topic}</span>
+                  <span className="ml-auto relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
+                </div>
+                <h4 className="font-bold text-[12px] text-white leading-snug line-clamp-1">{s.title}</h4>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-[10px] text-white/30 truncate">@{s.host_username || "host"}</span>
+                  <span className="flex items-center gap-1 text-[10px] text-white/20"><Headphones className="h-2.5 w-2.5" />{total}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
@@ -548,71 +710,63 @@ const SpaceCard = ({ space, onJoin, variant = "default" }: { space: Space; onJoi
   return (
     <button onClick={() => { if (isPast && !hasReplay) return; onJoin(space); }}
       className={cn(
-        "w-full text-left rounded-2xl border transition-all group relative overflow-hidden",
+        "w-full text-left rounded-xl border transition-all group",
         isPast
           ? hasReplay
-            ? "p-4 border-white/[0.06] bg-white/[0.02] hover:border-primary/30 hover:bg-primary/[0.02] cursor-pointer"
-            : "p-4 border-white/[0.05] bg-white/[0.015] opacity-40 cursor-default"
-          : "p-4 border-white/[0.08] bg-gradient-to-br hover:border-white/[0.15] hover:shadow-lg hover:shadow-white/[0.02]",
-        !isPast && cardGrad(space.id),
+            ? "p-3.5 border-white/[0.06] bg-white/[0.015] hover:border-primary/25 hover:bg-white/[0.03] cursor-pointer"
+            : "p-3.5 border-white/[0.04] bg-white/[0.01] opacity-35 cursor-default"
+          : "p-3.5 border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]",
       )}>
-      {/* Hover glow */}
-      {!isPast && <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-primary/[0.04] blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />}
-
-      <div className="relative flex gap-3">
-        {/* Left: Topic icon */}
-        <div className={cn("shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-lg border", tm.color, "bg-opacity-20")}>
+      <div className="flex gap-3 items-center">
+        {/* Left: Topic badge */}
+        <div className={cn("shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-base border", tm.color)}>
           {tm.icon}
         </div>
 
+        {/* Middle: Info */}
         <div className="flex-1 min-w-0">
-          {/* Badges row */}
-          <div className="flex items-center gap-1.5 mb-1">
+          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
             {space.is_live && !isPast && (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20">
                 <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
-                <span className="text-[9px] font-bold text-red-400">LIVE</span>
+                <span className="text-[8px] font-bold text-red-400">LIVE</span>
               </span>
             )}
-            {space.is_recording && <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-red-400/60 uppercase"><div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />REC</span>}
-            {space.is_private && <Lock className="h-2.5 w-2.5 text-white/20" />}
+            {space.is_recording && <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-red-400/50"><div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />REC</span>}
+            {space.is_private && <Lock className="h-2.5 w-2.5 text-white/15" />}
             {isPast && space.ended_at && (
-              <span className="inline-flex items-center gap-1 text-[9px] text-white/25"><Archive className="h-2.5 w-2.5" />Ended {formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}</span>
+              <span className="text-[9px] text-white/20">{formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}</span>
             )}
             {isPast && hasReplay && (
-              <span className="inline-flex items-center gap-1 text-[9px] text-primary/70 font-bold"><Play className="h-2.5 w-2.5" />Replay{space.duration_seconds ? ` · ${formatDuration(space.duration_seconds)}` : ""}</span>
+              <span className="inline-flex items-center gap-1 text-[9px] text-primary/60 font-bold"><Play className="h-2.5 w-2.5" />{space.duration_seconds ? formatDuration(space.duration_seconds) : "Replay"}</span>
             )}
-            {isPast && !hasReplay && space.ended_at && (
-              <span className="text-[9px] text-white/15 italic">No recording</span>
-            )}
-            {space.tags?.slice(0, 2).map(t => (
-              <span key={t} className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/[0.04] text-white/20 border border-white/[0.05]">#{t}</span>
-            ))}
+            {isPast && !hasReplay && <span className="text-[8px] text-white/15 italic">No recording</span>}
           </div>
-
           <h3 className="font-bold text-[13px] text-white leading-tight line-clamp-1">{space.title}</h3>
-          {space.description && <p className="text-[11px] text-white/30 mt-0.5 line-clamp-1">{space.description}</p>}
-
-          {/* Footer */}
-          <div className="flex items-center gap-3 mt-2.5">
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full bg-primary/15 border border-primary/25 flex items-center justify-center overflow-hidden">
-                {safAvatar(space.host_avatar) ? <img src={safAvatar(space.host_avatar)} alt="" className="w-full h-full object-cover" onError={e => (e.target as HTMLImageElement).style.display = "none"} /> : <Crown className="h-2.5 w-2.5 text-primary" />}
-              </div>
-              <span className="text-[10px] text-white/40 font-medium">{space.host_username ? `@${space.host_username}` : "Host"}</span>
-            </div>
-            <div className="flex items-center gap-3 ml-auto text-white/20">
-              {space.speaker_count > 1 && <span className="flex items-center gap-0.5 text-[10px]"><Mic className="h-2.5 w-2.5" />{space.speaker_count}</span>}
-              <span className="flex items-center gap-0.5 text-[10px]"><Headphones className="h-2.5 w-2.5" />{total.toLocaleString()}</span>
-              {!isPast && space.is_live && <AudioEQ active bars={3} color="bg-emerald-400/60" />}
-            </div>
+          {space.description && <p className="text-[10px] text-white/25 mt-0.5 line-clamp-1">{space.description}</p>}
+          <div className="flex items-center gap-2.5 mt-1.5">
+            <span className="text-[10px] text-white/30 font-medium">@{space.host_username || "host"}</span>
+            {space.speaker_count > 1 && <span className="flex items-center gap-0.5 text-[9px] text-white/20"><Mic className="h-2.5 w-2.5" />{space.speaker_count}</span>}
+            <span className="flex items-center gap-0.5 text-[9px] text-white/15"><Headphones className="h-2.5 w-2.5" />{total}</span>
+            {space.tags?.slice(0, 1).map(t => (
+              <span key={t} className="text-[8px] px-1.5 py-0.5 rounded-full bg-white/[0.03] text-white/15 border border-white/[0.04]">#{t}</span>
+            ))}
           </div>
         </div>
 
-        {/* Join arrow */}
+        {/* Right: action hint */}
         {!isPast && (
-          <div className="self-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <ChevronRight className="h-4 w-4 text-white/20" />
+          <div className="shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] text-white/40 font-medium group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/25 transition-all">
+              Join
+            </div>
+          </div>
+        )}
+        {isPast && hasReplay && (
+          <div className="shrink-0 self-center">
+            <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+              <Play className="h-3.5 w-3.5 text-primary ml-0.5" />
+            </div>
           </div>
         )}
       </div>
@@ -627,37 +781,33 @@ const SpaceCard = ({ space, onJoin, variant = "default" }: { space: Space; onJoi
 const ScheduledSpaceCard = ({ space, onRemind, onStartNow, isOwner }: { space: Space; onRemind: (s: Space) => void; onStartNow?: (s: Space) => void; isOwner: boolean }) => {
   const tm = topicOf(space.topic);
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] hover:border-white/[0.12] transition-all p-4">
-      <div className="flex items-start gap-3">
-        <div className={cn("shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-lg border", tm.color)}>
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] hover:border-white/[0.1] transition-all p-3.5">
+      <div className="flex items-center gap-3">
+        <div className={cn("shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-base border", tm.color)}>
           {tm.icon}
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-[13px] text-white line-clamp-1">{space.title}</h3>
-          {space.description && <p className="text-[11px] text-white/25 mt-0.5 line-clamp-1">{space.description}</p>}
-          {space.scheduled_for && (
-            <div className="flex items-center gap-2 mt-2">
-              <Clock className="h-3 w-3 text-primary/50" />
-              <span className="text-[11px] text-primary/70 font-medium">{format(new Date(space.scheduled_for), "MMM d · h:mm a")}</span>
-              <span className="text-[9px] text-white/20">({formatDistanceToNow(new Date(space.scheduled_for), { addSuffix: true })})</span>
-            </div>
-          )}
-          <div className="flex items-center gap-1.5 mt-2">
-            <div className="w-4 h-4 rounded-full bg-primary/15 border border-primary/25 flex items-center justify-center overflow-hidden">
-              {safAvatar(space.host_avatar) ? <img src={safAvatar(space.host_avatar)} alt="" className="w-full h-full object-cover" /> : <Crown className="h-2 w-2 text-primary" />}
-            </div>
-            <span className="text-[10px] text-white/30">{space.host_username ? `@${space.host_username}` : "Host"}</span>
+          <div className="flex items-center gap-2 mt-1">
+            {space.scheduled_for && (
+              <>
+                <Clock className="h-2.5 w-2.5 text-primary/50" />
+                <span className="text-[10px] text-primary/60 font-medium">{format(new Date(space.scheduled_for), "MMM d · h:mm a")}</span>
+                <span className="text-[9px] text-white/15">({formatDistanceToNow(new Date(space.scheduled_for), { addSuffix: true })})</span>
+              </>
+            )}
           </div>
+          <span className="text-[10px] text-white/25 mt-0.5 block">@{space.host_username || "host"}</span>
         </div>
-        <div className="flex flex-col gap-1.5 shrink-0">
-          <Button size="sm" variant="outline" onClick={() => onRemind(space)}
-            className="rounded-full text-[10px] h-7 border-primary/20 text-primary hover:bg-primary/10 gap-1 px-2.5">
-            <Bell className="h-3 w-3" /> Remind
-          </Button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button onClick={() => onRemind(space)}
+            className="h-8 w-8 rounded-lg flex items-center justify-center border border-white/[0.06] text-white/30 hover:bg-white/[0.04] hover:text-primary transition-all" title="Set reminder">
+            <Bell className="h-3.5 w-3.5" />
+          </button>
           {isOwner && onStartNow && (
             <Button size="sm" onClick={() => onStartNow(space)}
-              className="rounded-full text-[10px] h-7 gap-1 px-2.5 btn-3d">
-              <Play className="h-3 w-3" /> Start now
+              className="rounded-lg text-[10px] h-8 gap-1 px-3 font-bold">
+              <Play className="h-3 w-3" /> Go Live
             </Button>
           )}
         </div>
@@ -1190,15 +1340,23 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
       {/* ── Bottom Controls ── */}
       <div className="px-4 pb-4 pt-3 border-t border-white/[0.06] shrink-0 bg-[#070d14]/90 backdrop-blur-xl relative z-10">
         {/* Role indicator */}
-        <div className={cn("mb-2.5 px-3 py-1.5 rounded-full text-center text-[10px] font-bold border",
+        <div className={cn("mb-2 px-3 py-1.5 rounded-full text-center text-[10px] font-bold border",
           myRole === "speaker"
             ? (muted ? "bg-red-500/5 border-red-500/15 text-red-400/70" : "bg-emerald-500/5 border-emerald-500/15 text-emerald-400/80")
             : "bg-blue-500/5 border-blue-500/15 text-blue-400/70"
         )}>
           {myRole === "speaker"
-            ? (muted ? "🔇 You are muted" : "🎤 You are live")
+            ? (muted ? "🔇 You are muted — tap unmute to talk" : "🎤 You are live — others can hear you")
             : `🎧 Listening${voiceParticipants.filter(p => p.role === "speaker").length < MAX_SPEAKERS ? " — raise hand to speak" : ""}`}
         </div>
+
+        {/* Live mic waveform visualizer */}
+        {myRole === "speaker" && (
+          <div className="mb-2.5">
+            <MicVisualizer active={!muted} />
+          </div>
+        )}
+
         {/* Reactions */}
         <div className="flex items-center gap-1.5 mb-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {REACTION_EMOJIS.map(e => (
@@ -1542,105 +1700,85 @@ const Spaces = () => {
     <div className="relative">
       <SpaceStyles />
 
-      {/* Action bar — sits below ToolShell header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          {live.length > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-white/30 font-medium">
-              <span className="relative flex h-2 w-2"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-2 w-2 rounded-full bg-red-500" /></span>
-              {live.length} live · {totalListening.toLocaleString()} listening
-            </span>
-          )}
+      {/* ── Top toolbar: tabs + actions ── */}
+      <div className="flex items-center justify-between mb-3">
+        {/* Tabs inline */}
+        <div className="flex items-center gap-1">
+          {([
+            { key: "live" as const, label: "Live", count: live.length, pulse: live.length > 0 },
+            { key: "scheduled" as const, label: "Upcoming", count: scheduled.length, pulse: false },
+            { key: "past" as const, label: "Replay", count: ended.length, pulse: false },
+          ]).map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={cn("px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5",
+                tab === t.key
+                  ? "bg-white/[0.08] text-white"
+                  : "text-white/30 hover:text-white/50 hover:bg-white/[0.03]"
+              )}>
+              {t.pulse && <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>}
+              {t.label}
+              {t.count > 0 && <span className={cn("text-[9px] px-1.5 rounded-full font-bold min-w-[18px] text-center",
+                tab === t.key ? "bg-primary/20 text-primary" : "bg-white/[0.04] text-white/15"
+              )}>{t.count}</span>}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-2">
+        {/* Actions */}
+        <div className="flex items-center gap-1.5">
           <button onClick={() => setShowSearch(!showSearch)}
-            className={cn("h-9 w-9 rounded-xl flex items-center justify-center transition-all border",
-              showSearch ? "bg-primary/10 border-primary/30 text-primary" : "border-white/[0.08] text-white/30 hover:bg-white/[0.04]"
+            className={cn("h-8 w-8 rounded-lg flex items-center justify-center transition-all",
+              showSearch ? "bg-primary/10 text-primary" : "text-white/25 hover:bg-white/[0.04] hover:text-white/40"
             )}>
             <Search className="h-3.5 w-3.5" />
           </button>
-          <Button onClick={() => setShowCreate(true)} className="rounded-full btn-3d gap-2 text-[12px] h-9 px-4 font-black" size="sm">
-            <Mic className="h-3.5 w-3.5" /> New Space
+          <Button onClick={() => setShowCreate(true)} className="rounded-lg gap-1.5 text-[11px] h-8 px-3 font-bold" size="sm">
+            <Plus className="h-3 w-3" /> New Space
           </Button>
         </div>
       </div>
 
-      {/* Search */}
+      {/* ── Search bar ── */}
       {showSearch && (
-        <div className="mb-4 relative sp-slide-up">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/15" />
-          <Input placeholder="Search by title, topic, host, or tag..." value={search} onChange={e => setSearch(e.target.value)}
-            className="bg-white/[0.03] border-white/[0.08] rounded-xl pl-10 pr-10 h-10 focus:border-primary/40" autoFocus />
-          {search && <button onClick={() => setSearch("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50"><XIcon className="h-4 w-4" /></button>}
+        <div className="mb-3 relative sp-slide-up">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/15" />
+          <Input placeholder="Search spaces..." value={search} onChange={e => setSearch(e.target.value)}
+            className="bg-white/[0.03] border-white/[0.06] rounded-lg pl-9 pr-9 h-9 text-sm focus:border-primary/40" autoFocus />
+          {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50"><XIcon className="h-3.5 w-3.5" /></button>}
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex border-b border-white/[0.06] mb-4">
-        {([
-          { key: "live" as const, label: "Live Now", count: live.length, pulse: live.length > 0 },
-          { key: "scheduled" as const, label: "Upcoming", count: scheduled.length, pulse: false },
-          { key: "past" as const, label: "Replay", count: ended.length, pulse: false },
-        ]).map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={cn("px-4 py-3 text-[12px] font-bold transition-all relative flex items-center gap-2",
-              tab === t.key ? "text-white" : "text-white/25 hover:text-white/50"
-            )}>
-            {t.pulse && <span className="relative flex h-2 w-2"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-2 w-2 rounded-full bg-red-500" /></span>}
-            {t.label}
-            {t.count > 0 && <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[20px] text-center", tab === t.key ? "bg-primary/20 text-primary" : "bg-white/[0.04] text-white/15")}>{t.count}</span>}
-            {tab === t.key && <div className="absolute bottom-0 left-3 right-3 h-[2px] bg-primary rounded-full" />}
-          </button>
-        ))}
-      </div>
-
-      {/* Topic filters */}
-      <div className="flex gap-1.5 overflow-x-auto pb-3 mb-3" style={{ scrollbarWidth: "none" }}>
+      {/* ── Topic filters ── */}
+      <div className="flex gap-1.5 overflow-x-auto pb-3 mb-1" style={{ scrollbarWidth: "none" }}>
         <button onClick={() => setTopicFilter(null)}
-          className={cn("px-3 py-1.5 rounded-full text-[11px] font-bold border shrink-0 transition-all",
-            !topicFilter ? "bg-primary/15 border-primary/40 text-primary shadow-sm shadow-primary/10" : "border-white/[0.08] text-white/30 hover:border-white/[0.12]"
+          className={cn("px-2.5 py-1 rounded-lg text-[10px] font-bold shrink-0 transition-all",
+            !topicFilter ? "bg-white/[0.08] text-white" : "text-white/25 hover:bg-white/[0.04] hover:text-white/40"
           )}>All</button>
         {TOPICS.map(t => { const m = topicOf(t); return (
           <button key={t} onClick={() => setTopicFilter(topicFilter === t ? null : t)}
-            className={cn("px-3 py-1.5 rounded-full text-[11px] font-bold border shrink-0 transition-all flex items-center gap-1",
-              topicFilter === t ? "bg-primary/15 border-primary/40 text-primary shadow-sm shadow-primary/10" : "border-white/[0.08] text-white/30 hover:border-white/[0.12]"
-            )}><span>{m.icon}</span>{t}</button>
+            className={cn("px-2.5 py-1 rounded-lg text-[10px] font-bold shrink-0 transition-all flex items-center gap-1",
+              topicFilter === t ? "bg-white/[0.08] text-white" : "text-white/25 hover:bg-white/[0.04] hover:text-white/40"
+            )}><span className="text-[11px]">{m.icon}</span>{t}</button>
         ); })}
       </div>
 
-      {/* Content */}
+      {/* ── Content ── */}
       {loading ? (
-        <div className="flex flex-col gap-3">{[1, 2, 3].map(i => <div key={i} className="h-24 rounded-2xl bg-white/[0.02] animate-pulse" />)}</div>
+        <div className="flex flex-col gap-2 mt-2">{[1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl bg-white/[0.02] animate-pulse" />)}</div>
       ) : tab === "live" ? (
         live.length === 0 ? (
           <EmptyState icon={Radio} title="No live spaces right now" sub={search ? "Try a different search" : "Be the first to start one!"}
             action={!search ? { label: "Start a Space", onClick: () => setShowCreate(true) } : undefined} />
         ) : (
-          <>
-            {/* Trending banner for top spaces */}
-            {live.length > 1 && <TrendingBanner spaces={live} onJoin={setActiveSpace} />}
-            {/* If only 1, still show cards */}
-            {live.length === 1 && (
-              <div className="mb-3">
-                <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Flame className="h-3 w-3 text-red-400" /> Live</p>
-                <SpaceCard space={live[0]} onJoin={setActiveSpace} />
-              </div>
-            )}
-            {/* All live cards below banner */}
-            {live.length > 1 && (
-              <div className="flex flex-col gap-2.5 pb-4">
-                <p className="text-[10px] font-black text-white/20 uppercase tracking-widest flex items-center gap-1.5">All Live Spaces</p>
-                {live.map(s => <SpaceCard key={s.id} space={s} onJoin={setActiveSpace} />)}
-              </div>
-            )}
-          </>
+          <div className="space-y-2">
+            <TrendingBanner spaces={live} onJoin={setActiveSpace} />
+          </div>
         )
       ) : tab === "scheduled" ? (
         scheduled.length === 0 ? (
           <EmptyState icon={Calendar} title="No upcoming spaces" sub="Schedule one and your community will be notified"
             action={{ label: "Schedule a Space", onClick: () => setShowCreate(true) }} />
         ) : (
-          <div className="flex flex-col gap-3 pb-4">
+          <div className="flex flex-col gap-2 pb-4">
             {scheduled.map(s => (
               <ScheduledSpaceCard key={s.id} space={s} onRemind={s => toast.success(`Reminder set for "${s.title}" 🔔`)} onStartNow={startScheduled} isOwner={s.host_id === user?.id} />
             ))}
@@ -1650,7 +1788,7 @@ const Spaces = () => {
         ended.length === 0 ? (
           <EmptyState icon={Archive} title="No past spaces" sub="Ended spaces will appear here for replay" />
         ) : (
-          <div className="flex flex-col gap-2.5 pb-4">
+          <div className="flex flex-col gap-2 pb-4">
             {ended.map(s => <SpaceCard key={s.id} space={s} onJoin={setReplaySpace} variant="past" />)}
           </div>
         )
