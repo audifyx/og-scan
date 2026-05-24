@@ -66,6 +66,36 @@ import { cn } from "@/lib/utils";
 import { DEFAULT_OG_MINT, OGSCAN_DEV_WALLET, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr } from "@/lib/og";
 import { AuthButton } from "@/components/AuthButton";
 
+/* ─── 20x Feature imports ─── */
+import { RugScore } from "@/components/scanner-20x/RugScore";
+import { DevWalletDNA } from "@/components/scanner-20x/DevWalletDNA";
+import { ScanHistory } from "@/components/scanner-20x/ScanHistory";
+import { BundleVisual } from "@/components/scanner-20x/BundleVisual";
+import { ComparativeScan } from "@/components/scanner-20x/ComparativeScan";
+import { ScanShare } from "@/components/scanner-20x/ScanShare";
+import { LaunchQualityScore } from "@/components/launch-radar-20x/LaunchQualityScore";
+import { CreatorPatterns } from "@/components/launch-radar-20x/CreatorPatterns";
+import { MigrationTimer } from "@/components/launch-radar-20x/MigrationTimer";
+import { FirstBuyersForensics } from "@/components/launch-radar-20x/FirstBuyersForensics";
+import { LaunchAlerts } from "@/components/launch-radar-20x/LaunchAlerts";
+import { MomentumHeatmap } from "@/components/market-feed-20x/MomentumHeatmap";
+import { NarrativeClusters } from "@/components/market-feed-20x/NarrativeClusters";
+import { CrossReferenceCard } from "@/components/market-feed-20x/CrossReferenceCard";
+import { CustomFeedBuilder } from "@/components/market-feed-20x/CustomFeedBuilder";
+import { WalletXRay } from "@/components/wallets-20x/WalletXRay";
+import { CopyTradingFeed } from "@/components/wallets-20x/CopyTradingFeed";
+import { PnLTracker } from "@/components/wallets-20x/PnLTracker";
+import { ThreadedDiscussions } from "@/components/alpha-chat-20x/ThreadedDiscussions";
+import { SentimentPulse } from "@/components/alpha-chat-20x/SentimentPulse";
+import { CommunityReputation } from "@/components/communities-20x/CommunityReputation";
+import { MultiChartView } from "@/components/charts-20x/MultiChartView";
+import { DrawingTools } from "@/components/charts-20x/DrawingTools";
+import { SmartFilters } from "@/components/live-feed-20x/SmartFilters";
+import { OGDaily } from "@/components/new-features/OGDaily";
+import { SmartWatchlist } from "@/components/new-features/SmartWatchlist";
+import { PaperTrading } from "@/components/new-features/PaperTrading";
+import { CryptoCalendar } from "@/components/new-features/CryptoCalendar";
+
 const LEGACY_DEFAULT_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
 const STORAGE_TAB = "og_scanner.active_site_tab";
 
@@ -413,7 +443,13 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void): 
   if (tab === "pairs") return <PairTracker onSelect={updateMint} />;
   if (tab === "migrations") return <Migrations onSelect={updateMint} />;
   if (tab === "trending") return <Trending onSelect={updateMint} />;
-  if (tab === "whales") return <Whales mint={mint} />;
+  if (tab === "whales") return (
+    <div className="space-y-4">
+      <Whales mint={mint} />
+      <WalletXRay walletAddress="" compact={false} />
+      <CopyTradingFeed onSelectMint={updateMint} />
+    </div>
+  );
   if (tab === "tx-feed") return <TxFeed mint={mint} />;
   if (tab === "swap") return <SwapPanel ogMint={mint} onSelectMint={updateMint} />;
   if (tab === "tech") return <TechStack />;
@@ -1013,6 +1049,25 @@ const OverviewPage = ({
         </div>
       </div>
 
+      {/* ─── 20x Features Dashboard ─── */}
+      <div>
+        <div className="mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-og-lime">Daily Intelligence</p>
+          <h3 className="text-lg font-black text-white">OG Scan 20x</h3>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <OGDaily onSelectMint={(m) => { onSwitchTab("scanner"); }} />
+          <SmartWatchlist onSelectMint={(m) => { onSwitchTab("scanner"); }} />
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <PaperTrading onSelectMint={(m) => { onSwitchTab("scanner"); }} />
+        <CryptoCalendar />
+      </div>
+
+      <MultiChartView onSelectMint={(m) => { onSwitchTab("scanner"); }} />
+
       {/* All tools list */}
       <div>
         <div className="mb-3">
@@ -1176,9 +1231,14 @@ const marketSuiteOptions: SuiteOption<"feed" | "market-pulse" | "pairs" | "trend
 const TruthScanSuite = ({ onSelect }: { onSelect: (m: string) => void }) => {
   const [active, setActive] = useState<"scanner" | "og-finder">("scanner");
   return (
-    <section>
+    <section className="space-y-4">
       <SuiteNav options={truthSuiteOptions} activeId={active} onChange={setActive} />
       {active === "scanner" ? <Scanner onSelect={onSelect} /> : <OgFinder onSelect={onSelect} />}
+      {/* 20x Features */}
+      <div className="space-y-3 mt-4">
+        <ScanHistory onSelect={onSelect} />
+        <ComparativeScan onSelect={onSelect} />
+      </div>
     </section>
   );
 };
@@ -1186,9 +1246,13 @@ const TruthScanSuite = ({ onSelect }: { onSelect: (m: string) => void }) => {
 const LaunchRadarSuite = ({ onSelect }: { onSelect: (m: string) => void }) => {
   const [active, setActive] = useState<"snipe-feed" | "migrations">("snipe-feed");
   return (
-    <section>
+    <section className="space-y-4">
       <SuiteNav options={launchSuiteOptions} activeId={active} onChange={setActive} />
       {active === "snipe-feed" ? <SnipeFeed onSelect={onSelect} /> : <Migrations onSelect={onSelect} />}
+      {/* 20x Features */}
+      <div className="space-y-3 mt-4">
+        <LaunchAlerts />
+      </div>
     </section>
   );
 };
@@ -1196,7 +1260,7 @@ const LaunchRadarSuite = ({ onSelect }: { onSelect: (m: string) => void }) => {
 const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: string) => void }) => {
   const [active, setActive] = useState<"feed" | "market-pulse" | "pairs" | "trending" | "news-signal" | "whales" | "tx-feed">("feed");
   return (
-    <section>
+    <section className="space-y-4">
       <SuiteNav options={marketSuiteOptions} activeId={active} onChange={setActive} />
       {active === "feed" && <Feed onSelect={onSelect} />}
       {active === "news-signal" && <NewsSignal onSelect={onSelect} />}
@@ -1205,6 +1269,11 @@ const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: strin
       {active === "trending" && <Trending onSelect={onSelect} />}
       {active === "whales" && <Whales mint={mint} />}
       {active === "tx-feed" && <TxFeed mint={mint} />}
+      {/* 20x Features */}
+      <div className="space-y-3 mt-4">
+        <MomentumHeatmap onSelectMint={onSelect} />
+        <NarrativeClusters onSelectMint={onSelect} />
+      </div>
     </section>
   );
 };

@@ -1,0 +1,238 @@
+/**
+ * CryptoCalendar — Upcoming launches, unlocks, and events.
+ * Calendar view with event cards, reminders, and notifications.
+ */
+import { useState, useMemo } from "react";
+import { Calendar, Clock, Bell, ChevronLeft, ChevronRight, Plus, Rocket, Unlock, Star, Users, ExternalLink, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  time?: string;
+  type: "launch" | "unlock" | "ama" | "airdrop" | "custom";
+  tokenSymbol?: string;
+  url?: string;
+  reminder: boolean;
+}
+
+const STORAGE_KEY = "ogscan_crypto_calendar";
+const typeConfig: Record<string, { emoji: string; color: string; label: string }> = {
+  launch: { emoji: "🚀", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20", label: "Launch" },
+  unlock: { emoji: "🔓", color: "bg-amber-500/10 text-amber-400 border-amber-500/20", label: "Token Unlock" },
+  ama: { emoji: "🎙️", color: "bg-blue-500/10 text-blue-400 border-blue-500/20", label: "AMA/Space" },
+  airdrop: { emoji: "🎁", color: "bg-purple-500/10 text-purple-400 border-purple-500/20", label: "Airdrop" },
+  custom: { emoji: "📌", color: "bg-white/[0.04] text-white/40 border-white/[0.08]", label: "Custom" },
+};
+
+function loadEvents(): CalendarEvent[] {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
+}
+function saveEvents(events: CalendarEvent[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+}
+
+export const CryptoCalendar: React.FC = () => {
+  const [events, setEvents] = useState<CalendarEvent[]>(loadEvents);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showAddEvent, setShowAddEvent] = useState(false);
+  const [newEvent, setNewEvent] = useState<Partial<CalendarEvent>>({
+    type: "custom",
+    reminder: false,
+  });
+  const [view, setView] = useState<"calendar" | "list">("list");
+
+  const monthStr = currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+  const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+
+  const upcomingEvents = useMemo(() =>
+    events
+      .filter(e => new Date(e.date) >= new Date(new Date().toDateString()))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [events]
+  );
+
+  const addEvent = () => {
+    if (!newEvent.title || !newEvent.date) {
+      toast.error("Title and date are required");
+      return;
+    }
+    const event: CalendarEvent = {
+      id: crypto.randomUUID(),
+      title: newEvent.title || "",
+      description: newEvent.description || "",
+      date: newEvent.date || "",
+      time: newEvent.time,
+      type: (newEvent.type as CalendarEvent["type"]) || "custom",
+      tokenSymbol: newEvent.tokenSymbol,
+      url: newEvent.url,
+      reminder: newEvent.reminder || false,
+    };
+    setEvents(prev => {
+      const next = [...prev, event];
+      saveEvents(next);
+      return next;
+    });
+    setNewEvent({ type: "custom", reminder: false });
+    setShowAddEvent(false);
+    toast.success("Event added!");
+  };
+
+  const removeEvent = (id: string) => {
+    setEvents(prev => {
+      const next = prev.filter(e => e.id !== id);
+      saveEvents(next);
+      return next;
+    });
+  };
+
+  const daysUntil = (date: string) => {
+    const diff = Math.ceil((new Date(date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Tomorrow";
+    return `${diff} days`;
+  };
+
+  return (
+    <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
+      <div className="flex items-center gap-3 p-4 border-b border-white/[0.06]">
+        <Calendar className="h-4 w-4 text-primary" />
+        <div className="flex-1">
+          <p className="text-sm font-bold text-white">Crypto Calendar</p>
+          <p className="text-[10px] text-white/25">{upcomingEvents.length} upcoming events</p>
+        </div>
+        <div className="flex gap-1">
+          {(["list", "calendar"] as const).map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={cn("px-2 py-0.5 rounded text-[9px]",
+                view === v ? "bg-primary/10 text-primary" : "text-white/20"
+              )}
+            >
+              {v.charAt(0).toUpperCase() + v.slice(1)}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setShowAddEvent(!showAddEvent)}
+          className="p-1.5 rounded-lg border border-white/[0.08] text-white/20 hover:border-primary/30"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {showAddEvent && (
+        <div className="p-3 border-b border-white/[0.06] bg-primary/5 space-y-2">
+          <Input
+            placeholder="Event title..."
+            value={newEvent.title || ""}
+            onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
+            className="h-8 text-xs bg-white/[0.03] border-white/[0.08]"
+          />
+          <div className="flex gap-2">
+            <Input
+              type="date"
+              value={newEvent.date || ""}
+              onChange={e => setNewEvent({ ...newEvent, date: e.target.value })}
+              className="flex-1 h-8 text-xs bg-white/[0.03] border-white/[0.08]"
+            />
+            <Input
+              type="time"
+              value={newEvent.time || ""}
+              onChange={e => setNewEvent({ ...newEvent, time: e.target.value })}
+              className="w-28 h-8 text-xs bg-white/[0.03] border-white/[0.08]"
+            />
+          </div>
+          <div className="flex gap-1">
+            {Object.entries(typeConfig).map(([key, config]) => (
+              <button
+                key={key}
+                onClick={() => setNewEvent({ ...newEvent, type: key as CalendarEvent["type"] })}
+                className={cn("px-2 py-1 rounded text-[9px] border transition-all",
+                  newEvent.type === key ? config.color : "border-white/[0.06] text-white/20"
+                )}
+              >
+                {config.emoji} {config.label}
+              </button>
+            ))}
+          </div>
+          <Input
+            placeholder="URL (optional)"
+            value={newEvent.url || ""}
+            onChange={e => setNewEvent({ ...newEvent, url: e.target.value })}
+            className="h-7 text-xs bg-white/[0.03] border-white/[0.08]"
+          />
+          <div className="flex gap-2">
+            <Button size="sm" onClick={addEvent} className="h-7 text-xs">Add Event</Button>
+            <Button size="sm" variant="outline" onClick={() => setShowAddEvent(false)} className="h-7 text-xs">Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar month nav */}
+      {view === "calendar" && (
+        <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.04]">
+          <button onClick={prevMonth} className="text-white/20 hover:text-white/40"><ChevronLeft className="h-4 w-4" /></button>
+          <span className="text-xs font-bold text-white">{monthStr}</span>
+          <button onClick={nextMonth} className="text-white/20 hover:text-white/40"><ChevronRight className="h-4 w-4" /></button>
+        </div>
+      )}
+
+      {/* Event list */}
+      <div className="max-h-[400px] overflow-y-auto">
+        {upcomingEvents.length === 0 ? (
+          <div className="p-8 text-center">
+            <Calendar className="h-8 w-8 text-white/[0.06] mx-auto mb-2" />
+            <p className="text-xs text-white/20">No upcoming events</p>
+            <p className="text-[10px] text-white/10 mt-1">Add launches, AMAs, unlocks, and more</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.03]">
+            {upcomingEvents.map(event => {
+              const config = typeConfig[event.type];
+              return (
+                <div key={event.id} className="p-3 hover:bg-white/[0.015] transition-colors">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{config.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-white">{event.title}</span>
+                        <Badge className={cn("text-[7px]", config.color)}>{config.label}</Badge>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-white/25">
+                        <span>{new Date(event.date).toLocaleDateString()}</span>
+                        {event.time && <span>{event.time}</span>}
+                        <Badge className="bg-white/[0.03] text-white/25 border-white/[0.06] text-[8px]">
+                          {daysUntil(event.date)}
+                        </Badge>
+                      </div>
+                    </div>
+                    {event.url && (
+                      <a href={event.url} target="_blank" rel="noopener" className="text-white/15 hover:text-white/30">
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    <button onClick={() => removeEvent(event.id)} className="text-white/10 hover:text-red-400">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default CryptoCalendar;
