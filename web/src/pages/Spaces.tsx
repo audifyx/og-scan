@@ -664,11 +664,14 @@ const SpaceChat = ({ spaceId, isHost }: { spaceId: string; isHost: boolean }) =>
 
   useEffect(() => {
     load();
-    const ch = supabase.channel(`sp-chat-${spaceId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "space_messages", filter: `space_id=eq.${spaceId}` },
-        p => setMsgs(prev => [...prev, p.new as SpaceChatMessage]))
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      ch = supabase.channel(`sp-chat-${spaceId}`)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "space_messages", filter: `space_id=eq.${spaceId}` },
+          p => setMsgs(prev => [...prev, p.new as SpaceChatMessage]))
+        .subscribe();
+    } catch { /* */ }
+    return () => { if (ch) supabase.removeChannel(ch); };
   }, [spaceId, load]);
 
   useEffect(() => { if (atBottom && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [msgs, atBottom]);
@@ -804,11 +807,14 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
 
   // Realtime
   useEffect(() => {
-    const ch = supabase.channel(`sp-room-${space.id}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "spaces", filter: `id=eq.${space.id}` },
-        p => { const u = p.new as Space; setCur(u); if (u.pinned_message !== pinnedMsg) setPinnedMsg(u.pinned_message); if (u.ended_at) { toast("Space ended"); onLeave(); } })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      ch = supabase.channel(`sp-room-${space.id}`)
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "spaces", filter: `id=eq.${space.id}` },
+          p => { const u = p.new as Space; setCur(u); if (u.pinned_message !== pinnedMsg) setPinnedMsg(u.pinned_message); if (u.ended_at) { toast("Space ended"); onLeave(); } })
+        .subscribe();
+    } catch { /* */ }
+    return () => { if (ch) supabase.removeChannel(ch); };
   }, [space.id]);
 
   useEffect(() => {
@@ -1155,20 +1161,23 @@ const Spaces = () => {
   const fetchSpaces = useCallback(async () => {
     try {
       const [lr, pr] = await Promise.all([
-        supabase.from("spaces").select("*").or("is_live.eq.true,and(is_live.eq.false,ended_at.is.null)").order("is_live", { ascending: false }).order("listener_count", { ascending: false }).limit(50),
+        supabase.from("spaces").select("*").is("ended_at", null).order("is_live", { ascending: false }).order("listener_count", { ascending: false }).limit(50),
         supabase.from("spaces").select("*").eq("is_live", false).not("ended_at", "is", null).order("ended_at", { ascending: false }).limit(20),
       ]);
-      if (lr.error) { console.warn("Spaces table not found or error:", lr.error.message); setSpaces([]); setPastSpaces([]); setLoading(false); return; }
-      setSpaces((lr.data as Space[]) || []);
-      setPastSpaces((pr.data as Space[]) || []);
-    } catch { setSpaces([]); setPastSpaces([]); }
+      if (lr.error) { console.warn("Spaces fetch error:", lr.error.message); }
+      setSpaces((lr.data as Space[] | null) ?? []);
+      setPastSpaces((pr.data as Space[] | null) ?? []);
+    } catch (e) { console.warn("Spaces fetch exception:", e); setSpaces([]); setPastSpaces([]); }
     setLoading(false);
   }, []);
 
   useEffect(() => {
     fetchSpaces();
-    const ch = supabase.channel("sp-list").on("postgres_changes", { event: "*", schema: "public", table: "spaces" }, () => fetchSpaces()).subscribe();
-    return () => { supabase.removeChannel(ch); };
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      ch = supabase.channel("sp-list").on("postgres_changes", { event: "*", schema: "public", table: "spaces" }, () => fetchSpaces()).subscribe();
+    } catch { /* realtime optional */ }
+    return () => { if (ch) supabase.removeChannel(ch); };
   }, [fetchSpaces]);
 
   useEffect(() => {
