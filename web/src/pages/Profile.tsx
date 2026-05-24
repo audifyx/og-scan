@@ -413,15 +413,6 @@ const Profile = () => {
 
         {/* ── BANNER + AVATAR ──────────────────────────────────────────────── */}
         <div className="relative">
-          {/* Back button — floating on banner */}
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="absolute top-3 left-3 z-20 flex h-8 w-8 items-center justify-center rounded-lg border border-white/20 bg-black/50 backdrop-blur-sm text-white/70 transition hover:bg-black/70 hover:text-white"
-            aria-label="Go back"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
           {/* Banner */}
           <div className="h-32 sm:h-40 bg-gradient-to-br from-primary/40 via-secondary/20 to-primary/20 relative overflow-hidden">
             {safeAvatarUrl(profile.banner_url) && (

@@ -6,7 +6,6 @@ import {
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -197,7 +196,6 @@ const AdvancedTools = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-6">
-          <OGBannerPromo title="Advanced Analytics" subtitle="30+ professional forensic tools for Solana intelligence" accent="purple" />
 
         {/* ── Search ── */}
         <div className="relative max-w-xl">

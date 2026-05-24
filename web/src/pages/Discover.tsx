@@ -3,7 +3,6 @@ import { Search, Trophy, TrendingUp, Users, Star, Crown, Zap, Filter, Flame, Eye
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo, OGBannerStats } from "@/components/banners/OGBanner3D";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -237,12 +236,6 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
 
       <ScrollArea className="h-[calc(100vh-120px)]">
         <div className="p-4 lg:p-6 space-y-6">
-          {/* 3D Stats Banner */}
-          <OGBannerStats />
-
-          {/* 3D Promo */}
-          <OGBannerPromo title="Discover Alpha" subtitle="Trending tokens, whale movements & live chain activity" accent="purple" />
-
           {/* Trending Tokens Section */}
           <div>
             <div className="flex items-center justify-between mb-4">

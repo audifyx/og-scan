@@ -5,7 +5,6 @@ import {
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,7 +58,6 @@ const Premium = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-6">
-          <OGBannerPromo title="OG Premium" subtitle="Unlock advanced forensics, unlimited scans & priority intel" accent="gold" />
         {/* Credits Overview - Enhanced */}
         <Card className="og-glass-card-premium overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5" />

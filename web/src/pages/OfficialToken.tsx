@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,7 +77,6 @@ const OfficialToken = () => {
 
       <ScrollArea className="h-[calc(100vh-120px)]">
         <div className="p-4 lg:p-6 space-y-6">
-            <OGBannerPromo title="Official Token" subtitle="$SOLTOOLS 2014 The token powering the OG Scan ecosystem" accent="gold" />
           {/* Hero */}
           <Card className="og-glass-card-premium overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/5" />

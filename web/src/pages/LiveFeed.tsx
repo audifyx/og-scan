@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Zap, TrendingUp, Clock, ExternalLink, RefreshCw, Filter, Sparkles, Rocket, Globe, Play, Pause, Copy, ArrowUpRight, ArrowDownRight, Repeat } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -298,7 +297,6 @@ const LiveFeed = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-5">
-          <OGBannerPromo title="Live Feed" subtitle="Real-time Solana token launches & market activity" accent="cyan" />
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full max-w-md grid-cols-2">
