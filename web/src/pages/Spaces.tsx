@@ -893,7 +893,10 @@ const SpaceChat = ({ spaceId, isHost }: { spaceId: string; isHost: boolean }) =>
    SPEAKER QUEUE
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-const SpeakerQueue = ({ spaceId, isHost, onRaiseHand, hasRaised }: { spaceId: string; isHost: boolean; onRaiseHand: () => void; hasRaised: boolean }) => {
+const SpeakerQueue = ({ spaceId, isHost, onRaiseHand, hasRaised, onPromote }: {
+  spaceId: string; isHost: boolean; onRaiseHand: () => void; hasRaised: boolean;
+  onPromote?: (userId: string) => void;
+}) => {
   const [reqs, setReqs] = useState<SpeakerRequest[]>([]);
 
   useEffect(() => {
@@ -904,10 +907,15 @@ const SpeakerQueue = ({ spaceId, isHost, onRaiseHand, hasRaised }: { spaceId: st
     return () => { supabase.removeChannel(ch); };
   }, [spaceId, isHost]);
 
-  const handle = async (id: string, s: "approved" | "denied") => {
-    await supabase.from("speaker_requests").update({ status: s }).eq("id", id);
-    setReqs(prev => prev.filter(r => r.id !== id));
-    toast.success(s === "approved" ? "Speaker approved! 🎙️" : "Request denied");
+  const handle = async (req: SpeakerRequest, s: "approved" | "denied") => {
+    await supabase.from("speaker_requests").update({ status: s }).eq("id", req.id);
+    setReqs(prev => prev.filter(r => r.id !== req.id));
+    if (s === "approved" && onPromote && req.user_id) {
+      onPromote(req.user_id);
+      toast.success(`${req.username || "User"} promoted to speaker! 🎙️`);
+    } else {
+      toast.success(s === "approved" ? "Speaker approved! 🎙️" : "Request denied");
+    }
   };
 
   if (!isHost) return (
@@ -929,8 +937,8 @@ const SpeakerQueue = ({ spaceId, isHost, onRaiseHand, hasRaised }: { spaceId: st
             {safAvatar(r.avatar_url) ? <img src={safAvatar(r.avatar_url)} alt="" className="w-full h-full object-cover" /> : <span className="text-[9px] font-bold text-white/30">{r.username?.[0]?.toUpperCase() || "?"}</span>}
           </div>
           <span className="text-[11px] text-white/60 font-medium flex-1 truncate">{r.username || "User"}</span>
-          <button onClick={() => handle(r.id, "approved")} className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20 hover:bg-emerald-500/20">Accept</button>
-          <button onClick={() => handle(r.id, "denied")} className="p-1 rounded-full hover:bg-white/10 text-white/25"><XIcon className="h-3 w-3" /></button>
+          <button onClick={() => handle(r, "approved")} className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20 hover:bg-emerald-500/20">Accept</button>
+          <button onClick={() => handle(r, "denied")} className="p-1 rounded-full hover:bg-white/10 text-white/25"><XIcon className="h-3 w-3" /></button>
         </div>
       ))}
     </div>
@@ -1225,7 +1233,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
 
           {/* Speaker queue (only for non-hosts or pending requests) */}
           <div className="mt-4">
-            <SpeakerQueue spaceId={space.id} isHost={isHost} onRaiseHand={raiseHand} hasRaised={hasRaised} />
+            <SpeakerQueue spaceId={space.id} isHost={isHost} onRaiseHand={raiseHand} hasRaised={hasRaised} onPromote={(userId) => voicePanelRef.current?.promoteToSpeaker(userId)} />
           </div>
 
           {/* About section */}
