@@ -226,15 +226,17 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
 
   const content = (
     <>
-      <PageHeader title="Discover" description="Trending tokens, top traders & live activity">
-        <div className="flex items-center gap-2">
-          <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
-            <Activity className="h-3 w-3" /> Live
-          </Badge>
-        </div>
-      </PageHeader>
+      {!inline && (
+        <PageHeader title="Discover" description="Trending tokens, top traders & live activity">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
+              <Activity className="h-3 w-3" /> Live
+            </Badge>
+          </div>
+        </PageHeader>
+      )}
 
-      <ScrollArea className="h-[calc(100vh-120px)]">
+      <ScrollArea className={inline ? "max-h-[80vh]" : "h-[calc(100vh-120px)]"}>
         <div className="p-4 lg:p-6 space-y-6">
           {/* Trending Tokens Section */}
           <div>
