@@ -49,6 +49,8 @@ interface Space {
   tags: string[] | null;
   pinned_message: string | null;
   co_hosts: string[] | null;
+  recording_url: string | null;
+  duration_seconds: number | null;
 }
 
 interface SpaceChatMessage {
@@ -527,16 +529,31 @@ const TrendingBanner = ({ spaces, onJoin }: { spaces: Space[]; onJoin: (s: Space
    SPACE CARD — list view
    ═══════════════════════════════════════════════════════════════════════════════ */
 
+const formatDuration = (sec: number | null): string => {
+  if (!sec) return "";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+};
+
 const SpaceCard = ({ space, onJoin, variant = "default" }: { space: Space; onJoin: (s: Space) => void; variant?: "default" | "past" }) => {
   const tm = topicOf(space.topic);
   const total = (space.listener_count || 0) + (space.speaker_count || 0);
   const isPast = variant === "past";
+  const hasReplay = isPast && !!space.recording_url;
 
   return (
-    <button onClick={() => !isPast && onJoin(space)}
+    <button onClick={() => { if (isPast && !hasReplay) return; onJoin(space); }}
       className={cn(
         "w-full text-left rounded-2xl border transition-all group relative overflow-hidden",
-        isPast ? "p-4 border-white/[0.05] bg-white/[0.015] opacity-60 cursor-default" : "p-4 border-white/[0.08] bg-gradient-to-br hover:border-white/[0.15] hover:shadow-lg hover:shadow-white/[0.02]",
+        isPast
+          ? hasReplay
+            ? "p-4 border-white/[0.06] bg-white/[0.02] hover:border-primary/30 hover:bg-primary/[0.02] cursor-pointer"
+            : "p-4 border-white/[0.05] bg-white/[0.015] opacity-40 cursor-default"
+          : "p-4 border-white/[0.08] bg-gradient-to-br hover:border-white/[0.15] hover:shadow-lg hover:shadow-white/[0.02]",
         !isPast && cardGrad(space.id),
       )}>
       {/* Hover glow */}
@@ -561,6 +578,12 @@ const SpaceCard = ({ space, onJoin, variant = "default" }: { space: Space; onJoi
             {space.is_private && <Lock className="h-2.5 w-2.5 text-white/20" />}
             {isPast && space.ended_at && (
               <span className="inline-flex items-center gap-1 text-[9px] text-white/25"><Archive className="h-2.5 w-2.5" />Ended {formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}</span>
+            )}
+            {isPast && hasReplay && (
+              <span className="inline-flex items-center gap-1 text-[9px] text-primary/70 font-bold"><Play className="h-2.5 w-2.5" />Replay{space.duration_seconds ? ` · ${formatDuration(space.duration_seconds)}` : ""}</span>
+            )}
+            {isPast && !hasReplay && space.ended_at && (
+              <span className="text-[9px] text-white/15 italic">No recording</span>
             )}
             {space.tags?.slice(0, 2).map(t => (
               <span key={t} className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/[0.04] text-white/20 border border-white/[0.05]">#{t}</span>
@@ -846,7 +869,12 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
 
   const endSpace = async () => {
     if (!isHost) return;
-    await supabase.from("spaces").update({ is_live: false, ended_at: new Date().toISOString() }).eq("id", space.id);
+    const duration = Math.round((Date.now() - new Date(space.created_at).getTime()) / 1000);
+    await supabase.from("spaces").update({
+      is_live: false,
+      ended_at: new Date().toISOString(),
+      duration_seconds: duration,
+    }).eq("id", space.id);
     toast.success("Space ended"); onLeave();
   };
 
@@ -965,7 +993,14 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
           {/* Voice panel */}
           <div className="mb-5">
             <p className="text-[10px] font-black text-white/25 uppercase tracking-widest mb-2.5 flex items-center gap-1.5"><Mic className="h-3 w-3" /> Speakers</p>
-            <VoicePanel lobbyId={`space-${space.id}`} lobbyName={space.title} autoJoin />
+            <VoicePanel
+              lobbyId={`space-${space.id}`}
+              lobbyName={space.title}
+              autoJoin
+              isRecording={cur.is_recording && isHost}
+              spaceId={space.id}
+              onRecordingSaved={(url, dur) => { setCur(prev => ({ ...prev, recording_url: url, duration_seconds: dur })); }}
+            />
           </div>
 
           {/* Speaker queue */}
@@ -1130,6 +1165,136 @@ const MiniPlayerBar = ({ space, onExpand, onLeave }: { space: Space; onExpand: (
    EMPTY STATE
    ═══════════════════════════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════════════════════════
+   REPLAY PLAYER — Plays back a recorded Space
+   ═══════════════════════════════════════════════════════════════════════════════ */
+const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void }) => {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurTime] = useState(0);
+  const [duration, setDuration] = useState(space.duration_seconds || 0);
+  const [loading, setLoading] = useState(true);
+  const tm = topicOf(space.topic);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    const onLoad = () => { setDuration(Math.round(el.duration)); setLoading(false); };
+    const onTime = () => setCurTime(Math.round(el.currentTime));
+    const onEnded = () => setPlaying(false);
+    const onCanPlay = () => setLoading(false);
+    el.addEventListener("loadedmetadata", onLoad);
+    el.addEventListener("timeupdate", onTime);
+    el.addEventListener("ended", onEnded);
+    el.addEventListener("canplay", onCanPlay);
+    return () => { el.removeEventListener("loadedmetadata", onLoad); el.removeEventListener("timeupdate", onTime); el.removeEventListener("ended", onEnded); el.removeEventListener("canplay", onCanPlay); };
+  }, []);
+
+  const togglePlay = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (playing) { el.pause(); setPlaying(false); }
+    else { el.play().then(() => setPlaying(true)).catch(() => {}); }
+  };
+
+  const seek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const el = audioRef.current;
+    if (!el) return;
+    const t = Number(e.target.value);
+    el.currentTime = t;
+    setCurTime(t);
+  };
+
+  const fmtTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="flex flex-col h-full min-h-0 relative">
+      <SpaceStyles />
+      {/* Background */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-72 bg-gradient-to-b from-primary/[0.04] via-violet-900/[0.03] to-transparent" />
+      </div>
+
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] bg-[#070d14]/80 backdrop-blur-xl z-10 shrink-0 relative">
+        <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition"><ArrowLeft className="h-4 w-4 text-white/50" /></button>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-black text-sm text-white truncate">{space.title}</h3>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={cn("inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border", tm.color)}>{tm.icon} {space.topic}</span>
+            <span className="text-[10px] text-white/15">·</span>
+            <span className="text-[10px] text-white/25">Replay</span>
+            {space.ended_at && <><span className="text-[10px] text-white/15">·</span><span className="text-[10px] text-white/15">{formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}</span></>}
+          </div>
+        </div>
+      </div>
+
+      {/* Player Content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 gap-6 relative">
+        {/* Space info */}
+        <div className="text-center">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-violet-600/20 border-2 border-primary/20 flex items-center justify-center overflow-hidden">
+            {safAvatar(space.host_avatar) ? <img src={safAvatar(space.host_avatar)} alt="" className="w-full h-full object-cover rounded-2xl" /> : <Radio className="h-8 w-8 text-primary/50" />}
+          </div>
+          <h2 className="text-lg font-black text-white mb-1">{space.title}</h2>
+          {space.description && <p className="text-sm text-white/30 mb-2">{space.description}</p>}
+          <p className="text-[11px] text-white/25">Hosted by @{space.host_username || "unknown"}</p>
+        </div>
+
+        {/* Audio element */}
+        <audio ref={audioRef} src={space.recording_url || ""} preload="metadata" />
+
+        {/* Play button */}
+        <button onClick={togglePlay} disabled={loading}
+          className={cn(
+            "w-16 h-16 rounded-full flex items-center justify-center transition-all",
+            playing
+              ? "bg-white/10 border-2 border-white/20 text-white hover:bg-white/15"
+              : "bg-primary/20 border-2 border-primary/40 text-primary hover:bg-primary/30 shadow-[0_0_30px_rgba(var(--primary-rgb,190,242,100),0.2)]",
+            loading && "opacity-50"
+          )}
+        >
+          {loading ? (
+            <div className="h-6 w-6 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          ) : playing ? (
+            <Pause className="h-6 w-6" />
+          ) : (
+            <Play className="h-6 w-6 ml-0.5" />
+          )}
+        </button>
+
+        {/* Progress bar */}
+        <div className="w-full max-w-sm space-y-2">
+          <input
+            type="range"
+            min={0}
+            max={duration || 1}
+            value={currentTime}
+            onChange={seek}
+            className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(var(--primary-rgb,190,242,100),0.5)]"
+            style={{ background: `linear-gradient(to right, hsl(var(--primary)) ${(currentTime / (duration || 1)) * 100}%, rgba(255,255,255,0.1) ${(currentTime / (duration || 1)) * 100}%)` }}
+          />
+          <div className="flex justify-between text-[10px] text-white/25 font-mono">
+            <span>{fmtTime(currentTime)}</span>
+            <span>{fmtTime(duration)}</span>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-4 text-[10px] text-white/20">
+          {space.peak_listeners > 0 && <span className="flex items-center gap-1"><Headphones className="h-3 w-3" />{space.peak_listeners} peak listeners</span>}
+          {space.speaker_count > 0 && <span className="flex items-center gap-1"><Mic className="h-3 w-3" />{space.speaker_count} speakers</span>}
+          {space.duration_seconds && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatDuration(space.duration_seconds)}</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const EmptyState = ({ icon: Icon, title, sub, action }: { icon: React.ComponentType<{ className?: string }>; title: string; sub: string; action?: { label: string; onClick: () => void } }) => (
   <div className="text-center py-20">
     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/[0.05] mb-4">
@@ -1157,6 +1322,7 @@ const Spaces = () => {
   const [tab, setTab] = useState<"live" | "scheduled" | "past">("live");
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [replaySpace, setReplaySpace] = useState<Space | null>(null);
 
   const fetchSpaces = useCallback(async () => {
     try {
@@ -1205,6 +1371,11 @@ const Spaces = () => {
   const scheduled = useMemo(() => spaces.filter(s => !s.is_live && !s.ended_at && matchTopic(s) && matchSearch(s)), [spaces, topicFilter, search]);
   const ended = useMemo(() => pastSpaces.filter(s => matchTopic(s) && matchSearch(s)), [pastSpaces, topicFilter, search]);
   const totalListening = live.reduce((a, s) => a + (s.listener_count || 0) + (s.speaker_count || 0), 0);
+
+  // ── Replay player ──
+  if (replaySpace) return (
+    <ReplayPlayer space={replaySpace} onClose={() => { setReplaySpace(null); }} />
+  );
 
   // ── Active room ──
   if (activeSpace) return (
@@ -1328,7 +1499,7 @@ const Spaces = () => {
           <EmptyState icon={Archive} title="No past spaces" sub="Ended spaces will appear here for replay" />
         ) : (
           <div className="flex flex-col gap-2.5 pb-4">
-            {ended.map(s => <SpaceCard key={s.id} space={s} onJoin={() => {}} variant="past" />)}
+            {ended.map(s => <SpaceCard key={s.id} space={s} onJoin={setReplaySpace} variant="past" />)}
           </div>
         )
       )}
