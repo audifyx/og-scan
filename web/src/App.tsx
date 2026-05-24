@@ -87,6 +87,8 @@ const App = () => (
             <Route path="/news-signal" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/memes" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/art-feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/spaces" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/voice-rooms" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tech" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/page/:pageNumber" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/page-:pageNumber" element={<ProtectedRoute><Index /></ProtectedRoute>} />

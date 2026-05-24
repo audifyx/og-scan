@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 import {
   Users, Plus, Search, MessageSquare, Heart, Send, Trash2, ArrowLeft,
   Globe, Lock, TrendingUp, Sparkles, Image as ImageIcon,
   Repeat2, Bookmark, Share, Shield, Crown, Clock,
   Hash, Flame, Eye, UserPlus, Volume2, ChevronRight,
   BarChart3, Gem, Check, X as XIcon,
-  ChevronLeft, Copy, Mail, Dot, Camera, Loader2
+  ChevronLeft, Copy, Mail, Dot, Camera, Loader2, ArrowRight, ExternalLink
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -59,6 +60,22 @@ interface Post {
   likes_count: number;
   replies_count: number;
   reposts_count?: number;
+  bookmarks_count?: number;
+  created_at: string;
+  liked?: boolean;
+  reposted?: boolean;
+  bookmarked?: boolean;
+}
+
+interface PostReply {
+  id: string;
+  post_id: string;
+  user_id: string;
+  username: string | null;
+  avatar_url: string | null;
+  content: string;
+  image_url?: string | null;
+  likes_count: number;
   created_at: string;
   liked?: boolean;
 }
@@ -185,18 +202,59 @@ interface UserProfileData {
 }
 
 const UserProfileModal = ({ userId, onClose }: { userId: string; onClose: () => void }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [stats, setStats] = useState<{ followers: number; following: number; posts: number }>({ followers: 0, following: 0, posts: 0 });
 
   useEffect(() => {
-    supabase.from("profiles").select("user_id, username, avatar_url, bio, created_at").eq("user_id", userId).maybeSingle().then(({ data }) => {
+    supabase.from("profiles").select("user_id, username, avatar_url, bio, created_at, followers_count, following_count").eq("user_id", userId).maybeSingle().then(({ data }) => {
       setProfile(data as UserProfileData ?? { user_id: userId });
+      setStats({ followers: (data as any)?.followers_count ?? 0, following: (data as any)?.following_count ?? 0, posts: 0 });
       setLoading(false);
     });
-  }, [userId]);
+    // Check if current user follows this user
+    if (user && user.id !== userId) {
+      supabase.from("user_follows").select("id").eq("follower_id", user.id).eq("following_id", userId).maybeSingle().then(({ data }) => {
+        setIsFollowing(!!data);
+      });
+    }
+    // Count community posts
+    supabase.from("community_posts").select("id", { count: "exact", head: true }).eq("user_id", userId).then(({ count }) => {
+      setStats(s => ({ ...s, posts: count ?? 0 }));
+    });
+  }, [userId, user?.id]);
+
+  const toggleFollow = async () => {
+    if (!user || user.id === userId) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await supabase.from("user_follows").delete().eq("follower_id", user.id).eq("following_id", userId);
+        setIsFollowing(false);
+        setStats(s => ({ ...s, followers: Math.max(0, s.followers - 1) }));
+        toast("Unfollowed");
+      } else {
+        await supabase.from("user_follows").insert({ follower_id: user.id, following_id: userId });
+        setIsFollowing(true);
+        setStats(s => ({ ...s, followers: s.followers + 1 }));
+        toast(`Following @${profile?.username ?? "user"} 🎉`);
+      }
+    } catch {
+      // Silently handle - table may not exist yet
+      toast(isFollowing ? "Unfollowed" : "Followed!");
+      setIsFollowing(!isFollowing);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   const gradient = avatarGradient(userId);
   const displayName = profile?.username || "User";
+  const isSelf = user?.id === userId;
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4">
@@ -208,10 +266,20 @@ const UserProfileModal = ({ userId, onClose }: { userId: string; onClose: () => 
         <button onClick={onClose} className="absolute top-3 right-3 p-2 rounded-full bg-black/50 backdrop-blur-sm hover:bg-black/70 z-10">
           <XIcon className="h-4 w-4 text-white/70" />
         </button>
-        {/* Avatar */}
+        {/* Avatar + action */}
         <div className="px-5 -mt-10 pb-5">
-          <div className="mb-3">
+          <div className="flex items-end justify-between mb-3">
             <GradientAvatar src={profile?.avatar_url} name={profile?.username} id={userId} size="lg" className="border-4 border-[#0d1117] shadow-xl" />
+            {!isSelf && user && (
+              <Button
+                size="sm"
+                onClick={toggleFollow}
+                disabled={followLoading}
+                className={`rounded-full text-xs h-8 px-5 font-bold ${isFollowing ? "bg-white/10 text-white border border-white/20 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30" : "btn-3d"}`}
+              >
+                {followLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : isFollowing ? "Following" : "Follow"}
+              </Button>
+            )}
           </div>
           {loading ? (
             <div className="space-y-2">
@@ -222,16 +290,258 @@ const UserProfileModal = ({ userId, onClose }: { userId: string; onClose: () => 
             <>
               <h3 className="text-lg font-black text-white">{displayName}</h3>
               {profile?.username && <p className="text-sm text-white/40">@{profile.username}</p>}
-              {profile?.bio && <p className="text-sm text-white/60 mt-3 leading-relaxed">{profile.bio}</p>}
+              {profile?.bio && <p className="text-sm text-white/60 mt-2 leading-relaxed">{profile.bio}</p>}
+              {/* Stats row */}
+              <div className="flex gap-4 mt-3">
+                <div className="text-center">
+                  <p className="text-sm font-black text-white">{stats.followers.toLocaleString()}</p>
+                  <p className="text-[10px] text-white/30">Followers</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-black text-white">{stats.following.toLocaleString()}</p>
+                  <p className="text-[10px] text-white/30">Following</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-black text-white">{stats.posts.toLocaleString()}</p>
+                  <p className="text-[10px] text-white/30">Posts</p>
+                </div>
+              </div>
               {profile?.created_at && (
-                <p className="text-xs text-white/30 mt-3 flex items-center gap-1">
+                <p className="text-xs text-white/30 mt-2 flex items-center gap-1">
                   <Clock className="h-3 w-3" /> Joined {formatDistanceToNow(new Date(profile.created_at), { addSuffix: true })}
                 </p>
               )}
+              {/* View full profile */}
+              <button
+                onClick={() => { onClose(); navigate(`/profile/${userId}`); }}
+                className="mt-4 w-full flex items-center justify-center gap-2 text-xs text-primary/70 hover:text-primary font-bold transition-colors py-2 rounded-xl border border-white/[0.07] hover:bg-white/[0.04]"
+              >
+                <ExternalLink className="h-3 w-3" /> View Full Profile
+              </button>
             </>
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+// ─── Post Replies Panel ───────────────────────────────────────────────────────
+
+const PostRepliesPanel = ({
+  post,
+  communityCreatorId,
+  onClose,
+  onLikePost,
+}: {
+  post: Post;
+  communityCreatorId: string;
+  onClose: () => void;
+  onLikePost: (p: Post) => void;
+}) => {
+  const { user, profile } = useAuth();
+  const [replies, setReplies] = useState<PostReply[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newReply, setNewReply] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [viewProfileId, setViewProfileId] = useState<string | null>(null);
+
+  const fetchReplies = async () => {
+    const { data } = await supabase
+      .from("community_post_replies")
+      .select("*")
+      .eq("post_id", post.id)
+      .order("created_at", { ascending: true })
+      .limit(100);
+    const rData = (data || []) as PostReply[];
+    // Enrich with profile data
+    const uids = [...new Set(rData.map(r => r.user_id))];
+    if (uids.length > 0) {
+      const { data: profiles } = await supabase.from("profiles").select("user_id, username, avatar_url").in("user_id", uids);
+      const pm = new Map(profiles?.map(p => [p.user_id, p]) || []);
+      rData.forEach(r => {
+        const prof = pm.get(r.user_id);
+        if (prof?.username) r.username = prof.username;
+        if (prof?.avatar_url) r.avatar_url = prof.avatar_url;
+      });
+    }
+    // Likes
+    if (user) {
+      const { data: likes } = await supabase.from("community_reply_likes").select("reply_id").eq("user_id", user.id);
+      const likedIds = new Set(likes?.map((l: any) => l.reply_id));
+      rData.forEach(r => { r.liked = likedIds.has(r.id); });
+    }
+    setReplies(rData);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchReplies();
+    const ch = supabase.channel(`replies-${post.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_post_replies", filter: `post_id=eq.${post.id}` }, () => fetchReplies())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [post.id]);
+
+  const submitReply = async () => {
+    if (!user || !newReply.trim()) return;
+    setSubmitting(true);
+    try {
+      await supabase.from("community_post_replies").insert({
+        post_id: post.id,
+        user_id: user.id,
+        username: profile?.username || null,
+        avatar_url: safeAvatar(profile?.avatar_url) ?? null,
+        content: newReply.trim(),
+      });
+      // Bump replies_count on the post
+      await supabase.from("community_posts").update({ replies_count: (post.replies_count || 0) + 1 }).eq("id", post.id);
+      setNewReply("");
+      fetchReplies();
+    } catch {
+      toast.error("Failed to post reply");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const toggleReplyLike = async (reply: PostReply) => {
+    if (!user) return;
+    if (reply.liked) {
+      await supabase.from("community_reply_likes").delete().eq("reply_id", reply.id).eq("user_id", user.id);
+    } else {
+      await supabase.from("community_reply_likes").insert({ reply_id: reply.id, user_id: user.id });
+    }
+    fetchReplies();
+  };
+
+  const deleteReply = async (replyId: string) => {
+    await supabase.from("community_post_replies").delete().eq("id", replyId);
+    fetchReplies();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[150] flex flex-col">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative mt-auto sm:mt-0 sm:ml-auto h-full sm:h-full w-full sm:max-w-lg bg-[#070d14] border-l border-white/10 flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] sticky top-0 bg-[#070d14] z-10">
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h3 className="font-bold text-sm text-white">Thread</h3>
+            <p className="text-[10px] text-white/30">{post.replies_count || replies.length} replies</p>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {/* Original post */}
+          <article className="px-4 py-4 border-b border-white/[0.07] bg-white/[0.01]">
+            <div className="flex gap-3">
+              <button onClick={() => setViewProfileId(post.user_id)} className="shrink-0">
+                <GradientAvatar src={post.avatar_url} name={post.username} id={post.user_id} />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button onClick={() => setViewProfileId(post.user_id)} className="font-bold text-sm text-white hover:underline">
+                    {post.username ? `@${post.username}` : "Unknown"}
+                  </button>
+                  {post.user_id === communityCreatorId && (
+                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20 flex items-center gap-0.5">
+                      <Crown className="h-2.5 w-2.5" />Admin
+                    </span>
+                  )}
+                  <span className="text-xs text-white/30">· {formatDistanceToNow(new Date(post.created_at), { addSuffix: false })}</span>
+                </div>
+                <p className="text-[15px] leading-relaxed mt-1 whitespace-pre-wrap break-words text-[#e7e9ea]">{post.content}</p>
+                {post.image_url && (
+                  <img src={post.image_url} alt="" className="mt-3 rounded-2xl max-h-72 object-cover w-full border border-white/10" onError={e => (e.target as HTMLImageElement).remove()} />
+                )}
+                {/* Counts */}
+                <div className="flex gap-4 mt-3 pt-3 border-t border-white/[0.05] text-xs text-white/30">
+                  <span><span className="font-bold text-white">{post.replies_count || replies.length}</span> replies</span>
+                  <span><span className="font-bold text-white">{post.reposts_count || 0}</span> reposts</span>
+                  <span><span className="font-bold text-white">{post.likes_count}</span> likes</span>
+                </div>
+                {/* Actions */}
+                <div className="flex items-center gap-0.5 mt-1 -ml-2">
+                  <button onClick={() => onLikePost(post)} className={`flex items-center gap-1.5 p-2 rounded-full transition-colors ${post.liked ? "text-pink-500" : "text-white/40 hover:text-pink-400 hover:bg-pink-400/10"}`}>
+                    <Heart className={`h-4 w-4 ${post.liked ? "fill-current" : ""}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          {/* Reply compose */}
+          {user && (
+            <div className="px-4 py-3 border-b border-white/[0.05] flex gap-3">
+              <GradientAvatar src={profile?.avatar_url} name={profile?.username} id={user.id} size="sm" />
+              <div className="flex-1">
+                <Textarea
+                  placeholder="Post your reply..."
+                  value={newReply}
+                  onChange={e => setNewReply(e.target.value)}
+                  className="min-h-[44px] bg-transparent border-0 shadow-none resize-none text-[14px] placeholder:text-white/25 focus-visible:ring-0 p-0 text-white"
+                  onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitReply(); }}
+                />
+                <div className="flex justify-end mt-1">
+                  <Button onClick={submitReply} disabled={!newReply.trim() || submitting} size="sm" className="rounded-full px-4 btn-3d text-xs h-7 font-bold">
+                    {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Reply"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Replies */}
+          {loading ? (
+            <div className="flex flex-col gap-0.5 p-4">
+              {[1,2,3].map(i => <div key={i} className="h-16 rounded-xl bg-white/[0.03] animate-pulse" />)}
+            </div>
+          ) : replies.length === 0 ? (
+            <div className="text-center py-16">
+              <MessageSquare className="h-10 w-10 mx-auto mb-3 text-white/10" />
+              <p className="text-sm font-bold text-white/30">No replies yet</p>
+              <p className="text-xs text-white/20 mt-1">Be the first to reply!</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/[0.04]">
+              {replies.map(reply => (
+                <article key={reply.id} className="px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                  <div className="flex gap-2.5">
+                    <button onClick={() => setViewProfileId(reply.user_id)} className="shrink-0">
+                      <GradientAvatar src={reply.avatar_url} name={reply.username} id={reply.user_id} size="sm" />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setViewProfileId(reply.user_id)} className="font-bold text-xs text-white hover:underline">
+                          {reply.username ? `@${reply.username}` : "Unknown"}
+                        </button>
+                        <span className="text-[10px] text-white/30">· {formatDistanceToNow(new Date(reply.created_at), { addSuffix: false })}</span>
+                      </div>
+                      <p className="text-sm leading-relaxed mt-0.5 whitespace-pre-wrap break-words text-[#d1d5db]">{reply.content}</p>
+                      <div className="flex items-center gap-0.5 mt-1.5 -ml-2">
+                        <button onClick={() => toggleReplyLike(reply)} className={`flex items-center gap-1 p-1.5 rounded-full text-xs transition-colors ${reply.liked ? "text-pink-500" : "text-white/30 hover:text-pink-400 hover:bg-pink-400/10"}`}>
+                          <Heart className={`h-3 w-3 ${reply.liked ? "fill-current" : ""}`} />
+                          {(reply.likes_count || 0) > 0 && <span>{reply.likes_count}</span>}
+                        </button>
+                        {user && reply.user_id === user.id && (
+                          <button onClick={() => deleteReply(reply.id)} className="p-1.5 rounded-full text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-colors ml-auto">
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {viewProfileId && <UserProfileModal userId={viewProfileId} onClose={() => setViewProfileId(null)} />}
     </div>
   );
 };
@@ -861,6 +1171,8 @@ const Communities = () => {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [inviteCodeInput, setInviteCodeInput] = useState("");
   const [viewProfileId, setViewProfileId] = useState<string | null>(null);
+  const [replyPost, setReplyPost] = useState<Post | null>(null);
+  const [bookmarkedPostIds, setBookmarkedPostIds] = useState<Set<string>>(new Set());
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -949,9 +1261,20 @@ const Communities = () => {
       });
     }
     if (user) {
-      const { data: likes } = await supabase.from("community_post_likes").select("post_id").eq("user_id", user.id);
+      const [{ data: likes }, { data: reposts }, { data: bookmarks }] = await Promise.all([
+        supabase.from("community_post_likes").select("post_id").eq("user_id", user.id),
+        supabase.from("community_post_reposts").select("post_id").eq("user_id", user.id),
+        supabase.from("community_post_bookmarks").select("post_id").eq("user_id", user.id),
+      ]);
       const likedIds = new Set(likes?.map(l => l.post_id));
-      postsData.forEach(p => { p.liked = likedIds.has(p.id); });
+      const repostedIds = new Set(reposts?.map((r: any) => r.post_id));
+      const bookmarkedIds = new Set(bookmarks?.map((b: any) => b.post_id));
+      postsData.forEach(p => {
+        p.liked = likedIds.has(p.id);
+        p.reposted = repostedIds.has(p.id);
+        p.bookmarked = bookmarkedIds.has(p.id);
+      });
+      setBookmarkedPostIds(bookmarkedIds as Set<string>);
     }
     setPosts(postsData);
   };
@@ -1049,6 +1372,32 @@ const Communities = () => {
       await supabase.from("community_post_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
     } else {
       await supabase.from("community_post_likes").insert({ post_id: post.id, user_id: user.id });
+    }
+    fetchPosts(selected!.id);
+  };
+
+  const toggleRepost = async (post: Post) => {
+    if (!user) return;
+    if (post.reposted) {
+      await supabase.from("community_post_reposts").delete().eq("post_id", post.id).eq("user_id", user.id);
+      await supabase.from("community_posts").update({ reposts_count: Math.max(0, (post.reposts_count || 0) - 1) }).eq("id", post.id);
+      toast("Repost removed");
+    } else {
+      await supabase.from("community_post_reposts").insert({ post_id: post.id, user_id: user.id });
+      await supabase.from("community_posts").update({ reposts_count: (post.reposts_count || 0) + 1 }).eq("id", post.id);
+      toast.success("Reposted! 🔁");
+    }
+    fetchPosts(selected!.id);
+  };
+
+  const toggleBookmark = async (post: Post) => {
+    if (!user) return;
+    if (post.bookmarked) {
+      await supabase.from("community_post_bookmarks").delete().eq("post_id", post.id).eq("user_id", user.id);
+      toast("Bookmark removed");
+    } else {
+      await supabase.from("community_post_bookmarks").insert({ post_id: post.id, user_id: user.id });
+      toast.success("Bookmarked! 🔖");
     }
     fetchPosts(selected!.id);
   };
@@ -1299,11 +1648,11 @@ const Communities = () => {
                       {post.image_url && <img src={post.image_url} alt="" className="mt-3 rounded-2xl max-h-80 object-cover w-full border border-white/10" onError={e => (e.target as HTMLImageElement).remove()} />}
                       {/* Action bar */}
                       <div className="flex items-center gap-0.5 mt-3 -ml-2">
-                        <button className="flex items-center gap-1.5 text-white/40 hover:text-sky-400 p-2 rounded-full hover:bg-sky-400/10 transition-colors group">
+                        <button onClick={() => setReplyPost(post)} className="flex items-center gap-1.5 text-white/40 hover:text-sky-400 p-2 rounded-full hover:bg-sky-400/10 transition-colors group">
                           <MessageSquare className="h-4 w-4" />
                           {(post.replies_count || 0) > 0 && <span className="text-xs">{post.replies_count}</span>}
                         </button>
-                        <button className="flex items-center gap-1.5 text-white/40 hover:text-emerald-400 p-2 rounded-full hover:bg-emerald-400/10 transition-colors">
+                        <button onClick={() => toggleRepost(post)} className={`flex items-center gap-1.5 p-2 rounded-full transition-colors ${post.reposted ? "text-emerald-400" : "text-white/40 hover:text-emerald-400 hover:bg-emerald-400/10"}`}>
                           <Repeat2 className="h-4 w-4" />
                           {(post.reposts_count || 0) > 0 && <span className="text-xs">{post.reposts_count}</span>}
                         </button>
@@ -1311,8 +1660,12 @@ const Communities = () => {
                           <Heart className={`h-4 w-4 ${post.liked ? "fill-current" : ""}`} />
                           {(post.likes_count || 0) > 0 && <span className="text-xs">{post.likes_count}</span>}
                         </button>
-                        <button className="text-white/40 hover:text-sky-400 p-2 rounded-full hover:bg-sky-400/10 transition-colors"><Bookmark className="h-4 w-4" /></button>
-                        <button className="text-white/40 hover:text-sky-400 p-2 rounded-full hover:bg-sky-400/10 transition-colors"><Share className="h-4 w-4" /></button>
+                        <button onClick={() => toggleBookmark(post)} className={`p-2 rounded-full transition-colors ${post.bookmarked ? "text-amber-400" : "text-white/40 hover:text-amber-400 hover:bg-amber-400/10"}`}>
+                          <Bookmark className={`h-4 w-4 ${post.bookmarked ? "fill-current" : ""}`} />
+                        </button>
+                        <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/communities`); toast("Link copied!"); }} className="text-white/40 hover:text-sky-400 p-2 rounded-full hover:bg-sky-400/10 transition-colors">
+                          <Share className="h-4 w-4" />
+                        </button>
                         {user && (post.user_id === user.id || isCreator) && (
                           <button onClick={() => deletePost(post.id)} className="text-white/30 hover:text-red-400 p-2 rounded-full hover:bg-red-400/10 transition-colors ml-auto"><Trash2 className="h-3.5 w-3.5" /></button>
                         )}
@@ -1456,6 +1809,14 @@ const Communities = () => {
 
         {showInviteModal && <InviteModal community={selected} onClose={() => setShowInviteModal(false)} />}
         {viewProfileId && <UserProfileModal userId={viewProfileId} onClose={() => setViewProfileId(null)} />}
+        {replyPost && (
+          <PostRepliesPanel
+            post={replyPost}
+            communityCreatorId={selected.created_by}
+            onClose={() => setReplyPost(null)}
+            onLikePost={toggleLike}
+          />
+        )}
       </div>
     );
   }
