@@ -114,7 +114,18 @@ export const VoicePanel = forwardRef<VoicePanelHandle, VoicePanelProps>(({
     if (autoJoin && user) {
       joinVoice();
     }
-    return () => { leaveVoice(); };
+    // Save recording on page unload (best-effort)
+    const handleBeforeUnload = () => {
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop(); // triggers onstop → upload
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      leaveVoice();
+    };
   }, [lobbyId, user?.id]);
 
   // Expose methods to parent via ref
@@ -628,21 +639,24 @@ export const VoicePanel = forwardRef<VoicePanelHandle, VoicePanelProps>(({
         const durationSec = Math.round((Date.now() - recordingStartRef.current) / 1000);
         const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType });
         recordedChunksRef.current = [];
-        if (blob.size < 1000 || !spaceId) { resolve(); return; }
+        if (blob.size < 1000 || !spaceId) { console.warn("[VoicePanel] Recording too small or no spaceId, skipping save", blob.size, spaceId); resolve(); return; }
         try {
           const ext = recorder.mimeType.includes("webm") ? "webm" : "mp4";
           const filePath = `${userIdRef.current}/${spaceId}.${ext}`;
+          console.log("[VoicePanel] Uploading recording:", filePath, "size:", blob.size, "duration:", durationSec);
           const { error: uploadError } = await supabase.storage
             .from("space-recordings")
             .upload(filePath, blob, { contentType: recorder.mimeType, upsert: true });
-          if (uploadError) { resolve(); return; }
+          if (uploadError) { console.error("[VoicePanel] Upload failed:", uploadError.message); resolve(); return; }
           const { data: urlData } = supabase.storage.from("space-recordings").getPublicUrl(filePath);
           const url = urlData?.publicUrl;
           if (url) {
-            await supabase.from("spaces").update({ recording_url: url, duration_seconds: durationSec }).eq("id", spaceId);
+            const { error: updateErr } = await supabase.from("spaces").update({ recording_url: url, duration_seconds: durationSec }).eq("id", spaceId);
+            if (updateErr) console.error("[VoicePanel] DB update failed:", updateErr.message);
+            else console.log("[VoicePanel] Recording saved:", url);
             onRecordingSaved?.(url, durationSec);
           }
-        } catch { /* ignore */ }
+        } catch (e) { console.error("[VoicePanel] Recording save error:", e); }
         resolve();
       };
       recorder.stop();

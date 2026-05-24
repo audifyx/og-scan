@@ -673,13 +673,11 @@ const SpaceCard = ({ space, onJoin, variant = "default" }: { space: Space; onJoi
   const hasReplay = isPast && !!space.recording_url;
 
   return (
-    <button onClick={() => { if (isPast && !hasReplay) return; onJoin(space); }}
+    <button onClick={() => onJoin(space)}
       className={cn(
-        "w-full text-left rounded-xl border transition-all group",
+        "w-full text-left rounded-xl border transition-all group cursor-pointer",
         isPast
-          ? hasReplay
-            ? "p-3.5 border-white/[0.06] bg-white/[0.015] hover:border-primary/25 hover:bg-white/[0.03] cursor-pointer"
-            : "p-3.5 border-white/[0.04] bg-white/[0.01] opacity-35 cursor-default"
+          ? "p-3.5 border-white/[0.06] bg-white/[0.015] hover:border-primary/25 hover:bg-white/[0.03]"
           : "p-3.5 border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]",
       )}>
       <div className="flex gap-3 items-center">
@@ -727,11 +725,17 @@ const SpaceCard = ({ space, onJoin, variant = "default" }: { space: Space; onJoi
             </div>
           </div>
         )}
-        {isPast && hasReplay && (
+        {isPast && (
           <div className="shrink-0 self-center">
-            <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-              <Play className="h-3.5 w-3.5 text-primary ml-0.5" />
-            </div>
+            {hasReplay ? (
+              <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                <Play className="h-3.5 w-3.5 text-primary ml-0.5" />
+              </div>
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center group-hover:bg-white/[0.08] transition-colors">
+                <Eye className="h-3.5 w-3.5 text-white/25" />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -991,6 +995,10 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
 
   const endSpace = async () => {
     if (!isHost) return;
+    // Save recording BEFORE ending (leaveVoice triggers upload)
+    if (voicePanelRef.current) {
+      try { await voicePanelRef.current.leaveVoice(); } catch {}
+    }
     const duration = Math.round((Date.now() - new Date(space.created_at).getTime()) / 1000);
     await supabase.from("spaces").update({
       is_live: false,
@@ -1322,26 +1330,29 @@ const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void })
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurTime] = useState(0);
   const [duration, setDuration] = useState(space.duration_seconds || 0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!space.recording_url);
   const tm = topicOf(space.topic);
+  const hasAudio = !!space.recording_url;
 
   useEffect(() => {
     const el = audioRef.current;
-    if (!el) return;
+    if (!el || !hasAudio) return;
     const onLoad = () => { setDuration(Math.round(el.duration)); setLoading(false); };
     const onTime = () => setCurTime(Math.round(el.currentTime));
     const onEnded = () => setPlaying(false);
     const onCanPlay = () => setLoading(false);
+    const onError = () => setLoading(false);
     el.addEventListener("loadedmetadata", onLoad);
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("ended", onEnded);
     el.addEventListener("canplay", onCanPlay);
-    return () => { el.removeEventListener("loadedmetadata", onLoad); el.removeEventListener("timeupdate", onTime); el.removeEventListener("ended", onEnded); el.removeEventListener("canplay", onCanPlay); };
-  }, []);
+    el.addEventListener("error", onError);
+    return () => { el.removeEventListener("loadedmetadata", onLoad); el.removeEventListener("timeupdate", onTime); el.removeEventListener("ended", onEnded); el.removeEventListener("canplay", onCanPlay); el.removeEventListener("error", onError); };
+  }, [hasAudio]);
 
   const togglePlay = () => {
     const el = audioRef.current;
-    if (!el) return;
+    if (!el || !hasAudio) return;
     if (playing) { el.pause(); setPlaying(false); }
     else { el.play().then(() => setPlaying(true)).catch(() => {}); }
   };
@@ -1376,7 +1387,7 @@ const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void })
           <div className="flex items-center gap-2 mt-0.5">
             <span className={cn("inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border", tm.color)}>{tm.icon} {space.topic}</span>
             <span className="text-[10px] text-white/15">·</span>
-            <span className="text-[10px] text-white/25">Replay</span>
+            <span className="text-[10px] text-white/25">{hasAudio ? "Replay" : "Summary"}</span>
             {space.ended_at && <><span className="text-[10px] text-white/15">·</span><span className="text-[10px] text-white/15">{formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}</span></>}
           </div>
         </div>
@@ -1394,50 +1405,64 @@ const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void })
           <p className="text-[11px] text-white/25">Hosted by @{space.host_username || "unknown"}</p>
         </div>
 
-        {/* Audio element */}
-        <audio ref={audioRef} src={space.recording_url || ""} preload="metadata" />
+        {hasAudio ? (
+          <>
+            {/* Audio element */}
+            <audio ref={audioRef} src={space.recording_url!} preload="metadata" />
 
-        {/* Play button */}
-        <button onClick={togglePlay} disabled={loading}
-          className={cn(
-            "w-16 h-16 rounded-full flex items-center justify-center transition-all",
-            playing
-              ? "bg-white/10 border-2 border-white/20 text-white hover:bg-white/15"
-              : "bg-primary/20 border-2 border-primary/40 text-primary hover:bg-primary/30 shadow-[0_0_30px_rgba(var(--primary-rgb,190,242,100),0.2)]",
-            loading && "opacity-50"
-          )}
-        >
-          {loading ? (
-            <div className="h-6 w-6 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          ) : playing ? (
-            <Pause className="h-6 w-6" />
-          ) : (
-            <Play className="h-6 w-6 ml-0.5" />
-          )}
-        </button>
+            {/* Play button */}
+            <button onClick={togglePlay} disabled={loading}
+              className={cn(
+                "w-16 h-16 rounded-full flex items-center justify-center transition-all",
+                playing
+                  ? "bg-white/10 border-2 border-white/20 text-white hover:bg-white/15"
+                  : "bg-primary/20 border-2 border-primary/40 text-primary hover:bg-primary/30 shadow-[0_0_30px_rgba(var(--primary-rgb,190,242,100),0.2)]",
+                loading && "opacity-50"
+              )}
+            >
+              {loading ? (
+                <div className="h-6 w-6 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : playing ? (
+                <Pause className="h-6 w-6" />
+              ) : (
+                <Play className="h-6 w-6 ml-0.5" />
+              )}
+            </button>
 
-        {/* Progress bar */}
-        <div className="w-full max-w-sm space-y-2">
-          <input
-            type="range"
-            min={0}
-            max={duration || 1}
-            value={currentTime}
-            onChange={seek}
-            className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(var(--primary-rgb,190,242,100),0.5)]"
-            style={{ background: `linear-gradient(to right, hsl(var(--primary)) ${(currentTime / (duration || 1)) * 100}%, rgba(255,255,255,0.1) ${(currentTime / (duration || 1)) * 100}%)` }}
-          />
-          <div className="flex justify-between text-[10px] text-white/25 font-mono">
-            <span>{fmtTime(currentTime)}</span>
-            <span>{fmtTime(duration)}</span>
+            {/* Progress bar */}
+            <div className="w-full max-w-sm space-y-2">
+              <input
+                type="range"
+                min={0}
+                max={duration || 1}
+                value={currentTime}
+                onChange={seek}
+                className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(var(--primary-rgb,190,242,100),0.5)]"
+                style={{ background: `linear-gradient(to right, hsl(var(--primary)) ${(currentTime / (duration || 1)) * 100}%, rgba(255,255,255,0.1) ${(currentTime / (duration || 1)) * 100}%)` }}
+              />
+              <div className="flex justify-between text-[10px] text-white/25 font-mono">
+                <span>{fmtTime(currentTime)}</span>
+                <span>{fmtTime(duration)}</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* No recording available */
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
+              <Mic className="h-7 w-7 text-white/20" />
+            </div>
+            <p className="text-sm font-bold text-white/40">No recording available</p>
+            <p className="text-xs text-white/20 text-center max-w-xs">This space ended without saving a recording. Future spaces with recording enabled will be playable here.</p>
           </div>
-        </div>
+        )}
 
         {/* Stats */}
         <div className="flex items-center gap-4 text-[10px] text-white/20">
           {space.peak_listeners > 0 && <span className="flex items-center gap-1"><Headphones className="h-3 w-3" />{space.peak_listeners} peak listeners</span>}
           {space.speaker_count > 0 && <span className="flex items-center gap-1"><Mic className="h-3 w-3" />{space.speaker_count} speakers</span>}
           {space.duration_seconds && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatDuration(space.duration_seconds)}</span>}
+          {space.ended_at && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Ended {formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}</span>}
         </div>
       </div>
     </div>
@@ -1858,7 +1883,7 @@ const Spaces = () => {
                 ) : (
                   <div className="space-y-3">
                     {filteredPast.map(s => (
-                      <SpaceCard key={s.id} space={s} onJoin={s.recording_url ? setReplaySpace : () => {}} variant="past" />
+                      <SpaceCard key={s.id} space={s} onJoin={setReplaySpace} variant="past" />
                     ))}
                   </div>
                 )
