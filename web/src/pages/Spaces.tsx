@@ -820,12 +820,12 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
   useEffect(() => {
     if (!user) return;
     // Try RPC first, fall back to direct update
-    supabase.rpc("increment_listener", { space_id: space.id }).catch(() => {
-      supabase.from("spaces").update({ listener_count: (cur.listener_count || 0) + 1 }).eq("id", space.id).then(() => {});
+    supabase.rpc("increment_listener", { space_id: space.id }).then(({ error }) => {
+      if (error) supabase.from("spaces").update({ listener_count: (cur.listener_count || 0) + 1 }).eq("id", space.id);
     });
     return () => {
-      supabase.rpc("decrement_listener", { space_id: space.id }).catch(() => {
-        supabase.from("spaces").update({ listener_count: Math.max((cur.listener_count || 1) - 1, 0) }).eq("id", space.id).then(() => {});
+      supabase.rpc("decrement_listener", { space_id: space.id }).then(({ error }) => {
+        if (error) supabase.from("spaces").update({ listener_count: Math.max((cur.listener_count || 1) - 1, 0) }).eq("id", space.id);
       });
     };
   }, [space.id, user?.id]);
