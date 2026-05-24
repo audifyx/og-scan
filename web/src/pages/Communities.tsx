@@ -1221,6 +1221,68 @@ const Communities = () => {
 
   const joinCommunity = async () => {
     if (!user || !selected) return;
+
+    // ── Private: send a join request instead of auto-joining ──
+    if (selected.privacy === "private") {
+      // Check if already requested
+      const { data: existing } = await supabase.from("community_invites")
+        .select("id, status")
+        .eq("community_id", selected.id)
+        .eq("invited_user_id", user.id)
+        .maybeSingle();
+      if (existing) {
+        toast(existing.status === "accepted" ? "You already have an invite — joining now!" : "Join request already sent ⏳");
+        if (existing.status === "accepted") {
+          await supabase.from("community_members").insert({ community_id: selected.id, user_id: user.id, role: "member" });
+          setIsMember(true);
+          setJoinedIds(prev => new Set([...prev, selected.id]));
+          fetchMembers(selected.id);
+        }
+        return;
+      }
+      await supabase.from("community_invites").insert({
+        community_id: selected.id,
+        invited_user_id: user.id,
+        invited_by: selected.created_by,
+        invite_code: selected.invite_code || null,
+        status: "pending",
+      });
+      toast("Join request sent! The owner will review it 📬");
+      return;
+    }
+
+    // ── Invite-only: must have a valid invite or enter code ──
+    if (selected.privacy === "invite_only") {
+      const { data: invite } = await supabase.from("community_invites")
+        .select("id, status")
+        .eq("community_id", selected.id)
+        .eq("invited_user_id", user.id)
+        .in("status", ["pending", "accepted"])
+        .maybeSingle();
+      if (!invite) {
+        toast.error("This community is invite-only. Ask a member for an invite or use an invite code.");
+        return;
+      }
+      if (invite.status === "pending") {
+        await supabase.from("community_invites").update({ status: "accepted" }).eq("id", invite.id);
+      }
+      await supabase.from("community_members").insert({ community_id: selected.id, user_id: user.id, role: "member" });
+      setIsMember(true);
+      setJoinedIds(prev => new Set([...prev, selected.id]));
+      toast("Joined! 🎉");
+      fetchMembers(selected.id);
+      return;
+    }
+
+    // ── Holder-only: show requirement (on-chain verification is server-side) ──
+    if (selected.privacy === "holder_only") {
+      if (selected.required_token_symbol) {
+        toast.error(`This community requires holding ${selected.required_token_amount?.toLocaleString() ?? "some"} ${selected.required_token_symbol}. Connect your wallet to verify.`);
+        return;
+      }
+    }
+
+    // ── Public: join directly ──
     await supabase.from("community_members").insert({ community_id: selected.id, user_id: user.id, role: "member" });
     setIsMember(true);
     setJoinedIds(prev => new Set([...prev, selected.id]));

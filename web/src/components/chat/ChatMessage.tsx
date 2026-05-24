@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { safeAvatarUrl } from "@/lib/utils";
 
 interface Message {
   id: string;
@@ -245,8 +246,8 @@ export const ChatMessage = ({ message, onWalletClick, isOwnMessage }: ChatMessag
   return (
     <div className={`flex gap-3 ${isOwnMessage ? "flex-row-reverse" : ""}`}>
       <div className="p-2 rounded-full bg-muted h-fit">
-        {message.avatar_url ? (
-          <img src={message.avatar_url} alt="" className="h-5 w-5 rounded-full" />
+        {safeAvatarUrl(message.avatar_url) ? (
+          <img src={safeAvatarUrl(message.avatar_url)} alt="" className="h-5 w-5 rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
         ) : (
           <User className="h-5 w-5" />
         )}

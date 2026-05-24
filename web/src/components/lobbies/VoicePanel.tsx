@@ -3,6 +3,7 @@ import { Mic, MicOff, PhoneOff, Volume2, Users, Radio, Settings2 } from "lucide-
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
+import { safeAvatarUrl } from "@/lib/utils";
 
 interface VoicePanelProps {
   lobbyId: string;
@@ -275,9 +276,10 @@ export const VoicePanel = ({ lobbyId, lobbyName, autoJoin = true }: VoicePanelPr
                       : "border-border/30"
                   }`}>
                     <img
-                      src={p.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${p.username}`}
+                      src={safeAvatarUrl(p.avatar_url) || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${p.username}`}
                       className="w-full h-full rounded-full object-cover"
                       alt={p.username}
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=fallback`; }}
                     />
                     {p.is_muted && (
                       <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">

@@ -3,6 +3,7 @@ import { MessageSquare, Send } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { safeAvatarUrl } from "@/lib/utils";
 
 interface Message {
   id: string;
@@ -92,9 +93,10 @@ export const LobbyChat = ({ lobbyId }: { lobbyId: string }) => {
                 title={!isSelf ? `View @${msg.username}'s profile` : undefined}
               >
                 <img
-                  src={msg.avatar_url || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${msg.username}`}
-                  className="w-6 h-6 rounded-full border border-primary/20"
+                  src={safeAvatarUrl(msg.avatar_url) || `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${msg.username}`}
+                  className="w-6 h-6 rounded-full border border-primary/20 object-cover"
                   alt=""
+                  onError={(e) => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=fallback`; }}
                 />
               </button>
               <div className={`max-w-[75%] ${isSelf ? "text-right" : ""}`}>

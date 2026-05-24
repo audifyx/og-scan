@@ -1,10 +1,10 @@
 import {
-  Activity, Bell, Bot, Coins, Crown, Home, LineChart, LogOut,
+  Activity, Bell, Bot, Coins, Compass, Crown, Home, LineChart, LogOut,
   MessageSquare, Rocket, Search, Settings, Sparkles, Target, Trophy,
-  TrendingUp, User, Users, Wallet, Webhook, Wrench, X, Zap, Compass,
-  Globe2, Radio, Shield, Palette,
+  TrendingUp, User, Users, Wallet, Webhook, Wrench, X, Zap,
+  Globe2, Radio, Shield, Palette, Menu, Mic,
 } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -15,7 +15,7 @@ import { useState } from "react";
 
 type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; label: string; eyebrow: string };
 
-const scannerItems: NavItem[] = [
+const ogScanItems: NavItem[] = [
   { to: "/app",          icon: Home,          label: "Dashboard",       eyebrow: "OGScan home" },
   { to: "/scanner",      icon: Search,        label: "Truth Scan",      eyebrow: "Mint forensics" },
   { to: "/snipe-feed",   icon: Target,        label: "Launch Radar",    eyebrow: "New launches" },
@@ -24,6 +24,7 @@ const scannerItems: NavItem[] = [
   { to: "/communities",  icon: Globe2,        label: "Communities",     eyebrow: "Social hub" },
   { to: "/discover",     icon: Compass,       label: "Discover",        eyebrow: "Top traders" },
   { to: "/art",          icon: Palette,       label: "Memes",           eyebrow: "Art & vibes" },
+  { to: "/spaces",       icon: Mic,           label: "Spaces",          eyebrow: "Live audio rooms" },
 ];
 
 const solToolsItems: NavItem[] = [
@@ -38,49 +39,52 @@ const solToolsItems: NavItem[] = [
   { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
   { to: "/advanced-tools",  icon: Wrench,        label: "Advanced Tools",  eyebrow: "30+ pro tools" },
   { to: "/pumpv5",          icon: Rocket,        label: "Launch Pad",      eyebrow: "Token listings" },
+  { to: "/webhooks",        icon: Webhook,       label: "Webhooks",        eyebrow: "Push alerts" },
+  { to: "/notifications",   icon: Bell,          label: "Notifications",   eyebrow: "Your alerts" },
 ];
 
-const communityItems: NavItem[] = [
-  { to: "/notifications",   icon: Bell,          label: "Notifications",   eyebrow: "Your alerts" },
+const accountItems: NavItem[] = [
+  { to: "/profile",   icon: User,     label: "Profile",   eyebrow: "Your account" },
+  { to: "/settings",  icon: Settings, label: "Settings",  eyebrow: "Preferences" },
+  { to: "/credits",   icon: Coins,    label: "Credits",   eyebrow: "Balance" },
 ];
 
 // ── NavRow ────────────────────────────────────────────────────────────────
 
-const NavRow = ({ item }: { item: NavItem }) => (
-  <NavLink
-    to={item.to}
-    className={({ isActive }) =>
-      cn(
+const NavRow = ({ item }: { item: NavItem }) => {
+  const location = useLocation();
+  const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+
+  return (
+    <NavLink
+      to={item.to}
+      className={cn(
         "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
         isActive
           ? "bg-white/[0.09] text-white"
           : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
-      )
-    }
-  >
-    {({ isActive }) => (
-      <>
-        <span
-          className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition",
-            isActive
-              ? "border-og-lime/40 bg-og-lime/10 text-og-lime"
-              : "border-white/10 bg-white/[0.04]",
-          )}
-        >
-          <item.icon className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-semibold leading-tight">{item.label}</span>
-          <span className="block truncate text-[10px] text-white/35">{item.eyebrow}</span>
-        </span>
-        {isActive && (
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-lime" />
+      )}
+    >
+      <span
+        className={cn(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition",
+          isActive
+            ? "border-og-lime/40 bg-og-lime/10 text-og-lime"
+            : "border-white/10 bg-white/[0.04]",
         )}
-      </>
-    )}
-  </NavLink>
-);
+      >
+        <item.icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-semibold leading-tight">{item.label}</span>
+        <span className="block truncate text-[10px] text-white/35">{item.eyebrow}</span>
+      </span>
+      {isActive && (
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-lime" />
+      )}
+    </NavLink>
+  );
+};
 
 // ── Section label ─────────────────────────────────────────────────────────
 
@@ -110,6 +114,15 @@ export const Sidebar = () => {
           onClick={() => setMobileOpen(false)}
         />
       )}
+
+      {/* Mobile hamburger trigger */}
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        className="fixed left-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-xl bg-[#060c13]/90 border border-white/10 text-white/60 backdrop-blur-xl transition hover:bg-white/[0.08] hover:text-white lg:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
 
       {/* Sidebar panel */}
       <aside
@@ -141,15 +154,15 @@ export const Sidebar = () => {
 
         {/* Nav scrollable area */}
         <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
-          {/* Scanner / OGScan tools */}
+          {/* OGScan tools */}
           <div className="mb-1">
             <SectionLabel label="OGScan" />
             <div className="space-y-0.5">
-              {scannerItems.map((item) => <NavRow key={item.to} item={item} />)}
+              {ogScanItems.map((item) => <NavRow key={item.to} item={item} />)}
             </div>
           </div>
 
-          {/* SolTools features */}
+          {/* SolTools Features */}
           <div className="mb-1 mt-5">
             <SectionLabel label="SolTools Features" />
             <div className="space-y-0.5">
@@ -157,11 +170,11 @@ export const Sidebar = () => {
             </div>
           </div>
 
-          {/* Community */}
+          {/* Account */}
           <div className="mb-1 mt-5">
-            <SectionLabel label="Community" />
+            <SectionLabel label="Account" />
             <div className="space-y-0.5">
-              {communityItems.map((item) => <NavRow key={item.to} item={item} />)}
+              {accountItems.map((item) => <NavRow key={item.to} item={item} />)}
             </div>
           </div>
 
