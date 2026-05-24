@@ -612,9 +612,145 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   TRENDING BANNER — horizontal scroll of hot spaces
+   GRADIENT TAB — SocialHub-style gradient pill tab
    ═══════════════════════════════════════════════════════════════════════════════ */
 
+const GradientTab = ({ active, icon: Icon, label, onClick }: { active: boolean; icon: React.ComponentType<{ className?: string }>; label: string; onClick: () => void }) => (
+  <button onClick={onClick}
+    className={cn(
+      "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-black uppercase tracking-wider transition-all",
+      active
+        ? "bg-gradient-to-r from-emerald-500 to-yellow-400 text-black shadow-lg shadow-emerald-500/20"
+        : "text-white/40 hover:text-white/60 hover:bg-white/[0.03]"
+    )}>
+    <Icon className="h-4 w-4" />
+    {label}
+  </button>
+);
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   PERSON CARD — avatar card for people grid
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+const PersonCard = ({ username, avatarUrl, isYou, isSpeaking, online = true }: {
+  username: string | null;
+  avatarUrl: string | null;
+  isYou?: boolean;
+  isSpeaking?: boolean;
+  online?: boolean;
+}) => (
+  <div className={cn(
+    "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all",
+    isSpeaking ? "border-emerald-500/30 bg-emerald-500/[0.04]" : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]"
+  )}>
+    <div className="relative">
+      <div className={cn(
+        "w-14 h-14 rounded-full flex items-center justify-center overflow-hidden border-2",
+        isSpeaking ? "border-emerald-400/50 sp-pulse-ring" : "border-white/[0.08] bg-white/[0.04]"
+      )}>
+        {safAvatar(avatarUrl) ? (
+          <img src={safAvatar(avatarUrl)} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-lg font-bold text-white/20">{(username?.[0] || "?").toUpperCase()}</span>
+        )}
+      </div>
+      {online && (
+        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0f18]" />
+      )}
+    </div>
+    <span className="text-[11px] font-bold text-white/60 truncate max-w-[100px]">
+      {isYou ? `${username || "You"} (You)` : username || "User"}
+    </span>
+    {isSpeaking && <AudioEQ active bars={3} color="bg-emerald-400" />}
+  </div>
+);
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   ROOM CARD — voice room list item
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+const RoomCard = ({ space, onJoin }: { space: Space; onJoin: (s: Space) => void }) => {
+  const tm = topicOf(space.topic);
+  const total = (space.listener_count || 0) + (space.speaker_count || 0);
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] transition-all p-4">
+      <div className="flex items-start gap-3">
+        <div className={cn("shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-lg border", tm.color)}>
+          {tm.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <h3 className="font-bold text-[14px] text-white leading-tight line-clamp-1">{space.title}</h3>
+            {space.is_live && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20">
+                <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
+                <span className="text-[8px] font-bold text-red-400">LIVE</span>
+              </span>
+            )}
+          </div>
+          {space.description && <p className="text-[11px] text-white/25 line-clamp-1 mb-1.5">{space.description}</p>}
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-white/30">@{space.host_username || "host"}</span>
+            <span className="flex items-center gap-1 text-[10px] text-white/20"><Users className="h-3 w-3" />{total}</span>
+            {space.is_recording && <span className="flex items-center gap-1 text-[8px] text-red-400/50 font-bold"><div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />REC</span>}
+          </div>
+        </div>
+        <button onClick={() => onJoin(space)}
+          className="shrink-0 self-center px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-yellow-400 text-black text-[11px] font-black hover:shadow-lg hover:shadow-emerald-500/20 transition-all">
+          Join
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   PAST ROOM CARD — for replay section
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+const formatDuration = (sec: number | null): string => {
+  if (!sec) return "";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+};
+
+const PastRoomCard = ({ space, onPlay }: { space: Space; onPlay: (s: Space) => void }) => {
+  const tm = topicOf(space.topic);
+  const hasReplay = !!space.recording_url;
+  return (
+    <div className={cn(
+      "rounded-2xl border p-4 transition-all",
+      hasReplay ? "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] cursor-pointer" : "border-white/[0.04] bg-white/[0.01] opacity-40"
+    )} onClick={() => hasReplay && onPlay(space)}>
+      <div className="flex items-center gap-3">
+        <div className={cn("shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-base border", tm.color)}>
+          {tm.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-[13px] text-white line-clamp-1">{space.title}</h3>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[10px] text-white/20">@{space.host_username || "host"}</span>
+            {space.ended_at && <span className="text-[9px] text-white/15">{formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}</span>}
+            {hasReplay && <span className="text-[9px] text-primary/60 font-bold">{space.duration_seconds ? formatDuration(space.duration_seconds) : "Replay"}</span>}
+          </div>
+        </div>
+        {hasReplay && (
+          <div className="shrink-0 w-10 h-10 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center hover:bg-primary/20 transition-colors">
+            <Play className="h-4 w-4 text-primary ml-0.5" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   UNUSED — kept for compat (referenced nowhere now)
+   ═══════════════════════════════════════════════════════════════════════════════ */
 const TrendingBanner = ({ spaces, onJoin }: { spaces: Space[]; onJoin: (s: Space) => void }) => {
   if (spaces.length === 0) return null;
   const top = spaces[0];
@@ -960,10 +1096,10 @@ const SpeakerQueue = ({ spaceId, isHost, onRaiseHand, hasRaised }: { spaceId: st
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SPACE ROOM — Full immersive experience
+   SPACE ROOM — SocialHub-style clean room view
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () => void; onMinimize?: () => void }) => {
+const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) => {
   const { user, profile } = useAuth();
   const [muted, setMuted] = useState(true);
   const [hasRaised, setHasRaised] = useState(false);
@@ -1042,63 +1178,45 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
     setPoll({ ...poll, votedIndex: idx, options: poll.options.map((o, i) => i === idx ? { ...o, votes: o.votes + 1 } : o) });
   };
 
+  const totalInRoom = voiceParticipants.length || ((cur.listener_count || 0) + (cur.speaker_count || 0));
+
   return (
     <div className="flex flex-col h-full min-h-0 relative">
       <SpaceStyles />
       <ReactionOverlay items={reactions} />
 
-      {/* ── Animated gradient background ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-72 bg-gradient-to-b from-primary/[0.06] via-violet-900/[0.04] to-transparent sp-gradient-bg" />
-        <div className="absolute -top-20 -left-20 w-64 h-64 rounded-full bg-primary/[0.04] blur-[80px] sp-glow" />
-        <div className="absolute -top-10 -right-20 w-48 h-48 rounded-full bg-violet-500/[0.04] blur-[60px] sp-glow" style={{ animationDelay: "1.2s" }} />
-      </div>
-
-      {/* ── Room Header ── */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] bg-[#070d14]/80 backdrop-blur-xl z-10 shrink-0 relative">
-        <button onClick={onLeave} className="p-2 rounded-full hover:bg-white/10 transition"><ArrowLeft className="h-4 w-4 text-white/50" /></button>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-black text-sm text-white truncate">{cur.title}</h3>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className={cn("inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border", tm.color)}>{tm.icon} {cur.topic}</span>
-            <span className="text-[10px] text-white/15">·</span>
-            <span className="flex items-center gap-0.5 text-[10px] text-white/25"><Headphones className="h-2.5 w-2.5" />{(cur.listener_count || 0) + (cur.speaker_count || 0)}</span>
-            {cur.peak_listeners > 5 && <><span className="text-[10px] text-white/15">·</span><span className="text-[10px] text-white/15">Peak: {cur.peak_listeners}</span></>}
+      {/* ── Room Header — SocialHub style ── */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] shrink-0">
+        <button onClick={onLeave} className="text-emerald-400 text-sm font-bold flex items-center gap-1 hover:text-emerald-300 transition">
+          <ArrowLeft className="h-4 w-4" /> Leave
+        </button>
+        <div className="flex-1 min-w-0 ml-2">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+            <h3 className="font-black text-sm text-white uppercase tracking-wide truncate">{cur.title}</h3>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5 ml-[18px]">
+            <Globe className="h-3 w-3 text-white/20" />
+            <span className="text-[11px] text-white/30">{cur.is_private ? "private" : "public"} · {totalInRoom} connected</span>
+            {cur.is_recording && <span className="flex items-center gap-1 text-[9px] text-red-400/60 font-bold"><div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />REC</span>}
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20">
+        <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/10 border border-red-500/20">
             <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
             <LiveTimer startedAt={cur.created_at} />
           </div>
-          <button onClick={share} className="p-2 rounded-full hover:bg-white/10 transition" title="Share"><Share2 className="h-4 w-4 text-white/30" /></button>
-          {onMinimize && <button onClick={onMinimize} className="p-2 rounded-full hover:bg-white/10 transition" title="Minimize"><Minimize2 className="h-4 w-4 text-white/30" /></button>}
           {isHost && (
             <div className="relative">
-              <button onClick={() => setShowMore(!showMore)} className="p-2 rounded-full hover:bg-white/10 transition"><MoreVertical className="h-4 w-4 text-white/30" /></button>
+              <button onClick={() => setShowMore(!showMore)} className="p-2 rounded-xl hover:bg-white/[0.05] transition"><MoreVertical className="h-4 w-4 text-white/30" /></button>
               {showMore && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setShowMore(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-56 bg-[#0c1219] border border-white/[0.08] rounded-xl shadow-2xl z-30 overflow-hidden sp-slide-up">
-                    <button onClick={() => { setShowHostPanel(!showHostPanel); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-primary hover:bg-primary/5 transition">
-                      <Shield className="h-4 w-4" /> Host Controls
-                    </button>
-                    <button onClick={() => { setShowPollCreate(true); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition">
-                      <BarChart3 className="h-4 w-4" /> Create Poll
-                    </button>
-                    <button onClick={() => { setPinnedMsg(null); supabase.from("spaces").update({ pinned_message: null }).eq("id", space.id); setShowMore(false); }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition">
-                      <PinOff className="h-4 w-4" /> Clear Pin
-                    </button>
-                    <button onClick={() => { setSlowMode(!slowMode); setShowMore(false); }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition">
-                      <Clock className="h-4 w-4" /> {slowMode ? "Disable" : "Enable"} Slow Mode
-                    </button>
+                  <div className="absolute right-0 top-full mt-1 w-52 bg-[#0c1219] border border-white/[0.08] rounded-xl shadow-2xl z-30 overflow-hidden sp-slide-up">
+                    <button onClick={() => { setShowHostPanel(!showHostPanel); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-primary hover:bg-primary/5 transition"><Shield className="h-4 w-4" /> Host Controls</button>
+                    <button onClick={() => { setShowPollCreate(true); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition"><BarChart3 className="h-4 w-4" /> Create Poll</button>
                     <div className="border-t border-white/[0.06]" />
-                    <button onClick={() => { endSpace(); setShowMore(false); }}
-                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition">
-                      <StopCircle className="h-4 w-4" /> End Space
-                    </button>
+                    <button onClick={() => { endSpace(); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition"><StopCircle className="h-4 w-4" /> End Room</button>
                   </div>
                 </>
               )}
@@ -1116,142 +1234,92 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
         </div>
       )}
 
-      {/* ── Recording indicator ── */}
-      {cur.is_recording && (
-        <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/[0.04] border border-red-500/15 w-fit shrink-0">
-          <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" /><span className="text-[10px] font-bold text-red-400/60">Recording</span>
-        </div>
-      )}
-
       {/* ── Poll ── */}
       {poll && <LivePollWidget poll={poll} onVote={votePoll} onClose={() => setPoll({ ...poll, closed: true })} isHost={isHost} />}
-
-      {/* ── Create Poll Modal (inline) ── */}
       {showPollCreate && <CreatePollInline onCreate={p => { setPoll(p); setShowPollCreate(false); }} onCancel={() => setShowPollCreate(false)} />}
 
       {/* ── Host Controls Panel ── */}
       {isHost && showHostPanel && (
-        <div className="mx-4 mt-2 rounded-2xl border border-primary/15 bg-primary/[0.02] p-4 sp-slide-up space-y-3">
+        <div className="mx-4 mt-3 rounded-2xl border border-primary/15 bg-primary/[0.02] p-4 sp-slide-up space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold text-primary flex items-center gap-2"><Shield className="h-4 w-4" /> Host Controls</p>
             <button onClick={() => setShowHostPanel(false)} className="p-1 rounded hover:bg-white/10"><XIcon className="h-3 w-3 text-white/25" /></button>
           </div>
-
-          {/* Speakers Management */}
           <div>
-            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">
-              Speakers ({voiceParticipants.filter(p => p.role === "speaker").length}/{MAX_SPEAKERS})
-            </p>
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">Speakers ({voiceParticipants.filter(p => p.role === "speaker").length}/{MAX_SPEAKERS})</p>
             <div className="space-y-1.5">
               {voiceParticipants.filter(p => p.role === "speaker").map(p => (
                 <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
                   <div className="w-7 h-7 rounded-full bg-white/[0.05] border border-white/[0.08] overflow-hidden flex items-center justify-center">
-                    {safAvatar(p.avatar_url) ? <img src={safAvatar(p.avatar_url)} alt="" className="w-full h-full object-cover" /> :
-                      <span className="text-[9px] font-bold text-white/30">{p.username?.[0]?.toUpperCase() || "?"}</span>}
+                    {safAvatar(p.avatar_url) ? <img src={safAvatar(p.avatar_url)} alt="" className="w-full h-full object-cover" /> : <span className="text-[9px] font-bold text-white/30">{p.username?.[0]?.toUpperCase() || "?"}</span>}
                   </div>
-                  <span className="text-[11px] text-white/60 font-medium flex-1 truncate">
-                    {p.username || "User"}
-                    {p.user_id === space.host_id && <Crown className="h-3 w-3 text-amber-400 inline ml-1" />}
-                  </span>
+                  <span className="text-[11px] text-white/60 font-medium flex-1 truncate">{p.username || "User"}{p.user_id === space.host_id && <Crown className="h-3 w-3 text-amber-400 inline ml-1" />}</span>
                   {p.user_id !== space.host_id && p.user_id !== user?.id && (
                     <div className="flex gap-1">
-                      <button onClick={() => voicePanelRef.current?.muteUser(p.user_id)}
-                        className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/15 hover:bg-red-500/20">
-                        Mute
-                      </button>
-                      <button onClick={() => voicePanelRef.current?.demoteToListener(p.user_id)}
-                        className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-white/[0.04] text-white/40 border border-white/[0.08] hover:bg-white/[0.08]">
-                        Demote
-                      </button>
+                      <button onClick={() => voicePanelRef.current?.muteUser(p.user_id)} className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/15 hover:bg-red-500/20">Mute</button>
+                      <button onClick={() => voicePanelRef.current?.demoteToListener(p.user_id)} className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-white/[0.04] text-white/40 border border-white/[0.08] hover:bg-white/[0.08]">Demote</button>
                     </div>
                   )}
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Listeners — promote */}
           {voiceParticipants.filter(p => p.role === "listener").length > 0 && (
             <div>
-              <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">
-                Listeners ({voiceParticipants.filter(p => p.role === "listener").length})
-              </p>
+              <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">Listeners ({voiceParticipants.filter(p => p.role === "listener").length})</p>
               <div className="space-y-1.5 max-h-32 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
                 {voiceParticipants.filter(p => p.role === "listener").map(p => (
                   <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
                     <div className="w-6 h-6 rounded-full bg-white/[0.05] border border-white/[0.06] overflow-hidden flex items-center justify-center">
-                      {safAvatar(p.avatar_url) ? <img src={safAvatar(p.avatar_url)} alt="" className="w-full h-full object-cover" /> :
-                        <span className="text-[8px] font-bold text-white/20">{p.username?.[0]?.toUpperCase() || "?"}</span>}
+                      {safAvatar(p.avatar_url) ? <img src={safAvatar(p.avatar_url)} alt="" className="w-full h-full object-cover" /> : <span className="text-[8px] font-bold text-white/20">{p.username?.[0]?.toUpperCase() || "?"}</span>}
                     </div>
                     <span className="text-[10px] text-white/40 font-medium flex-1 truncate">{p.username || "User"}</span>
                     {voiceParticipants.filter(pp => pp.role === "speaker").length < MAX_SPEAKERS && (
-                      <button onClick={() => voicePanelRef.current?.promoteToSpeaker(p.user_id)}
-                        className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 hover:bg-emerald-500/20">
-                        <UserPlus className="h-3 w-3 inline mr-0.5" />Promote
-                      </button>
+                      <button onClick={() => voicePanelRef.current?.promoteToSpeaker(p.user_id)} className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/15"><UserPlus className="h-3 w-3 inline mr-0.5" />Promote</button>
                     )}
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          {/* Announcement */}
-          <div>
-            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-1.5">Send Announcement</p>
-            <div className="flex gap-2">
-              <Input placeholder="Type announcement..." value={announcement} onChange={e => setAnnouncement(e.target.value)}
-                className="bg-white/[0.04] border-white/[0.06] rounded-lg text-sm h-8 flex-1" />
-              <Button size="sm" disabled={!announcement.trim()} onClick={() => {
-                setPinnedMsg(announcement.trim());
-                supabase.from("spaces").update({ pinned_message: announcement.trim() }).eq("id", space.id);
-                setAnnouncement("");
-              }} className="rounded-lg h-8 px-3 text-[10px]">Pin</Button>
-            </div>
-          </div>
-
-          {/* Quick actions */}
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={() => setSlowMode(!slowMode)}
-              className={cn("px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all",
-                slowMode ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : "bg-white/[0.03] text-white/30 border-white/[0.08] hover:border-white/[0.12]"
-              )}>
-              <Clock className="h-3 w-3 inline mr-1" />{slowMode ? "Slow Mode ON" : "Slow Mode"}
-            </button>
+          <div className="flex gap-2">
+            <Input placeholder="Announcement..." value={announcement} onChange={e => setAnnouncement(e.target.value)} className="bg-white/[0.04] border-white/[0.06] rounded-lg text-sm h-8 flex-1" />
+            <Button size="sm" disabled={!announcement.trim()} onClick={() => { setPinnedMsg(announcement.trim()); supabase.from("spaces").update({ pinned_message: announcement.trim() }).eq("id", space.id); setAnnouncement(""); }} className="rounded-lg h-8 px-3 text-[10px]">Pin</Button>
           </div>
         </div>
       )}
 
-      {/* ── Main Content ── */}
-      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0 relative">
-        {/* Left: Voice / Speakers */}
+      {/* ── Main content: IN ROOM grid ── */}
+      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
         <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0" style={{ scrollbarWidth: "none" }}>
-          {/* Host card */}
-          <div className="mb-5">
-            <p className="text-[10px] font-black text-white/25 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
-              <Crown className="h-3 w-3 text-amber-400" /> Host
-            </p>
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-primary/[0.06] via-violet-900/[0.03] to-transparent border border-primary/15 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/[0.03] to-transparent" />
-              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/30 to-violet-600/30 border-2 border-primary/30 flex items-center justify-center font-black text-xl overflow-hidden sp-pulse-ring">
-                {safAvatar(cur.host_avatar) ? <img src={safAvatar(cur.host_avatar)} alt="" className="w-full h-full object-cover rounded-2xl" /> : <span>{cur.host_username?.[0]?.toUpperCase() ?? "H"}</span>}
-              </div>
-              <div className="flex-1 relative">
-                <p className="font-black text-sm text-white">{cur.host_username ? `@${cur.host_username}` : "Host"}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Mic className="h-3 w-3 text-emerald-400" />
-                  <span className="text-[10px] text-emerald-400 font-bold">Speaking</span>
-                  <AudioEQ active color="bg-emerald-400" bars={5} />
-                </div>
-              </div>
-            </div>
+          {/* Section header */}
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-white/[0.06]">
+            <Users className="h-4 w-4 text-white/30" />
+            <span className="text-[12px] font-black text-white/40 uppercase tracking-widest">In Room ({totalInRoom})</span>
           </div>
 
-          {/* Voice panel */}
-          <div className="mb-5">
-            <p className="text-[10px] font-black text-white/25 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
-              <Mic className="h-3 w-3" /> Speakers · {voiceParticipants.filter(p => p.role === "speaker").length}/{MAX_SPEAKERS}
-            </p>
+          {/* Avatar grid — matching SocialHub style */}
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+            {/* All participants as PersonCards */}
+            {voiceParticipants.map((p, i) => (
+              <PersonCard
+                key={p.id}
+                username={p.username}
+                avatarUrl={p.avatar_url}
+                isYou={p.user_id === user?.id}
+                isSpeaking={p.role === "speaker" && !p.muted}
+              />
+            ))}
+            {voiceParticipants.length === 0 && (
+              <div className="col-span-full text-center py-8">
+                <Users className="h-8 w-8 mx-auto text-white/[0.06] mb-2" />
+                <p className="text-[11px] text-white/15">Waiting for people to join...</p>
+              </div>
+            )}
+          </div>
+
+          {/* Hidden VoicePanel — provides WebRTC functionality */}
+          <div className="hidden">
             <VoicePanel
               ref={voicePanelRef}
               lobbyId={`space-${space.id}`}
@@ -1268,61 +1336,21 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
             />
           </div>
 
-          {/* Speaker queue */}
-          <div className="mb-5">
+          {/* Speaker queue (only for non-hosts or pending requests) */}
+          <div className="mt-4">
             <SpeakerQueue spaceId={space.id} isHost={isHost} onRaiseHand={raiseHand} hasRaised={hasRaised} />
           </div>
 
-          {/* Listeners */}
-          <div className="mb-5">
-            <p className="text-[10px] font-black text-white/25 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
-              <Headphones className="h-3 w-3" /> Listeners · {voiceParticipants.filter(p => p.role === "listener").length || cur.listener_count || 0}
-            </p>
-            <div className="grid grid-cols-6 sm:grid-cols-8 gap-2.5">
-              {voiceParticipants.filter(p => p.role === "listener").slice(0, 16).map((p, i) => (
-                <div key={p.id} className="flex flex-col items-center gap-1 sp-slide-up" style={{ animationDelay: `${i * 0.03}s` }}>
-                  <div className={cn("w-10 h-10 rounded-xl border-2 flex items-center justify-center font-bold text-sm overflow-hidden",
-                    p.user_id === user?.id ? "bg-primary/10 border-primary/25" : "bg-white/[0.03] border-white/[0.06]"
-                  )}>
-                    {safAvatar(p.avatar_url)
-                      ? <img src={safAvatar(p.avatar_url)} alt="" className="w-full h-full object-cover rounded-xl" />
-                      : <span className={cn("text-[10px] font-bold", p.user_id === user?.id ? "text-primary" : "text-white/20")}>{p.username?.[0]?.toUpperCase() ?? "?"}</span>}
-                  </div>
-                  <span className={cn("text-[9px] font-bold truncate max-w-[48px]",
-                    p.user_id === user?.id ? "text-primary/60" : "text-white/[0.15]"
-                  )}>{p.user_id === user?.id ? "You" : p.username || "Listener"}</span>
-                </div>
-              ))}
-              {voiceParticipants.filter(p => p.role === "listener").length > 16 && (
-                <div className="flex flex-col items-center gap-1">
-                  <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
-                    <span className="text-[10px] font-bold text-white/15">+{voiceParticipants.filter(p => p.role === "listener").length - 16}</span>
-                  </div>
-                </div>
-              )}
-              {voiceParticipants.filter(p => p.role === "listener").length === 0 && (
-                <div className="col-span-6 text-center py-2">
-                  <p className="text-[10px] text-white/10">No listeners yet</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* About */}
+          {/* About section */}
           {cur.description && (
-            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] mb-4">
-              <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-1.5">About this Space</p>
+            <div className="mt-4 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+              <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-1.5">About</p>
               <p className="text-[12px] text-white/40 leading-relaxed">{cur.description}</p>
-            </div>
-          )}
-          {cur.tags && cur.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-4">
-              {cur.tags.map(t => <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.03] text-white/20 border border-white/[0.05]">#{t}</span>)}
             </div>
           )}
         </div>
 
-        {/* Right: Chat panel */}
+        {/* Chat panel (side on desktop, bottom on mobile) */}
         <div className={cn("border-t lg:border-t-0 lg:border-l border-white/[0.06] flex flex-col transition-all",
           showChat ? "h-[45vh] lg:h-auto lg:w-80" : "h-0 lg:h-auto lg:w-0 overflow-hidden")}>
           {showChat && (
@@ -1337,81 +1365,82 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
         </div>
       </div>
 
-      {/* ── Bottom Controls ── */}
-      <div className="px-4 pb-4 pt-3 border-t border-white/[0.06] shrink-0 bg-[#070d14]/90 backdrop-blur-xl relative z-10">
-        {/* Role indicator */}
-        <div className={cn("mb-2 px-3 py-1.5 rounded-full text-center text-[10px] font-bold border",
-          myRole === "speaker"
-            ? (muted ? "bg-red-500/5 border-red-500/15 text-red-400/70" : "bg-emerald-500/5 border-emerald-500/15 text-emerald-400/80")
-            : "bg-blue-500/5 border-blue-500/15 text-blue-400/70"
-        )}>
-          {myRole === "speaker"
-            ? (muted ? "🔇 You are muted — tap unmute to talk" : "🎤 You are live — others can hear you")
-            : `🎧 Listening${voiceParticipants.filter(p => p.role === "speaker").length < MAX_SPEAKERS ? " — raise hand to speak" : ""}`}
-        </div>
-
-        {/* Live mic waveform visualizer */}
-        {myRole === "speaker" && (
-          <div className="mb-2.5">
-            <MicVisualizer active={!muted} />
-          </div>
+      {/* ── Bottom Controls — SocialHub-style rounded squares ── */}
+      <div className="px-4 pb-6 pt-4 shrink-0 relative z-10">
+        {/* Mic visualizer when speaking */}
+        {myRole === "speaker" && !muted && (
+          <div className="mb-3"><MicVisualizer active={true} /></div>
         )}
 
-        {/* Reactions */}
-        <div className="flex items-center gap-1.5 mb-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          {REACTION_EMOJIS.map(e => (
+        {/* Reactions row */}
+        <div className="flex items-center gap-1.5 mb-3 overflow-x-auto justify-center" style={{ scrollbarWidth: "none" }}>
+          {REACTION_EMOJIS.slice(0, 6).map(e => (
             <button key={e} onClick={() => react(e)}
-              className="flex items-center justify-center w-9 h-9 rounded-full bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.08] hover:scale-110 active:scale-90 transition-all text-lg shrink-0">
+              className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.08] hover:scale-110 active:scale-90 transition-all text-lg shrink-0">
               {e}
             </button>
           ))}
         </div>
-        {/* Controls */}
-        <div className="flex items-center justify-between gap-3">
+
+        {/* Main controls — centered rounded squares */}
+        <div className="flex items-center justify-center gap-3">
+          {/* Mic toggle */}
           {myRole === "speaker" ? (
             <button onClick={() => { setMuted(v => !v); toast(muted ? "Unmuted 🎙️" : "Muted 🔇"); }}
-              className={cn("flex items-center gap-2 px-5 h-11 rounded-full font-bold text-sm transition-all",
-                muted ? "bg-white/[0.06] text-white/50 hover:bg-white/[0.1] border border-white/[0.08]" : "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 border border-emerald-400/30"
+              className={cn(
+                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
+                muted
+                  ? "bg-white/[0.06] border border-white/[0.08] text-white/50 hover:bg-white/[0.1]"
+                  : "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10"
               )}>
-              {muted ? <><MicOff className="h-4 w-4" />Unmute</> : <><Mic className="h-4 w-4" /><AudioEQ active color="bg-white" bars={3} /></>}
+              {muted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </button>
           ) : (
             <button onClick={raiseHand} disabled={hasRaised}
-              className={cn("flex items-center gap-2 px-5 h-11 rounded-full font-bold text-sm transition-all",
-                hasRaised ? "bg-amber-400/15 text-amber-400 border border-amber-400/25" : "bg-white/[0.06] text-white/50 hover:bg-white/[0.1] border border-white/[0.08]"
+              className={cn(
+                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
+                hasRaised
+                  ? "bg-amber-400/15 border border-amber-400/25 text-amber-400"
+                  : "bg-white/[0.06] border border-white/[0.08] text-white/50 hover:bg-white/[0.1]"
               )}>
-              <Hand className={cn("h-4 w-4", hasRaised && "animate-bounce")} />
-              {hasRaised ? "Hand Raised ✋" : "Raise Hand"}
+              <Hand className={cn("h-5 w-5", hasRaised && "animate-bounce")} />
             </button>
           )}
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowChat(!showChat)}
-              className={cn("h-11 w-11 rounded-full flex items-center justify-center transition-all border",
-                showChat ? "bg-primary/15 border-primary/30 text-primary" : "bg-white/[0.04] border-white/[0.08] text-white/30 hover:bg-white/[0.08]"
-              )} title="Chat">
-              <MessageSquare className="h-4 w-4" />
+
+          {/* Chat */}
+          <button onClick={() => setShowChat(!showChat)}
+            className={cn(
+              "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
+              showChat
+                ? "bg-primary/15 border border-primary/30 text-primary"
+                : "bg-white/[0.06] border border-white/[0.08] text-white/40 hover:bg-white/[0.1]"
+            )}>
+            <MessageSquare className="h-5 w-5" />
+          </button>
+
+          {/* Host controls / Sparkle effects */}
+          {isHost ? (
+            <button onClick={() => setShowHostPanel(!showHostPanel)}
+              className={cn(
+                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
+                showHostPanel
+                  ? "bg-primary/15 border border-primary/30 text-primary"
+                  : "bg-white/[0.06] border border-white/[0.08] text-white/40 hover:bg-white/[0.1]"
+              )}>
+              <Sparkles className="h-5 w-5" />
             </button>
-            {isHost && (
-              <button onClick={() => setShowHostPanel(!showHostPanel)}
-                className={cn("h-11 w-11 rounded-full flex items-center justify-center transition-all border",
-                  showHostPanel ? "bg-primary/15 border-primary/30 text-primary" : "bg-white/[0.04] border-white/[0.08] text-white/30 hover:bg-white/[0.08]"
-                )} title="Host Controls">
-                <Shield className="h-4 w-4" />
-              </button>
-            )}
-            {!isHost && myRole === "speaker" && (
-              <button onClick={raiseHand}
-                className={cn("h-11 w-11 rounded-full flex items-center justify-center transition-all border",
-                  hasRaised ? "bg-amber-400/15 border-amber-400/25 text-amber-400" : "bg-white/[0.04] border-white/[0.08] text-white/30 hover:bg-white/[0.08]"
-                )} title="Raise hand">
-                <Hand className="h-4 w-4" />
-              </button>
-            )}
-            <button onClick={onLeave}
-              className="h-11 px-5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 font-bold text-sm hover:bg-red-500/15 transition flex items-center gap-1.5">
-              Leave
+          ) : (
+            <button onClick={share}
+              className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/[0.06] border border-white/[0.08] text-white/40 hover:bg-white/[0.1] transition-all">
+              <Share2 className="h-5 w-5" />
             </button>
-          </div>
+          )}
+
+          {/* Leave — red */}
+          <button onClick={onLeave}
+            className="w-14 h-14 rounded-2xl flex items-center justify-center bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all">
+            <XIcon className="h-5 w-5" />
+          </button>
         </div>
       </div>
     </div>
@@ -1607,18 +1636,23 @@ const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void })
 };
 
 const EmptyState = ({ icon: Icon, title, sub, action }: { icon: React.ComponentType<{ className?: string }>; title: string; sub: string; action?: { label: string; onClick: () => void } }) => (
-  <div className="text-center py-20">
-    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/[0.05] mb-4">
-      <Icon className="h-8 w-8 text-white/[0.06]" />
+  <div className="flex flex-col items-center justify-center py-16">
+    <div className="w-16 h-16 rounded-full bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
+      <Icon className="h-7 w-7 text-white/[0.08]" />
     </div>
-    <p className="font-bold text-white/25 text-sm">{title}</p>
-    <p className="text-[12px] text-white/15 mt-1">{sub}</p>
-    {action && <Button onClick={action.onClick} className="mt-5 rounded-full btn-3d gap-2 text-sm"><Mic className="h-4 w-4" />{action.label}</Button>}
+    <p className="font-black text-white/25 text-sm uppercase tracking-wider">{title}</p>
+    <p className="text-[12px] text-white/15 mt-1 text-center max-w-xs">{sub}</p>
+    {action && (
+      <button onClick={action.onClick}
+        className="mt-5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-yellow-400 text-black text-sm font-black hover:shadow-lg hover:shadow-emerald-500/20 transition-all flex items-center gap-2">
+        <Plus className="h-4 w-4" />{action.label}
+      </button>
+    )}
   </div>
 );
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   MAIN SPACES PAGE
+   MAIN SPACES PAGE — SocialHub-style with LOBBY / PEOPLE / ROOMS
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 const Spaces = () => {
@@ -1628,12 +1662,13 @@ const Spaces = () => {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [activeSpace, setActiveSpace] = useState<Space | null>(null);
-  const [minimizedSpace, setMinimizedSpace] = useState<Space | null>(null);
-  const [topicFilter, setTopicFilter] = useState<string | null>(null);
-  const [tab, setTab] = useState<"live" | "scheduled" | "past">("live");
+  const [subTab, setSubTab] = useState<"lobby" | "people" | "rooms">("lobby");
+  const [inLobby, setInLobby] = useState(false);
   const [search, setSearch] = useState("");
-  const [showSearch, setShowSearch] = useState(false);
   const [replaySpace, setReplaySpace] = useState<Space | null>(null);
+  const [lobbyParticipants, setLobbyParticipants] = useState<VoiceParticipant[]>([]);
+  const [lobbyMuted, setLobbyMuted] = useState(true);
+  const lobbyVoiceRef = useRef<VoicePanelHandle>(null);
 
   const fetchSpaces = useCallback(async () => {
     try {
@@ -1663,36 +1698,30 @@ const Spaces = () => {
     if (j) { const s = spaces.find(x => x.id === j); if (s) setActiveSpace(s); }
   }, [spaces]);
 
-  const handleCreated = (s: Space) => { if (s.is_live) { setSpaces(prev => [s, ...prev]); setActiveSpace(s); } else { setSpaces(prev => [s, ...prev]); setTab("scheduled"); } };
-
-  const startScheduled = async (s: Space) => {
-    await supabase.from("spaces").update({ is_live: true, scheduled_for: null }).eq("id", s.id);
-    toast.success("Space is now live! 🎙️"); fetchSpaces();
-    setActiveSpace({ ...s, is_live: true, scheduled_for: null });
+  const handleCreated = (s: Space) => {
+    if (s.is_live) { setSpaces(prev => [s, ...prev]); setActiveSpace(s); }
+    else { setSpaces(prev => [s, ...prev]); setSubTab("rooms"); }
   };
 
-  const matchSearch = (s: Space) => {
-    if (!search.trim()) return true;
+  const liveRooms = useMemo(() => spaces.filter(s => s.is_live), [spaces]);
+  const scheduledRooms = useMemo(() => spaces.filter(s => !s.is_live && !s.ended_at), [spaces]);
+  const endedRooms = useMemo(() => pastSpaces, [pastSpaces]);
+  const allRooms = useMemo(() => [...liveRooms, ...scheduledRooms], [liveRooms, scheduledRooms]);
+  const filteredRooms = useMemo(() => {
+    if (!search.trim()) return allRooms;
     const q = search.toLowerCase();
-    return s.title.toLowerCase().includes(q) || (s.description?.toLowerCase().includes(q)) || (s.topic?.toLowerCase().includes(q)) || (s.host_username?.toLowerCase().includes(q)) || (s.tags?.some(t => t.toLowerCase().includes(q)));
-  };
-  const matchTopic = (s: Space) => !topicFilter || s.topic === topicFilter;
+    return allRooms.filter(s => s.title.toLowerCase().includes(q) || s.host_username?.toLowerCase().includes(q) || s.topic?.toLowerCase().includes(q));
+  }, [allRooms, search]);
 
-  const live = useMemo(() => spaces.filter(s => s.is_live && matchTopic(s) && matchSearch(s)), [spaces, topicFilter, search]);
-  const scheduled = useMemo(() => spaces.filter(s => !s.is_live && !s.ended_at && matchTopic(s) && matchSearch(s)), [spaces, topicFilter, search]);
-  const ended = useMemo(() => pastSpaces.filter(s => matchTopic(s) && matchSearch(s)), [pastSpaces, topicFilter, search]);
-  const totalListening = live.reduce((a, s) => a + (s.listener_count || 0) + (s.speaker_count || 0), 0);
+  const lobbyCount = lobbyParticipants.length || 0;
 
   // ── Replay player ──
-  if (replaySpace) return (
-    <ReplayPlayer space={replaySpace} onClose={() => { setReplaySpace(null); }} />
-  );
+  if (replaySpace) return <ReplayPlayer space={replaySpace} onClose={() => setReplaySpace(null)} />;
 
-  // ── Active room ──
+  // ── Active room (custom space) ──
   if (activeSpace) return (
     <SpaceRoom space={activeSpace}
-      onLeave={() => { setActiveSpace(null); setMinimizedSpace(null); fetchSpaces(); }}
-      onMinimize={() => { setMinimizedSpace(activeSpace); setActiveSpace(null); }} />
+      onLeave={() => { setActiveSpace(null); fetchSpaces(); }} />
   );
 
   // ── Main view ──
@@ -1700,105 +1729,213 @@ const Spaces = () => {
     <div className="relative">
       <SpaceStyles />
 
-      {/* ── Top toolbar: tabs + actions ── */}
-      <div className="flex items-center justify-between mb-3">
-        {/* Tabs inline */}
-        <div className="flex items-center gap-1">
-          {([
-            { key: "live" as const, label: "Live", count: live.length, pulse: live.length > 0 },
-            { key: "scheduled" as const, label: "Upcoming", count: scheduled.length, pulse: false },
-            { key: "past" as const, label: "Replay", count: ended.length, pulse: false },
-          ]).map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={cn("px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5",
-                tab === t.key
-                  ? "bg-white/[0.08] text-white"
-                  : "text-white/30 hover:text-white/50 hover:bg-white/[0.03]"
-              )}>
-              {t.pulse && <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>}
-              {t.label}
-              {t.count > 0 && <span className={cn("text-[9px] px-1.5 rounded-full font-bold min-w-[18px] text-center",
-                tab === t.key ? "bg-primary/20 text-primary" : "bg-white/[0.04] text-white/15"
-              )}>{t.count}</span>}
+      {/* ══════ SUB-TABS: LOBBY / PEOPLE / ROOMS ══════ */}
+      <div className="flex gap-2 mb-4">
+        <GradientTab active={subTab === "lobby"} icon={Volume2} label="Lobby" onClick={() => setSubTab("lobby")} />
+        <GradientTab active={subTab === "people"} icon={Users} label="People" onClick={() => setSubTab("people")} />
+        <GradientTab active={subTab === "rooms"} icon={Globe} label="Rooms" onClick={() => setSubTab("rooms")} />
+      </div>
+
+      {/* ══════ LOBBY TAB ══════ */}
+      {subTab === "lobby" && !inLobby && (
+        <div className="space-y-5">
+          {/* Voice Lobby hero card */}
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                <h3 className="font-black text-base text-white uppercase tracking-wide">Voice Lobby</h3>
+              </div>
+              {lobbyCount > 0 && (
+                <span className="text-[11px] text-white/30 font-bold px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+                  {lobbyCount} here
+                </span>
+              )}
+            </div>
+            <p className="text-[13px] text-white/30 mb-4">Community voice channel with live audio & soundboard support.</p>
+            <button onClick={() => { setInLobby(true); toast.success("Joined Voice Lobby 🎙️"); }}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-yellow-400 text-black font-black text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-emerald-500/20 transition-all">
+              <Volume2 className="h-4 w-4" /> Join Voice Lobby
             </button>
-          ))}
-        </div>
-        {/* Actions */}
-        <div className="flex items-center gap-1.5">
-          <button onClick={() => setShowSearch(!showSearch)}
-            className={cn("h-8 w-8 rounded-lg flex items-center justify-center transition-all",
-              showSearch ? "bg-primary/10 text-primary" : "text-white/25 hover:bg-white/[0.04] hover:text-white/40"
-            )}>
-            <Search className="h-3.5 w-3.5" />
-          </button>
-          <Button onClick={() => setShowCreate(true)} className="rounded-lg gap-1.5 text-[11px] h-8 px-3 font-bold" size="sm">
-            <Plus className="h-3 w-3" /> New Space
-          </Button>
-        </div>
-      </div>
+          </div>
 
-      {/* ── Search bar ── */}
-      {showSearch && (
-        <div className="mb-3 relative sp-slide-up">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/15" />
-          <Input placeholder="Search spaces..." value={search} onChange={e => setSearch(e.target.value)}
-            className="bg-white/[0.03] border-white/[0.06] rounded-lg pl-9 pr-9 h-9 text-sm focus:border-primary/40" autoFocus />
-          {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50"><XIcon className="h-3.5 w-3.5" /></button>}
+          {/* People here */}
+          <div>
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/[0.06]">
+              <Users className="h-4 w-4 text-white/25" />
+              <span className="text-[11px] font-black text-white/35 uppercase tracking-widest">People Here</span>
+            </div>
+            {lobbyCount > 0 ? (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                {lobbyParticipants.map(p => (
+                  <PersonCard key={p.id} username={p.username} avatarUrl={p.avatar_url} isYou={p.user_id === user?.id} isSpeaking={p.role === "speaker" && !p.muted} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-white/15 text-center py-6">No one in the lobby yet. Be the first!</p>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ── Topic filters ── */}
-      <div className="flex gap-1.5 overflow-x-auto pb-3 mb-1" style={{ scrollbarWidth: "none" }}>
-        <button onClick={() => setTopicFilter(null)}
-          className={cn("px-2.5 py-1 rounded-lg text-[10px] font-bold shrink-0 transition-all",
-            !topicFilter ? "bg-white/[0.08] text-white" : "text-white/25 hover:bg-white/[0.04] hover:text-white/40"
-          )}>All</button>
-        {TOPICS.map(t => { const m = topicOf(t); return (
-          <button key={t} onClick={() => setTopicFilter(topicFilter === t ? null : t)}
-            className={cn("px-2.5 py-1 rounded-lg text-[10px] font-bold shrink-0 transition-all flex items-center gap-1",
-              topicFilter === t ? "bg-white/[0.08] text-white" : "text-white/25 hover:bg-white/[0.04] hover:text-white/40"
-            )}><span className="text-[11px]">{m.icon}</span>{t}</button>
-        ); })}
-      </div>
-
-      {/* ── Content ── */}
-      {loading ? (
-        <div className="flex flex-col gap-2 mt-2">{[1, 2, 3].map(i => <div key={i} className="h-16 rounded-xl bg-white/[0.02] animate-pulse" />)}</div>
-      ) : tab === "live" ? (
-        live.length === 0 ? (
-          <EmptyState icon={Radio} title="No live spaces right now" sub={search ? "Try a different search" : "Be the first to start one!"}
-            action={!search ? { label: "Start a Space", onClick: () => setShowCreate(true) } : undefined} />
-        ) : (
-          <div className="space-y-2">
-            <TrendingBanner spaces={live} onJoin={setActiveSpace} />
+      {/* ══════ LOBBY TAB — IN LOBBY (joined) ══════ */}
+      {subTab === "lobby" && inLobby && (
+        <div className="space-y-0">
+          {/* Room header */}
+          <div className="flex items-center gap-3 pb-3 mb-4 border-b border-white/[0.06]">
+            <button onClick={() => { setInLobby(false); lobbyVoiceRef.current?.leaveVoice(); toast("Left the lobby"); }}
+              className="text-emerald-400 text-sm font-bold flex items-center gap-1 hover:text-emerald-300 transition">
+              <ArrowLeft className="h-4 w-4" /> Leave
+            </button>
+            <div className="flex-1 min-w-0 ml-1">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                <h3 className="font-black text-sm text-white uppercase tracking-wide">Voice Lobby</h3>
+              </div>
+              <p className="text-[11px] text-white/25 ml-[18px]">
+                <Globe className="h-3 w-3 text-white/15 inline mr-1" />public · {lobbyParticipants.length} connected
+              </p>
+            </div>
           </div>
-        )
-      ) : tab === "scheduled" ? (
-        scheduled.length === 0 ? (
-          <EmptyState icon={Calendar} title="No upcoming spaces" sub="Schedule one and your community will be notified"
-            action={{ label: "Schedule a Space", onClick: () => setShowCreate(true) }} />
-        ) : (
-          <div className="flex flex-col gap-2 pb-4">
-            {scheduled.map(s => (
-              <ScheduledSpaceCard key={s.id} space={s} onRemind={s => toast.success(`Reminder set for "${s.title}" 🔔`)} onStartNow={startScheduled} isOwner={s.host_id === user?.id} />
+
+          {/* In room section */}
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="h-4 w-4 text-white/30" />
+            <span className="text-[12px] font-black text-white/40 uppercase tracking-widest">In Room ({lobbyParticipants.length})</span>
+          </div>
+
+          {/* Avatar grid */}
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-6">
+            {lobbyParticipants.map(p => (
+              <PersonCard key={p.id} username={p.username} avatarUrl={p.avatar_url} isYou={p.user_id === user?.id} isSpeaking={p.role === "speaker" && !p.muted} />
             ))}
+            {lobbyParticipants.length === 0 && (
+              <PersonCard username={profile?.username} avatarUrl={profile?.avatar_url} isYou />
+            )}
           </div>
-        )
-      ) : (
-        ended.length === 0 ? (
-          <EmptyState icon={Archive} title="No past spaces" sub="Ended spaces will appear here for replay" />
-        ) : (
-          <div className="flex flex-col gap-2 pb-4">
-            {ended.map(s => <SpaceCard key={s.id} space={s} onJoin={setReplaySpace} variant="past" />)}
+
+          {/* Hidden voice panel for WebRTC */}
+          <div className="hidden">
+            <VoicePanel
+              ref={lobbyVoiceRef}
+              lobbyId="main-voice-lobby"
+              lobbyName="Voice Lobby"
+              autoJoin
+              onParticipantsChange={setLobbyParticipants}
+            />
           </div>
-        )
+
+          {/* Mic visualizer */}
+          {!lobbyMuted && <div className="mb-4"><MicVisualizer active={true} /></div>}
+
+          {/* Bottom controls — centered rounded squares */}
+          <div className="flex items-center justify-center gap-3 pt-4">
+            <button onClick={() => { setLobbyMuted(v => !v); toast(lobbyMuted ? "Unmuted 🎙️" : "Muted 🔇"); }}
+              className={cn(
+                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
+                lobbyMuted
+                  ? "bg-white/[0.06] border border-white/[0.08] text-white/50 hover:bg-white/[0.1]"
+                  : "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10"
+              )}>
+              {lobbyMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            </button>
+            <button className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/[0.06] border border-white/[0.08] text-white/40 hover:bg-white/[0.1] transition-all">
+              <Sparkles className="h-5 w-5" />
+            </button>
+            <button onClick={() => { setInLobby(false); lobbyVoiceRef.current?.leaveVoice(); toast("Left the lobby"); }}
+              className="w-14 h-14 rounded-2xl flex items-center justify-center bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all">
+              <XIcon className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* Mini player */}
-      {minimizedSpace && !activeSpace && (
-        <MiniPlayerBar space={minimizedSpace}
-          onExpand={() => { setActiveSpace(minimizedSpace); setMinimizedSpace(null); }}
-          onLeave={() => setMinimizedSpace(null)} />
+      {/* ══════ PEOPLE TAB ══════ */}
+      {subTab === "people" && (
+        <div>
+          <div className="flex items-center gap-2 mb-4 pb-2 border-b border-white/[0.06]">
+            <Users className="h-4 w-4 text-white/25" />
+            <span className="text-[11px] font-black text-white/35 uppercase tracking-widest">People Online ({lobbyParticipants.length})</span>
+          </div>
+          {lobbyParticipants.length > 0 ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+              {lobbyParticipants.map(p => (
+                <PersonCard key={p.id} username={p.username} avatarUrl={p.avatar_url} isYou={p.user_id === user?.id} online />
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={Users} title="No one online" sub="People in voice will appear here" />
+          )}
+        </div>
+      )}
+
+      {/* ══════ ROOMS TAB ══════ */}
+      {subTab === "rooms" && (
+        <div>
+          {/* Rooms header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-white/30" />
+              <div>
+                <h3 className="font-black text-sm text-white uppercase tracking-wide">Voice Rooms</h3>
+                <p className="text-[11px] text-white/25">{liveRooms.length} active room{liveRooms.length !== 1 ? "s" : ""}</p>
+              </div>
+            </div>
+            <button onClick={() => setShowCreate(true)}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-yellow-400 text-black text-[12px] font-black flex items-center gap-1.5 hover:shadow-lg hover:shadow-emerald-500/20 transition-all">
+              <Plus className="h-3.5 w-3.5" /> New Room
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20" />
+            <Input placeholder="Search rooms..." value={search} onChange={e => setSearch(e.target.value)}
+              className="bg-white/[0.03] border-white/[0.06] rounded-xl pl-10 h-10 text-sm focus:border-emerald-500/40" />
+            {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50"><XIcon className="h-4 w-4" /></button>}
+          </div>
+
+          {/* Room lists */}
+          {loading ? (
+            <div className="flex flex-col gap-3">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-2xl bg-white/[0.02] animate-pulse" />)}</div>
+          ) : filteredRooms.length === 0 && endedRooms.length === 0 ? (
+            <EmptyState icon={Globe} title="No Rooms Yet" sub="Create a room above to start a conversation"
+              action={{ label: "New Room", onClick: () => setShowCreate(true) }} />
+          ) : (
+            <div className="space-y-3 pb-4">
+              {/* Live rooms */}
+              {filteredRooms.filter(s => s.is_live).map(s => (
+                <RoomCard key={s.id} space={s} onJoin={setActiveSpace} />
+              ))}
+              {/* Scheduled rooms */}
+              {filteredRooms.filter(s => !s.is_live).length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 pt-2">
+                    <Clock className="h-3.5 w-3.5 text-white/20" />
+                    <span className="text-[10px] font-bold text-white/20 uppercase tracking-wider">Upcoming</span>
+                    <div className="flex-1 h-px bg-white/[0.04]" />
+                  </div>
+                  {filteredRooms.filter(s => !s.is_live).map(s => (
+                    <RoomCard key={s.id} space={s} onJoin={setActiveSpace} />
+                  ))}
+                </>
+              )}
+              {/* Past rooms with replay */}
+              {endedRooms.length > 0 && !search && (
+                <>
+                  <div className="flex items-center gap-2 pt-2">
+                    <Archive className="h-3.5 w-3.5 text-white/20" />
+                    <span className="text-[10px] font-bold text-white/20 uppercase tracking-wider">Past Rooms</span>
+                    <div className="flex-1 h-px bg-white/[0.04]" />
+                  </div>
+                  {endedRooms.slice(0, 5).map(s => (
+                    <PastRoomCard key={s.id} space={s} onPlay={setReplaySpace} />
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Create modal */}

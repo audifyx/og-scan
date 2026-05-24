@@ -1887,9 +1887,8 @@ const Communities = () => {
 
   return (
     <div>
-      {/* Header — compact for mobile */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-black text-white">Communities</h2>
+      {/* Action bar — no duplicate header (ToolShell provides the main header) */}
+      <div className="flex items-center justify-end mb-3">
         <Button onClick={() => setShowCreate(true)} className="rounded-full btn-3d gap-1 text-xs h-8 px-3" size="sm">
           <Plus className="h-3.5 w-3.5" /> New
         </Button>
