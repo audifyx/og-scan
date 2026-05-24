@@ -18,7 +18,7 @@ import {
   TrendingUp, Heart, ThumbsUp, Eye, BarChart3, Copy, Zap,
   Shield, Play, Pause, Minimize2, Maximize2, ChevronRight,
   AlertCircle, CheckCircle2, Repeat2, ExternalLink, UserPlus,
-  Timer, MessageCircleQuestion, Twitter,
+  Timer, MessageCircleQuestion, Twitter, Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -43,6 +43,7 @@ import SpaceLeaderboard from "@/components/spaces/SpaceLeaderboard";
 import SpaceBadges from "@/components/spaces/SpaceBadges";
 import InviteLink from "@/components/spaces/InviteLink";
 import SpaceNotifications from "@/components/spaces/SpaceNotifications";
+import GreenRoom from "@/components/spaces/GreenRoom";
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    TYPES
@@ -744,11 +745,13 @@ const formatDuration = (sec: number | null): string => {
    SPACE CARD — list view
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-const SpaceCard = ({ space, onJoin, variant = "default" }: { space: Space; onJoin: (s: Space) => void; variant?: "default" | "past" }) => {
+const SpaceCard = ({ space, onJoin, variant = "default", onDelete, currentUserId }: { space: Space; onJoin: (s: Space) => void; variant?: "default" | "past"; onDelete?: (s: Space) => void; currentUserId?: string }) => {
   const tm = topicOf(space.topic);
   const total = (space.listener_count || 0) + (space.speaker_count || 0);
   const isPast = variant === "past";
   const hasReplay = isPast && !!space.recording_url;
+  const isOwner = currentUserId && space.host_id === currentUserId;
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
     <button onClick={() => onJoin(space)}
@@ -806,6 +809,29 @@ const SpaceCard = ({ space, onJoin, variant = "default" }: { space: Space; onJoi
         )}
         {isPast && (
           <div className="shrink-0 self-center flex items-center gap-1.5">
+            {/* Delete button (owner only) */}
+            {isOwner && onDelete && (
+              confirmDelete ? (
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(space); }}
+                    className="px-2 py-1 rounded-lg bg-red-500/15 border border-red-500/25 text-[9px] font-bold text-red-400 hover:bg-red-500/25 transition-all">
+                    Delete
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}
+                    className="px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[9px] font-bold text-white/30 hover:bg-white/[0.08] transition-all">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+                  className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-red-500/10 hover:border-red-500/20 transition-colors"
+                  title="Delete space"
+                >
+                  <Trash2 className="h-3 w-3 text-white/20 hover:text-red-400" />
+                </button>
+              )
+            )}
             {/* Share link button */}
             <button
               onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/listen/${space.id}`).then(() => toast?.("Link copied! 🔗")).catch(() => {}); }}
@@ -1049,6 +1075,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
   const [tickerCA, setTickerCA] = useState("");
   const [showQA, setShowQA] = useState(false);
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
+  const [inGreenRoom, setInGreenRoom] = useState(false);
   const voicePanelRef = useRef<VoicePanelHandle>(null);
   const isHost = user?.id === space.host_id;
   const isCoHost = coHosts.some(ch => ch.userId === user?.id);
@@ -1138,6 +1165,19 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
 
   const totalInRoom = voiceParticipants.length || ((cur.listener_count || 0) + (cur.speaker_count || 0));
 
+  // Green Room pre-show
+  if (inGreenRoom) {
+    return (
+      <GreenRoom
+        spaceName={cur.title}
+        isHost={isHost}
+        username={profile?.username || null}
+        onGoLive={() => setInGreenRoom(false)}
+        onLeave={onLeave}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0 relative">
       <SpaceStyles />
@@ -1175,6 +1215,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
                     <button onClick={() => { setShowPollCreate(true); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition"><BarChart3 className="h-4 w-4" /> Create Poll</button>
                     <button onClick={() => { setShowQA(!showQA); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-purple-400/80 hover:bg-purple-500/5 transition"><MessageCircleQuestion className="h-4 w-4" /> Q&A Mode</button>
                     <button onClick={() => { setShowTokenTicker(!showTokenTicker); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition"><TrendingUp className="h-4 w-4" /> Token Chart</button>
+                    <button onClick={() => { setInGreenRoom(true); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-emerald-400/80 hover:bg-emerald-500/5 transition"><Volume2 className="h-4 w-4" /> Green Room</button>
                     <div className="border-t border-white/[0.06]" />
                     <button onClick={() => { endSpace(); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition"><StopCircle className="h-4 w-4" /> End Room</button>
                   </div>
@@ -2036,6 +2077,29 @@ const Spaces = () => {
     else { setSpaces(prev => [s, ...prev]); setTab("upcoming"); }
   };
 
+  const handleDeleteSpace = async (s: Space) => {
+    try {
+      // Delete related records first, then the space itself
+      await Promise.all([
+        supabase.from("space_messages").delete().eq("space_id", s.id),
+        supabase.from("speaker_requests").delete().eq("space_id", s.id),
+        supabase.from("space_polls").delete().eq("space_id", s.id),
+        supabase.from("space_qa_questions").delete().eq("space_id", s.id),
+        supabase.from("space_highlights").delete().eq("space_id", s.id),
+      ]);
+      // Delete recording from storage if exists
+      if (s.recording_url) {
+        const path = s.recording_url.split("/space-recordings/")[1];
+        if (path) await supabase.storage.from("space-recordings").remove([path]);
+      }
+      const { error } = await supabase.from("spaces").delete().eq("id", s.id);
+      if (error) { toast.error("Failed to delete"); return; }
+      setPastSpaces(prev => prev.filter(sp => sp.id !== s.id));
+      setSpaces(prev => prev.filter(sp => sp.id !== s.id));
+      toast.success("Space deleted");
+    } catch { toast.error("Failed to delete"); }
+  };
+
   // Derived lists
   const liveRooms = useMemo(() => spaces.filter(s => s.is_live), [spaces]);
   const scheduledRooms = useMemo(() => spaces.filter(s => !s.is_live && !s.ended_at), [spaces]);
@@ -2289,7 +2353,7 @@ const Spaces = () => {
                 ) : (
                   <div className="space-y-3">
                     {filteredPast.map(s => (
-                      <SpaceCard key={s.id} space={s} onJoin={setReplaySpace} variant="past" />
+                      <SpaceCard key={s.id} space={s} onJoin={setReplaySpace} variant="past" onDelete={handleDeleteSpace} currentUserId={user?.id} />
                     ))}
                   </div>
                 )
