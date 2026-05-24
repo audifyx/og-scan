@@ -34,6 +34,13 @@ import ReactionOverlayNew from "@/components/spaces/ReactionOverlay";
 import QAQueue from "@/components/spaces/QAQueue";
 import SpeakerTimerWidget from "@/components/spaces/SpeakerTimer";
 import PinnedContent from "@/components/spaces/PinnedContent";
+import Soundboard from "@/components/spaces/Soundboard";
+import CoHostManager from "@/components/spaces/CoHostManager";
+import type { CoHost, CoHostPermissions } from "@/components/spaces/CoHostManager";
+import SpaceHighlights from "@/components/spaces/SpaceHighlights";
+import SpaceAnalytics from "@/components/spaces/SpaceAnalytics";
+import SpaceLeaderboard from "@/components/spaces/SpaceLeaderboard";
+import SpaceBadges from "@/components/spaces/SpaceBadges";
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    TYPES
@@ -1039,8 +1046,10 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
   const [showTokenTicker, setShowTokenTicker] = useState(false);
   const [tickerCA, setTickerCA] = useState("");
   const [showQA, setShowQA] = useState(false);
+  const [coHosts, setCoHosts] = useState<CoHost[]>([]);
   const voicePanelRef = useRef<VoicePanelHandle>(null);
   const isHost = user?.id === space.host_id;
+  const isCoHost = coHosts.some(ch => ch.userId === user?.id);
   const tm = topicOf(cur.topic);
   const rxId = useRef(0);
   const MAX_SPEAKERS = 10;
@@ -1382,7 +1391,51 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
                 username={profile?.username || null}
                 avatarUrl={safAvatar(profile?.avatar_url) ?? null}
                 isHost={isHost}
+                isCoHost={isCoHost}
               />
+            </div>
+          )}
+
+          {/* ── Soundboard (host only) ── */}
+          <div className="mt-4">
+            <Soundboard isHost={isHost} />
+          </div>
+
+          {/* ── Co-Host Manager (host only) ── */}
+          <div className="mt-4">
+            <CoHostManager
+              isHost={isHost}
+              coHosts={coHosts}
+              participants={voiceParticipants.map(p => ({ userId: p.user_id, username: p.username || "User", avatarUrl: p.avatar_url }))}
+              onAddCoHost={(userId, perms) => {
+                const p = voiceParticipants.find(pp => pp.user_id === userId);
+                setCoHosts(prev => [...prev, { userId, username: p?.username || "User", avatarUrl: p?.avatar_url ?? null, permissions: perms }]);
+                supabase.from("spaces").update({ co_host_permissions: JSON.stringify([...coHosts.map(c => c.userId), userId]) }).eq("id", space.id);
+              }}
+              onRemoveCoHost={(userId) => {
+                setCoHosts(prev => prev.filter(c => c.userId !== userId));
+              }}
+              onUpdatePermissions={(userId, perms) => {
+                setCoHosts(prev => prev.map(c => c.userId === userId ? { ...c, permissions: perms } : c));
+              }}
+            />
+          </div>
+
+          {/* ── Highlights / Chapters ── */}
+          <div className="mt-4">
+            <SpaceHighlights
+              spaceId={space.id}
+              startedAt={space.created_at}
+              isHost={isHost}
+              isCoHost={isCoHost}
+              isLive={cur.is_live}
+            />
+          </div>
+
+          {/* ── Analytics (host only, shows after space ends) ── */}
+          {!cur.is_live && (
+            <div className="mt-4">
+              <SpaceAnalytics spaceId={space.id} isHost={isHost} />
             </div>
           )}
 
@@ -2244,6 +2297,23 @@ const Spaces = () => {
         activeNow={totalSpeakers + totalListeners}
         trending={liveRooms.filter(s => (s.listener_count || 0) >= 5).length}
       />
+
+      {/* ── Speaker Leaderboard ── */}
+      <div className="px-4">
+        <SpaceLeaderboard compact />
+      </div>
+
+      {/* ── Badges ── */}
+      {user && (
+        <div className="px-4">
+          <SpaceBadges
+            spacesHosted={spaces.filter(s => s.host_id === user.id && s.ended_at).length}
+            spacesAttended={pastSpaces.length}
+            totalSpeakingMin={0}
+            compact
+          />
+        </div>
+      )}
 
       {/* Create modal */}
       {showCreate && <CreateSpaceModal onClose={() => setShowCreate(false)} onCreated={handleCreated} user={user} profile={profile} />}
