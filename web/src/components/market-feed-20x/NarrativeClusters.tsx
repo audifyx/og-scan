@@ -32,8 +32,9 @@ interface Narrative {
 }
 
 interface Props {
-  tokens: TokenInfo[];
+  tokens?: TokenInfo[];
   onSelect?: (mint: string) => void;
+  onSelectMint?: (mint: string) => void;
 }
 
 const NARRATIVE_PATTERNS: Array<{ id: string; name: string; emoji: string; keywords: string[]; color: string }> = [
@@ -59,7 +60,8 @@ function classifyToken(token: TokenInfo): string[] {
   return matches;
 }
 
-export const NarrativeClusters: React.FC<Props> = ({ tokens, onSelect }) => {
+export const NarrativeClusters: React.FC<Props> = ({ tokens = [], onSelect, onSelectMint }) => {
+  const handleSelect = onSelect || onSelectMint;
   const [expandedNarrative, setExpandedNarrative] = useState<string | null>(null);
 
   const narratives = useMemo(() => {
@@ -81,7 +83,7 @@ export const NarrativeClusters: React.FC<Props> = ({ tokens, onSelect }) => {
         const totalVolume = patternTokens.reduce((s, t) => s + t.volume24h, 0);
         const totalMcap = patternTokens.reduce((s, t) => s + t.mcap, 0);
         const strength = Math.min(100, Math.round(
-          (patternTokens.length / tokens.length) * 40 +
+          (tokens.length > 0 ? (patternTokens.length / tokens.length) * 40 : 0) +
           Math.min(avgChange, 100) * 0.4 +
           Math.min(totalVolume / 1000000, 20)
         ));
@@ -165,7 +167,7 @@ export const NarrativeClusters: React.FC<Props> = ({ tokens, onSelect }) => {
                 {narrative.tokens.slice(0, 10).map(t => (
                   <button
                     key={t.mint}
-                    onClick={() => onSelect?.(t.mint)}
+                    onClick={() => handleSelect?.(t.mint)}
                     className="w-full flex items-center gap-2 p-2 rounded-md hover:bg-white/[0.02] transition-colors text-left"
                   >
                     {t.logoURI && <img src={t.logoURI} className="w-4 h-4 rounded-full" alt="" />}

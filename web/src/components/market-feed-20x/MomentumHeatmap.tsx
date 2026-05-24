@@ -20,6 +20,7 @@ interface HeatmapCell {
 
 interface Props {
   onSelect?: (mint: string) => void;
+  onSelectMint?: (mint: string) => void;
   tokens?: JupTokenInfo[];
 }
 
@@ -41,7 +42,8 @@ function getTextColor(change: number): string {
   return "text-red-300";
 }
 
-export const MomentumHeatmap: React.FC<Props> = ({ onSelect, tokens: externalTokens }) => {
+export const MomentumHeatmap: React.FC<Props> = ({ onSelect, onSelectMint, tokens: externalTokens }) => {
+  const handleSelect = onSelect || onSelectMint;
   const [tokens, setTokens] = useState<HeatmapCell[]>([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -124,7 +126,7 @@ export const MomentumHeatmap: React.FC<Props> = ({ onSelect, tokens: externalTok
               return (
                 <button
                   key={token.mint}
-                  onClick={() => onSelect?.(token.mint)}
+                  onClick={() => handleSelect?.(token.mint)}
                   className={cn(
                     "rounded-lg border p-2 transition-all cursor-pointer",
                     getHeatColor(token.priceChange)

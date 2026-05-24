@@ -96,6 +96,24 @@ import { SmartWatchlist } from "@/components/new-features/SmartWatchlist";
 import { PaperTrading } from "@/components/new-features/PaperTrading";
 import { CryptoCalendar } from "@/components/new-features/CryptoCalendar";
 
+/* ─── Phase 29 imports ─── */
+import { AlphaCallouts } from "@/components/callouts-20x/AlphaCallouts";
+import { CalloutLeaderboard } from "@/components/callouts-20x/CalloutLeaderboard";
+import { PlatformLeaderboard } from "@/components/leaderboard-20x/PlatformLeaderboard";
+import { TradingLobbies } from "@/components/lobbies-20x/TradingLobbies";
+import { TokenCompare } from "@/components/advanced-tools-20x/TokenCompare";
+import { QuickCalc } from "@/components/advanced-tools-20x/QuickCalc";
+import { UserProfile } from "@/components/profile-20x/UserProfile";
+import { WebhookManager } from "@/components/webhooks-20x/WebhookManager";
+
+/* ─── Phase 30 imports (Discover / Launchpad) ─── */
+import { TokenExplorer } from "@/components/discover-20x/TokenExplorer";
+import { ViralFeed } from "@/components/discover-20x/ViralFeed";
+import { LaunchpadExplorer } from "@/components/discover-20x/LaunchpadExplorer";
+import { LaunchTracker } from "@/components/launchpad-20x/LaunchTracker";
+import { MemeGallery } from "@/components/memes-20x/MemeGallery";
+import { ProDashboard } from "@/components/premium-20x/ProDashboard";
+
 const LEGACY_DEFAULT_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
 const STORAGE_TAB = "og_scanner.active_site_tab";
 
@@ -453,7 +471,12 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void): 
   if (tab === "tx-feed") return <TxFeed mint={mint} />;
   if (tab === "swap") return <SwapPanel ogMint={mint} onSelectMint={updateMint} />;
   if (tab === "tech") return <TechStack />;
-  if (tab === "news-signal") return <NewsSignal onSelect={updateMint} />;
+  if (tab === "news-signal") return (
+    <div className="space-y-4">
+      <NewsSignal onSelect={updateMint} />
+      <TokenCompare onSelectMint={updateMint} />
+    </div>
+  );
   if (tab === "communities") return <CommunitiesInline />;
   if (tab === "discover") return <DiscoverInline />;
   if (tab === "memes") return <ArtFeed inline />;
@@ -1068,6 +1091,13 @@ const OverviewPage = ({
 
       <MultiChartView onSelectMint={(m) => { onSwitchTab("scanner"); }} />
 
+      {/* Phase 29: Alpha + Leaderboard + Calculator */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <AlphaCallouts onSelectMint={(m) => { onSwitchTab("scanner"); }} />
+        <PlatformLeaderboard />
+      </div>
+      <QuickCalc />
+
       {/* All tools list */}
       <div>
         <div className="mb-3">
@@ -1273,6 +1303,8 @@ const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: strin
       <div className="space-y-3 mt-4">
         <MomentumHeatmap onSelectMint={onSelect} />
         <NarrativeClusters onSelectMint={onSelect} />
+        <TradingLobbies onSelectMint={onSelect} />
+        <CalloutLeaderboard />
       </div>
     </section>
   );
@@ -1285,6 +1317,43 @@ const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: strin
  */
 const CommunitiesInline = () => <CommunitiesPage />;
 
-const DiscoverInline = () => <DiscoverPage inline />;
+const DiscoverInline = () => {
+  const [discoverTab, setDiscoverTab] = useState<"explore" | "launchpads" | "viral" | "launches" | "memes" | "profile" | "webhooks" | "pro">("explore");
+  const discoverTabs = [
+    { id: "explore" as const, label: "🔥 Explore", desc: "Trending tokens" },
+    { id: "launchpads" as const, label: "🚀 Launchpads", desc: "Pump.fun, Moonshot, Believe" },
+    { id: "viral" as const, label: "⚡ Viral", desc: "Going viral" },
+    { id: "launches" as const, label: "🆕 Launches", desc: "New tokens" },
+    { id: "memes" as const, label: "😂 Memes", desc: "Meme factory" },
+    { id: "profile" as const, label: "👤 Profile", desc: "Your stats" },
+    { id: "webhooks" as const, label: "🔔 Webhooks", desc: "Alerts setup" },
+    { id: "pro" as const, label: "👑 Pro", desc: "Premium tools" },
+  ];
+  return (
+    <div className="space-y-4">
+      {/* Discover sub-nav */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+        {discoverTabs.map(t => (
+          <button key={t.id} onClick={() => setDiscoverTab(t.id)}
+            className={cn("shrink-0 px-3 py-2 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap",
+              discoverTab === t.id
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "text-white/25 hover:text-white/40 border border-transparent"
+            )}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {discoverTab === "explore" && <TokenExplorer />}
+      {discoverTab === "launchpads" && <LaunchpadExplorer />}
+      {discoverTab === "viral" && <ViralFeed />}
+      {discoverTab === "launches" && <LaunchTracker />}
+      {discoverTab === "memes" && <MemeGallery />}
+      {discoverTab === "profile" && <UserProfile />}
+      {discoverTab === "webhooks" && <WebhookManager />}
+      {discoverTab === "pro" && <ProDashboard />}
+    </div>
+  );
+};
 
 export default Index;
