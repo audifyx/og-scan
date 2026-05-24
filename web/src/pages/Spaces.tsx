@@ -83,17 +83,18 @@ interface SpacePoll { question: string; options: PollOption[]; votedIndex: numbe
    CONSTANTS
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-const TOPICS = ["Trading", "Alpha", "NFTs", "DeFi", "Memes", "Research", "Tech", "General"] as const;
+const TOPICS = ["Trading", "Alpha", "NFTs", "DeFi", "Memes", "Real World", "Research", "Tech", "General"] as const;
 
 const TOPIC_META: Record<string, { icon: string; color: string; glow: string }> = {
-  Trading:  { icon: "📈", color: "text-sky-400 bg-sky-500/10 border-sky-500/25",       glow: "shadow-sky-500/10" },
-  Alpha:    { icon: "🔑", color: "text-amber-400 bg-amber-500/10 border-amber-500/25", glow: "shadow-amber-500/10" },
-  NFTs:     { icon: "🖼️", color: "text-violet-400 bg-violet-500/10 border-violet-500/25", glow: "shadow-violet-500/10" },
-  DeFi:     { icon: "🏦", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/25", glow: "shadow-emerald-500/10" },
-  Memes:    { icon: "🐸", color: "text-pink-400 bg-pink-500/10 border-pink-500/25",     glow: "shadow-pink-500/10" },
-  Research: { icon: "🔬", color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/25",     glow: "shadow-cyan-500/10" },
-  Tech:     { icon: "⚡", color: "text-blue-400 bg-blue-500/10 border-blue-500/25",     glow: "shadow-blue-500/10" },
-  General:  { icon: "💬", color: "text-white/50 bg-white/5 border-white/10",            glow: "" },
+  Trading:     { icon: "📈", color: "text-sky-400 bg-sky-500/10 border-sky-500/25",       glow: "shadow-sky-500/10" },
+  Alpha:       { icon: "🔑", color: "text-amber-400 bg-amber-500/10 border-amber-500/25", glow: "shadow-amber-500/10" },
+  NFTs:        { icon: "🖼️", color: "text-violet-400 bg-violet-500/10 border-violet-500/25", glow: "shadow-violet-500/10" },
+  DeFi:        { icon: "🏛", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/25", glow: "shadow-emerald-500/10" },
+  Memes:       { icon: "🤪", color: "text-pink-400 bg-pink-500/10 border-pink-500/25",     glow: "shadow-pink-500/10" },
+  "Real World":{ icon: "🌐", color: "text-teal-400 bg-teal-500/10 border-teal-500/25",     glow: "shadow-teal-500/10" },
+  Research:    { icon: "🔬", color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/25",     glow: "shadow-cyan-500/10" },
+  Tech:        { icon: "⚡", color: "text-blue-400 bg-blue-500/10 border-blue-500/25",     glow: "shadow-blue-500/10" },
+  General:     { icon: "💬", color: "text-white/50 bg-white/5 border-white/10",            glow: "" },
 };
 
 const REACTION_EMOJIS = ["🔥", "👏", "❤️", "💎", "🚀", "💯", "🎯", "⚡", "🧠", "😂"];
@@ -826,16 +827,6 @@ const TrendingBanner = ({ spaces, onJoin }: { spaces: Space[]; onJoin: (s: Space
 /* ═══════════════════════════════════════════════════════════════════════════════
    SPACE CARD — list view
    ═══════════════════════════════════════════════════════════════════════════════ */
-
-const formatDuration = (sec: number | null): string => {
-  if (!sec) return "";
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
-};
 
 const SpaceCard = ({ space, onJoin, variant = "default" }: { space: Space; onJoin: (s: Space) => void; variant?: "default" | "past" }) => {
   const tm = topicOf(space.topic);
@@ -1652,7 +1643,132 @@ const EmptyState = ({ icon: Icon, title, sub, action }: { icon: React.ComponentT
 );
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   MAIN SPACES PAGE — SocialHub-style with LOBBY / PEOPLE / ROOMS
+   MICROPHONE SVG ILLUSTRATION — used in hero card & empty state
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+const MicIllustration = ({ size = 160, className = "" }: { size?: number; className?: string }) => (
+  <div className={cn("relative flex items-center justify-center", className)} style={{ width: size, height: size }}>
+    {/* Outer glow rings */}
+    <div className="absolute inset-0 rounded-full border border-blue-500/20 animate-ping" style={{ animationDuration: "3s" }} />
+    <div className="absolute inset-2 rounded-full border border-cyan-500/15" />
+    <div className="absolute inset-4 rounded-full border border-blue-400/10" />
+    {/* Inner glow */}
+    <div className="absolute w-24 h-24 rounded-full bg-blue-500/15 blur-xl" />
+    {/* Mic body */}
+    <svg viewBox="0 0 80 100" className="relative z-10" style={{ width: size * 0.5, height: size * 0.6 }}>
+      <defs>
+        <linearGradient id="micGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.7" />
+        </linearGradient>
+        <linearGradient id="micShine" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#93c5fd" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {/* Stand base */}
+      <ellipse cx="40" cy="92" rx="20" ry="5" fill="#1e3a5f" opacity="0.5" />
+      {/* Stand */}
+      <rect x="37" y="68" width="6" height="20" rx="3" fill="#2563eb" opacity="0.4" />
+      {/* Mic head */}
+      <rect x="22" y="10" width="36" height="52" rx="18" fill="url(#micGrad)" />
+      <rect x="22" y="10" width="36" height="52" rx="18" fill="url(#micShine)" />
+      {/* Grille lines */}
+      {[22, 28, 34, 40, 46].map(y => (
+        <line key={y} x1="30" y1={y} x2="50" y2={y} stroke="#1e40af" strokeWidth="1" opacity="0.3" />
+      ))}
+      {/* Highlight */}
+      <rect x="28" y="14" width="4" height="20" rx="2" fill="white" opacity="0.15" />
+    </svg>
+    {/* Floating user icons */}
+    <div className="absolute -left-1 top-1/3">
+      <div className="w-7 h-7 rounded-full bg-blue-900/60 border border-blue-500/20 flex items-center justify-center">
+        <Users className="h-3 w-3 text-blue-400/60" />
+      </div>
+    </div>
+    <div className="absolute -right-1 top-1/4">
+      <div className="w-7 h-7 rounded-full bg-blue-900/60 border border-blue-500/20 flex items-center justify-center">
+        <Users className="h-3 w-3 text-blue-400/60" />
+      </div>
+    </div>
+    <div className="absolute left-1 bottom-1/4">
+      <div className="w-6 h-6 rounded-full bg-blue-900/60 border border-blue-500/20 flex items-center justify-center">
+        <Users className="h-2.5 w-2.5 text-blue-400/50" />
+      </div>
+    </div>
+  </div>
+);
+
+/* Empty state mic illustration (bigger, with extra icons) */
+const EmptyMicIllustration = () => (
+  <div className="relative flex items-center justify-center w-48 h-48 mx-auto">
+    {/* Glow */}
+    <div className="absolute w-40 h-40 rounded-full bg-blue-500/8 blur-2xl" />
+    <div className="absolute w-28 h-28 rounded-full bg-purple-500/5 blur-xl" />
+    {/* Rings */}
+    <div className="absolute w-44 h-44 rounded-full border border-blue-500/10" />
+    <div className="absolute w-36 h-36 rounded-full border border-purple-500/8" />
+    {/* Mic */}
+    <svg viewBox="0 0 80 100" className="relative z-10 w-20 h-24">
+      <defs>
+        <linearGradient id="emicGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.7" />
+        </linearGradient>
+      </defs>
+      <ellipse cx="40" cy="93" rx="22" ry="5" fill="#1e3a5f" opacity="0.4" />
+      <rect x="37" y="68" width="6" height="22" rx="3" fill="#4338ca" opacity="0.4" />
+      <rect x="22" y="10" width="36" height="52" rx="18" fill="url(#emicGrad)" />
+      {[22, 28, 34, 40, 46].map(y => (
+        <line key={y} x1="30" y1={y} x2="50" y2={y} stroke="#1e3a8a" strokeWidth="1" opacity="0.35" />
+      ))}
+      <rect x="28" y="14" width="4" height="20" rx="2" fill="white" opacity="0.15" />
+    </svg>
+    {/* Floating icons */}
+    <div className="absolute left-4 top-6 w-9 h-9 rounded-xl bg-blue-900/40 border border-blue-500/15 flex items-center justify-center">
+      <Users className="h-4 w-4 text-blue-400/50" />
+    </div>
+    <div className="absolute right-3 top-8 w-9 h-9 rounded-xl bg-purple-900/40 border border-purple-500/15 flex items-center justify-center">
+      <MessageSquare className="h-4 w-4 text-purple-400/50" />
+    </div>
+    {/* Sparkle dots */}
+    <div className="absolute top-2 right-12 w-2 h-2 rounded-full bg-purple-400/30" />
+    <div className="absolute top-10 left-10 w-1.5 h-1.5 rounded-full bg-blue-400/30" />
+    <div className="absolute bottom-14 right-8 w-1.5 h-1.5 rounded-full bg-pink-400/30" />
+    <div className="absolute top-5 left-16 w-1 h-1 rounded-full bg-cyan-400/40" />
+  </div>
+);
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   STATS BAR — bottom stats row
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+const StatsBar = ({ liveCount, listenerCount, activeNow, trending }: {
+  liveCount: number; listenerCount: number; activeNow: number; trending: number;
+}) => {
+  const stats = [
+    { icon: Users,       value: liveCount,     label: "Live Spaces", color: "text-blue-400" },
+    { icon: Headphones,  value: listenerCount >= 1000 ? `${(listenerCount / 1000).toFixed(1)}K` : listenerCount, label: "Listeners", color: "text-blue-400" },
+    { icon: BarChart3,   value: activeNow,     label: "Active Now", color: "text-amber-400" },
+    { icon: Flame,       value: trending,      label: "Trending",   color: "text-orange-400" },
+  ];
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {stats.map((s, i) => (
+        <div key={i} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3 flex flex-col items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            <s.icon className={cn("h-4 w-4", s.color)} />
+            <span className="text-base font-black text-white">{s.value}</span>
+          </div>
+          <span className="text-[9px] text-white/30 font-medium">{s.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MAIN SPACES PAGE
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 const Spaces = () => {
@@ -1662,13 +1778,12 @@ const Spaces = () => {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [activeSpace, setActiveSpace] = useState<Space | null>(null);
-  const [subTab, setSubTab] = useState<"lobby" | "people" | "rooms">("lobby");
-  const [inLobby, setInLobby] = useState(false);
+  const [tab, setTab] = useState<"live" | "upcoming" | "replay">("live");
+  const [topicFilter, setTopicFilter] = useState<string>("All");
   const [search, setSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [replaySpace, setReplaySpace] = useState<Space | null>(null);
-  const [lobbyParticipants, setLobbyParticipants] = useState<VoiceParticipant[]>([]);
-  const [lobbyMuted, setLobbyMuted] = useState(true);
-  const lobbyVoiceRef = useRef<VoicePanelHandle>(null);
+  const topicScrollRef = useRef<HTMLDivElement>(null);
 
   const fetchSpaces = useCallback(async () => {
     try {
@@ -1700,243 +1815,264 @@ const Spaces = () => {
 
   const handleCreated = (s: Space) => {
     if (s.is_live) { setSpaces(prev => [s, ...prev]); setActiveSpace(s); }
-    else { setSpaces(prev => [s, ...prev]); setSubTab("rooms"); }
+    else { setSpaces(prev => [s, ...prev]); setTab("upcoming"); }
   };
 
+  // Derived lists
   const liveRooms = useMemo(() => spaces.filter(s => s.is_live), [spaces]);
   const scheduledRooms = useMemo(() => spaces.filter(s => !s.is_live && !s.ended_at), [spaces]);
   const endedRooms = useMemo(() => pastSpaces, [pastSpaces]);
-  const allRooms = useMemo(() => [...liveRooms, ...scheduledRooms], [liveRooms, scheduledRooms]);
-  const filteredRooms = useMemo(() => {
-    if (!search.trim()) return allRooms;
-    const q = search.toLowerCase();
-    return allRooms.filter(s => s.title.toLowerCase().includes(q) || s.host_username?.toLowerCase().includes(q) || s.topic?.toLowerCase().includes(q));
-  }, [allRooms, search]);
 
-  const lobbyCount = lobbyParticipants.length || 0;
+  // Filter by topic
+  const filterByTopic = useCallback((list: Space[]) => {
+    if (topicFilter === "All") return list;
+    return list.filter(s => s.topic === topicFilter);
+  }, [topicFilter]);
+
+  // Filter by search
+  const filterBySearch = useCallback((list: Space[]) => {
+    if (!search.trim()) return list;
+    const q = search.toLowerCase();
+    return list.filter(s => s.title.toLowerCase().includes(q) || s.host_username?.toLowerCase().includes(q) || s.topic?.toLowerCase().includes(q));
+  }, [search]);
+
+  const filteredLive = useMemo(() => filterBySearch(filterByTopic(liveRooms)), [liveRooms, filterByTopic, filterBySearch]);
+  const filteredScheduled = useMemo(() => filterBySearch(filterByTopic(scheduledRooms)), [scheduledRooms, filterByTopic, filterBySearch]);
+  const filteredPast = useMemo(() => filterBySearch(filterByTopic(endedRooms)), [endedRooms, filterByTopic, filterBySearch]);
+
+  // Stats (real data with some flair)
+  const totalListeners = useMemo(() => liveRooms.reduce((a, s) => a + (s.listener_count || 0), 0), [liveRooms]);
+  const totalSpeakers = useMemo(() => liveRooms.reduce((a, s) => a + (s.speaker_count || 0), 0), [liveRooms]);
 
   // ── Replay player ──
   if (replaySpace) return <ReplayPlayer space={replaySpace} onClose={() => setReplaySpace(null)} />;
 
-  // ── Active room (custom space) ──
+  // ── Active room (joined) ──
   if (activeSpace) return (
-    <SpaceRoom space={activeSpace}
-      onLeave={() => { setActiveSpace(null); fetchSpaces(); }} />
+    <SpaceRoom space={activeSpace} onLeave={() => { setActiveSpace(null); fetchSpaces(); }} />
   );
 
-  // ── Main view ──
+  const displayTopics = ["All", ...TOPICS.filter(t => t !== "General")];
+
+  // ── Main listing view ──
   return (
-    <div className="relative">
+    <div className="relative space-y-4">
       <SpaceStyles />
 
-      {/* ══════ SUB-TABS: LOBBY / PEOPLE / ROOMS ══════ */}
-      <div className="flex gap-2 mb-4">
-        <GradientTab active={subTab === "lobby"} icon={Volume2} label="Lobby" onClick={() => setSubTab("lobby")} />
-        <GradientTab active={subTab === "people"} icon={Users} label="People" onClick={() => setSubTab("people")} />
-        <GradientTab active={subTab === "rooms"} icon={Globe} label="Rooms" onClick={() => setSubTab("rooms")} />
+      {/* ═══ HERO CARD ═══ */}
+      <div className="relative overflow-hidden rounded-2xl border border-blue-500/15 bg-gradient-to-br from-[#0a1628] via-[#0d1f3c] to-[#091428]">
+        {/* Animated wave background */}
+        <div className="absolute inset-0 overflow-hidden">
+          <svg className="absolute right-0 top-0 h-full w-2/3 opacity-30" viewBox="0 0 400 300" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="waveGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.1" />
+              </linearGradient>
+            </defs>
+            {[0, 1, 2, 3, 4].map(i => (
+              <path key={i}
+                d={`M${100 + i * 30},${300 - i * 15} Q${200 + i * 10},${180 - i * 25} ${400},${140 - i * 20}`}
+                fill="none" stroke="url(#waveGrad)" strokeWidth={1.5 - i * 0.2} opacity={0.6 - i * 0.1}
+              />
+            ))}
+          </svg>
+          {/* Extra particle dots */}
+          <div className="absolute right-20 top-8 w-1 h-1 rounded-full bg-blue-400/30 animate-pulse" />
+          <div className="absolute right-32 top-16 w-1.5 h-1.5 rounded-full bg-cyan-400/20 animate-pulse" style={{ animationDelay: "0.5s" }} />
+          <div className="absolute right-14 bottom-12 w-1 h-1 rounded-full bg-blue-300/25 animate-pulse" style={{ animationDelay: "1s" }} />
+        </div>
+
+        <div className="relative z-10 flex items-center gap-4 p-5 sm:p-6">
+          {/* Mic illustration */}
+          <MicIllustration size={130} className="shrink-0 hidden sm:flex" />
+          <MicIllustration size={100} className="shrink-0 sm:hidden" />
+
+          {/* Text content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">Live Voice</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight mb-1.5">
+              OG Spaces
+            </h2>
+            <p className="text-[13px] text-white/40 leading-relaxed max-w-sm">
+              Join or start live voice rooms — alpha calls, discussions, and community hangouts.
+            </p>
+            <div className="flex items-center gap-2 mt-3">
+              <span className="text-[11px] text-white/25 font-mono px-2.5 py-1 rounded-full border border-white/[0.08] bg-white/[0.02]">/spaces</span>
+              <span className="text-[11px] text-blue-400/60 font-mono px-2.5 py-1 rounded-full border border-blue-400/20 bg-blue-400/[0.05]">pg 20</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* ══════ LOBBY TAB ══════ */}
-      {subTab === "lobby" && !inLobby && (
-        <div className="space-y-5">
-          {/* Voice Lobby hero card */}
-          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                <h3 className="font-black text-base text-white uppercase tracking-wide">Voice Lobby</h3>
-              </div>
-              {lobbyCount > 0 && (
-                <span className="text-[11px] text-white/30 font-bold px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
-                  {lobbyCount} here
-                </span>
-              )}
-            </div>
-            <p className="text-[13px] text-white/30 mb-4">Community voice channel with live audio & soundboard support.</p>
-            <button onClick={() => { setInLobby(true); toast.success("Joined Voice Lobby 🎙️"); }}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-yellow-400 text-black font-black text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-emerald-500/20 transition-all">
-              <Volume2 className="h-4 w-4" /> Join Voice Lobby
-            </button>
+      {/* ═══ TAB BAR + ACTIONS ═══ */}
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 space-y-3">
+        <div className="flex items-center gap-2">
+          {/* Tabs */}
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            {(["live", "upcoming", "replay"] as const).map(t => {
+              const isActive = tab === t;
+              const label = t === "live" ? "Live" : t === "upcoming" ? "Upcoming" : "Replay";
+              const count = t === "replay" ? endedRooms.length : undefined;
+              return (
+                <button key={t} onClick={() => setTab(t)}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
+                    isActive
+                      ? "bg-blue-500/15 text-blue-400 border border-blue-500/25"
+                      : "text-white/35 hover:text-white/60 hover:bg-white/[0.03]"
+                  )}>
+                  {label}
+                  {count !== undefined && count > 0 && (
+                    <span className={cn(
+                      "ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                      isActive ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.06] text-white/30"
+                    )}>{count}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          {/* People here */}
-          <div>
-            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/[0.06]">
-              <Users className="h-4 w-4 text-white/25" />
-              <span className="text-[11px] font-black text-white/35 uppercase tracking-widest">People Here</span>
-            </div>
-            {lobbyCount > 0 ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                {lobbyParticipants.map(p => (
-                  <PersonCard key={p.id} username={p.username} avatarUrl={p.avatar_url} isYou={p.user_id === user?.id} isSpeaking={p.role === "speaker" && !p.is_muted} />
-                ))}
-              </div>
-            ) : (
-              <p className="text-[12px] text-white/15 text-center py-6">No one in the lobby yet. Be the first!</p>
-            )}
-          </div>
+          {/* Search toggle */}
+          <button onClick={() => setShowSearch(v => !v)}
+            className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center transition-all shrink-0",
+              showSearch
+                ? "bg-blue-500/15 border border-blue-500/25 text-blue-400"
+                : "bg-white/[0.04] border border-white/[0.06] text-white/30 hover:text-white/50"
+            )}>
+            <Search className="h-4 w-4" />
+          </button>
+
+          {/* + New Space */}
+          <button onClick={() => setShowCreate(true)}
+            className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-sm font-black flex items-center gap-1.5 transition-all shadow-lg shadow-amber-400/10 shrink-0">
+            <Plus className="h-4 w-4" /> New Space
+          </button>
         </div>
-      )}
 
-      {/* ══════ LOBBY TAB — IN LOBBY (joined) ══════ */}
-      {subTab === "lobby" && inLobby && (
-        <div className="space-y-0">
-          {/* Room header */}
-          <div className="flex items-center gap-3 pb-3 mb-4 border-b border-white/[0.06]">
-            <button onClick={() => { setInLobby(false); lobbyVoiceRef.current?.leaveVoice(); toast("Left the lobby"); }}
-              className="text-emerald-400 text-sm font-bold flex items-center gap-1 hover:text-emerald-300 transition">
-              <ArrowLeft className="h-4 w-4" /> Leave
-            </button>
-            <div className="flex-1 min-w-0 ml-1">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                <h3 className="font-black text-sm text-white uppercase tracking-wide">Voice Lobby</h3>
-              </div>
-              <p className="text-[11px] text-white/25 ml-[18px]">
-                <Globe className="h-3 w-3 text-white/15 inline mr-1" />public · {lobbyParticipants.length} connected
-              </p>
-            </div>
-          </div>
-
-          {/* In room section */}
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="h-4 w-4 text-white/30" />
-            <span className="text-[12px] font-black text-white/40 uppercase tracking-widest">In Room ({lobbyParticipants.length})</span>
-          </div>
-
-          {/* Avatar grid */}
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-6">
-            {lobbyParticipants.map(p => (
-              <PersonCard key={p.id} username={p.username} avatarUrl={p.avatar_url} isYou={p.user_id === user?.id} isSpeaking={p.role === "speaker" && !p.is_muted} />
-            ))}
-            {lobbyParticipants.length === 0 && (
-              <PersonCard username={profile?.username} avatarUrl={profile?.avatar_url} isYou />
-            )}
-          </div>
-
-          {/* Hidden voice panel for WebRTC */}
-          <div className="hidden">
-            <VoicePanel
-              ref={lobbyVoiceRef}
-              lobbyId="main-voice-lobby"
-              lobbyName="Voice Lobby"
-              autoJoin
-              onParticipantsChange={setLobbyParticipants}
-            />
-          </div>
-
-          {/* Mic visualizer */}
-          {!lobbyMuted && <div className="mb-4"><MicVisualizer active={true} /></div>}
-
-          {/* Bottom controls — centered rounded squares */}
-          <div className="flex items-center justify-center gap-3 pt-4">
-            <button onClick={() => { setLobbyMuted(v => !v); toast(lobbyMuted ? "Unmuted 🎙️" : "Muted 🔇"); }}
-              className={cn(
-                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
-                lobbyMuted
-                  ? "bg-white/[0.06] border border-white/[0.08] text-white/50 hover:bg-white/[0.1]"
-                  : "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10"
-              )}>
-              {lobbyMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-            </button>
-            <button className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/[0.06] border border-white/[0.08] text-white/40 hover:bg-white/[0.1] transition-all">
-              <Sparkles className="h-5 w-5" />
-            </button>
-            <button onClick={() => { setInLobby(false); lobbyVoiceRef.current?.leaveVoice(); toast("Left the lobby"); }}
-              className="w-14 h-14 rounded-2xl flex items-center justify-center bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all">
-              <XIcon className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ══════ PEOPLE TAB ══════ */}
-      {subTab === "people" && (
-        <div>
-          <div className="flex items-center gap-2 mb-4 pb-2 border-b border-white/[0.06]">
-            <Users className="h-4 w-4 text-white/25" />
-            <span className="text-[11px] font-black text-white/35 uppercase tracking-widest">People Online ({lobbyParticipants.length})</span>
-          </div>
-          {lobbyParticipants.length > 0 ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-              {lobbyParticipants.map(p => (
-                <PersonCard key={p.id} username={p.username} avatarUrl={p.avatar_url} isYou={p.user_id === user?.id} online />
-              ))}
-            </div>
-          ) : (
-            <EmptyState icon={Users} title="No one online" sub="People in voice will appear here" />
-          )}
-        </div>
-      )}
-
-      {/* ══════ ROOMS TAB ══════ */}
-      {subTab === "rooms" && (
-        <div>
-          {/* Rooms header */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Globe className="h-5 w-5 text-white/30" />
-              <div>
-                <h3 className="font-black text-sm text-white uppercase tracking-wide">Voice Rooms</h3>
-                <p className="text-[11px] text-white/25">{liveRooms.length} active room{liveRooms.length !== 1 ? "s" : ""}</p>
-              </div>
-            </div>
-            <button onClick={() => setShowCreate(true)}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-yellow-400 text-black text-[12px] font-black flex items-center gap-1.5 hover:shadow-lg hover:shadow-emerald-500/20 transition-all">
-              <Plus className="h-3.5 w-3.5" /> New Room
-            </button>
-          </div>
-
-          {/* Search */}
-          <div className="relative mb-4">
+        {/* Search input (expandable) */}
+        {showSearch && (
+          <div className="relative sp-slide-up">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20" />
-            <Input placeholder="Search rooms..." value={search} onChange={e => setSearch(e.target.value)}
-              className="bg-white/[0.03] border-white/[0.06] rounded-xl pl-10 h-10 text-sm focus:border-emerald-500/40" />
+            <Input placeholder="Search spaces..." value={search} onChange={e => setSearch(e.target.value)} autoFocus
+              className="bg-white/[0.03] border-white/[0.06] rounded-xl pl-10 h-10 text-sm focus:border-blue-500/40" />
             {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/50"><XIcon className="h-4 w-4" /></button>}
           </div>
+        )}
 
-          {/* Room lists */}
+        {/* ═══ TOPIC FILTER PILLS ═══ */}
+        <div className="relative">
+          <div ref={topicScrollRef} className="flex gap-2 overflow-x-auto scrollbar-none pb-1" style={{ scrollbarWidth: "none" }}>
+            {displayTopics.map(t => {
+              const isActive = topicFilter === t;
+              const meta = TOPIC_META[t];
+              return (
+                <button key={t} onClick={() => setTopicFilter(t)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-bold whitespace-nowrap transition-all shrink-0",
+                    isActive
+                      ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                      : "bg-white/[0.03] text-white/35 border border-white/[0.06] hover:bg-white/[0.06] hover:text-white/50"
+                  )}>
+                  {meta && <span className="text-sm">{meta.icon}</span>}
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+          {/* Scroll fade indicator */}
+          <div className="absolute right-0 top-0 bottom-1 w-10 bg-gradient-to-l from-[#0a0f1a] to-transparent pointer-events-none flex items-center justify-end pr-1">
+            <ChevronRight className="h-3.5 w-3.5 text-white/20" />
+          </div>
+        </div>
+
+        {/* ═══ CONTENT AREA ═══ */}
+        <div className="pt-1">
           {loading ? (
-            <div className="flex flex-col gap-3">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-2xl bg-white/[0.02] animate-pulse" />)}</div>
-          ) : filteredRooms.length === 0 && endedRooms.length === 0 ? (
-            <EmptyState icon={Globe} title="No Rooms Yet" sub="Create a room above to start a conversation"
-              action={{ label: "New Room", onClick: () => setShowCreate(true) }} />
+            <div className="flex flex-col gap-3 py-4">{[1, 2, 3].map(i => <div key={i} className="h-20 rounded-xl bg-white/[0.02] animate-pulse" />)}</div>
           ) : (
-            <div className="space-y-3 pb-4">
-              {/* Live rooms */}
-              {filteredRooms.filter(s => s.is_live).map(s => (
-                <RoomCard key={s.id} space={s} onJoin={setActiveSpace} />
-              ))}
-              {/* Scheduled rooms */}
-              {filteredRooms.filter(s => !s.is_live).length > 0 && (
-                <>
-                  <div className="flex items-center gap-2 pt-2">
-                    <Clock className="h-3.5 w-3.5 text-white/20" />
-                    <span className="text-[10px] font-bold text-white/20 uppercase tracking-wider">Upcoming</span>
-                    <div className="flex-1 h-px bg-white/[0.04]" />
+            <>
+              {/* LIVE TAB */}
+              {tab === "live" && (
+                filteredLive.length === 0 ? (
+                  <div className="rounded-2xl border border-white/[0.05] bg-white/[0.015] py-10 px-6">
+                    <EmptyMicIllustration />
+                    <h3 className="text-lg font-bold text-white text-center mt-4">No live spaces right now</h3>
+                    <p className="text-sm text-white/30 text-center mt-1">Be the first to start one!</p>
+                    <div className="flex justify-center mt-5">
+                      <button onClick={() => setShowCreate(true)}
+                        className="px-6 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-sm font-black flex items-center gap-2 transition-all shadow-lg shadow-amber-400/10">
+                        <Mic className="h-4 w-4" /> Start a Space
+                      </button>
+                    </div>
                   </div>
-                  {filteredRooms.filter(s => !s.is_live).map(s => (
-                    <RoomCard key={s.id} space={s} onJoin={setActiveSpace} />
-                  ))}
-                </>
-              )}
-              {/* Past rooms with replay */}
-              {endedRooms.length > 0 && !search && (
-                <>
-                  <div className="flex items-center gap-2 pt-2">
-                    <Archive className="h-3.5 w-3.5 text-white/20" />
-                    <span className="text-[10px] font-bold text-white/20 uppercase tracking-wider">Past Rooms</span>
-                    <div className="flex-1 h-px bg-white/[0.04]" />
+                ) : (
+                  <div className="space-y-3">
+                    {filteredLive.map(s => (
+                      <SpaceCard key={s.id} space={s} onJoin={setActiveSpace} />
+                    ))}
                   </div>
-                  {endedRooms.slice(0, 5).map(s => (
-                    <PastRoomCard key={s.id} space={s} onPlay={setReplaySpace} />
-                  ))}
-                </>
+                )
               )}
-            </div>
+
+              {/* UPCOMING TAB */}
+              {tab === "upcoming" && (
+                filteredScheduled.length === 0 ? (
+                  <div className="rounded-2xl border border-white/[0.05] bg-white/[0.015] py-10 px-6">
+                    <EmptyMicIllustration />
+                    <h3 className="text-lg font-bold text-white text-center mt-4">No upcoming spaces</h3>
+                    <p className="text-sm text-white/30 text-center mt-1">Schedule one and invite your community!</p>
+                    <div className="flex justify-center mt-5">
+                      <button onClick={() => setShowCreate(true)}
+                        className="px-6 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-sm font-black flex items-center gap-2 transition-all shadow-lg shadow-amber-400/10">
+                        <Calendar className="h-4 w-4" /> Schedule Space
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredScheduled.map(s => (
+                      <ScheduledSpaceCard key={s.id} space={s} onRemind={() => toast.success("Reminder set! 🔔")}
+                        onStartNow={user?.id === s.host_id ? (sp) => { setActiveSpace(sp); } : undefined}
+                        isOwner={user?.id === s.host_id} />
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* REPLAY TAB */}
+              {tab === "replay" && (
+                filteredPast.length === 0 ? (
+                  <div className="rounded-2xl border border-white/[0.05] bg-white/[0.015] py-10 px-6">
+                    <EmptyMicIllustration />
+                    <h3 className="text-lg font-bold text-white text-center mt-4">No replays yet</h3>
+                    <p className="text-sm text-white/30 text-center mt-1">Recorded spaces will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredPast.map(s => (
+                      <SpaceCard key={s.id} space={s} onJoin={s.recording_url ? setReplaySpace : () => {}} variant="past" />
+                    ))}
+                  </div>
+                )
+              )}
+            </>
           )}
         </div>
-      )}
+      </div>
+
+      {/* ═══ STATS BAR ═══ */}
+      <StatsBar
+        liveCount={liveRooms.length}
+        listenerCount={totalListeners}
+        activeNow={totalSpeakers + totalListeners}
+        trending={liveRooms.filter(s => (s.listener_count || 0) >= 5).length}
+      />
 
       {/* Create modal */}
       {showCreate && <CreateSpaceModal onClose={() => setShowCreate(false)} onCreated={handleCreated} user={user} profile={profile} />}
