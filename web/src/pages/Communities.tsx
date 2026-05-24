@@ -3,15 +3,11 @@
  * Features: Posts, Threads, Articles, News tab, Comments, Likes, Reposts, Bookmarks.
  * Rendered inline inside Index.tsx — no AppLayout wrapper.
  */
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Users, Plus, Search, MessageSquare, Heart, Send, Trash2, ArrowLeft,
-  Globe, TrendingUp, Sparkles, Image as ImageIcon, Repeat2, Bookmark,
-  Share, Crown, Clock, Hash, Flame, Eye, ChevronRight, BarChart3,
-  Check, X as XIcon, ChevronDown, Loader2, MoreHorizontal,
-  FileText, Newspaper, Home, Bell, PenSquare, Link2, AtSign, Bold,
-  List, Quote, AlertCircle, ThumbsUp, Reply, ExternalLink, Pin, Star,
-  ArrowUp
+  Users, Plus, Search, MessageSquare, Heart, Trash2, ArrowLeft,
+  Repeat2, Bookmark, Share, Eye, ChevronRight,
+  X as XIcon, Loader2, Newspaper, Home, PenSquare, Pin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

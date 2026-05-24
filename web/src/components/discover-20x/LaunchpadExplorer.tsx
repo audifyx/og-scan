@@ -4,7 +4,7 @@
  * Uses DexScreener to discover tokens tagged with each launchpad.
  */
 import { useState, useEffect, useCallback } from "react";
-import { Rocket, Search, RefreshCw, Loader2, TrendingUp, Clock, ArrowUpRight, ArrowDownRight, Filter, ExternalLink, Zap, Star, Users, BarChart3 } from "lucide-react";
+import { Rocket, RefreshCw, Loader2, ArrowUpRight, ArrowDownRight, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { fmtUsd, fmtNum, DEXSCREENER_WEB_BASE } from "@/lib/og";
