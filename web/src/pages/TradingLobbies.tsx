@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LobbyChat } from "@/components/lobbies/LobbyChat";
 import { LobbyWatchlist } from "@/components/lobbies/LobbyWatchlist";
-import { VoicePanel } from "@/components/lobbies/VoicePanel";
+import { LiveKitVoicePanel as VoicePanel } from "@/components/lobbies/LiveKitVoicePanel";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { toast } from "sonner";
 

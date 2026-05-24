@@ -23,7 +23,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { VoicePanel, VoicePanelHandle, VoiceParticipant, VoiceRole } from "@/components/lobbies/VoicePanel";
+// LiveKit-powered voice (replaces WebRTC mesh VoicePanel)
+import { LiveKitVoicePanel as VoicePanel, type VoicePanelHandle, type VoiceParticipant, type VoiceRole } from "@/components/lobbies/LiveKitVoicePanel";
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { safeAvatarUrl } from "@/lib/utils";
