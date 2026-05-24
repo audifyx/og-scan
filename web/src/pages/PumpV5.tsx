@@ -18,7 +18,7 @@ import { TokenDetailModal } from "@/components/pumpv5/TokenDetailModal";
 import { 
   Rocket, Star, TrendingUp, TrendingDown, 
   Plus, Globe, Twitter, Send, Upload, Search,
-  Loader2, Image, ChevronRight, Flame, Sparkles,
+  Loader2, Image, ChevronLeft, ChevronRight, Flame, Sparkles,
   BarChart3, Droplets, Users, Zap, Filter, ArrowUpRight,
   ArrowDownRight, Crown, Timer, ExternalLink, Copy, RefreshCw
 } from "lucide-react";
@@ -559,6 +559,14 @@ const PumpV5 = () => {
             {/* Header */}
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
               <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white hover:border-white/20"
+                  aria-label="Go back"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary blur-xl opacity-60 animate-pulse" />
                   <div className="relative p-4 rounded-2xl bg-gradient-to-br from-primary to-secondary shadow-2xl shadow-primary/40">

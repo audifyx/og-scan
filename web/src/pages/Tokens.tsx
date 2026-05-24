@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -253,6 +254,9 @@ const Tokens = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-6">
+        {/* 3D Banner */}
+        <OGBannerPromo title="Token Monitor" subtitle="Real-time Solana token tracking & forensic analysis" accent="cyan" />
+
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[

@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback, type ComponentType, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { OGBannerHero, OGBannerPromo, OGBannerCTA, OGBannerStats, Tilt3D } from "@/components/banners/OGBanner3D";
 import {
   Activity,
   ArrowUpRight,
   Bell,
   Bot,
+  ChevronLeft,
   ChevronRight,
   Coins,
   Compass,
@@ -519,6 +521,7 @@ const Index = () => {
           onOpenSidebar={() => setSidebarOpen(true)}
           onChangeMint={promptMint}
           onNavigate={switchTab}
+          onGoBack={() => navigate(-1)}
         />
 
         {/* Page content */}
@@ -800,10 +803,21 @@ const AppTopBar = ({
   onOpenSidebar: () => void;
   onChangeMint: () => void;
   onNavigate: (t: string) => void;
+  onGoBack: () => void;
 }) => (
   <div className="sticky top-0 z-30 border-b border-white/[0.07] bg-[#060c13]/90 backdrop-blur-xl">
     {/* Top row: title + controls */}
     <header className="flex items-center gap-3 px-4 py-2.5 sm:px-5 lg:px-6">
+      {/* Back button */}
+      <button
+        type="button"
+        onClick={onGoBack}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white hover:border-white/20"
+        aria-label="Go back"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+
       {/* Hamburger — mobile only */}
       <button
         type="button"
@@ -1013,6 +1027,16 @@ const OverviewPage = ({
         </div>
       </div>
 
+      {/* 3D Stats Banner */}
+      <OGBannerStats />
+
+      {/* 3D Promo Banner */}
+      <OGBannerPromo
+        title="On-Chain Forensics"
+        subtitle="1.2M+ tokens scanned · 47K rugs detected · Real-time intelligence"
+        accent="cyan"
+      />
+
       {/* All tools list */}
       <div>
         <div className="mb-3">
@@ -1024,6 +1048,13 @@ const OverviewPage = ({
           ))}
         </div>
       </div>
+
+      {/* 3D CTA Banner */}
+      <OGBannerCTA
+        text="Ready to find the next 100x gem before everyone else?"
+        buttonText="Open Truth Scan"
+        onClick={onScanClick}
+      />
     </div>
   );
 };

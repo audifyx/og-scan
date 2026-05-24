@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { safeAvatarUrl } from "@/lib/utils";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
