@@ -206,10 +206,12 @@ const useReactions = () => {
   const [userReactions, setUserReactions] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const saved = localStorage.getItem("og-meme-reactions");
-    const savedUser = localStorage.getItem("og-meme-user-reactions");
-    if (saved) setReactions(JSON.parse(saved));
-    if (savedUser) setUserReactions(JSON.parse(savedUser));
+    try {
+      const saved = localStorage.getItem("og-meme-reactions");
+      const savedUser = localStorage.getItem("og-meme-user-reactions");
+      if (saved) setReactions(JSON.parse(saved));
+      if (savedUser) setUserReactions(JSON.parse(savedUser));
+    } catch { /* corrupted localStorage — use defaults */ }
   }, []);
 
   const react = useCallback((memeId: number, reactionKey: string) => {
@@ -802,29 +804,31 @@ const ArtFeed = ({ inline = false }: { inline?: boolean }) => {
 
   const content = (
     <>
-      <PageHeader title="OG Gallery" description="Memes, trailers & art from the OG Scan universe.">
-        <div className="flex items-center gap-2">
-          <Badge className="bg-[#a855f7]/15 text-[#a855f7] border-[#a855f7]/20 text-[10px] font-bold">
-            <ImageIcon className="h-2.5 w-2.5 mr-1" /> {MEMES.length} MEMES
-          </Badge>
-          <div className="flex rounded-lg overflow-hidden border border-white/10">
-            <button
-              onClick={() => setView("slider")}
-              className={`p-1.5 transition-colors ${view === "slider" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
-              title="Slider view"
-            >
-              <LayoutList className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setView("grid")}
-              className={`p-1.5 border-l border-white/10 transition-colors ${view === "grid" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
-              title="Grid view"
-            >
-              <Grid3X3 className="h-4 w-4" />
-            </button>
+      {!inline && (
+        <PageHeader title="OG Gallery" description="Memes, trailers & art from the OG Scan universe.">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-[#a855f7]/15 text-[#a855f7] border-[#a855f7]/20 text-[10px] font-bold">
+              <ImageIcon className="h-2.5 w-2.5 mr-1" /> {MEMES.length} MEMES
+            </Badge>
+            <div className="flex rounded-lg overflow-hidden border border-white/10">
+              <button
+                onClick={() => setView("slider")}
+                className={`p-1.5 transition-colors ${view === "slider" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+                title="Slider view"
+              >
+                <LayoutList className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setView("grid")}
+                className={`p-1.5 border-l border-white/10 transition-colors ${view === "grid" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"}`}
+                title="Grid view"
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-        </div>
-      </PageHeader>
+        </PageHeader>
+      )}
 
       <div className="py-4 sm:py-6">
         {/* 3D Hero Banner */}

@@ -1307,7 +1307,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
                 username={p.username}
                 avatarUrl={p.avatar_url}
                 isYou={p.user_id === user?.id}
-                isSpeaking={p.role === "speaker" && !p.muted}
+                isSpeaking={p.role === "speaker" && !p.is_muted}
               />
             ))}
             {voiceParticipants.length === 0 && (
@@ -1768,7 +1768,7 @@ const Spaces = () => {
             {lobbyCount > 0 ? (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                 {lobbyParticipants.map(p => (
-                  <PersonCard key={p.id} username={p.username} avatarUrl={p.avatar_url} isYou={p.user_id === user?.id} isSpeaking={p.role === "speaker" && !p.muted} />
+                  <PersonCard key={p.id} username={p.username} avatarUrl={p.avatar_url} isYou={p.user_id === user?.id} isSpeaking={p.role === "speaker" && !p.is_muted} />
                 ))}
               </div>
             ) : (
@@ -1807,7 +1807,7 @@ const Spaces = () => {
           {/* Avatar grid */}
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mb-6">
             {lobbyParticipants.map(p => (
-              <PersonCard key={p.id} username={p.username} avatarUrl={p.avatar_url} isYou={p.user_id === user?.id} isSpeaking={p.role === "speaker" && !p.muted} />
+              <PersonCard key={p.id} username={p.username} avatarUrl={p.avatar_url} isYou={p.user_id === user?.id} isSpeaking={p.role === "speaker" && !p.is_muted} />
             ))}
             {lobbyParticipants.length === 0 && (
               <PersonCard username={profile?.username} avatarUrl={profile?.avatar_url} isYou />
