@@ -511,12 +511,14 @@ const Index = () => {
 
       {/* Main content */}
       <div className="flex min-w-0 flex-1 flex-col lg:ml-[260px]">
-        {/* Top bar */}
+        {/* Top bar + horizontal tab strip */}
         <AppTopBar
           tab={activeTab}
           mint={mint}
+          activeId={tab}
           onOpenSidebar={() => setSidebarOpen(true)}
           onChangeMint={promptMint}
+          onNavigate={switchTab}
         />
 
         {/* Page content */}
@@ -787,41 +789,84 @@ const NavItem = ({
 const AppTopBar = ({
   tab,
   mint,
+  activeId,
   onOpenSidebar,
   onChangeMint,
+  onNavigate,
 }: {
   tab: TabConfig;
   mint: string;
+  activeId: TabId;
   onOpenSidebar: () => void;
   onChangeMint: () => void;
+  onNavigate: (t: string) => void;
 }) => (
-  <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/[0.07] bg-[#060c13]/90 px-4 py-3 backdrop-blur-xl sm:px-5 lg:px-6">
-    {/* Title */}
-    <div className="min-w-0 flex-1">
-      <div className="flex items-center gap-2">
-        <div className={cn("h-1.5 w-1.5 rounded-full shadow-[0_0_8px_currentColor]", accentDot(tab.accent))} />
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-white/45">{tab.eyebrow}</span>
-      </div>
-      <h1 className="truncate text-lg font-black leading-tight tracking-tight text-white sm:text-xl">{tab.label}</h1>
-    </div>
-
-    {/* Right controls */}
-    <div className="flex shrink-0 items-center gap-2">
+  <div className="sticky top-0 z-30 border-b border-white/[0.07] bg-[#060c13]/90 backdrop-blur-xl">
+    {/* Top row: title + controls */}
+    <header className="flex items-center gap-3 px-4 py-2.5 sm:px-5 lg:px-6">
+      {/* Hamburger — mobile only */}
       <button
         type="button"
-        onClick={onChangeMint}
-        className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-semibold text-white/60 transition hover:border-og-cyan/40 hover:text-white sm:flex"
+        onClick={onOpenSidebar}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition hover:bg-white/[0.06] hover:text-white lg:hidden"
       >
-        <Layers3 className="h-3.5 w-3.5" />
-        {shortAddr(mint, 4)}
+        <Menu className="h-4 w-4" />
       </button>
-      <AuthButton />
-      <div className="flex items-center gap-1.5 rounded-xl border border-og-lime/25 bg-og-lime/10 px-3 py-2">
-        <span className="h-1.5 w-1.5 rounded-full bg-og-lime shadow-[0_0_6px_hsl(var(--og-lime))]" />
-        <span className="text-[11px] font-bold text-og-lime">Live</span>
+
+      {/* Title */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <div className={cn("h-1.5 w-1.5 rounded-full shadow-[0_0_8px_currentColor]", accentDot(tab.accent))} />
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">{tab.eyebrow}</span>
+        </div>
+        <h1 className="truncate text-base font-black leading-tight tracking-tight text-white sm:text-lg">{tab.label}</h1>
       </div>
-    </div>
-  </header>
+
+      {/* Right controls */}
+      <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={onChangeMint}
+          className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/60 transition hover:border-og-cyan/40 hover:text-white sm:flex"
+        >
+          <Layers3 className="h-3.5 w-3.5" />
+          {shortAddr(mint, 4)}
+        </button>
+        <AuthButton />
+        <div className="flex items-center gap-1.5 rounded-xl border border-og-lime/25 bg-og-lime/10 px-2.5 py-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-og-lime shadow-[0_0_6px_hsl(var(--og-lime))]" />
+          <span className="text-[11px] font-bold text-og-lime">Live</span>
+        </div>
+      </div>
+    </header>
+
+    {/* Horizontal tab strip — scrollable */}
+    <nav
+      className="flex gap-0.5 overflow-x-auto px-3 pb-2 sm:px-5 lg:px-5"
+      style={{ scrollbarWidth: "none" }}
+      aria-label="Tab navigation"
+    >
+      {NAV_TABS.map((item) => {
+        const isActive = activeId === item.id || TAB_BY_ID[activeId]?.mergedInto === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onNavigate(item.id)}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition whitespace-nowrap",
+              isActive
+                ? "bg-white/[0.09] text-white"
+                : "text-white/40 hover:bg-white/[0.04] hover:text-white/80",
+            )}
+          >
+            <item.Icon className={cn("h-3.5 w-3.5 shrink-0", isActive ? accentText(item.accent) : "")} />
+            {item.label}
+          </button>
+        );
+      })}
+    </nav>
+  </div>
 );
 
 /* ─── Mobile bottom nav ─── */

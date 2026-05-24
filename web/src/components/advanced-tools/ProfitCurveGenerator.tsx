@@ -23,7 +23,8 @@ interface PnLData {
   solBalance?: number;
 }
 
-const MOCK_CURVE = (totalPnL: number, tradeCount: number): CurvePoint[] => {
+// Interpolates a per-trade curve from aggregate PnL + trade count returned by the API
+const buildCurveFromPnL = (totalPnL: number, tradeCount: number): CurvePoint[] => {
   const points: CurvePoint[] = [];
   let cumulative = 0;
   const trades = Math.max(tradeCount, 10);
@@ -62,7 +63,7 @@ export const ProfitCurveGenerator = () => {
 
   const curvePoints = useMemo(() => {
     if (!pnlData) return [];
-    return MOCK_CURVE(pnlData.totalPnL, pnlData.tradeCount);
+    return buildCurveFromPnL(pnlData.totalPnL, pnlData.tradeCount);
   }, [pnlData]);
 
   // SVG chart
