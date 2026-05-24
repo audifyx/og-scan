@@ -20,6 +20,7 @@ interface SpeakerTimerProps {
   isHost: boolean;
   speakers: { id: string; name: string }[];
   onTimeUp?: (speakerId: string) => void; // Called when timer expires — parent should demote
+  autoTimerMinutes?: number | null; // If set, auto-start timer for the first speaker
 }
 
 const PRESETS = [
@@ -38,14 +39,28 @@ const fmtTime = (sec: number): string => {
   return `${m}:${s.toString().padStart(2, "0")}`;
 };
 
-const SpeakerTimer: React.FC<SpeakerTimerProps> = ({ isHost, speakers, onTimeUp }) => {
+const SpeakerTimer: React.FC<SpeakerTimerProps> = ({ isHost, speakers, onTimeUp, autoTimerMinutes }) => {
   const [timer, setTimer] = useState<ActiveTimer | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [selectedSpeaker, setSelectedSpeaker] = useState("");
-  const [customMin, setCustomMin] = useState(5);
+  const [customMin, setCustomMin] = useState(autoTimerMinutes || 5);
   const [paused, setPaused] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const alertedRef = useRef(false);
+  const autoStartedRef = useRef<Set<string>>(new Set());
+
+  // Auto-start timer for new speakers if autoTimerMinutes is set
+  useEffect(() => {
+    if (!autoTimerMinutes || !isHost || timer) return;
+    // Find a speaker that hasn't had a timer yet (skip host)
+    const newSpeaker = speakers.find(s => !autoStartedRef.current.has(s.id));
+    if (newSpeaker) {
+      autoStartedRef.current.add(newSpeaker.id);
+      alertedRef.current = false;
+      setTimer({ speakerId: newSpeaker.id, speakerName: newSpeaker.name, durationSec: autoTimerMinutes * 60, startedAt: Date.now(), remaining: autoTimerMinutes * 60 });
+      setPaused(false);
+    }
+  }, [speakers, autoTimerMinutes, isHost, timer]);
 
   // Tick
   useEffect(() => {

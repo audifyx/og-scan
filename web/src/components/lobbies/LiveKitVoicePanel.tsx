@@ -39,6 +39,7 @@ export interface VoicePanelHandle {
   promoteToSpeaker: (userId: string) => void;
   demoteToListener: (userId: string) => void;
   muteUser: (userId: string) => void;
+  toggleMute: (muted: boolean) => Promise<void>;
 }
 
 export interface VoiceParticipant {
@@ -411,6 +412,15 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
   };
 
   /* ─── Expose imperative handle ─── */
+  /* ─── Toggle mute (accepts explicit muted boolean or toggles) ─── */
+  const toggleMute = useCallback(async (forceMuted?: boolean) => {
+    const room = roomRef.current;
+    if (!room) return;
+    const newMuted = forceMuted !== undefined ? forceMuted : !muted;
+    await room.localParticipant.setMicrophoneEnabled(!newMuted);
+    setMuted(newMuted);
+  }, [muted]);
+
   useImperativeHandle(ref, () => ({
     leaveVoice,
     saveRecording: stopAndSaveRecording,
@@ -418,6 +428,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
     promoteToSpeaker: (userId: string) => sendCommand("promote", userId),
     demoteToListener: (userId: string) => sendCommand("demote", userId),
     muteUser: (userId: string) => sendCommand("force-mute", userId),
+    toggleMute,
   }));
 
   /* ─── Auto-join ─── */
@@ -427,15 +438,6 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
     }
     return () => { leaveVoice(); };
   }, [lobbyId, user?.id]);
-
-  /* ─── Toggle mute ─── */
-  const toggleMute = async () => {
-    const room = roomRef.current;
-    if (!room) return;
-    const newMuted = !muted;
-    await room.localParticipant.setMicrophoneEnabled(!newMuted);
-    setMuted(newMuted);
-  };
 
   // This component is rendered hidden in Spaces — it provides voice functionality
   // without visible UI (Spaces renders its own participant UI)

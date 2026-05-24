@@ -1401,7 +1401,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
               hostId={space.host_id}
               initialRole={isHost ? "speaker" : "listener"}
               maxSpeakers={MAX_SPEAKERS}
-              onRecordingSaved={(url, dur) => { setCur(prev => ({ ...prev, recording_url: url, duration_seconds: dur })); }}
+              onRecordingSaved={(url, dur) => { setCur(prev => ({ ...prev, recording_url: url, duration_seconds: dur })); supabase.from("spaces").update({ recording_url: url, duration_seconds: dur }).eq("id", space.id); }}
               onParticipantsChange={setVoiceParticipants}
               onRoleChange={setMyRole}
             />
@@ -1423,6 +1423,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
               isHost={isHost}
               speakers={voiceParticipants.filter(p => p.role === "speaker").map(p => ({ id: p.user_id, name: p.username || "User" }))}
               onTimeUp={handleSpeakerTimeUp}
+              autoTimerMinutes={cur.max_speaker_time_minutes}
             />
           </div>
 
@@ -1536,7 +1537,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
         <div className="flex items-center justify-center gap-3">
           {/* Mic toggle */}
           {myRole === "speaker" ? (
-            <button onClick={() => { setMuted(v => !v); toast(muted ? "Unmuted 🎙️" : "Muted 🔇"); }}
+            <button onClick={() => { const next = !muted; setMuted(next); voicePanelRef.current?.toggleMute?.(next); toast(muted ? "Unmuted 🎙️" : "Muted 🔇"); }}
               className={cn(
                 "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
                 muted
@@ -2052,8 +2053,11 @@ const Spaces = () => {
         supabase.from("spaces").select("*").eq("is_live", false).not("ended_at", "is", null).order("ended_at", { ascending: false }).limit(20),
       ]);
       if (lr.error) { console.warn("Spaces fetch error:", lr.error.message); }
-      setSpaces((lr.data as Space[] | null) ?? []);
-      setPastSpaces((pr.data as Space[] | null) ?? []);
+      // Filter private spaces: show only if user is host or co-host
+      const uid = user?.id;
+      const filterPrivate = (list: Space[]) => list.filter(s => !s.is_private || s.host_id === uid || (s.co_hosts && uid && s.co_hosts.includes(uid)));
+      setSpaces(filterPrivate((lr.data as Space[] | null) ?? []));
+      setPastSpaces(filterPrivate((pr.data as Space[] | null) ?? []));
     } catch (e) { console.warn("Spaces fetch exception:", e); setSpaces([]); setPastSpaces([]); }
     setLoading(false);
   }, []);
@@ -2070,7 +2074,15 @@ const Spaces = () => {
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const j = p.get("join");
-    if (j) { const s = spaces.find(x => x.id === j); if (s) setActiveSpace(s); }
+    if (j && !activeSpace) {
+      // For invite links: fetch the space directly (bypasses private filter)
+      const found = spaces.find(x => x.id === j);
+      if (found) { handleJoinSpace(found); return; }
+      // Space might be private and filtered out — fetch directly
+      supabase.from("spaces").select("*").eq("id", j).single().then(({ data }) => {
+        if (data && !data.ended_at) handleJoinSpace(data as Space);
+      });
+    }
   }, [spaces]);
 
   const handleCreated = (s: Space) => {
@@ -2090,8 +2102,10 @@ const Spaces = () => {
       ]);
       // Delete recording from storage if exists
       if (s.recording_url) {
-        const path = s.recording_url.split("/space-recordings/")[1];
-        if (path) await supabase.storage.from("space-recordings").remove([path]);
+        const vrPath = s.recording_url.split("/voice-recordings/")[1];
+        const srPath = s.recording_url.split("/space-recordings/")[1];
+        if (vrPath) await supabase.storage.from("voice-recordings").remove([vrPath]);
+        else if (srPath) await supabase.storage.from("space-recordings").remove([srPath]);
       }
       const { error } = await supabase.from("spaces").delete().eq("id", s.id);
       if (error) { toast.error("Failed to delete"); return; }

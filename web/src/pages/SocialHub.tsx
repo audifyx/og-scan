@@ -805,24 +805,30 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
     setParticipants(list);
   }, []);
 
-  /* ─── Fetch LiveKit token ─── */
+  /* ─── Fetch LiveKit token (with retry) ─── */
   const fetchToken = useCallback(async (lkRoomName: string): Promise<string | null> => {
     if (!user) return null;
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/livekit-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({ roomName: lkRoomName, identity: user.id, name: profile?.username || "Anon" }),
-      });
-      if (!resp.ok) throw new Error(`Server ${resp.status}`);
-      const data = await resp.json();
-      if (data.token) return data.token;
-      throw new Error(data.error || "No token");
-    } catch (e: any) {
-      setError(e.message === "Failed to fetch" ? "Unable to reach voice server — check your connection" : e.message);
-      return null;
+    const MAX_RETRIES = 2;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) { setError("Sign in to join voice"); return null; }
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/livekit-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ roomName: lkRoomName, identity: user.id, name: profile?.username || "Anon" }),
+        });
+        if (!resp.ok) throw new Error(`Server ${resp.status}`);
+        const data = await resp.json();
+        if (data.token) return data.token;
+        throw new Error(data.error || "No token");
+      } catch (e: any) {
+        if (attempt < MAX_RETRIES) { await new Promise(r => setTimeout(r, 800 * (attempt + 1))); continue; }
+        setError(e.message === "Failed to fetch" ? "Unable to reach voice server — retries exhausted. Check your connection or try again." : e.message);
+        return null;
+      }
     }
+    return null;
   }, [user, profile]);
 
   /* ─── Disconnect current room ─── */
