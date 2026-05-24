@@ -33,7 +33,7 @@ const RANK_CONFIG: Record<number, { bg: string; border: string; text: string }> 
   3: { bg: "bg-amber-700/10", border: "border-amber-700/20", text: "text-amber-600" },
 };
 
-export const PlatformLeaderboard: React.FC<Props> = ({ users }) => {
+export const PlatformLeaderboard: React.FC<Partial<Props>> = ({ users = [] }) => {
   const [timeframe, setTimeframe] = useState<"week" | "month" | "all">("all");
   const [sortBy, setSortBy] = useState<"xp" | "scans" | "spaces" | "accuracy">("xp");
   const [expanded, setExpanded] = useState(true);
