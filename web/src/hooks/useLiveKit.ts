@@ -45,7 +45,6 @@ export function useLiveKit(options: UseLiveKitOptions) {
   // Get token from Supabase edge function
   const getToken = useCallback(async (): Promise<string | null> => {
     if (!identity || !roomName) {
-      setError("Sign in to use voice features");
       return null;
     }
     try {
