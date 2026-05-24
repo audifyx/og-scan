@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -314,7 +313,6 @@ const SupportCenter = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-4 max-w-3xl mx-auto">
-          <OGBannerPromo title="Support Center" subtitle="Get help from the OG Scan team 2014 we respond fast" accent="purple" />
         {/* Search + New */}
         <div className="flex gap-2">
           <div className="relative flex-1">

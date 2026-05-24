@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -300,14 +299,6 @@ const Admin = () => {
           {/* Header */}
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/50 transition hover:bg-white/[0.08] hover:text-white hover:border-white/20"
-                aria-label="Go back"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
               <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-destructive/20"><Shield className="h-8 w-8 text-[#22d3ee]" /></div>
               <div>
                 <h1 className="text-2xl font-bold">Admin Dashboard</h1>

@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Bell, Check, Trash2, Wallet, TrendingUp, TrendingDown, Coins, AlertTriangle, BellRing, BellOff, Plus, Search, Zap } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -140,7 +139,6 @@ const Notifications = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-4">
-          <OGBannerPromo title="Alerts & Notifications" subtitle="Smart alerts, whale tracking & custom automation triggers" accent="purple" />
         {/* Push Notification Settings */}
         {supported && (
           <Card className="og-glass-card border-primary/20">

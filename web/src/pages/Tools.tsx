@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -128,7 +127,6 @@ const Tools = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-6">
-          <OGBannerPromo title="Sol Tools" subtitle="Professional Solana analysis toolkit 2014 scan, verify, track" accent="cyan" />
 
         {/* ── Tool Grid ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">

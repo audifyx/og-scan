@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,7 +53,6 @@ const LiveTrading = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-6 max-w-4xl mx-auto">
-          <OGBannerPromo title="Live Trading" subtitle="Trade directly on the platform 2014 coming soon" accent="cyan" />
 
         {/* ── Hero Card ── */}
         <div className="og-glass-frame rounded-3xl overflow-hidden relative">

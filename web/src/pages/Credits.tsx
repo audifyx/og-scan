@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -104,7 +103,6 @@ const Credits = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-6">
-          <OGBannerPromo title="Credits" subtitle="Track usage, spending history & manage your credit balance" accent="gold" />
         {/* Hero Balance Card */}
         <Card className="og-glass-frame overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-[#22d3ee]/8 via-transparent to-transparent" />

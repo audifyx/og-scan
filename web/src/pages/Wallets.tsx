@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Plus, Eye, Trash2, RefreshCw, Send, Copy, ExternalLink, Zap, Clock, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Coins, Globe, Twitter, MessageCircle, Link as LinkIcon, Play, Pause, BarChart3, Droplets, Users, Shield, Check } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { WalletSearch } from "@/components/WalletSearch";
 import { PortfolioOverview } from "@/components/PortfolioOverview";
 import { TokenList } from "@/components/TokenList";
@@ -335,7 +334,6 @@ const Wallets = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-6">
-          <OGBannerPromo title="Wallet Tracker" subtitle="Track any Solana wallet · Holdings, activity & forensic analysis" accent="purple" />
         <WalletSearch onSearch={handleSearch} isLoading={isLoading} />
 
         {trackedWallets.length > 0 && (
