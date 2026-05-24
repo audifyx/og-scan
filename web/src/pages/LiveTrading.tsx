@@ -36,40 +36,9 @@ interface TradeHistoryItem {
   total: number; pnl?: number; timestamp: Date;
 }
 
-/* ─── Demo Data ─── */
-const DEMO_POSITIONS: Position[] = [
-  { id: "p1", token: "So11...", symbol: "SOL", side: "long", entry: 168.42, current: 174.89, amount: 12.5, pnl: 80.88, pnlPct: 3.84, timestamp: new Date(Date.now() - 3600000) },
-  { id: "p2", token: "DezX...", symbol: "BONK", side: "long", entry: 0.0000234, current: 0.0000289, amount: 45000000, pnl: 247.50, pnlPct: 23.50, timestamp: new Date(Date.now() - 7200000) },
-  { id: "p3", token: "JUPy...", symbol: "JUP", side: "long", entry: 1.12, current: 1.08, amount: 500, pnl: -20.00, pnlPct: -3.57, timestamp: new Date(Date.now() - 14400000) },
-  { id: "p4", token: "7GCi...", symbol: "POPCAT", side: "long", entry: 0.82, current: 1.15, amount: 3000, pnl: 990.00, pnlPct: 40.24, timestamp: new Date(Date.now() - 86400000) },
-  { id: "p5", token: "HEiv...", symbol: "SOLTOOLS", side: "long", entry: 0.0012, current: 0.0018, amount: 250000, pnl: 150.00, pnlPct: 50.00, timestamp: new Date(Date.now() - 43200000) },
-];
 
-const DEMO_ORDERS: Order[] = [
-  { id: "o1", token: "SOL", symbol: "SOL", type: "limit", side: "buy", price: 165.00, amount: 5, status: "open", timestamp: new Date(Date.now() - 1800000) },
-  { id: "o2", token: "BONK", symbol: "BONK", type: "stop", side: "sell", price: 0.0000200, amount: 20000000, status: "open", timestamp: new Date(Date.now() - 3600000) },
-  { id: "o3", token: "JUP", symbol: "JUP", type: "limit", side: "buy", price: 1.00, amount: 1000, status: "open", timestamp: new Date(Date.now() - 5400000) },
-  { id: "o4", token: "WIF", symbol: "WIF", type: "limit", side: "sell", price: 3.50, amount: 200, status: "open", timestamp: new Date(Date.now() - 7200000) },
-];
 
-const DEMO_HISTORY: TradeHistoryItem[] = [
-  { id: "h1", symbol: "SOL", side: "buy", price: 168.42, amount: 12.5, total: 2105.25, timestamp: new Date(Date.now() - 3600000) },
-  { id: "h2", symbol: "BONK", side: "buy", price: 0.0000234, amount: 45000000, total: 1053.00, timestamp: new Date(Date.now() - 7200000) },
-  { id: "h3", symbol: "WIF", side: "sell", price: 2.89, amount: 500, total: 1445.00, pnl: 245.00, timestamp: new Date(Date.now() - 10800000) },
-  { id: "h4", symbol: "POPCAT", side: "buy", price: 0.82, amount: 3000, total: 2460.00, timestamp: new Date(Date.now() - 86400000) },
-  { id: "h5", symbol: "RAY", side: "sell", price: 5.12, amount: 300, total: 1536.00, pnl: -84.00, timestamp: new Date(Date.now() - 172800000) },
-  { id: "h6", symbol: "ORCA", side: "buy", price: 4.25, amount: 200, total: 850.00, timestamp: new Date(Date.now() - 259200000) },
-  { id: "h7", symbol: "JTO", side: "sell", price: 3.78, amount: 400, total: 1512.00, pnl: 312.00, timestamp: new Date(Date.now() - 345600000) },
-  { id: "h8", symbol: "SOLTOOLS", side: "buy", price: 0.0012, amount: 250000, total: 300.00, timestamp: new Date(Date.now() - 432000000) },
-];
 
-const TOP_TRADERS = [
-  { name: "phantom_whale", pnl: "+$48.2K", winRate: "78%", trades: 342, avatar: "PW" },
-  { name: "solana_degen", pnl: "+$31.7K", winRate: "71%", trades: 518, avatar: "SD" },
-  { name: "bonk_maxi", pnl: "+$22.1K", winRate: "65%", trades: 891, avatar: "BM" },
-  { name: "jup_sniper", pnl: "+$18.9K", winRate: "82%", trades: 156, avatar: "JS" },
-  { name: "mev_hunter", pnl: "+$15.4K", winRate: "69%", trades: 1203, avatar: "MH" },
-];
 
 /* ─── Helpers ─── */
 const fmt = (n: number, d = 2) => {
@@ -97,10 +66,13 @@ const LiveTrading = () => {
   const [slippage, setSlippage] = useState("1.0");
   const [searchToken, setSearchToken] = useState("");
   const [copyTrading, setCopyTrading] = useState(false);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [history, setHistory] = useState<TradeHistoryItem[]>([]);
 
-  const totalPnl = useMemo(() => DEMO_POSITIONS.reduce((s, p) => s + p.pnl, 0), []);
-  const totalValue = useMemo(() => DEMO_POSITIONS.reduce((s, p) => s + p.current * p.amount, 0), []);
-  const totalInvested = useMemo(() => DEMO_POSITIONS.reduce((s, p) => s + p.entry * p.amount, 0), []);
+  const totalPnl = useMemo(() => positions.reduce((s, p) => s + p.pnl, 0), [positions]);
+  const totalValue = useMemo(() => positions.reduce((s, p) => s + p.current * p.amount, 0), [positions]);
+  const totalInvested = useMemo(() => positions.reduce((s, p) => s + p.entry * p.amount, 0), [positions]);
 
   return (
     <AppLayout>
@@ -122,8 +94,8 @@ const LiveTrading = () => {
           {[
             { icon: DollarSign, label: "Portfolio Value", value: fmt(totalValue), color: "text-[#22d3ee]", bg: "from-[#22d3ee]/12" },
             { icon: TrendingUp, label: "Total P&L", value: `${totalPnl >= 0 ? "+" : ""}${fmt(totalPnl)}`, color: totalPnl >= 0 ? "text-emerald-400" : "text-red-400", bg: totalPnl >= 0 ? "from-emerald-500/12" : "from-red-500/12" },
-            { icon: Percent, label: "Win Rate", value: "72%", color: "text-[#eab308]", bg: "from-[#eab308]/12" },
-            { icon: Activity, label: "Active Positions", value: String(DEMO_POSITIONS.length), color: "text-purple-400", bg: "from-purple-500/12" },
+            { icon: Percent, label: "Win Rate", value: "—", color: "text-[#eab308]", bg: "from-[#eab308]/12" },
+            { icon: Activity, label: "Active Positions", value: String(positions.length), color: "text-purple-400", bg: "from-purple-500/12" },
           ].map((s, i) => (
             <div key={i} className="og-glass-card rounded-2xl p-4">
               <div className="flex items-center gap-3">
@@ -159,14 +131,23 @@ const LiveTrading = () => {
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">Open Positions</CardTitle>
                       <Badge variant="outline" className="text-[10px] border-white/10 text-white/40">
-                        {DEMO_POSITIONS.length} active
+                        {positions.length} active
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     <ScrollArea className="max-h-[500px]">
+                      {positions.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 px-6">
+                          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
+                            <PieChart className="h-7 w-7 text-white/20" />
+                          </div>
+                          <p className="text-sm font-bold text-white/50 mb-1">No open positions</p>
+                          <p className="text-xs text-white/25 text-center">Your active trades will appear here when you start trading</p>
+                        </div>
+                      ) : (
                       <div className="divide-y divide-white/[0.05]">
-                        {DEMO_POSITIONS.map((p) => (
+                        {positions.map((p) => (
                           <div key={p.id} className="flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center text-xs font-bold text-[#22d3ee]">
@@ -193,6 +174,7 @@ const LiveTrading = () => {
                           </div>
                         ))}
                       </div>
+                      )}
                     </ScrollArea>
                   </CardContent>
                 </Card>
@@ -205,14 +187,23 @@ const LiveTrading = () => {
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">Open Orders</CardTitle>
                       <Badge variant="outline" className="text-[10px] border-white/10 text-white/40">
-                        {DEMO_ORDERS.filter(o => o.status === "open").length} active
+                        {orders.filter(o => o.status === "open").length} active
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     <ScrollArea className="max-h-[500px]">
+                      {orders.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 px-6">
+                          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
+                            <Layers className="h-7 w-7 text-white/20" />
+                          </div>
+                          <p className="text-sm font-bold text-white/50 mb-1">No open orders</p>
+                          <p className="text-xs text-white/25 text-center">Place limit or stop orders to see them here</p>
+                        </div>
+                      ) : (
                       <div className="divide-y divide-white/[0.05]">
-                        {DEMO_ORDERS.map((o) => (
+                        {orders.map((o) => (
                           <div key={o.id} className="flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors">
                             <div className="flex items-center gap-3">
                               <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold ${
@@ -244,6 +235,7 @@ const LiveTrading = () => {
                           </div>
                         ))}
                       </div>
+                      )}
                     </ScrollArea>
                   </CardContent>
                 </Card>
@@ -257,8 +249,17 @@ const LiveTrading = () => {
                   </CardHeader>
                   <CardContent className="p-0">
                     <ScrollArea className="max-h-[500px]">
+                      {history.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 px-6">
+                          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
+                            <Clock className="h-7 w-7 text-white/20" />
+                          </div>
+                          <p className="text-sm font-bold text-white/50 mb-1">No trade history</p>
+                          <p className="text-xs text-white/25 text-center">Your completed trades will appear here</p>
+                        </div>
+                      ) : (
                       <div className="divide-y divide-white/[0.05]">
-                        {DEMO_HISTORY.map((t) => (
+                        {history.map((t) => (
                           <div key={t.id} className="flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors">
                             <div className="flex items-center gap-3">
                               <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold ${
@@ -290,6 +291,7 @@ const LiveTrading = () => {
                           </div>
                         ))}
                       </div>
+                      )}
                     </ScrollArea>
                   </CardContent>
                 </Card>
@@ -308,34 +310,13 @@ const LiveTrading = () => {
                   </CardHeader>
                   <CardContent className="p-0">
                     <ScrollArea className="max-h-[500px]">
-                      <div className="divide-y divide-white/[0.05]">
-                        {TOP_TRADERS.map((t, i) => (
-                          <div key={i} className="flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors">
-                            <div className="flex items-center gap-3">
-                              <div className="relative">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#22d3ee]/20 to-purple-500/20 flex items-center justify-center text-xs font-bold text-white">
-                                  {t.avatar}
-                                </div>
-                                {i < 3 && (
-                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#eab308] flex items-center justify-center">
-                                    <span className="text-[8px] font-black text-black">{i + 1}</span>
-                                  </div>
-                                )}
-                              </div>
-                              <div>
-                                <p className="font-bold text-sm">{t.name}</p>
-                                <p className="text-[11px] text-white/35 font-mono">{t.winRate} WR · {t.trades} trades</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <p className="font-bold font-mono text-sm text-emerald-400">{t.pnl}</p>
-                              <Button size="sm" className="h-8 rounded-xl text-xs font-bold bg-[#22d3ee]/12 text-[#22d3ee] border border-[#22d3ee]/20 hover:bg-[#22d3ee]/20">
-                                <Copy className="h-3 w-3 mr-1" /> Copy
-                              </Button>
-                            </div>
+                      <div className="flex flex-col items-center justify-center py-16 px-6">
+                          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
+                            <Copy className="h-7 w-7 text-white/20" />
                           </div>
-                        ))}
-                      </div>
+                          <p className="text-sm font-bold text-white/50 mb-1">Copy trading coming soon</p>
+                          <p className="text-xs text-white/25 text-center">Follow top traders and auto-mirror their moves</p>
+                        </div>
                     </ScrollArea>
                   </CardContent>
                 </Card>
@@ -396,7 +377,7 @@ const LiveTrading = () => {
                     </Button>
                   </div>
                   <div className="flex items-center justify-between px-1">
-                    <span className="text-[10px] text-white/25">Balance: 24.89 SOL</span>
+                    <span className="text-[10px] text-white/25">Balance: — SOL</span>
                     <div className="flex gap-1">
                       {["25%", "50%", "MAX"].map(pct => (
                         <button key={pct} className="text-[9px] text-[#22d3ee]/60 hover:text-[#22d3ee] font-bold px-1.5 py-0.5 rounded bg-[#22d3ee]/5 hover:bg-[#22d3ee]/10 transition-colors">
@@ -482,10 +463,10 @@ const LiveTrading = () => {
                 <h4 className="text-xs font-bold text-white/50 uppercase tracking-wider">24h Performance</h4>
                 <div className="space-y-2.5">
                   {[
-                    { label: "Trades Today", value: "7", icon: BarChart3, color: "text-[#22d3ee]" },
-                    { label: "Volume", value: "$8,420", icon: DollarSign, color: "text-[#eab308]" },
-                    { label: "Best Trade", value: "+40.24%", icon: Flame, color: "text-emerald-400" },
-                    { label: "Avg Hold Time", value: "2.4h", icon: Clock, color: "text-purple-400" },
+                    { label: "Trades Today", value: "0", icon: BarChart3, color: "text-[#22d3ee]" },
+                    { label: "Volume", value: "$0", icon: DollarSign, color: "text-[#eab308]" },
+                    { label: "Best Trade", value: "—", icon: Flame, color: "text-emerald-400" },
+                    { label: "Avg Hold Time", value: "—", icon: Clock, color: "text-purple-400" },
                   ].map((s, i) => (
                     <div key={i} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">

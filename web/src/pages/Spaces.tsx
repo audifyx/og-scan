@@ -354,19 +354,6 @@ const Toggle = ({ on, onChange, activeColor = "bg-primary" }: { on: boolean; onC
    AVATAR STACK — overlapping avatars
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-const AvatarStack = ({ avatars, count, size = 24 }: { avatars: (string | null)[]; count: number; size?: number }) => (
-  <div className="flex items-center">
-    <div className="flex -space-x-2">
-      {avatars.slice(0, 3).map((a, i) => (
-        <div key={i} style={{ width: size, height: size, zIndex: 3 - i }} className="rounded-full border-2 border-[#0a0f18] bg-white/[0.06] flex items-center justify-center overflow-hidden">
-          {safAvatar(a) ? <img src={safAvatar(a)} alt="" className="w-full h-full object-cover" /> : <Headphones style={{ width: size * 0.5, height: size * 0.5 }} className="text-white/20" />}
-        </div>
-      ))}
-    </div>
-    {count > 3 && <span className="text-[10px] text-white/30 font-bold ml-1.5">+{count - 3}</span>}
-  </div>
-);
-
 /* ═══════════════════════════════════════════════════════════════════════════════
    LIVE POLL — in-room polls
    ═══════════════════════════════════════════════════════════════════════════════ */
@@ -616,19 +603,6 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
    GRADIENT TAB — SocialHub-style gradient pill tab
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-const GradientTab = ({ active, icon: Icon, label, onClick }: { active: boolean; icon: React.ComponentType<{ className?: string }>; label: string; onClick: () => void }) => (
-  <button onClick={onClick}
-    className={cn(
-      "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-black uppercase tracking-wider transition-all",
-      active
-        ? "bg-gradient-to-r from-emerald-500 to-yellow-400 text-black shadow-lg shadow-emerald-500/20"
-        : "text-white/40 hover:text-white/60 hover:bg-white/[0.03]"
-    )}>
-    <Icon className="h-4 w-4" />
-    {label}
-  </button>
-);
-
 /* ═══════════════════════════════════════════════════════════════════════════════
    PERSON CARD — avatar card for people grid
    ═══════════════════════════════════════════════════════════════════════════════ */
@@ -670,41 +644,6 @@ const PersonCard = ({ username, avatarUrl, isYou, isSpeaking, online = true }: {
    ROOM CARD — voice room list item
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-const RoomCard = ({ space, onJoin }: { space: Space; onJoin: (s: Space) => void }) => {
-  const tm = topicOf(space.topic);
-  const total = (space.listener_count || 0) + (space.speaker_count || 0);
-  return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] transition-all p-4">
-      <div className="flex items-start gap-3">
-        <div className={cn("shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-lg border", tm.color)}>
-          {tm.icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <h3 className="font-bold text-[14px] text-white leading-tight line-clamp-1">{space.title}</h3>
-            {space.is_live && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20">
-                <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
-                <span className="text-[8px] font-bold text-red-400">LIVE</span>
-              </span>
-            )}
-          </div>
-          {space.description && <p className="text-[11px] text-white/25 line-clamp-1 mb-1.5">{space.description}</p>}
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] text-white/30">@{space.host_username || "host"}</span>
-            <span className="flex items-center gap-1 text-[10px] text-white/20"><Users className="h-3 w-3" />{total}</span>
-            {space.is_recording && <span className="flex items-center gap-1 text-[8px] text-red-400/50 font-bold"><div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />REC</span>}
-          </div>
-        </div>
-        <button onClick={() => onJoin(space)}
-          className="shrink-0 self-center px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-yellow-400 text-black text-[11px] font-black hover:shadow-lg hover:shadow-emerald-500/20 transition-all">
-          Join
-        </button>
-      </div>
-    </div>
-  );
-};
-
 /* ═══════════════════════════════════════════════════════════════════════════════
    PAST ROOM CARD — for replay section
    ═══════════════════════════════════════════════════════════════════════════════ */
@@ -719,110 +658,9 @@ const formatDuration = (sec: number | null): string => {
   return `${s}s`;
 };
 
-const PastRoomCard = ({ space, onPlay }: { space: Space; onPlay: (s: Space) => void }) => {
-  const tm = topicOf(space.topic);
-  const hasReplay = !!space.recording_url;
-  return (
-    <div className={cn(
-      "rounded-2xl border p-4 transition-all",
-      hasReplay ? "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.1] cursor-pointer" : "border-white/[0.04] bg-white/[0.01] opacity-40"
-    )} onClick={() => hasReplay && onPlay(space)}>
-      <div className="flex items-center gap-3">
-        <div className={cn("shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-base border", tm.color)}>
-          {tm.icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-[13px] text-white line-clamp-1">{space.title}</h3>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[10px] text-white/20">@{space.host_username || "host"}</span>
-            {space.ended_at && <span className="text-[9px] text-white/15">{formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}</span>}
-            {hasReplay && <span className="text-[9px] text-primary/60 font-bold">{space.duration_seconds ? formatDuration(space.duration_seconds) : "Replay"}</span>}
-          </div>
-        </div>
-        {hasReplay && (
-          <div className="shrink-0 w-10 h-10 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center hover:bg-primary/20 transition-colors">
-            <Play className="h-4 w-4 text-primary ml-0.5" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 /* ═══════════════════════════════════════════════════════════════════════════════
    UNUSED — kept for compat (referenced nowhere now)
    ═══════════════════════════════════════════════════════════════════════════════ */
-const TrendingBanner = ({ spaces, onJoin }: { spaces: Space[]; onJoin: (s: Space) => void }) => {
-  if (spaces.length === 0) return null;
-  const top = spaces[0];
-  const ttm = topicOf(top.topic);
-  const topTotal = (top.listener_count || 0) + (top.speaker_count || 0);
-  return (
-    <div className="mb-5">
-      {/* Featured / top space — full width hero card */}
-      <button onClick={() => onJoin(top)} className="w-full text-left rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.06] via-violet-900/[0.04] to-transparent p-5 relative overflow-hidden group transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/[0.05] mb-3">
-        <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-primary/[0.06] blur-3xl opacity-60 group-hover:opacity-100 transition-opacity" />
-        <div className="relative flex items-start gap-4">
-          <div className="shrink-0 w-14 h-14 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-2xl">
-            {ttm.icon}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/25">
-                <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
-                <span className="text-[9px] font-bold text-red-400">LIVE</span>
-              </span>
-              <span className={cn("inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border", ttm.color)}>
-                {top.topic}
-              </span>
-              {top.is_recording && <span className="inline-flex items-center gap-1 text-[8px] font-bold text-red-400/60 px-1.5 py-0.5 rounded-full bg-red-500/5 border border-red-500/10">● REC</span>}
-            </div>
-            <h3 className="font-black text-base text-white leading-snug line-clamp-1">{top.title}</h3>
-            {top.description && <p className="text-[11px] text-white/30 mt-0.5 line-clamp-1">{top.description}</p>}
-            <div className="flex items-center gap-4 mt-3">
-              <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center overflow-hidden">
-                  {safAvatar(top.host_avatar) ? <img src={safAvatar(top.host_avatar)} alt="" className="w-full h-full object-cover" /> : <Crown className="h-2.5 w-2.5 text-primary" />}
-                </div>
-                <span className="text-[10px] text-white/40 font-medium">@{top.host_username || "host"}</span>
-              </div>
-              <span className="flex items-center gap-1 text-[10px] text-white/25"><Headphones className="h-3 w-3" />{topTotal.toLocaleString()} listening</span>
-              <AudioEQ active bars={4} color="bg-emerald-400/80" />
-            </div>
-          </div>
-          <div className="shrink-0 self-center px-4 py-2 rounded-full bg-primary/15 border border-primary/30 text-primary text-[11px] font-bold group-hover:bg-primary/25 transition-colors">
-            Join
-          </div>
-        </div>
-      </button>
-
-      {/* More live — smaller horizontal cards */}
-      {spaces.length > 1 && (
-        <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-          {spaces.slice(1, 6).map((s) => {
-            const tm = topicOf(s.topic);
-            const total = (s.listener_count || 0) + (s.speaker_count || 0);
-            return (
-              <button key={s.id} onClick={() => onJoin(s)}
-                className="shrink-0 w-56 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-left transition-all hover:border-white/[0.12] hover:bg-white/[0.04] group">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-sm">{tm.icon}</span>
-                  <span className="text-[9px] font-bold text-white/30 uppercase">{s.topic}</span>
-                  <span className="ml-auto relative flex h-1.5 w-1.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-1.5 w-1.5 rounded-full bg-red-500" /></span>
-                </div>
-                <h4 className="font-bold text-[12px] text-white leading-snug line-clamp-1">{s.title}</h4>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-[10px] text-white/30 truncate">@{s.host_username || "host"}</span>
-                  <span className="flex items-center gap-1 text-[10px] text-white/20"><Headphones className="h-2.5 w-2.5" />{total}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-};
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    SPACE CARD — list view
@@ -1472,26 +1310,6 @@ const CreatePollInline = ({ onCreate, onCancel }: { onCreate: (p: SpacePoll) => 
    MINI PLAYER BAR
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-const MiniPlayerBar = ({ space, onExpand, onLeave }: { space: Space; onExpand: () => void; onLeave: () => void }) => (
-  <div className="fixed bottom-20 left-4 right-4 z-50 bg-[#0c1219]/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-3 shadow-2xl shadow-black/40 flex items-center gap-3 sp-slide-up">
-    <div className="relative">
-      <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center overflow-hidden">
-        {safAvatar(space.host_avatar) ? <img src={safAvatar(space.host_avatar)} alt="" className="w-full h-full object-cover rounded-xl" /> : <Radio className="h-4 w-4 text-primary" />}
-      </div>
-      <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-2.5 w-2.5 rounded-full bg-red-500 border border-[#0c1219]" /></span>
-    </div>
-    <div className="flex-1 min-w-0 cursor-pointer" onClick={onExpand}>
-      <p className="font-bold text-[12px] text-white truncate">{space.title}</p>
-      <div className="flex items-center gap-1.5">
-        <AudioEQ active bars={3} color="bg-emerald-400" />
-        <span className="text-[10px] text-white/25">{(space.listener_count || 0) + (space.speaker_count || 0)} listening</span>
-      </div>
-    </div>
-    <button onClick={onExpand} className="p-2 rounded-full hover:bg-white/10 transition"><Maximize2 className="h-4 w-4 text-white/40" /></button>
-    <button onClick={onLeave} className="p-2 rounded-full hover:bg-red-500/10 transition"><XIcon className="h-4 w-4 text-red-400/60" /></button>
-  </div>
-);
-
 /* ═══════════════════════════════════════════════════════════════════════════════
    EMPTY STATE
    ═══════════════════════════════════════════════════════════════════════════════ */
@@ -1625,22 +1443,6 @@ const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void })
     </div>
   );
 };
-
-const EmptyState = ({ icon: Icon, title, sub, action }: { icon: React.ComponentType<{ className?: string }>; title: string; sub: string; action?: { label: string; onClick: () => void } }) => (
-  <div className="flex flex-col items-center justify-center py-16">
-    <div className="w-16 h-16 rounded-full bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
-      <Icon className="h-7 w-7 text-white/[0.08]" />
-    </div>
-    <p className="font-black text-white/25 text-sm uppercase tracking-wider">{title}</p>
-    <p className="text-[12px] text-white/15 mt-1 text-center max-w-xs">{sub}</p>
-    {action && (
-      <button onClick={action.onClick}
-        className="mt-5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-yellow-400 text-black text-sm font-black hover:shadow-lg hover:shadow-emerald-500/20 transition-all flex items-center gap-2">
-        <Plus className="h-4 w-4" />{action.label}
-      </button>
-    )}
-  </div>
-);
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    MICROPHONE SVG ILLUSTRATION — used in hero card & empty state

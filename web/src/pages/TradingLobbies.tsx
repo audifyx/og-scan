@@ -45,13 +45,6 @@ const CRYPTO_AVATARS = [
   "bonk", "jup", "ray", "orca", "mango", "serum", "step", "atlas",
 ];
 
-const DEMO_LOBBIES: Lobby[] = [
-  { id: "dl1", name: "SOL Alpha Hunters", description: "Daily alpha drops and live trading calls for Solana degens", created_by: "demo", creator_name: "phantom_whale", creator_avatar: null, privacy: "public", chart_pair: null, member_count: 24, is_active: true, created_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: "dl2", name: "Meme Coin Snipers", description: "First to find the next 100x meme coin. Pump.fun watchers unite", created_by: "demo", creator_name: "bonk_maxi", creator_avatar: null, privacy: "public", chart_pair: null, member_count: 47, is_active: true, created_at: new Date(Date.now() - 172800000).toISOString() },
-  { id: "dl3", name: "Whale Watch Room", description: "Tracking whale wallets and big moves in real-time", created_by: "demo", creator_name: "chain_explorer", creator_avatar: null, privacy: "public", chart_pair: null, member_count: 18, is_active: true, created_at: new Date(Date.now() - 259200000).toISOString() },
-  { id: "dl4", name: "DeFi Yield Farmers", description: "Best yield strategies across Solana DeFi protocols", created_by: "demo", creator_name: "solana_degen", creator_avatar: null, privacy: "public", chart_pair: null, member_count: 31, is_active: true, created_at: new Date(Date.now() - 345600000).toISOString() },
-  { id: "dl5", name: "OG Inner Circle", description: "Private room for verified OG Scan power users", created_by: "demo", creator_name: "og_scanner", creator_avatar: null, privacy: "private", chart_pair: null, member_count: 12, is_active: true, created_at: new Date(Date.now() - 604800000).toISOString() },
-];
 
 const TradingLobbies = () => {
   const navigate = useNavigate();
@@ -214,7 +207,7 @@ const TradingLobbies = () => {
     toast.success("Chart synced for all users!");
   };
 
-  const sourceLobbies = lobbies.length > 0 ? lobbies : DEMO_LOBBIES;
+  const sourceLobbies = lobbies;
   const filteredLobbies = sourceLobbies.filter((l) =>
     !searchFilter || l.name.toLowerCase().includes(searchFilter.toLowerCase())
   );
@@ -519,9 +512,12 @@ const TradingLobbies = () => {
         </div>
 
         {filteredLobbies.length === 0 && (
-          <div className="text-center py-16">
-            <Users className="h-12 w-12 text-muted-foreground/20 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground/50">No lobbies found. Create the first one!</p>
+          <div className="flex flex-col items-center justify-center py-16 px-6">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
+              <Users className="h-7 w-7 text-white/20" />
+            </div>
+            <p className="text-sm font-bold text-white/50 mb-1">No lobbies found</p>
+            <p className="text-xs text-white/25 text-center">Create the first one and start trading together</p>
           </div>
         )}
       </div>

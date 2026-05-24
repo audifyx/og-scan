@@ -23,20 +23,6 @@ const rankColors = [
   "text-amber-600",
 ];
 
-const DEMO_LEADERBOARD = [
-  { user_id: "demo-1", username: "phantom_whale", avatar_url: null, total_pnl: 48200, win_rate: 78, trades_count: 342, badge: "Whale" },
-  { user_id: "demo-2", username: "solana_degen", avatar_url: null, total_pnl: 31700, win_rate: 71, trades_count: 518, badge: "OG" },
-  { user_id: "demo-3", username: "bonk_maxi", avatar_url: null, total_pnl: 22100, win_rate: 65, trades_count: 891, badge: "Degen" },
-  { user_id: "demo-4", username: "jup_sniper", avatar_url: null, total_pnl: 18900, win_rate: 82, trades_count: 156, badge: "Sniper" },
-  { user_id: "demo-5", username: "mev_hunter", avatar_url: null, total_pnl: 15400, win_rate: 69, trades_count: 1203, badge: null },
-  { user_id: "demo-6", username: "orca_flipper", avatar_url: null, total_pnl: 12800, win_rate: 63, trades_count: 445, badge: null },
-  { user_id: "demo-7", username: "raydium_ray", avatar_url: null, total_pnl: 9500, win_rate: 58, trades_count: 287, badge: "Builder" },
-  { user_id: "demo-8", username: "wif_holder", avatar_url: null, total_pnl: 7200, win_rate: 74, trades_count: 98, badge: "Diamond" },
-  { user_id: "demo-9", username: "popcat_chad", avatar_url: null, total_pnl: 5100, win_rate: 61, trades_count: 412, badge: null },
-  { user_id: "demo-10", username: "sol_surgeon", avatar_url: null, total_pnl: 3800, win_rate: 55, trades_count: 634, badge: null },
-  { user_id: "demo-11", username: "token_tactician", avatar_url: null, total_pnl: 2100, win_rate: 52, trades_count: 189, badge: null },
-  { user_id: "demo-12", username: "chain_explorer", avatar_url: null, total_pnl: 1400, win_rate: 48, trades_count: 321, badge: null },
-];
 
 const Leaderboard = () => {
   const [sortBy, setSortBy] = useState<SortKey>("pnl");
@@ -71,7 +57,7 @@ const Leaderboard = () => {
     },
   });
 
-  const source = traders && traders.length > 0 ? traders : DEMO_LEADERBOARD;
+  const source = traders || [];
   const sorted = [...source].sort((a, b) => {
     if (sortBy === "pnl") return (b.total_pnl ?? 0) - (a.total_pnl ?? 0);
     if (sortBy === "winrate") return (b.win_rate ?? 0) - (a.win_rate ?? 0);
@@ -211,10 +197,12 @@ const Leaderboard = () => {
         </div>
 
         {!isLoading && sorted.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
-            <Trophy className="h-12 w-12 mx-auto mb-3 opacity-40" />
-            <p className="font-mono text-sm">No traders on the board yet</p>
-            <p className="text-xs mt-1">Start trading to claim your rank</p>
+          <div className="flex flex-col items-center justify-center py-16 px-6">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
+              <Trophy className="h-7 w-7 text-white/20" />
+            </div>
+            <p className="text-sm font-bold text-white/50 mb-1">No traders on the board yet</p>
+            <p className="text-xs text-white/25 text-center">Start trading to claim your rank</p>
           </div>
         )}
       </div>

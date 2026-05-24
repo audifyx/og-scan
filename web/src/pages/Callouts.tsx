@@ -36,14 +36,6 @@ interface Callout {
   sentToDiscord: boolean;
 }
 
-const DEMO_CALLOUTS: Callout[] = [
-  { id: "dc1", type: "token", address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", symbol: "BONK", name: "Bonk", price: 0.0000289, priceChange24h: 23.5, marketCap: 1800000000, liquidity: 42000000, holders: 890000, riskScore: 12, username: "phantom_whale", timestamp: new Date(Date.now() - 300000), sentToDiscord: true },
-  { id: "dc2", type: "wallet", address: "7xKXs32ePUBijNfYmXLz3mPq8Js9gZ5KPqUdH26ymR1V", totalValue: 2400000, tokenCount: 47, username: "chain_explorer", timestamp: new Date(Date.now() - 600000), sentToDiscord: true },
-  { id: "dc3", type: "token", address: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr", symbol: "POPCAT", name: "Popcat", price: 1.15, priceChange24h: 40.2, marketCap: 520000000, liquidity: 18000000, holders: 210000, riskScore: 28, username: "meme_hunter", timestamp: new Date(Date.now() - 1200000), sentToDiscord: false },
-  { id: "dc4", type: "token", address: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", symbol: "WIF", name: "dogwifhat", price: 2.89, priceChange24h: 12.8, marketCap: 2900000000, liquidity: 85000000, holders: 450000, riskScore: 8, username: "solana_degen", timestamp: new Date(Date.now() - 1800000), sentToDiscord: true },
-  { id: "dc5", type: "wallet", address: "Gh8K9dF3vR2veMnPqZxYkJwLsW4N7aT1bC6rR2vK8sEf", totalValue: 890000, tokenCount: 23, username: "degen_king", timestamp: new Date(Date.now() - 2400000), sentToDiscord: false },
-  { id: "dc6", type: "token", address: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", symbol: "JUP", name: "Jupiter", price: 1.08, priceChange24h: -3.6, marketCap: 1400000000, liquidity: 62000000, holders: 380000, riskScore: 5, username: "jup_sniper", timestamp: new Date(Date.now() - 3600000), sentToDiscord: true },
-];
 
 const Callouts = () => {
   const { user } = useAuth();
@@ -270,7 +262,7 @@ const Callouts = () => {
     toast({ title: "Address copied" });
   };
 
-  const sourceCallouts = callouts.length > 0 ? callouts : DEMO_CALLOUTS;
+  const sourceCallouts = callouts;
   const filteredCallouts = sourceCallouts.filter(c => filter === 'all' || c.type === filter);
   const tokenCount = callouts.filter(c => c.type === 'token').length;
   const walletCount = callouts.filter(c => c.type === 'wallet').length;
@@ -321,14 +313,12 @@ const Callouts = () => {
             <CardContent className="p-0 h-full">
               <ScrollArea className="h-full" ref={scrollRef}>
                 {filteredCallouts.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <div className="p-5 rounded-full bg-primary/10 mb-4">
-                      <Sparkles className="h-10 w-10 text-[#22d3ee]" />
+                  <div className="flex flex-col items-center justify-center py-16 px-6">
+                    <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
+                      <Sparkles className="h-7 w-7 text-white/20" />
                     </div>
-                    <h3 className="text-lg font-semibold mb-2">No callouts yet</h3>
-                    <p className="text-sm text-muted-foreground max-w-sm">
-                      Drop a token CA or wallet address below to post the first callout!
-                    </p>
+                    <p className="text-sm font-bold text-white/50 mb-1">No callouts yet</p>
+                    <p className="text-xs text-white/25 text-center max-w-xs">Drop a token CA or wallet address below to post the first callout</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-border/50">
