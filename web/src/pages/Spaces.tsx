@@ -1176,15 +1176,25 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
                 Listeners ({voiceParticipants.filter(p => p.role === "listener").length})
               </span>
             </div>
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2.5">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
               {voiceParticipants.filter(p => p.role === "listener").map(p => (
-                <PersonCard
-                  key={p.id}
-                  username={p.username}
-                  avatarUrl={p.avatar_url}
-                  isYou={p.user_id === user?.id}
-                  isSpeaking={false}
-                />
+                <div key={p.id} className="relative group">
+                  <PersonCard
+                    username={p.username}
+                    avatarUrl={p.avatar_url}
+                    isYou={p.user_id === user?.id}
+                    isSpeaking={false}
+                  />
+                  {isHost && voiceParticipants.filter(pp => pp.role === "speaker").length < MAX_SPEAKERS && (
+                    <button
+                      onClick={() => voicePanelRef.current?.promoteToSpeaker(p.user_id)}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500/40"
+                      title="Promote to speaker"
+                    >
+                      <Mic className="h-3 w-3 text-emerald-400" />
+                    </button>
+                  )}
+                </div>
               ))}
               {voiceParticipants.filter(p => p.role === "listener").length === 0 && (
                 <div className="col-span-full text-center py-6">
@@ -1275,12 +1285,13 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
           ) : (
             <button onClick={raiseHand} disabled={hasRaised}
               className={cn(
-                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
+                "h-14 px-5 rounded-2xl flex items-center justify-center gap-2 transition-all",
                 hasRaised
                   ? "bg-amber-400/15 border border-amber-400/25 text-amber-400"
                   : "bg-white/[0.06] border border-white/[0.08] text-white/50 hover:bg-white/[0.1]"
               )}>
               <Hand className={cn("h-5 w-5", hasRaised && "animate-bounce")} />
+              <span className="text-[11px] font-bold">{hasRaised ? "Raised ✋" : "Speak"}</span>
             </button>
           )}
 
