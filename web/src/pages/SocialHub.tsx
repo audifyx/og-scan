@@ -15,13 +15,18 @@ import {
   UserPlus, X, MoreVertical, Smile, Image as ImageIcon,
   ArrowDown, Pin, Trash2, Copy, Reply, Heart,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { useLiveKit } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
 import { safeAvatarUrl } from "@/lib/utils";
 import { formatDistanceToNow, format } from "date-fns";
+import {
+  Room,
+  RoomEvent,
+  RemoteParticipant,
+  ConnectionState,
+} from "livekit-client";
 
 /* ═══════════════════════════════════════════════════════════════
    Types
@@ -749,106 +754,182 @@ const GeneralChat = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   Voice Rooms — LiveKit-powered voice chat
+   Voice Rooms — LiveKit-powered voice chat (direct Room API)
    ═══════════════════════════════════════════════════════════════ */
+
+const LK_URL = "wss://new-7unnd5e1.livekit.cloud";
+
+interface VoiceParticipantInfo {
+  identity: string;
+  name: string;
+  isSpeaking: boolean;
+  isMuted: boolean;
+  isLocal: boolean;
+}
 
 const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
   const { user, profile } = useAuth();
   const [subTab, setSubTab] = useState<VoiceSubTab>("lobby");
   const [rooms, setRooms] = useState<VoiceRoom[]>([]);
-  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-  const [activeRoomName, setActiveRoomName] = useState<string>("social-voice-lobby");
+
+  /* Connection state */
+  const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<VoiceParticipantInfo[]>([]);
+  const [activeRoomLabel, setActiveRoomLabel] = useState<string | null>(null); // "lobby" | room id
+  const roomRef = useRef<Room | null>(null);
+  const mountedRef = useRef(true);
+
+  /* Room creation state */
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [creatingRoom, setCreatingRoom] = useState(false);
 
-  /* LiveKit for voice (one instance, switches between lobby and rooms) */
-  const voice = useLiveKit({
-    roomName: activeRoomName,
-    identity: user?.id || "",
-    displayName: profile?.username || "Anon",
-  });
+  const isInLobby = connected && activeRoomLabel === "lobby";
+  const isInRoom = connected && activeRoomLabel !== null && activeRoomLabel !== "lobby";
 
-  const isInLobby = voice.connected && activeRoomName === "social-voice-lobby";
-  const isInRoom = voice.connected && activeRoomId !== null;
+  /* ─── Sync participant list from LiveKit Room ─── */
+  const syncParticipants = useCallback(() => {
+    const room = roomRef.current;
+    if (!room || room.state !== ConnectionState.Connected) { setParticipants([]); return; }
+    const list: VoiceParticipantInfo[] = [];
+    const lp = room.localParticipant;
+    if (lp) {
+      const hasAudio = Array.from(lp.audioTrackPublications.values()).some(p => p.track && !p.isMuted);
+      list.push({ identity: lp.identity, name: lp.name || lp.identity, isSpeaking: lp.isSpeaking, isMuted: !hasAudio, isLocal: true });
+    }
+    room.remoteParticipants.forEach((rp: RemoteParticipant) => {
+      const hasAudio = Array.from(rp.audioTrackPublications.values()).some(p => p.isSubscribed && p.track && !p.isMuted);
+      list.push({ identity: rp.identity, name: rp.name || rp.identity, isSpeaking: rp.isSpeaking, isMuted: !hasAudio, isLocal: false });
+    });
+    setParticipants(list);
+  }, []);
 
-  /* Fetch voice rooms */
+  /* ─── Fetch LiveKit token ─── */
+  const fetchToken = useCallback(async (lkRoomName: string): Promise<string | null> => {
+    if (!user) return null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/livekit-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ roomName: lkRoomName, identity: user.id, name: profile?.username || "Anon" }),
+      });
+      if (!resp.ok) throw new Error(`Server ${resp.status}`);
+      const data = await resp.json();
+      if (data.token) return data.token;
+      throw new Error(data.error || "No token");
+    } catch (e: any) {
+      setError(e.message === "Failed to fetch" ? "Unable to reach voice server — check your connection" : e.message);
+      return null;
+    }
+  }, [user, profile]);
+
+  /* ─── Disconnect current room ─── */
+  const disconnect = useCallback(async () => {
+    try { roomRef.current?.disconnect(true); } catch {}
+    roomRef.current = null;
+    if (mountedRef.current) { setConnected(false); setMuted(true); setParticipants([]); setActiveRoomLabel(null); }
+  }, []);
+
+  /* ─── Connect to a LiveKit room ─── */
+  const connectToRoom = useCallback(async (lkRoomName: string, label: string) => {
+    if (!user) { toast.error("Sign in to join voice"); return; }
+    // If already in this room, leave
+    if (connected && activeRoomLabel === label) { await disconnect(); return; }
+    // Disconnect old room first
+    if (roomRef.current) { try { roomRef.current.disconnect(true); } catch {} roomRef.current = null; }
+
+    setConnecting(true);
+    setError(null);
+    setActiveRoomLabel(label);
+
+    const token = await fetchToken(lkRoomName);
+    if (!token) { setConnecting(false); setActiveRoomLabel(null); return; }
+
+    try {
+      const room = new Room({
+        adaptiveStream: true, dynacast: true,
+        audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+
+      room.on(RoomEvent.Connected, () => { if (mountedRef.current) { setConnected(true); setConnecting(false); syncParticipants(); } });
+      room.on(RoomEvent.Disconnected, () => { if (mountedRef.current) { setConnected(false); setParticipants([]); } });
+      room.on(RoomEvent.ParticipantConnected, syncParticipants);
+      room.on(RoomEvent.ParticipantDisconnected, syncParticipants);
+      room.on(RoomEvent.TrackSubscribed, syncParticipants);
+      room.on(RoomEvent.TrackUnsubscribed, syncParticipants);
+      room.on(RoomEvent.TrackMuted, syncParticipants);
+      room.on(RoomEvent.TrackUnmuted, syncParticipants);
+      room.on(RoomEvent.ActiveSpeakersChanged, syncParticipants);
+      room.on(RoomEvent.LocalTrackPublished, syncParticipants);
+      room.on(RoomEvent.LocalTrackUnpublished, syncParticipants);
+
+      roomRef.current = room;
+      await room.connect(LK_URL, token);
+
+      // Start with mic off (muted)
+      try { await room.localParticipant.setMicrophoneEnabled(false); } catch {}
+      setMuted(true);
+      syncParticipants();
+    } catch (e: any) {
+      setError(`Connection failed: ${e.message}`);
+      setConnecting(false);
+      setActiveRoomLabel(null);
+      roomRef.current = null;
+    }
+  }, [user, fetchToken, connected, activeRoomLabel, disconnect, syncParticipants]);
+
+  /* ─── Toggle mute ─── */
+  const toggleMute = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room?.localParticipant) return;
+    const newMuted = !muted;
+    try {
+      await room.localParticipant.setMicrophoneEnabled(!newMuted);
+      setMuted(newMuted);
+      syncParticipants();
+    } catch (e: any) {
+      toast.error("Mic error — check browser permissions");
+    }
+  }, [muted, syncParticipants]);
+
+  /* ─── Cleanup on unmount ─── */
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; try { roomRef.current?.disconnect(true); } catch {} roomRef.current = null; };
+  }, []);
+
+  /* ─── Fetch voice rooms from Supabase ─── */
   useEffect(() => {
     const fetchRooms = async () => {
-      const { data } = await supabase
-        .from("social_voice_rooms")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(20);
+      const { data } = await supabase.from("social_voice_rooms").select("*").order("created_at", { ascending: false }).limit(20);
       if (data) setRooms(data);
     };
     fetchRooms();
-
-    // Realtime updates for rooms
-    const channel = supabase
-      .channel("social-rooms-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "social_voice_rooms" },
-        () => fetchRooms(),
-      )
-      .subscribe();
+    const channel = supabase.channel("social-rooms-realtime").on("postgres_changes", { event: "*", schema: "public", table: "social_voice_rooms" }, () => fetchRooms()).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const joinLobby = async () => {
-    if (!user) { toast.error("Sign in to join voice"); return; }
-    if (isInLobby) {
-      await voice.leave();
-      setActiveRoomId(null);
-      return;
-    }
-    // Switch to lobby
-    if (voice.connected) await voice.leave();
-    setActiveRoomId(null);
-    setActiveRoomName("social-voice-lobby");
-    // Small delay for state to settle
-    setTimeout(() => voice.join(), 50);
-  };
-
-  const joinRoom = async (room: VoiceRoom) => {
-    if (!user) { toast.error("Sign in to join voice"); return; }
-    if (voice.connected) await voice.leave();
-    setActiveRoomId(room.id);
-    setActiveRoomName(`social-room-${room.id}`);
-    setTimeout(() => voice.join(), 50);
-    toast.success(`Joining "${room.name}"...`);
-  };
-
-  const leaveVoice = async () => {
-    await voice.leave();
-    setActiveRoomId(null);
-    setActiveRoomName("social-voice-lobby");
-  };
-
+  /* ─── Room CRUD ─── */
   const createRoom = async () => {
     if (!user || !newRoomName.trim()) return;
     setCreatingRoom(true);
-    const { error } = await supabase.from("social_voice_rooms").insert({
-      name: newRoomName.trim(),
-      created_by: user.id,
-      creator_username: profile?.username || "Anon",
-      participant_count: 0,
-    });
+    const { error: err } = await supabase.from("social_voice_rooms").insert({ name: newRoomName.trim(), created_by: user.id, creator_username: profile?.username || "Anon", participant_count: 0 });
     setCreatingRoom(false);
-    if (error) toast.error("Failed to create room");
-    else {
-      toast.success("Room created!");
-      setNewRoomName("");
-      setShowCreateRoom(false);
-    }
+    if (err) toast.error("Failed to create room");
+    else { toast.success("Room created!"); setNewRoomName(""); setShowCreateRoom(false); }
+  };
+  const deleteRoom = async (roomId: string) => {
+    const { error: err } = await supabase.from("social_voice_rooms").delete().eq("id", roomId);
+    if (err) toast.error("Failed to delete room"); else toast.success("Room deleted");
   };
 
-  const deleteRoom = async (roomId: string) => {
-    const { error } = await supabase.from("social_voice_rooms").delete().eq("id", roomId);
-    if (error) toast.error("Failed to delete room");
-    else toast.success("Room deleted");
-  };
+  /* ─── Shortcut handlers ─── */
+  const joinLobby = () => connectToRoom("social-voice-lobby", "lobby");
+  const joinRoom = (room: VoiceRoom) => { connectToRoom(`social-room-${room.id}`, room.id); if (!connected || activeRoomLabel !== room.id) toast.success(`Joining "${room.name}"...`); };
 
   const VOICE_SUB_TABS: { id: VoiceSubTab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
     { id: "lobby", label: "Lobby", Icon: Volume2 },
@@ -867,39 +948,27 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
           </div>
           <span className={cn(
             "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold",
-            voice.connected ? "bg-og-lime/15 text-og-lime" : "bg-white/[0.05] text-white/30",
+            connected ? "bg-og-lime/15 text-og-lime" : "bg-white/[0.05] text-white/30",
           )}>
-            <span className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              voice.connected ? "bg-og-lime animate-pulse" : "bg-white/20",
-            )} />
-            {voice.connected ? "connected" : "offline"}
+            <span className={cn("h-1.5 w-1.5 rounded-full", connected ? "bg-og-lime animate-pulse" : "bg-white/20")} />
+            {connected ? "connected" : connecting ? "connecting…" : "offline"}
           </span>
         </div>
         <div className="flex gap-1.5">
-          {VOICE_SUB_TABS.map((t) => {
-            const isActive = subTab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setSubTab(t.id)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-wide transition",
-                  isActive
-                    ? "bg-gradient-to-r from-og-lime/80 to-og-gold/70 text-black shadow-lg"
-                    : "text-white/40 hover:bg-white/5 hover:text-white/60",
-                )}
-              >
-                <t.Icon className="h-3 w-3" />
-                {t.label}
-              </button>
-            );
-          })}
+          {VOICE_SUB_TABS.map((t) => (
+            <button key={t.id} onClick={() => setSubTab(t.id)} className={cn(
+              "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-wide transition",
+              subTab === t.id ? "bg-gradient-to-r from-og-lime/80 to-og-gold/70 text-black shadow-lg" : "text-white/40 hover:bg-white/5 hover:text-white/60",
+            )}>
+              <t.Icon className="h-3 w-3" />
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Active voice control bar */}
-      {voice.connected && (
+      {connected && (
         <div className="border-b border-og-lime/20 bg-og-lime/[0.04] px-4 py-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -909,38 +978,27 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
               </span>
               <div>
                 <p className="text-[10px] font-bold text-og-lime">
-                  {isInLobby ? "VOICE LOBBY" : `ROOM: ${rooms.find((r) => r.id === activeRoomId)?.name || "..."}`}
+                  {isInLobby ? "VOICE LOBBY" : `ROOM: ${rooms.find((r) => r.id === activeRoomLabel)?.name || "Private Room"}`}
                 </p>
-                <p className="text-[9px] text-white/30">{voice.participantCount} connected</p>
+                <p className="text-[9px] text-white/30">{participants.length} connected</p>
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              <button
-                onClick={voice.toggleMute}
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full transition",
-                  voice.muted
-                    ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                    : "bg-og-lime/20 text-og-lime hover:bg-og-lime/30",
-                )}
-                title={voice.muted ? "Unmute" : "Mute"}
-              >
-                {voice.muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+              <button onClick={toggleMute} className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full transition",
+                muted ? "bg-red-500/20 text-red-400 hover:bg-red-500/30" : "bg-og-lime/20 text-og-lime hover:bg-og-lime/30",
+              )} title={muted ? "Unmute" : "Mute"}>
+                {muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
               </button>
-              <button
-                onClick={leaveVoice}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500/20 text-red-400 transition hover:bg-red-500/30"
-                title="Disconnect"
-              >
+              <button onClick={disconnect} className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500/20 text-red-400 transition hover:bg-red-500/30" title="Disconnect">
                 <PhoneOff className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
-
           {/* Participant avatars */}
-          {voice.participants.length > 0 && (
+          {participants.length > 0 && (
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              {voice.participants.map((p) => (
+              {participants.map((p) => (
                 <div key={p.identity} className="flex flex-col items-center gap-1">
                   <div className={cn(
                     "relative h-9 w-9 overflow-hidden rounded-full border-2 transition-all",
@@ -955,9 +1013,7 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
                       </div>
                     )}
                   </div>
-                  <span className="max-w-[48px] truncate text-[8px] font-semibold text-white/40">
-                    {p.isLocal ? "You" : p.name}
-                  </span>
+                  <span className="max-w-[48px] truncate text-[8px] font-semibold text-white/40">{p.isLocal ? "You" : p.name}</span>
                 </div>
               ))}
             </div>
@@ -965,13 +1021,14 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
         </div>
       )}
 
-      {/* Error display — only show when user has attempted to connect */}
-      {voice.error && (voice.connected || voice.connecting || voice.participantCount > 0) && (
+      {/* Error */}
+      {error && (
         <div className="mx-4 mt-2 flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/10 p-2.5">
-          <p className="text-[10px] text-red-400">{voice.error}</p>
-          <button onClick={() => { if (user) voice.join(); else toast.error("Sign in to join voice"); }} className="ml-3 text-[9px] font-bold text-og-lime underline">
-            Retry
-          </button>
+          <p className="text-[10px] text-red-400">{error}</p>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setError(null)} className="text-[9px] text-white/30 underline">Dismiss</button>
+            <button onClick={() => { if (activeRoomLabel) connectToRoom(activeRoomLabel === "lobby" ? "social-voice-lobby" : `social-room-${activeRoomLabel}`, activeRoomLabel); }} className="text-[9px] font-bold text-og-lime underline">Retry</button>
+          </div>
         </div>
       )}
 
@@ -980,40 +1037,25 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
         {subTab === "lobby" && (
           <div>
             {/* Lobby card */}
-            <div className={cn(
-              "rounded-xl border p-5 transition",
-              isInLobby ? "border-og-lime/30 bg-og-lime/[0.06]" : "border-og-lime/15 bg-og-lime/[0.03]",
-            )}>
+            <div className={cn("rounded-xl border p-5 transition", isInLobby ? "border-og-lime/30 bg-og-lime/[0.06]" : "border-og-lime/15 bg-og-lime/[0.03]")}>
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <span className={cn(
-                    "h-3 w-3 rounded-full",
-                    isInLobby ? "bg-og-lime shadow-[0_0_10px_hsl(var(--og-lime))] animate-pulse" : "bg-og-lime/50",
-                  )} />
+                  <span className={cn("h-3 w-3 rounded-full", isInLobby ? "bg-og-lime shadow-[0_0_10px_hsl(var(--og-lime))] animate-pulse" : "bg-og-lime/50")} />
                   <h3 className="text-sm font-black text-white">VOICE LOBBY</h3>
                 </div>
                 <span className="rounded-full bg-white/[0.06] px-2.5 py-0.5 text-[10px] font-bold text-white/40">
-                  {isInLobby ? voice.participantCount : 0} here
+                  {isInLobby ? participants.length : 0} here
                 </span>
               </div>
-              <p className="mb-5 text-[11px] text-white/40">
-                Community voice channel powered by LiveKit. Talk live with OG Scan traders.
-              </p>
-
+              <p className="mb-5 text-[11px] text-white/40">Community voice channel powered by LiveKit. Talk live with OG Scan traders.</p>
               {!user ? (
                 <p className="text-center text-[11px] text-white/25">Sign in to join voice</p>
               ) : (
-                <button
-                  onClick={joinLobby}
-                  disabled={voice.connecting}
-                  className={cn(
-                    "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-xs font-bold uppercase tracking-wide transition disabled:opacity-50",
-                    isInLobby
-                      ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                      : "bg-gradient-to-r from-og-lime/80 to-og-gold/60 text-black hover:shadow-[0_0_20px_hsl(var(--og-lime)/0.3)]",
-                  )}
-                >
-                  {voice.connecting ? (
+                <button onClick={joinLobby} disabled={connecting} className={cn(
+                  "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-xs font-bold uppercase tracking-wide transition disabled:opacity-50",
+                  isInLobby ? "bg-red-500/20 text-red-400 hover:bg-red-500/30" : "bg-gradient-to-r from-og-lime/80 to-og-gold/60 text-black hover:shadow-[0_0_20px_hsl(var(--og-lime)/0.3)]",
+                )}>
+                  {connecting && activeRoomLabel === "lobby" ? (
                     <><div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> Connecting...</>
                   ) : isInLobby ? (
                     <><PhoneOff className="h-4 w-4" /> Leave Voice Lobby</>
@@ -1025,20 +1067,18 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
             </div>
 
             {/* People in lobby */}
-            {isInLobby && voice.participants.length > 0 && (
+            {isInLobby && participants.length > 0 && (
               <div className="mt-5">
                 <h4 className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">
-                  <Users className="h-3 w-3" /> In Lobby — {voice.participantCount}
+                  <Users className="h-3 w-3" /> In Lobby — {participants.length}
                 </h4>
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4">
-                  {voice.participants.map((p) => (
+                  {participants.map((p) => (
                     <div key={p.identity} className="flex flex-col items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] p-3.5 transition hover:bg-white/[0.05]">
                       <div className="relative">
                         <div className={cn(
                           "h-14 w-14 overflow-hidden rounded-full border-2 transition-all",
-                          p.isSpeaking && !p.isMuted
-                            ? "border-og-lime shadow-[0_0_16px_hsl(var(--og-lime)/0.5)]"
-                            : p.isMuted ? "border-red-500/30" : "border-white/10",
+                          p.isSpeaking && !p.isMuted ? "border-og-lime shadow-[0_0_16px_hsl(var(--og-lime)/0.5)]" : p.isMuted ? "border-red-500/30" : "border-white/10",
                         )}>
                           <img src={dicebear(p.name)} alt="" className="h-full w-full object-cover" />
                         </div>
@@ -1050,13 +1090,8 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
                         </span>
                       </div>
                       <div className="text-center">
-                        <span className="block max-w-[80px] truncate text-[10px] font-bold text-white/70">
-                          {p.isLocal ? "You" : p.name}
-                        </span>
-                        <span className={cn(
-                          "text-[8px] font-semibold",
-                          p.isSpeaking && !p.isMuted ? "text-og-lime" : p.isMuted ? "text-red-400/60" : "text-white/25",
-                        )}>
+                        <span className="block max-w-[80px] truncate text-[10px] font-bold text-white/70">{p.isLocal ? "You" : p.name}</span>
+                        <span className={cn("text-[8px] font-semibold", p.isSpeaking && !p.isMuted ? "text-og-lime" : p.isMuted ? "text-red-400/60" : "text-white/25")}>
                           {p.isMuted ? "Muted" : p.isSpeaking ? "Speaking" : "Listening"}
                         </span>
                       </div>
@@ -1066,7 +1101,7 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
               </div>
             )}
 
-            {!voice.connected && (
+            {!connected && (
               <div className="mt-8 flex flex-col items-center py-8">
                 <Volume2 className="mb-3 h-10 w-10 text-white/[0.06]" />
                 <p className="text-sm font-bold text-white/15">Join the lobby to start talking</p>
@@ -1083,37 +1118,18 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
             </h4>
             <div className="space-y-1">
               {members.map((m) => (
-                <div
-                  key={m.user_id}
-                  className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 transition hover:bg-white/[0.04]"
-                >
+                <div key={m.user_id} className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 transition hover:bg-white/[0.04]">
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <img
-                        src={avatarSrc(m.avatar_url, m.username || m.user_id)}
-                        alt="" className={cn("h-9 w-9 rounded-full border object-cover", m.is_online ? "border-og-lime/30" : "border-white/10 grayscale-[50%]")}
-                        onError={(e) => { (e.target as HTMLImageElement).src = dicebear("fb"); }}
-                      />
-                      <span className={cn(
-                        "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#0a1018]",
-                        m.is_online ? "bg-og-lime" : "bg-white/15",
-                      )} />
+                      <img src={avatarSrc(m.avatar_url, m.username || m.user_id)} alt="" className={cn("h-9 w-9 rounded-full border object-cover", m.is_online ? "border-og-lime/30" : "border-white/10 grayscale-[50%]")} onError={(e) => { (e.target as HTMLImageElement).src = dicebear("fb"); }} />
+                      <span className={cn("absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#0a1018]", m.is_online ? "bg-og-lime" : "bg-white/15")} />
                     </div>
                     <div>
                       <span className="text-xs font-bold text-og-cyan">@{m.username || "Anon"}</span>
-                      <p className={cn("text-[9px]", m.is_online ? "text-og-lime/60" : "text-white/20")}>
-                        {m.is_online ? "Online" : "Offline"}
-                      </p>
+                      <p className={cn("text-[9px]", m.is_online ? "text-og-lime/60" : "text-white/20")}>{m.is_online ? "Online" : "Offline"}</p>
                     </div>
                   </div>
-                  <span className={cn(
-                    "rounded-full px-2.5 py-1 text-[9px] font-bold",
-                    m.is_online
-                      ? "bg-og-lime/10 text-og-lime"
-                      : "bg-white/[0.03] text-white/20",
-                  )}>
-                    {m.is_online ? "Online" : "Offline"}
-                  </span>
+                  <span className={cn("rounded-full px-2.5 py-1 text-[9px] font-bold", m.is_online ? "bg-og-lime/10 text-og-lime" : "bg-white/[0.03] text-white/20")}>{m.is_online ? "Online" : "Offline"}</span>
                 </div>
               ))}
             </div>
@@ -1124,55 +1140,30 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
           <div>
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h4 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">
-                  <Headphones className="h-3 w-3" /> Voice Rooms
-                </h4>
+                <h4 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/40"><Headphones className="h-3 w-3" /> Voice Rooms</h4>
                 <p className="mt-0.5 text-[10px] text-white/25">{rooms.length} rooms</p>
               </div>
               {!showCreateRoom && (
-                <button
-                  onClick={() => { if (!user) { toast.error("Sign in to create a room"); return; } setShowCreateRoom(true); }}
-                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-og-lime/80 to-og-gold/60 px-3 py-1.5 text-[10px] font-bold text-black transition hover:shadow-[0_0_16px_hsl(var(--og-lime)/0.3)]"
-                >
-                  <Plus className="h-3 w-3" />
-                  New Room
+                <button onClick={() => { if (!user) { toast.error("Sign in to create a room"); return; } setShowCreateRoom(true); }} className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-og-lime/80 to-og-gold/60 px-3 py-1.5 text-[10px] font-bold text-black transition hover:shadow-[0_0_16px_hsl(var(--og-lime)/0.3)]">
+                  <Plus className="h-3 w-3" /> New Room
                 </button>
               )}
             </div>
 
-            {/* Inline Create Room Form */}
+            {/* Create Room Form */}
             {showCreateRoom && (
               <div className="mb-4 rounded-xl border border-og-lime/20 bg-og-lime/[0.04] p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <h4 className="text-xs font-black text-white">CREATE VOICE ROOM</h4>
-                  <button onClick={() => { setShowCreateRoom(false); setNewRoomName(""); }} className="rounded-full p-1 text-white/30 transition hover:bg-white/[0.06] hover:text-white/60">
-                    <X className="h-4 w-4" />
-                  </button>
+                  <button onClick={() => { setShowCreateRoom(false); setNewRoomName(""); }} className="rounded-full p-1 text-white/30 transition hover:bg-white/[0.06] hover:text-white/60"><X className="h-4 w-4" /></button>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
                     <Headphones className="h-4 w-4 flex-shrink-0 text-white/20" />
-                    <input
-                      type="text"
-                      value={newRoomName}
-                      onChange={(e) => setNewRoomName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") createRoom(); }}
-                      placeholder="Room name (e.g. Trading Talk)"
-                      className="min-w-0 flex-1 bg-transparent text-[12px] text-white/80 placeholder:text-white/20 outline-none"
-                      autoFocus
-                      maxLength={50}
-                    />
+                    <input type="text" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") createRoom(); }} placeholder="Room name (e.g. Trading Talk)" className="min-w-0 flex-1 bg-transparent text-[12px] text-white/80 placeholder:text-white/20 outline-none" autoFocus maxLength={50} />
                   </div>
-                  <button
-                    onClick={createRoom}
-                    disabled={!newRoomName.trim() || creatingRoom}
-                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-og-lime/80 to-og-gold/60 px-4 py-2.5 text-[11px] font-bold text-black transition hover:shadow-[0_0_16px_hsl(var(--og-lime)/0.3)] disabled:opacity-40"
-                  >
-                    {creatingRoom ? (
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black/30 border-t-black" />
-                    ) : (
-                      <Plus className="h-3.5 w-3.5" />
-                    )}
+                  <button onClick={createRoom} disabled={!newRoomName.trim() || creatingRoom} className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-og-lime/80 to-og-gold/60 px-4 py-2.5 text-[11px] font-bold text-black transition hover:shadow-[0_0_16px_hsl(var(--og-lime)/0.3)] disabled:opacity-40">
+                    {creatingRoom ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black/30 border-t-black" /> : <Plus className="h-3.5 w-3.5" />}
                     Create
                   </button>
                 </div>
@@ -1188,71 +1179,38 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
             ) : (
               <div className="space-y-2">
                 {rooms.map((room) => {
-                  const isInThisRoom = activeRoomId === room.id && voice.connected;
+                  const isInThisRoom = connected && activeRoomLabel === room.id;
                   const isOwner = room.created_by === user?.id;
                   return (
-                    <div
-                      key={room.id}
-                      className={cn(
-                        "rounded-xl border p-4 transition",
-                        isInThisRoom
-                          ? "border-og-lime/30 bg-og-lime/[0.06]"
-                          : "border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.05]",
-                      )}
-                    >
+                    <div key={room.id} className={cn("rounded-xl border p-4 transition", isInThisRoom ? "border-og-lime/30 bg-og-lime/[0.06]" : "border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.05]")}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "flex h-9 w-9 items-center justify-center rounded-lg",
-                            isInThisRoom ? "bg-og-lime/20" : "bg-white/[0.04]",
-                          )}>
+                          <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg", isInThisRoom ? "bg-og-lime/20" : "bg-white/[0.04]")}>
                             <Headphones className={cn("h-4 w-4", isInThisRoom ? "text-og-lime" : "text-white/25")} />
                           </div>
                           <div>
                             <p className="text-xs font-bold text-white">{room.name}</p>
-                            <p className="mt-0.5 text-[10px] text-white/30">
-                              by @{room.creator_username || "Anon"}
-                              {isInThisRoom && ` · ${voice.participantCount} connected`}
-                            </p>
+                            <p className="mt-0.5 text-[10px] text-white/30">by @{room.creator_username || "Anon"}{isInThisRoom && ` · ${participants.length} connected`}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {isOwner && !isInThisRoom && (
-                            <button
-                              onClick={() => deleteRoom(room.id)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/20 transition hover:bg-red-500/15 hover:text-red-400"
-                              title="Delete room"
-                            >
+                            <button onClick={() => deleteRoom(room.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-white/20 transition hover:bg-red-500/15 hover:text-red-400" title="Delete room">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           )}
                           {isInThisRoom ? (
-                            <button
-                              onClick={leaveVoice}
-                              className="rounded-lg bg-red-500/15 px-3.5 py-1.5 text-[10px] font-bold text-red-400 transition hover:bg-red-500/25"
-                            >
-                              Leave
-                            </button>
+                            <button onClick={disconnect} className="rounded-lg bg-red-500/15 px-3.5 py-1.5 text-[10px] font-bold text-red-400 transition hover:bg-red-500/25">Leave</button>
                           ) : (
-                            <button
-                              onClick={() => joinRoom(room)}
-                              disabled={voice.connecting}
-                              className="rounded-lg bg-og-lime/15 px-3.5 py-1.5 text-[10px] font-bold text-og-lime transition hover:bg-og-lime/25 disabled:opacity-50"
-                            >
-                              Join
-                            </button>
+                            <button onClick={() => joinRoom(room)} disabled={connecting} className="rounded-lg bg-og-lime/15 px-3.5 py-1.5 text-[10px] font-bold text-og-lime transition hover:bg-og-lime/25 disabled:opacity-50">Join</button>
                           )}
                         </div>
                       </div>
-                      {/* Show participants when in room */}
-                      {isInThisRoom && voice.participants.length > 0 && (
+                      {isInThisRoom && participants.length > 0 && (
                         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
-                          {voice.participants.map((p) => (
+                          {participants.map((p) => (
                             <div key={p.identity} className="flex flex-col items-center gap-1">
-                              <div className={cn(
-                                "h-8 w-8 overflow-hidden rounded-full border",
-                                p.isSpeaking ? "border-og-lime shadow-[0_0_8px_hsl(var(--og-lime)/0.4)]" : "border-white/10",
-                              )}>
+                              <div className={cn("h-8 w-8 overflow-hidden rounded-full border", p.isSpeaking ? "border-og-lime shadow-[0_0_8px_hsl(var(--og-lime)/0.4)]" : "border-white/10")}>
                                 <img src={dicebear(p.name)} alt="" className="h-full w-full object-cover" />
                               </div>
                               <span className="text-[8px] text-white/40">{p.isLocal ? "You" : p.name}</span>
