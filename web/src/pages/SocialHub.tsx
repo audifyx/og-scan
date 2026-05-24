@@ -73,9 +73,12 @@ const SocialHub = () => {
   const { user, profile } = useAuth();
   const [activeChannel, setActiveChannel] = useState<ChannelId>("activity-feed");
   const [members, setMembers] = useState<CommunityMember[]>([]);
-  const [onlineCount, setOnlineCount] = useState(0);
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+  const [onlinePresenceMap, setOnlinePresenceMap] = useState<
+    Record<string, { user_id: string; username: string; avatar_url: string | null }>
+  >({});
 
-  /* Fetch community members */
+  /* Fetch all community members (offline list) */
   useEffect(() => {
     const fetchMembers = async () => {
       const { data } = await supabase
@@ -88,16 +91,15 @@ const SocialHub = () => {
           user_id: p.user_id,
           username: p.username,
           avatar_url: p.avatar_url,
-          is_online: Math.random() > 0.5, // Simulated — replace with presence
+          is_online: false, // Will be updated by presence
         }));
         setMembers(mapped);
-        setOnlineCount(mapped.filter((m) => m.is_online).length + 1); // +1 for current user
       }
     };
     fetchMembers();
   }, []);
 
-  /* Track Supabase presence for online count */
+  /* Real presence tracking — only users on the Social Hub page right now */
   useEffect(() => {
     if (!user) return;
     const channel = supabase.channel("social-presence", {
@@ -106,7 +108,21 @@ const SocialHub = () => {
     channel
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
-        setOnlineCount(Object.keys(state).length);
+        const ids = new Set<string>();
+        const pMap: typeof onlinePresenceMap = {};
+        for (const [key, entries] of Object.entries(state)) {
+          const entry = (entries as any[])[0];
+          if (entry?.user_id) {
+            ids.add(entry.user_id);
+            pMap[entry.user_id] = {
+              user_id: entry.user_id,
+              username: entry.username || "Anon",
+              avatar_url: entry.avatar_url || null,
+            };
+          }
+        }
+        setOnlineIds(ids);
+        setOnlinePresenceMap(pMap);
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
@@ -121,17 +137,21 @@ const SocialHub = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user, profile]);
 
-  const onlineMembers = members.filter((m) => m.is_online);
-  // Always include current user
-  const activeMembersList = [
-    ...(user ? [{
-      user_id: user.id,
-      username: profile?.username || "You",
-      avatar_url: profile?.avatar_url,
-      is_online: true,
-    }] : []),
-    ...onlineMembers.filter((m) => m.user_id !== user?.id),
-  ].slice(0, 8);
+  const onlineCount = onlineIds.size;
+
+  /* Active members: only those truly present via Supabase presence */
+  const activeMembersList: CommunityMember[] = Object.values(onlinePresenceMap).map((p) => ({
+    user_id: p.user_id,
+    username: p.username,
+    avatar_url: p.avatar_url,
+    is_online: true,
+  }));
+
+  /* Update members list with real online status */
+  const enrichedMembers = members.map((m) => ({
+    ...m,
+    is_online: onlineIds.has(m.user_id),
+  }));
 
   return (
     <div className="flex h-[calc(100vh-140px)] min-h-[500px] gap-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a1018]">
@@ -238,14 +258,14 @@ const SocialHub = () => {
         <div className="flex-1 overflow-y-auto">
           {activeChannel === "activity-feed" && (
             <ActivityFeed
-              members={members}
+              members={enrichedMembers}
               activeMembersList={activeMembersList}
               onlineCount={onlineCount}
               onSwitchChannel={setActiveChannel}
             />
           )}
           {activeChannel === "general-chat" && <GeneralChat />}
-          {activeChannel === "voice-rooms" && <VoiceRooms members={members} />}
+          {activeChannel === "voice-rooms" && <VoiceRooms members={enrichedMembers} />}
           {activeChannel === "live-stream" && <LiveStream />}
         </div>
       </div>
