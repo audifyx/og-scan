@@ -185,6 +185,8 @@ const TABS: TabConfig[] = [
     Icon: Search,
     accent: "lime",
     group: "Forensics",
+    showInNav: false,
+    mergedInto: "tools",
   },
   {
     id: "og-finder",
@@ -209,6 +211,8 @@ const TABS: TabConfig[] = [
     Icon: Target,
     accent: "cyan",
     group: "Forensics",
+    showInNav: false,
+    mergedInto: "tools",
   },
   {
     id: "migrations",
@@ -233,6 +237,8 @@ const TABS: TabConfig[] = [
     Icon: Rss,
     accent: "lime",
     group: "Market",
+    showInNav: false,
+    mergedInto: "tools",
   },
   {
     id: "market-pulse",
@@ -309,6 +315,8 @@ const TABS: TabConfig[] = [
     Icon: Zap,
     accent: "blue",
     group: "Market",
+    showInNav: false,
+    mergedInto: "tools",
   },
   {
     id: "our-coin",
@@ -320,6 +328,8 @@ const TABS: TabConfig[] = [
     Icon: Coins,
     accent: "gold",
     group: "Project",
+    showInNav: false,
+    mergedInto: "tools",
   },
   {
     id: "roadmap",
@@ -331,6 +341,8 @@ const TABS: TabConfig[] = [
     Icon: Map,
     accent: "cyan",
     group: "Project",
+    showInNav: false,
+    mergedInto: "tools",
   },
   {
     id: "tech",
@@ -342,6 +354,8 @@ const TABS: TabConfig[] = [
     Icon: Cpu,
     accent: "white",
     group: "Project",
+    showInNav: false,
+    mergedInto: "tools",
   },
   {
     id: "news-signal",
@@ -353,6 +367,8 @@ const TABS: TabConfig[] = [
     Icon: Radio,
     accent: "lime",
     group: "Market",
+    showInNav: false,
+    mergedInto: "tools",
   },
   {
     id: "communities",
@@ -497,6 +513,7 @@ const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
     social: "social",
     "social-hub": "social",
     socialhub: "social",
+    settings: "profile",
   },
 );
 
@@ -573,7 +590,9 @@ const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const pathSlug: string = location.pathname.replace(/^\/+|\/+$/g, "").split("/").pop() ?? "";
-  const routeSlug: string | undefined = pageNumber ? `page-${pageNumber}` : toolSlug ?? pathSlug;
+  /* /profile/:userId → always resolve to "profile" tab regardless of userId segment */
+  const isProfileSubRoute = location.pathname.startsWith("/profile");
+  const routeSlug: string | undefined = isProfileSubRoute ? "profile" : (pageNumber ? `page-${pageNumber}` : toolSlug ?? pathSlug);
   const routeTab: TabId = useMemo<TabId>(() => getTabFromSlug(routeSlug) ?? "overview", [routeSlug]);
   const [mint, setMint] = useState<string>(DEFAULT_OG_MINT);
   const [tab, setTab] = useState<TabId>(routeTab);
@@ -727,33 +746,26 @@ const AppSidebar = ({
   onNavigate: (t: string) => void;
 }) => {
   const location = useLocation();
-  const groups: { key: TabGroup; label: string }[] = [
-    { key: "Forensics", label: "Forensics" },
-    { key: "Market", label: "Market" },
-    { key: "Project", label: "Project" },
+
+  /* Consolidated sidebar links — grouped into fewer sections to minimize scroll */
+  const tradingItems: ExternalNavItem[] = [
+    { to: "/charts",          icon: LineChart,    label: "Charts",          eyebrow: "Live charts" },
+    { to: "/live-trading",    icon: TrendingUp,   label: "Live Trading",    eyebrow: "P&L · Signals" },
+    { to: "/live-feed-page",  icon: Radio,        label: "Live Feed",       eyebrow: "Tape stream" },
+    { to: "/wallets",         icon: Wallet,       label: "Wallets",         eyebrow: "Tracked wallets" },
+    { to: "/leaderboard",     icon: Trophy,       label: "Leaderboard",     eyebrow: "Top traders" },
   ];
 
-  const solToolsItems: ExternalNavItem[] = [
-    { to: "/wallets",         icon: Wallet,       label: "Wallets",         eyebrow: "Tracked wallets" },
-    { to: "/tokens",          icon: Coins,        label: "Tokens",          eyebrow: "Token tracker" },
-    { to: "/charts",          icon: LineChart,    label: "Charts",          eyebrow: "Live charts" },
-    { to: "/live-feed-page",  icon: Radio,        label: "Live Feed",       eyebrow: "Tape stream" },
+  const moreItems: ExternalNavItem[] = [
     { to: "/alpha-chat",      icon: Bot,          label: "Alpha Chat",      eyebrow: "AI assistant" },
-    { to: "/live-trading",    icon: TrendingUp,   label: "Live Trading",    eyebrow: "P&L · Signals" },
-    { to: "/callouts",        icon: Bell,         label: "Callouts",        eyebrow: "Trade alerts" },
-    { to: "/trading-lobbies", icon: MessageSquare,label: "Trading Lobbies", eyebrow: "Voice + charts" },
-    { to: "/leaderboard",     icon: Trophy,       label: "Leaderboard",     eyebrow: "Top traders" },
     { to: "/advanced-tools",  icon: Wrench,       label: "Advanced Tools",  eyebrow: "30+ pro tools" },
     { to: "/pumpv5",          icon: Rocket,       label: "Launch Pad",      eyebrow: "Token listings" },
-    { to: "/webhooks",        icon: Webhook,      label: "Webhooks",        eyebrow: "Push alerts" },
-    { to: "/notifications",   icon: Bell,         label: "Notifications",   eyebrow: "Your alerts" },
     { to: "/premium",         icon: Crown,        label: "Premium",         eyebrow: "Pro · AI · P&L" },
   ];
 
   const accountItems: ExternalNavItem[] = [
     { to: "/profile",        icon: User,         label: "Profile",         eyebrow: "Your account" },
     { to: "/settings",       icon: Settings,     label: "Settings",        eyebrow: "Preferences" },
-    { to: "/credits",        icon: Coins,        label: "Credits",         eyebrow: "Balance" },
   ];
 
   return (
@@ -784,43 +796,38 @@ const AppSidebar = ({
         </button>
       </div>
 
-      {/* Nav */}
+      {/* Nav — consolidated into 4 tight sections */}
       <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
-        {/* Main group */}
+        {/* Core */}
         <div className="mb-1">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Main</p>
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Core</p>
           <NavItem item={TAB_BY_ID.overview} activeId={activeId} onNavigate={onNavigate} />
           <NavItem item={TAB_BY_ID.community} activeId={activeId} onNavigate={onNavigate} />
           <NavItem item={TAB_BY_ID.tools} activeId={activeId} onNavigate={onNavigate} />
         </div>
 
-        {groups.map(({ key, label }) => {
-          const items = NAV_TABS.filter((t) => t.group === key);
-          if (!items.length) return null;
-          return (
-            <div key={key} className="mb-1 mt-4">
-              <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">{label}</p>
-              <div className="space-y-0.5">
-                {items.map((item) => (
-                  <NavItem key={item.id} item={item} activeId={activeId} onNavigate={onNavigate} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* SolTools Features */}
-        <div className="mb-1 mt-4">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">SolTools Features</p>
+        {/* Trading */}
+        <div className="mb-1 mt-3">
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Trading</p>
           <div className="space-y-0.5">
-            {solToolsItems.map((item) => (
+            {tradingItems.map((item) => (
+              <ExternalNavLink key={item.to} item={item} currentPath={location.pathname} onClose={onClose} />
+            ))}
+          </div>
+        </div>
+
+        {/* More */}
+        <div className="mb-1 mt-3">
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">More</p>
+          <div className="space-y-0.5">
+            {moreItems.map((item) => (
               <ExternalNavLink key={item.to} item={item} currentPath={location.pathname} onClose={onClose} />
             ))}
           </div>
         </div>
 
         {/* Account */}
-        <div className="mb-4 mt-4">
+        <div className="mb-4 mt-3">
           <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Account</p>
           <div className="space-y-0.5">
             {accountItems.map((item) => (
