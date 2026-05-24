@@ -109,7 +109,7 @@ const App = () => (
 
             {/* ── Protected: Tools & Features ── */}
             <Route path="/tokens" element={<ProtectedRoute><Tokens /></ProtectedRoute>} />
-            <Route path="/tools" element={<ProtectedRoute><Tools /></ProtectedRoute>} />
+            <Route path="/tools" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/advanced-tools" element={<ProtectedRoute><AdvancedTools /></ProtectedRoute>} />
             <Route path="/ai-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
             <Route path="/alpha-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />

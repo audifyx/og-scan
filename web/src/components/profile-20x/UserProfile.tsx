@@ -644,14 +644,183 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
         )}
 
         {/* ACTIVITY */}
-        {activeTab === "activity" && (
-          <div className="text-center py-8">
-            <History className="h-10 w-10 text-white/[0.06] mx-auto mb-2" />
-            <p className="text-sm font-bold text-white/15">Activity feed coming soon</p>
-            <p className="text-[10px] text-white/10 mt-1">Your scans, trades, voice sessions, and follows will appear here</p>
-          </div>
-        )}
+        {activeTab === "activity" && <ActivityFeed userId={profileData?.user_id || user?.id || ""} />}
       </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   ActivityFeed — Real activity pulled from Supabase tables
+   ═══════════════════════════════════════════════════════════════ */
+
+interface ActivityItem {
+  id: string;
+  type: "message" | "follow" | "space" | "voice" | "join";
+  text: string;
+  timestamp: string;
+  icon: string;
+}
+
+const ActivityFeed: React.FC<{ userId: string }> = ({ userId }) => {
+  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) return;
+    const fetchActivity = async () => {
+      setLoading(true);
+      const activities: ActivityItem[] = [];
+
+      // 1. Recent chat messages
+      const { data: msgs } = await supabase
+        .from("social_messages")
+        .select("id, content, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      msgs?.forEach(m => activities.push({
+        id: `msg-${m.id}`,
+        type: "message",
+        text: `Sent a message: "${(m.content || "").slice(0, 60)}${(m.content || "").length > 60 ? "…" : ""}"`,
+        timestamp: m.created_at,
+        icon: "💬",
+      }));
+
+      // 2. Recent follows
+      const { data: follows } = await supabase
+        .from("followers")
+        .select("followee_id, created_at")
+        .eq("follower_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (follows && follows.length > 0) {
+        const followeeIds = follows.map(f => f.followee_id);
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, username")
+          .in("user_id", followeeIds);
+        const nameMap = new Map(profiles?.map(p => [p.user_id, p.username]) || []);
+        follows.forEach(f => activities.push({
+          id: `follow-${f.followee_id}-${f.created_at}`,
+          type: "follow",
+          text: `Started following @${nameMap.get(f.followee_id) || "someone"}`,
+          timestamp: f.created_at,
+          icon: "👤",
+        }));
+      }
+
+      // 3. Spaces created
+      const { data: spaces } = await supabase
+        .from("spaces")
+        .select("id, title, created_at")
+        .eq("host_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      spaces?.forEach(s => activities.push({
+        id: `space-${s.id}`,
+        type: "space",
+        text: `Hosted a Space: "${s.title}"`,
+        timestamp: s.created_at,
+        icon: "🎙️",
+      }));
+
+      // 4. Voice rooms created
+      const { data: rooms } = await supabase
+        .from("social_voice_rooms")
+        .select("id, name, created_at")
+        .eq("created_by", userId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      rooms?.forEach(r => activities.push({
+        id: `voice-${r.id}`,
+        type: "voice",
+        text: `Created voice room: "${r.name}"`,
+        timestamp: r.created_at,
+        icon: "🔊",
+      }));
+
+      // 5. Profile join date as first activity
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("created_at")
+        .eq("user_id", userId)
+        .single();
+      if (profile?.created_at) {
+        activities.push({
+          id: "joined",
+          type: "join",
+          text: "Joined OG Scan",
+          timestamp: profile.created_at,
+          icon: "🚀",
+        });
+      }
+
+      // Sort by timestamp descending
+      activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setItems(activities);
+      setLoading(false);
+    };
+    fetchActivity();
+  }, [userId]);
+
+  const formatTime = (ts: string) => {
+    const d = new Date(ts);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return "just now";
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return d.toLocaleDateString("en", { month: "short", day: "numeric" });
+  };
+
+  const typeColor: Record<string, string> = {
+    message: "border-og-cyan/20 bg-og-cyan/[0.04]",
+    follow: "border-og-lime/20 bg-og-lime/[0.04]",
+    space: "border-og-gold/20 bg-og-gold/[0.04]",
+    voice: "border-purple-400/20 bg-purple-400/[0.04]",
+    join: "border-white/10 bg-white/[0.03]",
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <div className="h-5 w-5 animate-spin rounded-full border-2 border-og-lime border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <History className="h-8 w-8 text-white/[0.06] mx-auto mb-2" />
+        <p className="text-xs text-white/20">No activity yet</p>
+        <p className="text-[10px] text-white/10 mt-1">Start scanning tokens, chatting, or joining spaces!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {items.map(item => (
+        <div
+          key={item.id}
+          className={cn(
+            "flex items-start gap-3 rounded-xl border px-3 py-2.5 transition",
+            typeColor[item.type] || "border-white/[0.06] bg-white/[0.02]",
+          )}
+        >
+          <span className="mt-0.5 text-base">{item.icon}</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] text-white/60 leading-relaxed">{item.text}</p>
+            <p className="mt-0.5 text-[9px] text-white/20">{formatTime(item.timestamp)}</p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

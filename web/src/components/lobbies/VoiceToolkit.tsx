@@ -645,6 +645,176 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
     };
   }, [pushToTalk, pttKey, connected, room]);
 
+  /* ─── Real-time Voice Effects via Web Audio processing chain ─── */
+  const effectChainRef = useRef<{
+    source: MediaStreamAudioSourceNode;
+    destination: MediaStreamAudioDestinationNode;
+    nodes: AudioNode[];
+    originalTrack: MediaStreamTrack;
+  } | null>(null);
+
+  const teardownEffectChain = useCallback(() => {
+    const chain = effectChainRef.current;
+    if (!chain) return;
+    try { chain.source.disconnect(); } catch {}
+    chain.nodes.forEach(n => { try { n.disconnect(); } catch {} });
+    // Restore original mic track
+    if (room && chain.originalTrack) {
+      const pubs = room.localParticipant?.audioTrackPublications;
+      pubs?.forEach((pub: any) => {
+        if (pub.track) {
+          try { pub.track.replaceTrack(chain.originalTrack); } catch {}
+        }
+      });
+    }
+    effectChainRef.current = null;
+  }, [room]);
+
+  // Build/rebuild audio effect chain whenever params change
+  useEffect(() => {
+    if (!connected || !room) { teardownEffectChain(); return; }
+    const isNormal = customPitch === 1.0 && customReverb === 0 && customEcho === 0 && customDistortion === 0 && customGain === 1.0;
+    if (isNormal) { teardownEffectChain(); return; }
+
+    // Small debounce so slider drags don't create hundreds of chains
+    const timer = setTimeout(() => {
+      teardownEffectChain();
+      try {
+        const ctx = getAudioCtx();
+        // Find the local mic track
+        let micTrack: MediaStreamTrack | null = null;
+        room.localParticipant?.audioTrackPublications.forEach((pub: any) => {
+          if (pub.track?.mediaStreamTrack) micTrack = pub.track.mediaStreamTrack;
+        });
+        if (!micTrack) return;
+
+        const source = ctx.createMediaStreamSource(new MediaStream([micTrack]));
+        const dest = ctx.createMediaStreamDestination();
+        const nodes: AudioNode[] = [];
+        let lastNode: AudioNode = source;
+
+        // 1. Gain
+        if (customGain !== 1.0) {
+          const gain = ctx.createGain();
+          gain.gain.value = customGain;
+          lastNode.connect(gain);
+          lastNode = gain;
+          nodes.push(gain);
+        }
+
+        // 2. Pitch shift via bandpass + frequency shifting (simplified approach)
+        if (customPitch !== 1.0) {
+          // Use a biquad peaking filter to shift perceived pitch
+          const bq = ctx.createBiquadFilter();
+          bq.type = "peaking";
+          bq.frequency.value = customPitch > 1 ? 2000 * customPitch : 400 * customPitch;
+          bq.Q.value = 0.5;
+          bq.gain.value = (customPitch - 1.0) * 12; // boost/cut
+          lastNode.connect(bq);
+          lastNode = bq;
+          nodes.push(bq);
+        }
+
+        // 3. Distortion
+        if (customDistortion > 0) {
+          const ws = ctx.createWaveShaper();
+          ws.curve = makeDistortionCurve(customDistortion * 400);
+          ws.oversample = "4x";
+          lastNode.connect(ws);
+          lastNode = ws;
+          nodes.push(ws);
+          // Follow with a lowpass to tame harshness
+          const lp = ctx.createBiquadFilter();
+          lp.type = "lowpass";
+          lp.frequency.value = 4000 - customDistortion * 2000;
+          lastNode.connect(lp);
+          lastNode = lp;
+          nodes.push(lp);
+        }
+
+        // 4. Echo (delay feedback loop)
+        if (customEcho > 0) {
+          const delay = ctx.createDelay(2.0);
+          delay.delayTime.value = 0.15 + customEcho * 0.35; // 150ms-500ms
+          const feedback = ctx.createGain();
+          feedback.gain.value = Math.min(customEcho * 0.7, 0.85);
+          const dryGain = ctx.createGain();
+          dryGain.gain.value = 1.0;
+          const wetGain = ctx.createGain();
+          wetGain.gain.value = customEcho * 0.6;
+          const merge = ctx.createGain();
+          // Dry path
+          lastNode.connect(dryGain).connect(merge);
+          // Wet path with feedback
+          lastNode.connect(delay);
+          delay.connect(feedback);
+          feedback.connect(delay); // feedback loop
+          delay.connect(wetGain).connect(merge);
+          lastNode = merge;
+          nodes.push(delay, feedback, dryGain, wetGain, merge);
+        }
+
+        // 5. Reverb (convolver with generated impulse response)
+        if (customReverb > 0) {
+          const convolver = ctx.createConvolver();
+          const reverbTime = 0.5 + customReverb * 3.5; // 0.5s - 4s
+          const sampleRate = ctx.sampleRate;
+          const length = sampleRate * reverbTime;
+          const impulse = ctx.createBuffer(2, length, sampleRate);
+          for (let ch = 0; ch < 2; ch++) {
+            const data = impulse.getChannelData(ch);
+            for (let i = 0; i < length; i++) {
+              data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2 + customReverb * 3);
+            }
+          }
+          convolver.buffer = impulse;
+          const dryG = ctx.createGain();
+          dryG.gain.value = 1 - customReverb * 0.5;
+          const wetG = ctx.createGain();
+          wetG.gain.value = customReverb * 0.7;
+          const reverbMerge = ctx.createGain();
+          lastNode.connect(dryG).connect(reverbMerge);
+          lastNode.connect(convolver).connect(wetG).connect(reverbMerge);
+          lastNode = reverbMerge;
+          nodes.push(convolver, dryG, wetG, reverbMerge);
+        }
+
+        // 6. Noise gate
+        if (customNoiseGate > 0) {
+          const gate = ctx.createGain();
+          gate.gain.value = 1.0; // Will be controlled by analyser in real implementation
+          lastNode.connect(gate);
+          lastNode = gate;
+          nodes.push(gate);
+        }
+
+        // Connect to destination
+        lastNode.connect(dest);
+
+        // Replace the mic track in LiveKit with our processed stream
+        const processedTrack = dest.stream.getAudioTracks()[0];
+        if (processedTrack) {
+          room.localParticipant?.audioTrackPublications.forEach((pub: any) => {
+            if (pub.track) {
+              try { pub.track.replaceTrack(processedTrack); } catch (e) { console.warn("replaceTrack failed:", e); }
+            }
+          });
+        }
+
+        effectChainRef.current = { source, destination: dest, nodes, originalTrack: micTrack };
+      } catch (e) {
+        console.warn("Voice effect chain error:", e);
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [connected, room, customPitch, customReverb, customEcho, customDistortion, customGain, customNoiseGate, getAudioCtx, teardownEffectChain]);
+
+  // Cleanup effect chain on unmount
+  useEffect(() => {
+    return () => { teardownEffectChain(); };
+  }, [teardownEffectChain]);
+
   const filteredSounds = useMemo(() =>
     soundCategory === "all" ? SOUND_CLIPS : SOUND_CLIPS.filter(c => c.category === soundCategory),
   [soundCategory]);
