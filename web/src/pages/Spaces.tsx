@@ -20,7 +20,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { VoicePanel } from "@/components/lobbies/VoicePanel";
+import { VoicePanel, VoicePanelHandle, VoiceParticipant, VoiceRole } from "@/components/lobbies/VoicePanel";
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { safeAvatarUrl } from "@/lib/utils";
@@ -824,9 +824,16 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
   const [cur, setCur] = useState(space);
   const [poll, setPoll] = useState<SpacePoll | null>(null);
   const [showPollCreate, setShowPollCreate] = useState(false);
+  const [voiceParticipants, setVoiceParticipants] = useState<VoiceParticipant[]>([]);
+  const [myRole, setMyRole] = useState<VoiceRole>("speaker");
+  const [showHostPanel, setShowHostPanel] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const [slowMode, setSlowMode] = useState(false);
+  const voicePanelRef = useRef<VoicePanelHandle>(null);
   const isHost = user?.id === space.host_id;
   const tm = topicOf(cur.topic);
   const rxId = useRef(0);
+  const MAX_SPEAKERS = 10;
 
   // Realtime
   useEffect(() => {
@@ -922,13 +929,20 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
               {showMore && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setShowMore(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-52 bg-[#0c1219] border border-white/[0.08] rounded-xl shadow-2xl z-30 overflow-hidden sp-slide-up">
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-[#0c1219] border border-white/[0.08] rounded-xl shadow-2xl z-30 overflow-hidden sp-slide-up">
+                    <button onClick={() => { setShowHostPanel(!showHostPanel); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-primary hover:bg-primary/5 transition">
+                      <Shield className="h-4 w-4" /> Host Controls
+                    </button>
                     <button onClick={() => { setShowPollCreate(true); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition">
                       <BarChart3 className="h-4 w-4" /> Create Poll
                     </button>
                     <button onClick={() => { setPinnedMsg(null); supabase.from("spaces").update({ pinned_message: null }).eq("id", space.id); setShowMore(false); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition">
                       <PinOff className="h-4 w-4" /> Clear Pin
+                    </button>
+                    <button onClick={() => { setSlowMode(!slowMode); setShowMore(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition">
+                      <Clock className="h-4 w-4" /> {slowMode ? "Disable" : "Enable"} Slow Mode
                     </button>
                     <div className="border-t border-white/[0.06]" />
                     <button onClick={() => { endSpace(); setShowMore(false); }}
@@ -965,6 +979,99 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
       {/* ── Create Poll Modal (inline) ── */}
       {showPollCreate && <CreatePollInline onCreate={p => { setPoll(p); setShowPollCreate(false); }} onCancel={() => setShowPollCreate(false)} />}
 
+      {/* ── Host Controls Panel ── */}
+      {isHost && showHostPanel && (
+        <div className="mx-4 mt-2 rounded-2xl border border-primary/15 bg-primary/[0.02] p-4 sp-slide-up space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-primary flex items-center gap-2"><Shield className="h-4 w-4" /> Host Controls</p>
+            <button onClick={() => setShowHostPanel(false)} className="p-1 rounded hover:bg-white/10"><XIcon className="h-3 w-3 text-white/25" /></button>
+          </div>
+
+          {/* Speakers Management */}
+          <div>
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">
+              Speakers ({voiceParticipants.filter(p => p.role === "speaker").length}/{MAX_SPEAKERS})
+            </p>
+            <div className="space-y-1.5">
+              {voiceParticipants.filter(p => p.role === "speaker").map(p => (
+                <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                  <div className="w-7 h-7 rounded-full bg-white/[0.05] border border-white/[0.08] overflow-hidden flex items-center justify-center">
+                    {safAvatar(p.avatar_url) ? <img src={safAvatar(p.avatar_url)} alt="" className="w-full h-full object-cover" /> :
+                      <span className="text-[9px] font-bold text-white/30">{p.username?.[0]?.toUpperCase() || "?"}</span>}
+                  </div>
+                  <span className="text-[11px] text-white/60 font-medium flex-1 truncate">
+                    {p.username || "User"}
+                    {p.user_id === space.host_id && <Crown className="h-3 w-3 text-amber-400 inline ml-1" />}
+                  </span>
+                  {p.user_id !== space.host_id && p.user_id !== user?.id && (
+                    <div className="flex gap-1">
+                      <button onClick={() => voicePanelRef.current?.muteUser(p.user_id)}
+                        className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/15 hover:bg-red-500/20">
+                        Mute
+                      </button>
+                      <button onClick={() => voicePanelRef.current?.demoteToListener(p.user_id)}
+                        className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-white/[0.04] text-white/40 border border-white/[0.08] hover:bg-white/[0.08]">
+                        Demote
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Listeners — promote */}
+          {voiceParticipants.filter(p => p.role === "listener").length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">
+                Listeners ({voiceParticipants.filter(p => p.role === "listener").length})
+              </p>
+              <div className="space-y-1.5 max-h-32 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+                {voiceParticipants.filter(p => p.role === "listener").map(p => (
+                  <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <div className="w-6 h-6 rounded-full bg-white/[0.05] border border-white/[0.06] overflow-hidden flex items-center justify-center">
+                      {safAvatar(p.avatar_url) ? <img src={safAvatar(p.avatar_url)} alt="" className="w-full h-full object-cover" /> :
+                        <span className="text-[8px] font-bold text-white/20">{p.username?.[0]?.toUpperCase() || "?"}</span>}
+                    </div>
+                    <span className="text-[10px] text-white/40 font-medium flex-1 truncate">{p.username || "User"}</span>
+                    {voiceParticipants.filter(pp => pp.role === "speaker").length < MAX_SPEAKERS && (
+                      <button onClick={() => voicePanelRef.current?.promoteToSpeaker(p.user_id)}
+                        className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 hover:bg-emerald-500/20">
+                        <UserPlus className="h-3 w-3 inline mr-0.5" />Promote
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Announcement */}
+          <div>
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-1.5">Send Announcement</p>
+            <div className="flex gap-2">
+              <Input placeholder="Type announcement..." value={announcement} onChange={e => setAnnouncement(e.target.value)}
+                className="bg-white/[0.04] border-white/[0.06] rounded-lg text-sm h-8 flex-1" />
+              <Button size="sm" disabled={!announcement.trim()} onClick={() => {
+                setPinnedMsg(announcement.trim());
+                supabase.from("spaces").update({ pinned_message: announcement.trim() }).eq("id", space.id);
+                setAnnouncement("");
+              }} className="rounded-lg h-8 px-3 text-[10px]">Pin</Button>
+            </div>
+          </div>
+
+          {/* Quick actions */}
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={() => setSlowMode(!slowMode)}
+              className={cn("px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all",
+                slowMode ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : "bg-white/[0.03] text-white/30 border-white/[0.08] hover:border-white/[0.12]"
+              )}>
+              <Clock className="h-3 w-3 inline mr-1" />{slowMode ? "Slow Mode ON" : "Slow Mode"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Main Content ── */}
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0 relative">
         {/* Left: Voice / Speakers */}
@@ -992,14 +1099,22 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
 
           {/* Voice panel */}
           <div className="mb-5">
-            <p className="text-[10px] font-black text-white/25 uppercase tracking-widest mb-2.5 flex items-center gap-1.5"><Mic className="h-3 w-3" /> Speakers</p>
+            <p className="text-[10px] font-black text-white/25 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
+              <Mic className="h-3 w-3" /> Speakers · {voiceParticipants.filter(p => p.role === "speaker").length}/{MAX_SPEAKERS}
+            </p>
             <VoicePanel
+              ref={voicePanelRef}
               lobbyId={`space-${space.id}`}
               lobbyName={space.title}
               autoJoin
               isRecording={cur.is_recording && isHost}
               spaceId={space.id}
+              hostId={space.host_id}
+              initialRole={isHost ? "speaker" : "listener"}
+              maxSpeakers={MAX_SPEAKERS}
               onRecordingSaved={(url, dur) => { setCur(prev => ({ ...prev, recording_url: url, duration_seconds: dur })); }}
+              onParticipantsChange={setVoiceParticipants}
+              onRoleChange={setMyRole}
             />
           </div>
 
@@ -1011,25 +1126,35 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
           {/* Listeners */}
           <div className="mb-5">
             <p className="text-[10px] font-black text-white/25 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
-              <Headphones className="h-3 w-3" /> Listeners · {cur.listener_count || 0}
+              <Headphones className="h-3 w-3" /> Listeners · {voiceParticipants.filter(p => p.role === "listener").length || cur.listener_count || 0}
             </p>
             <div className="grid grid-cols-6 sm:grid-cols-8 gap-2.5">
-              {user && (
-                <div className="flex flex-col items-center gap-1">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 border-2 border-primary/25 flex items-center justify-center font-bold text-sm overflow-hidden">
-                    {safAvatar(profile?.avatar_url) ? <img src={safAvatar(profile?.avatar_url)} alt="" className="w-full h-full object-cover rounded-xl" /> : <span className="text-primary">{profile?.username?.[0]?.toUpperCase() ?? "Y"}</span>}
+              {voiceParticipants.filter(p => p.role === "listener").slice(0, 16).map((p, i) => (
+                <div key={p.id} className="flex flex-col items-center gap-1 sp-slide-up" style={{ animationDelay: `${i * 0.03}s` }}>
+                  <div className={cn("w-10 h-10 rounded-xl border-2 flex items-center justify-center font-bold text-sm overflow-hidden",
+                    p.user_id === user?.id ? "bg-primary/10 border-primary/25" : "bg-white/[0.03] border-white/[0.06]"
+                  )}>
+                    {safAvatar(p.avatar_url)
+                      ? <img src={safAvatar(p.avatar_url)} alt="" className="w-full h-full object-cover rounded-xl" />
+                      : <span className={cn("text-[10px] font-bold", p.user_id === user?.id ? "text-primary" : "text-white/20")}>{p.username?.[0]?.toUpperCase() ?? "?"}</span>}
                   </div>
-                  <span className="text-[9px] text-primary/60 font-bold">You</span>
-                </div>
-              )}
-              {Array.from({ length: Math.min(Math.max((cur.listener_count || 1) - 1, 0), 11) }, (_, i) => (
-                <div key={i} className="flex flex-col items-center gap-1 sp-slide-up" style={{ animationDelay: `${i * 0.03}s` }}>
-                  <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
-                    <Headphones className="h-4 w-4 text-white/[0.08]" />
-                  </div>
-                  <span className="text-[9px] text-white/[0.08]">Listener</span>
+                  <span className={cn("text-[9px] font-bold truncate max-w-[48px]",
+                    p.user_id === user?.id ? "text-primary/60" : "text-white/[0.15]"
+                  )}>{p.user_id === user?.id ? "You" : p.username || "Listener"}</span>
                 </div>
               ))}
+              {voiceParticipants.filter(p => p.role === "listener").length > 16 && (
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-white/15">+{voiceParticipants.filter(p => p.role === "listener").length - 16}</span>
+                  </div>
+                </div>
+              )}
+              {voiceParticipants.filter(p => p.role === "listener").length === 0 && (
+                <div className="col-span-6 text-center py-2">
+                  <p className="text-[10px] text-white/10">No listeners yet</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1064,6 +1189,16 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
 
       {/* ── Bottom Controls ── */}
       <div className="px-4 pb-4 pt-3 border-t border-white/[0.06] shrink-0 bg-[#070d14]/90 backdrop-blur-xl relative z-10">
+        {/* Role indicator */}
+        <div className={cn("mb-2.5 px-3 py-1.5 rounded-full text-center text-[10px] font-bold border",
+          myRole === "speaker"
+            ? (muted ? "bg-red-500/5 border-red-500/15 text-red-400/70" : "bg-emerald-500/5 border-emerald-500/15 text-emerald-400/80")
+            : "bg-blue-500/5 border-blue-500/15 text-blue-400/70"
+        )}>
+          {myRole === "speaker"
+            ? (muted ? "🔇 You are muted" : "🎤 You are live")
+            : `🎧 Listening${voiceParticipants.filter(p => p.role === "speaker").length < MAX_SPEAKERS ? " — raise hand to speak" : ""}`}
+        </div>
         {/* Reactions */}
         <div className="flex items-center gap-1.5 mb-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {REACTION_EMOJIS.map(e => (
@@ -1075,12 +1210,22 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
         </div>
         {/* Controls */}
         <div className="flex items-center justify-between gap-3">
-          <button onClick={() => { setMuted(v => !v); toast(muted ? "Unmuted 🎙️" : "Muted 🔇"); }}
-            className={cn("flex items-center gap-2 px-5 h-11 rounded-full font-bold text-sm transition-all",
-              muted ? "bg-white/[0.06] text-white/50 hover:bg-white/[0.1] border border-white/[0.08]" : "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 border border-emerald-400/30"
-            )}>
-            {muted ? <><MicOff className="h-4 w-4" />Unmute</> : <><Mic className="h-4 w-4" /><AudioEQ active color="bg-white" bars={3} /></>}
-          </button>
+          {myRole === "speaker" ? (
+            <button onClick={() => { setMuted(v => !v); toast(muted ? "Unmuted 🎙️" : "Muted 🔇"); }}
+              className={cn("flex items-center gap-2 px-5 h-11 rounded-full font-bold text-sm transition-all",
+                muted ? "bg-white/[0.06] text-white/50 hover:bg-white/[0.1] border border-white/[0.08]" : "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 border border-emerald-400/30"
+              )}>
+              {muted ? <><MicOff className="h-4 w-4" />Unmute</> : <><Mic className="h-4 w-4" /><AudioEQ active color="bg-white" bars={3} /></>}
+            </button>
+          ) : (
+            <button onClick={raiseHand} disabled={hasRaised}
+              className={cn("flex items-center gap-2 px-5 h-11 rounded-full font-bold text-sm transition-all",
+                hasRaised ? "bg-amber-400/15 text-amber-400 border border-amber-400/25" : "bg-white/[0.06] text-white/50 hover:bg-white/[0.1] border border-white/[0.08]"
+              )}>
+              <Hand className={cn("h-4 w-4", hasRaised && "animate-bounce")} />
+              {hasRaised ? "Hand Raised ✋" : "Raise Hand"}
+            </button>
+          )}
           <div className="flex items-center gap-2">
             <button onClick={() => setShowChat(!showChat)}
               className={cn("h-11 w-11 rounded-full flex items-center justify-center transition-all border",
@@ -1088,7 +1233,15 @@ const SpaceRoom = ({ space, onLeave, onMinimize }: { space: Space; onLeave: () =
               )} title="Chat">
               <MessageSquare className="h-4 w-4" />
             </button>
-            {!isHost && (
+            {isHost && (
+              <button onClick={() => setShowHostPanel(!showHostPanel)}
+                className={cn("h-11 w-11 rounded-full flex items-center justify-center transition-all border",
+                  showHostPanel ? "bg-primary/15 border-primary/30 text-primary" : "bg-white/[0.04] border-white/[0.08] text-white/30 hover:bg-white/[0.08]"
+                )} title="Host Controls">
+                <Shield className="h-4 w-4" />
+              </button>
+            )}
+            {!isHost && myRole === "speaker" && (
               <button onClick={raiseHand}
                 className={cn("h-11 w-11 rounded-full flex items-center justify-center transition-all border",
                   hasRaised ? "bg-amber-400/15 border-amber-400/25 text-amber-400" : "bg-white/[0.04] border-white/[0.08] text-white/30 hover:bg-white/[0.08]"
@@ -1389,16 +1542,15 @@ const Spaces = () => {
     <div className="relative">
       <SpaceStyles />
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-xl font-black text-white flex items-center gap-2.5">
-            <div className="p-1.5 rounded-xl bg-primary/15 border border-primary/25"><Radio className="h-4 w-4 text-primary" /></div>
-            Spaces
-          </h2>
-          <p className="text-[11px] text-white/25 mt-1">
-            {live.length > 0 ? `${live.length} live · ${totalListening.toLocaleString()} listening now` : "Live audio rooms for the community"}
-          </p>
+      {/* Action bar — sits below ToolShell header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          {live.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-white/30 font-medium">
+              <span className="relative flex h-2 w-2"><span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" /><span className="relative h-2 w-2 rounded-full bg-red-500" /></span>
+              {live.length} live · {totalListening.toLocaleString()} listening
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowSearch(!showSearch)}
