@@ -735,7 +735,15 @@ const SpaceCard = ({ space, onJoin, variant = "default" }: { space: Space; onJoi
           </div>
         )}
         {isPast && (
-          <div className="shrink-0 self-center">
+          <div className="shrink-0 self-center flex items-center gap-1.5">
+            {/* Share link button */}
+            <button
+              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(`${window.location.origin}/listen/${space.id}`).then(() => toast?.("Link copied! 🔗")).catch(() => {}); }}
+              className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-colors"
+              title="Copy share link"
+            >
+              <Share2 className="h-3 w-3 text-white/30" />
+            </button>
             {hasReplay ? (
               <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                 <Play className="h-3.5 w-3.5 text-primary ml-0.5" />
@@ -1023,10 +1031,13 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
       ended_at: new Date().toISOString(),
       duration_seconds: duration,
     }).eq("id", space.id);
-    toast.success("Space ended"); onLeave();
+    const shareUrl = `${window.location.origin}/listen/${space.id}`;
+    navigator.clipboard.writeText(shareUrl).catch(() => {});
+    toast.success("Space ended! Share link copied 🔗");
+    onLeave();
   };
 
-  const share = () => { navigator.clipboard.writeText(`${window.location.origin}/spaces?join=${space.id}`); toast.success("Link copied! 🔗"); };
+  const share = () => { navigator.clipboard.writeText(`${window.location.origin}/listen/${space.id}`); toast.success("Share link copied! 🔗"); };
 
   const votePoll = (idx: number) => {
     if (!poll || poll.votedIndex !== null) return;

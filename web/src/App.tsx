@@ -35,6 +35,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Admin from "./pages/Admin";
 import ArtFeed from "./pages/ArtFeed";
+import SpaceReplay from "./pages/SpaceReplay";
 
 const queryClient = new QueryClient();
 
@@ -133,6 +134,7 @@ const App = () => (
             {/* ── Public: Project/legal ── */}
             <Route path="/official-token" element={<OfficialToken />} />
             <Route path="/support" element={<SupportCenter />} />
+            <Route path="/listen/:spaceId" element={<SpaceReplay />} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
