@@ -5,7 +5,7 @@ import {
   Copy, Check, UserPlus, UserMinus, Wallet, Coins, ArrowUpRight, ArrowDownRight,
   RefreshCw, ExternalLink, Percent, Flame, Camera, Shield, Star, Hash, Lock,
   BarChart3, Crown, Medal, Award, Zap, Heart, Clock, ChevronRight, Edit3,
-  Image as ImageIcon, CheckCircle, XCircle, AlertCircle,
+  Image as ImageIcon, CheckCircle, XCircle, AlertCircle, Bookmark,
 } from "lucide-react";
 import { AvatarSelector, renderAvatar } from "@/components/avatars/AvatarSelector";
 import { safeAvatarUrl } from "@/lib/utils";
@@ -208,6 +208,7 @@ const Profile = () => {
   const [communities, setCommunities] = useState<UserCommunity[]>([]);
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryRow[]>([]);
   const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
+  const [bookmarks, setBookmarks] = useState<any[]>([]);
   const bannerFileRef = useRef<HTMLInputElement>(null);
 
   const isOwnProfile = !userId || userId === user?.id;
@@ -221,6 +222,7 @@ const Profile = () => {
       fetchTradeHistory();
       fetchLeaderboardRank();
       if (!isOwnProfile && user) checkFollowStatus();
+      if (isOwnProfile && user) fetchBookmarks();
     }
   }, [targetUserId, user]);
 
@@ -346,6 +348,27 @@ const Profile = () => {
     const { data } = await supabase.from("followers").select("id")
       .eq("follower_id", user.id).eq("followee_id", targetUserId).single();
     setIsFollowing(!!data);
+  };
+
+  const fetchBookmarks = async () => {
+    if (!user) return;
+    try {
+      const { data: bks } = await supabase
+        .from("community_post_bookmarks")
+        .select("post_id, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (!bks?.length) { setBookmarks([]); return; }
+      const postIds = bks.map((b: any) => b.post_id);
+      const { data: posts } = await supabase
+        .from("community_posts")
+        .select("id, content, image_url, likes_count, replies_count, created_at, user_id, username, avatar_url, community_id")
+        .in("id", postIds);
+      // Maintain bookmark order
+      const byId = new Map((posts || []).map((p: any) => [p.id, p]));
+      setBookmarks(postIds.map((id: string) => byId.get(id)).filter(Boolean));
+    } catch { setBookmarks([]); }
   };
 
   const handleFollow = async () => {
@@ -721,6 +744,9 @@ const Profile = () => {
             <TabsTrigger value="portfolio"  className="flex-1 min-w-fit rounded-lg text-xs sm:text-sm gap-1.5"><Wallet className="h-3.5 w-3.5" /><span>Portfolio</span></TabsTrigger>
             <TabsTrigger value="trades"     className="flex-1 min-w-fit rounded-lg text-xs sm:text-sm gap-1.5"><BarChart3 className="h-3.5 w-3.5" /><span>Trades</span></TabsTrigger>
             <TabsTrigger value="communities" className="flex-1 min-w-fit rounded-lg text-xs sm:text-sm gap-1.5"><Hash className="h-3.5 w-3.5" /><span>Communities</span></TabsTrigger>
+            {isOwnProfile && (
+              <TabsTrigger value="bookmarks" className="flex-1 min-w-fit rounded-lg text-xs sm:text-sm gap-1.5"><Bookmark className="h-3.5 w-3.5" /><span>Saved</span></TabsTrigger>
+            )}
             <TabsTrigger value="social"     className="flex-1 min-w-fit rounded-lg text-xs sm:text-sm gap-1.5"><Users className="h-3.5 w-3.5" /><span>Social</span></TabsTrigger>
             <TabsTrigger value="stats"      className="flex-1 min-w-fit rounded-lg text-xs sm:text-sm gap-1.5"><TrendingUp className="h-3.5 w-3.5" /><span>Stats</span></TabsTrigger>
           </TabsList>
@@ -1096,6 +1122,57 @@ const Profile = () => {
           </TabsContent>
 
           {/* ── SOCIAL TAB ────────────────────────────────────────────────── */}
+          {/* ── BOOKMARKS TAB ─────────────────────────────────────────────── */}
+          {isOwnProfile && (
+            <TabsContent value="bookmarks">
+              <Card className="glass-card">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Bookmark className="h-4 w-4 text-primary" /> Saved Posts
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {bookmarks.length > 0 ? (
+                    <div className="space-y-3">
+                      {bookmarks.map((post: any) => (
+                        <div key={post.id} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:bg-white/[0.05] transition-colors cursor-pointer group"
+                          onClick={() => navigate("/communities")}>
+                          <div className="flex items-start gap-2.5">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center text-xs font-bold shrink-0">
+                              {(post.username || "U")[0].toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className="text-xs font-bold text-white">@{post.username || "user"}</span>
+                                <span className="text-[10px] text-white/30">
+                                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                                </span>
+                              </div>
+                              <p className="text-sm text-white/80 line-clamp-3 leading-relaxed">{post.content}</p>
+                              {post.image_url && (
+                                <img src={post.image_url} alt="" className="mt-2 rounded-lg max-h-40 object-cover border border-white/10 w-full" onError={(e) => (e.target as HTMLImageElement).remove()} />
+                              )}
+                              <div className="flex items-center gap-4 mt-2 text-[11px] text-white/30">
+                                <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{post.likes_count || 0}</span>
+                                <span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" />{post.replies_count || 0}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Bookmark className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-30" />
+                      <p className="font-medium text-sm">No saved posts yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">Bookmark posts in Communities to save them here</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
           <TabsContent value="social">
             <SocialTab targetUserId={targetUserId!} isOwnProfile={isOwnProfile} />
           </TabsContent>
