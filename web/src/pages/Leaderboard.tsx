@@ -99,6 +99,7 @@ const Leaderboard = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-4">
+          <OGBannerPromo title="Leaderboard" subtitle="Top traders ranked by performance & OG score" accent="gold" />
         {/* Top 3 podium */}
         {!isLoading && sorted.length >= 3 && (
           <div className="grid grid-cols-3 gap-3">

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Maximize2, X, TrendingUp, BarChart3, ExternalLink, Star, Sparkles, Activity, Zap, Plus, Trash2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { OGBannerPromo } from "@/components/banners/OGBanner3D";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -141,6 +142,7 @@ const Charts = () => {
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-5">
+          <OGBannerPromo title="Live Charts" subtitle="Real-time DEX charts & token analytics powered by DexScreener" accent="cyan" />
         {/* Search */}
         <Card className="og-glass-frame overflow-hidden">
           <CardContent className="p-5">
