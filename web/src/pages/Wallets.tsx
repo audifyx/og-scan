@@ -15,10 +15,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WalletCalloutButton } from "@/components/webhooks/WalletCalloutButton";
 import { TokenDetailPopup } from "@/components/tokens/TokenDetailPopup";
-import { CreditBalance } from "@/components/credits/CreditBalance";
+// CreditBalance removed — credits system disabled
 import { getWalletOverview, getAssets, getTransactions, WalletOverview, TokenAsset, Transaction, formatAddress, formatUsd } from "@/lib/solana-api";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+// supabase import removed — wallet page uses direct APIs now
 import { formatDistanceToNow } from "date-fns";
 
 interface TrackedWallet {
@@ -169,16 +169,16 @@ const Wallets = () => {
       ]);
 
       setOverview(overviewData);
-      setAssets(assetsData.assets || []);
-      setTransactions(txData.transactions || []);
+      setAssets(assetsData.items || []);
+      setTransactions(txData || []);
       setLastRefresh(new Date());
 
       // Enrich transactions with token data
-      const enriched = await enrichTransactions(txData.transactions || [], address);
+      const enriched = await enrichTransactions(txData || [], address);
       setEnrichedTxs(enriched);
       
       // Process tokens with real links from DexScreener
-      const tokens = (assetsData.assets || [])
+      const tokens = (assetsData.items || [])
         .filter((a: any) => a.interface === 'FungibleToken' || a.interface === 'FungibleAsset')
         .slice(0, 30);
 
@@ -255,36 +255,7 @@ const Wallets = () => {
   };
 
   const pushTokenToDiscord = async (token: TokenWithLinks) => {
-    try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "analyzeToken", tokenAddress: token.address },
-      });
-      await supabase.functions.invoke("discord-webhook", {
-        body: {
-          type: "token_callout",
-          tokenAddress: token.address,
-          tokenSymbol: token.symbol,
-          tokenName: token.name,
-          message: `💊 ${token.symbol} [${formatNumber(data?.marketCap || 0)}/${data?.priceChange24h >= 0 ? '+' : ''}${(data?.priceChange24h || 0).toFixed(0)}%] $${token.symbol} 🌐 Solana`,
-          tokenData: {
-            price: data?.price || token.price,
-            priceChange24h: data?.priceChange24h || token.priceChange24h,
-            marketCap: data?.marketCap || 0,
-            holders: data?.totalHolders || 0,
-            liquidity: data?.liquidity || 0,
-            supply: data?.supply || 0,
-            riskScore: data?.riskScore || 50,
-            topHolderPercent: data?.top10HoldersPercent || 0,
-            mintDisabled: !data?.mintAuthority,
-            freezeDisabled: !data?.freezeAuthority,
-            lpLocked: data?.lpBurned,
-          },
-        },
-      });
-      toast({ title: "Pushed to Discord!", description: `${token.symbol} callout sent` });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to push to Discord", variant: "destructive" });
-    }
+    toast({ title: "Coming Soon", description: "Discord sharing is coming soon!" });
   };
 
   const formatNumber = (num: number) => {
@@ -323,10 +294,10 @@ const Wallets = () => {
     <AppLayout>
       <PageHeader title="Wallet Tracker" description="Track any Solana wallet in real-time">
         <div className="flex items-center gap-2">
-          <CreditBalance compact />
+          {/* credits removed */}
           {activeWallet && (
-            <Badge className={`gap-1.5 ${autoRefresh ? "bg-[#22d3ee]/15 text-[#22d3ee] border-[#22d3ee]/25" : "bg-white/[0.05]"}`}>
-              <div className={`w-2 h-2 rounded-full ${autoRefresh ? "bg-[#22d3ee] animate-pulse" : "bg-white/30"}`} />
+            <Badge className={`gap-1.5 ${autoRefresh ? "bg-primary/15 text-primary border-primary/25" : "bg-white/[0.05]"}`}>
+              <div className={`w-2 h-2 rounded-full ${autoRefresh ? "bg-primary animate-pulse" : "bg-white/30"}`} />
               {autoRefresh ? "Live" : "Paused"}
             </Badge>
           )}
@@ -341,7 +312,7 @@ const Wallets = () => {
             <h3 className="text-sm font-medium text-white/40">Tracked Wallets</h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {trackedWallets.map((wallet) => (
-                <Card key={wallet.address} className={`glass-card cursor-pointer transition-all hover:border-primary/50 ${activeWallet === wallet.address ? 'border-[#22d3ee]/40 bg-[#22d3ee]/8' : ''}`} onClick={() => loadWalletData(wallet.address)}>
+                <Card key={wallet.address} className={`glass-card cursor-pointer transition-all hover:border-primary/50 ${activeWallet === wallet.address ? 'border-primary/40 bg-primary/8' : ''}`} onClick={() => loadWalletData(wallet.address)}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
@@ -370,7 +341,7 @@ const Wallets = () => {
               <CardContent className="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-[#22d3ee]/10"><Zap className="h-5 w-5 text-[#22d3ee]" /></div>
+                    <div className="p-2 rounded-xl bg-primary/10"><Zap className="h-5 w-5 text-primary" /></div>
                     <div>
                       <p className="font-semibold">Live Tracking</p>
                       {lastRefresh && <p className="text-xs text-white/40">Last updated {formatDistanceToNow(lastRefresh, { addSuffix: true })}</p>}
@@ -391,12 +362,12 @@ const Wallets = () => {
             {/* Wallet Metrics Summary */}
             <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
               {[
-                { icon: BarChart3, label: "Portfolio", value: formatUsd(overview.totalUsdValue), color: "text-[#22d3ee]" },
-                { icon: Coins, label: "SOL", value: `${(overview.balance || 0).toFixed(2)}`, color: "text-[#22d3ee]" },
+                { icon: BarChart3, label: "Portfolio", value: formatUsd(overview.totalUsdValue), color: "text-primary" },
+                { icon: Coins, label: "SOL", value: `${(overview.balance || 0).toFixed(2)}`, color: "text-primary" },
                 { icon: TrendingUp, label: "24h", value: `${overview.priceChange24h >= 0 ? '+' : ''}${overview.priceChange24h.toFixed(1)}%`, color: overview.priceChange24h >= 0 ? "text-green-500" : "text-red-500" },
                 { icon: Coins, label: "Tokens", value: String(overview.tokenCount), color: "text-[#eab308]" },
-                { icon: Shield, label: "NFTs", value: String(overview.nftCount), color: "text-[#22d3ee]" },
-                { icon: Users, label: "Assets", value: String(overview.totalAssets), color: "text-[#22d3ee]" },
+                { icon: Shield, label: "NFTs", value: String(overview.nftCount), color: "text-primary" },
+                { icon: Users, label: "Assets", value: String(overview.totalAssets), color: "text-primary" },
               ].map((s, i) => (
                 <Card key={i} className="og-glass-card">
                   <CardContent className="p-3 text-center">
@@ -451,7 +422,7 @@ const Wallets = () => {
                                         </Badge>
                                       </div>
                                       <p className="text-xs text-muted-foreground truncate">{token.name}</p>
-                                      <p className="text-xs font-mono text-[#22d3ee]">${token.price < 0.01 ? token.price.toExponential(2) : token.price.toFixed(4)} • {token.balance.toFixed(2)} held • ${token.value.toFixed(2)}</p>
+                                      <p className="text-xs font-mono text-primary">${token.price < 0.01 ? token.price.toExponential(2) : token.price.toFixed(4)} • {token.balance.toFixed(2)} held • ${token.value.toFixed(2)}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1 flex-wrap justify-end">
@@ -481,7 +452,7 @@ const Wallets = () => {
                     <CardContent className="p-0">
                       <div className="p-4 border-b border-white/[0.07] flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Clock className="h-5 w-5 text-[#22d3ee]" />
+                          <Clock className="h-5 w-5 text-primary" />
                           <h3 className="font-semibold">Transaction History</h3>
                           <Badge variant="outline">{enrichedTxs.length} txns</Badge>
                         </div>
