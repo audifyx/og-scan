@@ -748,8 +748,8 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
       {selectedWallet && selectedWallet.length > 0 ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-og-cyan">Wallet X-Ray: {shortAddr(selectedWallet)}</h3>
-            <button onClick={() => setSelectedWallet("")} className="text-[10px] text-white/40 hover:text-white">Clear</button>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-og-cyan">Wallet X-Ray: {shortAddr(selectedWallet ?? "")}</h3>
+            <button onClick={() => setSelectedWallet?.("")} className="text-[10px] text-white/40 hover:text-white">Clear</button>
           </div>
           <WalletXRay walletAddress={selectedWallet} compact={false} />
         </div>
