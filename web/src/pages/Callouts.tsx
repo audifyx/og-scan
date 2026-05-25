@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useEffect, useRef } from "react";
 import { Send, Zap, Wallet, Coins, TrendingUp, Copy, ExternalLink, RefreshCw, Sparkles, Shield, AlertTriangle } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";

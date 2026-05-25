@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useEffect } from "react";
 import { Bell, Check, Trash2, Wallet, TrendingUp, TrendingDown, Coins, AlertTriangle, BellRing, BellOff, Plus, Search, Zap } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";

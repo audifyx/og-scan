@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Search, TrendingUp, TrendingDown, Star, StarOff, ExternalLink, RefreshCw, 
