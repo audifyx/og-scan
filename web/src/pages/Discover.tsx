@@ -229,7 +229,7 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
       {!inline && (
         <PageHeader title="Discover" description="Trending tokens, top traders & live activity">
           <div className="flex items-center gap-2">
-            <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
+            <Badge className="bg-og-cyan/20 text-og-cyan border-og-cyan/30 gap-1">
               <Activity className="h-3 w-3" /> Live
             </Badge>
           </div>
@@ -251,7 +251,7 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
             
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {(loadingTrending ? Array(4).fill(null) : trendingTokens.slice(0, 8)).map((token, i) => (
-                <Card key={i} className="og-glass-card hover:border-primary/20 transition-all hover:scale-[1.02] cursor-pointer group"
+                <Card key={i} className="og-glass-card hover:border-og-cyan/20 transition-all hover:scale-[1.02] cursor-pointer group"
                   onClick={() => { if (token) { try { localStorage.setItem("og_active_mint", token.address); } catch {} navigate(`/scanner`); } }}>
                   <CardContent className="p-4">
                     {!token ? (
@@ -266,7 +266,7 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
                           {token.imageUrl ? (
                             <img src={token.imageUrl} alt="" className="h-8 w-8 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                           ) : (
-                            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xs font-bold">
+                            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-og-cyan to-accent flex items-center justify-center text-xs font-bold">
                               {token.symbol?.charAt(0)}
                             </div>
                           )}
@@ -348,7 +348,7 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
                   <ScrollArea className="h-[500px]">
                     {loading ? (
                       <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-og-cyan" />
                       </div>
                     ) : displayList.length === 0 ? (
                       <div className="text-center py-12">
@@ -458,7 +458,7 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
               <Card className="og-glass-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Zap className="h-5 w-5 text-primary animate-pulse" /> Live Activity
+                    <Zap className="h-5 w-5 text-og-cyan animate-pulse" /> Live Activity
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

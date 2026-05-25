@@ -371,7 +371,7 @@ const LiveTimer = ({ startedAt }: { startedAt: string }) => {
    TOGGLE SWITCH — reusable
    ═══════════════════════════════════════════════════════════════════════════════ */
 
-const Toggle = ({ on, onChange, activeColor = "bg-primary" }: { on: boolean; onChange: () => void; activeColor?: string }) => (
+const Toggle = ({ on, onChange, activeColor = "bg-og-cyan" }: { on: boolean; onChange: () => void; activeColor?: string }) => (
   <button onClick={onChange} className={cn("w-11 h-6 rounded-full transition-colors relative shrink-0", on ? activeColor : "bg-white/10")}>
     <div className={cn("absolute top-1 w-4 h-4 rounded-full bg-white shadow-md transition-transform", on ? "translate-x-6" : "translate-x-1")} />
   </button>
@@ -393,11 +393,11 @@ const LivePollWidget = ({ poll, onVote, onClose, isHost }: {
 }) => {
   const totalVotes = poll.options.reduce((s, o) => s + o.votes, 0);
   return (
-    <div className="mx-4 mt-2 rounded-2xl border border-primary/20 bg-primary/[0.04] backdrop-blur-sm p-4 sp-slide-up">
+    <div className="mx-4 mt-2 rounded-2xl border border-og-cyan/20 bg-og-cyan/[0.04] backdrop-blur-sm p-4 sp-slide-up">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-primary" />
-          <span className="text-xs font-bold text-primary">Live Poll</span>
+          <BarChart3 className="h-4 w-4 text-og-cyan" />
+          <span className="text-xs font-bold text-og-cyan">Live Poll</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-white/30">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</span>
@@ -421,13 +421,13 @@ const LivePollWidget = ({ poll, onVote, onClose, isHost }: {
               disabled={!canVote}
               className={cn(
                 "w-full text-left relative rounded-xl overflow-hidden border transition-all h-10 flex items-center",
-                voted ? "border-primary/40 bg-primary/10" : canVote ? "border-white/10 bg-white/[0.03] hover:border-white/20" : "border-white/[0.06] bg-white/[0.02]"
+                voted ? "border-og-cyan/40 bg-og-cyan/10" : canVote ? "border-white/10 bg-white/[0.03] hover:border-white/20" : "border-white/[0.06] bg-white/[0.02]"
               )}
             >
-              <div className="absolute inset-y-0 left-0 bg-primary/10 transition-all" style={{ width: `${pct}%` }} />
+              <div className="absolute inset-y-0 left-0 bg-og-cyan/10 transition-all" style={{ width: `${pct}%` }} />
               <span className="relative z-10 px-3 text-xs font-medium text-white/80 flex-1">{opt.label}</span>
               <span className="relative z-10 px-3 text-xs font-bold text-white/40">{pct}%</span>
-              {voted && <CheckCircle2 className="relative z-10 h-3.5 w-3.5 text-primary mr-3 shrink-0" />}
+              {voted && <CheckCircle2 className="relative z-10 h-3.5 w-3.5 text-og-cyan mr-3 shrink-0" />}
             </button>
           );
         })}
@@ -496,14 +496,14 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
       <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={onClose} />
       <div className="relative w-full sm:max-w-lg mx-4 bg-[#0c1219] rounded-3xl border border-white/[0.08] shadow-2xl shadow-black/40 overflow-hidden max-h-[92vh] flex flex-col sp-slide-up">
         {/* Decorative top glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-og-cyan/20 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-white/[0.06] relative">
           <div>
             <h2 className="text-lg font-black flex items-center gap-2.5 text-white">
-              <div className="p-1.5 rounded-xl bg-primary/15 border border-primary/25">
-                <Radio className="h-4 w-4 text-primary" />
+              <div className="p-1.5 rounded-xl bg-og-cyan/15 border border-og-cyan/25">
+                <Radio className="h-4 w-4 text-og-cyan" />
               </div>
               {isScheduled ? "Schedule a Space" : "Start a Space"}
             </h2>
@@ -522,7 +522,7 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
           <div>
             <label className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 block">Title *</label>
             <Input placeholder="e.g. Solana Alpha Call — New Launches" value={title} onChange={e => setTitle(e.target.value)} maxLength={80}
-              className="bg-white/[0.04] border-white/[0.08] rounded-xl h-11 focus:border-primary/50 transition-colors" />
+              className="bg-white/[0.04] border-white/[0.08] rounded-xl h-11 focus:border-og-cyan/50 transition-colors" />
             <div className="flex justify-end mt-1">
               <span className={cn("text-[10px] tabular-nums", title.length > 70 ? "text-amber-400" : "text-white/15")}>{title.length}/80</span>
             </div>
@@ -532,7 +532,7 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
           <div>
             <label className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 block">Description</label>
             <Textarea placeholder="What will you discuss?" value={description} onChange={e => setDescription(e.target.value)} maxLength={280}
-              className="bg-white/[0.04] border-white/[0.08] rounded-xl resize-none min-h-[80px] text-sm focus:border-primary/50" />
+              className="bg-white/[0.04] border-white/[0.08] rounded-xl resize-none min-h-[80px] text-sm focus:border-og-cyan/50" />
           </div>
 
           {/* Topic */}
@@ -546,11 +546,11 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
                     className={cn(
                       "flex flex-col items-center gap-1 py-2.5 rounded-xl border transition-all text-center",
                       topic === t
-                        ? "bg-primary/10 border-primary/40 scale-[1.02] shadow-lg shadow-primary/10"
+                        ? "bg-og-cyan/10 border-og-cyan/40 scale-[1.02] shadow-lg shadow-og-cyan/10"
                         : "border-white/[0.06] hover:border-white/[0.12] bg-white/[0.02]"
                     )}>
                     <span className="text-lg">{m.icon}</span>
-                    <span className={cn("text-[10px] font-bold", topic === t ? "text-primary" : "text-white/40")}>{t}</span>
+                    <span className={cn("text-[10px] font-bold", topic === t ? "text-og-cyan" : "text-white/40")}>{t}</span>
                   </button>
                 );
               })}
@@ -571,7 +571,7 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {tags.map(t => (
-                  <span key={t} className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  <span key={t} className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-og-cyan/10 text-og-cyan border border-og-cyan/20">
                     #{t}
                     <button onClick={() => setTags(tags.filter(x => x !== t))} className="hover:text-red-400 transition"><XIcon className="h-2.5 w-2.5" /></button>
                   </span>
@@ -586,7 +586,7 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
               <div className="flex items-center justify-between p-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-1.5 rounded-lg bg-primary/10"><Calendar className="h-3.5 w-3.5 text-primary" /></div>
+                  <div className="p-1.5 rounded-lg bg-og-cyan/10"><Calendar className="h-3.5 w-3.5 text-og-cyan" /></div>
                   <div><p className="text-[13px] font-bold text-white">Schedule for later</p><p className="text-[10px] text-white/25">Set a date & time</p></div>
                 </div>
                 <Toggle on={isScheduled} onChange={() => setIsScheduled(v => !v)} />
@@ -759,7 +759,7 @@ const SpaceCard = ({ space, onJoin, variant = "default", onDelete, currentUserId
       className={cn(
         "w-full text-left rounded-xl border transition-all group cursor-pointer",
         isPast
-          ? "p-3.5 border-white/[0.06] bg-white/[0.015] hover:border-primary/25 hover:bg-white/[0.03]"
+          ? "p-3.5 border-white/[0.06] bg-white/[0.015] hover:border-og-cyan/25 hover:bg-white/[0.03]"
           : "p-3.5 border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]",
       )}>
       <div className="flex gap-3 items-center">
@@ -784,7 +784,7 @@ const SpaceCard = ({ space, onJoin, variant = "default", onDelete, currentUserId
               <span className="text-[9px] text-white/20">{formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}</span>
             )}
             {isPast && hasReplay && (
-              <span className="inline-flex items-center gap-1 text-[9px] text-primary/60 font-bold"><Play className="h-2.5 w-2.5" />{space.duration_seconds ? formatDuration(space.duration_seconds) : "Replay"}</span>
+              <span className="inline-flex items-center gap-1 text-[9px] text-og-cyan/60 font-bold"><Play className="h-2.5 w-2.5" />{space.duration_seconds ? formatDuration(space.duration_seconds) : "Replay"}</span>
             )}
             {isPast && !hasReplay && <span className="text-[8px] text-white/15 italic">No recording</span>}
           </div>
@@ -803,7 +803,7 @@ const SpaceCard = ({ space, onJoin, variant = "default", onDelete, currentUserId
         {/* Right: action hint */}
         {!isPast && (
           <div className="shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <div className="px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] text-white/40 font-medium group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/25 transition-all">
+            <div className="px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] text-white/40 font-medium group-hover:bg-og-cyan/10 group-hover:text-og-cyan group-hover:border-og-cyan/25 transition-all">
               Join
             </div>
           </div>
@@ -842,8 +842,8 @@ const SpaceCard = ({ space, onJoin, variant = "default", onDelete, currentUserId
               <Share2 className="h-3 w-3 text-white/30" />
             </button>
             {hasReplay ? (
-              <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                <Play className="h-3.5 w-3.5 text-primary ml-0.5" />
+              <div className="w-9 h-9 rounded-full bg-og-cyan/10 border border-og-cyan/25 flex items-center justify-center group-hover:bg-og-cyan/20 transition-colors">
+                <Play className="h-3.5 w-3.5 text-og-cyan ml-0.5" />
               </div>
             ) : (
               <div className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center group-hover:bg-white/[0.08] transition-colors">
@@ -874,8 +874,8 @@ const ScheduledSpaceCard = ({ space, onRemind, onStartNow, isOwner }: { space: S
           <div className="flex items-center gap-2 mt-1">
             {space.scheduled_for && (
               <>
-                <Clock className="h-2.5 w-2.5 text-primary/50" />
-                <span className="text-[10px] text-primary/60 font-medium">{format(new Date(space.scheduled_for), "MMM d · h:mm a")}</span>
+                <Clock className="h-2.5 w-2.5 text-og-cyan/50" />
+                <span className="text-[10px] text-og-cyan/60 font-medium">{format(new Date(space.scheduled_for), "MMM d · h:mm a")}</span>
                 <span className="text-[9px] text-white/15">({formatDistanceToNow(new Date(space.scheduled_for), { addSuffix: true })})</span>
               </>
             )}
@@ -884,7 +884,7 @@ const ScheduledSpaceCard = ({ space, onRemind, onStartNow, isOwner }: { space: S
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <button onClick={() => onRemind(space)}
-            className="h-8 w-8 rounded-lg flex items-center justify-center border border-white/[0.06] text-white/30 hover:bg-white/[0.04] hover:text-primary transition-all" title="Set reminder">
+            className="h-8 w-8 rounded-lg flex items-center justify-center border border-white/[0.06] text-white/30 hover:bg-white/[0.04] hover:text-og-cyan transition-all" title="Set reminder">
             <Bell className="h-3.5 w-3.5" />
           </button>
           {isOwner && onStartNow && (
@@ -976,7 +976,7 @@ const SpaceChat = ({ spaceId, isHost }: { spaceId: string; isHost: boolean }) =>
       </div>
       {!atBottom && msgs.length > 3 && (
         <button onClick={() => { setAtBottom(true); scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }}
-          className="mx-3 mb-1 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] text-primary font-bold flex items-center gap-1 justify-center">
+          className="mx-3 mb-1 py-1 rounded-full bg-og-cyan/10 border border-og-cyan/20 text-[10px] text-og-cyan font-bold flex items-center gap-1 justify-center">
           <ChevronDown className="h-3 w-3" /> New messages
         </button>
       )}
@@ -984,7 +984,7 @@ const SpaceChat = ({ spaceId, isHost }: { spaceId: string; isHost: boolean }) =>
         <div className="flex gap-2">
           <Input placeholder="Type a message..." value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), send())}
-            className="bg-white/[0.04] border-white/[0.06] rounded-full text-sm h-9 focus:border-primary/40" />
+            className="bg-white/[0.04] border-white/[0.06] rounded-full text-sm h-9 focus:border-og-cyan/40" />
           <Button size="sm" onClick={send} disabled={!input.trim() || sending} className="rounded-full h-9 w-9 p-0 shrink-0">
             <Send className="h-3.5 w-3.5" />
           </Button>
@@ -1212,7 +1212,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setShowMore(false)} />
                   <div className="absolute right-0 top-full mt-1 w-52 bg-[#0c1219] border border-white/[0.08] rounded-xl shadow-2xl z-30 overflow-hidden sp-slide-up">
-                    <button onClick={() => { setShowHostPanel(!showHostPanel); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-primary hover:bg-primary/5 transition"><Shield className="h-4 w-4" /> Host Controls</button>
+                    <button onClick={() => { setShowHostPanel(!showHostPanel); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-og-cyan hover:bg-og-cyan/5 transition"><Shield className="h-4 w-4" /> Host Controls</button>
                     <button onClick={() => { setShowPollCreate(true); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition"><BarChart3 className="h-4 w-4" /> Create Poll</button>
                     <button onClick={() => { setShowQA(!showQA); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-purple-400/80 hover:bg-purple-500/5 transition"><MessageCircleQuestion className="h-4 w-4" /> Q&A Mode</button>
                     <button onClick={() => { setShowTokenTicker(!showTokenTicker); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition"><TrendingUp className="h-4 w-4" /> Token Chart</button>
@@ -1271,9 +1271,9 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
 
       {/* ── Host Controls Panel ── */}
       {isHost && showHostPanel && (
-        <div className="mx-4 mt-3 rounded-2xl border border-primary/15 bg-primary/[0.02] p-4 sp-slide-up space-y-3">
+        <div className="mx-4 mt-3 rounded-2xl border border-og-cyan/15 bg-og-cyan/[0.02] p-4 sp-slide-up space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-primary flex items-center gap-2"><Shield className="h-4 w-4" /> Host Controls</p>
+            <p className="text-xs font-bold text-og-cyan flex items-center gap-2"><Shield className="h-4 w-4" /> Host Controls</p>
             <button onClick={() => setShowHostPanel(false)} className="p-1 rounded hover:bg-white/10"><XIcon className="h-3 w-3 text-white/25" /></button>
           </div>
           <div>
@@ -1564,7 +1564,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
             className={cn(
               "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
               showChat
-                ? "bg-primary/15 border border-primary/30 text-primary"
+                ? "bg-og-cyan/15 border border-og-cyan/30 text-og-cyan"
                 : "bg-white/[0.06] border border-white/[0.08] text-white/40 hover:bg-white/[0.1]"
             )}>
             <MessageSquare className="h-5 w-5" />
@@ -1587,7 +1587,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
               className={cn(
                 "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
                 showHostPanel
-                  ? "bg-primary/15 border border-primary/30 text-primary"
+                  ? "bg-og-cyan/15 border border-og-cyan/30 text-og-cyan"
                   : "bg-white/[0.06] border border-white/[0.08] text-white/40 hover:bg-white/[0.1]"
               )}>
               <Sparkles className="h-5 w-5" />
@@ -1621,8 +1621,8 @@ const CreatePollInline = ({ onCreate, onCancel }: { onCreate: (p: SpacePoll) => 
   const updateOpt = (i: number, v: string) => { const c = [...opts]; c[i] = v; setOpts(c); };
   const valid = q.trim() && opts.filter(o => o.trim()).length >= 2;
   return (
-    <div className="mx-4 mt-2 rounded-2xl border border-primary/20 bg-[#0c1219] p-4 sp-slide-up">
-      <p className="text-xs font-bold text-primary mb-3 flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Create Live Poll</p>
+    <div className="mx-4 mt-2 rounded-2xl border border-og-cyan/20 bg-[#0c1219] p-4 sp-slide-up">
+      <p className="text-xs font-bold text-og-cyan mb-3 flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Create Live Poll</p>
       <Input placeholder="Your question..." value={q} onChange={e => setQ(e.target.value)} className="bg-white/[0.04] border-white/[0.08] rounded-xl mb-3 text-sm" />
       <div className="space-y-2 mb-3">
         {opts.map((o, i) => (
@@ -1702,7 +1702,7 @@ const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void })
       <SpaceStyles />
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-72 bg-gradient-to-b from-primary/[0.04] via-violet-900/[0.03] to-transparent" />
+        <div className="absolute top-0 left-0 w-full h-72 bg-gradient-to-b from-og-cyan/[0.04] via-violet-900/[0.03] to-transparent" />
       </div>
 
       {/* Header */}
@@ -1723,8 +1723,8 @@ const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void })
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 gap-6 relative">
         {/* Space info */}
         <div className="text-center">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-violet-600/20 border-2 border-primary/20 flex items-center justify-center overflow-hidden">
-            {safAvatar(space.host_avatar) ? <img src={safAvatar(space.host_avatar)} alt="" className="w-full h-full object-cover rounded-2xl" /> : <Radio className="h-8 w-8 text-primary/50" />}
+          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-og-cyan/20 to-violet-600/20 border-2 border-og-cyan/20 flex items-center justify-center overflow-hidden">
+            {safAvatar(space.host_avatar) ? <img src={safAvatar(space.host_avatar)} alt="" className="w-full h-full object-cover rounded-2xl" /> : <Radio className="h-8 w-8 text-og-cyan/50" />}
           </div>
           <h2 className="text-lg font-black text-white mb-1">{space.title}</h2>
           {space.description && <p className="text-sm text-white/30 mb-2">{space.description}</p>}
@@ -1742,7 +1742,7 @@ const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void })
                 "w-16 h-16 rounded-full flex items-center justify-center transition-all",
                 playing
                   ? "bg-white/10 border-2 border-white/20 text-white hover:bg-white/15"
-                  : "bg-primary/20 border-2 border-primary/40 text-primary hover:bg-primary/30 shadow-[0_0_30px_rgba(var(--primary-rgb,190,242,100),0.2)]",
+                  : "bg-og-cyan/20 border-2 border-og-cyan/40 text-og-cyan hover:bg-og-cyan/30 shadow-[0_0_30px_rgba(var(--og-cyan-rgb,190,242,100),0.2)]",
                 loading && "opacity-50"
               )}
             >
@@ -1763,8 +1763,8 @@ const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void })
                 max={duration || 1}
                 value={currentTime}
                 onChange={seek}
-                className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(var(--primary-rgb,190,242,100),0.5)]"
-                style={{ background: `linear-gradient(to right, hsl(var(--primary)) ${(currentTime / (duration || 1)) * 100}%, rgba(255,255,255,0.1) ${(currentTime / (duration || 1)) * 100}%)` }}
+                className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-og-cyan [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(var(--og-cyan-rgb,190,242,100),0.5)]"
+                style={{ background: `linear-gradient(to right, hsl(var(--og-cyan)) ${(currentTime / (duration || 1)) * 100}%, rgba(255,255,255,0.1) ${(currentTime / (duration || 1)) * 100}%)` }}
               />
               <div className="flex justify-between text-[10px] text-white/25 font-mono">
                 <span>{fmtTime(currentTime)}</span>
@@ -2438,7 +2438,7 @@ class SpacesErrorBoundary extends React.Component<
           </p>
           <button
             onClick={() => this.setState({ hasError: false, error: null })}
-            className="px-4 py-2 rounded-xl bg-primary/15 border border-primary/30 text-primary text-sm font-bold hover:bg-primary/25 transition"
+            className="px-4 py-2 rounded-xl bg-og-cyan/15 border border-og-cyan/30 text-og-cyan text-sm font-bold hover:bg-og-cyan/25 transition"
           >
             Try Again
           </button>

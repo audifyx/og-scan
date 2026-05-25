@@ -86,6 +86,11 @@ interface PostReply {
 type MainView = "home" | "explore" | "news" | "community";
 type FeedSort = "latest" | "top" | "trending";
 
+/* ─── Standard Forensic Constants ─── */
+const ACCENT_GOLD = "hsl(var(--og-gold))";
+const ACCENT_LIME = "hsl(var(--og-lime))";
+const ACCENT_CYAN = "hsl(var(--og-cyan))";
+
 const Communities = () => {
   const { user } = useAuth();
   const [mainView, setMainView] = useState<MainView>("home");
@@ -160,9 +165,9 @@ const Communities = () => {
       {/* ─── FAB ─── */}
       <button
         onClick={() => setShowCompose(true)}
-        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-50 w-14 h-14 rounded-full bg-primary shadow-lg shadow-primary/30 flex items-center justify-center text-white hover:scale-105 transition-transform"
+        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-50 w-14 h-14 rounded-full bg-og-cyan shadow-lg shadow-og-cyan/20 flex items-center justify-center text-[#070d14] hover:scale-105 active:scale-95 transition-all"
       >
-        <PenSquare className="h-5 w-5" />
+        <Plus className="h-6 w-6 stroke-[3]" />
       </button>
 
       {/* ─── Compose Modal ─── */}
@@ -242,7 +247,7 @@ function TopNav({
             >
               {tab.label}
               {mainView === tab.id && (
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-[3px] rounded-full bg-primary" />
+                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-og-cyan shadow-[0_0_8px_hsl(var(--og-cyan)/0.6)]" />
               )}
             </button>
           ))}
@@ -324,7 +329,7 @@ function HomeFeed({
         <div className="py-3 border-b border-white/[0.04]">
           <div className="flex items-center justify-between px-4 mb-2.5">
             <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Your Communities</p>
-            <button onClick={() => onSelectCommunity(communities[0])} className="text-[10px] text-primary font-medium">See all</button>
+            <button onClick={() => onSelectCommunity(communities[0])} className="text-[10px] text-og-cyan font-medium">See all</button>
           </div>
           <div className="flex gap-3 px-4 overflow-x-auto scrollbar-hide pb-1">
             {communities.map(c => (
@@ -340,8 +345,8 @@ function HomeFeed({
           <button
             key={s}
             onClick={() => setSort(s)}
-            className={cn("px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-              sort === s ? "bg-primary/10 text-primary" : "text-white/25 hover:text-white/40"
+            className={cn("px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors border",
+              sort === s ? "bg-og-cyan/10 text-og-cyan border-og-cyan/30" : "text-white/25 border-transparent hover:text-white/40"
             )}
           >
             {s === "latest" ? "Latest" : s === "top" ? "🔥 Top" : "📈 Trending"}
@@ -426,7 +431,7 @@ function ExploreCommunities({
             placeholder="Search communities..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder-white/25 focus:border-primary/30 focus:outline-none transition-colors"
+            className="w-full pl-10 pr-4 py-2.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder-white/25 focus:border-og-cyan/30 focus:outline-none transition-colors"
           />
         </div>
       </div>
@@ -440,7 +445,7 @@ function ExploreCommunities({
               onClick={() => setActiveCategory(cat || "all")}
               className={cn("shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
                 activeCategory === cat
-                  ? "bg-primary text-white"
+                  ? "bg-og-cyan text-white"
                   : "bg-white/[0.04] text-white/30 hover:text-white/50"
               )}
             >
@@ -473,8 +478,8 @@ function ExploreCommunities({
             onClick={onCreateNew}
             className="w-full flex items-center gap-3 px-4 py-3 border-y border-white/[0.04] hover:bg-white/[0.02] transition-colors"
           >
-            <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-              <Plus className="h-5 w-5 text-primary" />
+            <div className="w-12 h-12 rounded-xl bg-og-cyan/10 border border-og-cyan/20 flex items-center justify-center">
+              <Plus className="h-5 w-5 text-og-cyan" />
             </div>
             <div className="text-left flex-1">
               <p className="text-sm font-bold text-white">Create a Community</p>
@@ -508,22 +513,22 @@ function ExploreCommunities({
 function CommunityCard({ community: c, onClick, variant = "list" }: { community: Community; onClick: () => void; variant?: "list" | "grid" | "compact" }) {
   // Deterministic gradient based on community name
   const gradients = [
-    "from-blue-600/40 via-purple-600/30 to-pink-600/20",
-    "from-emerald-600/40 via-teal-600/30 to-cyan-600/20",
-    "from-amber-600/40 via-orange-600/30 to-red-600/20",
-    "from-violet-600/40 via-fuchsia-600/30 to-pink-600/20",
-    "from-cyan-600/40 via-blue-600/30 to-indigo-600/20",
-    "from-rose-600/40 via-pink-600/30 to-purple-600/20",
+    "from-og-cyan/20 to-og-cyan/5 border-og-cyan/20 text-og-cyan",
+    "from-og-gold/20 to-og-gold/5 border-og-gold/20 text-og-gold",
+    "from-og-lime/20 to-og-lime/5 border-og-lime/20 text-og-lime",
+    "from-blue-500/20 to-blue-500/5 border-blue-500/20 text-blue-400",
+    "from-purple-500/20 to-purple-500/5 border-purple-500/20 text-purple-400",
   ];
   const gradIdx = c.name.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % gradients.length;
+  const showIcon = c.icon && c.icon !== "null" && c.icon !== "default" && c.icon !== "";
 
   if (variant === "compact") {
     return (
-      <button onClick={onClick} className="flex flex-col items-center gap-1.5 shrink-0 w-[72px]">
-        <div className={cn("w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center text-xl shadow-lg", gradients[gradIdx])}>
-          {c.icon || c.name.charAt(0).toUpperCase()}
+      <button onClick={onClick} className="flex flex-col items-center gap-1.5 shrink-0 w-[72px] group">
+        <div className={cn("w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center text-xl shadow-lg border transition-all group-hover:scale-105 group-active:scale-95", gradients[gradIdx])}>
+          {showIcon ? c.icon : c.name.charAt(0).toUpperCase()}
         </div>
-        <span className="text-[10px] text-white/50 font-medium truncate w-full text-center">{c.name}</span>
+        <span className="text-[10px] text-white/40 font-black uppercase tracking-tighter truncate w-full text-center">{c.name}</span>
       </button>
     );
   }
@@ -532,31 +537,28 @@ function CommunityCard({ community: c, onClick, variant = "list" }: { community:
     return (
       <button onClick={onClick} className="group rounded-2xl overflow-hidden border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-all hover:border-white/[0.12] w-full text-left">
         {/* Banner */}
-        <div className={cn("h-20 w-full bg-gradient-to-br relative", gradients[gradIdx])}>
+        <div className={cn("h-20 w-full bg-gradient-to-br relative border-b", gradients[gradIdx])}>
           {c.banner_url && (
             <img src={c.banner_url} className="w-full h-full object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
           )}
           <div className="absolute -bottom-5 left-3">
-            <div className={cn("w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center text-base border-2 border-black shadow-lg", gradients[gradIdx])}>
-              {c.icon || c.name.charAt(0).toUpperCase()}
+            <div className={cn("w-10 h-10 rounded-xl bg-[#070d14] flex items-center justify-center text-base border-2 shadow-lg", gradients[gradIdx])}>
+              {showIcon ? c.icon : c.name.charAt(0).toUpperCase()}
             </div>
           </div>
         </div>
         <div className="pt-7 px-3 pb-3">
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-bold text-white truncate">{c.name}</p>
+            <p className="text-xs font-black uppercase tracking-wider text-white truncate">{c.name}</p>
             {c.privacy === "private" && <span className="text-[9px] text-white/30">🔒</span>}
           </div>
           {c.description && (
             <p className="text-[11px] text-white/30 line-clamp-2 mt-1 leading-relaxed">{c.description}</p>
           )}
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-[10px] text-white/20 flex items-center gap-1">
-              <Users className="h-3 w-3" /> {c.member_count || 0}
+            <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest flex items-center gap-1">
+              <Users className="h-3 w-3" /> {c.member_count || 0} MEMBERS
             </span>
-            {c.category && (
-              <span className="text-[9px] text-primary/50 bg-primary/5 px-1.5 py-0.5 rounded-full">{c.category}</span>
-            )}
           </div>
         </div>
       </button>
@@ -565,28 +567,22 @@ function CommunityCard({ community: c, onClick, variant = "list" }: { community:
 
   // Default: list variant
   return (
-    <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors text-left">
-      <div className={cn("w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center text-lg shrink-0", gradients[gradIdx])}>
-        {c.icon || c.name.charAt(0).toUpperCase()}
+    <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors text-left group">
+      <div className={cn("w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center text-lg shrink-0 border", gradients[gradIdx])}>
+        {showIcon ? c.icon : c.name.charAt(0).toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <p className="text-sm font-bold text-white truncate">{c.name}</p>
-          {c.privacy === "private" && <span className="text-[9px] text-white/20">🔒</span>}
-        </div>
-        {c.description && (
-          <p className="text-xs text-white/30 truncate mt-0.5">{c.description}</p>
-        )}
-        <div className="flex items-center gap-3 mt-1">
-          <span className="text-[10px] text-white/20 flex items-center gap-1">
-            <Users className="h-3 w-3" /> {c.member_count || 0} members
+        <p className="text-sm font-black uppercase tracking-wider text-white truncate group-hover:text-og-cyan transition-colors">{c.name}</p>
+        <div className="flex items-center gap-3 mt-0.5">
+          <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest flex items-center gap-1">
+            <Users className="h-3 w-3" /> {c.member_count || 0}
           </span>
           {c.category && (
-            <span className="text-[9px] text-primary/40">{c.category}</span>
+            <span className="text-[9px] font-black uppercase text-og-cyan/60">{c.category}</span>
           )}
         </div>
       </div>
-      <ChevronRight className="h-4 w-4 text-white/10 shrink-0" />
+      <ChevronRight className="h-4 w-4 text-white/10 group-hover:text-white transition-all" />
     </button>
   );
 }
@@ -732,12 +728,12 @@ function CommunityFeed({
       {/* Community header — X-style with banner */}
       {(() => {
         const gradients = [
-          "from-blue-600/60 via-purple-600/40 to-pink-600/30",
-          "from-emerald-600/60 via-teal-600/40 to-cyan-600/30",
-          "from-amber-600/60 via-orange-600/40 to-red-600/30",
-          "from-violet-600/60 via-fuchsia-600/40 to-pink-600/30",
+          "from-og-cyan/20 via-og-cyan/10 to-transparent",
+          "from-og-gold/20 via-og-gold/10 to-transparent",
+          "from-og-lime/20 via-og-lime/10 to-transparent",
         ];
         const gIdx = community.name.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % gradients.length;
+        const showIcon = community.icon && community.icon !== "null" && community.icon !== "default" && community.icon !== "";
         return (
           <div className="border-b border-white/[0.06]">
             {/* Banner */}
@@ -747,8 +743,8 @@ function CommunityFeed({
                   onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
               )}
               <div className="absolute -bottom-7 left-4">
-                <div className={cn("w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center text-2xl border-[3px] border-black shadow-xl", gradients[gIdx])}>
-                  {community.icon || community.name.charAt(0)}
+                <div className={cn("w-14 h-14 rounded-2xl bg-[#070d14] flex items-center justify-center text-2xl border-[3px] border-[#070d14] shadow-xl", gradients[gIdx])}>
+                  {showIcon ? community.icon : community.name.charAt(0)}
                 </div>
               </div>
             </div>
@@ -756,27 +752,24 @@ function CommunityFeed({
             <div className="pt-9 px-4 pb-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-lg font-bold text-white">{community.name}</h2>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-white">{community.name}</h2>
                   {community.description && (
-                    <p className="text-[13px] text-white/40 mt-1 leading-relaxed">{community.description}</p>
+                    <p className="text-[11px] text-white/30 mt-1 leading-relaxed">{community.description}</p>
                   )}
                 </div>
                 <button
                   onClick={onCompose}
-                  className="shrink-0 ml-3 px-4 py-1.5 rounded-full bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors"
+                  className="shrink-0 ml-3 px-4 py-1.5 rounded-xl bg-og-cyan text-[#070d14] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all shadow-[0_0_15px_rgba(34,211,238,0.2)]"
                 >
                   Post
                 </button>
               </div>
               <div className="flex items-center gap-4 mt-3">
-                <span className="text-xs text-white/25 flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5" /> <span className="font-bold text-white/60">{community.member_count || 0}</span> members
+                <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest flex items-center gap-1.5">
+                  <Users className="h-3 w-3" /> <span className="text-white/40">{community.member_count || 0} MEMBERS</span>
                 </span>
                 {community.category && (
-                  <span className="text-[10px] text-primary/50 bg-primary/5 px-2 py-0.5 rounded-full">{community.category}</span>
-                )}
-                {community.privacy === "private" && (
-                  <span className="text-[10px] text-white/20">🔒 Private</span>
+                  <span className="text-[9px] font-black text-og-cyan/40 bg-og-cyan/5 px-2 py-0.5 rounded-full border border-og-cyan/10 uppercase">{community.category}</span>
                 )}
               </div>
             </div>
@@ -796,7 +789,7 @@ function CommunityFeed({
           >
             {f}
             {filter === f && (
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-[2px] rounded-full bg-primary" />
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-[2px] rounded-full bg-og-cyan" />
             )}
           </button>
         ))}
@@ -850,7 +843,7 @@ function PostCard({
       onClick={onClick}
       className={cn(
         "px-4 py-3 hover:bg-white/[0.015] transition-colors cursor-pointer",
-        post.is_pinned && "bg-primary/[0.03]"
+        post.is_pinned && "bg-og-cyan/[0.03]"
       )}
     >
       {/* Pinned label */}
@@ -914,14 +907,14 @@ function PostCard({
           {post.tags && post.tags.length > 0 && (
             <div className="flex gap-1 mt-2">
               {post.tags.slice(0, 3).map((t, i) => (
-                <span key={i} className="text-[9px] text-primary/60">#{t}</span>
+                <span key={i} className="text-[9px] text-og-cyan/60">#{t}</span>
               ))}
             </div>
           )}
 
           {/* Thread indicator */}
           {isThread && (
-            <p className="text-xs text-primary mt-2 flex items-center gap-1">
+            <p className="text-xs text-og-cyan mt-2 flex items-center gap-1">
               Show thread <ChevronRight className="h-3 w-3" />
             </p>
           )}
@@ -1031,14 +1024,14 @@ function PostActions({
       {/* Bookmark */}
       <button
         onClick={handleBookmark}
-        className={cn("p-2 rounded-full hover:bg-primary/10 transition-colors",
-          bookmarked ? "text-primary" : "text-white/20"
+        className={cn("p-2 rounded-full hover:bg-og-cyan/10 transition-colors",
+          bookmarked ? "text-og-cyan" : "text-white/20"
         )}
       >
         <Bookmark className={cn("h-4 w-4", bookmarked && "fill-current")} />
       </button>
       {/* Share */}
-      <button onClick={handleShare} className="p-2 rounded-full text-white/20 hover:bg-primary/10 hover:text-primary transition-colors">
+      <button onClick={handleShare} className="p-2 rounded-full text-white/20 hover:bg-og-cyan/10 hover:text-og-cyan transition-colors">
         <Share className="h-4 w-4" />
       </button>
     </div>
@@ -1461,7 +1454,7 @@ function ComposeModal({
               key={t}
               onClick={() => setPostType(t)}
               className={cn("px-3 py-1.5 rounded-full text-xs font-medium transition-colors capitalize",
-                postType === t ? "bg-primary/10 text-primary" : "text-white/20"
+                postType === t ? "bg-og-cyan/10 text-og-cyan" : "text-white/20"
               )}
             >
               {t === "post" ? "📝 Post" : t === "thread" ? "🧵 Thread" : "📰 Article"}
@@ -1500,7 +1493,7 @@ function ComposeModal({
               {threadParts.map((part, i) => (
                 <div key={i} className="flex gap-2">
                   <div className="flex flex-col items-center pt-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-og-cyan" />
                     {i < threadParts.length - 1 && <div className="w-0.5 flex-1 bg-white/[0.06] mt-1" />}
                   </div>
                   <textarea
@@ -1512,11 +1505,11 @@ function ComposeModal({
                     }}
                     placeholder={i === 0 ? "Start your thread..." : `Part ${i + 1}...`}
                     maxLength={2000}
-                    className="flex-1 bg-white/[0.02] border border-white/[0.06] rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 resize-none outline-none min-h-[80px] focus:border-primary/30"
+                    className="flex-1 bg-white/[0.02] border border-white/[0.06] rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 resize-none outline-none min-h-[80px] focus:border-og-cyan/30"
                   />
                 </div>
               ))}
-              <button onClick={addThreadPart} className="ml-5 text-xs text-primary/60 hover:text-primary flex items-center gap-1">
+              <button onClick={addThreadPart} className="ml-5 text-xs text-og-cyan/60 hover:text-og-cyan flex items-center gap-1">
                 <Plus className="h-3 w-3" /> Add part ({threadParts.length}/20)
               </button>
             </div>
@@ -1656,7 +1649,7 @@ function CreateCommunityModal({
               {ICONS.map(i => (
                 <button key={i} onClick={() => setIcon(i)}
                   className={cn("w-9 h-9 rounded-lg flex items-center justify-center text-lg transition-all",
-                    icon === i ? "bg-primary/10 border-2 border-primary scale-110" : "bg-white/[0.04] border border-transparent"
+                    icon === i ? "bg-og-cyan/10 border-2 border-og-cyan scale-110" : "bg-white/[0.04] border border-transparent"
                   )}>
                   {i}
                 </button>
@@ -1670,7 +1663,7 @@ function CreateCommunityModal({
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Community name..."
-              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-primary/30"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-og-cyan/30"
             />
           </div>
           <div>
@@ -1679,7 +1672,7 @@ function CreateCommunityModal({
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="What's this community about?"
-              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/20 outline-none resize-none h-20 focus:border-primary/30"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/20 outline-none resize-none h-20 focus:border-og-cyan/30"
             />
           </div>
           <div>
@@ -1688,7 +1681,7 @@ function CreateCommunityModal({
               {(["public", "private"] as const).map(p => (
                 <button key={p} onClick={() => setPrivacy(p)}
                   className={cn("flex-1 py-2 rounded-xl text-xs font-medium capitalize border transition-colors",
-                    privacy === p ? "border-primary bg-primary/10 text-primary" : "border-white/[0.06] text-white/25"
+                    privacy === p ? "border-og-cyan bg-og-cyan/10 text-og-cyan" : "border-white/[0.06] text-white/25"
                   )}>
                   {p === "public" ? "🌐 " : "🔒 "}{p}
                 </button>
@@ -1712,8 +1705,8 @@ function Avatar({ url, name, size = "md" }: { url?: string | null; name?: string
     return <img src={url} className={cn(sizeClass, "rounded-full object-cover shrink-0")} alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />;
   }
   return (
-    <div className={cn(sizeClass, "rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center shrink-0", textSize, "font-bold text-white/40")}>
-      {(name || "?").charAt(0).toUpperCase()}
+    <div className={cn(sizeClass, "rounded-full bg-gradient-to-br from-og-cyan/20 to-purple-500/10 flex items-center justify-center shrink-0 border border-white/10", textSize, "font-black text-white/40 uppercase")}>
+      {(name || "?").charAt(0)}
     </div>
   );
 }
