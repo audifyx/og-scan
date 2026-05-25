@@ -45,6 +45,7 @@ import SpaceBadges from "@/components/spaces/SpaceBadges";
 import InviteLink from "@/components/spaces/InviteLink";
 import SpaceNotifications from "@/components/spaces/SpaceNotifications";
 import GreenRoom from "@/components/spaces/GreenRoom";
+import { notifyUsers } from "@/lib/notifications";
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    TYPES
@@ -486,6 +487,18 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
       const { data, error } = await supabase.from("spaces").insert(d).select().single();
       if (error) throw error;
       toast.success(isScheduled ? "Space scheduled! 📅" : "Space started! 🎙️");
+      // Notify followers that a space just went live
+      if (!isScheduled) {
+        const { data: followers } = await supabase.from("space_follows").select("user_id").eq("host_id", user.id);
+        if (followers && followers.length > 0) {
+          notifyUsers(followers.map(f => f.user_id), {
+            type: "space_live",
+            title: `🎙️ ${profile?.username || "Someone"} is live!`,
+            message: title.trim(),
+            url: `/listen/${(data as any).id}`,
+          });
+        }
+      }
       onCreated(data as Space); onClose();
     } catch (e: any) { toast.error(e?.message || "Failed to create space."); }
     setCreating(false);

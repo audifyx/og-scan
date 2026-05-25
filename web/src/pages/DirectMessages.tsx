@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
+import { notifyUser } from "@/lib/notifications";
 
 /* ═══════════════════════════════════════════════════════════════
    Types
@@ -261,20 +262,15 @@ const DirectMessages: React.FC = () => {
     } else {
       // Update conversation timestamp
       await supabase.from("dm_conversations").update({ updated_at: new Date().toISOString() }).eq("id", activeConvo.id);
-      // Create notification for recipient
+      // Notify recipient (in-app + push)
       const otherId = activeConvo.user_a === user.id ? activeConvo.user_b : activeConvo.user_a;
-      await supabase.from("notifications").insert({
-        user_id: otherId,
+      notifyUser({
+        userId: otherId,
         type: "dm",
-        kind: "dm",
-        title: "New message",
-        message: `${profile?.username || "Someone"}: ${body.slice(0, 80)}`,
-        body: body.slice(0, 200),
-        actor_id: user.id,
-        target_type: "conversation",
-        target_id: activeConvo.id,
-        is_read: false,
-        read: false,
+        title: `💬 ${profile?.username || "Someone"}`,
+        message: body.slice(0, 100),
+        url: "/messages",
+        data: { actor_id: user.id, conversation_id: activeConvo.id },
       });
     }
     setSending(false);

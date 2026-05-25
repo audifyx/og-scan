@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   Trophy, TrendingUp, Target, Crown, Medal, Award, UserCircle, Users,
-  Flame, Zap, Star, Shield, ChevronUp, ChevronDown,
+  Flame, Zap, Star, Shield, ChevronUp, ChevronDown, Gift,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { safeAvatarUrl } from "@/lib/utils";
@@ -99,8 +99,19 @@ const getSortValue = (t: TraderRow, key: SortKey): number => {
    Component
    ═══════════════════════════════════════════════════════════════ */
 
+type MainTab = "rankings" | "invites";
+
+interface InviteLeaderRow {
+  inviter_id: string;
+  invited: number;
+  credits_earned: number;
+  username?: string;
+  avatar_url?: string;
+}
+
 const Leaderboard = () => {
   const [sortBy, setSortBy] = useState<SortKey>("xp");
+  const [mainTab, setMainTab] = useState<MainTab>("rankings");
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -116,6 +127,29 @@ const Leaderboard = () => {
       return (data || []) as TraderRow[];
     },
     staleTime: 30_000,
+  });
+
+  const { data: inviteRows, isLoading: invitesLoading } = useQuery<InviteLeaderRow[]>({
+    queryKey: ["invite-leaderboard"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("referral_leaderboard")
+        .select("inviter_id, invited, credits_earned")
+        .order("invited", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      if (!data || data.length === 0) return [];
+      const ids = data.map(r => r.inviter_id);
+      const { data: profs } = await supabase.from("profiles").select("user_id, username, avatar_url").in("user_id", ids);
+      const profMap = new Map((profs || []).map(p => [p.user_id, p]));
+      return data.map(r => ({
+        ...r,
+        username: profMap.get(r.inviter_id)?.username || undefined,
+        avatar_url: profMap.get(r.inviter_id)?.avatar_url || undefined,
+      }));
+    },
+    staleTime: 30_000,
+    enabled: mainTab === "invites",
   });
 
   const goToProfile = (t: TraderRow) => {
@@ -134,18 +168,85 @@ const Leaderboard = () => {
   return (
     <AppLayout>
       <PageHeader title="OG Leaderboard" description="The most active and successful OGs">
-        <Tabs value={sortBy} onValueChange={v => setSortBy(v as SortKey)}>
-          <TabsList className="bg-white/[0.04] h-10">
-            {SORT_OPTIONS.map(o => (
-              <TabsTrigger key={o.key} value={o.key} className="flex items-center gap-1.5 text-xs px-3">
-                <o.icon className="h-3.5 w-3.5" /> {o.label}
+        <div className="flex flex-col gap-2">
+          <Tabs value={mainTab} onValueChange={v => setMainTab(v as MainTab)}>
+            <TabsList className="bg-white/[0.04] h-10">
+              <TabsTrigger value="rankings" className="flex items-center gap-1.5 text-xs px-3">
+                <Trophy className="h-3.5 w-3.5" /> Rankings
               </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+              <TabsTrigger value="invites" className="flex items-center gap-1.5 text-xs px-3">
+                <Gift className="h-3.5 w-3.5" /> Invites
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {mainTab === "rankings" && (
+            <Tabs value={sortBy} onValueChange={v => setSortBy(v as SortKey)}>
+              <TabsList className="bg-white/[0.04] h-10">
+                {SORT_OPTIONS.map(o => (
+                  <TabsTrigger key={o.key} value={o.key} className="flex items-center gap-1.5 text-xs px-3">
+                    <o.icon className="h-3.5 w-3.5" /> {o.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
+        </div>
       </PageHeader>
 
       <div className="p-4 lg:p-6 space-y-6">
+
+      {/* ── Invite Leaderboard ── */}
+      {mainTab === "invites" && (
+        <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
+          <div className="hidden md:grid grid-cols-[3rem_1fr_6rem_6rem] gap-2 px-4 py-3 border-b border-white/[0.07] text-[9px] font-black text-white/25 uppercase tracking-widest">
+            <span>#</span><span>Inviter</span><span>Invited</span><span>XP Earned</span>
+          </div>
+          <div className="divide-y divide-white/[0.04]">
+            {invitesLoading ? (
+              Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
+            ) : !inviteRows || inviteRows.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 px-6">
+                <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
+                  <Gift className="h-7 w-7 text-white/20" />
+                </div>
+                <p className="text-sm font-bold text-white/50 mb-1">No invites yet</p>
+                <p className="text-xs text-white/25 text-center">Share your invite link from Settings → Invite to start earning XP!</p>
+              </div>
+            ) : inviteRows.map((row, i) => {
+              const isMe = row.inviter_id === user?.id;
+              const RIcon = i < 3 ? RANK_ICONS[i] : null;
+              return (
+                <div key={row.inviter_id}
+                  className={cn("flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] transition-all cursor-pointer", isMe && "bg-og-cyan/[0.03] border-l-2 border-og-cyan")}
+                  onClick={() => { if (isMe) navigate("/profile"); else navigate(`/profile/${row.inviter_id}`); }}>
+                  <div className="w-8 text-center shrink-0">
+                    {RIcon ? <RIcon className={cn("h-5 w-5 mx-auto", RANK_COLORS[i])} /> : <span className="text-sm font-mono font-bold text-white/30">{i + 1}</span>}
+                  </div>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Avatar className="h-9 w-9 border border-border">
+                      <AvatarImage src={safeAvatarUrl(row.avatar_url || null)} />
+                      <AvatarFallback className="bg-muted text-xs font-mono">{(row.username ?? "?")[0]?.toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <p className={cn("font-semibold text-sm truncate", isMe && "text-og-cyan")}>{row.username || "Anon"}</p>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-sm font-black text-white">{row.invited}</p>
+                      <p className="text-[8px] text-white/20 md:hidden">invited</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-amber-400">{row.credits_earned.toLocaleString()}</p>
+                      <p className="text-[8px] text-white/20 md:hidden">XP</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {mainTab === "rankings" && (<>
         {/* ── Global Stats Bar ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
@@ -320,6 +421,7 @@ const Leaderboard = () => {
             })}
           </div>
         </div>
+      </>)}
       </div>
     </AppLayout>
   );

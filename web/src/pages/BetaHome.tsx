@@ -1,5 +1,5 @@
-import { memo, useCallback, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   CheckCircle2,
@@ -150,6 +150,13 @@ const statBadges: StatBadge[] = [
 
 const BetaHome = memo(() => {
   const [copied, setCopied] = useState<"coin" | null>(null);
+  const [searchParams] = useSearchParams();
+
+  // Capture ?ref=CODE into localStorage so it persists through signup
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) localStorage.setItem("og_ref_code", ref);
+  }, [searchParams]);
 
   const launchNotes: string[] = useMemo<string[]>(
     () => ["No wallet needed", "First mint proof", "Real-time intel"],

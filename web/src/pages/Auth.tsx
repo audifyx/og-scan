@@ -32,6 +32,12 @@ const Auth = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; username?: string; password?: string; confirm?: string }>({});
 
+  // Capture ?ref=CODE into localStorage
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) localStorage.setItem("og_ref_code", ref);
+  }, [searchParams]);
+
   useEffect(() => {
     if (!loading && user && mode !== "signup") {
       const next = searchParams.get("next") || "/app";

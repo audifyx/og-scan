@@ -44,6 +44,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if (!error && data) {
       setProfile(data as Profile);
+      // Auto-generate referral code if missing
+      if (!data.referral_code) {
+        const code = userId.replace(/-/g, "").slice(0, 8).toUpperCase();
+        supabase.from("profiles").update({ referral_code: code }).eq("user_id", userId).then(() => {
+          setProfile(prev => prev ? { ...prev, referral_code: code } as any : prev);
+        });
+      }
     } else if (error && error.code === "PGRST116") {
       const displayName = (userMeta?.username as string) || userEmail || userId;
       const { data: newProfile } = await supabase
@@ -78,7 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, username: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -86,6 +93,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         data: { username: username.replace(/^@/, "") },
       },
     });
+
+    // Process referral if ?ref= was captured
+    if (!error && data?.user) {
+      const refCode = localStorage.getItem("og_ref_code");
+      if (refCode) {
+        localStorage.removeItem("og_ref_code");
+        supabase.functions.invoke("process-referral", {
+          body: { inviteeId: data.user.id, inviteCode: refCode },
+        }).catch(() => {}); // fire-and-forget
+      }
+    }
+
     return { error: error as Error | null };
   };
 

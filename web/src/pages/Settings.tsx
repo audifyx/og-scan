@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import {
   DollarSign, Bell, User, Shield, Webhook, Palette, LogOut, Eye, EyeOff,
   Check, Loader2, KeyRound, Mail, Link, Twitter, MessageSquare, Globe,
-  Wallet, Star, Copy, Flame, Trophy, Zap, Clock, ChevronRight,
+  Wallet, Star, Copy, Flame, Trophy, Zap, Clock, ChevronRight, Users, Gift, Share2,
 } from "lucide-react";
 
 interface ProfileData {
@@ -68,6 +68,8 @@ const Settings = () => {
   const [discordWebhook, setDiscordWebhook] = useState("");
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [copiedReferral, setCopiedReferral] = useState(false);
+  const [inviteStats, setInviteStats] = useState<{ invited: number; xpEarned: number; recentInvites: { username: string; created_at: string }[] }>({ invited: 0, xpEarned: 0, recentInvites: [] });
+  const [loadingInvite, setLoadingInvite] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -88,6 +90,38 @@ const Settings = () => {
       setLoadingProfile(false);
     };
     loadProfile();
+  }, [user]);
+
+  // Load invite stats
+  useEffect(() => {
+    if (!user) return;
+    const loadInviteStats = async () => {
+      setLoadingInvite(true);
+      // Get referral leaderboard entry (it's a view)
+      const { data: lb } = await supabase
+        .from("referral_leaderboard")
+        .select("invited, credits_earned")
+        .eq("inviter_id", user.id)
+        .maybeSingle();
+      // Get recent invites with usernames
+      const { data: recent } = await supabase
+        .from("referrals")
+        .select("invitee_id, created_at")
+        .eq("inviter_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      // Fetch usernames for recent invites
+      let recentInvites: { username: string; created_at: string }[] = [];
+      if (recent && recent.length > 0) {
+        const ids = recent.map(r => r.invitee_id);
+        const { data: profs } = await supabase.from("profiles").select("user_id, username").in("user_id", ids);
+        const nameMap = new Map((profs || []).map(p => [p.user_id, p.username || "Anonymous"]));
+        recentInvites = recent.map(r => ({ username: nameMap.get(r.invitee_id) || "Anonymous", created_at: r.created_at }));
+      }
+      setInviteStats({ invited: lb?.invited || 0, xpEarned: lb?.credits_earned || 0, recentInvites });
+      setLoadingInvite(false);
+    };
+    loadInviteStats();
   }, [user]);
 
   const saveProfile = async () => {
@@ -232,6 +266,7 @@ const Settings = () => {
                 { value: "account", icon: Shield, label: "Account" },
                 { value: "themes", icon: Palette, label: "Themes" },
 
+                { value: "invite", icon: Gift, label: "Invite" },
                 { value: "notifications", icon: Bell, label: "Alerts" },
                 { value: "webhooks", icon: Webhook, label: "Webhooks" },
               ].map(({ value, icon: Icon, label }) => (
@@ -340,33 +375,93 @@ const Settings = () => {
                 </div>
               </Card>
 
-              {/* Referral */}
-              {(profile as any)?.referral_code && (
-                <Card className="p-6 glass-card">
-                  <h3 className="font-semibold mb-4 flex items-center gap-2">
-                    <Star className="h-5 w-5 text-[#eab308]" /> Referral Program
-                  </h3>
-                  <p className="text-xs text-white/40 mb-3">Share your referral link to earn credits when friends sign up</p>
-                  <div className="flex gap-2">
-                    <Input
-                      value={`https://ogscan.fun?ref=${(profile as any).referral_code}`}
-                      readOnly
-                      className="font-mono text-xs bg-white/[0.03]"
-                    />
-                    <Button variant="outline" size="icon" onClick={copyReferral} className="shrink-0 border-white/10">
-                      {copiedReferral ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  {(profile as any)?.is_pioneer && (
-                    <Badge className="mt-3 bg-[#eab308]/10 text-[#eab308] border-[#eab308]/20">⭐ OG Pioneer</Badge>
-                  )}
-                </Card>
-              )}
+              {/* Invite link moved to Invite tab */}
 
               <Button onClick={saveProfile} disabled={savingProfile} className="w-full btn-3d gap-2">
                 {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 {savingProfile ? "Saving..." : "Save Profile"}
               </Button>
+            </div>
+          </TabsContent>
+
+          {/* ── Invite Tab ── */}
+          <TabsContent value="invite">
+            <div className="max-w-2xl space-y-4">
+              {/* Invite Link Card */}
+              <Card className="p-6 glass-card">
+                <h3 className="font-semibold mb-1 flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-og-cyan" /> Your Invite Link
+                </h3>
+                <p className="text-xs text-white/40 mb-4">Share your unique link. When someone signs up, you earn <span className="text-amber-400 font-bold">+100 XP</span> per invite + milestone bonuses every 5!</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={`https://ogscan.fun?ref=${(profile as any)?.referral_code || "..."}`}
+                    readOnly
+                    className="font-mono text-xs bg-white/[0.03] border-white/[0.08]"
+                  />
+                  <Button variant="outline" size="icon" onClick={copyReferral} className="shrink-0 border-white/10 hover:border-og-cyan/40">
+                    {copiedReferral ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {(profile as any)?.is_pioneer && (
+                  <Badge className="mt-3 bg-[#eab308]/10 text-[#eab308] border-[#eab308]/20">⭐ OG Pioneer</Badge>
+                )}
+              </Card>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="p-4 glass-card text-center">
+                  <Users className="h-5 w-5 text-og-cyan mx-auto mb-1" />
+                  <p className="text-2xl font-black text-white">{inviteStats.invited}</p>
+                  <p className="text-[10px] text-white/40 uppercase tracking-widest">Invited</p>
+                </Card>
+                <Card className="p-4 glass-card text-center">
+                  <Zap className="h-5 w-5 text-amber-400 mx-auto mb-1" />
+                  <p className="text-2xl font-black text-amber-400">{inviteStats.xpEarned.toLocaleString()}</p>
+                  <p className="text-[10px] text-white/40 uppercase tracking-widest">XP Earned</p>
+                </Card>
+              </div>
+
+              {/* Points Breakdown */}
+              <Card className="p-5 glass-card">
+                <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm">
+                  <Trophy className="h-4 w-4 text-amber-400" /> How Points Work
+                </h3>
+                <div className="space-y-2">
+                  {[
+                    { label: "Friend signs up with your link", xp: 100 },
+                    { label: "Milestone bonus (every 5 invites)", xp: 50 },
+                  ].map((r) => (
+                    <div key={r.label} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.04]">
+                      <span className="text-xs text-white/60">{r.label}</span>
+                      <span className="text-xs font-black text-amber-400">+{r.xp} XP</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Recent Invites */}
+              {inviteStats.recentInvites.length > 0 && (
+                <Card className="p-5 glass-card">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm">
+                    <Star className="h-4 w-4 text-og-cyan" /> Recent Invites
+                  </h3>
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+                    {inviteStats.recentInvites.map((inv, i) => (
+                      <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03]">
+                        <span className="text-xs text-white/70 font-medium">@{inv.username}</span>
+                        <span className="text-[10px] text-white/30">{new Date(inv.created_at).toLocaleDateString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {loadingInvite && (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-white/30" />
+                </div>
+              )}
             </div>
           </TabsContent>
 

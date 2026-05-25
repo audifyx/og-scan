@@ -39,6 +39,7 @@ import Admin from "./pages/Admin";
 import ArtFeed from "./pages/ArtFeed";
 import SpaceReplay from "./pages/SpaceReplay";
 import { AppLayout } from "./components/layout/AppLayout";
+import { NotificationListener } from "./components/notifications/NotificationListener";
 
 const DirectMessagesPage = () => (
   <AppLayout>
@@ -58,6 +59,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <NotificationListener />
         <BrowserRouter>
           <Routes>
             {/* ── Public routes (no auth required) ── */}
