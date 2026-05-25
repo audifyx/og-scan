@@ -423,6 +423,7 @@ const Communities = () => {
           user={user}
           onBack={() => setSelectedPost(null)}
           isGlobalAdmin={isGlobalAdmin}
+          canModerate={(() => { const r = myMemberships.get(selectedPost.community_id)?.role; return r === "creator" || r === "moderator" || isGlobalAdmin; })()}
         />
       ) : mainView === "community" && selectedCommunity ? (
         <CommunityFeed
@@ -1386,7 +1387,7 @@ function PostCard({
   const isArticle = post.is_article || post.post_type === "article";
   const isThread = post.post_type === "thread" && !post.thread_id;
   const isOwner = user && post.user_id === user.id;
-  const canDelete = isOwner || canModerate || isGlobalAdmin || (communityOwnerId && user && user.id === communityOwnerId);
+  const canDelete = canModerate || isGlobalAdmin || (communityOwnerId && user && user.id === communityOwnerId);
   const canPin = canModerate || isGlobalAdmin || (communityOwnerId && user && user.id === communityOwnerId);
   const [showMenu, setShowMenu] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -1675,7 +1676,7 @@ function ActionBtn({
    Post Detail — Full post with replies
    ═══════════════════════════════════════════════════════════════ */
 
-function PostDetail({ post, user, onBack, isGlobalAdmin = false }: { post: Post; user: any; onBack: () => void; isGlobalAdmin?: boolean }) {
+function PostDetail({ post, user, onBack, isGlobalAdmin = false, canModerate = false }: { post: Post; user: any; onBack: () => void; isGlobalAdmin?: boolean; canModerate?: boolean }) {
   const [replies, setReplies] = useState<PostReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [replyText, setReplyText] = useState("");
@@ -1792,18 +1793,20 @@ function PostDetail({ post, user, onBack, isGlobalAdmin = false }: { post: Post;
             <p className="text-sm font-bold text-white">{post.username || "Anonymous"}</p>
             <p className="text-xs text-white/20">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
           </div>
-          {(user && (post.user_id === user.id || isGlobalAdmin)) && (
+          {user && (canModerate || post.user_id === user.id) && (
             <div className="flex items-center gap-1">
               {post.user_id === user.id && (
                 <button onClick={() => { setEditingMain(true); setEditMainContent(post.content); }}
                   className="p-1.5 rounded-lg text-white/15 hover:text-white/40 hover:bg-white/[0.04]"><Edit className="h-4 w-4" /></button>
               )}
-              <button onClick={async () => {
-                if (!confirm("Delete this post?")) return;
-                if (isThread) await supabase.from("community_posts").delete().eq("thread_id", post.id);
-                await supabase.from("community_posts").delete().eq("id", post.id);
-                toast.success("Post deleted"); onBack();
-              }} className="p-1.5 rounded-lg text-white/15 hover:text-red-400 hover:bg-red-400/10"><Trash2 className="h-4 w-4" /></button>
+              {canModerate && (
+                <button onClick={async () => {
+                  if (!confirm("Delete this post?")) return;
+                  if (isThread) await supabase.from("community_posts").delete().eq("thread_id", post.id);
+                  await supabase.from("community_posts").delete().eq("id", post.id);
+                  toast.success("Post deleted"); onBack();
+                }} className="p-1.5 rounded-lg text-white/15 hover:text-red-400 hover:bg-red-400/10"><Trash2 className="h-4 w-4" /></button>
+              )}
             </div>
           )}
         </div>
@@ -1964,7 +1967,7 @@ function PostDetail({ post, user, onBack, isGlobalAdmin = false }: { post: Post;
                       <Heart className={cn("h-3.5 w-3.5", reply.liked && "fill-current")} />
                       {reply.likes_count > 0 && reply.likes_count}
                     </button>
-                    {user && reply.user_id === user.id && (
+                    {user && (canModerate || reply.user_id === user.id) && (
                       <button onClick={() => deleteReply(reply.id)} className="text-white/10 hover:text-red-400">
                         <Trash2 className="h-3 w-3" />
                       </button>
