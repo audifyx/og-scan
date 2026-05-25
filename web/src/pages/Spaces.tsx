@@ -1028,7 +1028,7 @@ const SpeakerQueue = ({ spaceId, isHost, onRaiseHand, hasRaised, onPromote }: {
       className={cn("flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold transition-all",
         hasRaised ? "bg-amber-400/15 text-amber-400 border border-amber-400/25 shadow-lg shadow-amber-400/5" : "bg-white/[0.04] text-white/40 border border-white/[0.08] hover:border-white/[0.15] hover:text-white/60"
       )}>
-      <Hand className={cn("h-4 w-4", hasRaised && "animate-bounce")} />{hasRaised ? "Hand Raised ✋" : "Raise Hand"}
+      <Hand className={cn("h-4 w-4", hasRaised && "animate-bounce")} />{hasRaised ? "Lower Hand ✋" : "Raise Hand"}
     </button>
   );
 
@@ -1116,13 +1116,36 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
   };
 
   const raiseHand = async () => {
-    if (!user || hasRaised) return;
+    if (!user) return;
+    if (hasRaised) {
+      // Lower hand — cancel the request
+      await supabase.from("speaker_requests").delete().eq("space_id", space.id).eq("user_id", user.id);
+      setHasRaised(false);
+      toast("Hand lowered");
+      return;
+    }
     // Delete any old requests for this user in this space first (re-raise after demote/leave)
     await supabase.from("speaker_requests").delete().eq("space_id", space.id).eq("user_id", user.id);
     const { error } = await supabase.from("speaker_requests").insert({ space_id: space.id, user_id: user.id, username: profile?.username || null, avatar_url: safAvatar(profile?.avatar_url) ?? null, status: "pending" });
     if (error) { console.error("Raise hand failed:", error); toast.error("Failed to raise hand"); return; }
     setHasRaised(true); toast("Hand raised! ✋");
   };
+
+  // Sync hasRaised from DB — auto-reset if request was processed
+  useEffect(() => {
+    if (!user || !space?.id) return;
+    const ch = supabase.channel(`sp-myreq-${space.id}-${user.id}`)
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "speaker_requests",
+        filter: `space_id=eq.${space.id}`,
+      }, (payload) => {
+        const row = (payload.new ?? payload.old) as any;
+        if (!row || row.user_id !== user.id) return;
+        if (payload.eventType === "DELETE") { setHasRaised(false); return; }
+        if (row.status === "approved" || row.status === "denied") setHasRaised(false);
+      }).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user, space?.id]);
 
   const endSpace = async () => {
     if (!isHost) return;
@@ -1553,7 +1576,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
               {muted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </button>
           ) : (
-            <button onClick={raiseHand} disabled={hasRaised}
+            <button onClick={raiseHand}
               className={cn(
                 "h-14 px-5 rounded-2xl flex items-center justify-center gap-2 transition-all",
                 hasRaised
@@ -1561,7 +1584,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
                   : "bg-white/[0.06] border border-white/[0.08] text-white/50 hover:bg-white/[0.1]"
               )}>
               <Hand className={cn("h-5 w-5", hasRaised && "animate-bounce")} />
-              <span className="text-[11px] font-bold">{hasRaised ? "Raised ✋" : "Speak"}</span>
+              <span className="text-[11px] font-bold">{hasRaised ? "Lower ✋" : "Speak"}</span>
             </button>
           )}
 
