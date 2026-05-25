@@ -404,6 +404,10 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
           role: "speaker",
           joined_at: new Date().toISOString(),
         });
+        // Clean up speaker_request so user can re-raise later if demoted
+        if (spaceId) {
+          supabase.from("speaker_requests").delete().eq("space_id", spaceId).eq("user_id", user!.id);
+        }
         break;
       case "demote":
         setRole("listener");
