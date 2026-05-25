@@ -12,8 +12,8 @@ type PhoneState = "splash" | "lock" | "home" | "app";
 // Routes that are "apps" inside the phone
 const appRoutes = [
   "/wallets", "/tokens", "/charts", "/tools", "/advanced-tools",
-  "/pump-v5", "/premium", "/notifications", "/alpha-chat",
-  "/webhooks", "/leaderboard", "/settings", "/discover",
+  "/pump-v5", "/notifications", "/alpha-chat",
+  "/leaderboard", "/settings", "/discover",
   "/callouts", "/official-token", "/credits", "/profile",
   "/live-feed", "/lobbies", "/communities", "/live-trading",
   "/support", "/admin",
@@ -26,10 +26,10 @@ const routeTitles: Record<string, string> = {
   "/tools": "Tools",
   "/advanced-tools": "Advanced",
   "/pump-v5": "Launch Pad",
-  "/premium": "Premium",
+
   "/notifications": "Alerts",
   "/alpha-chat": "Alpha Chat",
-  "/webhooks": "Webhooks",
+
   "/leaderboard": "Leaderboard",
   "/settings": "Settings",
   "/discover": "Discover",

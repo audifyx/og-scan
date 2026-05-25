@@ -1387,7 +1387,7 @@ function PostCard({
   const isArticle = post.is_article || post.post_type === "article";
   const isThread = post.post_type === "thread" && !post.thread_id;
   const isOwner = user && post.user_id === user.id;
-  const canDelete = canModerate || isGlobalAdmin || (communityOwnerId && user && user.id === communityOwnerId);
+  const canDelete = isOwner || canModerate || isGlobalAdmin || (communityOwnerId && user && user.id === communityOwnerId);
   const canPin = canModerate || isGlobalAdmin || (communityOwnerId && user && user.id === communityOwnerId);
   const [showMenu, setShowMenu] = useState(false);
   const [editing, setEditing] = useState(false);

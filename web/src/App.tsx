@@ -19,11 +19,11 @@ import Tools from "./pages/Tools";
 import AdvancedTools from "./pages/AdvancedTools";
 import AlphaChat from "./pages/AlphaChat";
 // Credits page removed
-import Webhooks from "./pages/Webhooks";
+// Webhooks removed
 import TradingLobbies from "./pages/TradingLobbies";
 import Leaderboard from "./pages/Leaderboard";
 import Notifications from "./pages/Notifications";
-import Premium from "./pages/Premium";
+// Premium removed
 import OfficialToken from "./pages/OfficialToken";
 import PumpV5 from "./pages/PumpV5";
 import Callouts from "./pages/Callouts";
@@ -113,15 +113,14 @@ const App = () => (
             <Route path="/advanced-tools" element={<ProtectedRoute><AdvancedTools /></ProtectedRoute>} />
             <Route path="/ai-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
             <Route path="/alpha-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
-            <Route path="/webhooks" element={<ProtectedRoute><Webhooks /></ProtectedRoute>} />
+            {/* Webhooks removed */}
             <Route path="/callouts" element={<ProtectedRoute><Callouts /></ProtectedRoute>} />
 
             {/* ── Protected: Community ── */}
             <Route path="/trading-lobbies" element={<ProtectedRoute><TradingLobbies /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
 
-            {/* ── Protected: Premium ── */}
-            <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
+            {/* Premium removed */}
 
             {/* ── Protected: Market ── */}
             <Route path="/live-trading" element={<ProtectedRoute><Index /></ProtectedRoute>} />
