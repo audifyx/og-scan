@@ -229,26 +229,50 @@ const Profile = () => {
     if (!walletAddress) return;
     setLoadingStats(true);
     try {
-      const { data: overviewData, error: overviewError } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getWalletOverview", walletAddress },
-      });
-      if (!overviewError && overviewData) {
-        setWalletStats(overviewData);
-        if (isOwnProfile && user)
-          await supabase.from("profiles").update({ total_pnl: overviewData.totalUsdValue || 0 }).eq("user_id", user.id);
-      }
-      const { data: assetsData, error: assetsError } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getAssets", walletAddress, page: 1, limit: 20 },
-      });
-      if (!assetsError && assetsData?.assets) {
+      // Fetch overview, PnL, assets, and transactions in parallel
+      const [overviewRes, pnlRes, assetsRes, txRes] = await Promise.all([
+        supabase.functions.invoke("solana-tracker", { body: { action: "getWalletOverview", walletAddress } }),
+        supabase.functions.invoke("solana-tracker", { body: { action: "getWalletPnL", walletAddress } }),
+        supabase.functions.invoke("solana-tracker", { body: { action: "getAssets", walletAddress, page: 1, limit: 20 } }),
+        supabase.functions.invoke("solana-tracker", { body: { action: "getTransactions", walletAddress, limit: 100 } }),
+      ]);
+
+      const overviewData = overviewRes.data;
+      const pnlData = pnlRes.data;
+      const assetsData = assetsRes.data;
+      const txData = txRes.data;
+
+      if (overviewData) setWalletStats(overviewData);
+
+      if (assetsData?.assets) {
         setTokenHoldings(assetsData.assets.filter((i: any) => i.interface === "FungibleToken" || i.interface === "FungibleAsset").slice(0, 20));
       }
-      const { data: txData, error: txError } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTransactions", walletAddress, limit: 30 },
-      });
-      if (!txError && txData?.transactions) {
+
+      if (txData?.transactions) {
         setWalletTransactions(txData.transactions);
         setTransactionCount(txData.signatures?.length || txData.transactions.length);
+      }
+
+      // Save real trade stats to profile for leaderboard
+      if (isOwnProfile && user) {
+        const txs = txData?.transactions || [];
+        const swapCount = txs.filter((tx: any) => (tx.type || "").includes("SWAP")).length;
+        const totalTxs = txs.length;
+        // Volume = total SOL out through swaps
+        const volumeSol = pnlData?.totalOutSol || 0;
+        const solPrice = pnlData?.solPrice || overviewData?.solPrice || 0;
+        const volumeUsd = volumeSol * solPrice;
+        const netPnl = pnlData?.netUsd || 0;
+        // Win rate estimate: if net PnL is positive, estimate based on ratio
+        const winRate = totalTxs > 0 ? Math.min(100, Math.max(0, 50 + (netPnl / Math.max(volumeUsd, 1)) * 100)) : 0;
+
+        await supabase.from("profiles").update({
+          total_pnl: netPnl,
+          trades_count: swapCount || totalTxs,
+          volume_usd: volumeUsd,
+          win_rate: Math.round(winRate * 10) / 10,
+          pnl_pct: volumeUsd > 0 ? Math.round((netPnl / volumeUsd) * 10000) / 100 : 0,
+        }).eq("user_id", user.id);
       }
     } catch {}
     finally { setLoadingStats(false); setRefreshing(false); }
