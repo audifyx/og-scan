@@ -492,9 +492,9 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pb-20 sm:pb-4">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg bg-[#0c1219] rounded-3xl border border-white/[0.08] shadow-2xl shadow-black/40 overflow-hidden max-h-full flex flex-col sp-slide-up">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto pt-10 pb-20 sm:pb-6 px-4">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-xl" onClick={onClose} />
+      <div className="relative w-full sm:max-w-lg bg-[#0c1219] rounded-3xl border border-white/[0.08] shadow-2xl shadow-black/40 overflow-hidden flex flex-col sp-slide-up" style={{ maxHeight: "calc(100vh - 7rem)" }}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-white/[0.06] relative shrink-0">
           <div>
