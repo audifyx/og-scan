@@ -8,7 +8,8 @@ import {
   Users, Plus, Search, MessageSquare, Heart, Trash2, ArrowLeft,
   Repeat2, Bookmark, Share, Eye, ChevronRight, MoreHorizontal,
   X as XIcon, Loader2, Newspaper, Home, PenSquare, Pin,
-  Edit, Shield, LogOut, Crown, ImagePlus, Upload
+  Edit, Shield, LogOut, Crown, ImagePlus, Upload, Video,
+  Settings, TrendingUp, ExternalLink, Copy, Play
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +94,148 @@ function ImageUploadBtn({ onUploaded, label = "Upload image", className = "" }: 
   );
 }
 
+/* ── Video upload helper ── */
+function MediaUploadBtn({ onUploaded, accept = "image/*,video/*", label = "Upload media", className = "" }: {
+  onUploaded: (url: string, type: "image" | "video") => void; accept?: string; label?: string; className?: string;
+}) {
+  const ref = React.useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = React.useState(false);
+  const handle = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const isVideo = file.type.startsWith("video/");
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > maxSize) { toast.error(isVideo ? "Max 50MB for videos" : "Max 5MB for images"); return; }
+    setUploading(true);
+    try {
+      const url = await uploadImage(file, isVideo ? "community-videos" : "community");
+      onUploaded(url, isVideo ? "video" : "image");
+    } catch (err: any) {
+      toast.error(err.message?.includes("Bucket not found") ? "Storage not configured" : "Upload failed");
+    }
+    setUploading(false);
+    if (ref.current) ref.current.value = "";
+  };
+  return (
+    <>
+      <input ref={ref} type="file" accept={accept} onChange={handle} className="hidden" />
+      <button type="button" onClick={() => ref.current?.click()} disabled={uploading}
+        className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] text-xs text-white/40 hover:text-white/60 hover:border-white/[0.15] transition-colors disabled:opacity-50", className)}>
+        {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+        {uploading ? "Uploading..." : label}
+      </button>
+    </>
+  );
+}
+
+/* ── DexScreener token fetch helper ── */
+interface DexTokenData {
+  address: string;
+  symbol: string;
+  name: string;
+  logoUrl: string | null;
+  priceUsd: number | null;
+  change24h: number | null;
+  marketCapUsd: number | null;
+  liquidityUsd: number | null;
+  volume24hUsd: number | null;
+  pairAddress: string | null;
+  chartUrl: string | null;
+}
+
+async function fetchTokenByCA(address: string): Promise<DexTokenData | null> {
+  try {
+    const resp = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${encodeURIComponent(address)}`);
+    if (!resp.ok) return null;
+    const pairs = await resp.json();
+    if (!Array.isArray(pairs) || pairs.length === 0) return null;
+    // Pick the highest liquidity pair
+    const pair = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+    return {
+      address,
+      symbol: pair.baseToken?.symbol || "???",
+      name: pair.baseToken?.name || "Unknown",
+      logoUrl: pair.info?.imageUrl || null,
+      priceUsd: pair.priceUsd ? parseFloat(pair.priceUsd) : null,
+      change24h: pair.priceChange?.h24 ?? null,
+      marketCapUsd: pair.marketCap ?? pair.fdv ?? null,
+      liquidityUsd: pair.liquidity?.usd ?? null,
+      volume24hUsd: pair.volume?.h24 ?? null,
+      pairAddress: pair.pairAddress || null,
+      chartUrl: pair.url || `https://dexscreener.com/solana/${address}`,
+    };
+  } catch { return null; }
+}
+
+/* ── Format helpers for token stats ── */
+function fmtCompact(n: number | null | undefined): string {
+  if (n == null || !isFinite(n)) return "—";
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(1)}K`;
+  return `$${n.toFixed(2)}`;
+}
+
+function fmtPrice(n: number | null | undefined): string {
+  if (n == null || !isFinite(n)) return "—";
+  if (n < 0.0001) return `$${n.toExponential(2)}`;
+  if (n < 1) return `$${n.toPrecision(4)}`;
+  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
+
+/* ── Live Chart Card component for posts ── */
+function TokenChartCard({ post, className = "" }: { post: Post; className?: string }) {
+  if (!post.token_address) return null;
+  const chartEmbedUrl = post.token_pair_address
+    ? `https://dexscreener.com/solana/${post.token_pair_address}?embed=1&theme=dark&trades=0&info=0`
+    : `https://dexscreener.com/solana/${post.token_address}?embed=1&theme=dark&trades=0&info=0`;
+  const change = post.token_change_24h;
+  const isPositive = change != null && change >= 0;
+
+  return (
+    <div className={cn("mt-3 rounded-xl border border-white/[0.08] overflow-hidden bg-white/[0.02]", className)}>
+      {/* Token header bar */}
+      <div className="flex items-center gap-3 px-3 py-2.5 border-b border-white/[0.06]">
+        {post.token_logo_url && (
+          <img src={post.token_logo_url} className="w-7 h-7 rounded-full" alt=""
+            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-black text-white">{post.token_symbol || "???"}</span>
+            <span className="text-[10px] text-white/30 truncate">{post.token_name}</span>
+          </div>
+          <div className="flex items-center gap-3 text-[10px]">
+            <span className="text-white/60 font-mono">{fmtPrice(post.token_price_usd)}</span>
+            {change != null && (
+              <span className={cn("font-bold", isPositive ? "text-emerald-400" : "text-red-400")}>
+                {isPositive ? "+" : ""}{change.toFixed(2)}%
+              </span>
+            )}
+          </div>
+        </div>
+        <a href={post.token_pair_address ? `https://dexscreener.com/solana/${post.token_pair_address}` : `https://dexscreener.com/solana/${post.token_address}`}
+          target="_blank" rel="noopener noreferrer"
+          className="p-1.5 rounded-lg text-white/20 hover:text-og-cyan hover:bg-og-cyan/10 transition-colors"
+          onClick={e => e.stopPropagation()}>
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+      </div>
+      {/* Stats row */}
+      <div className="flex items-center gap-4 px-3 py-2 border-b border-white/[0.06] text-[9px] text-white/30 uppercase tracking-wider">
+        <span>MCap <span className="text-white/50 font-mono">{fmtCompact(post.token_market_cap_usd)}</span></span>
+        <span>Liq <span className="text-white/50 font-mono">{fmtCompact(post.token_liquidity_usd)}</span></span>
+        <span>Vol 24h <span className="text-white/50 font-mono">{fmtCompact(post.token_volume_24h_usd)}</span></span>
+      </div>
+      {/* Embedded chart */}
+      <div className="relative w-full" style={{ height: 300 }}>
+        <iframe src={chartEmbedUrl} className="w-full h-full border-0" title="Chart"
+          sandbox="allow-scripts allow-same-origin" loading="lazy" />
+      </div>
+    </div>
+  );
+}
+
 interface Post {
   id: string;
   community_id: string;
@@ -115,6 +258,18 @@ interface Post {
   article_cover_url?: string | null;
   is_pinned?: boolean;
   tags?: string[];
+  video_url?: string | null;
+  // Token / live chart fields
+  token_address?: string | null;
+  token_symbol?: string | null;
+  token_name?: string | null;
+  token_logo_url?: string | null;
+  token_price_usd?: number | null;
+  token_change_24h?: number | null;
+  token_market_cap_usd?: number | null;
+  token_liquidity_usd?: number | null;
+  token_volume_24h_usd?: number | null;
+  token_pair_address?: string | null;
   // Client state
   liked?: boolean;
   reposted?: boolean;
@@ -171,6 +326,16 @@ const Communities = () => {
   const [showCompose, setShowCompose] = useState(false);
   const [showCreateCommunity, setShowCreateCommunity] = useState(false);
   const [myMemberships, setMyMemberships] = useState<Map<string, CommunityMember>>(new Map());
+  const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
+
+  // Check global admin status
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase.from("admin_roles").select("role").eq("user_id", user.id).limit(1);
+      if (data && data.length > 0 && ["owner","superadmin","admin"].includes(data[0].role)) setIsGlobalAdmin(true);
+    })();
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -257,6 +422,7 @@ const Communities = () => {
           post={selectedPost}
           user={user}
           onBack={() => setSelectedPost(null)}
+          isGlobalAdmin={isGlobalAdmin}
         />
       ) : mainView === "community" && selectedCommunity ? (
         <CommunityFeed
@@ -282,6 +448,7 @@ const Communities = () => {
           user={user}
           onSelectPost={openPost}
           onSelectCommunity={openCommunity}
+          joinedCommunityIds={Array.from(myMemberships.keys())}
         />
       )}
 
@@ -385,30 +552,42 @@ function TopNav({
    ═══════════════════════════════════════════════════════════════ */
 
 function HomeFeed({
-  user, onSelectPost, onSelectCommunity
+  user, onSelectPost, onSelectCommunity, joinedCommunityIds
 }: {
   user: any;
   onSelectPost: (p: Post) => void;
   onSelectCommunity: (c: Community) => void;
+  joinedCommunityIds: string[];
 }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<FeedSort>("latest");
+  const [communityNames, setCommunityNames] = useState<Map<string, Community>>(new Map());
 
-  // Fetch communities for the horizontal scroll
+  // Fetch trending communities for the horizontal scroll
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from("communities").select("*")
         .eq("is_active", true).order("member_count", { ascending: false }).limit(20);
-      setCommunities((data || []) as Community[]);
+      const items = (data || []) as Community[];
+      setCommunities(items);
+      const map = new Map<string, Community>();
+      items.forEach(c => map.set(c.id, c));
+      setCommunityNames(map);
     })();
   }, []);
 
   const fetchHomeFeed = useCallback(async () => {
     setLoading(true);
     try {
+      // Aggregated feed: only posts from communities the user has joined
       let q = supabase.from("community_posts").select("*").is("thread_id", null).limit(50);
+
+      if (joinedCommunityIds.length > 0) {
+        q = q.in("community_id", joinedCommunityIds);
+      }
+
       if (sort === "latest") q = q.order("created_at", { ascending: false });
       else if (sort === "top") q = q.order("likes_count", { ascending: false });
       else q = q.order("views_count", { ascending: false });
@@ -441,18 +620,17 @@ function HomeFeed({
     } finally {
       setLoading(false);
     }
-  }, [user, sort]);
+  }, [user, sort, joinedCommunityIds]);
 
   useEffect(() => { fetchHomeFeed(); }, [fetchHomeFeed]);
 
   return (
     <div>
-      {/* Your Communities — horizontal scroll */}
+      {/* Trending Communities — horizontal scroll */}
       {communities.length > 0 && (
         <div className="py-3 border-b border-white/[0.04]">
           <div className="flex items-center justify-between px-4 mb-2.5">
-            <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Your Communities</p>
-            <button onClick={() => onSelectCommunity(communities[0])} className="text-[10px] text-og-cyan font-medium">See all</button>
+            <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Trending Communities</p>
           </div>
           <div className="flex gap-3 px-4 overflow-x-auto scrollbar-hide pb-1">
             {communities.map(c => (
@@ -481,23 +659,40 @@ function HomeFeed({
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 text-white/10 animate-spin" />
         </div>
+      ) : !user || joinedCommunityIds.length === 0 ? (
+        <EmptyState
+          icon={<Users className="h-10 w-10" />}
+          title="Your feed is empty"
+          subtitle="Join communities to see their posts here"
+        />
       ) : posts.length === 0 ? (
         <EmptyState
           icon={<MessageSquare className="h-10 w-10" />}
           title="No posts yet"
-          subtitle="Join a community and start posting!"
+          subtitle="Your communities haven't posted yet — check back soon!"
         />
       ) : (
         <div className="divide-y divide-white/[0.04]">
-          {posts.map(post => (
-            <PostCard
-              key={post.id}
-              post={post}
-              user={user}
-              onClick={() => onSelectPost(post)}
-              onUpdate={fetchHomeFeed}
-            />
-          ))}
+          {posts.map(post => {
+            const comm = communityNames.get(post.community_id);
+            return (
+              <div key={post.id}>
+                {comm && (
+                  <button onClick={() => onSelectCommunity(comm)}
+                    className="flex items-center gap-1.5 px-4 pt-2.5 pb-0 text-[10px] text-white/25 hover:text-white/40 transition-colors">
+                    <span>{comm.icon || "✨"}</span>
+                    <span className="font-bold">{comm.name}</span>
+                  </button>
+                )}
+                <PostCard
+                  post={post}
+                  user={user}
+                  onClick={() => onSelectPost(post)}
+                  onUpdate={fetchHomeFeed}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -820,13 +1015,30 @@ function CommunityFeed({
 }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "posts" | "articles" | "threads" | "members">("all");
+  const [filter, setFilter] = useState<"all" | "posts" | "articles" | "threads" | "members" | "settings">("all");
   const [members, setMembers] = useState<CommunityMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
-  const canModerate = myRole === "creator" || myRole === "moderator";
+  const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
+  const [editRules, setEditRules] = useState(community.rules || "");
+  const [editDesc, setEditDesc] = useState(community.description || "");
+  const [savingSettings, setSavingSettings] = useState(false);
+  const canModerate = myRole === "creator" || myRole === "moderator" || isGlobalAdmin;
+  const isCreator = myRole === "creator";
+
+  // Check if user is a global platform admin
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase.from("admin_roles").select("role").eq("user_id", user.id).limit(1);
+      if (data && data.length > 0) {
+        const role = data[0].role;
+        if (["owner", "superadmin", "admin"].includes(role)) setIsGlobalAdmin(true);
+      }
+    })();
+  }, [user]);
 
   useEffect(() => {
-    if (filter !== "members") return;
+    if (filter !== "members" && filter !== "settings") return;
     (async () => {
       setMembersLoading(true);
       const { data } = await supabase.from("community_members")
@@ -850,6 +1062,23 @@ function CommunityFeed({
     await supabase.from("community_members").update({ role: newRole }).eq("id", member.id);
     setMembers(members.map(m => m.id === member.id ? { ...m, role: newRole as any } : m));
     toast.success(newRole === "moderator" ? "Promoted to mod! 🛡️" : "Removed mod role");
+  };
+
+  const togglePin = async (postId: string, currentlyPinned: boolean) => {
+    if (!canModerate) return;
+    await supabase.from("community_posts").update({ is_pinned: !currentlyPinned }).eq("id", postId);
+    toast.success(currentlyPinned ? "Unpinned" : "Pinned! 📌");
+    fetchPosts();
+  };
+
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    await supabase.from("communities").update({
+      description: editDesc.trim() || null,
+      rules: editRules.trim() || null,
+    }).eq("id", community.id);
+    toast.success("Settings saved ✨");
+    setSavingSettings(false);
   };
 
   const kickMember = async (member: CommunityMember) => {
@@ -978,15 +1207,15 @@ function CommunityFeed({
 
       {/* Filter tabs */}
       <div className="flex border-b border-white/[0.04]">
-        {(["all", "posts", "threads", "articles", "members"] as const).map(f => (
+        {(["all", "posts", "threads", "articles", "members", ...(canModerate || isCreator ? ["settings" as const] : [])] as const).map(f => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => setFilter(f as any)}
             className={cn("flex-1 py-2.5 text-xs font-medium transition-colors relative capitalize",
               filter === f ? "text-white" : "text-white/25"
             )}
           >
-            {f === "members" ? <Users className="h-3.5 w-3.5 mx-auto" /> : f}
+            {f === "members" ? <Users className="h-3.5 w-3.5 mx-auto" /> : f === "settings" ? <Settings className="h-3.5 w-3.5 mx-auto" /> : f}
             {filter === f && (
               <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-[2px] rounded-full bg-og-cyan" />
             )}
@@ -994,7 +1223,78 @@ function CommunityFeed({
         ))}
       </div>
 
-      {filter === "members" ? (
+      {filter === "settings" && (isCreator || canModerate) ? (
+        <div className="p-4 space-y-6">
+          {/* Description */}
+          <div>
+            <label className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 block">Description</label>
+            <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)}
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/20 outline-none resize-none h-20 focus:border-og-cyan/30"
+              placeholder="What's this community about?" />
+          </div>
+          {/* Rules */}
+          <div>
+            <label className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 block">Community Rules</label>
+            <textarea value={editRules} onChange={e => setEditRules(e.target.value)}
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/20 outline-none resize-none h-32 focus:border-og-cyan/30"
+              placeholder="Add community rules..." />
+          </div>
+          <button onClick={saveSettings} disabled={savingSettings}
+            className="px-4 py-2 rounded-xl bg-og-cyan text-[#070d14] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50">
+            {savingSettings ? "Saving..." : "Save Settings"}
+          </button>
+
+          {/* Moderator Management */}
+          <div>
+            <label className="text-[10px] text-white/20 uppercase tracking-wider mb-3 block">Moderators</label>
+            {membersLoading ? (
+              <Loader2 className="h-5 w-5 text-white/10 animate-spin" />
+            ) : (
+              <div className="space-y-2">
+                {members.filter(m => m.role === "moderator" || m.role === "creator").map(m => (
+                  <div key={m.id} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                    <Avatar url={m.avatar_url} name={m.username} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-bold text-white">{m.username || "User"}</span>
+                      <span className={cn("ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full border",
+                        m.role === "creator" ? "text-og-gold bg-og-gold/10 border-og-gold/20" : "text-og-cyan bg-og-cyan/10 border-og-cyan/20"
+                      )}>{m.role === "creator" ? "OWNER" : "MOD"}</span>
+                    </div>
+                    {isCreator && m.role === "moderator" && (
+                      <button onClick={() => toggleMod(m)}
+                        className="text-[10px] text-red-400/60 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-400/10 transition-colors">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {/* Add mod section */}
+                {isCreator && (
+                  <div className="mt-3">
+                    <p className="text-[10px] text-white/20 mb-2">Add moderators from the Members tab — click the shield icon next to any member.</p>
+                  </div>
+                )}
+                {/* Regular members list for quick mod assignment */}
+                <div className="mt-4">
+                  <label className="text-[10px] text-white/20 uppercase tracking-wider mb-2 block">All Members</label>
+                  {members.filter(m => m.role === "member").slice(0, 20).map(m => (
+                    <div key={m.id} className="flex items-center gap-3 px-3 py-2 hover:bg-white/[0.02] rounded-lg">
+                      <Avatar url={m.avatar_url} name={m.username} size="sm" />
+                      <span className="text-sm text-white/60 flex-1">{m.username || "User"}</span>
+                      {isCreator && (
+                        <button onClick={() => toggleMod(m)}
+                          className="p-1.5 rounded-lg text-white/15 hover:text-og-cyan hover:bg-og-cyan/10 transition-colors" title="Make moderator">
+                          <Shield className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : filter === "members" ? (
         membersLoading ? (
           <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 text-white/10 animate-spin" /></div>
         ) : members.length === 0 ? (
@@ -1061,6 +1361,8 @@ function CommunityFeed({
               onUpdate={fetchPosts}
               canModerate={canModerate}
               communityOwnerId={community.created_by}
+              isGlobalAdmin={isGlobalAdmin}
+              onPin={togglePin}
             />
           ))}
         </div>
@@ -1074,7 +1376,7 @@ function CommunityFeed({
    ═══════════════════════════════════════════════════════════════ */
 
 function PostCard({
-  post, user, onClick, onUpdate, compact = false, canModerate = false, communityOwnerId
+  post, user, onClick, onUpdate, compact = false, canModerate = false, communityOwnerId, isGlobalAdmin = false, onPin
 }: {
   post: Post;
   user: any;
@@ -1083,11 +1385,14 @@ function PostCard({
   compact?: boolean;
   canModerate?: boolean;
   communityOwnerId?: string;
+  isGlobalAdmin?: boolean;
+  onPin?: (postId: string, pinned: boolean) => void;
 }) {
   const isArticle = post.is_article || post.post_type === "article";
   const isThread = post.post_type === "thread" && !post.thread_id;
   const isOwner = user && post.user_id === user.id;
-  const canDelete = isOwner || canModerate || (communityOwnerId && user && user.id === communityOwnerId);
+  const canDelete = isOwner || canModerate || isGlobalAdmin || (communityOwnerId && user && user.id === communityOwnerId);
+  const canPin = canModerate || isGlobalAdmin || (communityOwnerId && user && user.id === communityOwnerId);
   const [showMenu, setShowMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
@@ -1149,7 +1454,7 @@ function PostCard({
             <span className="text-xs text-white/15 shrink-0">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
             {isThread && <Badge className="text-[7px] bg-blue-500/10 text-blue-400 border-blue-500/20 ml-1">Thread</Badge>}
             {isArticle && <Badge className="text-[7px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20 ml-1">Article</Badge>}
-            {canDelete && (
+            {(canDelete || canPin) && (
               <div className="ml-auto relative">
                 <button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
                   className="p-1 rounded-full text-white/15 hover:text-white/40 hover:bg-white/[0.04] transition-colors">
@@ -1164,10 +1469,18 @@ function PostCard({
                         <Edit className="h-3.5 w-3.5" /> Edit
                       </button>
                     )}
-                    <button onClick={handleDelete}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400/70 hover:bg-red-400/10 hover:text-red-400 transition-colors">
-                      <Trash2 className="h-3.5 w-3.5" /> Delete
-                    </button>
+                    {canPin && onPin && (
+                      <button onClick={(e) => { e.stopPropagation(); onPin(post.id, !!post.is_pinned); setShowMenu(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.04] hover:text-white transition-colors">
+                        <Pin className="h-3.5 w-3.5" /> {post.is_pinned ? "Unpin" : "Pin"}
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button onClick={handleDelete}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400/70 hover:bg-red-400/10 hover:text-red-400 transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1199,6 +1512,19 @@ function PostCard({
           {!isArticle && post.image_url && (
             <div className="mt-2 rounded-xl overflow-hidden border border-white/[0.06]">
               <img src={post.image_url} className="w-full max-h-96 object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            </div>
+          )}
+          {/* Video support */}
+          {post.video_url && (
+            <div className="mt-2 rounded-xl overflow-hidden border border-white/[0.06] bg-black" onClick={e => e.stopPropagation()}>
+              <video src={post.video_url} controls preload="metadata" playsInline
+                className="w-full max-h-96 object-contain" />
+            </div>
+          )}
+          {/* Live Chart Card for token/call posts */}
+          {post.token_address && (
+            <div onClick={e => e.stopPropagation()}>
+              <TokenChartCard post={post} />
             </div>
           )}
           {post.tags && post.tags.length > 0 && (
@@ -1354,7 +1680,7 @@ function ActionBtn({
    Post Detail — Full post with replies
    ═══════════════════════════════════════════════════════════════ */
 
-function PostDetail({ post, user, onBack }: { post: Post; user: any; onBack: () => void }) {
+function PostDetail({ post, user, onBack, isGlobalAdmin = false }: { post: Post; user: any; onBack: () => void; isGlobalAdmin?: boolean }) {
   const [replies, setReplies] = useState<PostReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [replyText, setReplyText] = useState("");
@@ -1471,10 +1797,12 @@ function PostDetail({ post, user, onBack }: { post: Post; user: any; onBack: () 
             <p className="text-sm font-bold text-white">{post.username || "Anonymous"}</p>
             <p className="text-xs text-white/20">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
           </div>
-          {user && post.user_id === user.id && (
+          {(user && (post.user_id === user.id || isGlobalAdmin)) && (
             <div className="flex items-center gap-1">
-              <button onClick={() => { setEditingMain(true); setEditMainContent(post.content); }}
-                className="p-1.5 rounded-lg text-white/15 hover:text-white/40 hover:bg-white/[0.04]"><Edit className="h-4 w-4" /></button>
+              {post.user_id === user.id && (
+                <button onClick={() => { setEditingMain(true); setEditMainContent(post.content); }}
+                  className="p-1.5 rounded-lg text-white/15 hover:text-white/40 hover:bg-white/[0.04]"><Edit className="h-4 w-4" /></button>
+              )}
               <button onClick={async () => {
                 if (!confirm("Delete this post?")) return;
                 if (isThread) await supabase.from("community_posts").delete().eq("thread_id", post.id);
@@ -1512,6 +1840,14 @@ function PostDetail({ post, user, onBack }: { post: Post; user: any; onBack: () 
           </div>
         )}
 
+        {post.video_url && (
+          <div className="mt-3 rounded-xl overflow-hidden border border-white/[0.06] bg-black">
+            <video src={post.video_url} controls preload="metadata" playsInline className="w-full max-h-[500px] object-contain" />
+          </div>
+        )}
+
+        {post.token_address && <TokenChartCard post={post} />}
+
         {post.article_cover_url && (
           <div className="mt-3 rounded-xl overflow-hidden border border-white/[0.06]">
             <img src={post.article_cover_url} className="w-full aspect-[2/1] object-cover" alt="" />
@@ -1529,25 +1865,42 @@ function PostDetail({ post, user, onBack }: { post: Post; user: any; onBack: () 
         <PostActions post={post} user={user} />
       </div>
 
-      {/* Thread posts */}
+      {/* Thread posts — X-style connected */}
       {threadPosts.length > 0 && (
         <div className="border-b border-white/[0.06]">
-          <div className="px-4 py-2 text-[10px] text-white/20 uppercase tracking-wider">Thread</div>
           {threadPosts.map((tp, i) => (
-            <div key={tp.id} className="px-4 py-3 border-t border-white/[0.03]">
-              <div className="flex gap-3">
-                <div className="flex flex-col items-center">
+            <div key={tp.id} className="relative px-4">
+              {/* Vertical connecting line from previous post's avatar to this avatar */}
+              {i === 0 && (
+                <div className="absolute left-[34px] -top-3 bottom-[calc(50%-16px)] w-0.5 bg-white/[0.08]" />
+              )}
+              <div className="flex gap-3 py-3">
+                <div className="flex flex-col items-center relative z-10">
                   <Avatar url={tp.avatar_url} name={tp.username} size="sm" />
-                  {i < threadPosts.length - 1 && <div className="w-0.5 flex-1 bg-white/[0.06] mt-1" />}
+                  {/* Line going down to next post */}
+                  {i < threadPosts.length - 1 && (
+                    <div className="w-0.5 flex-1 bg-white/[0.08] mt-1 min-h-[12px]" />
+                  )}
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 pb-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-white">{tp.username}</span>
-                    <span className="text-[10px] text-white/15">
+                    <span className="text-[13px] font-bold text-white">{tp.username}</span>
+                    <span className="text-[10px] text-white/20">·</span>
+                    <span className="text-[10px] text-white/20">
                       {formatDistanceToNow(new Date(tp.created_at), { addSuffix: true })}
                     </span>
                   </div>
-                  <p className="text-sm text-white/70 mt-1 whitespace-pre-wrap">{tp.content}</p>
+                  <p className="text-[14px] text-white/70 mt-0.5 whitespace-pre-wrap leading-relaxed">{tp.content}</p>
+                  {tp.image_url && (
+                    <div className="mt-2 rounded-xl overflow-hidden border border-white/[0.06]">
+                      <img src={tp.image_url} className="w-full max-h-80 object-cover" alt="" />
+                    </div>
+                  )}
+                  {tp.video_url && (
+                    <div className="mt-2 rounded-xl overflow-hidden border border-white/[0.06] bg-black">
+                      <video src={tp.video_url} controls preload="metadata" playsInline className="w-full max-h-80 object-contain" />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1643,16 +1996,20 @@ function ComposeModal({
   community: Community | null;
   onClose: () => void;
 }) {
-  const [postType, setPostType] = useState<"post" | "thread" | "article">("post");
+  const [postType, setPostType] = useState<"post" | "thread" | "article" | "call">("post");
   const [content, setContent] = useState("");
   const [threadParts, setThreadParts] = useState<string[]>([""]);
   const [articleTitle, setArticleTitle] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [bannerUrl, setBannerUrl] = useState("");
   const [tags, setTags] = useState("");
   const [selectedCommunityId, setSelectedCommunityId] = useState(community?.id || "");
   const [communities, setCommunities] = useState<Community[]>([]);
   const [posting, setPosting] = useState(false);
+  const [tokenAddress, setTokenAddress] = useState("");
+  const [tokenData, setTokenData] = useState<DexTokenData | null>(null);
+  const [fetchingToken, setFetchingToken] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -1675,11 +2032,25 @@ function ComposeModal({
       const avatar = profile?.avatar_url || null;
       const tagArr = tags.split(",").map(t => t.trim()).filter(Boolean);
 
+      // Token data for "call" posts
+      const tokenFields = postType === "call" && tokenData ? {
+        token_address: tokenData.address,
+        token_symbol: tokenData.symbol,
+        token_name: tokenData.name,
+        token_logo_url: tokenData.logoUrl,
+        token_price_usd: tokenData.priceUsd,
+        token_change_24h: tokenData.change24h,
+        token_market_cap_usd: tokenData.marketCapUsd,
+        token_liquidity_usd: tokenData.liquidityUsd,
+        token_volume_24h_usd: tokenData.volume24hUsd,
+        token_pair_address: tokenData.pairAddress,
+      } : {};
+
       if (postType === "thread") {
         const { data: parent } = await supabase.from("community_posts").insert({
           community_id: selectedCommunityId, user_id: user.id, username, avatar_url: avatar,
           content: threadParts[0].trim(), post_type: "thread", tags: tagArr,
-          image_url: imageUrl || null,
+          image_url: imageUrl || null, video_url: videoUrl || null,
         }).select().single();
         if (parent) {
           for (let i = 1; i < threadParts.length; i++) {
@@ -1694,11 +2065,13 @@ function ComposeModal({
       } else {
         await supabase.from("community_posts").insert({
           community_id: selectedCommunityId, user_id: user.id, username, avatar_url: avatar,
-          content: content.trim(), image_url: imageUrl || null, post_type: postType,
+          content: content.trim(), image_url: imageUrl || null, video_url: videoUrl || null,
+          post_type: postType === "call" ? "call" : postType,
           is_article: postType === "article",
           article_title: postType === "article" ? articleTitle : null,
           article_cover_url: postType === "article" ? (bannerUrl || imageUrl || null) : null,
           tags: tagArr,
+          ...tokenFields,
         });
       }
       toast.success(postType === "article" ? "Article published! 📝" : postType === "thread" ? "Thread posted! 🧵" : "Posted! ✨");
@@ -1726,12 +2099,12 @@ function ComposeModal({
 
         {/* Post type selector */}
         <div className="flex gap-1 px-4 pt-3">
-          {(["post", "thread", "article"] as const).map(t => (
+          {(["post", "thread", "article", "call"] as const).map(t => (
             <button key={t} onClick={() => setPostType(t)}
               className={cn("px-3 py-1.5 rounded-full text-xs font-medium transition-colors capitalize",
                 postType === t ? "bg-og-cyan/10 text-og-cyan" : "text-white/20"
               )}>
-              {t === "post" ? "📝 Post" : t === "thread" ? "🧵 Thread" : "📰 Article"}
+              {t === "post" ? "📝 Post" : t === "thread" ? "🧵 Thread" : t === "article" ? "📰 Article" : "📈 Call"}
             </button>
           ))}
         </div>
@@ -1796,24 +2169,88 @@ function ComposeModal({
               className="w-full bg-transparent text-sm text-white placeholder-white/20 resize-none outline-none min-h-[120px]" />
           )}
 
-          {/* Image upload */}
-          <div>
-            <label className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 block">
-              {postType === "article" ? "Article Icon / Image" : "Attach Image"}
-            </label>
-            {imageUrl ? (
-              <div className="relative rounded-xl overflow-hidden border border-white/[0.08]">
-                <img src={imageUrl} alt="Preview" className="w-full max-h-48 object-cover"
-                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                <button onClick={() => setImageUrl("")}
-                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white">
-                  <XIcon className="h-3.5 w-3.5" />
+          {/* Token address input for Call posts */}
+          {postType === "call" && (
+            <div>
+              <label className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 block">Contract Address (CA)</label>
+              <div className="flex gap-2">
+                <input type="text" value={tokenAddress} onChange={e => setTokenAddress(e.target.value)}
+                  placeholder="Paste Solana token address..."
+                  className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 outline-none focus:border-og-cyan/30 font-mono" />
+                <button onClick={async () => {
+                  if (!tokenAddress.trim()) return;
+                  setFetchingToken(true);
+                  const data = await fetchTokenByCA(tokenAddress.trim());
+                  setTokenData(data);
+                  if (!data) toast.error("Token not found on DexScreener");
+                  setFetchingToken(false);
+                }} disabled={fetchingToken || !tokenAddress.trim()}
+                  className="px-3 py-2 rounded-xl bg-og-cyan/10 text-og-cyan text-xs font-bold hover:bg-og-cyan/20 transition-colors disabled:opacity-50">
+                  {fetchingToken ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Fetch"}
                 </button>
               </div>
-            ) : (
-              <ImageUploadBtn onUploaded={setImageUrl} label="Upload image" />
-            )}
-          </div>
+              {tokenData && (
+                <div className="mt-2 rounded-xl border border-og-cyan/20 bg-og-cyan/[0.03] p-3">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    {tokenData.logoUrl && <img src={tokenData.logoUrl} className="w-6 h-6 rounded-full" alt="" />}
+                    <span className="text-sm font-black text-white">{tokenData.symbol}</span>
+                    <span className="text-[10px] text-white/30">{tokenData.name}</span>
+                  </div>
+                  <div className="flex gap-3 text-[10px] text-white/40">
+                    <span>Price: <span className="text-white/60 font-mono">{fmtPrice(tokenData.priceUsd)}</span></span>
+                    <span>MCap: <span className="text-white/60 font-mono">{fmtCompact(tokenData.marketCapUsd)}</span></span>
+                    <span>Vol: <span className="text-white/60 font-mono">{fmtCompact(tokenData.volume24hUsd)}</span></span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Media upload — image or video */}
+          {postType !== "article" && (
+            <div className="flex gap-2">
+              {imageUrl ? (
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] flex-1">
+                  <img src={imageUrl} alt="Preview" className="w-full max-h-48 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  <button onClick={() => setImageUrl("")}
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white">
+                    <XIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : videoUrl ? (
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] flex-1 bg-black">
+                  <video src={videoUrl} controls preload="metadata" className="w-full max-h-48 object-contain" />
+                  <button onClick={() => setVideoUrl("")}
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white">
+                    <XIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <ImageUploadBtn onUploaded={setImageUrl} label="Image" />
+                  <MediaUploadBtn accept="video/*" label="Video" onUploaded={(url, type) => { if (type === "video") setVideoUrl(url); else setImageUrl(url); }} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Article image upload */}
+          {postType === "article" && (
+            <div>
+              <label className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 block">Article Icon / Image</label>
+              {imageUrl ? (
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.08]">
+                  <img src={imageUrl} alt="Preview" className="w-full max-h-48 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  <button onClick={() => setImageUrl("")}
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white">
+                    <XIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <ImageUploadBtn onUploaded={setImageUrl} label="Upload image" />
+              )}
+            </div>
+          )}
 
           {/* Tags */}
           <input type="text" placeholder="Tags (comma-separated)..." value={tags} onChange={e => setTags(e.target.value)}
