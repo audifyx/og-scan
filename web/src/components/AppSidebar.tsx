@@ -107,7 +107,7 @@ export const AppSidebar = ({
 
   const moreItems: ExternalNavItem[] = [
     { to: "/alpha-chat",      icon: Bot,          label: "Alpha Chat",      eyebrow: "AI assistant" },
-    { to: "/advanced-tools",  icon: Wrench,       label: "Advanced Tools",  eyebrow: "30+ pro tools" },
+
     { to: "/pumpv5",          icon: Rocket,       label: "Launch Pad",      eyebrow: "Token listings" },
 
     ...(isAdmin ? [{ to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Owner dashboard" } as ExternalNavItem] : []),

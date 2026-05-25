@@ -22,7 +22,7 @@ const apps: AppItem[] = [
   { icon: Coins, label: "Tokens", path: "/tokens", gradient: "from-amber-600 to-yellow-700" },
   { icon: LineChart, label: "Charts", path: "/charts", gradient: "from-emerald-500 to-green-700" },
   { icon: Wrench, label: "Tools", path: "/tools", gradient: "from-slate-500 to-slate-700" },
-  { icon: Cpu, label: "Advanced", path: "/advanced-tools", gradient: "from-violet-500 to-purple-700" },
+
   { icon: Rocket, label: "Launch Pad", path: "/pump-v5", gradient: "from-primary to-accent", badge: "NEW" },
 
   { icon: Bell, label: "Alerts", path: "/notifications", gradient: "from-rose-500 to-red-700" },
@@ -35,7 +35,7 @@ const apps: AppItem[] = [
   { icon: Headphones, label: "Lobbies", path: "/lobbies", gradient: "from-pink-500 to-rose-700", badge: "NEW" },
   { icon: Globe2, label: "Communities", path: "/communities", gradient: "from-emerald-400 to-teal-700", badge: "NEW" },
   { icon: ArrowLeftRight, label: "Trading", path: "/live-trading", gradient: "from-purple-400 to-indigo-700", badge: "SOON" },
-  { icon: BarChart3, label: "Credits", path: "/credits", gradient: "from-lime-500 to-green-700" },
+
   { icon: Settings, label: "Settings", path: "/settings", gradient: "from-zinc-500 to-zinc-700" },
 ];
 

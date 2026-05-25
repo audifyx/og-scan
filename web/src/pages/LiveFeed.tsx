@@ -8,7 +8,8 @@ import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { heliusTxs, type HeliusTx, HELIUS_API_KEY } from "@/lib/og";
+import { heliusTxs, type HeliusTx, HELIUS_API_KEY, type JupTokenInfo } from "@/lib/og";
+import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 
 /* ═══════════════════════════════════════════════════════════════
    Types
@@ -404,8 +405,22 @@ const LiveFeed = () => {
                 </div>
               ) : activeTab === "launches" ? (
                 <div className="divide-y divide-white/[0.05]">
-                  {filteredTokens.map((token) => (
-                    <div key={token.id} className="p-4 hover:bg-white/[0.03] transition-all group">
+                  {filteredTokens.map((token) => {
+                    const jupToken: JupTokenInfo = {
+                      id: token.address,
+                      name: token.name,
+                      symbol: token.symbol,
+                      icon: token.imageUrl,
+                      decimals: 9,
+                      usdPrice: parseFloat(token.priceUsd) || 0,
+                      fdv: token.fdv,
+                      liquidity: token.liquidity,
+                      stats24h: { priceChange: token.priceChange24h },
+                      firstPool: { createdAt: token.pairCreatedAt ? new Date(token.pairCreatedAt).toISOString() : undefined },
+                    };
+                    return (
+                    <CoinDetailDialog key={token.id} token={jupToken} trigger={
+                    <div className="p-4 hover:bg-white/[0.03] transition-all group cursor-pointer">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="relative shrink-0">
@@ -452,14 +467,11 @@ const LiveFeed = () => {
                             <p className="text-[10px] font-bold text-white/40">{formatDistanceToNow(token.pairCreatedAt, { addSuffix: false })}</p>
                             <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest leading-none mt-0.5">Age</p>
                           </div>
-                          <a href={token.url} target="_blank" rel="noreferrer"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all opacity-0 group-hover:opacity-100">
-                            <ExternalLink className="h-3.5 w-3.5 text-white/40" />
-                          </a>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    } />
+                  );})}
                   {filteredTokens.length === 0 && !loading && (
                     <div className="p-12 text-center">
                       <p className="text-xs text-white/30 font-bold uppercase">No tokens matching filters</p>

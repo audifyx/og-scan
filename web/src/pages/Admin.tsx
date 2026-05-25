@@ -72,7 +72,7 @@ const NAV_SECTIONS = [
   { id: "users", icon: Users, label: "Users", color: "text-blue-400" },
   { id: "submissions", icon: Rocket, label: "Tokens", color: "text-green-400" },
   { id: "lobbies", icon: Headphones, label: "Lobbies", color: "text-purple-400" },
-  { id: "credits", icon: Coins, label: "Credits", color: "text-yellow-400" },
+
   { id: "community", icon: MessageSquare, label: "Community", color: "text-pink-400" },
   { id: "logs", icon: FileText, label: "Logs", color: "text-orange-400" },
   { id: "announce", icon: Bell, label: "Announce", color: "text-red-400" },
@@ -109,6 +109,15 @@ const Admin = () => {
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementMessage, setAnnouncementMessage] = useState("");
   const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
+  const [maintenanceOn, setMaintenanceOn] = useState(true);
+
+  /* ─── fetch maintenance mode ─── */
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("site_settings").select("value").eq("key", "maintenance_mode").single();
+      if (data) setMaintenanceOn(data.value === true || data.value === "true");
+    })();
+  }, []);
 
   /* ─── auth ─── */
   useEffect(() => { checkAdmin(); }, [user]);
@@ -359,7 +368,7 @@ const Admin = () => {
                 {[
                   { icon: Users, label: "Users", value: stats.totalUsers, color: "from-[#22d3ee]/20 to-blue-500/10", iconColor: "text-[#22d3ee]" },
                   { icon: Rocket, label: "Tokens", value: stats.totalSubmissions, color: "from-green-500/20 to-emerald-500/10", iconColor: "text-green-400" },
-                  { icon: Coins, label: "Credits", value: `$${stats.totalCreditsUsed.toLocaleString()}`, color: "from-yellow-500/20 to-orange-500/10", iconColor: "text-yellow-400" },
+
                   { icon: Headphones, label: "Lobbies", value: stats.activeLobbies, color: "from-purple-500/20 to-pink-500/10", iconColor: "text-purple-400" },
                   { icon: MessageSquare, label: "Posts", value: communityStats.posts, color: "from-pink-500/20 to-rose-500/10", iconColor: "text-pink-400" },
                   { icon: Clock, label: "Pending", value: pendingCount, color: "from-amber-500/20 to-yellow-500/10", iconColor: "text-amber-400" },
@@ -586,48 +595,7 @@ const Admin = () => {
             </div>
           )}
 
-          {/* ══════════════ CREDITS ══════════════ */}
-          {tab === "credits" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-gradient-to-br from-yellow-500/15 to-orange-500/10 border border-white/[0.06] p-3.5">
-                  <Coins className="h-4 w-4 text-yellow-400 mb-2" />
-                  <p className="text-xl font-black">${stats.totalCreditsUsed.toLocaleString()}</p>
-                  <p className="text-[10px] text-white/30">Total Used</p>
-                </div>
-                <div className="rounded-2xl bg-gradient-to-br from-green-500/15 to-emerald-500/10 border border-white/[0.06] p-3.5">
-                  <TrendingUp className="h-4 w-4 text-green-400 mb-2" />
-                  <p className="text-xl font-black">{users.length}</p>
-                  <p className="text-[10px] text-white/30">Active Accounts</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-xs font-bold text-white/20 uppercase tracking-widest px-1">Top Credit Users</h3>
-                {[...users]
-                  .sort((a, b) => (userCredits[b.user_id]?.used_credits || 0) - (userCredits[a.user_id]?.used_credits || 0))
-                  .slice(0, 15)
-                  .map((u, i) => {
-                    const c = userCredits[u.user_id];
-                    const used = c?.used_credits || 0;
-                    const total = c?.total_credits || 50000;
-                    const pct = total > 0 ? (used / total) * 100 : 0;
-                    return (
-                      <button key={u.id} onClick={() => openUserDetail(u)} className="w-full flex items-center gap-3 rounded-xl bg-white/[0.02] border border-white/[0.06] p-3 text-left hover:bg-white/[0.05] transition-colors">
-                        <span className="text-[10px] text-white/20 font-bold w-4 text-right">{i + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate">{u.username || u.user_id.slice(0, 8)}</p>
-                          <div className="mt-1 h-1 rounded-full bg-white/5 overflow-hidden">
-                            <div className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-orange-500" style={{ width: `${Math.min(pct, 100)}%` }} />
-                          </div>
-                        </div>
-                        <p className="text-xs font-bold text-yellow-400">${used.toLocaleString()}</p>
-                      </button>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
+          {/* Credits section removed */}
 
           {/* ══════════════ COMMUNITY ══════════════ */}
           {tab === "community" && (
@@ -770,6 +738,30 @@ const Admin = () => {
           {/* ══════════════ SETTINGS ══════════════ */}
           {tab === "settings" && (
             <div className="space-y-4">
+              {/* ── Maintenance Mode Toggle ── */}
+              <div className="flex items-center justify-between rounded-2xl bg-gradient-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/20 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/30">
+                    <Lock className="h-5 w-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white">Maintenance Mode</p>
+                    <p className="text-[10px] text-white/40 mt-0.5">
+                      {maintenanceOn ? "Site is locked — users need beta code to enter" : "Site is open to everyone"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={maintenanceOn}
+                  onCheckedChange={async (checked) => {
+                    setMaintenanceOn(checked);
+                    await supabase.from("site_settings").upsert({ key: "maintenance_mode", value: checked, updated_at: new Date().toISOString(), updated_by: user?.id });
+                    if (user) await supabase.from("admin_audit_log").insert({ admin_user_id: user.id, action: `Maintenance mode ${checked ? "ON" : "OFF"}`, target_type: "site_settings", target_id: "maintenance_mode", new_values: { value: checked } });
+                    toast.success(checked ? "Maintenance mode ON — site locked" : "Maintenance mode OFF — site open");
+                  }}
+                />
+              </div>
+
               <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
                 {[
                   { id: "submissions", icon: Rocket },

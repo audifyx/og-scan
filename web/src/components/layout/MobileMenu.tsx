@@ -11,14 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SheetClose } from "@/components/ui/sheet";
-import { CreditBalance } from "@/components/credits/CreditBalance";
+
 
 const mainNavItems = [
   { to: "/wallets", icon: Wallet, label: "Wallets" },
   { to: "/tokens", icon: Coins, label: "Tokens" },
   { to: "/charts", icon: LineChart, label: "Charts" },
   { to: "/tools", icon: Wrench, label: "Tools" },
-  { to: "/advanced-tools", icon: Rocket, label: "Advanced" },
+
   { to: "/pump-v5", icon: Sparkles, label: "PUMP V6" },
   { to: "/official-token", icon: Zap, label: "$SOLTOOLS" },
   { to: "/lobbies", icon: Headphones, label: "Lobbies" },
@@ -32,7 +32,7 @@ const socialNavItems = [
   { to: "/discover", icon: Users, label: "Discover" },
   { to: "/callouts", icon: Bell, label: "Callouts" },
   { to: "/support", icon: Headphones, label: "Support" },
-  { to: "/credits", icon: Coins, label: "Credits" },
+
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -126,7 +126,7 @@ export const MobileMenu = () => {
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/25 to-transparent" />
         {user ? (
           <div className="space-y-2">
-            <CreditBalance compact className="mb-1" />
+
             <SheetClose asChild>
               <div className="flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer bg-muted/15 active:bg-white/[0.04] border border-border/20 transition-all" onClick={() => navigate("/profile")}>
                 <div className="w-8 h-8 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground font-bold text-[10px] font-mono">
