@@ -569,7 +569,7 @@ function HomeFeed({
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from("communities").select("*")
-        .eq("is_active", true).order("member_count", { ascending: false }).limit(20);
+        .eq("is_active", true).neq("name", "SolTools Feed").order("member_count", { ascending: false }).limit(20);
       const items = (data || []) as Community[];
       setCommunities(items);
       const map = new Map<string, Community>();
@@ -720,6 +720,7 @@ function ExploreCommunities({
       setLoading(true);
       const { data } = await supabase.from("communities").select("*")
         .eq("is_active", true)
+        .neq("name", "SolTools Feed")
         .order("member_count", { ascending: false });
       setCommunities((data || []) as Community[]);
       setLoading(false);
@@ -1057,7 +1058,7 @@ function CommunityFeed({
   }, [filter, community.id]);
 
   const toggleMod = async (member: CommunityMember) => {
-    if (myRole !== "creator") return;
+    if (myRole !== "creator" && !isGlobalAdmin) return;
     const newRole = member.role === "moderator" ? "member" : "moderator";
     await supabase.from("community_members").update({ role: newRole }).eq("id", member.id);
     setMembers(members.map(m => m.id === member.id ? { ...m, role: newRole as any } : m));
@@ -1260,7 +1261,7 @@ function CommunityFeed({
                         m.role === "creator" ? "text-og-gold bg-og-gold/10 border-og-gold/20" : "text-og-cyan bg-og-cyan/10 border-og-cyan/20"
                       )}>{m.role === "creator" ? "OWNER" : "MOD"}</span>
                     </div>
-                    {isCreator && m.role === "moderator" && (
+                    {(isCreator || isGlobalAdmin) && m.role === "moderator" && (
                       <button onClick={() => toggleMod(m)}
                         className="text-[10px] text-red-400/60 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-400/10 transition-colors">
                         Remove
@@ -1268,12 +1269,6 @@ function CommunityFeed({
                     )}
                   </div>
                 ))}
-                {/* Add mod section */}
-                {isCreator && (
-                  <div className="mt-3">
-                    <p className="text-[10px] text-white/20 mb-2">Add moderators from the Members tab — click the shield icon next to any member.</p>
-                  </div>
-                )}
                 {/* Regular members list for quick mod assignment */}
                 <div className="mt-4">
                   <label className="text-[10px] text-white/20 uppercase tracking-wider mb-2 block">All Members</label>
@@ -1281,7 +1276,7 @@ function CommunityFeed({
                     <div key={m.id} className="flex items-center gap-3 px-3 py-2 hover:bg-white/[0.02] rounded-lg">
                       <Avatar url={m.avatar_url} name={m.username} size="sm" />
                       <span className="text-sm text-white/60 flex-1">{m.username || "User"}</span>
-                      {isCreator && (
+                      {(isCreator || isGlobalAdmin) && (
                         <button onClick={() => toggleMod(m)}
                           className="p-1.5 rounded-lg text-white/15 hover:text-og-cyan hover:bg-og-cyan/10 transition-colors" title="Make moderator">
                           <Shield className="h-3.5 w-3.5" />
@@ -1320,7 +1315,7 @@ function CommunityFeed({
                   </div>
                   <p className="text-[10px] text-white/20">Joined {formatDistanceToNow(new Date(m.joined_at), { addSuffix: true })}</p>
                 </div>
-                {myRole === "creator" && m.role !== "creator" && (
+                {(myRole === "creator" || isGlobalAdmin) && m.role !== "creator" && (
                   <div className="flex items-center gap-1">
                     <button onClick={() => toggleMod(m)} title={m.role === "moderator" ? "Remove mod" : "Make mod"}
                       className={cn("p-1.5 rounded-lg transition-colors", m.role === "moderator" ? "text-og-cyan hover:bg-og-cyan/10" : "text-white/15 hover:text-og-cyan hover:bg-og-cyan/10")}>
@@ -2013,7 +2008,7 @@ function ComposeModal({
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("communities").select("id, name, icon").eq("is_active", true);
+      const { data } = await supabase.from("communities").select("id, name, icon").eq("is_active", true).neq("name", "SolTools Feed");
       setCommunities((data || []) as Community[]);
       if (!selectedCommunityId && data && data.length > 0) setSelectedCommunityId(data[0].id);
     })();
