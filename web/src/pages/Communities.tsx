@@ -456,7 +456,7 @@ const Communities = () => {
       {/* ─── FAB ─── */}
       <button
         onClick={() => setShowCompose(true)}
-        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-50 w-14 h-14 rounded-full bg-og-cyan shadow-lg shadow-og-cyan/20 flex items-center justify-center text-[#070d14] hover:scale-105 active:scale-95 transition-all"
+        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-50 w-14 h-14 rounded-full bg-og-cyan shadow-lg shadow-og-cyan/20 flex items-center justify-center text-background hover:scale-105 active:scale-95 transition-all"
       >
         <Plus className="h-6 w-6 stroke-[3]" />
       </button>
@@ -886,7 +886,7 @@ function CommunityCard({ community: c, onClick, variant = "list" }: { community:
             <img src={c.banner_url} className="w-full h-full object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
           )}
           <div className="absolute -bottom-5 left-3">
-            <CommunityAvatar community={c} size="sm" className="border-2 border-[#070d14] shadow-lg" />
+            <CommunityAvatar community={c} size="sm" className="border-2 border-background shadow-lg" />
           </div>
         </div>
         <div className="pt-7 px-3 pb-3">
@@ -1160,7 +1160,7 @@ function CommunityFeed({
                   onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
               )}
               <div className="absolute -bottom-7 left-4">
-                <CommunityAvatar community={community} size="lg" className="border-[3px] border-[#070d14] shadow-xl" />
+                <CommunityAvatar community={community} size="lg" className="border-[3px] border-background shadow-xl" />
               </div>
             </div>
             {/* Info */}
@@ -1176,7 +1176,7 @@ function CommunityFeed({
                   {isMember ? (
                     <>
                       <button onClick={onCompose}
-                        className="px-4 py-1.5 rounded-xl bg-og-cyan text-[#070d14] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all shadow-[0_0_15px_rgba(34,211,238,0.2)]">
+                        className="px-4 py-1.5 rounded-xl bg-og-cyan text-background text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all shadow-[0_0_15px_rgba(34,211,238,0.2)]">
                         Post
                       </button>
                       {myRole !== "creator" && (
@@ -1188,7 +1188,7 @@ function CommunityFeed({
                     </>
                   ) : (
                     <button onClick={onJoin}
-                      className="px-4 py-1.5 rounded-xl bg-og-cyan text-[#070d14] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all">
+                      className="px-4 py-1.5 rounded-xl bg-og-cyan text-background text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all">
                       Join
                     </button>
                   )}
@@ -1242,7 +1242,7 @@ function CommunityFeed({
               placeholder="Add community rules..." />
           </div>
           <button onClick={saveSettings} disabled={savingSettings}
-            className="px-4 py-2 rounded-xl bg-og-cyan text-[#070d14] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50">
+            className="px-4 py-2 rounded-xl bg-og-cyan text-background text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50">
             {savingSettings ? "Saving..." : "Save Settings"}
           </button>
 
@@ -1489,7 +1489,7 @@ function PostCard({
                 className="w-full bg-white/[0.04] border border-og-cyan/30 rounded-xl px-3 py-2 text-sm text-white resize-none outline-none min-h-[80px]" />
               <div className="flex items-center gap-2 mt-1.5">
                 <button onClick={handleSaveEdit} disabled={saving}
-                  className="px-3 py-1 rounded-lg bg-og-cyan text-[#070d14] text-[10px] font-black uppercase disabled:opacity-50">
+                  className="px-3 py-1 rounded-lg bg-og-cyan text-background text-[10px] font-black uppercase disabled:opacity-50">
                   {saving ? "Saving..." : "Save"}
                 </button>
                 <button onClick={() => setEditing(false)} className="px-3 py-1 rounded-lg text-white/30 text-[10px] font-black uppercase hover:text-white/60">Cancel</button>
@@ -1823,7 +1823,7 @@ function PostDetail({ post, user, onBack, isGlobalAdmin = false, canModerate = f
               <button onClick={async () => {
                 await supabase.from("community_posts").update({ content: editMainContent.trim() }).eq("id", post.id);
                 post.content = editMainContent.trim(); setEditingMain(false); toast.success("Updated!");
-              }} className="px-3 py-1 rounded-lg bg-og-cyan text-[#070d14] text-[10px] font-black uppercase">Save</button>
+              }} className="px-3 py-1 rounded-lg bg-og-cyan text-background text-[10px] font-black uppercase">Save</button>
               <button onClick={() => setEditingMain(false)} className="px-3 py-1 rounded-lg text-white/30 text-[10px] font-black uppercase">Cancel</button>
             </div>
           </div>

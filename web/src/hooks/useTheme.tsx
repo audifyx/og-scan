@@ -300,6 +300,12 @@ function applyThemeVars(themeId: string) {
   Object.entries(preset.vars).forEach(([key, val]) => {
     root.style.setProperty(key, val);
   });
+  // Sync OG palette tokens so legacy og-* utilities follow the active theme
+  if (preset.vars["--primary"]) root.style.setProperty("--og-lime", preset.vars["--primary"]);
+  if (preset.vars["--primary"]) root.style.setProperty("--og-gold", preset.vars["--primary"]);
+  if (preset.vars["--accent"]) root.style.setProperty("--og-cyan", preset.vars["--accent"]);
+  if (preset.vars["--background"]) root.style.setProperty("--og-ink", preset.vars["--background"]);
+  if (preset.vars["--border"]) root.style.setProperty("--og-grid", preset.vars["--border"]);
 }
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {

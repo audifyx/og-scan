@@ -116,7 +116,7 @@ export const AppSidebar = ({
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-white/[0.07] bg-[#060c13] transition-transform duration-300 lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-border bg-card/80 backdrop-blur-xl transition-transform duration-300 lg:translate-x-0",
         open ? "translate-x-0" : "-translate-x-full",
       )}
     >

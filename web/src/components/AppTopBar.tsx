@@ -75,7 +75,7 @@ export const AppTopBar = ({
   onNavigate: (t: string) => void;
 }) => {
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full flex-col border-b border-white/[0.07] bg-[#070d14]/80 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex h-16 w-full flex-col border-b border-white/[0.07] bg-background/80 backdrop-blur-md">
       <div className="flex h-16 w-full items-center justify-between px-4 lg:px-6">
         <div className="flex items-center gap-4">
           <button

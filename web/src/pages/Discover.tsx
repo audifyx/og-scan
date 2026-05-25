@@ -1,501 +1,729 @@
-import { useState, useEffect, useCallback } from "react";
-import { Search, Trophy, TrendingUp, Users, Star, Crown, Zap, Filter, Flame, Eye, BarChart3, AlertTriangle, ArrowUpRight, ArrowDownRight, RefreshCw, Sparkles, Activity } from "lucide-react";
+/**
+ * Discover / LaunchPad — OG Scan's full-featured token discovery engine.
+ *
+ * Sections: All, Featured, Hot, New, Migrated, Gainers, Losers, Volume, Mine
+ * Data: DexScreener APIs + pump_v5_submissions from Supabase
+ * Style: OG hacker terminal aesthetic
+ */
+import { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  Search, Flame, TrendingUp, TrendingDown, Star, Zap, Filter, Eye,
+  BarChart3, ArrowUpRight, ArrowDownRight, RefreshCw, Sparkles, Rocket,
+  Plus, X, ExternalLink, Loader2, Copy, Check, ChevronRight,
+  Activity, Shield, Target, Award, Users, Clock, Waves,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
-import { renderAvatar } from "@/components/avatars/AvatarSelector";
+import { fmtUsd, fmtNum } from "@/lib/og";
+import { CoinDetailDialog } from "@/components/CoinDetailDialog";
+import type { JupTokenInfo } from "@/lib/og";
 
-interface LeaderboardUser {
-  user_id: string;
-  username: string | null;
-  avatar_url: string | null;
-  total_pnl: number;
-  win_rate: number;
-  trades_count: number;
-  followers_count: number;
-  badge: string | null;
-  bio: string | null;
-}
+/* ═══════════════════════ Types ═══════════════════════ */
 
-interface TrendingToken {
-  name: string;
-  symbol: string;
-  address: string;
-  price: number;
-  priceChange24h: number;
-  volume24h: number;
-  liquidity: number;
-  marketCap: number;
-  imageUrl?: string;
-}
-
-interface SocialActivity {
+interface LaunchToken {
   id: string;
-  user_id: string;
-  activity_type: string;
-  title: string;
-  description: string | null;
-  created_at: string;
-  username?: string | null;
-  avatar_url?: string | null;
+  name: string;
+  ticker: string;
+  contract: string;
+  logoUrl: string | null;
+  venue: string;
+  status: string;
+  tags: string[];
+  featured: boolean;
+  hot: boolean;
+  verified: boolean;
+  createdAt: number;
+  ownerId: string | null;
+  price: number | null;
+  change24hPct: number | null;
+  liquidityUsd: number | null;
+  marketCapUsd: number | null;
+  volume24hUsd: number | null;
+  holders: number | null;
+  pairAddress: string | null;
+  txns24h: number;
+  upvotes: number;
+  watchers: number;
+  source: "dex" | "submission" | "boost";
 }
+
+type Section = "all" | "featured" | "hot" | "new" | "migrated" | "gainers" | "losers" | "volume" | "whales" | "mine";
+
+const SECTIONS: { id: Section; label: string; Icon: React.ComponentType<any> }[] = [
+  { id: "all", label: "All", Icon: Sparkles },
+  { id: "featured", label: "Featured", Icon: Star },
+  { id: "hot", label: "Hot", Icon: Flame },
+  { id: "new", label: "New", Icon: Zap },
+  { id: "migrated", label: "Migrated", Icon: Rocket },
+  { id: "gainers", label: "Gainers", Icon: TrendingUp },
+  { id: "losers", label: "Losers", Icon: TrendingDown },
+  { id: "volume", label: "Volume", Icon: BarChart3 },
+  { id: "whales", label: "Whales", Icon: Waves },
+  { id: "mine", label: "Mine", Icon: Users },
+];
+
+/* ═══════════════════════ Scoring ═══════════════════════ */
+
+function heatScore(t: LaunchToken): number {
+  return (
+    (t.hot ? 1_000_000 : 0) +
+    (t.verified ? 250_000 : 0) +
+    (t.volume24hUsd ?? 0) * 0.72 +
+    (t.liquidityUsd ?? 0) * 0.22 +
+    Math.max(0, t.change24hPct ?? 0) * 15_000 +
+    t.upvotes * 2_500 +
+    t.watchers * 1_000
+  );
+}
+
+function isSafeToken(t: LaunchToken): boolean {
+  const mc = t.marketCapUsd ?? 0;
+  const liq = t.liquidityUsd ?? 0;
+  const vol = t.volume24hUsd ?? 0;
+  if (mc <= 0 && liq <= 0 && vol <= 0) return false;
+  if (typeof t.change24hPct === "number" && t.change24hPct <= -90) return false;
+  const tags = (t.tags ?? []).map(x => x.toLowerCase());
+  if (tags.some(x => /scam|honeypot|rug|blacklist|unsafe|fake/.test(x))) return false;
+  return true;
+}
+
+function isMigrated(t: LaunchToken): boolean {
+  const age = Date.now() - t.createdAt;
+  const text = `${t.name} ${t.ticker} ${(t.tags ?? []).join(" ")}`.toLowerCase();
+  return (
+    isSafeToken(t) &&
+    (t.venue === "pumpswap" || t.venue === "raydium" || t.venue === "meteora" ||
+     /pump|migrated|graduate|graduated|bonding/i.test(text)) &&
+    age >= 0 && age <= 72 * 60 * 60 * 1000 &&
+    (t.liquidityUsd ?? 0) >= 15_000
+  );
+}
+
+/* ═══════════════════════ API Helpers ═══════════════════════ */
+
+async function fetchDexScreenerBoosted(): Promise<LaunchToken[]> {
+  try {
+    const res = await fetch("https://api.dexscreener.com/token-boosts/top/v1");
+    if (!res.ok) return [];
+    const data = await res.json();
+    const solTokens = (Array.isArray(data) ? data : [])
+      .filter((t: any) => t.chainId === "solana")
+      .slice(0, 20);
+
+    const tokens: LaunchToken[] = [];
+    // Batch fetch details
+    const addresses = solTokens.map((t: any) => t.tokenAddress).filter(Boolean);
+    const batchSize = 5;
+    for (let i = 0; i < addresses.length; i += batchSize) {
+      const batch = addresses.slice(i, i + batchSize);
+      const promises = batch.map(async (addr: string) => {
+        try {
+          const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${addr}`);
+          if (!r.ok) return null;
+          const d = await r.json();
+          const pairs = Array.isArray(d) ? d : d?.pairs || [];
+          const pair = pairs[0];
+          if (!pair) return null;
+          const boost = solTokens.find((t: any) => t.tokenAddress === addr);
+          return pairToToken(pair, boost?.icon, "boost");
+        } catch { return null; }
+      });
+      const results = await Promise.all(promises);
+      results.forEach(t => { if (t) tokens.push(t); });
+    }
+    return tokens;
+  } catch { return []; }
+}
+
+async function fetchDexScreenerLatest(): Promise<LaunchToken[]> {
+  try {
+    const res = await fetch("https://api.dexscreener.com/token-profiles/latest/v1");
+    if (!res.ok) return [];
+    const data = await res.json();
+    const solTokens = (Array.isArray(data) ? data : [])
+      .filter((t: any) => t.chainId === "solana")
+      .slice(0, 20);
+
+    const tokens: LaunchToken[] = [];
+    const addresses = solTokens.map((t: any) => t.tokenAddress).filter(Boolean);
+    const batchSize = 5;
+    for (let i = 0; i < addresses.length; i += batchSize) {
+      const batch = addresses.slice(i, i + batchSize);
+      const promises = batch.map(async (addr: string) => {
+        try {
+          const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${addr}`);
+          if (!r.ok) return null;
+          const d = await r.json();
+          const pairs = Array.isArray(d) ? d : d?.pairs || [];
+          const pair = pairs[0];
+          if (!pair) return null;
+          const profile = solTokens.find((t: any) => t.tokenAddress === addr);
+          return pairToToken(pair, profile?.icon, "dex");
+        } catch { return null; }
+      });
+      const results = await Promise.all(promises);
+      results.forEach(t => { if (t) tokens.push(t); });
+    }
+    return tokens;
+  } catch { return []; }
+}
+
+async function searchDexScreener(query: string): Promise<LaunchToken[]> {
+  try {
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const pairs = (data?.pairs || []).filter((p: any) => p.chainId === "solana").slice(0, 20);
+    return pairs.map((p: any) => pairToToken(p, p.info?.imageUrl, "dex"));
+  } catch { return []; }
+}
+
+async function fetchSubmissions(userId: string | null): Promise<LaunchToken[]> {
+  try {
+    const { data, error } = await supabase
+      .from("pump_v5_submissions")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error || !data) return [];
+    return data
+      .filter((r: any) => {
+        const status = String(r.status ?? "approved").toLowerCase();
+        return status === "approved" || status === "live" || (!!userId && r.user_id === userId);
+      })
+      .map((r: any) => submissionToToken(r));
+  } catch { return []; }
+}
+
+function pairToToken(pair: any, icon?: string, source: "dex" | "boost" = "dex"): LaunchToken {
+  const created = pair.pairCreatedAt ? new Date(pair.pairCreatedAt).getTime() : Date.now();
+  const dexId = pair.dexId?.toLowerCase() ?? "";
+  let venue = "other";
+  if (dexId.includes("pump")) venue = "pumpfun";
+  else if (dexId.includes("raydium")) venue = "raydium";
+  else if (dexId.includes("meteora")) venue = "meteora";
+  else if (dexId.includes("moonshot")) venue = "moonshot";
+
+  return {
+    id: pair.baseToken?.address || pair.pairAddress || Math.random().toString(),
+    name: pair.baseToken?.name || "Unknown",
+    ticker: (pair.baseToken?.symbol || "???").replace("$", "").toUpperCase(),
+    contract: pair.baseToken?.address || "",
+    logoUrl: icon || pair.info?.imageUrl || null,
+    venue,
+    status: "live",
+    tags: [],
+    featured: source === "boost",
+    hot: (pair.volume?.h24 || 0) > 500_000,
+    verified: false,
+    createdAt: created,
+    ownerId: null,
+    price: parseFloat(pair.priceUsd || "0") || null,
+    change24hPct: pair.priceChange?.h24 ?? null,
+    liquidityUsd: pair.liquidity?.usd ?? null,
+    marketCapUsd: pair.marketCap || pair.fdv || null,
+    volume24hUsd: pair.volume?.h24 ?? null,
+    holders: null,
+    pairAddress: pair.pairAddress || null,
+    txns24h: (pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0),
+    upvotes: 0,
+    watchers: 0,
+    source,
+  };
+}
+
+function submissionToToken(row: any): LaunchToken {
+  const tags = Array.isArray(row.tags) ? row.tags.map(String) : [];
+  const venueTag = tags.find((t: string) => t.toLowerCase().startsWith("venue:"));
+  const venue = venueTag?.slice(6) ?? row.launch_platform ?? "other";
+  return {
+    id: row.id || row.contract_address,
+    name: row.token_name || "Unnamed",
+    ticker: (row.symbol || "TOKEN").replace("$", "").toUpperCase(),
+    contract: row.contract_address || "",
+    logoUrl: (row.logo_url && !row.logo_url.startsWith("file:")) ? row.logo_url : null,
+    venue,
+    status: row.status || "approved",
+    tags: tags.filter((t: string) => !t.toLowerCase().startsWith("venue:")),
+    featured: Boolean(row.is_featured),
+    hot: Boolean(row.is_hot),
+    verified: Boolean(row.is_verified),
+    createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+    ownerId: row.user_id || null,
+    price: row.price_usd ? Number(row.price_usd) : null,
+    change24hPct: row.change_24h_pct != null ? Number(row.change_24h_pct) : null,
+    liquidityUsd: row.liquidity_usd ? Number(row.liquidity_usd) : null,
+    marketCapUsd: row.market_cap ? Number(row.market_cap) : null,
+    volume24hUsd: row.volume_24h_usd ? Number(row.volume_24h_usd) : null,
+    holders: row.holders ?? row.holder_count ?? null,
+    pairAddress: null,
+    txns24h: 0,
+    upvotes: row.upvotes ?? 0,
+    watchers: row.watchers ?? 0,
+    source: "submission",
+  };
+}
+
+function mergeTokens(lists: LaunchToken[][]): LaunchToken[] {
+  const map = new Map<string, LaunchToken>();
+  for (const list of lists) {
+    for (const t of list) {
+      const key = t.contract || t.id;
+      if (!key) continue;
+      const existing = map.get(key);
+      if (existing) {
+        // Merge: prefer non-null values from newer source
+        map.set(key, {
+          ...existing,
+          ...t,
+          price: t.price ?? existing.price,
+          change24hPct: t.change24hPct ?? existing.change24hPct,
+          volume24hUsd: t.volume24hUsd ?? existing.volume24hUsd,
+          liquidityUsd: t.liquidityUsd ?? existing.liquidityUsd,
+          marketCapUsd: t.marketCapUsd ?? existing.marketCapUsd,
+          featured: t.featured || existing.featured,
+          hot: t.hot || existing.hot,
+        });
+      } else {
+        map.set(key, t);
+      }
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function tokenToJup(t: LaunchToken): JupTokenInfo {
+  return {
+    id: t.contract,
+    name: t.name,
+    symbol: t.ticker,
+    icon: t.logoUrl ?? undefined,
+    decimals: 9,
+    usdPrice: t.price ?? 0,
+    fdv: t.marketCapUsd ?? undefined,
+    liquidity: t.liquidityUsd ?? undefined,
+    pairAddress: t.pairAddress ?? undefined,
+    stats24h: { priceChange: t.change24hPct ?? undefined },
+    firstPool: { createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : undefined },
+  };
+}
+
+function tokenAge(createdAt: number): string {
+  const ms = Math.max(0, Date.now() - createdAt);
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 60) return `${Math.max(1, mins)}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+/* ═══════════════════════ Component ═══════════════════════ */
 
 const Discover = ({ inline = false }: { inline?: boolean }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
-  const [activities, setActivities] = useState<SocialActivity[]>([]);
-  const [trendingTokens, setTrendingTokens] = useState<TrendingToken[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<LeaderboardUser[]>([]);
-  const [sortBy, setSortBy] = useState<string>("total_pnl");
+  const [allTokens, setAllTokens] = useState<LaunchToken[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingTrending, setLoadingTrending] = useState(true);
-  // followState: map of userId -> boolean (true = currently following)
-  const [followState, setFollowState] = useState<Record<string, boolean>>({});
-  const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
+  const [refreshing, setRefreshing] = useState(false);
+  const [section, setSection] = useState<Section>("all");
+  const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<LaunchToken[] | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchLeaderboard();
-    fetchSocialFeed();
-    fetchTrendingTokens();
-    subscribeToActivity();
-  }, [sortBy]);
-
-  // Load which users the current user already follows
-  useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("followers")
-      .select("followee_id")
-      .eq("follower_id", user.id)
-      .then(({ data }) => {
-        const state: Record<string, boolean> = {};
-        data?.forEach((r: any) => { state[r.followee_id] = true; });
-        setFollowState(state);
-      });
-  }, [user]);
-
-  const fetchTrendingTokens = async () => {
-    setLoadingTrending(true);
+  const fetchAll = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const response = await fetch("https://api.dexscreener.com/token-boosts/top/v1");
-      if (response.ok) {
-        const data = await response.json();
-        const solanaTokens = data.filter((t: any) => t.chainId === "solana").slice(0, 8);
-        
-        const tokens: TrendingToken[] = [];
-        for (const t of solanaTokens) {
-          try {
-            const detailRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${t.tokenAddress}`);
-            if (detailRes.ok) {
-              const detailData = await detailRes.json();
-              const pair = detailData.pairs?.[0];
-              if (pair) {
-                tokens.push({
-                  name: pair.baseToken?.name || "Unknown",
-                  symbol: pair.baseToken?.symbol || "???",
-                  address: t.tokenAddress,
-                  price: parseFloat(pair.priceUsd || "0"),
-                  priceChange24h: pair.priceChange?.h24 || 0,
-                  volume24h: pair.volume?.h24 || 0,
-                  liquidity: pair.liquidity?.usd || 0,
-                  marketCap: pair.marketCap || 0,
-                  imageUrl: t.icon || pair.info?.imageUrl,
-                });
-              }
-            }
-          } catch {}
-        }
-        setTrendingTokens(tokens);
-      }
-    } catch (error) {
-      console.error("Error fetching trending:", error);
-    } finally {
-      setLoadingTrending(false);
-    }
-  };
-
-  const fetchLeaderboard = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("user_id, username, avatar_url, total_pnl, win_rate, trades_count, followers_count, badge, bio")
-        .order(sortBy, { ascending: false, nullsFirst: false })
-        .limit(50);
-      if (error) throw error;
-      setLeaderboard(data || []);
-    } catch (error) {
-      console.error("Error fetching leaderboard:", error);
+      const [boosted, latest, submissions] = await Promise.allSettled([
+        fetchDexScreenerBoosted(),
+        fetchDexScreenerLatest(),
+        fetchSubmissions(user?.id ?? null),
+      ]);
+      const b = boosted.status === "fulfilled" ? boosted.value : [];
+      const l = latest.status === "fulfilled" ? latest.value : [];
+      const s = submissions.status === "fulfilled" ? submissions.value : [];
+      setAllTokens(mergeTokens([b, l, s]));
+    } catch (e) {
+      console.error("[discover] fetch failed", e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [user?.id]);
 
-  const fetchSocialFeed = async () => {
-    try {
-      const { data: activityData, error } = await supabase
-        .from("user_activity")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(30);
-      if (error) throw error;
-      const userIds = [...new Set(activityData?.map(a => a.user_id) || [])];
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("user_id, username, avatar_url")
-        .in("user_id", userIds);
-      const profilesMap = new Map(profilesData?.map(p => [p.user_id, p]) || []);
-      setActivities((activityData || []).map(a => ({
-        ...a,
-        username: profilesMap.get(a.user_id)?.username,
-        avatar_url: profilesMap.get(a.user_id)?.avatar_url,
-      })));
-    } catch (error) {
-      console.error("Error fetching social feed:", error);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Search handler
+  useEffect(() => {
+    if (!query.trim()) { setSearchResults(null); return; }
+    const timeout = setTimeout(async () => {
+      const results = await searchDexScreener(query.trim());
+      setSearchResults(results);
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [query]);
+
+  // Filtered display
+  const safeTokens = useMemo(() => allTokens.filter(isSafeToken), [allTokens]);
+
+  const filtered = useMemo(() => {
+    if (searchResults) return searchResults;
+    let items = safeTokens.slice();
+    switch (section) {
+      case "featured": items = items.filter(t => t.featured); break;
+      case "hot": items = items.filter(t => heatScore(t) > 0).sort((a, b) => heatScore(b) - heatScore(a)); break;
+      case "new": items = items.sort((a, b) => b.createdAt - a.createdAt).slice(0, 30); break;
+      case "migrated": items = items.filter(isMigrated).sort((a, b) => b.createdAt - a.createdAt); break;
+      case "gainers": items = items.filter(t => (t.change24hPct ?? 0) > 0).sort((a, b) => (b.change24hPct ?? 0) - (a.change24hPct ?? 0)); break;
+      case "losers": items = items.filter(t => (t.change24hPct ?? 0) < 0).sort((a, b) => (a.change24hPct ?? 0) - (b.change24hPct ?? 0)); break;
+      case "volume": items = items.filter(t => (t.volume24hUsd ?? 0) > 0).sort((a, b) => (b.volume24hUsd ?? 0) - (a.volume24hUsd ?? 0)); break;
+      case "whales": items = items.filter(t => (t.holders ?? 0) > 100 || (t.volume24hUsd ?? 0) > 50_000).sort((a, b) => (b.volume24hUsd ?? 0) - (a.volume24hUsd ?? 0)); break;
+      case "mine": items = allTokens.filter(t => !!user?.id && t.ownerId === user.id); break;
+      default: items = items.sort((a, b) => heatScore(b) - heatScore(a)); break;
     }
+    return items;
+  }, [safeTokens, allTokens, section, searchResults, user?.id]);
+
+  // Precomputed carousels
+  const featuredSpotlight = useMemo(
+    () => safeTokens.filter(t => t.featured || (t.change24hPct ?? 0) >= 50 && (t.volume24hUsd ?? 0) >= 50_000)
+      .sort((a, b) => (b.change24hPct ?? 0) - (a.change24hPct ?? 0)).slice(0, 8),
+    [safeTokens]
+  );
+  const topGainers = useMemo(
+    () => safeTokens.filter(t => (t.change24hPct ?? 0) > 0).sort((a, b) => (b.change24hPct ?? 0) - (a.change24hPct ?? 0)).slice(0, 5),
+    [safeTokens]
+  );
+  const topLosers = useMemo(
+    () => safeTokens.filter(t => (t.change24hPct ?? 0) < 0).sort((a, b) => (a.change24hPct ?? 0) - (b.change24hPct ?? 0)).slice(0, 5),
+    [safeTokens]
+  );
+  const stats = useMemo(() => ({
+    total: safeTokens.length,
+    hot: safeTokens.filter(t => t.hot).length,
+    featured: safeTokens.filter(t => t.featured).length,
+    totalVol: safeTokens.reduce((s, t) => s + (t.volume24hUsd ?? 0), 0),
+    totalLiq: safeTokens.reduce((s, t) => s + (t.liquidityUsd ?? 0), 0),
+  }), [safeTokens]);
+
+  const copyCA = (addr: string) => {
+    navigator.clipboard.writeText(addr);
+    setCopied(addr);
+    setTimeout(() => setCopied(null), 1500);
+    toast.success("Contract copied");
   };
 
-  const subscribeToActivity = () => {
-    const channel = supabase
-      .channel("social-activity")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "user_activity" },
-        async (payload) => {
-          const newActivity = payload.new as SocialActivity;
-          const { data: profile } = await supabase.from("profiles").select("username, avatar_url").eq("user_id", newActivity.user_id).single();
-          setActivities(prev => [{ ...newActivity, username: profile?.username, avatar_url: profile?.avatar_url }, ...prev.slice(0, 29)]);
-        })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  };
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) { setSearchResults([]); return; }
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("user_id, username, avatar_url, total_pnl, win_rate, trades_count, followers_count, badge, bio")
-        .ilike("username", `%${searchQuery}%`)
-        .limit(20);
-      if (error) throw error;
-      setSearchResults(data || []);
-    } catch (error) {
-      console.error("Error searching:", error);
-    }
-  };
-
-  const handleFollow = async (userId: string) => {
-    if (!user) { navigate("/auth"); return; }
-    if (userId === user.id) return;
-    setFollowLoading(prev => ({ ...prev, [userId]: true }));
-    try {
-      const already = followState[userId];
-      if (already) {
-        await supabase.from("followers").delete()
-          .eq("follower_id", user.id).eq("followee_id", userId);
-        setFollowState(prev => ({ ...prev, [userId]: false }));
-        toast.success("Unfollowed");
-      } else {
-        await supabase.from("followers").insert({ follower_id: user.id, followee_id: userId });
-        setFollowState(prev => ({ ...prev, [userId]: true }));
-        toast.success("Following! 🎉");
-      }
-    } catch { toast.error("Failed to update follow status"); }
-    finally { setFollowLoading(prev => ({ ...prev, [userId]: false })); }
-  };
-
-  const formatNum = (n: number) => {
-    if (n >= 1e9) return `$${(n/1e9).toFixed(1)}B`;
-    if (n >= 1e6) return `$${(n/1e6).toFixed(1)}M`;
-    if (n >= 1e3) return `$${(n/1e3).toFixed(1)}K`;
-    return `$${n.toFixed(2)}`;
-  };
-
-  const displayList = searchQuery && searchResults.length > 0 ? searchResults : leaderboard;
+  const isFiltering = !!searchResults || section !== "all";
 
   const content = (
     <>
       {!inline && (
-        <PageHeader title="Discover" description="Trending tokens, top traders & live activity">
+        <PageHeader title="LaunchPad" description="Token discovery, trending launches & market intel">
           <div className="flex items-center gap-2">
-            <Badge className="bg-og-cyan/20 text-og-cyan border-og-cyan/30 gap-1">
-              <Activity className="h-3 w-3" /> Live
+            <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 font-mono text-[9px]">
+              <Activity className="h-3 w-3 animate-pulse" /> LIVE
             </Badge>
+            <span className="text-[10px] text-white/20 font-mono">{stats.total} tokens</span>
           </div>
         </PageHeader>
       )}
 
       <div className={inline ? "" : "h-[calc(100vh-120px)] overflow-y-auto"}>
-        <div className="p-4 lg:p-6 space-y-6">
-          {/* Trending Tokens Section */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold font-display flex items-center gap-2">
-                <Flame className="h-5 w-5 text-orange-500" /> Trending Tokens
-              </h2>
-              <Button variant="ghost" size="sm" onClick={fetchTrendingTokens} className="gap-1.5 text-xs">
-                <RefreshCw className={`h-3.5 w-3.5 ${loadingTrending ? 'animate-spin' : ''}`} /> Refresh
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {(loadingTrending ? Array(4).fill(null) : trendingTokens.slice(0, 8)).map((token, i) => (
-                <Card key={i} className="og-glass-card hover:border-og-cyan/20 transition-all hover:scale-[1.02] cursor-pointer group"
-                  onClick={() => { if (token) { try { localStorage.setItem("og_active_mint", token.address); } catch {} navigate(`/scanner`); } }}>
-                  <CardContent className="p-4">
-                    {!token ? (
-                      <div className="animate-pulse space-y-2">
-                        <div className="h-8 w-8 rounded-xl bg-muted" />
-                        <div className="h-4 w-20 rounded bg-muted" />
-                        <div className="h-3 w-16 rounded bg-muted" />
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2 mb-3">
-                          {token.imageUrl ? (
-                            <img src={token.imageUrl} alt="" className="h-8 w-8 rounded-xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                          ) : (
-                            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-og-cyan to-accent flex items-center justify-center text-xs font-bold">
-                              {token.symbol?.charAt(0)}
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-xs truncate">{token.symbol}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{token.name}</p>
-                          </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-mono">{token.price < 0.01 ? `$${token.price.toFixed(8)}` : formatNum(token.price)}</span>
-                            <span className={`text-xs font-bold flex items-center gap-0.5 ${token.priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                              {token.priceChange24h >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                              {Math.abs(token.priceChange24h).toFixed(1)}%
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-[10px] text-muted-foreground">
-                            <span>Vol: {formatNum(token.volume24h)}</span>
-                            <span>MC: {formatNum(token.marketCap)}</span>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+        <div className="p-4 lg:p-6 space-y-5">
 
-          {/* Search */}
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search traders by @username..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="pl-10 rounded-xl"
-              />
-            </div>
-            <Button onClick={handleSearch} className="rounded-xl">Search</Button>
-          </div>
-
-          <Tabs defaultValue="leaderboard">
-            <TabsList className="grid w-full max-w-lg grid-cols-3 bg-white/[0.04] p-1 rounded-xl">
-              <TabsTrigger value="leaderboard" className="rounded-lg gap-1.5">
-                <Trophy className="h-4 w-4" /> Leaderboard
-              </TabsTrigger>
-              <TabsTrigger value="whale" className="rounded-lg gap-1.5">
-                <Eye className="h-4 w-4" /> Whale Watch
-              </TabsTrigger>
-              <TabsTrigger value="feed" className="rounded-lg gap-1.5">
-                <Zap className="h-4 w-4" /> Live Feed
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="leaderboard" className="mt-4">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-sm text-muted-foreground">
-                  {searchQuery ? `${searchResults.length} results` : "Top Traders"}
-                </p>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[180px] rounded-xl">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="total_pnl">Portfolio Value</SelectItem>
-                    <SelectItem value="win_rate">Win Rate</SelectItem>
-                    <SelectItem value="followers_count">Followers</SelectItem>
-                    <SelectItem value="trades_count">Trades</SelectItem>
-                  </SelectContent>
-                </Select>
+          {/* ── Stats bar ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { label: "TOKENS", value: String(stats.total), icon: Target, color: "text-primary" },
+              { label: "24H VOLUME", value: fmtUsd(stats.totalVol), icon: BarChart3, color: "text-emerald-400" },
+              { label: "LIQUIDITY", value: fmtUsd(stats.totalLiq), icon: Waves, color: "text-cyan-400" },
+              { label: "HOT", value: String(stats.hot), icon: Flame, color: "text-orange-400" },
+            ].map((s, i) => (
+              <div key={i} className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <s.icon className={cn("h-3 w-3", s.color)} />
+                  <span className="text-[8px] text-white/20 uppercase tracking-wider font-mono">{s.label}</span>
+                </div>
+                <p className="text-sm font-black text-white font-mono">{s.value}</p>
               </div>
+            ))}
+          </div>
 
-              <Card className="og-glass-card">
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[500px]">
-                    {loading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-og-cyan" />
-                      </div>
-                    ) : displayList.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">No traders found</p>
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-border/30">
-                        {displayList.map((trader, index) => (
-                          <div key={trader.user_id} className="p-4 hover:bg-white/[0.03] transition-colors cursor-pointer" onClick={() => navigate(`/profile/${trader.user_id}`)}>
-                            <div className="flex items-center gap-3">
-                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
-                                index === 0 ? "bg-yellow-500 text-black" : index === 1 ? "bg-gray-400 text-black" : index === 2 ? "bg-amber-700 text-white" : "bg-muted text-muted-foreground"
-                              }`}>
-                                {index + 1}
-                              </div>
-                              <div className="shrink-0">{renderAvatar(trader.avatar_url, trader.username, "sm")}</div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-semibold text-sm truncate">@{trader.username || "anon"}</p>
-                                  {trader.badge && <Badge variant="outline" className="text-[9px]">{trader.badge}</Badge>}
-                                </div>
-                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                                  <span className={trader.total_pnl >= 0 ? "text-green-500" : "text-red-500"}>
-                                    ${(trader.total_pnl || 0).toFixed(2)}
-                                  </span>
-                                  <span>{(trader.win_rate || 0).toFixed(0)}% WR</span>
-                                  <span>{trader.trades_count || 0} trades</span>
-                                </div>
-                              </div>
-                              {trader.user_id !== user?.id && (
-                                <Button
-                                  variant={followState[trader.user_id] ? "outline" : "default"}
-                                  size="sm"
-                                  disabled={followLoading[trader.user_id]}
-                                  className={`h-7 text-xs rounded-lg shrink-0 transition-all ${followState[trader.user_id] ? "border-white/20 text-white/60 hover:border-red-500/40 hover:text-red-400" : ""}`}
-                                  onClick={(e) => { e.stopPropagation(); handleFollow(trader.user_id); }}
-                                >
-                                  {followLoading[trader.user_id] ? "..." : followState[trader.user_id] ? "Following" : "Follow"}
-                                </Button>
-                              )}
-                            </div>
+          {/* ── Featured spotlight carousel ── */}
+          {!isFiltering && featuredSpotlight.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Star className="h-4 w-4 text-yellow-400" />
+                <h3 className="text-xs font-black text-white/70 uppercase tracking-wider">Spotlight</h3>
+                <div className="h-px flex-1 bg-white/[0.06]" />
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                {featuredSpotlight.map(t => (
+                  <CoinDetailDialog key={t.id} token={tokenToJup(t)} trigger={
+                    <div className="shrink-0 w-[200px] rounded-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] p-3 cursor-pointer hover:border-primary/30 transition-all group">
+                      <div className="flex items-center gap-2 mb-2">
+                        {t.logoUrl ? (
+                          <img src={t.logoUrl} className="w-8 h-8 rounded-full object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
+                            {t.ticker?.charAt(0)}
                           </div>
-                        ))}
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-black text-white truncate">${t.ticker}</p>
+                          <p className="text-[9px] text-white/20 truncate">{t.name}</p>
+                        </div>
+                        {t.featured && <Star className="h-3 w-3 text-yellow-400 fill-yellow-400 shrink-0" />}
                       </div>
-                    )}
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono text-white/60">
+                          {t.price != null ? fmtUsd(t.price) : "—"}
+                        </span>
+                        <span className={cn("text-[10px] font-bold flex items-center gap-0.5",
+                          (t.change24hPct ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
+                        )}>
+                          {(t.change24hPct ?? 0) >= 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+                          {Math.abs(t.change24hPct ?? 0).toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between mt-1.5 text-[8px] text-white/15 font-mono">
+                        <span>MC {fmtUsd(t.marketCapUsd)}</span>
+                        <span>Vol {fmtUsd(t.volume24hUsd)}</span>
+                      </div>
+                    </div>
+                  } />
+                ))}
+              </div>
+            </div>
+          )}
 
-            <TabsContent value="whale" className="mt-4">
-              <Card className="og-glass-card-premium">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Eye className="h-5 w-5 text-[#22d3ee]" /> Whale Tracking
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <Card className="og-glass-card">
-                      <CardContent className="p-5 text-center">
-                        <div className="p-4 rounded-2xl bg-blue-500/10 inline-flex mb-3">
-                          <span className="text-4xl">🐋</span>
-                        </div>
-                        <h3 className="font-bold mb-1">Whale Alerts</h3>
-                        <p className="text-xs text-muted-foreground mb-3">Get notified when whales make large transactions on Solana</p>
-                        <Badge className="bg-accent/20 text-accent border-accent/30">Active Monitoring</Badge>
-                      </CardContent>
-                    </Card>
-                    <Card className="og-glass-card">
-                      <CardContent className="p-5 text-center">
-                        <div className="p-4 rounded-2xl bg-purple-500/10 inline-flex mb-3">
-                          <Sparkles className="h-10 w-10 text-purple-400" />
-                        </div>
-                        <h3 className="font-bold mb-1">AI Insights</h3>
-                        <p className="text-xs text-muted-foreground mb-3">AI-powered market analysis and token recommendations</p>
-                        <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Active — Premium</Badge>
-                      </CardContent>
-                    </Card>
-                    <Card className="og-glass-card">
-                      <CardContent className="p-5 text-center">
-                        <div className="p-4 rounded-2xl bg-orange-500/10 inline-flex mb-3">
-                          <AlertTriangle className="h-10 w-10 text-orange-400" />
-                        </div>
-                        <h3 className="font-bold mb-1">Risk Scanner</h3>
-                        <p className="text-xs text-muted-foreground mb-3">Automatic rug pull and risk detection for new tokens</p>
-                        <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">Active</Badge>
-                      </CardContent>
-                    </Card>
-                    <Card className="og-glass-card">
-                      <CardContent className="p-5 text-center">
-                        <div className="p-4 rounded-2xl bg-green-500/10 inline-flex mb-3">
-                          <BarChart3 className="h-10 w-10 text-green-400" />
-                        </div>
-                        <h3 className="font-bold mb-1">Market Trends</h3>
-                        <p className="text-xs text-muted-foreground mb-3">Real-time market trends and movement alerts</p>
-                        <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Live Data</Badge>
-                      </CardContent>
-                    </Card>
+          {/* ── Gainers / Losers mini strip ── */}
+          {!isFiltering && (topGainers.length > 0 || topLosers.length > 0) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {topGainers.length > 0 && (
+                <div className="rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <TrendingUp className="h-3 w-3 text-emerald-400" />
+                    <span className="text-[9px] font-black text-emerald-400/70 uppercase tracking-wider">Top Gainers</span>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="feed" className="mt-4">
-              <Card className="og-glass-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Zap className="h-5 w-5 text-og-cyan animate-pulse" /> Live Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[400px]">
-                    {activities.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">No activity yet</p>
-                        <p className="text-xs text-muted-foreground mt-1">Activity will appear here as users interact</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {activities.map(activity => (
-                          <div key={activity.id} className="p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.04] transition-colors cursor-pointer" onClick={() => navigate(`/profile/${activity.user_id}`)}>
-                            <div className="flex items-center gap-3">
-                              <div className="shrink-0">{renderAvatar(activity.avatar_url, activity.username, "sm")}</div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm">@{activity.username || "anon"}</p>
-                                <p className="text-xs text-muted-foreground truncate">{activity.title}</p>
-                              </div>
-                              <span className="text-[10px] text-muted-foreground shrink-0">
-                                {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
-                              </span>
-                            </div>
+                  <div className="space-y-1.5">
+                    {topGainers.map(t => (
+                      <CoinDetailDialog key={t.id} token={tokenToJup(t)} trigger={
+                        <div className="flex items-center justify-between py-1 cursor-pointer hover:bg-white/[0.02] rounded px-1 -mx-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {t.logoUrl ? (
+                              <img src={t.logoUrl} className="w-5 h-5 rounded-full" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-white/[0.06] text-[7px] font-bold text-white/20 flex items-center justify-center">{t.ticker?.[0]}</div>
+                            )}
+                            <span className="text-[10px] font-bold text-white truncate">${t.ticker}</span>
                           </div>
-                        ))}
+                          <span className="text-[10px] font-bold text-emerald-400">+{(t.change24hPct ?? 0).toFixed(1)}%</span>
+                        </div>
+                      } />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {topLosers.length > 0 && (
+                <div className="rounded-xl bg-red-500/[0.03] border border-red-500/10 p-3">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <TrendingDown className="h-3 w-3 text-red-400" />
+                    <span className="text-[9px] font-black text-red-400/70 uppercase tracking-wider">Top Losers</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {topLosers.map(t => (
+                      <CoinDetailDialog key={t.id} token={tokenToJup(t)} trigger={
+                        <div className="flex items-center justify-between py-1 cursor-pointer hover:bg-white/[0.02] rounded px-1 -mx-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {t.logoUrl ? (
+                              <img src={t.logoUrl} className="w-5 h-5 rounded-full" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-white/[0.06] text-[7px] font-bold text-white/20 flex items-center justify-center">{t.ticker?.[0]}</div>
+                            )}
+                            <span className="text-[10px] font-bold text-white truncate">${t.ticker}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-red-400">{(t.change24hPct ?? 0).toFixed(1)}%</span>
+                        </div>
+                      } />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Search ── */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20" />
+            <Input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search ticker, name, or paste contract address..."
+              className="pl-10 pr-10 rounded-xl bg-white/[0.02] border-white/[0.08] font-mono text-xs placeholder:text-white/15"
+            />
+            {query && (
+              <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="h-3.5 w-3.5 text-white/20 hover:text-white/40" />
+              </button>
+            )}
+          </div>
+
+          {/* ── Section tabs ── */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+            {SECTIONS.map(s => {
+              const active = section === s.id && !searchResults;
+              return (
+                <button key={s.id} onClick={() => { setSection(s.id); setQuery(""); setSearchResults(null); }}
+                  className={cn(
+                    "shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold transition-all whitespace-nowrap border",
+                    active
+                      ? "bg-primary/10 text-primary border-primary/20"
+                      : "text-white/20 hover:text-white/40 border-transparent hover:border-white/[0.06]"
+                  )}>
+                  <s.Icon className="h-3 w-3" />
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Filter header ── */}
+          {isFiltering && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white/50">
+                  {searchResults ? `${filtered.length} results for "${query}"` : `${filtered.length} tokens`}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => fetchAll(true)} className="flex items-center gap-1 text-[10px] text-white/20 hover:text-white/40">
+                  <RefreshCw className={cn("h-3 w-3", refreshing && "animate-spin")} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Token list ── */}
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.01] overflow-hidden">
+            {/* Header */}
+            <div className="grid grid-cols-[1fr_80px_80px_70px] sm:grid-cols-[1fr_90px_90px_90px_70px_32px] gap-1 px-3 py-2.5 border-b border-white/[0.06]">
+              <span className="text-[8px] text-white/15 uppercase tracking-wider font-mono">Token</span>
+              <span className="text-[8px] text-white/15 uppercase tracking-wider font-mono text-right">Price</span>
+              <span className="text-[8px] text-white/15 uppercase tracking-wider font-mono text-right hidden sm:block">MCap</span>
+              <span className="text-[8px] text-white/15 uppercase tracking-wider font-mono text-right">Volume</span>
+              <span className="text-[8px] text-white/15 uppercase tracking-wider font-mono text-right">24h</span>
+              <span className="hidden sm:block" />
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="h-6 w-6 text-primary/30 animate-spin" />
+                  <span className="text-[10px] text-white/15 font-mono">SCANNING...</span>
+                </div>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="py-16 text-center">
+                <Rocket className="h-8 w-8 text-white/[0.06] mx-auto mb-3" />
+                <p className="text-xs text-white/20 font-mono">
+                  {searchResults ? "No tokens match your search" : "No tokens in this section"}
+                </p>
+                {isFiltering && (
+                  <button onClick={() => { setSection("all"); setQuery(""); setSearchResults(null); }}
+                    className="mt-2 text-[10px] text-primary hover:text-primary/80">
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="divide-y divide-white/[0.03] max-h-[600px] overflow-y-auto">
+                {filtered.map((t, i) => (
+                  <CoinDetailDialog key={t.id + i} token={tokenToJup(t)} trigger={
+                    <div className="w-full grid grid-cols-[1fr_80px_80px_70px] sm:grid-cols-[1fr_90px_90px_90px_70px_32px] gap-1 px-3 py-2.5 hover:bg-white/[0.02] transition-colors text-left items-center cursor-pointer group">
+                      {/* Token info */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[9px] text-white/10 w-4 font-mono shrink-0">{i + 1}</span>
+                        {t.logoUrl ? (
+                          <img src={t.logoUrl} className="w-7 h-7 rounded-full shrink-0 object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary shrink-0">
+                            {t.ticker?.charAt(0)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-[11px] font-black text-white truncate">${t.ticker}</p>
+                            {t.featured && <Star className="h-2.5 w-2.5 text-yellow-400 fill-yellow-400 shrink-0" />}
+                            {t.hot && <Flame className="h-2.5 w-2.5 text-orange-400 shrink-0" />}
+                            {t.verified && <Shield className="h-2.5 w-2.5 text-primary shrink-0" />}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-[9px] text-white/15 truncate">{t.name}</p>
+                            {t.createdAt && <span className="text-[8px] text-white/10 shrink-0">{tokenAge(t.createdAt)}</span>}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                      {/* Price */}
+                      <span className="text-[10px] text-white/60 text-right font-mono">
+                        {t.price != null && t.price > 0 ? (t.price < 0.01 ? `$${t.price.toFixed(8)}` : fmtUsd(t.price)) : "—"}
+                      </span>
+                      {/* MCap */}
+                      <span className="text-[10px] text-white/40 text-right hidden sm:block font-mono">
+                        {fmtUsd(t.marketCapUsd)}
+                      </span>
+                      {/* Volume */}
+                      <span className="text-[10px] text-white/40 text-right font-mono">
+                        {fmtUsd(t.volume24hUsd)}
+                      </span>
+                      {/* 24h change */}
+                      <span className={cn("text-[10px] font-bold text-right flex items-center justify-end gap-0.5",
+                        (t.change24hPct ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"
+                      )}>
+                        {t.change24hPct != null ? (
+                          <>
+                            {t.change24hPct >= 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+                            {Math.abs(t.change24hPct).toFixed(1)}%
+                          </>
+                        ) : "—"}
+                      </span>
+                      {/* Copy CA */}
+                      <button
+                        className="hidden sm:flex h-6 w-6 items-center justify-center rounded-md bg-white/[0.03] border border-white/[0.06] opacity-0 group-hover:opacity-100 transition-all hover:bg-white/[0.08]"
+                        onClick={(e) => { e.stopPropagation(); copyCA(t.contract); }}
+                        title="Copy contract address"
+                      >
+                        {copied === t.contract ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3 text-white/30" />}
+                      </button>
+                    </div>
+                  } />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Refresh bar ── */}
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] text-white/10 font-mono">
+              Data: DexScreener + OG Scan submissions
+            </span>
+            <button onClick={() => fetchAll(true)} className="flex items-center gap-1.5 text-[10px] text-white/20 hover:text-primary transition-colors">
+              <RefreshCw className={cn("h-3 w-3", refreshing && "animate-spin")} />
+              <span className="font-mono">Refresh</span>
+            </button>
+          </div>
         </div>
       </div>
     </>
   );
+
   return inline ? content : <AppLayout>{content}</AppLayout>;
 };
 

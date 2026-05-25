@@ -122,9 +122,9 @@ export const BottomNav = () => {
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 select-none">
       {/* Gradient fade above */}
-      <div className="absolute -top-8 left-0 right-0 h-8 bg-gradient-to-t from-[#060c13] to-transparent pointer-events-none" />
+      <div className="absolute -top-8 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none" />
 
-      <div className="relative border-t border-white/[0.07] bg-[#060c13]/95 backdrop-blur-xl overflow-hidden">
+      <div className="relative border-t border-border bg-card/80 backdrop-blur-xl overflow-hidden">
         {/* Top accent line */}
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-og-lime/30 to-transparent" />
 

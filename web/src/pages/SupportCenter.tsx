@@ -194,7 +194,7 @@ const SupportCenter = () => {
       <AppLayout>
         <div className="flex flex-col h-[calc(100vh-60px)] lg:h-screen">
           {/* Header */}
-          <div className="shrink-0 border-b border-border/40 bg-[#070d14]/90 backdrop-blur-xl p-4 flex items-center gap-3">
+          <div className="shrink-0 border-b border-border/40 bg-background/90 backdrop-blur-xl p-4 flex items-center gap-3">
             <button onClick={() => { setActiveTicket(null); setMessages([]); }} className="p-2 rounded-xl bg-white/[0.03] hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-4 w-4" />
             </button>
@@ -278,7 +278,7 @@ const SupportCenter = () => {
           </ScrollArea>
 
           {/* Input */}
-          <div className="shrink-0 p-3 border-t border-border/40 bg-[#070d14]/80 backdrop-blur-xl">
+          <div className="shrink-0 p-3 border-t border-border/40 bg-background/80 backdrop-blur-xl">
             <div className="flex gap-2 max-w-2xl mx-auto">
               <Input
                 placeholder={isAdminUser ? "Reply to user..." : "Type your message..."}

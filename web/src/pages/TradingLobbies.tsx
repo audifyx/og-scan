@@ -224,7 +224,7 @@ const TradingLobbies = () => {
       <AppLayout>
         <div className="flex flex-col h-[calc(100vh-60px)] lg:h-screen">
           {/* Header */}
-          <div className="shrink-0 border-b border-primary/10 bg-[#070d14]/80 backdrop-blur-xl p-3 flex items-center gap-3">
+          <div className="shrink-0 border-b border-primary/10 bg-background/80 backdrop-blur-xl p-3 flex items-center gap-3">
             <button onClick={() => { leaveLobby(); }} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -305,7 +305,7 @@ const TradingLobbies = () => {
           </div>
 
           {/* Mobile tabs */}
-          <div className="flex lg:hidden border-b border-border/20 bg-[#070d14]/60 shrink-0">
+          <div className="flex lg:hidden border-b border-border/20 bg-background/60 shrink-0">
             {[
               { key: "chart", icon: LineChart, label: "Chart" },
               { key: "watchlist", icon: Coins, label: "Watchlist" },

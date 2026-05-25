@@ -372,7 +372,7 @@ const LiveFeed = () => {
                     <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-[10px] uppercase font-black tracking-widest">
                       <SelectValue placeholder="PLATFORM" />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#070d14] border-white/10 text-[10px] font-black uppercase">
+                    <SelectContent className="bg-background border-white/10 text-[10px] font-black uppercase">
                       {LAUNCH_PLATFORMS.map((p) => (
                         <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                       ))}
@@ -384,7 +384,7 @@ const LiveFeed = () => {
                     <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-[10px] uppercase font-black tracking-widest">
                       <SelectValue placeholder="LIQUIDITY" />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#070d14] border-white/10 text-[10px] font-black uppercase">
+                    <SelectContent className="bg-background border-white/10 text-[10px] font-black uppercase">
                       <SelectItem value="0">Any Depth</SelectItem>
                       <SelectItem value="1000">$1K+</SelectItem>
                       <SelectItem value="10000">$10K+</SelectItem>
@@ -569,7 +569,7 @@ const LiveFeed = () => {
                 placeholder="LABEL (OPTIONAL)"
                 className="h-9 w-full rounded-xl bg-white/5 border border-white/10 px-4 text-[10px] font-mono text-white placeholder:text-white/10 focus:border-og-gold/40 transition-all uppercase" />
               <button onClick={addWallet} disabled={addingWallet || !walletInput.trim()}
-                className="w-full h-10 rounded-xl bg-og-gold text-[#070d14] text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all shadow-[0_0_15px_rgba(234,179,8,0.1)] disabled:opacity-40 flex items-center justify-center gap-2">
+                className="w-full h-10 rounded-xl bg-og-gold text-background text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all shadow-[0_0_15px_rgba(234,179,8,0.1)] disabled:opacity-40 flex items-center justify-center gap-2">
                 <Plus className="h-3.5 w-3.5" />
                 {addingWallet ? "Adding..." : "Add to Watchlist"}
               </button>

@@ -33,7 +33,7 @@ const CommunityHub: React.FC = () => {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Sub-tab bar */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.07] bg-[#060c13]/80 px-2 py-1.5 backdrop-blur-lg">
+      <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.07] bg-card/80 px-2 py-1.5 backdrop-blur-lg">
         {SUB_TABS.map((t) => {
           const active = sub === t.id;
           return (

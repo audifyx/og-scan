@@ -1706,7 +1706,7 @@ const ReplayPlayer = ({ space, onClose }: { space: Space; onClose: () => void })
       </div>
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] bg-[#070d14]/80 backdrop-blur-xl z-10 shrink-0 relative">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] bg-background/80 backdrop-blur-xl z-10 shrink-0 relative">
         <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition"><ArrowLeft className="h-4 w-4 text-white/50" /></button>
         <div className="flex-1 min-w-0">
           <h3 className="font-black text-sm text-white truncate">{space.title}</h3>
@@ -2298,7 +2298,7 @@ const Spaces = () => {
             })}
           </div>
           {/* Scroll fade indicator */}
-          <div className="absolute right-0 top-0 bottom-1 w-10 bg-gradient-to-l from-[#0a0f1a] to-transparent pointer-events-none flex items-center justify-end pr-1">
+          <div className="absolute right-0 top-0 bottom-1 w-10 bg-gradient-to-l from-background to-transparent pointer-events-none flex items-center justify-end pr-1">
             <ChevronRight className="h-3.5 w-3.5 text-white/20" />
           </div>
         </div>

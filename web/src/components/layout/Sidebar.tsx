@@ -118,7 +118,7 @@ export const Sidebar = () => {
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
-        className="fixed left-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-xl bg-[#060c13]/90 border border-white/10 text-white/60 backdrop-blur-xl transition hover:bg-white/[0.08] hover:text-white lg:hidden"
+        className="fixed left-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-xl bg-background/90 border border-border text-muted-foreground backdrop-blur-xl transition hover:bg-white/[0.08] hover:text-foreground lg:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -126,7 +126,7 @@ export const Sidebar = () => {
       {/* Sidebar panel */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-white/[0.07] bg-[#060c13] transition-transform duration-300 lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-border bg-card/80 backdrop-blur-xl transition-transform duration-300 lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
@@ -244,7 +244,7 @@ export const Sidebar = () => {
           ) : (
             <Button
               onClick={() => navigate("/auth")}
-              className="w-full rounded-xl bg-og-lime py-2.5 text-sm font-black text-[#060c13] shadow-[0_0_24px_-8px_#bef264] transition hover:bg-white"
+              className="w-full rounded-xl bg-og-lime py-2.5 text-sm font-black text-background shadow-[0_0_24px_-8px_#bef264] transition hover:bg-white"
             >
               Sign In
             </Button>

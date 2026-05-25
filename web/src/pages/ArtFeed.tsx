@@ -385,7 +385,7 @@ const MemeGridCard = ({
       <div
         className={`
           relative rounded-2xl border-2 overflow-hidden
-          bg-[#070d14]/80 backdrop-blur cursor-pointer
+          bg-background/80 backdrop-blur cursor-pointer
           ${frame.border} ${frame.glow}
           transition-all duration-300
           ${hovered ? "scale-[1.02] shadow-lg" : ""}
@@ -498,8 +498,8 @@ const MemeSlider = ({ memes, onOpen, reactions }: { memes: Meme[]; onOpen: (idx:
   return (
     <div className="flex flex-col gap-4">
       <div className="relative">
-        <div className="absolute left-0 top-0 bottom-0 w-12 z-10 bg-gradient-to-r from-[#070d14] to-transparent pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-12 z-10 bg-gradient-to-l from-[#070d14] to-transparent pointer-events-none" />
+        <div className="absolute left-0 top-0 bottom-0 w-12 z-10 bg-gradient-to-r from-background to-transparent pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-12 z-10 bg-gradient-to-l from-background to-transparent pointer-events-none" />
         <div
           ref={trackRef}
           className="flex gap-4 sm:gap-5 overflow-x-auto scroll-smooth px-12 pb-4 cursor-grab select-none"
@@ -514,7 +514,7 @@ const MemeSlider = ({ memes, onOpen, reactions }: { memes: Meme[]; onOpen: (idx:
                 className={`
                   relative flex-shrink-0 w-72 sm:w-80
                   rounded-2xl border-2 ${frame.border} ${frame.glow}
-                  bg-[#070d14]/80 backdrop-blur overflow-hidden cursor-pointer
+                  bg-background/80 backdrop-blur overflow-hidden cursor-pointer
                   transition-all duration-500
                   ${i === activeIdx ? "scale-100 opacity-100" : "scale-95 opacity-60"}
                 `}
@@ -595,7 +595,7 @@ const TrailerCard = ({ trailer }: { trailer: Trailer }) => {
   return (
     <Tilt3D intensity={6} className="flex-shrink-0 w-72 sm:w-80">
       <div
-        className={`relative rounded-2xl border overflow-hidden bg-[#070d14]/90 group ${
+        className={`relative rounded-2xl border overflow-hidden bg-background/90 group ${
           trailer.comingSoon ? "border-white/[0.05] opacity-70" : "border-white/[0.08] cursor-pointer"
         }`}
         onMouseEnter={() => setHovered(true)}
@@ -686,7 +686,7 @@ const ArtFeedHero = () => (
   <Tilt3D className="mx-4 lg:mx-6 mb-6" intensity={7} glareOpacity={0.15}>
     <div className="relative overflow-hidden rounded-2xl border border-white/[0.08]">
       {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0d0d1a] via-[#0d1b2a] to-[#0a0a14]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0d0d1a] via-card to-[#0a0a14]" />
       {/* Grid */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.03)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
       {/* Scanlines */}
@@ -701,7 +701,7 @@ const ArtFeedHero = () => (
           {/* Logo block */}
           <div className="relative shrink-0" style={{ transform: "translateZ(40px)" }}>
             <div className="absolute inset-0 bg-gradient-to-br from-[#22d3ee] to-[#a855f7] blur-3xl opacity-30 animate-pulse" />
-            <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-[#0d1b2a] to-[#060c13] border-2 border-[#22d3ee]/25 flex items-center justify-center shadow-2xl">
+            <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-card to-[#060c13] border-2 border-[#22d3ee]/25 flex items-center justify-center shadow-2xl">
               <span className="text-4xl font-black bg-gradient-to-br from-[#22d3ee] via-white to-[#a855f7] bg-clip-text text-transparent">OG</span>
             </div>
           </div>
@@ -866,8 +866,8 @@ const ArtFeed = ({ inline = false }: { inline?: boolean }) => {
           </div>
           {showTrailers && (
             <div className="relative">
-              <div className="absolute left-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-r from-[#070d14] to-transparent pointer-events-none" />
-              <div className="absolute right-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-l from-[#070d14] to-transparent pointer-events-none" />
+              <div className="absolute left-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-r from-background to-transparent pointer-events-none" />
+              <div className="absolute right-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-l from-background to-transparent pointer-events-none" />
               <div
                 className="flex gap-4 overflow-x-auto scroll-smooth px-4 lg:px-6 pb-4"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
@@ -963,7 +963,7 @@ const ArtFeed = ({ inline = false }: { inline?: boolean }) => {
         {/* Bottom 3D Banner */}
         <div className="px-4 lg:px-6 mt-8">
           <Tilt3D intensity={5}>
-            <div className="relative overflow-hidden rounded-2xl border border-[#22d3ee]/15 bg-gradient-to-br from-[#0d1b2a] via-[#060c13] to-[#0d1b2a]">
+            <div className="relative overflow-hidden rounded-2xl border border-[#22d3ee]/15 bg-gradient-to-br from-card via-[#060c13] to-card">
               <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.03)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
               <div className="absolute top-0 right-0 w-[300px] h-[200px] bg-[#22d3ee]/5 blur-[100px] rounded-full" />
               <div className="relative px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -974,7 +974,7 @@ const ArtFeed = ({ inline = false }: { inline?: boolean }) => {
                 <div className="flex items-center gap-3">
                   <div className="flex -space-x-2">
                     {[...Array(4)].map((_, i) => (
-                      <div key={i} className="h-8 w-8 rounded-full bg-gradient-to-br from-[#22d3ee]/30 to-[#a855f7]/30 border-2 border-[#070d14] flex items-center justify-center">
+                      <div key={i} className="h-8 w-8 rounded-full bg-gradient-to-br from-[#22d3ee]/30 to-[#a855f7]/30 border-2 border-background flex items-center justify-center">
                         <span className="text-[10px] font-bold text-white/60">{["OG", "🔥", "💎", "🚀"][i]}</span>
                       </div>
                     ))}

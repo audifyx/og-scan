@@ -2,47 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-/* OG SCANNER — blue / black / white / gold theme */
+/* OG SCANNER — theme-aware dark UI
+   Defaults match og-hacker preset. ThemeProvider overrides on mount. */
 
 @layer base {
   :root {
-    --background: 220 60% 4%;
-    --foreground: 0 0% 96%;
+    --background: 210 40% 3%;
+    --foreground: 120 60% 90%;
 
-    --card: 222 55% 7%;
-    --card-foreground: 0 0% 96%;
+    --card: 210 30% 5%;
+    --card-foreground: 120 50% 88%;
 
-    --popover: 222 55% 5%;
-    --popover-foreground: 0 0% 96%;
+    --popover: 210 30% 5%;
+    --popover-foreground: 120 50% 88%;
 
-    --primary: 43 96% 56%;
-    --primary-foreground: 220 60% 4%;
+    --primary: 120 100% 50%;
+    --primary-foreground: 210 40% 3%;
 
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 220 60% 4%;
+    --secondary: 210 25% 10%;
+    --secondary-foreground: 120 40% 75%;
 
-    --muted: 220 30% 13%;
-    --muted-foreground: 214 18% 65%;
+    --muted: 210 20% 8%;
+    --muted-foreground: 120 10% 45%;
 
-    --accent: 213 90% 58%;
-    --accent-foreground: 220 60% 4%;
+    --accent: 120 80% 35%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 92% 62%;
     --destructive-foreground: 0 0% 96%;
 
-    --border: 218 45% 22%;
-    --input: 220 30% 13%;
-    --ring: 43 96% 56%;
+    --border: 120 30% 12%;
+    --input: 210 20% 12%;
+    --ring: 120 100% 50%;
 
     --radius: 22px;
 
-    /* gold = accent pop, blue = interactive/signal, white = text/highlight */
-    --og-lime: 43 96% 56%;       /* gold — replaces lime as primary accent */
-    --og-gold: 43 96% 56%;       /* gold */
-    --og-cyan: 213 90% 58%;      /* royal blue — replaces cyan */
-    --og-blood: 0 92% 62%;       /* red — keeps danger red */
-    --og-ink: 220 60% 4%;        /* near-black background */
-    --og-grid: 218 45% 22%;      /* blue-tinted grid lines */
+    /* OG palette tokens — derived from primary / accent / background */
+    --og-lime: var(--primary);
+    --og-gold: var(--primary);
+    --og-cyan: var(--accent);
+    --og-blood: 0 92% 62%;
+    --og-ink: var(--background);
+    --og-grid: var(--border);
   }
 }
 

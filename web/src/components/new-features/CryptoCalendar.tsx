@@ -347,7 +347,7 @@ export const CryptoCalendar: React.FC = () => {
                 <option key={k} value={k}>{v.emoji} {v.label}</option>
               ))}
             </select>
-            <Button size="sm" onClick={addCustomEvent} className="bg-og-cyan text-[#070d14] font-black text-xs px-4">Add</Button>
+            <Button size="sm" onClick={addCustomEvent} className="bg-og-cyan text-background font-black text-xs px-4">Add</Button>
             <Button size="sm" variant="ghost" onClick={() => setShowAddEvent(false)} className="text-white/30 text-xs">Cancel</Button>
           </div>
         </div>

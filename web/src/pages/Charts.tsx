@@ -126,10 +126,10 @@ const Charts = () => {
 
   if (isFullscreen) {
     return (
-      <div className="fixed inset-0 z-[200] bg-[#070d14]">
+      <div className="fixed inset-0 z-[200] bg-background">
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
           <Badge className="bg-og-cyan/10 text-og-cyan border-og-cyan/25">{selectedToken.symbol}</Badge>
-          <Button variant="outline" size="icon" className="rounded-xl bg-[#070d14]/80 backdrop-blur-sm border-white/10" onClick={() => setIsFullscreen(false)}><X className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" className="rounded-xl bg-background/80 backdrop-blur-sm border-white/10" onClick={() => setIsFullscreen(false)}><X className="h-4 w-4" /></Button>
         </div>
         <iframe src={getDexScreenerUrl(selectedToken)} className="w-full h-full border-0" title={`${selectedToken.name} Chart`} allow="clipboard-write" />
       </div>
@@ -164,7 +164,7 @@ const Charts = () => {
             </div>
             <button
               onClick={handleSearch}
-              className="h-10 rounded-xl bg-og-cyan px-5 text-[11px] font-black uppercase tracking-widest text-[#070d14] hover:bg-white transition-colors"
+              className="h-10 rounded-xl bg-og-cyan px-5 text-[11px] font-black uppercase tracking-widest text-background hover:bg-white transition-colors"
             >
               Load
             </button>
@@ -222,8 +222,8 @@ const Charts = () => {
                         </div>
                       )}
                       {isFavorite(pair.address) && (
-                        <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-og-gold flex items-center justify-center border border-[#070d14]">
-                          <Star className="h-1.5 w-1.5 fill-[#070d14]" />
+                        <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-og-gold flex items-center justify-center border border-background">
+                          <Star className="h-1.5 w-1.5 fill-background" />
                         </div>
                       )}
                     </div>
@@ -303,7 +303,7 @@ const Charts = () => {
             </div>
           </div>
           
-          <div className="flex-1 relative bg-[#070d14]">
+          <div className="flex-1 relative bg-background">
             <iframe
               src={getDexScreenerUrl(selectedToken)}
               className="absolute inset-0 w-full h-full border-0"

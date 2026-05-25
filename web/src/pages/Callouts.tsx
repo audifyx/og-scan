@@ -412,7 +412,7 @@ const Callouts = () => {
         </div>
 
         {/* Input Area */}
-        <div className="p-4 lg:px-6 border-t border-white/[0.07] bg-[#070d14]/80 backdrop-blur-xl">
+        <div className="p-4 lg:px-6 border-t border-white/[0.07] bg-background/80 backdrop-blur-xl">
           <div className="flex flex-col gap-2 max-w-4xl mx-auto">
             <div className="flex gap-3">
               <div className="flex-1 relative">

@@ -187,7 +187,7 @@ const Leaderboard = () => {
                         <AvatarImage src={safeAvatarUrl(t.avatar_url)} />
                         <AvatarFallback className="bg-muted text-sm font-mono">{(t.username ?? "?")[0]?.toUpperCase()}</AvatarFallback>
                       </Avatar>
-                      {t.is_online && <div className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-[#070d14]" />}
+                      {t.is_online && <div className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-background" />}
                     </div>
 
                     <p className="font-bold text-sm truncate max-w-full">{t.display_name || t.username || "Anon"}</p>
@@ -275,7 +275,7 @@ const Leaderboard = () => {
                         <AvatarImage src={safeAvatarUrl(t.avatar_url)} />
                         <AvatarFallback className="bg-muted text-xs font-mono">{(t.username ?? "?")[0]?.toUpperCase()}</AvatarFallback>
                       </Avatar>
-                      {t.is_online && <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-[#070d14]" />}
+                      {t.is_online && <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">

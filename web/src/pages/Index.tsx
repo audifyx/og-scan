@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, lazy, Suspense } from "react";
+import { useTheme } from "@/hooks/useTheme";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Activity,
@@ -648,6 +649,7 @@ const accentDot = (a: TabAccent): string =>
 
 /* ─── Main Index component ─── */
 const Index = () => {
+  const { customWallpaper } = useTheme();
   const { toolSlug, pageNumber } = useParams<{ toolSlug?: string; pageNumber?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -699,7 +701,13 @@ const Index = () => {
   };
 
   return (
-    <div className="st-workspace flex min-h-screen bg-[#070d14] text-white">
+    <div className="st-workspace flex min-h-screen bg-background text-foreground relative">
+      {/* Wallpaper layer */}
+      {customWallpaper && (
+        <div className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${customWallpaper})` }}>
+          <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
+        </div>
+      )}
       {/* Left sidebar */}
       <AppSidebar
         activeId={tab}

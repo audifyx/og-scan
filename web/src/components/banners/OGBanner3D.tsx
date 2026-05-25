@@ -79,7 +79,7 @@ export const OGBannerHero = () => (
   <Tilt3D className="mx-4 lg:mx-6 mb-6" intensity={6}>
     <div className="relative overflow-hidden rounded-2xl border border-white/[0.08]">
       {/* Animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#060c13] via-[#0d1b2a] to-[#060c13]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-card via-card to-card" />
       <div className="absolute inset-0 opacity-30">
         <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(45deg,transparent_25%,rgba(34,211,238,0.05)_50%,transparent_75%)] bg-[length:300%_300%] animate-[shimmer_8s_ease-in-out_infinite]" />
       </div>
@@ -97,7 +97,7 @@ export const OGBannerHero = () => (
         {/* Logo */}
         <div className="relative shrink-0">
           <div className="absolute inset-0 bg-gradient-to-br from-[#22d3ee] to-[#a855f7] blur-2xl opacity-40 animate-pulse" />
-          <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-[#0d1b2a] to-[#060c13] border border-[#22d3ee]/30 flex items-center justify-center shadow-2xl shadow-[#22d3ee]/20">
+          <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-card to-card border border-[#22d3ee]/30 flex items-center justify-center shadow-2xl shadow-[#22d3ee]/20">
             <span className="text-3xl sm:text-4xl font-black bg-gradient-to-br from-[#22d3ee] via-white to-[#a855f7] bg-clip-text text-transparent tracking-tighter">
               OG
             </span>
@@ -165,7 +165,7 @@ export const OGBannerPromo = ({ title, subtitle, accent = "cyan" }: { title: str
 
 export const OGBannerCTA = ({ text, buttonText, onClick }: { text: string; buttonText: string; onClick?: () => void }) => (
   <Tilt3D className="mx-4 lg:mx-6 my-4" intensity={7}>
-    <div className="relative overflow-hidden rounded-2xl border border-[#a855f7]/20 bg-gradient-to-br from-[#a855f7]/10 via-[#060c13] to-[#22d3ee]/10">
+    <div className="relative overflow-hidden rounded-2xl border border-[#a855f7]/20 bg-gradient-to-br from-[#a855f7]/10 via-card to-[#22d3ee]/10">
       {/* Grid */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(168,85,247,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(168,85,247,0.04)_1px,transparent_1px)] bg-[size:30px_30px] pointer-events-none" />
       {/* Scanlines */}
@@ -186,7 +186,7 @@ export const OGBannerCTA = ({ text, buttonText, onClick }: { text: string; butto
 
 export const OGBannerStats = () => (
   <Tilt3D className="mx-4 lg:mx-6 mb-6" intensity={4} glareOpacity={0.08}>
-    <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[#060c13]/80">
+    <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-card/80">
       {/* Scan line animation */}
       <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(34,211,238,0.02)_2px,rgba(34,211,238,0.02)_4px)] pointer-events-none" />
       <div className="absolute left-0 top-0 h-full w-[2px] bg-gradient-to-b from-transparent via-[#22d3ee]/30 to-transparent animate-pulse" />
