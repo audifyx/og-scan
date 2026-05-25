@@ -1,12 +1,13 @@
 /**
  * NarrativeClusters — Auto-group trending tokens by narrative/theme.
  * AI tokens, political tokens, animal coins, etc. Shows which narrative is hottest.
+ * Wired to: Jupiter trending API (self-fetching when no tokens prop).
  */
-import { useState, useMemo } from "react";
-import { Layers, TrendingUp, TrendingDown, Flame, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Layers, Flame, ChevronDown, ChevronUp, Loader2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { fmtUsd } from "@/lib/og";
+import { fmtUsd, jupTrending, type JupTokenInfo } from "@/lib/og";
 
 interface TokenInfo {
   mint: string;
@@ -28,7 +29,7 @@ interface Narrative {
   avgChange: number;
   totalVolume: number;
   totalMcap: number;
-  strength: number; // 0-100
+  strength: number;
 }
 
 interface Props {
@@ -60,9 +61,44 @@ function classifyToken(token: TokenInfo): string[] {
   return matches;
 }
 
-export const NarrativeClusters: React.FC<Props> = ({ tokens = [], onSelect, onSelectMint }) => {
+function mapJupToTokenInfo(t: JupTokenInfo): TokenInfo {
+  return {
+    mint: (t as any).address ?? t.id,
+    symbol: t.symbol || "???",
+    name: t.name || "",
+    mcap: t.mcap || 0,
+    priceChange24h: t.stats24h?.priceChange ?? (t as any).priceChange24h ?? 0,
+    volume24h: ((t.stats24h?.buyVolume ?? 0) + (t.stats24h?.sellVolume ?? 0)) || (t as any).volume24h || 0,
+    logoURI: (t as any).logoURI ?? t.icon,
+  };
+}
+
+export const NarrativeClusters: React.FC<Props> = ({ tokens: externalTokens, onSelect, onSelectMint }) => {
   const handleSelect = onSelect || onSelectMint;
   const [expandedNarrative, setExpandedNarrative] = useState<string | null>(null);
+  const [fetchedTokens, setFetchedTokens] = useState<TokenInfo[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const tokens = externalTokens && externalTokens.length > 0 ? externalTokens : fetchedTokens;
+
+  const refresh = () => {
+    if (externalTokens && externalTokens.length > 0) return;
+    setLoading(true);
+    jupTrending("24h", 50)
+      .then(res => setFetchedTokens(res.map(mapJupToTokenInfo)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  // Self-fetch if no external tokens
+  useEffect(() => { refresh(); }, [externalTokens]);
+
+  // Auto-refresh every 5 minutes
+  useEffect(() => {
+    if (externalTokens && externalTokens.length > 0) return;
+    const iv = setInterval(refresh, 5 * 60 * 1000);
+    return () => clearInterval(iv);
+  }, [externalTokens]);
 
   const narratives = useMemo(() => {
     const groups: Record<string, TokenInfo[]> = {};
@@ -84,7 +120,7 @@ export const NarrativeClusters: React.FC<Props> = ({ tokens = [], onSelect, onSe
         const totalMcap = patternTokens.reduce((s, t) => s + t.mcap, 0);
         const strength = Math.min(100, Math.round(
           (tokens.length > 0 ? (patternTokens.length / tokens.length) * 40 : 0) +
-          Math.min(avgChange, 100) * 0.4 +
+          Math.min(Math.abs(avgChange), 100) * 0.4 +
           Math.min(totalVolume / 1000000, 20)
         ));
 
@@ -101,6 +137,14 @@ export const NarrativeClusters: React.FC<Props> = ({ tokens = [], onSelect, onSe
       .sort((a, b) => (b as Narrative).strength - (a as Narrative).strength) as Narrative[];
   }, [tokens]);
 
+  if (loading && tokens.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-6 flex items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-white/20" />
+      </div>
+    );
+  }
+
   if (narratives.length === 0) return null;
 
   return (
@@ -109,8 +153,15 @@ export const NarrativeClusters: React.FC<Props> = ({ tokens = [], onSelect, onSe
         <Layers className="h-4 w-4 text-primary" />
         <div className="flex-1">
           <p className="text-sm font-bold text-white">Narrative Clusters</p>
-          <p className="text-[10px] text-white/25">{narratives.length} active narratives</p>
+          <p className="text-[10px] text-white/25">{narratives.length} active narratives · {tokens.length} tokens</p>
         </div>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="p-1.5 rounded-lg border border-white/[0.06] text-white/20 hover:text-white/40 transition-colors"
+        >
+          <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
+        </button>
       </div>
 
       <div className="p-3 space-y-1.5">
@@ -142,7 +193,6 @@ export const NarrativeClusters: React.FC<Props> = ({ tokens = [], onSelect, onSe
                 </div>
               </div>
 
-              {/* Strength bar */}
               <div className="w-12 flex flex-col items-end gap-0.5">
                 <span className="text-[9px] font-bold text-white/40">{narrative.strength}</span>
                 <div className="w-full h-1 rounded-full bg-white/[0.06] overflow-hidden">
