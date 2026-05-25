@@ -3,9 +3,9 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { TrendingUp, TrendingDown, RefreshCw, DollarSign, BarChart3, Activity, Target } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { solanaTracker } from "@/lib/solana-tools";
 
 interface CurvePoint {
   label: string;
@@ -49,9 +49,7 @@ export const ProfitCurveGenerator = () => {
     setLoading(true);
     setPnlData(null);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getWalletPnL", walletAddress },
-      });
+      const { data } = await solanaTracker("getWalletPnL", { walletAddress });
       setPnlData(data || { totalPnL: 0, winRate: "0", tradeCount: 0, bestTrade: 0, worstTrade: 0, avgTrade: 0 });
       toast({ title: "Profit curve generated" });
     } catch {

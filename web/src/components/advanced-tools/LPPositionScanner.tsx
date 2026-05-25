@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { Layers, RefreshCw, TrendingUp, TrendingDown, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatUsd, formatAddress } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 export const LPPositionScanner = () => {
   const [walletAddress, setWalletAddress] = useState("");
@@ -17,9 +17,7 @@ export const LPPositionScanner = () => {
     if (!walletAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getAssets", walletAddress },
-      });
+      const { data } = await solanaTracker("getAssets", { walletAddress });
       const lpTokens = (data?.items || []).filter((item: any) => {
         const name = item.content?.metadata?.name?.toLowerCase() || "";
         return name.includes("lp") || name.includes("pool") || name.includes("liquidity") || name.includes("raydium") || name.includes("meteora") || name.includes("orca");

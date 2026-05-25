@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatAddress, formatUsd } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 interface WalletConnection {
   address: string;
@@ -75,9 +76,7 @@ export const WalletRelationshipGraph = () => {
     if (!walletAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTransactions", walletAddress, limit: 100 },
-      });
+      const { data } = await solanaTracker("getTransactions", { walletAddress, limit: 100 });
 
       const txs = data?.transactions || [];
       const addressMap = new Map<string, { count: number; direction: Set<string>; volume: number }>();
@@ -141,12 +140,8 @@ export const WalletRelationshipGraph = () => {
 
     try {
       const [overviewRes, assetsRes] = await Promise.all([
-        supabase.functions.invoke("solana-tracker", {
-          body: { action: "getWalletOverview", walletAddress: address },
-        }),
-        supabase.functions.invoke("solana-tracker", {
-          body: { action: "getAssets", walletAddress: address },
-        }),
+        solanaTracker("getWalletOverview", { walletAddress: address }),
+        solanaTracker("getAssets", { walletAddress: address }),
       ]);
 
       const overview = overviewRes.data;
@@ -192,9 +187,7 @@ export const WalletRelationshipGraph = () => {
     setTokenDetails(null);
 
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "analyzeToken", tokenAddress: address },
-      });
+      const { data } = await solanaTracker("analyzeToken", { tokenAddress: address });
 
       setTokenDetails({
         address,

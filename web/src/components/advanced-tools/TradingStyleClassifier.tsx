@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { Target, RefreshCw, Zap, Clock, TrendingUp, Bot, Droplets } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { solanaTracker } from "@/lib/solana-tools";
 
 const STYLES = {
   sniper:  { label: "Sniper", icon: Target, color: "text-red-400", bg: "bg-red-500/10 border-red-500/20", desc: "Fast entries on new launches, high fee txs" },
@@ -23,9 +23,7 @@ export const TradingStyleClassifier = () => {
     if (!walletAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTransactions", walletAddress, limit: 100 },
-      });
+      const { data } = await solanaTracker("getTransactions", { walletAddress, limit: 100 });
       const txs = data?.transactions || [];
       const swaps = txs.filter((t: any) => t.type?.toLowerCase().includes("swap")).length;
       const transfers = txs.filter((t: any) => t.type?.toLowerCase().includes("transfer")).length;

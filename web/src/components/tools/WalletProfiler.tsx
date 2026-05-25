@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { solanaTracker } from "@/lib/solana-tools";
 
 interface WalletStats {
   currentValue: number;
@@ -29,9 +29,7 @@ export const WalletProfiler = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('solana-tracker', {
-        body: { action: 'getWalletPnL', walletAddress },
-      });
+      const { data, error } = await solanaTracker("getWalletPnL", { walletAddress });
       if (error) throw error;
       setStats(data);
       toast.success("Wallet analyzed");

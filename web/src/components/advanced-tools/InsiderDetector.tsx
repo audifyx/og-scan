@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { Eye, RefreshCw, AlertTriangle, Users, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatAddress } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 export const InsiderDetector = () => {
   const [tokenAddress, setTokenAddress] = useState("");
@@ -16,9 +16,7 @@ export const InsiderDetector = () => {
     if (!tokenAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTokenHolders", tokenAddress, limit: 50 },
-      });
+      const { data } = await solanaTracker("getTokenHolders", { tokenAddress, limit: 50 });
       const holders = data?.holders || [];
       const top10 = holders.slice(0, 10);
       const potentialInsiders = top10.filter((h: any) => (h.percentage || 0) > 3);

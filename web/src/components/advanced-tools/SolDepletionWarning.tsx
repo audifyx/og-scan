@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { Battery, BatteryLow, RefreshCw, AlertTriangle, Plus, Trash2, BatteryFull } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { solanaTracker } from "@/lib/solana-tools";
 
 interface WalletCheck {
   address: string;
@@ -27,9 +27,7 @@ export const SolDepletionWarning = () => {
     if (!w.address) return;
     setWallets((prev) => prev.map((x, idx) => (idx === i ? { ...x, loading: true } : x)));
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getBalance", walletAddress: w.address },
-      });
+      const { data } = await solanaTracker("getBalance", { walletAddress: w.address });
       const bal = data?.balance ?? 0;
       setWallets((prev) => prev.map((x, idx) => (idx === i ? { ...x, balance: bal, loading: false } : x)));
       if (bal < parseFloat(threshold)) {

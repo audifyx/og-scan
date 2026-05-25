@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/lib/supabase";
 import { AlertTriangle, RefreshCw, Search, ArrowLeftRight, Users, TrendingUp, Shield, Activity } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatAddress } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 interface WashPair {
   walletA: string;
@@ -46,14 +46,10 @@ export const WashTradingScanner = () => {
 
     try {
       // Get token transaction history
-      const { data: txData } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTokenTransactions", tokenAddress },
-      });
+      const { data: txData } = await solanaTracker("getTokenTransactions", { tokenAddress });
 
       // Get holder data for cross-referencing
-      const { data: holderData } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTokenHolders", tokenAddress },
-      });
+      const { data: holderData } = await solanaTracker("getTokenHolders", { tokenAddress });
 
       const txns = txData?.transactions || [];
       const holders = holderData?.holders || [];

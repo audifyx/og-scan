@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { FileText, RefreshCw, Shield, AlertTriangle, Check, X, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatAddress } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 export const TokenMetadataInspector = () => {
   const [tokenAddress, setTokenAddress] = useState("");
@@ -16,9 +16,7 @@ export const TokenMetadataInspector = () => {
     if (!tokenAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "analyzeToken", tokenAddress },
-      });
+      const { data } = await solanaTracker("analyzeToken", { tokenAddress });
       setMeta(data);
       toast({ title: "Inspection complete" });
     } catch {

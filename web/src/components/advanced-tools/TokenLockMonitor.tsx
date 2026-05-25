@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/lib/supabase";
 import { Lock, Unlock, RefreshCw, Clock, ExternalLink, Calendar, Shield, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format } from "date-fns";
 import { formatAddress } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 interface LockEvent {
   address: string;
@@ -62,14 +62,10 @@ export const TokenLockMonitor = () => {
     setAnalysis(null);
     try {
       // Fetch token holders
-      const { data: holderData } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTokenHolders", tokenAddress },
-      });
+      const { data: holderData } = await solanaTracker("getTokenHolders", { tokenAddress });
 
       // Fetch token metadata
-      const { data: metaData } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "analyzeToken", tokenAddress },
-      });
+      const { data: metaData } = await solanaTracker("analyzeToken", { tokenAddress });
 
       const holders = holderData?.holders || [];
       const totalSupply = metaData?.supply || 1_000_000_000;

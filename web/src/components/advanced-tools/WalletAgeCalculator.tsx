@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { Clock, RefreshCw, Calendar, Activity, Shield, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format, differenceInDays } from "date-fns";
+import { solanaTracker } from "@/lib/solana-tools";
 
 export const WalletAgeCalculator = () => {
   const [walletAddress, setWalletAddress] = useState("");
@@ -16,9 +16,7 @@ export const WalletAgeCalculator = () => {
     if (!walletAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTransactions", walletAddress, limit: 100 },
-      });
+      const { data } = await solanaTracker("getTransactions", { walletAddress, limit: 100 });
       const txs = data?.transactions || [];
       const stamps = txs.filter((t: any) => t.timestamp).map((t: any) => t.timestamp);
       if (stamps.length > 0) {
