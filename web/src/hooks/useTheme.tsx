@@ -256,6 +256,31 @@ export const THEME_PRESETS: ThemePreset[] = [
     "--secondary":"5 10% 12%","--secondary-foreground":"5 6% 80%","--muted":"5 8% 9%","--muted-foreground":"5 5% 44%",
     "--border":"5 8% 14%","--input":"5 8% 14%","--ring":"5 80% 52%","--popover":"5 12% 6%","--popover-foreground":"5 8% 92%",
   }},
+  // ── OG SCAN SIGNATURE ──
+  { id: "og-hacker", name: "OG Hacker", category: "OG Scan", vars: {
+    "--background":"210 40% 3%","--foreground":"120 60% 90%","--card":"210 30% 5%","--card-foreground":"120 50% 88%",
+    "--primary":"120 100% 50%","--primary-foreground":"210 40% 3%","--accent":"120 80% 35%","--accent-foreground":"0 0% 100%",
+    "--secondary":"210 25% 10%","--secondary-foreground":"120 40% 75%","--muted":"210 20% 8%","--muted-foreground":"120 10% 45%",
+    "--border":"120 30% 12%","--input":"210 20% 12%","--ring":"120 100% 50%","--popover":"210 30% 5%","--popover-foreground":"120 50% 88%",
+  }},
+  { id: "og-matrix", name: "OG Matrix", category: "OG Scan", vars: {
+    "--background":"0 0% 2%","--foreground":"120 100% 80%","--card":"0 0% 4%","--card-foreground":"120 100% 80%",
+    "--primary":"120 100% 45%","--primary-foreground":"0 0% 0%","--accent":"120 70% 30%","--accent-foreground":"120 100% 90%",
+    "--secondary":"120 10% 8%","--secondary-foreground":"120 60% 65%","--muted":"0 0% 6%","--muted-foreground":"120 20% 40%",
+    "--border":"120 20% 10%","--input":"120 15% 10%","--ring":"120 100% 45%","--popover":"0 0% 4%","--popover-foreground":"120 100% 80%",
+  }},
+  { id: "og-radar", name: "OG Radar", category: "OG Scan", vars: {
+    "--background":"215 35% 4%","--foreground":"170 40% 90%","--card":"215 25% 6%","--card-foreground":"170 35% 88%",
+    "--primary":"160 100% 45%","--primary-foreground":"215 35% 4%","--accent":"140 70% 35%","--accent-foreground":"0 0% 100%",
+    "--secondary":"215 20% 11%","--secondary-foreground":"170 30% 70%","--muted":"215 15% 9%","--muted-foreground":"170 10% 42%",
+    "--border":"160 20% 12%","--input":"215 18% 12%","--ring":"160 100% 45%","--popover":"215 25% 6%","--popover-foreground":"170 35% 88%",
+  }},
+  { id: "og-command", name: "OG Command Deck", category: "OG Scan", vars: {
+    "--background":"220 30% 3%","--foreground":"140 20% 88%","--card":"220 22% 6%","--card-foreground":"140 18% 85%",
+    "--primary":"142 70% 50%","--primary-foreground":"220 30% 3%","--accent":"0 85% 55%","--accent-foreground":"0 0% 100%",
+    "--secondary":"220 18% 11%","--secondary-foreground":"140 15% 70%","--muted":"220 14% 8%","--muted-foreground":"140 8% 42%",
+    "--border":"142 15% 13%","--input":"220 16% 12%","--ring":"142 70% 50%","--popover":"220 22% 6%","--popover-foreground":"140 18% 85%",
+  }},
 ];
 
 interface ThemeContextType {
@@ -280,7 +305,7 @@ function applyThemeVars(themeId: string) {
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [currentTheme, setCurrentTheme] = useState(() => {
-    return localStorage.getItem("sol-theme") || "broken-glass-gold";
+    return localStorage.getItem("sol-theme") || "og-hacker";
   });
   const [customWallpaper, setCustomWallpaperState] = useState<string | null>(() => {
     return localStorage.getItem("sol-wallpaper") || null;
