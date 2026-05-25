@@ -744,7 +744,7 @@ const Index = () => {
                 onSelectMint={updateMint}
               />
             ) : (
-              <ToolShell tab={activeTab}>{renderTool(tab, mint, updateMint, switchTab)}</ToolShell>
+              <ToolShell tab={activeTab}><Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>{renderTool(tab, mint, updateMint, switchTab)}</Suspense></ToolShell>
             )}
           </main>
         )}

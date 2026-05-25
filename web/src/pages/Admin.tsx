@@ -120,9 +120,8 @@ const Admin = () => {
 
   const checkAdmin = async () => {
     if (!user) { setLoading(false); return; }
-    if (user.email === "audifyx@gmail.com") { setIsAdmin(true); fetchAll(); setLoading(false); return; }
-    const { data } = await supabase.from("admin_roles").select("role").eq("user_id", user.id).maybeSingle();
-    if (data && ["admin", "owner"].includes(data.role)) { setIsAdmin(true); fetchAll(); }
+    // Email-only check — admin_roles has RLS recursion bug
+    if (user.email === "audifyx@gmail.com") { setIsAdmin(true); fetchAll(); }
     else setIsAdmin(false);
     setLoading(false);
   };
