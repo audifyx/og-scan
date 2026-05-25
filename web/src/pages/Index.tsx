@@ -702,10 +702,10 @@ const Index = () => {
 
   return (
     <div className="st-workspace flex min-h-screen bg-background text-foreground relative">
-      {/* Wallpaper layer */}
+      {/* Wallpaper layer — very subtle, pushed far back */}
       {customWallpaper && (
-        <div className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${customWallpaper})` }}>
-          <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-15" style={{ backgroundImage: `url(${customWallpaper})` }}>
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
         </div>
       )}
       {/* Left sidebar */}
