@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { PieChart, RefreshCw, AlertTriangle, Users, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatAddress } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 export const WhaleConcentration = () => {
   const [tokenAddress, setTokenAddress] = useState("");
@@ -16,9 +16,7 @@ export const WhaleConcentration = () => {
     if (!tokenAddress) return;
     setLoading(true);
     try {
-      const { data: res } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTokenHolders", tokenAddress },
-      });
+      const { data: res } = await solanaTracker("getTokenHolders", { tokenAddress });
       const holders = res?.holders || [];
       const top10 = holders.slice(0, 10).reduce((s: number, h: any) => s + (h.percentage || 0), 0);
       const top3 = holders.slice(0, 3).reduce((s: number, h: any) => s + (h.percentage || 0), 0);

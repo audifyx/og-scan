@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { Flame, RefreshCw, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatAddress } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 const BURN_ADDRS = [
   "1nc1nerator11111111111111111111111111111111",
@@ -22,9 +22,7 @@ export const BurnWatcher = () => {
     if (!tokenAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTokenHolders", tokenAddress },
-      });
+      const { data } = await solanaTracker("getTokenHolders", { tokenAddress });
       const holders = data?.holders || [];
       const burns = holders.filter((h: any) =>
         BURN_ADDRS.some((b) => h.address?.includes("111111")) ||

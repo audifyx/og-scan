@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { ArrowUpDown, RefreshCw, TrendingUp, TrendingDown, Repeat } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { solanaTracker } from "@/lib/solana-tools";
 
 export const TransferProfiler = () => {
   const [walletAddress, setWalletAddress] = useState("");
@@ -15,9 +15,7 @@ export const TransferProfiler = () => {
     if (!walletAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTransactions", walletAddress, limit: 100 },
-      });
+      const { data } = await solanaTracker("getTransactions", { walletAddress, limit: 100 });
       const txs = data?.transactions || [];
       let incoming = 0, outgoing = 0, swaps = 0, other = 0;
       txs.forEach((tx: any) => {

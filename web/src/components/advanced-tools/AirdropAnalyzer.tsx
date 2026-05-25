@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { Gift, RefreshCw, AlertTriangle, Check } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { solanaTracker } from "@/lib/solana-tools";
 
 export const AirdropAnalyzer = () => {
   const [walletAddress, setWalletAddress] = useState("");
@@ -15,9 +15,7 @@ export const AirdropAnalyzer = () => {
     if (!walletAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTransactions", walletAddress, limit: 100 },
-      });
+      const { data } = await solanaTracker("getTransactions", { walletAddress, limit: 100 });
       const txs = data?.transactions || [];
       const claims = txs.filter((t: any) =>
         t.type?.toLowerCase().includes("airdrop") ||

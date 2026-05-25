@@ -2,11 +2,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { User, RefreshCw, AlertTriangle, Shield, ExternalLink, Coins } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatAddress } from "@/lib/solana-api";
 import { formatDistanceToNow } from "date-fns";
+import { solanaTracker } from "@/lib/solana-tools";
 
 export const TokenCreatorTracker = () => {
   const [walletAddress, setWalletAddress] = useState("");
@@ -17,9 +17,7 @@ export const TokenCreatorTracker = () => {
     if (!walletAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTransactions", walletAddress, limit: 100 },
-      });
+      const { data } = await solanaTracker("getTransactions", { walletAddress, limit: 100 });
       const txs = data?.transactions || [];
       const deployments = txs.filter((tx: any) =>
         tx.type?.toLowerCase().includes("create") ||

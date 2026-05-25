@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { Shield, RefreshCw, AlertTriangle, Check } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { solanaTracker } from "@/lib/solana-tools";
 
 const RISK_FLAGS = [
   { id: "lowTxCount", label: "Low Activity", desc: "Fewer than 10 transactions" },
@@ -23,8 +23,8 @@ export const RiskDetector = () => {
     setLoading(true);
     try {
       const [{ data: overview }, { data: txData }] = await Promise.all([
-        supabase.functions.invoke("solana-tracker", { body: { action: "getWalletOverview", walletAddress: address } }),
-        supabase.functions.invoke("solana-tracker", { body: { action: "getTransactions", walletAddress: address, limit: 50 } }),
+        solanaTracker("getWalletOverview", { walletAddress: address }),
+        solanaTracker("getTransactions", { walletAddress: address, limit: 50 }),
       ]);
       const txs = txData?.transactions || [];
       const flags: string[] = [];

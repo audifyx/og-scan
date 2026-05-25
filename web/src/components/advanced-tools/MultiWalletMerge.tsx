@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/lib/supabase";
 import { GitMerge, Plus, Trash2, RefreshCw, DollarSign, TrendingUp, Wallet, BarChart3, ExternalLink } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatAddress } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 interface WalletStats {
   address: string;
@@ -68,9 +68,7 @@ export const MultiWalletMerge = () => {
       const results = await Promise.all(
         valid.map(async (addr): Promise<WalletStats> => {
           try {
-            const { data } = await supabase.functions.invoke("solana-tracker", {
-              body: { action: "getWalletPnL", walletAddress: addr },
-            });
+            const { data } = await solanaTracker("getWalletPnL", { walletAddress: addr });
             return {
               address: addr,
               solBalance: data?.solBalance || 0,

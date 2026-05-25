@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { ArrowRight, RefreshCw, Route, ExternalLink, Zap } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatAddress } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 export const JupiterRouteTracker = () => {
   const [walletAddress, setWalletAddress] = useState("");
@@ -17,9 +17,7 @@ export const JupiterRouteTracker = () => {
     if (!walletAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getTransactions", walletAddress, limit: 100 },
-      });
+      const { data } = await solanaTracker("getTransactions", { walletAddress, limit: 100 });
       const swaps = (data?.transactions || []).filter((tx: any) =>
         tx.type?.toLowerCase().includes("swap") || tx.source?.toLowerCase().includes("jupiter")
       );

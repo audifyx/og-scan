@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { solanaTracker } from "@/lib/solana-tools";
 
 interface NewPair {
   tokenAddress: string;
@@ -29,9 +29,7 @@ export const TokenSniper = () => {
   const fetchNewPairs = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('solana-tracker', {
-        body: { action: 'getNewPairs' },
-      });
+      const { data, error } = await solanaTracker("getNewPairs");
       if (error) throw error;
       setPairs(data.pairs || []);
     } catch (error) {

@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/lib/supabase";
 import { AlertTriangle, RefreshCw, Shield, Check, X, Lock, Users, Droplets, Zap, Eye, ExternalLink, Copy } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useCredits } from "@/hooks/useCredits";
+import { solanaTracker } from "@/lib/solana-tools";
 
 interface RiskFlag {
   flag: string;
@@ -60,9 +60,7 @@ export const RugDetector = () => {
         return;
       }
 
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "analyzeToken", tokenAddress },
-      });
+      const { data } = await solanaTracker("analyzeToken", { tokenAddress });
 
       const rugFlags: RiskFlag[] = [];
       let rugScore = 0;

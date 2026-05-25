@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
 import { Lock, RefreshCw, TrendingUp, Unlock, Layers } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatUsd } from "@/lib/solana-api";
+import { solanaTracker } from "@/lib/solana-tools";
 
 export const StakeAccountTracker = () => {
   const [walletAddress, setWalletAddress] = useState("");
@@ -16,13 +16,9 @@ export const StakeAccountTracker = () => {
     if (!walletAddress) return;
     setLoading(true);
     try {
-      const { data } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getWalletOverview", walletAddress },
-      });
+      const { data } = await solanaTracker("getWalletOverview", { walletAddress });
       // Also fetch assets to find staked tokens
-      const { data: assets } = await supabase.functions.invoke("solana-tracker", {
-        body: { action: "getAssets", walletAddress },
-      });
+      const { data: assets } = await solanaTracker("getAssets", { walletAddress });
       const stakeTokens = (assets?.items || []).filter((t: any) => {
         const name = (t.content?.metadata?.name || "").toLowerCase();
         return name.includes("stake") || name.includes("msol") || name.includes("bsol") || name.includes("jitoSOL") || name.includes("liquid");
