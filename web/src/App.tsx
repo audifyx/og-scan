@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ThemeProvider } from "@/hooks/useTheme";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { MaintenanceLock } from "@/components/MaintenanceLock";
 import BetaHome from "./pages/BetaHome";
@@ -16,7 +17,7 @@ import Settings from "./pages/Settings";
 import Wallets from "./pages/Wallets";
 import Tokens from "./pages/Tokens";
 import Tools from "./pages/Tools";
-import AdvancedTools from "./pages/AdvancedTools";
+// AdvancedTools removed
 import AlphaChat from "./pages/AlphaChat";
 // Credits page removed
 // Webhooks removed
@@ -43,6 +44,7 @@ const App = () => (
   <MaintenanceLock>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <ThemeProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -110,7 +112,7 @@ const App = () => (
             {/* ── Protected: Tools & Features ── */}
             <Route path="/tokens" element={<ProtectedRoute><Tokens /></ProtectedRoute>} />
             <Route path="/tools" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/advanced-tools" element={<ProtectedRoute><AdvancedTools /></ProtectedRoute>} />
+            {/* AdvancedTools removed */}
             <Route path="/ai-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
             <Route path="/alpha-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
             {/* Webhooks removed */}
@@ -143,6 +145,7 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
+      </ThemeProvider>
     </AuthProvider>
   </QueryClientProvider>
   </MaintenanceLock>

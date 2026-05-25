@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CreditsUsagePanel } from "@/components/credits/CreditsUsagePanel";
+// Credits removed
 import { ThemePicker } from "@/components/settings/ThemePicker";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
@@ -59,7 +59,7 @@ const Settings = () => {
   // Notifications state
   const [notifications, setNotifications] = useState({
     priceAlerts: true, whaleAlerts: true, walletActivity: true,
-    creditWarnings: true, communityPosts: true, newFollowers: true,
+    communityPosts: true, newFollowers: true,
     tradeSignals: true, lobbyInvites: true,
   });
   const [savingNotifs, setSavingNotifs] = useState(false);
@@ -231,7 +231,7 @@ const Settings = () => {
                 { value: "profile", icon: User, label: "Profile" },
                 { value: "account", icon: Shield, label: "Account" },
                 { value: "themes", icon: Palette, label: "Themes" },
-                { value: "credits", icon: DollarSign, label: "Credits" },
+
                 { value: "notifications", icon: Bell, label: "Alerts" },
                 { value: "webhooks", icon: Webhook, label: "Webhooks" },
               ].map(({ value, icon: Icon, label }) => (
@@ -473,9 +473,7 @@ const Settings = () => {
             <div className="max-w-4xl"><ThemePicker /></div>
           </TabsContent>
 
-          <TabsContent value="credits">
-            <div className="max-w-3xl"><CreditsUsagePanel /></div>
-          </TabsContent>
+          {/* Credits removed */}
 
           {/* ── Notifications Tab ── */}
           <TabsContent value="notifications">
@@ -489,7 +487,7 @@ const Settings = () => {
                     { key: "priceAlerts", label: "Price Alerts", desc: "Get notified when token prices hit your targets" },
                     { key: "whaleAlerts", label: "Whale Alerts", desc: "Track large wallet movements" },
                     { key: "walletActivity", label: "Wallet Activity", desc: "Updates from tracked wallets" },
-                    { key: "creditWarnings", label: "Credit Warnings", desc: "Alert when credits are running low" },
+
                     { key: "communityPosts", label: "Community Posts", desc: "New posts in communities you follow" },
                     { key: "newFollowers", label: "New Followers", desc: "When someone follows your profile" },
                     { key: "tradeSignals", label: "Trade Signals", desc: "Callouts and trade alerts from traders you follow" },

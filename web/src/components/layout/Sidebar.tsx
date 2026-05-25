@@ -37,7 +37,6 @@ const solToolsItems: NavItem[] = [
   { to: "/callouts",        icon: Bell,          label: "Callouts",        eyebrow: "Trade alerts" },
   { to: "/trading-lobbies", icon: MessageSquare, label: "Trading Lobbies", eyebrow: "Voice + charts" },
   { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
-  { to: "/advanced-tools",  icon: Wrench,        label: "Advanced Tools",  eyebrow: "30+ pro tools" },
   { to: "/pumpv5",          icon: Rocket,        label: "Launch Pad",      eyebrow: "Token listings" },
 
   { to: "/notifications",   icon: Bell,          label: "Notifications",   eyebrow: "Your alerts" },
@@ -46,7 +45,7 @@ const solToolsItems: NavItem[] = [
 const accountItems: NavItem[] = [
   { to: "/profile",   icon: User,     label: "Profile",   eyebrow: "Your account" },
   { to: "/settings",  icon: Settings, label: "Settings",  eyebrow: "Preferences" },
-  { to: "/credits",   icon: Coins,    label: "Credits",   eyebrow: "Balance" },
+
 ];
 
 // ── NavRow ────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Scanlines } from "@/components/Scanlines";
 import { Shield, Lock, Wrench, KeyRound } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const ADMIN_CODE = "0129";
 const BETA_CODE = "OG";
@@ -15,6 +16,31 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
     }
   });
 
+  // Check DB for maintenance_mode setting
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("site_settings")
+          .select("value")
+          .eq("key", "maintenance_mode")
+          .single();
+        if (alive) {
+          // value is stored as jsonb boolean
+          const isOn = data?.value === true || data?.value === "true";
+          setMaintenanceEnabled(isOn);
+        }
+      } catch {
+        // If table doesn't exist or query fails, default to maintenance ON
+        if (alive) setMaintenanceEnabled(true);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
   const [code, setCode] = useState("");
   const [error, setError] = useState(false);
   const [shaking, setShaking] = useState(false);
@@ -22,10 +48,10 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
 
   // Auto-focus input on mount
   useEffect(() => {
-    if (!unlocked) {
+    if (!unlocked && maintenanceEnabled) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [unlocked]);
+  }, [unlocked, maintenanceEnabled]);
 
   const tryUnlock = (value: string) => {
     const upper = value.trim().toUpperCase();
@@ -67,6 +93,19 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
     tryUnlock(pasted);
   };
 
+  // Still loading DB check
+  if (maintenanceEnabled === null) {
+    return (
+      <div className="min-h-screen w-full bg-[#050a12] flex items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+      </div>
+    );
+  }
+
+  // Maintenance is OFF in DB → let everyone through
+  if (!maintenanceEnabled) return <>{children}</>;
+
+  // Maintenance is ON but user entered the code → let through
   if (unlocked) return <>{children}</>;
 
   return (

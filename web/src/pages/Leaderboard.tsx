@@ -129,7 +129,7 @@ const Leaderboard = () => {
   const totalXP = sorted.reduce((s, t) => s + (t.total_xp ?? t.xp ?? 0), 0);
   const totalTrades = sorted.reduce((s, t) => s + (t.trades_count ?? 0), 0);
   const activeCount = sorted.filter(t => (t.daily_streak ?? 0) > 0).length;
-  const pioneerCount = sorted.filter(t => t.is_pioneer).length;
+  const memberCount = sorted.length;
 
   return (
     <AppLayout>
@@ -149,10 +149,10 @@ const Leaderboard = () => {
         {/* ── Global Stats Bar ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "Total XP Earned", value: totalXP.toLocaleString(), icon: Zap, color: "text-og-cyan" },
-            { label: "Total Trades", value: totalTrades.toLocaleString(), icon: Target, color: "text-og-lime" },
-            { label: "Active Streaks", value: String(activeCount), icon: Flame, color: "text-orange-400" },
-            { label: "Pioneers", value: String(pioneerCount), icon: Star, color: "text-og-gold" },
+            { label: "OGs Ranked", value: String(memberCount), icon: Users, color: "text-og-cyan" },
+            { label: "Total XP", value: totalXP.toLocaleString(), icon: Zap, color: "text-og-lime" },
+            { label: "Total Trades", value: totalTrades.toLocaleString(), icon: Target, color: "text-orange-400" },
+            { label: "Active Streaks", value: String(activeCount), icon: Flame, color: "text-og-gold" },
           ].map((s, i) => (
             <div key={i} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
               <div className="flex items-center gap-2 mb-2">

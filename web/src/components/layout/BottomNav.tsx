@@ -73,7 +73,7 @@ const routeToNav: Record<string, string> = {
   "/tokens": "/tools",
   "/alpha-chat": "/tools",
   "/ai-chat": "/tools",
-  "/advanced-tools": "/tools",
+
   "/callouts": "/tools",
 
   "/pumpv5": "/tools",
@@ -83,7 +83,7 @@ const routeToNav: Record<string, string> = {
   "/settings": "/profile",
 
   "/notifications": "/profile",
-  "/credits": "/profile",
+
   "/admin": "/profile",
 };
 
