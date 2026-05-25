@@ -76,16 +76,8 @@ export const AppTopBar = ({
 }) => {
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full flex-col border-b border-white/[0.07] bg-[#070d14]/80 backdrop-blur-md">
-      <div className="flex h-16 w-full items-center justify-between px-4 lg:px-6">
+      <div className="flex h-16 w-full items-center justify-between pl-14 pr-4 lg:pl-6 lg:pr-6">
         <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={onOpenSidebar}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.05] text-white/50 transition hover:bg-white/10 hover:text-white lg:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-
           <div className="hidden h-5 w-px bg-white/10 lg:block" />
 
           <div className="flex items-center gap-2">

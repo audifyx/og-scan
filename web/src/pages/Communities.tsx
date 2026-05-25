@@ -510,8 +510,35 @@ function ExploreCommunities({
   );
 }
 
+/* ── Community avatar helper — avatar_url image > emoji icon > initial letter ── */
+function CommunityAvatar({ community: c, size = "md", className = "" }: { community: Community; size?: "xs" | "sm" | "md" | "lg" | "xl"; className?: string }) {
+  const sizeMap = { xs: "w-8 h-8 text-xs", sm: "w-10 h-10 text-sm", md: "w-12 h-12 text-lg", lg: "w-14 h-14 text-xl", xl: "w-16 h-16 text-2xl" };
+  const gradients = [
+    "from-og-cyan/30 to-og-cyan/10 border-og-cyan/20",
+    "from-og-gold/30 to-og-gold/10 border-og-gold/20",
+    "from-og-lime/30 to-og-lime/10 border-og-lime/20",
+    "from-blue-500/30 to-blue-500/10 border-blue-500/20",
+    "from-purple-500/30 to-purple-500/10 border-purple-500/20",
+  ];
+  const gIdx = c.name.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % gradients.length;
+  const hasAvatar = c.avatar_url && c.avatar_url !== "null" && c.avatar_url !== "";
+  const hasIcon = c.icon && c.icon !== "null" && c.icon !== "default" && c.icon !== "" && c.icon.length <= 4;
+
+  return (
+    <div className={cn("rounded-2xl overflow-hidden bg-gradient-to-br border flex items-center justify-center shrink-0", sizeMap[size], gradients[gIdx], className)}>
+      {hasAvatar ? (
+        <img src={c.avatar_url!} className="w-full h-full object-cover" alt={c.name}
+          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+      ) : hasIcon ? (
+        <span>{c.icon}</span>
+      ) : (
+        <span className="font-black text-white/60">{c.name.charAt(0).toUpperCase()}</span>
+      )}
+    </div>
+  );
+}
+
 function CommunityCard({ community: c, onClick, variant = "list" }: { community: Community; onClick: () => void; variant?: "list" | "grid" | "compact" }) {
-  // Deterministic gradient based on community name
   const gradients = [
     "from-og-cyan/20 to-og-cyan/5 border-og-cyan/20 text-og-cyan",
     "from-og-gold/20 to-og-gold/5 border-og-gold/20 text-og-gold",
@@ -520,14 +547,11 @@ function CommunityCard({ community: c, onClick, variant = "list" }: { community:
     "from-purple-500/20 to-purple-500/5 border-purple-500/20 text-purple-400",
   ];
   const gradIdx = c.name.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % gradients.length;
-  const showIcon = c.icon && c.icon !== "null" && c.icon !== "default" && c.icon !== "";
 
   if (variant === "compact") {
     return (
       <button onClick={onClick} className="flex flex-col items-center gap-1.5 shrink-0 w-[72px] group">
-        <div className={cn("w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center text-xl shadow-lg border transition-all group-hover:scale-105 group-active:scale-95", gradients[gradIdx])}>
-          {showIcon ? c.icon : c.name.charAt(0).toUpperCase()}
-        </div>
+        <CommunityAvatar community={c} size="lg" className="group-hover:scale-105 group-active:scale-95 transition-all shadow-lg" />
         <span className="text-[10px] text-white/40 font-black uppercase tracking-tighter truncate w-full text-center">{c.name}</span>
       </button>
     );
@@ -542,9 +566,7 @@ function CommunityCard({ community: c, onClick, variant = "list" }: { community:
             <img src={c.banner_url} className="w-full h-full object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
           )}
           <div className="absolute -bottom-5 left-3">
-            <div className={cn("w-10 h-10 rounded-xl bg-[#070d14] flex items-center justify-center text-base border-2 shadow-lg", gradients[gradIdx])}>
-              {showIcon ? c.icon : c.name.charAt(0).toUpperCase()}
-            </div>
+            <CommunityAvatar community={c} size="sm" className="border-2 border-[#070d14] shadow-lg" />
           </div>
         </div>
         <div className="pt-7 px-3 pb-3">
@@ -568,9 +590,7 @@ function CommunityCard({ community: c, onClick, variant = "list" }: { community:
   // Default: list variant
   return (
     <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors text-left group">
-      <div className={cn("w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center text-lg shrink-0 border", gradients[gradIdx])}>
-        {showIcon ? c.icon : c.name.charAt(0).toUpperCase()}
-      </div>
+      <CommunityAvatar community={c} size="md" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-black uppercase tracking-wider text-white truncate group-hover:text-og-cyan transition-colors">{c.name}</p>
         <div className="flex items-center gap-3 mt-0.5">
@@ -733,7 +753,6 @@ function CommunityFeed({
           "from-og-lime/20 via-og-lime/10 to-transparent",
         ];
         const gIdx = community.name.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % gradients.length;
-        const showIcon = community.icon && community.icon !== "null" && community.icon !== "default" && community.icon !== "";
         return (
           <div className="border-b border-white/[0.06]">
             {/* Banner */}
@@ -743,9 +762,7 @@ function CommunityFeed({
                   onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
               )}
               <div className="absolute -bottom-7 left-4">
-                <div className={cn("w-14 h-14 rounded-2xl bg-[#070d14] flex items-center justify-center text-2xl border-[3px] border-[#070d14] shadow-xl", gradients[gIdx])}>
-                  {showIcon ? community.icon : community.name.charAt(0)}
-                </div>
+                <CommunityAvatar community={community} size="lg" className="border-[3px] border-[#070d14] shadow-xl" />
               </div>
             </div>
             {/* Info */}
