@@ -610,24 +610,24 @@ const ListingDetail: React.FC<{
   return (
     <div className="space-y-3">
       {/* Back + Share bar */}
-      <div className="flex items-center justify-between">
-        <button onClick={onBack} className="flex items-center gap-1.5 text-[11px] font-bold text-white/40 hover:text-white/70 transition-colors">
-          <ChevronDown className="h-3.5 w-3.5 rotate-90" /> Back to Listings
+      <div className="flex items-center justify-between gap-2">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-[11px] font-bold text-white/40 hover:text-white/70 transition-colors shrink-0">
+          <ChevronDown className="h-3.5 w-3.5 rotate-90" /> Back
         </button>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <button onClick={copyLink}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[10px] font-bold transition-all",
+              "flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-[11px] font-bold transition-all",
               linkCopied
-                ? "border-og-lime/30 bg-og-lime/10 text-og-lime"
-                : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20",
+                ? "border-og-lime/40 bg-og-lime/15 text-og-lime"
+                : "border-white/15 bg-white/[0.06] text-white/60 hover:text-white hover:border-white/30",
             )}>
-            {linkCopied ? <Check className="h-3 w-3" /> : <LinkIcon className="h-3 w-3" />}
-            {linkCopied ? "Link Copied!" : "Copy Link"}
+            {linkCopied ? <Check className="h-3.5 w-3.5" /> : <LinkIcon className="h-3.5 w-3.5" />}
+            {linkCopied ? "Copied!" : "Copy Link"}
           </button>
           <button onClick={shareNative}
-            className="flex items-center gap-1.5 rounded-lg border border-og-cyan/20 bg-og-cyan/5 px-3 py-1.5 text-[10px] font-bold text-og-cyan/60 hover:text-og-cyan hover:border-og-cyan/40 transition-all">
-            <Share2 className="h-3 w-3" /> Share
+            className="flex items-center gap-1.5 rounded-xl border border-og-cyan/30 bg-og-cyan/10 px-3.5 py-2 text-[11px] font-bold text-og-cyan hover:bg-og-cyan/20 hover:border-og-cyan/50 transition-all">
+            <Share2 className="h-3.5 w-3.5" /> Share
           </button>
         </div>
       </div>
