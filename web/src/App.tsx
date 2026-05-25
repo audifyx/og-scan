@@ -24,14 +24,6 @@ import AlphaChat from "./pages/AlphaChat";
 import TradingLobbies from "./pages/TradingLobbies";
 import Leaderboard from "./pages/Leaderboard";
 import DirectMessages from "./pages/DirectMessages";
-
-const DirectMessagesPage = () => (
-  <AppLayout>
-    <div className="h-[calc(100vh-68px)] lg:h-screen">
-      <DirectMessages />
-    </div>
-  </AppLayout>
-);
 import Notifications from "./pages/Notifications";
 // Premium removed
 import OfficialToken from "./pages/OfficialToken";
@@ -46,6 +38,15 @@ import Privacy from "./pages/Privacy";
 import Admin from "./pages/Admin";
 import ArtFeed from "./pages/ArtFeed";
 import SpaceReplay from "./pages/SpaceReplay";
+import { AppLayout } from "./components/layout/AppLayout";
+
+const DirectMessagesPage = () => (
+  <AppLayout>
+    <div className="h-[calc(100vh-68px)] lg:h-screen">
+      <DirectMessages />
+    </div>
+  </AppLayout>
+);
 
 const queryClient = new QueryClient();
 
