@@ -14,7 +14,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       {/* Wallpaper layer — very subtle, pushed far back */}
       {customWallpaper && (
         <div
-          className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-15"
+          className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-15"
           style={{ backgroundImage: `url(${customWallpaper})` }}
         >
           <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />

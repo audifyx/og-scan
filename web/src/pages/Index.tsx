@@ -704,7 +704,7 @@ const Index = () => {
     <div className="st-workspace flex min-h-screen bg-background text-foreground relative">
       {/* Wallpaper layer — very subtle, pushed far back */}
       {customWallpaper && (
-        <div className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-15" style={{ backgroundImage: `url(${customWallpaper})` }}>
+        <div className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-15" style={{ backgroundImage: `url(${customWallpaper})` }}>
           <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
         </div>
       )}
@@ -727,7 +727,7 @@ const Index = () => {
       )}
 
       {/* Main content */}
-      <div className="flex min-w-0 flex-1 flex-col lg:ml-[260px]">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col lg:ml-[260px]">
         {/* Top bar + horizontal tab strip */}
         <AppTopBar
           tab={activeTab}
@@ -1151,16 +1151,12 @@ const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: strin
 const CommunitiesInline = () => <CommunitiesPage />;
 
 const DiscoverInline = () => {
-  const [discoverTab, setDiscoverTab] = useState<"explore" | "launchpads" | "viral" | "launches" | "memes" | "profile" | "webhooks" | "pro">("explore");
+  const [discoverTab, setDiscoverTab] = useState<"explore" | "launchpads" | "viral" | "launches">("explore");
   const discoverTabs = [
     { id: "explore" as const, label: "🔥 Explore", desc: "Trending tokens" },
     { id: "launchpads" as const, label: "🚀 Launchpads", desc: "Pump.fun, Moonshot, Believe" },
     { id: "viral" as const, label: "⚡ Viral", desc: "Going viral" },
     { id: "launches" as const, label: "🆕 Launches", desc: "New tokens" },
-    { id: "memes" as const, label: "😂 Memes", desc: "Meme factory" },
-    { id: "profile" as const, label: "👤 Profile", desc: "Your stats" },
-    { id: "webhooks" as const, label: "🔔 Webhooks", desc: "Alerts setup" },
-    { id: "pro" as const, label: "👑 Pro", desc: "Premium tools" },
   ];
   return (
     <div className="space-y-4">
@@ -1181,10 +1177,6 @@ const DiscoverInline = () => {
       {discoverTab === "launchpads" && <LaunchpadExplorer />}
       {discoverTab === "viral" && <ViralFeed />}
       {discoverTab === "launches" && <LaunchTracker />}
-      {discoverTab === "memes" && <MemeGallery />}
-      {discoverTab === "profile" && <UserProfile />}
-      {discoverTab === "webhooks" && <WebhookManager />}
-      {discoverTab === "pro" && <ProDashboard />}
     </div>
   );
 };

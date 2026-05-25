@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useEffect } from "react";
 import {
   Users, Plus, ChevronLeft, Lock, Globe, Search, LineChart,
@@ -46,7 +47,8 @@ const CRYPTO_AVATARS = [
 ];
 
 
-const TradingLobbies = () => {
+const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
+  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
@@ -221,8 +223,8 @@ const TradingLobbies = () => {
     const isCreator = activeLobby.created_by === user?.id;
 
     return (
-      <AppLayout>
-        <div className="flex flex-col h-[calc(100vh-60px)] lg:h-screen">
+      <Wrap>
+        <div className="flex flex-col h-[calc(100dvh-140px)] lg:h-[calc(100vh-60px)]">
           {/* Header */}
           <div className="shrink-0 border-b border-primary/10 bg-background/80 backdrop-blur-xl p-3 flex items-center gap-3">
             <button onClick={() => { leaveLobby(); }} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
@@ -386,7 +388,7 @@ const TradingLobbies = () => {
                 </div>
               )}
               {mobileTab === "chat" && (
-                <div className="flex-1 p-2 min-h-0">
+                <div className="flex-1 p-2 min-h-0 h-full overflow-hidden">
                   <LobbyChat lobbyId={activeLobby.id} />
                 </div>
               )}
@@ -398,13 +400,13 @@ const TradingLobbies = () => {
             </div>
           </div>
         </div>
-      </AppLayout>
+      </Wrap>
     );
   }
 
   // Lobby list view
   return (
-    <AppLayout>
+    <Wrap>
       <div className="p-4 space-y-4 max-w-4xl mx-auto">
         <div className="flex items-center justify-between">
           <div>
@@ -521,7 +523,7 @@ const TradingLobbies = () => {
           </div>
         )}
       </div>
-    </AppLayout>
+    </Wrap>
   );
 };
 
