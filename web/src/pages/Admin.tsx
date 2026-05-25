@@ -2361,25 +2361,164 @@ const Admin = ({ inline = false }: { inline?: boolean }) => {
      ═══════════════════════════════════════════════════════════════ */
 
   const SecurityCenter = () => {
-    const [secTab, setSecTab] = useState<"audit" | "access" | "threats">("audit");
+    const [secTab, setSecTab] = useState<"devices" | "flagged" | "events" | "audit" | "access">("devices");
     const [auditSearch, setAuditSearch] = useState("");
     const [adminRoles, setAdminRoles] = useState<any[]>([]);
+    const [devices, setDevices] = useState<any[]>([]);
+    const [authEvents, setAuthEvents] = useState<any[]>([]);
+    const [flaggedGroups, setFlaggedGroups] = useState<{ type: string; key: string; users: any[] }[]>([]);
+    const [deviceSearch, setDeviceSearch] = useState("");
+    const [eventSearch, setEventSearch] = useState("");
+    const [selectedUser, setSelectedUser] = useState<any | null>(null);
+    const [banDialog, setBanDialog] = useState<{ user: any; action: "ban" | "suspend" | "unban" | "unsuspend" } | null>(null);
+    const [banReason, setBanReason] = useState("");
     const [loaded, setLoaded] = useState(false);
+    const [scanning, setScanning] = useState(false);
+    const [stats, setStats] = useState({ totalDevices: 0, uniqueIPs: 0, uniqueFingerprints: 0, bannedUsers: 0, suspendedUsers: 0, eventsToday: 0 });
 
-    useEffect(() => {
-      if (loaded) return;
-      (async () => {
-        const { data } = await supabase.from("admin_roles").select("*");
-        setAdminRoles(data ?? []);
-        setLoaded(true);
-      })();
-    }, [loaded]);
+    /* ── Load data ── */
+    const loadAll = useCallback(async () => {
+      const [devRes, evRes, roleRes] = await Promise.all([
+        supabase.from("user_devices").select("*").order("last_seen_at", { ascending: false }).limit(500),
+        supabase.from("auth_events").select("*").order("created_at", { ascending: false }).limit(500),
+        supabase.from("admin_roles").select("*"),
+      ]);
+      const devs = devRes.data ?? [];
+      const evts = evRes.data ?? [];
+      setDevices(devs);
+      setAuthEvents(evts);
+      setAdminRoles(roleRes.data ?? []);
 
+      /* stats */
+      const ips = new Set(devs.map((d: any) => d.ip_address).filter(Boolean));
+      const fps = new Set(devs.map((d: any) => d.fingerprint).filter(Boolean));
+      const todayStart = startOfDay(new Date()).toISOString();
+      const todayEvents = evts.filter((e: any) => e.created_at >= todayStart).length;
+      const banned = profiles.filter((p: any) => (p as any).is_banned).length;
+      const suspended = profiles.filter((p: any) => (p as any).is_suspended).length;
+      setStats({ totalDevices: devs.length, uniqueIPs: ips.size, uniqueFingerprints: fps.size, bannedUsers: banned, suspendedUsers: suspended, eventsToday: todayEvents });
+
+      setLoaded(true);
+    }, [profiles]);
+
+    useEffect(() => { if (!loaded) loadAll(); }, [loaded, loadAll]);
+
+    /* ── Duplicate scan ── */
+    const runDuplicateScan = useCallback(async () => {
+      setScanning(true);
+      const groups: { type: string; key: string; users: any[] }[] = [];
+
+      /* Group by fingerprint */
+      const fpMap: Record<string, Set<string>> = {};
+      devices.forEach((d: any) => {
+        if (!d.fingerprint) return;
+        if (!fpMap[d.fingerprint]) fpMap[d.fingerprint] = new Set();
+        fpMap[d.fingerprint].add(d.user_id);
+      });
+      for (const [fp, userIds] of Object.entries(fpMap)) {
+        if (userIds.size > 1) {
+          const users = [...userIds].map(uid => {
+            const prof = profiles.find((p: any) => p.user_id === uid);
+            const dev = devices.find((d: any) => d.user_id === uid && d.fingerprint === fp);
+            return { user_id: uid, username: (prof as any)?.username ?? uid.slice(0, 8), is_banned: (prof as any)?.is_banned, is_suspended: (prof as any)?.is_suspended, ip: dev?.ip_address, last_seen: dev?.last_seen_at };
+          });
+          groups.push({ type: "fingerprint", key: fp, users });
+        }
+      }
+
+      /* Group by IP */
+      const ipMap: Record<string, Set<string>> = {};
+      devices.forEach((d: any) => {
+        const ip = d.ip_address;
+        if (!ip || ip === "unknown") return;
+        if (!ipMap[ip]) ipMap[ip] = new Set();
+        ipMap[ip].add(d.user_id);
+      });
+      for (const [ip, userIds] of Object.entries(ipMap)) {
+        if (userIds.size > 1) {
+          const existsFp = groups.some(g => g.type === "fingerprint" && JSON.stringify([...g.users.map(u => u.user_id)].sort()) === JSON.stringify([...userIds].sort()));
+          const users = [...userIds].map(uid => {
+            const prof = profiles.find((p: any) => p.user_id === uid);
+            return { user_id: uid, username: (prof as any)?.username ?? uid.slice(0, 8), is_banned: (prof as any)?.is_banned, is_suspended: (prof as any)?.is_suspended, ip, last_seen: devices.find((d: any) => d.user_id === uid)?.last_seen_at };
+          });
+          groups.push({ type: existsFp ? "ip_only" : "ip", key: ip, users });
+        }
+      }
+
+      /* Group by wallet */
+      const walletMap: Record<string, string[]> = {};
+      profiles.forEach((p: any) => {
+        if (p.wallet_address) {
+          if (!walletMap[p.wallet_address]) walletMap[p.wallet_address] = [];
+          walletMap[p.wallet_address].push(p.user_id);
+        }
+      });
+      for (const [wallet, userIds] of Object.entries(walletMap)) {
+        if (userIds.length > 1) {
+          const users = userIds.map(uid => {
+            const prof = profiles.find((p: any) => p.user_id === uid);
+            return { user_id: uid, username: (prof as any)?.username ?? uid.slice(0, 8), is_banned: (prof as any)?.is_banned, is_suspended: (prof as any)?.is_suspended, ip: null, last_seen: null };
+          });
+          groups.push({ type: "wallet", key: wallet.slice(0, 12) + "…", users });
+        }
+      }
+
+      /* Sort: fingerprint matches first, then ip, then wallet */
+      groups.sort((a, b) => {
+        const order: Record<string, number> = { fingerprint: 0, ip: 1, ip_only: 2, wallet: 3 };
+        return (order[a.type] ?? 9) - (order[b.type] ?? 9);
+      });
+
+      setFlaggedGroups(groups);
+      setScanning(false);
+      if (groups.length === 0) toast.success("No duplicate accounts detected");
+      else toast.warning(`Found ${groups.length} suspicious groups`);
+    }, [devices, profiles]);
+
+    /* ── Ban / Suspend / Unban / Unsuspend ── */
+    const executeBanAction = async () => {
+      if (!banDialog) return;
+      const { user: u, action } = banDialog;
+      const updates: any = {};
+      if (action === "ban") { updates.is_banned = true; updates.banned_at = new Date().toISOString(); updates.ban_reason = banReason || "Multi-account violation"; }
+      if (action === "suspend") { updates.is_suspended = true; updates.suspended_at = new Date().toISOString(); updates.suspension_reason = banReason || "Suspicious activity"; }
+      if (action === "unban") { updates.is_banned = false; updates.ban_reason = null; updates.banned_at = null; }
+      if (action === "unsuspend") { updates.is_suspended = false; updates.suspension_reason = null; updates.suspended_at = null; }
+
+      const { error } = await supabase.from("profiles").update(updates).eq("user_id", u.user_id);
+      if (error) { toast.error("Failed: " + error.message); return; }
+
+      await supabase.from("admin_audit_log").insert({ admin_user_id: user!.id, action: `security_${action}`, target_type: "user", target_id: u.user_id, new_values: updates });
+      toast.success(`User ${action === "ban" ? "banned" : action === "suspend" ? "suspended" : action === "unban" ? "unbanned" : "unsuspended"}`);
+      setBanDialog(null);
+      setBanReason("");
+      setLoaded(false);
+    };
+
+    /* ── Helpers ── */
     const filteredLogs = useMemo(() => {
       if (!auditSearch) return auditLogs;
       const q = auditSearch.toLowerCase();
       return auditLogs.filter(l => l.action?.toLowerCase().includes(q) || l.target_type?.toLowerCase().includes(q));
     }, [auditLogs, auditSearch]);
+
+    const filteredDevices = useMemo(() => {
+      if (!deviceSearch) return devices;
+      const q = deviceSearch.toLowerCase();
+      return devices.filter((d: any) => {
+        const prof = profiles.find((p: any) => p.user_id === d.user_id);
+        return d.fingerprint?.toLowerCase().includes(q) || d.ip_address?.includes(q) || (prof as any)?.username?.toLowerCase().includes(q) || d.user_id?.toLowerCase().includes(q);
+      });
+    }, [devices, deviceSearch, profiles]);
+
+    const filteredEvents = useMemo(() => {
+      if (!eventSearch) return authEvents;
+      const q = eventSearch.toLowerCase();
+      return authEvents.filter((e: any) => {
+        const prof = profiles.find((p: any) => p.user_id === e.user_id);
+        return e.ip_address?.includes(q) || e.event_type?.includes(q) || (prof as any)?.username?.toLowerCase().includes(q) || e.fingerprint?.toLowerCase().includes(q);
+      });
+    }, [authEvents, eventSearch, profiles]);
 
     const removeAdmin = async (userId: string) => {
       if (!confirm("Remove this admin role?")) return;
@@ -2389,26 +2528,171 @@ const Admin = ({ inline = false }: { inline?: boolean }) => {
       setLoaded(false);
     };
 
-    const exportAuditLogs = () => {
-      const csv = ["timestamp,action,target_type,target_id,admin_id"].concat(
-        auditLogs.map(l => `${l.created_at},${l.action},${l.target_type ?? ""},${l.target_id ?? ""},${l.admin_user_id}`)
-      ).join("\n");
+    const exportSecurityData = () => {
+      const rows = devices.map((d: any) => {
+        const prof = profiles.find((p: any) => p.user_id === d.user_id);
+        return `${(prof as any)?.username ?? ""},${d.user_id},${d.fingerprint},${d.ip_address ?? ""},${d.platform ?? ""},${d.screen_resolution ?? ""},${d.timezone ?? ""},${d.last_seen_at}`;
+      });
+      const csv = ["username,user_id,fingerprint,ip,platform,screen,timezone,last_seen"].concat(rows).join("\n");
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = `audit-log-${format(new Date(), "yyyy-MM-dd")}.csv`; a.click();
-      toast.success("Audit log exported");
+      const a = document.createElement("a"); a.href = url; a.download = `security-data-${format(new Date(), "yyyy-MM-dd")}.csv`; a.click();
+      toast.success("Security data exported");
     };
+
+    const getUserProfile = (userId: string) => profiles.find((p: any) => p.user_id === userId) as any;
+    const riskColor = (type: string) => type === "fingerprint" ? "text-red-400 bg-red-500/10 border-red-500/20" : type === "ip" ? "text-orange-400 bg-orange-500/10 border-orange-500/20" : type === "ip_only" ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" : "text-blue-400 bg-blue-500/10 border-blue-500/20";
+    const riskLabel = (type: string) => type === "fingerprint" ? "SAME DEVICE" : type === "ip" ? "SAME IP" : type === "ip_only" ? "SHARED IP" : "SAME WALLET";
 
     return (
       <div className="space-y-4">
-        <SectionHeader title="Security Center" description="Audit logs, access control, and threat monitoring" action={<ActionButton icon={Download} label="Export Logs" onClick={exportAuditLogs} />} />
+        <SectionHeader title="Security & Anti-Fraud" description="Device fingerprinting, IP tracking, duplicate account detection, and account enforcement" action={<ActionButton icon={Download} label="Export Data" onClick={exportSecurityData} />} />
 
-        <div className="flex gap-2">
-          <Pill label={`Audit Log (${auditLogs.length})`} active={secTab === "audit"} onClick={() => setSecTab("audit")} />
-          <Pill label={`Access Control (${adminRoles.length})`} active={secTab === "access"} onClick={() => setSecTab("access")} />
-          <Pill label="Threats" active={secTab === "threats"} onClick={() => setSecTab("threats")} />
+        {/* ── Stats bar ── */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <StatCard label="Devices" value={stats.totalDevices} icon={Cpu} color="text-[#22d3ee]" />
+          <StatCard label="Unique IPs" value={stats.uniqueIPs} icon={Globe} color="text-blue-400" />
+          <StatCard label="Fingerprints" value={stats.uniqueFingerprints} icon={Crosshair} color="text-purple-400" />
+          <StatCard label="Banned" value={stats.bannedUsers} icon={Ban} color="text-red-400" />
+          <StatCard label="Suspended" value={stats.suspendedUsers} icon={AlertTriangle} color="text-orange-400" />
+          <StatCard label="Events Today" value={stats.eventsToday} icon={Activity} color="text-emerald-400" />
         </div>
 
+        {/* ── Sub-tabs ── */}
+        <div className="flex gap-2 flex-wrap">
+          <Pill label={`Devices (${devices.length})`} active={secTab === "devices"} onClick={() => setSecTab("devices")} />
+          <Pill label={`Flagged (${flaggedGroups.length})`} active={secTab === "flagged"} onClick={() => { setSecTab("flagged"); if (flaggedGroups.length === 0 && !scanning) runDuplicateScan(); }} />
+          <Pill label={`Events (${authEvents.length})`} active={secTab === "events"} onClick={() => setSecTab("events")} />
+          <Pill label={`Audit (${auditLogs.length})`} active={secTab === "audit"} onClick={() => setSecTab("audit")} />
+          <Pill label={`Access (${adminRoles.length})`} active={secTab === "access"} onClick={() => setSecTab("access")} />
+        </div>
+
+        {/* ═══ DEVICES TAB ═══ */}
+        {secTab === "devices" && (
+          <div className="space-y-2">
+            <SearchBar value={deviceSearch} onChange={setDeviceSearch} placeholder="Search by username, IP, fingerprint..." />
+            <div className="space-y-1 max-h-[500px] overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+              {filteredDevices.map((d: any) => {
+                const prof = getUserProfile(d.user_id);
+                return (
+                  <div key={d.id} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/[0.03] transition cursor-pointer" onClick={() => setSelectedUser(d)}>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#22d3ee]/10">
+                      <Cpu className="h-3.5 w-3.5 text-[#22d3ee]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[12px] font-semibold text-white truncate">{prof?.username || d.user_id.slice(0, 12)}</p>
+                        {prof?.is_banned && <Badge className="text-[8px] border-0 bg-red-500/20 text-red-400">BANNED</Badge>}
+                        {prof?.is_suspended && <Badge className="text-[8px] border-0 bg-orange-500/20 text-orange-400">SUSPENDED</Badge>}
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <span className="text-[10px] text-white/30 font-mono">{d.ip_address ?? "no IP"}</span>
+                        <span className="text-[10px] text-white/20">•</span>
+                        <span className="text-[10px] text-white/30 font-mono">FP: {d.fingerprint?.slice(0, 10)}…</span>
+                        {d.platform && <><span className="text-[10px] text-white/20">•</span><span className="text-[10px] text-white/20">{d.platform.slice(0, 20)}</span></>}
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-white/20 shrink-0">{d.last_seen_at ? formatDistanceToNow(new Date(d.last_seen_at), { addSuffix: true }) : "—"}</span>
+                  </div>
+                );
+              })}
+              {filteredDevices.length === 0 && <EmptyState icon={Cpu} title="No device data" desc="Device fingerprints appear after users log in" />}
+            </div>
+          </div>
+        )}
+
+        {/* ═══ FLAGGED / DUPLICATES TAB ═══ */}
+        {secTab === "flagged" && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Button size="sm" className="h-8 text-[11px] gap-1.5" onClick={runDuplicateScan} disabled={scanning}>
+                {scanning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
+                {scanning ? "Scanning…" : "Re-scan"}
+              </Button>
+              <span className="text-[10px] text-white/30">Scans devices, IPs, and wallets for shared accounts</span>
+            </div>
+            <div className="space-y-3 max-h-[500px] overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+              {flaggedGroups.map((group, gi) => (
+                <div key={`${group.type}-${group.key}-${gi}`} className={cn("rounded-xl border p-4 space-y-2", riskColor(group.type).replace("text-", "border-").replace(/bg-[^\s]+/, "").replace(/\s+/g, " "), "bg-white/[0.02]")}>
+                  <div className="flex items-center gap-2">
+                    <Badge className={cn("text-[9px] border font-bold", riskColor(group.type))}>{riskLabel(group.type)}</Badge>
+                    <span className="text-[10px] text-white/40 font-mono">{group.key.slice(0, 24)}{group.key.length > 24 ? "…" : ""}</span>
+                    <span className="text-[10px] text-white/25 ml-auto">{group.users.length} accounts</span>
+                  </div>
+                  <div className="space-y-1">
+                    {group.users.map((u: any) => (
+                      <div key={u.user_id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/[0.03]">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[11px] font-semibold text-white">{u.username}</p>
+                          {u.is_banned && <Badge className="text-[8px] border-0 bg-red-500/20 text-red-400">BANNED</Badge>}
+                          {u.is_suspended && <Badge className="text-[8px] border-0 bg-orange-500/20 text-orange-400">SUSPENDED</Badge>}
+                          {u.ip && <span className="text-[10px] text-white/20 font-mono">{u.ip}</span>}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {!u.is_banned && !u.is_suspended && (
+                            <>
+                              <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 border-orange-500/30 text-orange-400 hover:bg-orange-500/10" onClick={() => { setBanDialog({ user: u, action: "suspend" }); setBanReason("Multi-account violation"); }}>
+                                Suspend
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => { setBanDialog({ user: u, action: "ban" }); setBanReason("Multi-account violation"); }}>
+                                Ban
+                              </Button>
+                            </>
+                          )}
+                          {u.is_suspended && !u.is_banned && (
+                            <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 border-green-500/30 text-green-400 hover:bg-green-500/10" onClick={() => { setBanDialog({ user: u, action: "unsuspend" }); }}>
+                              Unsuspend
+                            </Button>
+                          )}
+                          {u.is_banned && (
+                            <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 border-green-500/30 text-green-400 hover:bg-green-500/10" onClick={() => { setBanDialog({ user: u, action: "unban" }); }}>
+                              Unban
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {flaggedGroups.length === 0 && !scanning && <EmptyState icon={Shield} title="No duplicates found" desc="All accounts look unique" />}
+              {scanning && <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-white/30" /></div>}
+            </div>
+          </div>
+        )}
+
+        {/* ═══ AUTH EVENTS TAB ═══ */}
+        {secTab === "events" && (
+          <div className="space-y-2">
+            <SearchBar value={eventSearch} onChange={setEventSearch} placeholder="Search events by user, IP, type..." />
+            <div className="space-y-1 max-h-[500px] overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+              {filteredEvents.map((e: any) => {
+                const prof = getUserProfile(e.user_id);
+                return (
+                  <div key={e.id} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/[0.03] transition">
+                    <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", e.event_type === "login" ? "bg-emerald-500/10" : "bg-blue-500/10")}>
+                      {e.event_type === "login" ? <Key className="h-3.5 w-3.5 text-emerald-400" /> : <RefreshCw className="h-3.5 w-3.5 text-blue-400" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[12px] font-semibold text-white">{prof?.username || e.user_id.slice(0, 12)}</p>
+                        <Badge variant="outline" className="text-[9px] border-white/10 text-white/40">{e.event_type}</Badge>
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <span className="text-[10px] text-white/30 font-mono">{e.ip_address ?? "no IP"}</span>
+                        {e.fingerprint && <><span className="text-[10px] text-white/20">•</span><span className="text-[10px] text-white/20 font-mono">FP: {e.fingerprint.slice(0, 10)}</span></>}
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-white/20 shrink-0">{formatDistanceToNow(new Date(e.created_at), { addSuffix: true })}</span>
+                  </div>
+                );
+              })}
+              {filteredEvents.length === 0 && <EmptyState icon={Activity} title="No auth events yet" desc="Login events appear after users sign in" />}
+            </div>
+          </div>
+        )}
+
+        {/* ═══ AUDIT LOG TAB ═══ */}
         {secTab === "audit" && (
           <div className="space-y-2">
             <SearchBar value={auditSearch} onChange={setAuditSearch} placeholder="Search actions..." />
@@ -2433,13 +2717,14 @@ const Admin = ({ inline = false }: { inline?: boolean }) => {
           </div>
         )}
 
+        {/* ═══ ACCESS CONTROL TAB ═══ */}
         {secTab === "access" && (
           <div className="space-y-2">
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
               <p className="text-[12px] font-bold text-white mb-3">Admin & Moderator Roles</p>
               <div className="space-y-1">
                 {adminRoles.map((r: any) => {
-                  const prof = profiles.find(p => p.user_id === r.user_id);
+                  const prof = getUserProfile(r.user_id);
                   return (
                     <div key={r.id} className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/[0.03]">
                       <div className="flex items-center gap-3">
@@ -2464,30 +2749,106 @@ const Admin = ({ inline = false }: { inline?: boolean }) => {
           </div>
         )}
 
-        {secTab === "threats" && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <StatCard label="Banned Users" value={profiles.filter(p => p.status === "banned").length} icon={Ban} color="text-red-400" />
-              <StatCard label="Admin Roles" value={adminRoles.length} icon={Crown} color="text-amber-400" />
-              <StatCard label="Audit Events" value={auditLogs.length} icon={ShieldAlert} color="text-orange-400" />
-            </div>
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-              <p className="text-[12px] font-bold text-white mb-2">Multi-Account Detection</p>
-              <p className="text-[10px] text-white/30">Scans for users sharing the same wallet address</p>
-              <Button size="sm" className="mt-2 h-8 text-[11px]" onClick={async () => {
-                const walletMap: Record<string, string[]> = {};
-                profiles.forEach(p => {
-                  if (p.wallet_address) {
-                    if (!walletMap[p.wallet_address]) walletMap[p.wallet_address] = [];
-                    walletMap[p.wallet_address].push(p.username || p.user_id.slice(0, 8));
-                  }
-                });
-                const dupes = Object.entries(walletMap).filter(([_, users]) => users.length > 1);
-                if (dupes.length === 0) toast.success("No duplicate wallets found");
-                else toast.warning(`Found ${dupes.length} shared wallets: ${dupes.map(([w, u]) => `${w.slice(0, 8)}… (${u.join(", ")})`).join(" | ")}`);
-              }}>Scan Now</Button>
-            </div>
-          </div>
+        {/* ═══ DEVICE DETAIL PANEL ═══ */}
+        {selectedUser && (() => {
+          const d = selectedUser;
+          const prof = getUserProfile(d.user_id);
+          const userDevices = devices.filter((dd: any) => dd.user_id === d.user_id);
+          const userEvents = authEvents.filter((e: any) => e.user_id === d.user_id);
+          const sameFingerprint = devices.filter((dd: any) => dd.fingerprint === d.fingerprint && dd.user_id !== d.user_id);
+          const sameIp = devices.filter((dd: any) => dd.ip_address === d.ip_address && dd.user_id !== d.user_id && dd.ip_address && dd.ip_address !== "unknown");
+          return (
+            <Dialog open onOpenChange={() => setSelectedUser(null)}>
+              <DialogContent className="max-w-lg bg-[#0a0a0f] border-white/10">
+                <DialogHeader>
+                  <DialogTitle className="text-white flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-orange-400" />
+                    {prof?.username || d.user_id.slice(0, 12)} — Device Intel
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 text-[11px]">
+                  {/* User info */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-white/[0.03] p-2.5"><span className="text-white/30 block">User ID</span><span className="text-white font-mono text-[10px] break-all">{d.user_id}</span></div>
+                    <div className="rounded-lg bg-white/[0.03] p-2.5"><span className="text-white/30 block">Status</span><span className={cn("font-bold", prof?.is_banned ? "text-red-400" : prof?.is_suspended ? "text-orange-400" : "text-green-400")}>{prof?.is_banned ? "BANNED" : prof?.is_suspended ? "SUSPENDED" : "Active"}</span></div>
+                    <div className="rounded-lg bg-white/[0.03] p-2.5"><span className="text-white/30 block">IP Address</span><span className="text-white font-mono">{d.ip_address ?? "unknown"}</span></div>
+                    <div className="rounded-lg bg-white/[0.03] p-2.5"><span className="text-white/30 block">Fingerprint</span><span className="text-white font-mono text-[10px]">{d.fingerprint}</span></div>
+                    <div className="rounded-lg bg-white/[0.03] p-2.5"><span className="text-white/30 block">Platform</span><span className="text-white">{d.platform ?? "—"}</span></div>
+                    <div className="rounded-lg bg-white/[0.03] p-2.5"><span className="text-white/30 block">Screen</span><span className="text-white">{d.screen_resolution ?? "—"}</span></div>
+                    <div className="rounded-lg bg-white/[0.03] p-2.5"><span className="text-white/30 block">Timezone</span><span className="text-white">{d.timezone ?? "—"}</span></div>
+                    <div className="rounded-lg bg-white/[0.03] p-2.5"><span className="text-white/30 block">Language</span><span className="text-white">{d.language ?? "—"}</span></div>
+                  </div>
+                  {/* Linked accounts */}
+                  {(sameFingerprint.length > 0 || sameIp.length > 0) && (
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 space-y-2">
+                      <p className="text-[11px] font-bold text-red-400 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Linked Accounts Detected</p>
+                      {sameFingerprint.length > 0 && (
+                        <div><p className="text-[10px] text-red-300/70 mb-1">Same device fingerprint:</p>
+                        {sameFingerprint.map((dd: any) => { const p2 = getUserProfile(dd.user_id); return <p key={dd.id} className="text-[10px] text-white/60 font-mono">{p2?.username || dd.user_id.slice(0, 12)} ({dd.ip_address})</p>; })}</div>
+                      )}
+                      {sameIp.length > 0 && (
+                        <div><p className="text-[10px] text-orange-300/70 mb-1">Same IP address:</p>
+                        {sameIp.map((dd: any) => { const p2 = getUserProfile(dd.user_id); return <p key={dd.id} className="text-[10px] text-white/60 font-mono">{p2?.username || dd.user_id.slice(0, 12)} (FP: {dd.fingerprint?.slice(0, 10)})</p>; })}</div>
+                      )}
+                    </div>
+                  )}
+                  {/* Login history */}
+                  <div><p className="text-[11px] font-bold text-white mb-1">Login History ({userEvents.length})</p>
+                    <div className="space-y-0.5 max-h-32 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+                      {userEvents.slice(0, 20).map((e: any) => (
+                        <div key={e.id} className="flex items-center justify-between px-2 py-1 rounded-md hover:bg-white/[0.02]">
+                          <span className="text-[10px] text-white/40 font-mono">{e.ip_address} — {e.event_type}</span>
+                          <span className="text-[10px] text-white/20">{format(new Date(e.created_at), "MMM d, HH:mm")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-2 border-t border-white/[0.06]">
+                    {!prof?.is_banned && !prof?.is_suspended && (
+                      <>
+                        <Button size="sm" variant="outline" className="h-8 text-[10px] border-orange-500/30 text-orange-400 hover:bg-orange-500/10 flex-1" onClick={() => { setBanDialog({ user: { user_id: d.user_id, username: prof?.username }, action: "suspend" }); setBanReason(""); setSelectedUser(null); }}>Suspend</Button>
+                        <Button size="sm" variant="outline" className="h-8 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 flex-1" onClick={() => { setBanDialog({ user: { user_id: d.user_id, username: prof?.username }, action: "ban" }); setBanReason(""); setSelectedUser(null); }}>Ban</Button>
+                      </>
+                    )}
+                    {prof?.is_suspended && <Button size="sm" variant="outline" className="h-8 text-[10px] border-green-500/30 text-green-400 hover:bg-green-500/10 flex-1" onClick={() => { setBanDialog({ user: { user_id: d.user_id, username: prof?.username }, action: "unsuspend" }); setSelectedUser(null); }}>Unsuspend</Button>}
+                    {prof?.is_banned && <Button size="sm" variant="outline" className="h-8 text-[10px] border-green-500/30 text-green-400 hover:bg-green-500/10 flex-1" onClick={() => { setBanDialog({ user: { user_id: d.user_id, username: prof?.username }, action: "unban" }); setSelectedUser(null); }}>Unban</Button>}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          );
+        })()}
+
+        {/* ═══ BAN/SUSPEND CONFIRMATION DIALOG ═══ */}
+        {banDialog && (
+          <Dialog open onOpenChange={() => setBanDialog(null)}>
+            <DialogContent className="max-w-sm bg-[#0a0a0f] border-white/10">
+              <DialogHeader>
+                <DialogTitle className="text-white flex items-center gap-2">
+                  {banDialog.action === "ban" ? <Ban className="h-4 w-4 text-red-400" /> : banDialog.action === "suspend" ? <AlertTriangle className="h-4 w-4 text-orange-400" /> : <UserCheck className="h-4 w-4 text-green-400" />}
+                  {banDialog.action === "ban" ? "Ban" : banDialog.action === "suspend" ? "Suspend" : banDialog.action === "unban" ? "Unban" : "Unsuspend"} User
+                </DialogTitle>
+                <DialogDescription className="text-white/40 text-[11px]">
+                  {banDialog.action === "ban" || banDialog.action === "suspend"
+                    ? `This will ${banDialog.action} "${banDialog.user.username || banDialog.user.user_id.slice(0, 12)}". They'll be signed out on next visit.`
+                    : `Restore access for "${banDialog.user.username || banDialog.user.user_id.slice(0, 12)}".`}
+                </DialogDescription>
+              </DialogHeader>
+              {(banDialog.action === "ban" || banDialog.action === "suspend") && (
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-white/50">Reason</Label>
+                  <Input value={banReason} onChange={e => setBanReason(e.target.value)} placeholder="Multi-account violation" className="h-8 text-[11px] bg-white/[0.04] border-white/10" />
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" size="sm" className="h-8 text-[11px]" onClick={() => setBanDialog(null)}>Cancel</Button>
+                <Button size="sm" className={cn("h-8 text-[11px]", banDialog.action === "ban" ? "bg-red-600 hover:bg-red-700" : banDialog.action === "suspend" ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700")} onClick={executeBanAction}>
+                  Confirm {banDialog.action === "ban" ? "Ban" : banDialog.action === "suspend" ? "Suspend" : banDialog.action === "unban" ? "Unban" : "Unsuspend"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     );

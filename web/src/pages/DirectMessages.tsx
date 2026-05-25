@@ -245,23 +245,51 @@ const DirectMessages: React.FC = () => {
   const sendMessage = async () => {
     if (!input.trim() || !user || !activeConvo || sending) return;
     const body = input.trim();
+    const replyId = replyTo?.id || null;
     setInput("");
     setReplyTo(null);
     setSending(true);
-    const { error } = await supabase.from("dm_messages").insert({
+
+    // Optimistic: show message instantly with a temp ID
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimisticMsg: DMMessage = {
+      id: tempId,
       conversation_id: activeConvo.id,
       sender_id: user.id,
       body,
-      reply_to_id: replyTo?.id || null,
+      image_url: null,
+      created_at: new Date().toISOString(),
+      read: false,
+      read_at: null,
+      edited_at: null,
+      deleted_at: null,
+      reply_to_id: replyId,
+      message_type: "text",
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setTimeout(() => scrollToBottom(), 20);
+
+    const { data, error } = await supabase.from("dm_messages").insert({
+      conversation_id: activeConvo.id,
+      sender_id: user.id,
+      body,
+      reply_to_id: replyId,
       read: false,
       message_type: "text",
-    });
+    }).select("id").single();
+
     if (error) {
+      // Remove optimistic message on failure
+      setMessages(prev => prev.filter(m => m.id !== tempId));
       toast.error("Failed to send");
       setInput(body);
     } else {
+      // Replace temp ID with real ID so realtime dedup works
+      if (data?.id) {
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: data.id } : m));
+      }
       // Update conversation timestamp
-      await supabase.from("dm_conversations").update({ updated_at: new Date().toISOString() }).eq("id", activeConvo.id);
+      supabase.from("dm_conversations").update({ updated_at: new Date().toISOString() }).eq("id", activeConvo.id);
       // Notify recipient (in-app + push)
       const otherId = activeConvo.user_a === user.id ? activeConvo.user_b : activeConvo.user_a;
       notifyUser({

@@ -41,6 +41,7 @@ import SpaceReplay from "./pages/SpaceReplay";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
+import { SecurityTracker } from "./components/SecurityTracker";
 
 const DirectMessagesPage = () => (
   <AppLayout>
@@ -62,6 +63,7 @@ const App = () => (
         <Sonner />
         <NotificationListener />
         <PresenceHeartbeat />
+        <SecurityTracker />
         <BrowserRouter>
           <Routes>
             {/* ── Public routes (no auth required) ── */}

@@ -45,6 +45,21 @@ interface ProfileData {
   verified: boolean;
 }
 
+interface UserBadge {
+  id: string;
+  name: string;
+  icon: string | null;
+  rarity: string | null;
+}
+
+interface ProfileBadge {
+  id: string;
+  label: string;
+  color: string | null;
+  icon: string | null;
+  glow: boolean | null;
+}
+
 interface Props {
   viewUserId?: string;
 }
@@ -64,6 +79,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
   const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [userBadges, setUserBadges] = useState<UserBadge[]>([]);
+  const [profileBadges, setProfileBadges] = useState<ProfileBadge[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -106,6 +123,36 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
         setEditWebsite(data.website_url || "");
       }
     }
+
+    // Fetch user badges (from badges table via user_badges)
+    const { data: ubData } = await supabase
+      .from("user_badges")
+      .select("id, badge_id, badges(name, icon, rarity)")
+      .eq("user_id", targetId);
+    if (ubData) {
+      setUserBadges(ubData.map((ub: any) => ({
+        id: ub.id,
+        name: ub.badges?.name ?? "Badge",
+        icon: ub.badges?.icon ?? null,
+        rarity: ub.badges?.rarity ?? null,
+      })));
+    }
+
+    // Fetch profile badges (custom admin-assigned badges)
+    const { data: pbData } = await supabase
+      .from("profile_badges")
+      .select("id, label, color, icon, glow")
+      .eq("user_id", targetId);
+    if (pbData) {
+      setProfileBadges(pbData.map((pb: any) => ({
+        id: pb.id,
+        label: pb.label ?? "Badge",
+        color: pb.color ?? null,
+        icon: pb.icon ?? null,
+        glow: pb.glow ?? false,
+      })));
+    }
+
     setLoading(false);
   }, [viewUserId, user?.id, isOwnProfile]);
 
@@ -283,6 +330,44 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
         {/* Handle */}
         {handle && (
           <p className="text-[13px] text-white/35">{handle}</p>
+        )}
+
+        {/* Badges row */}
+        {(userBadges.length > 0 || profileBadges.length > 0) && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {userBadges.map(b => {
+              const rarityColors: Record<string, string> = {
+                legendary: "bg-amber-500/20 text-amber-300 border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]",
+                epic: "bg-purple-500/20 text-purple-300 border-purple-500/30",
+                rare: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+                common: "bg-white/[0.08] text-white/60 border-white/10",
+              };
+              const cls = rarityColors[(b.rarity ?? "common").toLowerCase()] ?? rarityColors.common;
+              return (
+                <span key={b.id} className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold", cls)}>
+                  {b.icon && <span className="text-[11px]">{b.icon}</span>}
+                  {b.name}
+                </span>
+              );
+            })}
+            {profileBadges.map(b => (
+              <span
+                key={b.id}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold",
+                  b.glow ? "shadow-[0_0_8px_rgba(190,242,100,0.2)]" : "",
+                )}
+                style={{
+                  backgroundColor: b.color ? `${b.color}20` : "rgba(255,255,255,0.06)",
+                  color: b.color || "rgba(255,255,255,0.6)",
+                  borderColor: b.color ? `${b.color}40` : "rgba(255,255,255,0.1)",
+                }}
+              >
+                {b.icon && <span className="text-[11px]">{b.icon}</span>}
+                {b.label}
+              </span>
+            ))}
+          </div>
         )}
 
         {/* Bio */}
