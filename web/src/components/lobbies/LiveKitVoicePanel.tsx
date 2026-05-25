@@ -261,7 +261,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
   /* ─── Supabase Presence for roles ─── */
   const setupPresence = () => {
     if (!user) return;
-    const ch = supabase.channel(`lk-presence-${lobbyId}`, {
+    const ch = supabase.channel(`lk-presence-${lobbyId}-${Date.now()}`, {
       config: { presence: { key: user.id } },
     });
     ch.on("presence", { event: "sync" }, () => {
@@ -298,7 +298,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
   /* ─── Supabase Broadcast for host commands ─── */
   const setupBroadcast = () => {
     if (!user) return;
-    const ch = supabase.channel(`lk-commands-${lobbyId}`);
+    const ch = supabase.channel(`lk-commands-${lobbyId}-${Date.now()}`);
     ch.on("broadcast", { event: "command" }, ({ payload }) => {
       if (payload.target !== user.id) return;
       handleCommand(payload.cmd, payload.from);

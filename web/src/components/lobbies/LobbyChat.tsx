@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import { MessageSquare, Send } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,8 +34,9 @@ export const LobbyChat = ({ lobbyId }: { lobbyId: string }) => {
     };
     fetchMessages();
 
+    const channelName = `lobby-chat-${lobbyId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const channel = supabase
-      .channel(`lobby-chat-${lobbyId}`)
+      .channel(channelName)
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",

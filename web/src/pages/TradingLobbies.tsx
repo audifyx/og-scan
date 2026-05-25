@@ -71,7 +71,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
     if (!user) return;
     fetchLobbies();
     const channel = supabase
-      .channel("lobbies-realtime")
+      .channel(`lobbies-realtime-${Date.now()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "trading_lobbies" }, () => fetchLobbies())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -82,7 +82,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
     if (!activeLobby) return;
     fetchMembers(activeLobby.id);
     const channel = supabase
-      .channel(`lobby-members-${activeLobby.id}`)
+      .channel(`lobby-members-${activeLobby.id}-${Date.now()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "lobby_members", filter: `lobby_id=eq.${activeLobby.id}` },
         () => fetchMembers(activeLobby.id))
       .subscribe();
@@ -93,7 +93,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
   useEffect(() => {
     if (!activeLobby) return;
     const channel = supabase
-      .channel(`lobby-chart-${activeLobby.id}`)
+      .channel(`lobby-chart-${activeLobby.id}-${Date.now()}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "trading_lobbies", filter: `id=eq.${activeLobby.id}` },
         (payload) => {
           const updated = payload.new as any;
