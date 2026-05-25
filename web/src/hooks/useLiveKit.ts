@@ -12,7 +12,7 @@ import {
 } from "livekit-client";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
 
-const LIVEKIT_URL = "wss://new-7unnd5e1.livekit.cloud";
+const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL || "";
 
 export interface LiveKitParticipant {
   identity: string;

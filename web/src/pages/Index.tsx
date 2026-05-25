@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode, lazy, Suspense } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Activity,
@@ -42,79 +42,90 @@ import {
   Palette,
   Image as ImageIcon,
 } from "lucide-react";
-import { OgStats } from "@/components/OgStats";
-import { Scanner } from "@/components/Scanner";
-import { Trending } from "@/components/Trending";
-import { OgFinder } from "@/components/OgFinder";
-import { PairTracker } from "@/components/PairTracker";
-import { Migrations } from "@/components/Migrations";
-import { TxFeed } from "@/components/TxFeed";
-import { Whales } from "@/components/Whales";
-import { SwapPanel } from "@/components/SwapPanel";
-import { TechStack } from "@/components/TechStack";
-import { OurCoin } from "@/components/OurCoin";
-import { SnipeFeed } from "@/components/SnipeFeed";
-import { Feed } from "@/components/Feed";
-import { NewsSignal } from "@/components/NewsSignal";
-import { SolToolsRoadmap } from "@/components/SolToolsRoadmap";
-import CommunitiesPage from "./Communities";
-import DiscoverPage from "./Discover";
-import ArtFeed from "./ArtFeed";
-import SpacesPage from "./Spaces";
-import SocialHub from "./SocialHub";
-import CommunityHub from "./CommunityHub";
-import ToolsHub from "./ToolsHub";
+
 import { cn } from "@/lib/utils";
 import { DEFAULT_OG_MINT, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr } from "@/lib/og";
 import { AuthButton } from "@/components/AuthButton";
+import { AppSidebar } from "@/components/AppSidebar";
+import { AppTopBar } from "@/components/AppTopBar";
+import { MobileNav } from "@/components/MobileNav";
+
+/* ─── Standard Feature imports ─── */
+const OgStats = lazy(() => import("@/components/OgStats").then(m => ({ default: m.OgStats })));
+const Scanner = lazy(() => import("@/components/Scanner").then(m => ({ default: m.Scanner })));
+const Trending = lazy(() => import("@/components/Trending").then(m => ({ default: m.Trending })));
+const OgFinder = lazy(() => import("@/components/OgFinder").then(m => ({ default: m.OgFinder })));
+const PairTracker = lazy(() => import("@/components/PairTracker").then(m => ({ default: m.PairTracker })));
+const Migrations = lazy(() => import("@/components/Migrations").then(m => ({ default: m.Migrations })));
+const TxFeed = lazy(() => import("@/components/TxFeed").then(m => ({ default: m.TxFeed })));
+const Whales = lazy(() => import("@/components/Whales").then(m => ({ default: m.Whales })));
+const SwapPanel = lazy(() => import("@/components/SwapPanel").then(m => ({ default: m.SwapPanel })));
+const TechStack = lazy(() => import("@/components/TechStack").then(m => ({ default: m.TechStack })));
+const OurCoin = lazy(() => import("@/components/OurCoin").then(m => ({ default: m.OurCoin })));
+const SnipeFeed = lazy(() => import("@/components/SnipeFeed").then(m => ({ default: m.SnipeFeed })));
+const Feed = lazy(() => import("@/components/Feed").then(m => ({ default: m.Feed })));
+const NewsSignal = lazy(() => import("@/components/NewsSignal").then(m => ({ default: m.NewsSignal })));
+const SolToolsRoadmap = lazy(() => import("@/components/SolToolsRoadmap").then(m => ({ default: m.SolToolsRoadmap })));
+
+/* ─── Page imports ─── */
+const CommunitiesPage = lazy(() => import("./Communities"));
+const DiscoverPage = lazy(() => import("./Discover"));
+const ArtFeed = lazy(() => import("./ArtFeed"));
+const SpacesPage = lazy(() => import("./Spaces"));
+const SocialHub = lazy(() => import("./SocialHub"));
+const CommunityHub = lazy(() => import("./CommunityHub"));
+const ToolsHub = lazy(() => import("./ToolsHub"));
+const ChartsPage = lazy(() => import("./Charts"));
+const LiveTradingPage = lazy(() => import("./LiveTrading"));
+const LiveFeedPage = lazy(() => import("./LiveFeed"));
 
 /* ─── 20x Feature imports ─── */
-import { RugScore } from "@/components/scanner-20x/RugScore";
-import { DevWalletDNA } from "@/components/scanner-20x/DevWalletDNA";
-import { ScanHistory } from "@/components/scanner-20x/ScanHistory";
-import { BundleVisual } from "@/components/scanner-20x/BundleVisual";
-import { ComparativeScan } from "@/components/scanner-20x/ComparativeScan";
-import { ScanShare } from "@/components/scanner-20x/ScanShare";
-import { LaunchQualityScore } from "@/components/launch-radar-20x/LaunchQualityScore";
-import { CreatorPatterns } from "@/components/launch-radar-20x/CreatorPatterns";
-import { MigrationTimer } from "@/components/launch-radar-20x/MigrationTimer";
-import { FirstBuyersForensics } from "@/components/launch-radar-20x/FirstBuyersForensics";
-import { LaunchAlerts } from "@/components/launch-radar-20x/LaunchAlerts";
-import { MomentumHeatmap } from "@/components/market-feed-20x/MomentumHeatmap";
-import { NarrativeClusters } from "@/components/market-feed-20x/NarrativeClusters";
-import { CrossReferenceCard } from "@/components/market-feed-20x/CrossReferenceCard";
-import { CustomFeedBuilder } from "@/components/market-feed-20x/CustomFeedBuilder";
-import { WalletXRay } from "@/components/wallets-20x/WalletXRay";
-import { CopyTradingFeed } from "@/components/wallets-20x/CopyTradingFeed";
-import { PnLTracker } from "@/components/wallets-20x/PnLTracker";
-import { ThreadedDiscussions } from "@/components/alpha-chat-20x/ThreadedDiscussions";
-import { SentimentPulse } from "@/components/alpha-chat-20x/SentimentPulse";
-import { CommunityReputation } from "@/components/communities-20x/CommunityReputation";
-import { MultiChartView } from "@/components/charts-20x/MultiChartView";
-import { DrawingTools } from "@/components/charts-20x/DrawingTools";
-import { SmartFilters } from "@/components/live-feed-20x/SmartFilters";
-import { OGDaily } from "@/components/new-features/OGDaily";
-import { SmartWatchlist } from "@/components/new-features/SmartWatchlist";
-import { PaperTrading } from "@/components/new-features/PaperTrading";
-import { CryptoCalendar } from "@/components/new-features/CryptoCalendar";
+const RugScore = lazy(() => import("@/components/scanner-20x/RugScore").then(m => ({ default: m.RugScore })));
+const DevWalletDNA = lazy(() => import("@/components/scanner-20x/DevWalletDNA").then(m => ({ default: m.DevWalletDNA })));
+const ScanHistory = lazy(() => import("@/components/scanner-20x/ScanHistory").then(m => ({ default: m.ScanHistory })));
+const BundleVisual = lazy(() => import("@/components/scanner-20x/BundleVisual").then(m => ({ default: m.BundleVisual })));
+const ComparativeScan = lazy(() => import("@/components/scanner-20x/ComparativeScan").then(m => ({ default: m.ComparativeScan })));
+const ScanShare = lazy(() => import("@/components/scanner-20x/ScanShare").then(m => ({ default: m.ScanShare })));
+const LaunchQualityScore = lazy(() => import("@/components/launch-radar-20x/LaunchQualityScore").then(m => ({ default: m.LaunchQualityScore })));
+const CreatorPatterns = lazy(() => import("@/components/launch-radar-20x/CreatorPatterns").then(m => ({ default: m.CreatorPatterns })));
+const MigrationTimer = lazy(() => import("@/components/launch-radar-20x/MigrationTimer").then(m => ({ default: m.MigrationTimer })));
+const FirstBuyersForensics = lazy(() => import("@/components/launch-radar-20x/FirstBuyersForensics").then(m => ({ default: m.FirstBuyersForensics })));
+const LaunchAlerts = lazy(() => import("@/components/launch-radar-20x/LaunchAlerts").then(m => ({ default: m.LaunchAlerts })));
+const MomentumHeatmap = lazy(() => import("@/components/market-feed-20x/MomentumHeatmap").then(m => ({ default: m.MomentumHeatmap })));
+const NarrativeClusters = lazy(() => import("@/components/market-feed-20x/NarrativeClusters").then(m => ({ default: m.NarrativeClusters })));
+const CrossReferenceCard = lazy(() => import("@/components/market-feed-20x/CrossReferenceCard").then(m => ({ default: m.CrossReferenceCard })));
+const CustomFeedBuilder = lazy(() => import("@/components/market-feed-20x/CustomFeedBuilder").then(m => ({ default: m.CustomFeedBuilder })));
+const WalletXRay = lazy(() => import("@/components/wallets-20x/WalletXRay").then(m => ({ default: m.WalletXRay })));
+const CopyTradingFeed = lazy(() => import("@/components/wallets-20x/CopyTradingFeed").then(m => ({ default: m.CopyTradingFeed })));
+const PnLTracker = lazy(() => import("@/components/wallets-20x/PnLTracker").then(m => ({ default: m.PnLTracker })));
+const ThreadedDiscussions = lazy(() => import("@/components/alpha-chat-20x/ThreadedDiscussions").then(m => ({ default: m.ThreadedDiscussions })));
+const SentimentPulse = lazy(() => import("@/components/alpha-chat-20x/SentimentPulse").then(m => ({ default: m.SentimentPulse })));
+const CommunityReputation = lazy(() => import("@/components/communities-20x/CommunityReputation").then(m => ({ default: m.CommunityReputation })));
+const MultiChartView = lazy(() => import("@/components/charts-20x/MultiChartView").then(m => ({ default: m.MultiChartView })));
+const DrawingTools = lazy(() => import("@/components/charts-20x/DrawingTools").then(m => ({ default: m.DrawingTools })));
+const SmartFilters = lazy(() => import("@/components/live-feed-20x/SmartFilters").then(m => ({ default: m.SmartFilters })));
+const OGDaily = lazy(() => import("@/components/new-features/OGDaily").then(m => ({ default: m.OGDaily })));
+const SmartWatchlist = lazy(() => import("@/components/new-features/SmartWatchlist").then(m => ({ default: m.SmartWatchlist })));
+const PaperTrading = lazy(() => import("@/components/new-features/PaperTrading").then(m => ({ default: m.PaperTrading })));
+const CryptoCalendar = lazy(() => import("@/components/new-features/CryptoCalendar").then(m => ({ default: m.CryptoCalendar })));
 
 /* ─── Phase 29 imports ─── */
-import { AlphaCallouts } from "@/components/callouts-20x/AlphaCallouts";
-import { CalloutLeaderboard } from "@/components/callouts-20x/CalloutLeaderboard";
-import { PlatformLeaderboard } from "@/components/leaderboard-20x/PlatformLeaderboard";
-import { TradingLobbies } from "@/components/lobbies-20x/TradingLobbies";
-import { TokenCompare } from "@/components/advanced-tools-20x/TokenCompare";
-import { QuickCalc } from "@/components/advanced-tools-20x/QuickCalc";
-import { UserProfile } from "@/components/profile-20x/UserProfile";
-import { WebhookManager } from "@/components/webhooks-20x/WebhookManager";
+const AlphaCallouts = lazy(() => import("@/components/callouts-20x/AlphaCallouts").then(m => ({ default: m.AlphaCallouts })));
+const CalloutLeaderboard = lazy(() => import("@/components/callouts-20x/CalloutLeaderboard").then(m => ({ default: m.CalloutLeaderboard })));
+const PlatformLeaderboard = lazy(() => import("@/components/leaderboard-20x/PlatformLeaderboard").then(m => ({ default: m.PlatformLeaderboard })));
+const TradingLobbies = lazy(() => import("@/components/lobbies-20x/TradingLobbies").then(m => ({ default: m.TradingLobbies })));
+const TokenCompare = lazy(() => import("@/components/advanced-tools-20x/TokenCompare").then(m => ({ default: m.TokenCompare })));
+const QuickCalc = lazy(() => import("@/components/advanced-tools-20x/QuickCalc").then(m => ({ default: m.QuickCalc })));
+const UserProfile = lazy(() => import("@/components/profile-20x/UserProfile").then(m => ({ default: m.UserProfile })));
+const WebhookManager = lazy(() => import("@/components/webhooks-20x/WebhookManager").then(m => ({ default: m.WebhookManager })));
 
 /* ─── Phase 30 imports (Discover / Launchpad) ─── */
-import { TokenExplorer } from "@/components/discover-20x/TokenExplorer";
-import { ViralFeed } from "@/components/discover-20x/ViralFeed";
-import { LaunchpadExplorer } from "@/components/discover-20x/LaunchpadExplorer";
-import { LaunchTracker } from "@/components/launchpad-20x/LaunchTracker";
-import { MemeGallery } from "@/components/memes-20x/MemeGallery";
-import { ProDashboard } from "@/components/premium-20x/ProDashboard";
+const TokenExplorer = lazy(() => import("@/components/discover-20x/TokenExplorer").then(m => ({ default: m.TokenExplorer })));
+const ViralFeed = lazy(() => import("@/components/discover-20x/ViralFeed").then(m => ({ default: m.ViralFeed })));
+const LaunchpadExplorer = lazy(() => import("@/components/discover-20x/LaunchpadExplorer").then(m => ({ default: m.LaunchpadExplorer })));
+const LaunchTracker = lazy(() => import("@/components/launchpad-20x/LaunchTracker").then(m => ({ default: m.LaunchTracker })));
+const MemeGallery = lazy(() => import("@/components/memes-20x/MemeGallery").then(m => ({ default: m.MemeGallery })));
+const ProDashboard = lazy(() => import("@/components/premium-20x/ProDashboard").then(m => ({ default: m.ProDashboard })));
 
 const LEGACY_DEFAULT_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
 const STORAGE_TAB = "og_scanner.active_site_tab";
@@ -143,7 +154,10 @@ type TabId =
   | "social"
   | "community"
   | "tools"
-  | "profile";
+  | "profile"
+  | "charts"
+  | "live-trading"
+  | "live-feed-page";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
@@ -467,6 +481,39 @@ const TABS: TabConfig[] = [
     accent: "cyan",
     group: "Main",
   },
+  {
+    id: "charts",
+    label: "Charts",
+    slug: "charts",
+    pageNumber: 25,
+    eyebrow: "Live Charts",
+    description: "Real-time DEX charts powered by DexScreener with favorites and history.",
+    Icon: LineChart,
+    accent: "cyan",
+    group: "Market",
+  },
+  {
+    id: "live-trading",
+    label: "Live Trading",
+    slug: "live-trading",
+    pageNumber: 26,
+    eyebrow: "P&L · Signals",
+    description: "Track your trades, watch signals, and manage your portfolio in real-time.",
+    Icon: TrendingUp,
+    accent: "lime",
+    group: "Market",
+  },
+  {
+    id: "live-feed-page",
+    label: "Live Feed",
+    slug: "live-feed-page",
+    pageNumber: 27,
+    eyebrow: "Tape stream",
+    description: "Real-time transaction feed with smart filters and alerts.",
+    Icon: Radio,
+    accent: "cyan",
+    group: "Market",
+  },
 ];
 
 const NAV_TABS: TabConfig[] = TABS.filter((t: TabConfig) => t.showInNav !== false);
@@ -543,8 +590,20 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "trending") return <Trending onSelect={updateMint} />;
   if (tab === "whales") return (
     <div className="space-y-4">
-      <Whales mint={mint} />
-      <WalletXRay walletAddress="" compact={false} />
+      <Whales mint={mint} onSelectWallet={setSelectedWallet} />
+      {selectedWallet ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-og-cyan">Wallet X-Ray: {shortAddr(selectedWallet)}</h3>
+            <button onClick={() => setSelectedWallet("")} className="text-[10px] text-white/40 hover:text-white">Clear</button>
+          </div>
+          <WalletXRay walletAddress={selectedWallet} compact={false} />
+        </div>
+      ) : (
+        <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-8 text-center">
+          <p className="text-xs text-white/30 uppercase tracking-widest">Select a whale below to inspect their wallet</p>
+        </div>
+      )}
       <CopyTradingFeed onSelectMint={updateMint} />
     </div>
   );
@@ -564,6 +623,9 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "social") return <SocialHub />;
   if (tab === "tools") return <ToolsHub onNavigate={onNavigate || (() => {})} />;
   if (tab === "profile") return <UserProfile />;
+  if (tab === "charts") return <ChartsPage />;
+  if (tab === "live-trading") return <LiveTradingPage />;
+  if (tab === "live-feed-page") return <LiveFeedPage />;
   return null;
 };
 
@@ -594,6 +656,7 @@ const Index = () => {
   const routeSlug: string | undefined = isProfileSubRoute ? "profile" : (pageNumber ? `page-${pageNumber}` : toolSlug ?? pathSlug);
   const routeTab: TabId = useMemo<TabId>(() => getTabFromSlug(routeSlug) ?? "overview", [routeSlug]);
   const [mint, setMint] = useState<string>(DEFAULT_OG_MINT);
+  const [selectedWallet, setSelectedWallet] = useState<string>("");
   const [tab, setTab] = useState<TabId>(routeTab);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -666,26 +729,32 @@ const Index = () => {
         />
 
         {/* Page content */}
-        {tab === "community" || tab === "social" ? (
-          /* CommunityHub / SocialHub need full height — skip ToolShell wrapper and padding.
-             pb-[4.5rem] on mobile accounts for fixed MobileNav (lg:pb-0 on desktop). */
-          <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
-            <CommunityHub />
-          </main>
-        ) : (
-          <main className="min-h-0 flex-1 overflow-x-hidden px-3 pb-28 pt-4 sm:px-5 lg:px-6 lg:pb-8">
-            {tab === "overview" ? (
-              <OverviewPage
-                mint={mint}
-                onSwitchTab={(t: TabId) => switchTab(t)}
-                onScanClick={() => switchTab("scanner")}
-                onChangeMint={promptMint}
-              />
-            ) : (
-              <ToolShell tab={activeTab}>{renderTool(tab, mint, updateMint, switchTab)}</ToolShell>
-            )}
-          </main>
-        )}
+        <Suspense fallback={
+          <div className="flex flex-1 items-center justify-center p-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-og-lime border-t-transparent" />
+          </div>
+        }>
+          {tab === "community" || tab === "social" ? (
+            /* CommunityHub / SocialHub need full height — skip ToolShell wrapper and padding.
+               pb-[4.5rem] on mobile accounts for fixed MobileNav (lg:pb-0 on desktop). */
+            <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
+              <CommunityHub />
+            </main>
+          ) : (
+            <main className="min-h-0 flex-1 overflow-x-hidden px-3 pb-28 pt-4 sm:px-5 lg:px-6 lg:pb-8">
+              {tab === "overview" ? (
+                <OverviewPage
+                  mint={mint}
+                  onSwitchTab={(t: TabId) => switchTab(t)}
+                  onScanClick={() => switchTab("scanner")}
+                  onChangeMint={promptMint}
+                />
+              ) : (
+                <ToolShell tab={activeTab}>{renderTool(tab, mint, updateMint, switchTab)}</ToolShell>
+              )}
+            </main>
+          )}
+        </Suspense>
       </div>
 
       {/* Mobile bottom nav */}
@@ -694,334 +763,15 @@ const Index = () => {
   );
 };
 
-/* ─── External nav link (navigates to a proper route, not a tab) ─── */
-type ExternalNavItem = {
-  to: string;
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  eyebrow: string;
-};
+/* ─── External nav placeholder ─── */
 
-const ExternalNavLink = ({ item, currentPath, onClose }: { item: ExternalNavItem; currentPath: string; onClose: () => void }) => {
-  const isActive = currentPath === item.to || currentPath.startsWith(item.to + "/");
-  return (
-    <Link
-      to={item.to}
-      onClick={onClose}
-      className={cn(
-        "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
-        isActive ? "bg-white/[0.09] text-white" : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
-      )}
-    >
-      <span className={cn(
-        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition",
-        isActive ? "border-og-cyan/40 bg-og-cyan/10 text-og-cyan" : "border-white/10 bg-white/[0.04]",
-      )}>
-        <item.icon className="h-4 w-4" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-semibold leading-tight">{item.label}</span>
-        <span className="block truncate text-[10px] text-white/35">{item.eyebrow}</span>
-      </span>
-      {isActive && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-cyan" />}
-    </Link>
-  );
-};
+/* ─── Sidebar placeholder for old local component ─── */
 
-/* ─── Sidebar ─── */
-const AppSidebar = ({
-  activeId,
-  mint,
-  open,
-  onClose,
-  onChangeMint,
-  onNavigate,
-}: {
-  activeId: TabId;
-  mint: string;
-  open: boolean;
-  onClose: () => void;
-  onChangeMint: () => void;
-  onNavigate: (t: string) => void;
-}) => {
-  const location = useLocation();
+/* ─── Nav item placeholder ─── */
 
-  /* Consolidated sidebar links — grouped into fewer sections to minimize scroll */
-  const tradingItems: ExternalNavItem[] = [
-    { to: "/charts",          icon: LineChart,    label: "Charts",          eyebrow: "Live charts" },
-    { to: "/live-trading",    icon: TrendingUp,   label: "Live Trading",    eyebrow: "P&L · Signals" },
-    { to: "/live-feed-page",  icon: Radio,        label: "Live Feed",       eyebrow: "Tape stream" },
-    { to: "/wallets",         icon: Wallet,       label: "Wallets",         eyebrow: "Tracked wallets" },
-    { to: "/leaderboard",     icon: Trophy,       label: "Leaderboard",     eyebrow: "Top traders" },
-  ];
+/* ─── Top bar placeholder ─── */
 
-  const moreItems: ExternalNavItem[] = [
-    { to: "/alpha-chat",      icon: Bot,          label: "Alpha Chat",      eyebrow: "AI assistant" },
-    { to: "/advanced-tools",  icon: Wrench,       label: "Advanced Tools",  eyebrow: "30+ pro tools" },
-    { to: "/pumpv5",          icon: Rocket,       label: "Launch Pad",      eyebrow: "Token listings" },
-    { to: "/premium",         icon: Crown,        label: "Premium",         eyebrow: "Pro · AI · P&L" },
-  ];
-
-
-
-  return (
-    <aside
-      className={cn(
-        "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-white/[0.07] bg-[#060c13] transition-transform duration-300 lg:translate-x-0",
-        open ? "translate-x-0" : "-translate-x-full",
-      )}
-    >
-      {/* Logo */}
-      <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-4">
-        <button type="button" onClick={() => onNavigate("overview")} className="flex items-center gap-3 text-left">
-          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-og-lime/50 bg-og-lime/10">
-            <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" />
-            <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-og-lime shadow-[0_0_6px_hsl(var(--og-lime))]" />
-          </div>
-          <div>
-            <div className="text-sm font-black uppercase tracking-wide text-white">OGScan</div>
-            <div className="text-[10px] font-semibold tracking-widest text-og-cyan/80">PRO TRADING SUITE</div>
-          </div>
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 transition hover:bg-white/5 hover:text-white lg:hidden"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Nav — consolidated into 4 tight sections */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
-
-
-        {/* Trading */}
-        <div className="mb-1 mt-3">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Trading</p>
-          <div className="space-y-0.5">
-            {tradingItems.map((item) => (
-              <ExternalNavLink key={item.to} item={item} currentPath={location.pathname} onClose={onClose} />
-            ))}
-          </div>
-        </div>
-
-        {/* More */}
-        <div className="mb-1 mt-3">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">More</p>
-          <div className="space-y-0.5">
-            {moreItems.map((item) => (
-              <ExternalNavLink key={item.to} item={item} currentPath={location.pathname} onClose={onClose} />
-            ))}
-          </div>
-        </div>
-
-
-      </nav>
-
-      {/* Active mint */}
-      <div className="border-t border-white/[0.07] px-3 py-2">
-        <button
-          type="button"
-          onClick={onChangeMint}
-          className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left transition hover:border-og-cyan/40 hover:bg-white/[0.07]"
-        >
-          <div>
-            <div className="text-[9px] font-bold uppercase tracking-widest text-white/40">Active mint</div>
-            <div className="mt-0.5 font-mono text-[11px] font-semibold text-white/80">{shortAddr(mint, 6)}</div>
-          </div>
-          <Menu className="h-3.5 w-3.5 text-white/30" />
-        </button>
-      </div>
-
-      {/* Pro features callout */}
-      <div className="border-t border-white/[0.07] px-3 pb-4 pt-3">
-        <Link
-          to="/premium"
-          onClick={onClose}
-          className="flex items-center gap-3 rounded-xl border border-og-lime/25 bg-og-lime/[0.08] px-3 py-3 transition hover:border-og-lime/40 hover:bg-og-lime/[0.12]"
-        >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-og-lime/40 bg-og-lime/15">
-            <Sparkles className="h-4 w-4 text-og-lime" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-[11px] font-black uppercase tracking-wide text-white">Pro Features</div>
-            <div className="text-[10px] text-white/50">AI · Alerts · P&L</div>
-          </div>
-          <div className="h-4 w-4 shrink-0">
-            <div className="h-2 w-2 rounded-full bg-og-lime shadow-[0_0_8px_hsl(var(--og-lime))]" />
-          </div>
-        </Link>
-      </div>
-
-      {/* Token CA */}
-      <div className="border-t border-white/[0.07] px-3 pb-4 pt-2">
-        <div className="text-[9px] font-bold uppercase tracking-widest text-white/30">Official Token</div>
-        <div className="mt-1 font-mono text-[10px] text-white/50">
-          CA {shortAddr(OGSCAN_TOKEN_MINT, 5)}
-        </div>
-      </div>
-    </aside>
-  );
-};
-
-const NavItem = ({
-  item,
-  activeId,
-  onNavigate,
-}: {
-  item: TabConfig;
-  activeId: TabId;
-  onNavigate: (t: string) => void;
-}) => {
-  const isActive = activeId === item.id || TAB_BY_ID[activeId]?.mergedInto === item.id;
-
-  return (
-    <button
-      type="button"
-      onClick={() => onNavigate(item.id)}
-      className={cn(
-        "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
-        isActive
-          ? "bg-white/[0.09] text-white"
-          : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
-      )}
-    >
-      <span
-        className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition",
-          isActive ? accentIcon(item.accent) : "border-white/10 bg-white/[0.04]",
-        )}
-      >
-        <item.Icon className="h-4 w-4" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-semibold leading-tight">{item.label}</span>
-        <span className="block truncate text-[10px] text-white/35">{item.eyebrow}</span>
-      </span>
-      {isActive && (
-        <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", accentDot(item.accent))} />
-      )}
-    </button>
-  );
-};
-
-/* ─── Top bar ─── */
-const AppTopBar = ({
-  tab,
-  mint,
-  activeId,
-  onOpenSidebar,
-  onChangeMint,
-  onNavigate,
-}: {
-  tab: TabConfig;
-  mint: string;
-  activeId: TabId;
-  onOpenSidebar: () => void;
-  onChangeMint: () => void;
-  onNavigate: (t: string) => void;
-}) => (
-  <div className="sticky top-0 z-30 border-b border-white/[0.07] bg-[#060c13]/90 backdrop-blur-xl">
-    {/* Top row: title + controls */}
-    <header className="flex items-center gap-3 px-4 py-2.5 sm:px-5 lg:px-6">
-      {/* Hamburger — mobile only */}
-      <button
-        type="button"
-        onClick={onOpenSidebar}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition hover:bg-white/[0.06] hover:text-white lg:hidden"
-      >
-        <Menu className="h-4 w-4" />
-      </button>
-
-      {/* Title */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <div className={cn("h-1.5 w-1.5 rounded-full shadow-[0_0_8px_currentColor]", accentDot(tab.accent))} />
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">{tab.eyebrow}</span>
-        </div>
-        <h1 className="truncate text-base font-black leading-tight tracking-tight text-white sm:text-lg">{tab.label}</h1>
-      </div>
-
-      {/* Right controls */}
-      <div className="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={onChangeMint}
-          className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-white/60 transition hover:border-og-cyan/40 hover:text-white sm:flex"
-        >
-          <Layers3 className="h-3.5 w-3.5" />
-          {shortAddr(mint, 4)}
-        </button>
-        <AuthButton />
-        <div className="flex items-center gap-1.5 rounded-xl border border-og-lime/25 bg-og-lime/10 px-2.5 py-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-og-lime shadow-[0_0_6px_hsl(var(--og-lime))]" />
-          <span className="text-[11px] font-bold text-og-lime">Live</span>
-        </div>
-      </div>
-    </header>
-
-    {/* Horizontal tab strip — scrollable */}
-    <nav
-      className="flex gap-0.5 overflow-x-auto px-3 pb-2 sm:px-5 lg:px-5"
-      style={{ scrollbarWidth: "none" }}
-      aria-label="Tab navigation"
-    >
-      {NAV_TABS.map((item) => {
-        const isActive = activeId === item.id || TAB_BY_ID[activeId]?.mergedInto === item.id;
-        return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => onNavigate(item.id)}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition whitespace-nowrap",
-              isActive
-                ? "bg-white/[0.09] text-white"
-                : "text-white/40 hover:bg-white/[0.04] hover:text-white/80",
-            )}
-          >
-            <item.Icon className={cn("h-3.5 w-3.5 shrink-0", isActive ? accentText(item.accent) : "")} />
-            {item.label}
-          </button>
-        );
-      })}
-    </nav>
-  </div>
-);
-
-/* ─── Mobile bottom nav ─── */
-const MobileNav = ({ activeId, onNavigate }: { activeId: TabId; onNavigate: (t: string) => void }) => {
-  const items = [
-    { id: "overview" as TabId, label: "Home", Icon: Home },
-    { id: "community" as TabId, label: "Community", Icon: Users },
-    { id: "tools" as TabId, label: "Tools", Icon: Wrench },
-    { id: "profile" as TabId, label: "Profile", Icon: User },
-  ];
-  return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-white/[0.07] bg-[#060c13]/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-xl lg:hidden">
-      <div className="flex items-stretch justify-around px-1 pb-2 pt-1.5">
-        {items.map((item) => {
-          const isActive = activeId === item.id || TAB_BY_ID[activeId]?.mergedInto === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onNavigate(item.id)}
-              className={cn(
-                "flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 transition",
-                isActive ? "text-og-lime" : "text-white/35",
-              )}
-            >
-              <item.Icon className={cn("h-5 w-5", isActive ? "text-og-lime" : "")} strokeWidth={isActive ? 2.5 : 1.5} />
-              <span className="text-[9px] font-bold uppercase tracking-wider">{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
-};
+/* ─── Mobile nav placeholder ─── */
 
 /* ─── Overview / Dashboard ─── */
 const OverviewPage = ({
