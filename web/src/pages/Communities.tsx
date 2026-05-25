@@ -1061,7 +1061,12 @@ function CommunityFeed({
   const toggleMod = async (member: CommunityMember) => {
     if (myRole !== "creator" && !isGlobalAdmin) return;
     const newRole = member.role === "moderator" ? "member" : "moderator";
-    await supabase.from("community_members").update({ role: newRole }).eq("id", member.id);
+    const { error } = await supabase.from("community_members").update({ role: newRole }).eq("id", member.id);
+    if (error) {
+      console.error("Failed to update mod role:", error);
+      toast.error("Failed to update role — please try again");
+      return;
+    }
     setMembers(members.map(m => m.id === member.id ? { ...m, role: newRole as any } : m));
     toast.success(newRole === "moderator" ? "Promoted to mod! 🛡️" : "Removed mod role");
   };

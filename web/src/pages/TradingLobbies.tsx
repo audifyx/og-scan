@@ -68,7 +68,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
   const [showMembers, setShowMembers] = useState(false);
 
   useEffect(() => {
-    if (!user) { navigate("/auth"); return; }
+    if (!user) return;
     fetchLobbies();
     const channel = supabase
       .channel("lobbies-realtime")
@@ -106,12 +106,17 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
   }, [activeLobby?.id]);
 
   const fetchLobbies = async () => {
-    const { data } = await supabase
-      .from("trading_lobbies")
-      .select("*")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
-    if (data) setLobbies(data);
+    try {
+      const { data, error } = await supabase
+        .from("trading_lobbies")
+        .select("*")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+      if (error) { console.error("Fetch lobbies error:", error); return; }
+      if (data) setLobbies(data);
+    } catch (err) {
+      console.error("Fetch lobbies exception:", err);
+    }
   };
 
   const fetchMembers = async (lobbyId: string) => {
@@ -564,4 +569,47 @@ const MembersPanel = ({ members, creatorId }: { members: LobbyMember[]; creatorI
   </div>
 );
 
-export default TradingLobbies;
+// Error boundary to catch LiveKit or other runtime crashes
+class TradingLobbiesErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: string }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: "" };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+  componentDidCatch(error: Error) {
+    console.error("TradingLobbies crash:", error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <AppLayout>
+          <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+              <Shield className="h-7 w-7 text-red-400" />
+            </div>
+            <h2 className="text-lg font-bold text-white mb-2">Trading Lobbies Error</h2>
+            <p className="text-xs text-white/40 mb-4 max-w-md">{this.state.error || "Something went wrong loading this page."}</p>
+            <button onClick={() => { this.setState({ hasError: false, error: "" }); window.location.reload(); }}
+              className="px-4 py-2 rounded-xl bg-primary/15 text-primary text-xs font-bold hover:bg-primary/25 transition-colors">
+              Reload Page
+            </button>
+          </div>
+        </AppLayout>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const TradingLobbiesWithBoundary = (props: { inline?: boolean }) => (
+  <TradingLobbiesErrorBoundary>
+    <TradingLobbies {...props} />
+  </TradingLobbiesErrorBoundary>
+);
+
+export default TradingLobbiesWithBoundary;

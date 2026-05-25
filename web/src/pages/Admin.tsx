@@ -2640,7 +2640,7 @@ const Admin = ({ inline = false }: { inline?: boolean }) => {
 
   return (
     <Wrap>
-      <div className="flex min-h-screen">
+      <div className="flex flex-col lg:flex-row min-h-screen">
         {/* Sidebar Navigation */}
         <aside className="hidden lg:flex flex-col w-56 shrink-0 border-r border-white/[0.06] bg-black/20 p-3 gap-1 sticky top-0 h-screen overflow-y-auto" style={{ scrollbarWidth: "none" }}>
           <div className="flex items-center gap-2 px-3 py-3 mb-2">

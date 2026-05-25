@@ -301,6 +301,7 @@ export const TokenExplorer: React.FC<Props> = ({ onSelectMint }) => {
       {/* Token detail dialog */}
       {selectedToken && (
         <CoinDetailDialog
+          key={selectedToken.address}
           token={{
             id: selectedToken.address,
             name: selectedToken.name,
@@ -318,6 +319,8 @@ export const TokenExplorer: React.FC<Props> = ({ onSelectMint }) => {
             },
           }}
           trigger={<span />}
+          defaultOpen={true}
+          onOpenChange={(open) => { if (!open) setSelectedToken(null); }}
           onOpenScanner={onSelectMint ? (mint) => onSelectMint(mint) : undefined}
         />
       )}
