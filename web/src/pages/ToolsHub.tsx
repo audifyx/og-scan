@@ -5,7 +5,7 @@
 import React from "react";
 import {
   Search, Target, Rss, Activity,
-  Zap, Coins, ArrowRight,
+  Zap, Coins, ArrowRight, Star,
   Sparkles, Shield, TrendingUp, Layers,
   Wrench,
 } from "lucide-react";
@@ -83,6 +83,18 @@ const TOOLS: ToolItem[] = [
     gradient: "from-yellow-400 to-amber-500",
     glowColor: "rgba(250,204,21,0.3)",
     category: "trading",
+  },
+  {
+    id: "listings",
+    label: "Token Listings",
+    description: "List & promote tokens — paste a CA, blockchain pulls all data & analysis",
+    detail: "List Tokens, Price Data, Dev Wallet, Holder Analysis, AI Verdict",
+    Icon: Star,
+    gradient: "from-amber-400 to-orange-500",
+    glowColor: "rgba(251,146,60,0.3)",
+    category: "trading",
+    badge: "New",
+    contains: ["List", "Promote", "Analyze", "Dev Wallet"],
   },
   {
     id: "our-coin",

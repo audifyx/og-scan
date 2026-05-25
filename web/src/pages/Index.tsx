@@ -127,6 +127,9 @@ const QuickCalc = lazy(() => import("@/components/advanced-tools-20x/QuickCalc")
 const UserProfile = lazy(() => import("@/components/profile-20x/UserProfile").then(m => ({ default: m.UserProfile })));
 const WebhookManager = lazy(() => import("@/components/webhooks-20x/WebhookManager").then(m => ({ default: m.WebhookManager })));
 
+/* ─── Token Listings ─── */
+const TokenListings = lazy(() => import("@/components/TokenListings").then(m => ({ default: m.TokenListings })));
+
 /* ─── Phase 30 imports (Discover / Launchpad) ─── */
 const TokenExplorer = lazy(() => import("@/components/discover-20x/TokenExplorer").then(m => ({ default: m.TokenExplorer })));
 const ViralFeed = lazy(() => import("@/components/discover-20x/ViralFeed").then(m => ({ default: m.ViralFeed })));
@@ -165,7 +168,8 @@ type TabId =
   | "profile"
   | "charts"
   | "live-trading"
-  | "live-feed-page";
+  | "live-feed-page"
+  | "listings";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
@@ -457,6 +461,17 @@ const TABS: TabConfig[] = [
     mergedInto: "community",
   },
   {
+    id: "listings",
+    label: "Listings",
+    slug: "listings",
+    pageNumber: 28,
+    eyebrow: "Token Listings",
+    description: "List & promote tokens — paste a CA, Helius pulls all data, analytics, and verdict.",
+    Icon: Star,
+    accent: "gold",
+    group: "Main",
+  },
+  {
     id: "community",
     label: "Community",
     slug: "community",
@@ -623,6 +638,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "spaces") return <SpacesPage />;
   if (tab === "social") return <SocialHub />;
   if (tab === "tools") return <ToolsHub onNavigate={onNavigate || (() => {})} />;
+  if (tab === "listings") return <TokenListings />;
   if (tab === "profile") return <UserProfile viewUserId={profileViewUserId} />;
   if (tab === "live-trading") return <LiveTradingPage />;
   if (tab === "live-feed-page") return <LiveFeedPage />;
@@ -804,8 +820,8 @@ const OverviewPage = ({
 }) => {
   const quickActions = [
     { label: "Scan Token", Icon: Search, accent: "lime" as TabAccent, tab: "scanner" as TabId },
+    { label: "Listings", Icon: Star, accent: "gold" as TabAccent, tab: "listings" as TabId },
     { label: "Launch Radar", Icon: Target, accent: "cyan" as TabAccent, tab: "snipe-feed" as TabId },
-    { label: "Profile", Icon: User, accent: "gold" as TabAccent, tab: "profile" as TabId },
     { label: "Community", Icon: MessageSquare, accent: "cyan" as TabAccent, tab: "community" as TabId },
   ];
 
