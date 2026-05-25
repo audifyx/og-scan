@@ -655,8 +655,8 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-5 pb-4 pt-3 border-t border-white/[0.06]">
+        {/* Footer — always pinned at bottom */}
+        <div className="shrink-0 px-4 pb-3 pt-2 border-t border-white/[0.06]">
           <Button onClick={handleCreate} disabled={!title.trim() || creating || (isScheduled && (!scheduledDate || !scheduledTime))}
             className="w-full rounded-full btn-3d font-black gap-2 h-10 text-sm">
             {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : isScheduled ? <><Calendar className="h-4 w-4" /> Schedule Space</> : <><Mic className="h-4 w-4" /> Go Live</>}
