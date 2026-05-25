@@ -893,7 +893,7 @@ const OverviewPage = ({
         <SmartWatchlist onSelectMint={(m: string) => setPopupMint(m)} />
       </div>
 
-      {/* ─── Tool Sections ─── */}
+      {/* ─── Quick Tools Grid ─── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-black text-white">Quick Tools</h2>
@@ -905,54 +905,42 @@ const OverviewPage = ({
             All tools <ChevronRight className="h-3 w-3" />
           </button>
         </div>
-        {toolSections.map((section) => (
-          <div key={section.title}>
-            <p className={cn("mb-1.5 text-[9px] font-bold uppercase tracking-widest", accentText(section.accent))}>{section.title}</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {section.items.map((tool) => (
-                <button
-                  key={tool.id}
-                  type="button"
-                  onClick={() => onSwitchTab(tool.id)}
-                  className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 text-left transition hover:border-white/[0.1] hover:bg-white/[0.04] active:scale-[0.99]"
-                >
-                  <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", accentIcon(tool.accent))}>
-                    <tool.Icon className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[13px] font-bold text-white group-hover:text-og-lime transition-colors">{tool.label}</span>
-                    <p className="text-[11px] text-white/30 truncate">{(tool as any).shortDesc}</p>
-                  </div>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/10 group-hover:text-white/30 transition" />
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
+        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
+          {toolSections.flatMap(s => s.items).map((tool) => (
+            <button
+              key={tool.id}
+              type="button"
+              onClick={() => onSwitchTab(tool.id)}
+              className="group flex flex-col items-center gap-2 py-3 px-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-all hover:bg-white/[0.06] hover:border-white/[0.12] hover:scale-[1.04] active:scale-95"
+            >
+              <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl border", accentIcon(tool.accent))}>
+                <tool.Icon className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] font-bold text-white/60 group-hover:text-white transition-colors text-center leading-tight">{tool.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ─── Community & Activity ─── */}
       <div className="space-y-3">
         <h2 className="text-[15px] font-black text-white">Community & Activity</h2>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
           {[
-            { label: "Chat & Voice", desc: "Join conversations", Icon: MessageSquare, accent: "lime" as TabAccent, tab: "community" as TabId },
-            { label: "Spaces", desc: "Live voice rooms", Icon: Radio, accent: "cyan" as TabAccent, tab: "community" as TabId },
-            { label: "Alpha Calls", desc: "Community picks", Icon: TrendingUp, accent: "gold" as TabAccent, tab: "community" as TabId },
+            { label: "Chat", Icon: MessageSquare, accent: "lime" as TabAccent, tab: "community" as TabId },
+            { label: "Spaces", Icon: Radio, accent: "cyan" as TabAccent, tab: "community" as TabId },
+            { label: "Alpha", Icon: TrendingUp, accent: "gold" as TabAccent, tab: "community" as TabId },
           ].map((item) => (
             <button
               key={item.label}
               type="button"
               onClick={() => onSwitchTab(item.tab)}
-              className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5 text-left transition hover:border-white/[0.1] hover:bg-white/[0.04]"
+              className="group flex flex-col items-center gap-2 py-3 px-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-all hover:bg-white/[0.06] hover:border-white/[0.12] hover:scale-[1.04] active:scale-95"
             >
-              <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", accentIcon(item.accent))}>
-                <item.Icon className="h-4 w-4" />
+              <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl border", accentIcon(item.accent))}>
+                <item.Icon className="h-5 w-5" />
               </div>
-              <div>
-                <span className="text-[12px] font-bold text-white">{item.label}</span>
-                <p className="text-[10px] text-white/30">{item.desc}</p>
-              </div>
+              <span className="text-[10px] font-bold text-white/60 group-hover:text-white transition-colors text-center leading-tight">{item.label}</span>
             </button>
           ))}
         </div>
@@ -1030,35 +1018,8 @@ const AllToolRow = ({ tool, onClick }: { tool: TabConfig; onClick: () => void })
 );
 
 /* ─── Tool Shell (wraps each tool) ─── */
-const ToolShell = ({ tab, children }: { tab: TabConfig; children: ReactNode }) => (
-  <div className="space-y-4">
-    {/* Tool header */}
-    <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-      <div className="flex items-center gap-4">
-        <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border", accentIcon(tab.accent))}>
-          <tab.Icon className="h-6 w-6" />
-        </div>
-        <div>
-          <div className={cn("mb-0.5 text-[9px] font-bold uppercase tracking-widest", accentText(tab.accent))}>
-            {tab.group} · {tab.eyebrow}
-          </div>
-          <h2 className="text-xl font-black leading-tight text-white sm:text-2xl">{tab.label}</h2>
-          <p className="mt-0.5 max-w-xl text-[12px] text-white/45">{tab.description}</p>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] text-white/40">
-          /{tab.slug}
-        </span>
-        <span className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] text-og-cyan/60">
-          pg {tab.pageNumber}
-        </span>
-      </div>
-    </div>
-
-    {/* Tool content */}
-    <div className="og-tool-shell og-tool-shell-redesign relative">{children}</div>
-  </div>
+const ToolShell = ({ children }: { tab: TabConfig; children: ReactNode }) => (
+  <div className="og-tool-shell og-tool-shell-redesign relative">{children}</div>
 );
 
 /* ─── Suite nav for merged tools ─── */
