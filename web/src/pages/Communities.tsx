@@ -1097,11 +1097,28 @@ function PostCard({
     e.stopPropagation();
     if (!confirm("Delete this post?")) return;
     try {
-      if (isThread) await supabase.from("community_posts").delete().eq("thread_id", post.id);
-      await supabase.from("community_posts").delete().eq("id", post.id);
-      toast.success("Post deleted");
-      onUpdate?.();
-    } catch { toast.error("Failed to delete"); }
+      if (isThread) {
+        await supabase.from("community_posts").delete().eq("thread_id", post.id);
+      }
+      // Delete related data first, then the post
+      await Promise.allSettled([
+        supabase.from("community_post_likes").delete().eq("post_id", post.id),
+        supabase.from("community_reposts").delete().eq("post_id", post.id),
+        supabase.from("community_bookmarks").delete().eq("post_id", post.id),
+        supabase.from("community_post_replies").delete().eq("post_id", post.id),
+      ]);
+      const { error } = await supabase.from("community_posts").delete().eq("id", post.id);
+      if (error) {
+        console.error("Delete error:", error);
+        toast.error("Failed to delete post: " + error.message);
+      } else {
+        toast.success("Post deleted");
+        // Hide immediately from UI
+        const el = (e.target as HTMLElement).closest("[data-post-id]");
+        if (el) (el as HTMLElement).style.display = "none";
+        onUpdate?.();
+      }
+    } catch (err: any) { toast.error("Failed to delete: " + (err.message || "")); }
     setShowMenu(false);
   };
 
@@ -1119,7 +1136,7 @@ function PostCard({
   };
 
   return (
-    <article className={cn("px-4 py-3 hover:bg-white/[0.015] transition-colors relative", post.is_pinned && "bg-og-cyan/[0.03]")}>
+    <article data-post-id={post.id} className={cn("px-4 py-3 hover:bg-white/[0.015] transition-colors relative", post.is_pinned && "bg-og-cyan/[0.03]")}>
       {post.is_pinned && (
         <div className="flex items-center gap-1 ml-12 mb-1 text-[10px] text-white/20"><Pin className="h-3 w-3" /> Pinned</div>
       )}
