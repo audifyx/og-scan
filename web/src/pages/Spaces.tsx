@@ -1063,7 +1063,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
   const [poll, setPoll] = useState<SpacePoll | null>(null);
   const [showPollCreate, setShowPollCreate] = useState(false);
   const [voiceParticipants, setVoiceParticipants] = useState<VoiceParticipant[]>([]);
-  const [myRole, setMyRole] = useState<VoiceRole>("speaker");
+  const [myRole, setMyRole] = useState<VoiceRole>(user?.id === space.host_id ? "speaker" : "listener");
   const [showHostPanel, setShowHostPanel] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const [slowMode, setSlowMode] = useState(false);
@@ -1177,7 +1177,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 relative">
+    <div className="flex flex-col min-h-[calc(100vh-6rem)] relative">
       <SpaceStyles />
       <ReactionOverlay items={reactions} />
 
@@ -1514,7 +1514,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
       </div>
 
       {/* ── Bottom Controls — SocialHub-style rounded squares ── */}
-      <div className="px-4 pb-6 pt-4 shrink-0 relative z-10">
+      <div className="px-4 pb-24 pt-4 shrink-0 relative z-10">
         {/* Mic visualizer when speaking */}
         {myRole === "speaker" && !muted && (
           <div className="mb-3"><MicVisualizer active={true} /></div>
