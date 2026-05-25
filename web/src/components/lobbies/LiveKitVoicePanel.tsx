@@ -281,6 +281,9 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
       broadcastChannelRef.current = null;
     }
     if (dbPromoteChannelRef.current) {
+      if ((dbPromoteChannelRef as any)._pollInterval) {
+        clearInterval((dbPromoteChannelRef as any)._pollInterval);
+      }
       await supabase.removeChannel(dbPromoteChannelRef.current);
       dbPromoteChannelRef.current = null;
     }
@@ -339,19 +342,45 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
     // Redundant DB-backed promote: subscribe to speaker_requests changes
     // so promote works even if broadcast is missed
     if (spaceId) {
+      const handleDbPromote = (payload: any) => {
+        const row = (payload.new ?? payload) as any;
+        if (row.user_id === user.id && row.status === "approved" && roleRef.current === "listener") {
+          console.log("[LiveKit] DB promote detected for", user.id);
+          handleCommand("promote", row.user_id);
+        }
+      };
       const dbCh = supabase.channel(`lk-db-promote-${lobbyId}-${user.id}`)
         .on("postgres_changes", {
           event: "UPDATE",
           schema: "public",
           table: "speaker_requests",
           filter: `space_id=eq.${spaceId}`,
-        }, (payload) => {
-          const row = payload.new as any;
-          if (row.user_id === user.id && row.status === "approved" && roleRef.current === "listener") {
-            handleCommand("promote", row.user_id);
-          }
-        }).subscribe();
+        }, handleDbPromote)
+        .on("postgres_changes", {
+          event: "INSERT",
+          schema: "public",
+          table: "speaker_requests",
+          filter: `space_id=eq.${spaceId}`,
+        }, handleDbPromote)
+        .subscribe();
       dbPromoteChannelRef.current = dbCh;
+
+      // Polling fallback: check every 5s if we have an approved request
+      const pollInterval = setInterval(async () => {
+        if (roleRef.current === "speaker") return;
+        const { data } = await supabase.from("speaker_requests")
+          .select("status")
+          .eq("space_id", spaceId)
+          .eq("user_id", user.id)
+          .eq("status", "approved")
+          .limit(1);
+        if (data && data.length > 0 && roleRef.current === "listener") {
+          console.log("[LiveKit] Poll detected approved request for", user.id);
+          handleCommand("promote", user.id);
+        }
+      }, 5000);
+      // Store interval for cleanup
+      (dbPromoteChannelRef as any)._pollInterval = pollInterval;
     }
   };
 
