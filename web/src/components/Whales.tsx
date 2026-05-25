@@ -10,9 +10,9 @@ import {
   shortAddr,
 } from "@/lib/og";
 
-type Props = { mint: string };
+type Props = { mint: string; onSelectWallet?: (w: string) => void };
 
-export const Whales = ({ mint }: Props) => {
+export const Whales = ({ mint, onSelectWallet }: Props) => {
   const { data: holders, isLoading } = useQuery({
     queryKey: ["whales", mint],
     queryFn: () => heliusLargestAccounts(mint),
@@ -115,12 +115,10 @@ export const Whales = ({ mint }: Props) => {
             const usd = h.uiAmount * price;
             const isWhale = pct >= 1;
             return (
-              <a
+              <div
                 key={h.address}
-                href={`https://solscan.io/account/${h.address}`}
-                target="_blank"
-                rel="noreferrer"
-                className="block border-b border-og-grid/50 p-3 text-xs transition hover:bg-og-gold/5 md:grid md:grid-cols-12 md:items-center md:gap-2 md:px-3 md:py-2"
+                onClick={() => onSelectWallet?.(h.address)}
+                className="group cursor-pointer border-b border-og-grid/50 p-3 text-xs transition hover:bg-og-cyan/5 md:grid md:grid-cols-12 md:items-center md:gap-2 md:px-3 md:py-2"
               >
                 <div className="flex min-w-0 items-center justify-between gap-3 md:contents">
                   <div className="font-mono text-og-gold md:col-span-1">
@@ -128,8 +126,16 @@ export const Whales = ({ mint }: Props) => {
                   </div>
                   <div className="flex min-w-0 items-center gap-2 font-mono text-foreground/80 md:col-span-5">
                     {isWhale && <Crown className="h-3 w-3 shrink-0 text-og-gold" />}
-                    <span className="truncate">{shortAddr(h.address, 6)}</span>
-                    <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+                    <span className="truncate group-hover:text-og-cyan transition-colors">{shortAddr(h.address, 6)}</span>
+                    <a
+                      href={`https://solscan.io/account/${h.address}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="hover:text-white transition-colors"
+                    >
+                      <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+                    </a>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 md:contents">
@@ -152,7 +158,7 @@ export const Whales = ({ mint }: Props) => {
                     </div>
                   </div>
                 </div>
-              </a>
+              </div>
             );
           })}
           {!isLoading && (holders?.length ?? 0) === 0 && (

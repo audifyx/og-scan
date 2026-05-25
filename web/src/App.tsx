@@ -124,9 +124,9 @@ const App = () => (
             <Route path="/premium" element={<ProtectedRoute><Premium /></ProtectedRoute>} />
 
             {/* ── Protected: Market ── */}
-            <Route path="/live-trading" element={<ProtectedRoute><LiveTrading /></ProtectedRoute>} />
-            <Route path="/charts" element={<ProtectedRoute><Charts /></ProtectedRoute>} />
-            <Route path="/live-feed-page" element={<ProtectedRoute><LiveFeed /></ProtectedRoute>} />
+            <Route path="/live-trading" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/charts" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/live-feed-page" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/pumpv5" element={<ProtectedRoute><PumpV5 /></ProtectedRoute>} />
 
             {/* ── Protected: Admin ── */}
