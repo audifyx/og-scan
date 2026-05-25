@@ -499,7 +499,7 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 bg-og-cyan/20 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-white/[0.06] relative">
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/[0.06] relative">
           <div>
             <h2 className="text-lg font-black flex items-center gap-2.5 text-white">
               <div className="p-1.5 rounded-xl bg-og-cyan/15 border border-og-cyan/25">
@@ -517,39 +517,39 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5" style={{ scrollbarWidth: "none" }}>
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3" style={{ scrollbarWidth: "none" }}>
           {/* Title */}
           <div>
-            <label className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 block">Title *</label>
+            <label className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1.5 block">Title *</label>
             <Input placeholder="e.g. Solana Alpha Call — New Launches" value={title} onChange={e => setTitle(e.target.value)} maxLength={80}
-              className="bg-white/[0.04] border-white/[0.08] rounded-xl h-11 focus:border-og-cyan/50 transition-colors" />
-            <div className="flex justify-end mt-1">
-              <span className={cn("text-[10px] tabular-nums", title.length > 70 ? "text-amber-400" : "text-white/15")}>{title.length}/80</span>
+              className="bg-white/[0.04] border-white/[0.08] rounded-xl h-9 text-sm focus:border-og-cyan/50 transition-colors" />
+            <div className="flex justify-end -mt-0.5">
+              <span className={cn("text-[9px] tabular-nums", title.length > 70 ? "text-amber-400" : "text-white/15")}>{title.length}/80</span>
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 block">Description</label>
+            <label className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1.5 block">Description</label>
             <Textarea placeholder="What will you discuss?" value={description} onChange={e => setDescription(e.target.value)} maxLength={280}
-              className="bg-white/[0.04] border-white/[0.08] rounded-xl resize-none min-h-[80px] text-sm focus:border-og-cyan/50" />
+              className="bg-white/[0.04] border-white/[0.08] rounded-xl resize-none min-h-[56px] text-sm focus:border-og-cyan/50" />
           </div>
 
           {/* Topic */}
           <div>
-            <label className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 block">Topic</label>
-            <div className="grid grid-cols-4 gap-2">
+            <label className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1.5 block">Topic</label>
+            <div className="grid grid-cols-5 gap-1.5">
               {TOPICS.map(t => {
                 const m = topicOf(t);
                 return (
                   <button key={t} onClick={() => setTopic(t)}
                     className={cn(
-                      "flex flex-col items-center gap-1 py-2.5 rounded-xl border transition-all text-center",
+                      "flex flex-col items-center gap-0.5 py-1.5 rounded-lg border transition-all text-center",
                       topic === t
                         ? "bg-og-cyan/10 border-og-cyan/40 scale-[1.02] shadow-lg shadow-og-cyan/10"
                         : "border-white/[0.06] hover:border-white/[0.12] bg-white/[0.02]"
                     )}>
-                    <span className="text-lg">{m.icon}</span>
+                    <span className="text-base">{m.icon}</span>
                     <span className={cn("text-[10px] font-bold", topic === t ? "text-og-cyan" : "text-white/40")}>{t}</span>
                   </button>
                 );
@@ -581,8 +581,8 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
           </div>
 
           {/* Settings Cards */}
-          <div className="space-y-2">
-            {/* Schedule */}
+          <div className="space-y-1.5">
+            {/* Schedule */
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
               <div className="flex items-center justify-between p-3">
                 <div className="flex items-center gap-3">
@@ -659,9 +659,9 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
         </div>
 
         {/* Footer */}
-        <div className="px-6 pb-6 pt-4 border-t border-white/[0.06]">
+        <div className="px-5 pb-4 pt-3 border-t border-white/[0.06]">
           <Button onClick={handleCreate} disabled={!title.trim() || creating || (isScheduled && (!scheduledDate || !scheduledTime))}
-            className="w-full rounded-full btn-3d font-black gap-2 h-12 text-sm">
+            className="w-full rounded-full btn-3d font-black gap-2 h-10 text-sm">
             {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : isScheduled ? <><Calendar className="h-4 w-4" /> Schedule Space</> : <><Mic className="h-4 w-4" /> Go Live</>}
           </Button>
         </div>
@@ -1906,7 +1906,7 @@ const StatsBar = ({ liveCount, listenerCount, activeNow, trending }: {
     { icon: Flame,       value: trending,      label: "Trending",   color: "text-orange-400" },
   ];
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className="grid grid-cols-5 gap-1.5">
       {stats.map((s, i) => (
         <div key={i} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3 flex flex-col items-center gap-1">
           <div className="flex items-center gap-1.5">
