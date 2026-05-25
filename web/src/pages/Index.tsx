@@ -680,6 +680,7 @@ const Index = () => {
                 onSwitchTab={(t: TabId) => switchTab(t)}
                 onScanClick={() => switchTab("scanner")}
                 onChangeMint={promptMint}
+                onSelectMint={updateMint}
               />
             ) : (
               <ToolShell tab={activeTab}>{renderTool(tab, mint, updateMint, switchTab)}</ToolShell>
@@ -1029,11 +1030,13 @@ const OverviewPage = ({
   onSwitchTab,
   onScanClick,
   onChangeMint,
+  onSelectMint,
 }: {
   mint: string;
   onSwitchTab: (t: TabId) => void;
   onScanClick: () => void;
   onChangeMint: () => void;
+  onSelectMint: (m: string) => void;
 }) => {
   const quickActions = [
     { label: "Scan Token", Icon: Search, accent: "lime" as TabAccent, tab: "scanner" as TabId },
@@ -1117,8 +1120,8 @@ const OverviewPage = ({
 
       {/* ─── Intelligence Row ─── */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <OGDaily onSelectMint={() => { onSwitchTab("scanner"); }} />
-        <SmartWatchlist onSelectMint={() => { onSwitchTab("scanner"); }} />
+        <OGDaily onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
+        <SmartWatchlist onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
       </div>
 
       {/* ─── Tool Sections ─── */}
@@ -1187,15 +1190,15 @@ const OverviewPage = ({
       </div>
 
       {/* ─── Advanced: charts, alpha, leaderboard ─── */}
-      <MultiChartView onSelectMint={() => { onSwitchTab("scanner"); }} />
+      <MultiChartView onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <AlphaCallouts onSelectMint={() => { onSwitchTab("scanner"); }} />
+        <AlphaCallouts onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
         <PlatformLeaderboard />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <PaperTrading onSelectMint={() => { onSwitchTab("scanner"); }} />
+        <PaperTrading onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
         <CryptoCalendar />
       </div>
 

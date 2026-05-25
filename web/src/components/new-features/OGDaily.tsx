@@ -26,6 +26,7 @@ interface DailySection {
     mint?: string;
     badge?: string;
     badgeColor?: string;
+    logoURI?: string;
   }>;
 }
 
@@ -58,6 +59,9 @@ function vol24h(t: JupTokenInfo): number {
 }
 function tokenAddr(t: JupTokenInfo): string {
   return (t as any).address ?? t.id;
+}
+function tokenLogo(t: JupTokenInfo): string | undefined {
+  return (t as any).logoURI ?? t.icon ?? undefined;
 }
 
 const NARRATIVE_KEYWORDS: Record<string, string[]> = {
@@ -155,6 +159,7 @@ export const OGDaily: React.FC<Props> = ({ onSelectMint }) => {
             text: `$${t.symbol || "???"}`,
             detail: `MCap: ${fmtUsd(t.mcap || 0)} | Vol: ${fmtUsd(vol24h(t))}`,
             mint: tokenAddr(t),
+            logoURI: tokenLogo(t),
             badge: `+${pctChange(t).toFixed(1)}%`,
             badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
           })),
@@ -166,6 +171,7 @@ export const OGDaily: React.FC<Props> = ({ onSelectMint }) => {
             text: `$${t.symbol || "???"}`,
             detail: `MCap: ${fmtUsd(t.mcap || 0)} | Vol: ${fmtUsd(vol24h(t))}`,
             mint: tokenAddr(t),
+            logoURI: tokenLogo(t),
             badge: `${pctChange(t).toFixed(1)}%`,
             badgeColor: "bg-red-500/10 text-red-400 border-red-500/20",
           })),
@@ -177,6 +183,7 @@ export const OGDaily: React.FC<Props> = ({ onSelectMint }) => {
             text: `$${t.symbol || "???"}`,
             detail: `Volume: ${fmtUsd(vol24h(t))} | MCap: ${fmtUsd(t.mcap || 0)}`,
             mint: tokenAddr(t),
+            logoURI: tokenLogo(t),
             badge: `${fmtUsd(vol24h(t))}`,
             badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/20",
           })),
@@ -191,6 +198,7 @@ export const OGDaily: React.FC<Props> = ({ onSelectMint }) => {
             text: `$${t.symbol || "???"}`,
             detail: `MCap: ${fmtUsd(t.mcap || 0)} | 1h: +${pctChange1h(t).toFixed(1)}%`,
             mint: tokenAddr(t),
+            logoURI: tokenLogo(t),
             badge: `+${pctChange1h(t).toFixed(0)}% 1h`,
             badgeColor: "bg-orange-500/10 text-orange-400 border-orange-500/20",
           })),
@@ -220,6 +228,7 @@ export const OGDaily: React.FC<Props> = ({ onSelectMint }) => {
             text: `$${t.symbol || "???"}`,
             detail: `Vol: ${fmtUsd(vol24h(t))} | MCap: ${fmtUsd(t.mcap || 0)} | Holders: ${t.holderCount?.toLocaleString() ?? "?"}`,
             mint: tokenAddr(t),
+            logoURI: tokenLogo(t),
             badge: `${pctChange(t) >= 0 ? "+" : ""}${pctChange(t).toFixed(1)}%`,
             badgeColor: pctChange(t) >= 0
               ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
@@ -376,10 +385,24 @@ export const OGDaily: React.FC<Props> = ({ onSelectMint }) => {
                         item.mint ? "hover:bg-white/[0.03] cursor-pointer" : "cursor-default"
                       )}
                     >
-                      <span className="text-[11px] font-bold text-white">{item.text}</span>
-                      {item.detail && <span className="text-[9px] text-white/20 flex-1 truncate">{item.detail}</span>}
-                      {item.badge && (
-                        <Badge className={cn("text-[8px]", item.badgeColor)}>{item.badge}</Badge>
+                      {item.logoURI ? (
+                        <img src={item.logoURI} alt="" className="w-6 h-6 rounded-full shrink-0 bg-white/[0.04]" />
+                      ) : item.mint ? (
+                        <div className="w-6 h-6 rounded-full shrink-0 bg-white/[0.06] flex items-center justify-center text-[9px] font-bold text-white/30">
+                          {item.text.replace("$", "").charAt(0)}
+                        </div>
+                      ) : null}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-bold text-white">{item.text}</span>
+                          {item.badge && (
+                            <Badge className={cn("text-[8px]", item.badgeColor)}>{item.badge}</Badge>
+                          )}
+                        </div>
+                        {item.detail && <p className="text-[9px] text-white/20 truncate">{item.detail}</p>}
+                      </div>
+                      {item.mint && (
+                        <ExternalLink className="h-3 w-3 text-white/10 shrink-0" />
                       )}
                     </button>
                   ))}
