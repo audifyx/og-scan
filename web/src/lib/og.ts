@@ -851,7 +851,17 @@ function pairQuoteLiquidityUsd(pair: DexSearchPair): number | undefined {
 
   const quoteMint: string | undefined = pair.quoteToken?.address;
   const quoteSymbol: string = (pair.quoteToken?.symbol ?? "").toUpperCase();
+  // Stablecoin quotes: amount IS the USD value
   if ((quoteMint && STABLE_QUOTE_MINTS.has(quoteMint)) || STABLE_QUOTE_SYMBOLS.has(quoteSymbol)) return quoteAmount;
+
+  // SOL-quoted pairs: derive USD from the pair's reported USD liquidity.
+  // In an x*y=k AMM pool the quote side is ~half the reported USD liquidity.
+  if (quoteMint === SOL_MINT || quoteSymbol === "SOL" || quoteSymbol === "WSOL") {
+    const reportedUsd: number | undefined = pair.liquidity?.usd;
+    if (reportedUsd != null && Number.isFinite(reportedUsd) && reportedUsd > 0) {
+      return reportedUsd / 2;
+    }
+  }
   return undefined;
 }
 
@@ -869,9 +879,10 @@ function isPairLpPulled(pair: DexSearchPair): boolean {
   const reported: number = pair.liquidity?.usd ?? 0;
   const effective: number = pairEffectiveLiquidityUsd(pair) ?? 0;
   const quoteLiquidity: number | undefined = pairQuoteLiquidityUsd(pair);
-  const marketCap: number = pair.marketCap ?? pair.fdv ?? 0;
+  // Quote-side liquidity is tiny despite high reported liquidity — classic rug
   if (quoteLiquidity != null && quoteLiquidity < 500 && reported >= 10_000) return true;
-  if (effective < MIN_OGSCAN_LIQUIDITY_USD && marketCap >= 100_000) return true;
+  // Effective liquidity is near-zero but reported is large — LP backing removed
+  if (effective < MIN_OGSCAN_LIQUIDITY_USD && reported >= 50_000) return true;
   return false;
 }
 

@@ -118,7 +118,13 @@ function pairQuoteLiquidityUsd(pair: DetailDexPair | undefined): number | undefi
   if (quoteAmount == null || !Number.isFinite(quoteAmount)) return undefined;
   const quoteSymbol: string = (pair?.quoteToken?.symbol ?? "").toUpperCase();
   const quoteMint: string | undefined = pair?.quoteToken?.address;
+  // Stablecoin quotes: amount IS the USD value
   if (quoteSymbol === "USDC" || quoteSymbol === "USDT" || quoteSymbol === "USDH" || quoteSymbol === "USDS" || quoteMint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v") return quoteAmount;
+  // SOL-quoted pairs: derive USD from reported — quote side is ~half
+  if (quoteSymbol === "SOL" || quoteSymbol === "WSOL" || quoteMint === "So11111111111111111111111111111111111111112") {
+    const reportedUsd: number | undefined = pair?.liquidity?.usd;
+    if (reportedUsd != null && Number.isFinite(reportedUsd) && reportedUsd > 0) return reportedUsd / 2;
+  }
   return undefined;
 }
 
@@ -134,8 +140,11 @@ function pairHasPulledLiquidity(pair: DetailDexPair | undefined): boolean {
   const reported: number = pair.liquidity?.usd ?? 0;
   const quoteLiquidity: number | undefined = pairQuoteLiquidityUsd(pair);
   const effective: number = pairEffectiveLiquidityUsd(pair) ?? 0;
-  const marketCap: number = pair.marketCap ?? pair.fdv ?? 0;
-  return (quoteLiquidity != null && quoteLiquidity < 500 && reported >= 10_000) || (effective < 1_000 && marketCap >= 100_000);
+  // Quote-side liquidity is tiny despite high reported liquidity — classic rug
+  if (quoteLiquidity != null && quoteLiquidity < 500 && reported >= 10_000) return true;
+  // Effective liquidity is near-zero but reported is large — LP backing removed
+  if (effective < 1_000 && reported >= 50_000) return true;
+  return false;
 }
 
 function bestPair(pairs: DetailDexPair[]): DetailDexPair | undefined {

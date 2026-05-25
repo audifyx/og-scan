@@ -677,7 +677,7 @@ const Index = () => {
     if (routeSlug && !getTabFromSlug(routeSlug)) navigate("/app", { replace: true });
   }, [navigate, routeSlug]);
 
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [location.pathname, tab]);
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [location.pathname, tab]);
 
   const activeTab = useMemo<TabConfig>(() => TABS.find((t) => t.id === tab) ?? TABS[0], [tab]);
 
