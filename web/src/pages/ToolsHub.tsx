@@ -6,7 +6,7 @@ import React, { useState } from "react";
 import {
   Search, Target, Rss, Activity, Flame, Radar, Rocket,
   Wallet, Zap, Cpu, Radio, Coins, Map, Palette,
-  Wrench, TrendingUp, LayoutGrid, BarChart3,
+  Wrench, TrendingUp, LayoutGrid, BarChart3, LineChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +33,7 @@ const TOOLS: ToolItem[] = [
   { id: "whales", label: "Whales", Icon: Wallet, gradient: "from-purple-400 to-violet-500", glowColor: "shadow-purple-400/25", category: "market" },
   { id: "tx-feed", label: "Tx Feed", Icon: BarChart3, gradient: "from-teal-400 to-cyan-500", glowColor: "shadow-teal-400/25", category: "market" },
   { id: "news-signal", label: "News", Icon: Radio, gradient: "from-lime-400 to-green-500", glowColor: "shadow-lime-400/25", category: "market" },
+  { id: "charts", label: "Charts", Icon: LineChart, gradient: "from-indigo-400 to-violet-500", glowColor: "shadow-indigo-400/25", category: "trading" },
   { id: "swap", label: "Swap", Icon: Zap, gradient: "from-yellow-400 to-amber-500", glowColor: "shadow-yellow-400/25", category: "trading" },
   { id: "discover", label: "LaunchPad", Icon: Rocket, gradient: "from-pink-400 to-rose-500", glowColor: "shadow-pink-400/25", category: "trading" },
   { id: "memes", label: "Memes", Icon: Palette, gradient: "from-fuchsia-400 to-pink-500", glowColor: "shadow-fuchsia-400/25", category: "project" },
@@ -79,8 +80,8 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onNavigate }) => {
             className={cn(
               "shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-bold transition-all",
               filter === c.id
-                ? "bg-primary/15 text-primary border border-primary/30"
-                : "bg-white/[0.04] text-white/40 border border-white/[0.06] hover:bg-white/[0.08] hover:text-white/60",
+                ? "bg-white/15 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]"
+                : "bg-white/[0.04] text-white/40 hover:bg-white/[0.07] hover:text-white/60",
             )}
           >
             {c.label}
@@ -88,26 +89,24 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* Icon grid — 4 columns on mobile, 5 on tablet, 6 on desktop */}
-      <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 gap-3">
+      {/* Tool grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
         {filtered.map((tool) => (
           <button
             key={tool.id}
             onClick={() => onNavigate(tool.id)}
-            className="group flex flex-col items-center gap-2.5 py-4 px-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-all hover:bg-white/[0.06] hover:border-white/[0.12] hover:scale-[1.04] active:scale-95"
+            className="group flex flex-col items-center gap-2.5 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 transition-all hover:border-white/[0.12] hover:bg-white/[0.04] hover:scale-[1.03] active:scale-[0.97]"
           >
-            {/* Icon circle */}
             <div
               className={cn(
-                "flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br shadow-lg transition-all group-hover:scale-110 group-hover:shadow-xl",
+                "flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br shadow-lg transition-transform group-hover:scale-110",
                 tool.gradient,
                 tool.glowColor,
               )}
             >
-              <tool.Icon className="h-5.5 w-5.5 text-white drop-shadow-sm" style={{ width: 22, height: 22 }} />
+              <tool.Icon className="h-5 w-5 text-white drop-shadow" />
             </div>
-            {/* Label */}
-            <span className="text-[11px] font-bold text-white/70 group-hover:text-white transition-colors text-center leading-tight line-clamp-2">
+            <span className="text-[11px] font-bold text-white/70 group-hover:text-white transition-colors text-center leading-tight">
               {tool.label}
             </span>
           </button>

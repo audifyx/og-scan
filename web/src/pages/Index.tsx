@@ -514,6 +514,8 @@ const TABS: TabConfig[] = [
     description: "Real-time transaction feed with smart filters and alerts.",
     Icon: Radio,
     accent: "cyan",
+    showInNav: false,
+    mergedInto: "community",
     group: "Market",
   },
 ];

@@ -1,8 +1,8 @@
 import {
-  Activity, Bell, Bot, Coins, Compass, Crown, Home, LineChart, LogOut,
-  MessageSquare, Rocket, Search, Settings, Sparkles, Target, Trophy,
-  TrendingUp, User, Users, Wallet, Webhook, Wrench, X, Zap,
-  Globe2, Radio, Shield, Palette, Menu, Mic,
+  Activity, Bell, Coins, Compass, Home, LineChart, LogOut,
+  MessageSquare, Search, Settings, Target, Trophy,
+  TrendingUp, User, Wallet, Wrench, X, Zap,
+  Globe2, Shield, Menu, Mic,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -21,31 +21,24 @@ const ogScanItems: NavItem[] = [
   { to: "/snipe-feed",   icon: Target,        label: "Launch Radar",    eyebrow: "New launches" },
   { to: "/feed",         icon: Activity,      label: "Market Feed",     eyebrow: "Live market" },
   { to: "/swap",         icon: Zap,           label: "Swap",            eyebrow: "Jupiter route" },
-  { to: "/communities",  icon: Globe2,        label: "Communities",     eyebrow: "Social hub" },
-  { to: "/discover",     icon: Compass,       label: "Discover",        eyebrow: "Top traders" },
-  { to: "/art",          icon: Palette,       label: "Memes",           eyebrow: "Art & vibes" },
-  { to: "/spaces",       icon: Mic,           label: "Spaces",          eyebrow: "Live audio rooms" },
 ];
 
-const solToolsItems: NavItem[] = [
+const communityItems: NavItem[] = [
+  { to: "/community",    icon: Globe2,        label: "Community Hub",   eyebrow: "Chat · Spaces · Groups · Discover" },
+];
+
+const tradingItems: NavItem[] = [
   { to: "/wallets",         icon: Wallet,        label: "Wallets",         eyebrow: "Tracked wallets" },
-  { to: "/tokens",          icon: Coins,         label: "Tokens",          eyebrow: "Token tracker" },
   { to: "/charts",          icon: LineChart,     label: "Charts",          eyebrow: "Live charts" },
-  { to: "/live-feed-page",  icon: Radio,         label: "Live Feed",       eyebrow: "Tape stream" },
-  { to: "/alpha-chat",      icon: Bot,           label: "Alpha Chat",      eyebrow: "AI assistant" },
-  { to: "/live-trading",    icon: TrendingUp,    label: "Live Trading",    eyebrow: "P&L · Signals" },
   { to: "/callouts",        icon: Bell,          label: "Callouts",        eyebrow: "Trade alerts" },
   { to: "/trading-lobbies", icon: MessageSquare, label: "Trading Lobbies", eyebrow: "Voice + charts" },
   { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
-  { to: "/pumpv5",          icon: Rocket,        label: "Launch Pad",      eyebrow: "Token listings" },
-
   { to: "/notifications",   icon: Bell,          label: "Notifications",   eyebrow: "Your alerts" },
 ];
 
 const accountItems: NavItem[] = [
   { to: "/profile",   icon: User,     label: "Profile",   eyebrow: "Your account" },
   { to: "/settings",  icon: Settings, label: "Settings",  eyebrow: "Preferences" },
-
 ];
 
 // ── NavRow ────────────────────────────────────────────────────────────────
@@ -161,11 +154,19 @@ export const Sidebar = () => {
             </div>
           </div>
 
-          {/* SolTools Features */}
+          {/* Community */}
           <div className="mb-1 mt-5">
-            <SectionLabel label="SolTools Features" />
+            <SectionLabel label="Community" />
             <div className="space-y-0.5">
-              {solToolsItems.map((item) => <NavRow key={item.to} item={item} />)}
+              {communityItems.map((item) => <NavRow key={item.to} item={item} />)}
+            </div>
+          </div>
+
+          {/* Trading */}
+          <div className="mb-1 mt-5">
+            <SectionLabel label="Trading" />
+            <div className="space-y-0.5">
+              {tradingItems.map((item) => <NavRow key={item.to} item={item} />)}
             </div>
           </div>
 
@@ -176,8 +177,6 @@ export const Sidebar = () => {
               {accountItems.map((item) => <NavRow key={item.to} item={item} />)}
             </div>
           </div>
-
-          {/* Premium removed */}
 
           {/* Admin */}
           {isAdmin && (

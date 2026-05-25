@@ -582,7 +582,7 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
 
           {/* Settings Cards */}
           <div className="space-y-1.5">
-            {/* Schedule */
+            {/* Schedule */}
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
               <div className="flex items-center justify-between p-3">
                 <div className="flex items-center gap-3">
