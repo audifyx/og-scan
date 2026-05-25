@@ -11,13 +11,13 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const { customWallpaper } = useTheme();
   return (
     <div className="min-h-screen bg-background text-foreground flex relative">
-      {/* Wallpaper layer */}
+      {/* Wallpaper layer — very subtle, pushed far back */}
       {customWallpaper && (
         <div
-          className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
+          className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-15"
           style={{ backgroundImage: `url(${customWallpaper})` }}
         >
-          <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
         </div>
       )}
 
