@@ -729,6 +729,7 @@ const Index = () => {
         />
 
         {/* Page content */}
+<<<<<<< HEAD
         <Suspense fallback={
           <div className="flex flex-1 items-center justify-center p-12">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-og-lime border-t-transparent" />
@@ -755,6 +756,29 @@ const Index = () => {
             </main>
           )}
         </Suspense>
+=======
+        {tab === "community" || tab === "social" ? (
+          /* CommunityHub / SocialHub need full height — skip ToolShell wrapper and padding.
+             pb-[4.5rem] on mobile accounts for fixed MobileNav (lg:pb-0 on desktop). */
+          <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
+            <CommunityHub />
+          </main>
+        ) : (
+          <main className="min-h-0 flex-1 overflow-x-hidden px-3 pb-28 pt-4 sm:px-5 lg:px-6 lg:pb-8">
+            {tab === "overview" ? (
+              <OverviewPage
+                mint={mint}
+                onSwitchTab={(t: TabId) => switchTab(t)}
+                onScanClick={() => switchTab("scanner")}
+                onChangeMint={promptMint}
+                onSelectMint={updateMint}
+              />
+            ) : (
+              <ToolShell tab={activeTab}>{renderTool(tab, mint, updateMint, switchTab)}</ToolShell>
+            )}
+          </main>
+        )}
+>>>>>>> origin/main
       </div>
 
       {/* Mobile bottom nav */}
@@ -779,11 +803,13 @@ const OverviewPage = ({
   onSwitchTab,
   onScanClick,
   onChangeMint,
+  onSelectMint,
 }: {
   mint: string;
   onSwitchTab: (t: TabId) => void;
   onScanClick: () => void;
   onChangeMint: () => void;
+  onSelectMint: (m: string) => void;
 }) => {
   const quickActions = [
     { label: "Scan Token", Icon: Search, accent: "lime" as TabAccent, tab: "scanner" as TabId },
@@ -867,8 +893,8 @@ const OverviewPage = ({
 
       {/* ─── Intelligence Row ─── */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <OGDaily onSelectMint={() => { onSwitchTab("scanner"); }} />
-        <SmartWatchlist onSelectMint={() => { onSwitchTab("scanner"); }} />
+        <OGDaily onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
+        <SmartWatchlist onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
       </div>
 
       {/* ─── Tool Sections ─── */}
@@ -937,15 +963,15 @@ const OverviewPage = ({
       </div>
 
       {/* ─── Advanced: charts, alpha, leaderboard ─── */}
-      <MultiChartView onSelectMint={() => { onSwitchTab("scanner"); }} />
+      <MultiChartView onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <AlphaCallouts onSelectMint={() => { onSwitchTab("scanner"); }} />
+        <AlphaCallouts onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
         <PlatformLeaderboard />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <PaperTrading onSelectMint={() => { onSwitchTab("scanner"); }} />
+        <PaperTrading onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
         <CryptoCalendar />
       </div>
 

@@ -1,14 +1,15 @@
 /**
  * SmartWatchlist — Track tokens with price alerts and auto-categorization.
- * Tags tokens, sets alerts, groups by narrative, shows mini-chart sparklines.
+ * Tags tokens, sets alerts, groups by narrative, shows live prices.
+ * Wired to: Jupiter search + price APIs for real-time data.
  */
-import { useState, useEffect, useCallback } from "react";
-import { Star, Bell, BellOff, Tag, Plus, X, Search, Loader2, TrendingUp, TrendingDown, AlertTriangle, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Star, Bell, BellOff, Tag, Plus, X, Search, Loader2, TrendingUp, TrendingDown, AlertTriangle, Trash2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { jupSearchToken, fmtUsd, shortAddr, type JupTokenInfo } from "@/lib/og";
+import { jupSearchToken, jupPrice, fmtUsd, shortAddr, type JupTokenInfo } from "@/lib/og";
 import { toast } from "sonner";
 
 interface WatchlistItem {
@@ -57,6 +58,9 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
   const [searching, setSearching] = useState(false);
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
 
   const search = async (q: string) => {
     if (q.length < 2) { setResults([]); return; }
@@ -66,19 +70,68 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
     setSearching(false);
   };
 
-  const addItem = (token: JupTokenInfo) => {
-    if (items.some(i => i.mint === token.address)) {
+  // Fetch live prices for all watchlist items
+  const refreshPrices = useCallback(async () => {
+    if (items.length === 0) return;
+    setRefreshing(true);
+    try {
+      const mints = items.map(i => i.mint);
+      const prices = await jupPrice(mints);
+      if (!mounted.current) return;
+      setItems(prev => {
+        const updated = prev.map(item => {
+          const priceData = prices[item.mint];
+          if (!priceData) return item;
+          const currentPrice = priceData.usdPrice ?? item.currentPrice;
+          const priceChange = item.addedPrice > 0
+            ? ((currentPrice - item.addedPrice) / item.addedPrice) * 100
+            : (priceData.priceChange24h ?? 0);
+
+          // Check price alerts
+          if (item.alertAbove && currentPrice >= item.alertAbove) {
+            toast.success(`🔔 $${item.symbol} hit $${currentPrice.toFixed(6)} (above alert $${item.alertAbove})`);
+          }
+          if (item.alertBelow && currentPrice <= item.alertBelow) {
+            toast.warning(`🔔 $${item.symbol} dropped to $${currentPrice.toFixed(6)} (below alert $${item.alertBelow})`);
+          }
+
+          return { ...item, currentPrice, priceChange };
+        });
+        saveWatchlist(updated);
+        return updated;
+      });
+    } catch {}
+    if (mounted.current) setRefreshing(false);
+  }, [items.length]);
+
+  // Refresh prices on mount and every 60 seconds
+  useEffect(() => {
+    refreshPrices();
+    const iv = setInterval(refreshPrices, 60 * 1000);
+    return () => clearInterval(iv);
+  }, [refreshPrices]);
+
+  const addItem = async (token: JupTokenInfo) => {
+    if (items.some(i => i.mint === ((token as any).address ?? token.id))) {
       toast.error("Already in watchlist");
       return;
     }
+    const mint = (token as any).address ?? token.id;
+    // Fetch current price
+    let currentPrice = token.usdPrice ?? 0;
+    try {
+      const priceData = await jupPrice([mint]);
+      if (priceData[mint]) currentPrice = priceData[mint].usdPrice;
+    } catch {}
+
     const item: WatchlistItem = {
-      mint: token.address,
+      mint,
       symbol: token.symbol || "???",
       name: token.name || "",
-      logoURI: token.logoURI,
+      logoURI: (token as any).logoURI ?? token.icon,
       addedAt: new Date().toISOString(),
-      addedPrice: 0,
-      currentPrice: 0,
+      addedPrice: currentPrice,
+      currentPrice,
       priceChange: 0,
       mcap: token.mcap || 0,
       tags: [],
@@ -94,7 +147,7 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
     setQuery("");
     setResults([]);
     setShowAdd(false);
-    toast.success(`Added $${item.symbol} to watchlist`);
+    toast.success(`Added $${item.symbol} at $${currentPrice > 0.001 ? currentPrice.toFixed(4) : currentPrice.toExponential(2)}`);
   };
 
   const removeItem = (mint: string) => {
@@ -126,8 +179,16 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
         <Star className="h-4 w-4 text-primary" />
         <div className="flex-1">
           <p className="text-sm font-bold text-white">Smart Watchlist</p>
-          <p className="text-[10px] text-white/25">{items.length} token{items.length !== 1 ? "s" : ""} tracked</p>
+          <p className="text-[10px] text-white/25">{items.length} token{items.length !== 1 ? "s" : ""} tracked · Live prices</p>
         </div>
+        <button
+          onClick={refreshPrices}
+          disabled={refreshing}
+          className="p-1.5 rounded-lg border border-white/[0.08] text-white/20 hover:text-white/40 transition-colors"
+          title="Refresh prices"
+        >
+          <RefreshCw className={cn("h-3 w-3", refreshing && "animate-spin")} />
+        </button>
         <button
           onClick={() => setShowAdd(!showAdd)}
           className="p-1.5 rounded-lg border border-white/[0.08] text-white/20 hover:border-primary/30 transition-all"
@@ -148,15 +209,16 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
               autoFocus
             />
           </div>
+          {searching && <div className="flex justify-center py-2"><Loader2 className="h-4 w-4 animate-spin text-white/20" /></div>}
           {results.length > 0 && (
             <div className="mt-2 space-y-0.5">
               {results.map(r => (
                 <button
-                  key={r.address}
+                  key={(r as any).address ?? r.id}
                   onClick={() => addItem(r)}
                   className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-white/[0.04] transition-colors text-left"
                 >
-                  {r.logoURI && <img src={r.logoURI} className="w-5 h-5 rounded-full" alt="" />}
+                  {((r as any).logoURI ?? r.icon) && <img src={(r as any).logoURI ?? r.icon} className="w-5 h-5 rounded-full" alt="" />}
                   <span className="text-[11px] font-bold text-white">{r.symbol}</span>
                   <span className="text-[9px] text-white/20 flex-1 truncate">{r.name}</span>
                   {r.mcap ? <span className="text-[9px] text-white/15">{fmtUsd(r.mcap)}</span> : null}
@@ -167,7 +229,6 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
         </div>
       )}
 
-      {/* Tag filters */}
       {allTags.length > 0 && (
         <div className="px-3 py-2 border-b border-white/[0.04] flex gap-1 flex-wrap">
           <button
@@ -194,13 +255,12 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
         </div>
       )}
 
-      {/* Watchlist items */}
       <div className="max-h-[400px] overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="p-8 text-center">
             <Star className="h-8 w-8 text-white/[0.06] mx-auto mb-2" />
             <p className="text-xs text-white/20">Watchlist is empty</p>
-            <p className="text-[10px] text-white/10 mt-1">Add tokens to track them</p>
+            <p className="text-[10px] text-white/10 mt-1">Add tokens to track them with live prices</p>
           </div>
         ) : (
           <div className="divide-y divide-white/[0.03]">
@@ -231,15 +291,26 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
                     </div>
                   </button>
                   <div className="text-right">
-                    {item.mcap > 0 && <p className="text-[10px] font-bold text-white">{fmtUsd(item.mcap)}</p>}
-                    <p className="text-[9px] text-white/15">Added {new Date(item.addedAt).toLocaleDateString()}</p>
+                    {item.currentPrice > 0 && (
+                      <p className="text-[10px] font-bold text-white">
+                        ${item.currentPrice < 0.001 ? item.currentPrice.toExponential(2) : item.currentPrice.toFixed(4)}
+                      </p>
+                    )}
+                    {item.priceChange !== 0 && (
+                      <p className={cn("text-[9px] font-bold", item.priceChange >= 0 ? "text-emerald-400" : "text-red-400")}>
+                        {item.priceChange >= 0 ? "+" : ""}{item.priceChange.toFixed(1)}%
+                      </p>
+                    )}
+                    {item.currentPrice === 0 && item.mcap > 0 && (
+                      <p className="text-[10px] font-bold text-white">{fmtUsd(item.mcap)}</p>
+                    )}
+                    <p className="text-[8px] text-white/15">Added {new Date(item.addedAt).toLocaleDateString()}</p>
                   </div>
                   <button onClick={() => removeItem(item.mint)} className="p-1 text-white/10 hover:text-red-400">
                     <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
 
-                {/* Quick tag bar */}
                 {editingItem === item.mint && (
                   <div className="flex gap-1 mt-2 flex-wrap">
                     {["gem", "risky", "watching", "ai", "meme", "defi"].map(tag => (

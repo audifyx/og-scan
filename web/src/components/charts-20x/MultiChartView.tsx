@@ -1,8 +1,9 @@
 /**
  * MultiChartView — View up to 4 token charts simultaneously in a grid.
  * Each chart uses DexScreener embed. Drag to rearrange, click to fullscreen.
+ * Charts persist in localStorage across page refreshes.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Grid2X2, Maximize2, Minimize2, X, Plus, Search, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -22,14 +23,29 @@ interface Props {
 }
 
 const MAX_CHARTS = 4;
+const STORAGE_KEY = "ogscan_multichart_slots";
+
+function loadSlots(): ChartSlot[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveSlots(slots: ChartSlot[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(slots));
+}
 
 export const MultiChartView: React.FC<Props> = ({ onSelectMint }) => {
-  const [slots, setSlots] = useState<ChartSlot[]>([]);
+  const [slots, setSlots] = useState<ChartSlot[]>(loadSlots);
   const [fullscreenSlot, setFullscreenSlot] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<JupTokenInfo[]>([]);
   const [searching, setSearching] = useState(false);
   const [addingSlot, setAddingSlot] = useState(false);
+
+  // Persist slots whenever they change
+  useEffect(() => { saveSlots(slots); }, [slots]);
 
   const searchToken = async (q: string) => {
     if (q.length < 2) { setSearchResults([]); return; }
@@ -41,12 +57,20 @@ export const MultiChartView: React.FC<Props> = ({ onSelectMint }) => {
 
   const addChart = (token: JupTokenInfo) => {
     if (slots.length >= MAX_CHARTS) return;
+    const mint = (token as any).address ?? token.id;
+    // Don't add duplicate mints
+    if (slots.some(s => s.mint === mint)) {
+      setSearchQuery("");
+      setSearchResults([]);
+      setAddingSlot(false);
+      return;
+    }
     setSlots(prev => [...prev, {
       id: crypto.randomUUID(),
-      mint: token.address,
+      mint,
       symbol: token.symbol || "???",
       name: token.name || "",
-      logoURI: token.logoURI,
+      logoURI: (token as any).logoURI ?? token.icon,
     }]);
     setSearchQuery("");
     setSearchResults([]);
@@ -94,17 +118,23 @@ export const MultiChartView: React.FC<Props> = ({ onSelectMint }) => {
           </div>
           {searchResults.length > 0 && (
             <div className="mt-2 space-y-0.5">
-              {searchResults.map(r => (
-                <button
-                  key={r.address}
-                  onClick={() => addChart(r)}
-                  className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-white/[0.04] transition-colors text-left"
-                >
-                  {r.logoURI && <img src={r.logoURI} className="w-5 h-5 rounded-full" alt="" />}
-                  <span className="text-[11px] font-bold text-white">{r.symbol}</span>
-                  <span className="text-[9px] text-white/20 truncate flex-1">{r.name}</span>
-                </button>
-              ))}
+              {searchResults.map(r => {
+                const rMint = (r as any).address ?? r.id;
+                return (
+                  <button
+                    key={rMint}
+                    onClick={() => addChart(r)}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-white/[0.04] transition-colors text-left"
+                  >
+                    {((r as any).logoURI ?? r.icon) && <img src={(r as any).logoURI ?? r.icon} className="w-5 h-5 rounded-full" alt="" />}
+                    <span className="text-[11px] font-bold text-white">{r.symbol}</span>
+                    <span className="text-[9px] text-white/20 truncate flex-1">{r.name}</span>
+                    {slots.some(s => s.mint === rMint) && (
+                      <Badge className="bg-white/[0.05] text-white/20 text-[7px]">Added</Badge>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -125,9 +155,13 @@ export const MultiChartView: React.FC<Props> = ({ onSelectMint }) => {
             return (
               <>
                 <div className="flex items-center gap-2 p-2 border-b border-white/[0.06]">
+                  {slot.logoURI && <img src={slot.logoURI} className="w-4 h-4 rounded-full" alt="" />}
                   <span className="text-xs font-bold text-white">{slot.symbol}</span>
                   <span className="text-[10px] text-white/20">{slot.name}</span>
                   <div className="flex-1" />
+                  <button onClick={() => onSelectMint?.(slot.mint)} className="text-[9px] text-primary hover:underline">
+                    Full Scan →
+                  </button>
                   <button onClick={() => setFullscreenSlot(null)} className="p-1 text-white/20 hover:text-white/40">
                     <Minimize2 className="h-3.5 w-3.5" />
                   </button>
@@ -150,6 +184,9 @@ export const MultiChartView: React.FC<Props> = ({ onSelectMint }) => {
                 {slot.logoURI && <img src={slot.logoURI} className="w-3.5 h-3.5 rounded-full" alt="" />}
                 <span className="text-[10px] font-bold text-white">{slot.symbol}</span>
                 <div className="flex-1" />
+                <button onClick={() => onSelectMint?.(slot.mint)} className="p-0.5 text-[8px] text-primary hover:underline mr-1">
+                  Scan
+                </button>
                 <button onClick={() => setFullscreenSlot(slot.id)} className="p-0.5 text-white/20 hover:text-white/40">
                   <Maximize2 className="h-2.5 w-2.5" />
                 </button>

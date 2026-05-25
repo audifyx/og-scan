@@ -1,14 +1,15 @@
 /**
  * PaperTrading — Simulated trading with virtual SOL balance.
  * Practice trading without risk. Track portfolio, P&L, win rate.
+ * Wired to: Jupiter search + price APIs for real token prices.
  */
-import { useState, useEffect } from "react";
-import { Wallet, TrendingUp, TrendingDown, DollarSign, BarChart3, History, Plus, Minus, Loader2, Search, ArrowUpRight, ArrowDownRight, Trophy, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Wallet, TrendingUp, TrendingDown, DollarSign, BarChart3, History, Plus, Minus, Loader2, Search, ArrowUpRight, ArrowDownRight, Trophy, Trash2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { jupSearchToken, fmtUsd, type JupTokenInfo } from "@/lib/og";
+import { jupSearchToken, jupPrice, fmtUsd, type JupTokenInfo, SOL_MINT } from "@/lib/og";
 import { toast } from "sonner";
 
 interface PaperTrade {
@@ -16,8 +17,8 @@ interface PaperTrade {
   type: "buy" | "sell";
   mint: string;
   symbol: string;
-  amount: number; // token amount
-  price: number; // price per token at time of trade
+  amount: number;
+  price: number;
   solAmount: number;
   timestamp: string;
 }
@@ -46,7 +47,7 @@ interface PaperPortfolio {
 }
 
 const STORAGE_KEY = "ogscan_paper_trading";
-const INITIAL_BALANCE = 100; // 100 SOL starting balance
+const INITIAL_BALANCE = 100;
 
 function loadPortfolio(): PaperPortfolio {
   try {
@@ -75,13 +76,22 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
   const [results, setResults] = useState<JupTokenInfo[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedToken, setSelectedToken] = useState<JupTokenInfo | null>(null);
+  const [selectedPrice, setSelectedPrice] = useState<number>(0);
+  const [solPrice, setSolPrice] = useState<number>(170);
   const [solAmount, setSolAmount] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [fetchingPrice, setFetchingPrice] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
 
-  const totalPositionValue = portfolio.positions.reduce((s, p) => s + (p.holdingAmount * p.currentPrice), 0);
-  const totalPortfolioValue = portfolio.solBalance + totalPositionValue;
-  const totalPnl = totalPortfolioValue - INITIAL_BALANCE;
-  const pnlPct = ((totalPortfolioValue / INITIAL_BALANCE) - 1) * 100;
+  // Fetch SOL price on mount
+  useEffect(() => {
+    jupPrice([SOL_MINT]).then(res => {
+      const p = res[SOL_MINT]?.usdPrice;
+      if (p) setSolPrice(p);
+    }).catch(() => {});
+  }, []);
 
   const search = async (q: string) => {
     if (q.length < 2) { setResults([]); return; }
@@ -91,21 +101,84 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
     setSearching(false);
   };
 
+  // Fetch real price when a token is selected
+  const selectToken = async (token: JupTokenInfo) => {
+    setSelectedToken(token);
+    setResults([]);
+    setQuery(token.symbol || "");
+    setFetchingPrice(true);
+    try {
+      const mint = (token as any).address ?? token.id;
+      const priceData = await jupPrice([mint]);
+      const usdPrice = priceData[mint]?.usdPrice ?? token.usdPrice ?? 0;
+      setSelectedPrice(usdPrice);
+    } catch {
+      setSelectedPrice(token.usdPrice ?? 0);
+    }
+    setFetchingPrice(false);
+  };
+
+  // Refresh all position prices
+  const refreshPositionPrices = useCallback(async () => {
+    if (portfolio.positions.length === 0) return;
+    setRefreshing(true);
+    try {
+      const mints = portfolio.positions.map(p => p.mint);
+      const prices = await jupPrice(mints);
+      if (!mounted.current) return;
+      setPortfolio(prev => {
+        const updated = { ...prev };
+        updated.positions = prev.positions.map(pos => {
+          const pd = prices[pos.mint];
+          if (!pd) return pos;
+          const currentPrice = pd.usdPrice ?? pos.currentPrice;
+          const unrealizedPnl = (currentPrice - pos.avgBuyPrice) * pos.holdingAmount;
+          const pnlPct = pos.avgBuyPrice > 0 ? ((currentPrice - pos.avgBuyPrice) / pos.avgBuyPrice) * 100 : 0;
+          return { ...pos, currentPrice, unrealizedPnl, pnlPct };
+        });
+        savePortfolio(updated);
+        return updated;
+      });
+    } catch {}
+    if (mounted.current) setRefreshing(false);
+  }, [portfolio.positions.length]);
+
+  // Refresh prices every 30 seconds
+  useEffect(() => {
+    refreshPositionPrices();
+    const iv = setInterval(refreshPositionPrices, 30 * 1000);
+    return () => clearInterval(iv);
+  }, [refreshPositionPrices]);
+
+  const totalPositionValue = portfolio.positions.reduce((s, p) => {
+    const posValueUsd = p.holdingAmount * p.currentPrice;
+    return s + (solPrice > 0 ? posValueUsd / solPrice : 0);
+  }, 0);
+  const totalPortfolioValue = portfolio.solBalance + totalPositionValue;
+  const totalPnl = totalPortfolioValue - INITIAL_BALANCE;
+  const pnlPct = ((totalPortfolioValue / INITIAL_BALANCE) - 1) * 100;
+
   const executeTrade = () => {
     if (!selectedToken || !solAmount || Number(solAmount) <= 0) return;
     const sol = Number(solAmount);
-    const price = (selectedToken as any).price || 0.0001;
-    const tokenAmount = sol / price;
+    const price = selectedPrice || selectedToken.usdPrice || 0;
+    if (price === 0) {
+      toast.error("Could not fetch token price. Try again.");
+      return;
+    }
+    const solUsd = sol * solPrice;
+    const tokenAmount = solUsd / price;
 
     if (tradeType === "buy" && sol > portfolio.solBalance) {
       toast.error("Insufficient SOL balance!");
       return;
     }
 
+    const mint = (selectedToken as any).address ?? selectedToken.id;
     const trade: PaperTrade = {
       id: crypto.randomUUID(),
       type: tradeType,
-      mint: selectedToken.address,
+      mint,
       symbol: selectedToken.symbol || "???",
       amount: tokenAmount,
       price,
@@ -119,7 +192,7 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
 
       if (tradeType === "buy") {
         updated.solBalance -= sol;
-        const existing = updated.positions.find(p => p.mint === selectedToken.address);
+        const existing = updated.positions.find(p => p.mint === mint);
         if (existing) {
           const newTotal = existing.holdingAmount + tokenAmount;
           existing.avgBuyPrice = ((existing.avgBuyPrice * existing.holdingAmount) + (price * tokenAmount)) / newTotal;
@@ -127,10 +200,10 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
           existing.currentPrice = price;
         } else {
           updated.positions.push({
-            mint: selectedToken.address,
+            mint,
             symbol: selectedToken.symbol || "???",
             name: selectedToken.name || "",
-            logoURI: selectedToken.logoURI,
+            logoURI: (selectedToken as any).logoURI ?? selectedToken.icon,
             totalBought: tokenAmount,
             avgBuyPrice: price,
             currentPrice: price,
@@ -140,12 +213,12 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
           });
         }
       } else {
-        const existing = updated.positions.find(p => p.mint === selectedToken.address);
+        const existing = updated.positions.find(p => p.mint === mint);
         if (existing) {
           existing.holdingAmount = Math.max(0, existing.holdingAmount - tokenAmount);
-          if (existing.holdingAmount === 0) {
-            updated.positions = updated.positions.filter(p => p.mint !== selectedToken.address);
-            const pnl = sol - (existing.avgBuyPrice * tokenAmount);
+          if (existing.holdingAmount <= 0) {
+            updated.positions = updated.positions.filter(p => p.mint !== mint);
+            const pnl = sol - (existing.avgBuyPrice * tokenAmount / solPrice);
             if (pnl > 0) updated.winCount++;
             else updated.lossCount++;
           }
@@ -157,14 +230,15 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
       return updated;
     });
 
-    toast.success(`${tradeType === "buy" ? "Bought" : "Sold"} ${tokenAmount.toFixed(2)} ${selectedToken.symbol} for ${sol} SOL`);
+    toast.success(`${tradeType === "buy" ? "Bought" : "Sold"} ${tokenAmount.toFixed(2)} ${selectedToken.symbol} for ${sol} SOL ($${(sol * solPrice).toFixed(2)})`);
     setSelectedToken(null);
+    setSelectedPrice(0);
     setSolAmount("");
     setShowTrade(false);
   };
 
   const resetPortfolio = () => {
-    const fresh = {
+    const fresh: PaperPortfolio = {
       solBalance: INITIAL_BALANCE,
       positions: [],
       trades: [],
@@ -180,7 +254,6 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
 
   return (
     <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
-      {/* Header */}
       <div className="p-4 border-b border-white/[0.06]">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -188,8 +261,15 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
           </div>
           <div className="flex-1">
             <p className="text-sm font-bold text-white">Paper Trading</p>
-            <p className="text-[10px] text-white/25">Practice with virtual SOL — no real money</p>
+            <p className="text-[10px] text-white/25">Practice with virtual SOL — live prices</p>
           </div>
+          <button
+            onClick={refreshPositionPrices}
+            disabled={refreshing}
+            className="p-1.5 rounded-lg border border-white/[0.08] text-white/20 hover:text-white/40 transition-colors"
+          >
+            <RefreshCw className={cn("h-3 w-3", refreshing && "animate-spin")} />
+          </button>
           <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px]">
             Simulation
           </Badge>
@@ -228,7 +308,6 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
         </div>
       </div>
 
-      {/* Action buttons */}
       <div className="flex gap-2 p-3 border-b border-white/[0.06]">
         <Button
           size="sm"
@@ -260,7 +339,6 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
         </button>
       </div>
 
-      {/* Trade form */}
       {showTrade && (
         <div className="p-3 border-b border-white/[0.06] bg-primary/5">
           <p className="text-xs font-bold text-white mb-2">{tradeType === "buy" ? "Buy" : "Sell"} Token</p>
@@ -278,11 +356,11 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
             <div className="space-y-0.5 mb-2">
               {results.map(r => (
                 <button
-                  key={r.address}
-                  onClick={() => { setSelectedToken(r); setResults([]); setQuery(r.symbol || ""); }}
+                  key={(r as any).address ?? r.id}
+                  onClick={() => selectToken(r)}
                   className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-white/[0.04] text-left"
                 >
-                  {r.logoURI && <img src={r.logoURI} className="w-5 h-5 rounded-full" alt="" />}
+                  {((r as any).logoURI ?? r.icon) && <img src={(r as any).logoURI ?? r.icon} className="w-5 h-5 rounded-full" alt="" />}
                   <span className="text-[11px] font-bold text-white">{r.symbol}</span>
                   <span className="text-[9px] text-white/20 flex-1 truncate">{r.name}</span>
                 </button>
@@ -290,28 +368,40 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
             </div>
           )}
           {selectedToken && (
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                placeholder="SOL amount"
-                value={solAmount}
-                onChange={e => setSolAmount(e.target.value)}
-                className="flex-1 h-8 text-xs bg-white/[0.03] border-white/[0.08]"
-              />
-              <Button size="sm" onClick={executeTrade} className={cn("h-8 text-xs",
-                tradeType === "buy" ? "bg-emerald-600" : "bg-red-600"
-              )}>
-                {tradeType === "buy" ? "Buy" : "Sell"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => { setShowTrade(false); setSelectedToken(null); }} className="h-8 text-xs">
-                Cancel
-              </Button>
+            <div>
+              {fetchingPrice && (
+                <div className="flex items-center gap-2 mb-2 text-[10px] text-white/30">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Fetching live price...
+                </div>
+              )}
+              {selectedPrice > 0 && (
+                <p className="text-[10px] text-white/40 mb-2">
+                  Price: ${selectedPrice < 0.001 ? selectedPrice.toExponential(3) : selectedPrice.toFixed(6)}
+                  {solPrice > 0 && ` · 1 SOL = $${solPrice.toFixed(2)}`}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  placeholder="SOL amount"
+                  value={solAmount}
+                  onChange={e => setSolAmount(e.target.value)}
+                  className="flex-1 h-8 text-xs bg-white/[0.03] border-white/[0.08]"
+                />
+                <Button size="sm" onClick={executeTrade} disabled={fetchingPrice || selectedPrice === 0} className={cn("h-8 text-xs",
+                  tradeType === "buy" ? "bg-emerald-600" : "bg-red-600"
+                )}>
+                  {tradeType === "buy" ? "Buy" : "Sell"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setShowTrade(false); setSelectedToken(null); setSelectedPrice(0); }} className="h-8 text-xs">
+                  Cancel
+                </Button>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Positions */}
       <div className="max-h-[250px] overflow-y-auto">
         {portfolio.positions.length === 0 && !showHistory ? (
           <div className="p-6 text-center">
@@ -341,29 +431,34 @@ export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({
           </div>
         ) : (
           <div className="divide-y divide-white/[0.03]">
-            {portfolio.positions.map(pos => (
-              <button
-                key={pos.mint}
-                onClick={() => onSelectMint?.(pos.mint)}
-                className="w-full flex items-center gap-2 p-3 hover:bg-white/[0.015] transition-colors text-left"
-              >
-                {pos.logoURI ? (
-                  <img src={pos.logoURI} className="w-7 h-7 rounded-full" alt="" />
-                ) : (
-                  <div className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center text-[9px] font-bold text-white/20">
-                    {pos.symbol.charAt(0)}
+            {portfolio.positions.map(pos => {
+              const posValueSol = solPrice > 0 ? (pos.holdingAmount * pos.currentPrice) / solPrice : 0;
+              return (
+                <button
+                  key={pos.mint}
+                  onClick={() => onSelectMint?.(pos.mint)}
+                  className="w-full flex items-center gap-2 p-3 hover:bg-white/[0.015] transition-colors text-left"
+                >
+                  {pos.logoURI ? (
+                    <img src={pos.logoURI} className="w-7 h-7 rounded-full" alt="" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center text-[9px] font-bold text-white/20">
+                      {pos.symbol.charAt(0)}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-bold text-white">{pos.symbol}</span>
+                    <span className="text-[9px] text-white/20 ml-1">{pos.holdingAmount.toFixed(2)} tokens</span>
                   </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs font-bold text-white">{pos.symbol}</span>
-                  <span className="text-[9px] text-white/20 ml-1">{pos.holdingAmount.toFixed(2)} tokens</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold text-white">{(pos.holdingAmount * pos.currentPrice).toFixed(2)} SOL</p>
-                  <p className="text-[9px] text-white/20">avg {pos.avgBuyPrice < 0.001 ? pos.avgBuyPrice.toExponential(1) : pos.avgBuyPrice.toFixed(4)}</p>
-                </div>
-              </button>
-            ))}
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold text-white">{posValueSol.toFixed(2)} SOL</p>
+                    <p className={cn("text-[9px] font-bold", pos.pnlPct >= 0 ? "text-emerald-400" : "text-red-400")}>
+                      {pos.pnlPct >= 0 ? "+" : ""}{pos.pnlPct.toFixed(1)}%
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
