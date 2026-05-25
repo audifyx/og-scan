@@ -74,6 +74,7 @@ const NAV_SECTIONS = [
   { id: "security",     icon: ShieldAlert,    label: "Security",       color: "text-orange-400" },
   { id: "support",      icon: Inbox,          label: "Support",        color: "text-sky-400" },
   { id: "dms",          icon: MessageSquare,  label: "DM & Chat",      color: "text-violet-400" },
+  { id: "data",          icon: BookOpen,        label: "Data",           color: "text-teal-400" },
   { id: "export",       icon: Download,       label: "Data Export",    color: "text-lime-400" },
   { id: "developer",    icon: Terminal,        label: "Developer",      color: "text-gray-400" },
 ] as const;
@@ -3060,6 +3061,113 @@ const Admin = ({ inline = false }: { inline?: boolean }) => {
      SECTION 15: DATA & EXPORT TOOLS
      ═══════════════════════════════════════════════════════════════ */
 
+  /* ═══════════════════════════════════════════════════════════════
+     CONTENT DATA — Downloadable content files for social media team
+     ═══════════════════════════════════════════════════════════════ */
+  const ContentData = () => {
+    const [downloading, setDownloading] = useState<string | null>(null);
+
+    const files = [
+      {
+        id: "updates",
+        icon: FileText,
+        title: "Full Feature Updates (48h)",
+        desc: "Complete changelog of every new feature, fix, and improvement. Use this as the master source for all content.",
+        filename: "og-scan-updates-48h.md",
+        color: "from-cyan-500/20 to-cyan-500/5 border-cyan-500/20",
+        iconColor: "text-cyan-400",
+        badge: "153 Commits",
+      },
+      {
+        id: "content",
+        icon: Megaphone,
+        title: "Content Strategy & Ideas",
+        desc: "Content pillars, post templates, structures, hashtag strategy, engagement tactics, and weekly schedule template.",
+        filename: "og-scan-content-plan.md",
+        color: "from-purple-500/20 to-purple-500/5 border-purple-500/20",
+        iconColor: "text-purple-400",
+        badge: "Strategy",
+      },
+      {
+        id: "calendar",
+        icon: Calendar,
+        title: "2-Week Daily Content Calendar",
+        desc: "14-day plan — one feature per day with full tweet copy, thread structure, and image/visual ideas for each post.",
+        filename: "og-scan-2week-calendar.md",
+        color: "from-amber-500/20 to-amber-500/5 border-amber-500/20",
+        iconColor: "text-amber-400",
+        badge: "14 Days",
+      },
+    ];
+
+    const downloadFile = async (filename: string, id: string) => {
+      setDownloading(id);
+      try {
+        const response = await fetch(`/content/${filename}`);
+        if (!response.ok) throw new Error("File not found");
+        const text = await response.text();
+        const blob = new Blob([text], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`Downloaded ${filename}`);
+      } catch {
+        toast.error("Download failed");
+      }
+      setDownloading(null);
+    };
+
+    return (
+      <div className="space-y-4">
+        <SectionHeader title="Data" description="Downloadable content files for your content manager and social media team" />
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {files.map(f => (
+            <div
+              key={f.id}
+              className={cn(
+                "group relative rounded-2xl border bg-gradient-to-b p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-xl",
+                f.color,
+              )}
+              onClick={() => downloadFile(f.filename, f.id)}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]", f.iconColor)}>
+                  <f.icon className="h-5 w-5" />
+                </div>
+                <Badge className="text-[9px] border-0 bg-white/[0.08] text-white/50">{f.badge}</Badge>
+              </div>
+              <h3 className="text-[13px] font-bold text-white mb-1">{f.title}</h3>
+              <p className="text-[11px] text-white/40 leading-relaxed mb-4">{f.desc}</p>
+              <div className="flex items-center gap-2 text-[11px]">
+                {downloading === f.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-white/40" />
+                ) : (
+                  <Download className="h-3.5 w-3.5 text-white/30 group-hover:text-white/60 transition" />
+                )}
+                <span className="text-white/30 group-hover:text-white/60 transition font-medium">
+                  {downloading === f.id ? "Downloading…" : "Click to download"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 mt-4">
+          <p className="text-[12px] font-bold text-white mb-2">📋 How to use these files</p>
+          <div className="space-y-1.5 text-[11px] text-white/40">
+            <p>1. <strong className="text-white/60">Feature Updates</strong> — Master list of everything new. Reference this when writing any post.</p>
+            <p>2. <strong className="text-white/60">Content Strategy</strong> — Templates, hashtags, and formats. Copy-paste the thread structures.</p>
+            <p>3. <strong className="text-white/60">2-Week Calendar</strong> — Follow day by day. One feature per post. Ready-to-use tweet copy included.</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const DataExport = () => {
     const [tableCounts, setTableCounts] = useState<{ name: string; count: number }[]>([]);
     const [loaded, setLoaded] = useState(false);
@@ -3324,6 +3432,7 @@ const Admin = ({ inline = false }: { inline?: boolean }) => {
           {tab === "security" && <SecurityCenter />}
           {tab === "support" && <SupportTicketsSection />}
           {tab === "dms" && <DmChatManagement />}
+          {tab === "data" && <ContentData />}
           {tab === "export" && <DataExport />}
           {tab === "developer" && <DeveloperApi />}
         </main>
