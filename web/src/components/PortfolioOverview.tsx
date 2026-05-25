@@ -74,21 +74,8 @@ export function PortfolioOverview({ data, walletAddress, onRefresh }: PortfolioO
           break;
       }
 
-      const { error } = await supabase.functions.invoke('discord-webhook', {
-        body: {
-          embeds: [{
-            title: embedTitle,
-            description: embedDescription,
-            color: 0x9945FF,
-            fields,
-            footer: { text: "SolanaHub • Wallet Tracker" },
-            timestamp: new Date().toISOString(),
-          }]
-        }
-      });
-
-      if (error) throw error;
-      toast.success("Sent to Discord!");
+      // Discord webhook removed — feature coming soon
+      toast.info("Discord sharing coming soon!");
       setActiveModal(null);
     } catch (error) {
       console.error("Discord webhook error:", error);

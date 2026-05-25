@@ -39,15 +39,8 @@ export function TokenList({ tokens }: TokenListProps) {
         mint: token.id,
       };
 
-      const { data, error } = await supabase.functions.invoke("ai-analyzer", {
-        body: {
-          action: "analyzeToken",
-          data: { tokenInfo },
-        },
-      });
-
-      if (error) throw error;
-      setAnalysis(data.analysis || "No analysis available");
+      // AI analyzer — coming soon, show basic info for now
+      setAnalysis(`## ${tokenInfo.name} (${tokenInfo.symbol})\n\n- **Balance:** ${formatNumber(tokenInfo.balance, 4)}\n- **Price:** $${tokenInfo.pricePerToken.toFixed(6)}\n- **Value:** ${formatUsd(tokenInfo.totalValue)}\n- **Contract:** \`${tokenInfo.mint}\`\n\n*AI analysis coming soon.*`);
     } catch (error) {
       console.error("Error analyzing token:", error);
       setAnalysis("Failed to analyze token. Please try again.");
@@ -68,27 +61,8 @@ export function TokenList({ tokens }: TokenListProps) {
       const totalValue = selectedToken.token_info?.price_info?.total_price || 0;
       const image = selectedToken.content?.links?.image;
 
-      const { error } = await supabase.functions.invoke('discord-webhook', {
-        body: {
-          embeds: [{
-            title: `🪙 ${name} (${symbol})`,
-            description: `Token Details & Analysis`,
-            color: 0x00FFA3,
-            thumbnail: image ? { url: image } : undefined,
-            fields: [
-              { name: "Balance", value: formatNumber(balance, 4), inline: true },
-              { name: "Price", value: `$${pricePerToken.toFixed(6)}`, inline: true },
-              { name: "Value", value: formatUsd(totalValue), inline: true },
-              { name: "Contract", value: `\`${selectedToken.id.slice(0, 12)}...\``, inline: false },
-            ],
-            footer: { text: "SolanaHub • Token Analysis" },
-            timestamp: new Date().toISOString(),
-          }]
-        }
-      });
-
-      if (error) throw error;
-      toast.success("Token sent to Discord!");
+      // Discord webhook removed — feature coming soon
+      toast.info("Discord sharing coming soon!");
     } catch (error) {
       console.error("Discord webhook error:", error);
       toast.error("Failed to send to Discord");
