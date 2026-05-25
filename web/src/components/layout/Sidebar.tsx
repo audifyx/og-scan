@@ -1,8 +1,7 @@
 import {
-  Activity, Bell, Coins, Compass, Home, LineChart, LogOut,
-  MessageSquare, Search, Settings, Target, Trophy,
-  TrendingUp, User, Wallet, Wrench, X, Zap,
-  Globe2, Shield, Menu, Mic,
+  Bell, LineChart, LogOut,
+  MessageSquare, Settings, Trophy,
+  User, Wallet, X, Shield, Menu,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -10,46 +9,30 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
 
-// ── nav sections ────────────────────────────────────────────────────────────
+// ── nav sections — MUST match AppSidebar exactly ────────────────────────
 
 type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; label: string; eyebrow: string };
 
-const ogScanItems: NavItem[] = [
-  { to: "/app",          icon: Home,          label: "Dashboard",       eyebrow: "OGScan home" },
-  { to: "/scanner",      icon: Search,        label: "Truth Scan",      eyebrow: "Mint forensics" },
-  { to: "/snipe-feed",   icon: Target,        label: "Launch Radar",    eyebrow: "New launches" },
-  { to: "/feed",         icon: Activity,      label: "Market Feed",     eyebrow: "Live market" },
-  { to: "/swap",         icon: Zap,           label: "Swap",            eyebrow: "Jupiter route" },
-];
-
-const communityItems: NavItem[] = [
-  { to: "/community",    icon: Globe2,        label: "Community Hub",   eyebrow: "Chat · Spaces · Groups · Discover" },
-];
-
 const tradingItems: NavItem[] = [
   { to: "/wallets",         icon: Wallet,        label: "Wallets",         eyebrow: "Tracked wallets" },
-  { to: "/charts",          icon: LineChart,     label: "Charts",          eyebrow: "Live charts" },
-  { to: "/callouts",        icon: Bell,          label: "Callouts",        eyebrow: "Trade alerts" },
-  { to: "/trading-lobbies", icon: MessageSquare, label: "Trading Lobbies", eyebrow: "Voice + charts" },
-  { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
-  { to: "/notifications",   icon: Bell,          label: "Notifications",   eyebrow: "Your alerts" },
-];
-
-const accountItems: NavItem[] = [
-  { to: "/profile",   icon: User,     label: "Profile",   eyebrow: "Your account" },
-  { to: "/settings",  icon: Settings, label: "Settings",  eyebrow: "Preferences" },
+  { to: "/charts",          icon: LineChart,      label: "Charts",          eyebrow: "Live charts" },
+  { to: "/callouts",        icon: Bell,           label: "Callouts",        eyebrow: "Trade alerts" },
+  { to: "/trading-lobbies", icon: MessageSquare,  label: "Trading Lobbies", eyebrow: "Voice + charts" },
+  { to: "/leaderboard",     icon: Trophy,         label: "Leaderboard",     eyebrow: "Top traders" },
 ];
 
 // ── NavRow ────────────────────────────────────────────────────────────────
 
-const NavRow = ({ item }: { item: NavItem }) => {
+const NavRow = ({ item, onClick }: { item: NavItem; onClick?: () => void }) => {
   const location = useLocation();
   const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
 
   return (
     <NavLink
       to={item.to}
+      onClick={onClick}
       className={cn(
         "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
         isActive
@@ -61,7 +44,7 @@ const NavRow = ({ item }: { item: NavItem }) => {
         className={cn(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition",
           isActive
-            ? "border-og-lime/40 bg-og-lime/10 text-og-lime"
+            ? "border-og-cyan/40 bg-og-cyan/10 text-og-cyan"
             : "border-white/10 bg-white/[0.04]",
         )}
       >
@@ -72,7 +55,7 @@ const NavRow = ({ item }: { item: NavItem }) => {
         <span className="block truncate text-[10px] text-white/35">{item.eyebrow}</span>
       </span>
       {isActive && (
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-lime" />
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-cyan" />
       )}
     </NavLink>
   );
@@ -85,12 +68,18 @@ const SectionLabel = ({ label }: { label: string }) => (
 );
 
 // ── Sidebar ───────────────────────────────────────────────────────────────
+// Matches AppSidebar: TRADING section + Admin only.
+// All other pages (Dashboard, Scanner, Feed, Community, etc.) are reachable
+// via the bottom nav (Home / Community / Tools / Profile) and the scrolling
+// tab strip inside Index — they do NOT belong in the sidebar.
 
 export const Sidebar = () => {
   const { user, profile, signOut } = useAuth();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const closeMobile = () => setMobileOpen(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -103,7 +92,7 @@ export const Sidebar = () => {
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setMobileOpen(false)}
+          onClick={closeMobile}
         />
       )}
 
@@ -123,88 +112,72 @@ export const Sidebar = () => {
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        {/* Logo */}
+        {/* Logo — matches AppSidebar header */}
         <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-4">
-          <NavLink to="/app" className="flex items-center gap-3 text-left">
+          <NavLink to="/app" onClick={closeMobile} className="flex items-center gap-3 text-left">
             <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-og-lime/50 bg-og-lime/10">
               <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-              <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-og-lime shadow-[0_0_6px_#bef264]" />
+              <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-og-lime shadow-[0_0_6px_hsl(var(--og-lime))]" />
             </div>
             <div>
               <div className="text-sm font-black uppercase tracking-wide text-white">OGScan</div>
-              <div className="text-[10px] font-semibold tracking-widest text-[#22d3ee]/80">PRO TRADING SUITE</div>
+              <div className="text-[10px] font-semibold tracking-widest text-og-cyan/80">PRO TRADING SUITE</div>
             </div>
           </NavLink>
           <button
             type="button"
-            onClick={() => setMobileOpen(false)}
+            onClick={closeMobile}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 transition hover:bg-white/5 hover:text-white lg:hidden"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Nav scrollable area */}
+        {/* Nav — TRADING + MORE only */}
         <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
-          {/* OGScan tools */}
-          <div className="mb-1">
-            <SectionLabel label="OGScan" />
-            <div className="space-y-0.5">
-              {ogScanItems.map((item) => <NavRow key={item.to} item={item} />)}
-            </div>
-          </div>
-
-          {/* Community */}
-          <div className="mb-1 mt-5">
-            <SectionLabel label="Community" />
-            <div className="space-y-0.5">
-              {communityItems.map((item) => <NavRow key={item.to} item={item} />)}
-            </div>
-          </div>
-
-          {/* Trading */}
-          <div className="mb-1 mt-5">
+          <div className="mb-1 mt-3">
             <SectionLabel label="Trading" />
             <div className="space-y-0.5">
-              {tradingItems.map((item) => <NavRow key={item.to} item={item} />)}
+              {tradingItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
             </div>
           </div>
 
-          {/* Account */}
-          <div className="mb-1 mt-5">
-            <SectionLabel label="Account" />
-            <div className="space-y-0.5">
-              {accountItems.map((item) => <NavRow key={item.to} item={item} />)}
-            </div>
-          </div>
-
-          {/* Admin */}
           {isAdmin && (
-            <div className="mt-2 px-1">
-              <NavLink
-                to="/admin"
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-3 rounded-xl border px-3 py-2.5 transition",
-                    isActive
-                      ? "border-red-500/30 bg-red-500/10 text-red-400"
-                      : "border-white/10 bg-white/[0.03] text-white/45 hover:bg-white/[0.06] hover:text-white",
-                  )
-                }
-              >
-                <Shield className="h-4 w-4" />
-                <span className="text-[12px] font-semibold">Admin Panel</span>
-              </NavLink>
+            <div className="mb-1 mt-3">
+              <SectionLabel label="More" />
+              <div className="space-y-0.5">
+                <NavLink
+                  to="/admin"
+                  onClick={closeMobile}
+                  className={({ isActive }) =>
+                    cn(
+                      "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
+                      isActive
+                        ? "bg-white/[0.09] text-white"
+                        : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
+                    )
+                  }
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] transition">
+                    <Shield className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-semibold leading-tight">Admin Panel</span>
+                    <span className="block truncate text-[10px] text-white/35">Owner dashboard</span>
+                  </span>
+                </NavLink>
+              </div>
             </div>
           )}
-
-          {/* Legal */}
-          <div className="mt-4 flex gap-3 px-3 pb-2">
-            <NavLink to="/privacy" className="text-[9px] text-white/25 hover:text-white/50">Privacy</NavLink>
-            <span className="text-[9px] text-white/15">·</span>
-            <NavLink to="/terms" className="text-[9px] text-white/25 hover:text-white/50">Terms</NavLink>
-          </div>
         </nav>
+
+        {/* Official token — matches AppSidebar footer */}
+        <div className="border-t border-white/[0.07] px-3 pb-4 pt-2">
+          <div className="text-[9px] font-bold uppercase tracking-widest text-white/30">Official Token</div>
+          <div className="mt-1 font-mono text-[10px] text-white/50">
+            CA {shortAddr(OGSCAN_TOKEN_MINT, 5)}
+          </div>
+        </div>
 
         {/* User footer */}
         <div className="border-t border-white/[0.07] p-3">
@@ -212,7 +185,7 @@ export const Sidebar = () => {
             <div className="space-y-2">
               <div
                 className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-2.5 transition hover:border-og-lime/25 hover:bg-white/[0.07]"
-                onClick={() => navigate("/profile")}
+                onClick={() => { closeMobile(); navigate("/profile"); }}
               >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-og-lime/20 text-sm font-black text-og-lime">
                   {profile?.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}
@@ -226,6 +199,7 @@ export const Sidebar = () => {
               <div className="flex gap-2">
                 <NavLink
                   to="/settings"
+                  onClick={closeMobile}
                   className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] py-2 text-[11px] text-white/40 transition hover:bg-white/[0.06] hover:text-white"
                 >
                   <Settings className="h-3.5 w-3.5" /> Settings
