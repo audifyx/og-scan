@@ -194,7 +194,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
             avatar_url: null,
             is_speaking: rp.isSpeaking,
             is_muted: !rp.isMicrophoneEnabled,
-            role: "speaker", // Will be updated by presence
+            role: "listener", // Updated to real role by presence sync
             joined_at: new Date().toISOString(),
           });
         });
@@ -227,13 +227,11 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
       // Enable audio playback (handles browser autoplay policy)
       try { await room.startAudio(); } catch {}
 
-      // Publish mic if speaker — start muted
-      if (initialRole === "speaker") {
-        try {
-          await room.localParticipant.setMicrophoneEnabled(false);
-        } catch {}
-        setMuted(true);
-      }
+      // Speakers: publish mic but start muted. Listeners: ensure mic is off.
+      try {
+        await room.localParticipant.setMicrophoneEnabled(false);
+      } catch {}
+      setMuted(true);
 
       // Set up recording if needed
       if (isRecording) {
