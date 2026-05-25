@@ -6,7 +6,7 @@ import {
   RefreshCw, ExternalLink, Percent, Flame, Camera, Shield, Star, Hash, Lock,
   BarChart3, Crown, Medal, Award, Zap, Heart, Clock, ChevronRight, Edit3,
   Image as ImageIcon, CheckCircle, XCircle, AlertCircle, Bookmark, ChevronLeft,
-  MapPin, Link as LinkIcon, Calendar, X as XIcon,
+  MapPin, Link as LinkIcon, Calendar, X as XIcon, Repeat2, Settings,
 } from "lucide-react";
 import { AvatarSelector, renderAvatar } from "@/components/avatars/AvatarSelector";
 import { safeAvatarUrl } from "@/lib/utils";
@@ -199,6 +199,9 @@ const Profile = () => {
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryRow[]>([]);
   const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
   const [bookmarks, setBookmarks] = useState<any[]>([]);
+  const [likedPosts, setLikedPosts] = useState<any[]>([]);
+  const [repostedPosts, setRepostedPosts] = useState<any[]>([]);
+  const [savedTab, setSavedTab] = useState<"bookmarks"|"likes"|"reposts">("bookmarks");
   const bannerFileRef = useRef<HTMLInputElement>(null);
 
   const isOwnProfile = !userId || userId === user?.id;
@@ -212,7 +215,11 @@ const Profile = () => {
       fetchTradeHistory();
       fetchLeaderboardRank();
       if (!isOwnProfile && user) checkFollowStatus();
-      if (isOwnProfile && user) fetchBookmarks();
+      if (isOwnProfile && user) {
+        fetchBookmarks();
+        fetchLikedPosts();
+        fetchRepostedPosts();
+      }
     }
   }, [targetUserId, user]);
 
@@ -302,13 +309,37 @@ const Profile = () => {
   const fetchBookmarks = async () => {
     if (!user) return;
     try {
-      const { data: bks } = await supabase.from("community_post_bookmarks").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+      const { data: bks } = await supabase.from("community_bookmarks").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
       if (!bks?.length) { setBookmarks([]); return; }
       const postIds = bks.map((b: any) => b.post_id);
       const { data: posts } = await supabase.from("community_posts").select("id, content, image_url, likes_count, replies_count, created_at, user_id, username, avatar_url, community_id").in("id", postIds);
       const byId = new Map((posts || []).map((p: any) => [p.id, p]));
       setBookmarks(postIds.map((id: string) => byId.get(id)).filter(Boolean));
     } catch { setBookmarks([]); }
+  };
+
+  const fetchLikedPosts = async () => {
+    if (!user) return;
+    try {
+      const { data: likes } = await supabase.from("community_post_likes").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+      if (!likes?.length) { setLikedPosts([]); return; }
+      const postIds = likes.map((l: any) => l.post_id);
+      const { data: posts } = await supabase.from("community_posts").select("id, content, image_url, likes_count, replies_count, created_at, user_id, username, avatar_url, community_id").in("id", postIds);
+      const byId = new Map((posts || []).map((p: any) => [p.id, p]));
+      setLikedPosts(postIds.map((id: string) => byId.get(id)).filter(Boolean));
+    } catch { setLikedPosts([]); }
+  };
+
+  const fetchRepostedPosts = async () => {
+    if (!user) return;
+    try {
+      const { data: reposts } = await supabase.from("community_reposts").select("post_id, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+      if (!reposts?.length) { setRepostedPosts([]); return; }
+      const postIds = reposts.map((r: any) => r.post_id);
+      const { data: posts } = await supabase.from("community_posts").select("id, content, image_url, likes_count, replies_count, created_at, user_id, username, avatar_url, community_id").in("id", postIds);
+      const byId = new Map((posts || []).map((p: any) => [p.id, p]));
+      setRepostedPosts(postIds.map((id: string) => byId.get(id)).filter(Boolean));
+    } catch { setRepostedPosts([]); }
   };
 
   const handleFollow = async () => {
@@ -642,6 +673,7 @@ const Profile = () => {
               { value: "portfolio", label: "Portfolio", icon: <Wallet className="h-3.5 w-3.5" /> },
               { value: "social",    label: "Social",    icon: <Users className="h-3.5 w-3.5" /> },
               ...(isOwnProfile ? [{ value: "saved", label: "Saved", icon: <Bookmark className="h-3.5 w-3.5" /> }] : []),
+              ...(isOwnProfile ? [{ value: "settings", label: "Settings", icon: <Settings className="h-3.5 w-3.5" /> }] : []),
               { value: "stats",     label: "Stats",     icon: <TrendingUp className="h-3.5 w-3.5" /> },
             ].map(t => (
               <TabsTrigger key={t.value} value={t.value}
@@ -844,39 +876,65 @@ const Profile = () => {
             <SocialTab targetUserId={targetUserId!} isOwnProfile={isOwnProfile} />
           </TabsContent>
 
-          {/* ── SAVED ─────────────────────────────────────────────────────── */}
+          {/* ── SAVED — Bookmarks / Likes / Reposts ─────────────────────── */}
           {isOwnProfile && (
             <TabsContent value="saved" className="m-0">
-              <div className="divide-y divide-white/[0.04]">
-                {bookmarks.length > 0 ? bookmarks.map((post: any) => (
-                  <div key={post.id} className="px-4 py-3 flex gap-3 hover:bg-white/[0.02] transition-colors cursor-pointer"
-                    onClick={() => navigate("/communities")}>
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/25 to-secondary/25 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                      {(post.username || "U")[0].toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-xs font-semibold">@{post.username || "user"}</span>
-                        <span className="text-[11px] text-white/30">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-                      </div>
-                      <p className="text-sm text-white/75 line-clamp-3 leading-relaxed">{post.content}</p>
-                      {post.image_url && (
-                        <img src={post.image_url} alt="" className="mt-2 rounded-xl max-h-32 w-full object-cover border border-white/10" onError={e => (e.target as HTMLImageElement).remove()} />
-                      )}
-                      <div className="flex items-center gap-4 mt-2">
-                        <span className="flex items-center gap-1 text-[11px] text-white/30"><Heart className="h-3 w-3" />{post.likes_count || 0}</span>
-                        <span className="flex items-center gap-1 text-[11px] text-white/30"><MessageCircle className="h-3 w-3" />{post.replies_count || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="py-16 text-center">
-                    <Bookmark className="h-10 w-10 mx-auto mb-3 text-white/15" />
-                    <p className="text-sm text-white/40">No saved posts yet</p>
-                    <p className="text-xs text-white/25 mt-1">Bookmark posts in Communities</p>
-                  </div>
-                )}
+              {/* Sub-tabs */}
+              <div className="flex border-b border-white/[0.06]">
+                {([
+                  { key: "bookmarks" as const, label: "Bookmarks", icon: <Bookmark className="h-3.5 w-3.5" />, count: bookmarks.length },
+                  { key: "likes" as const, label: "Likes", icon: <Heart className="h-3.5 w-3.5" />, count: likedPosts.length },
+                  { key: "reposts" as const, label: "Reposts", icon: <Repeat2 className="h-3.5 w-3.5" />, count: repostedPosts.length },
+                ]).map(t => (
+                  <button key={t.key} onClick={() => setSavedTab(t.key)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium border-b-2 transition-all ${
+                      savedTab === t.key ? "border-primary text-white" : "border-transparent text-white/30 hover:text-white/60"
+                    }`}>
+                    {t.icon} {t.label}
+                    {t.count > 0 && <span className="ml-1 text-[10px] text-white/20">({t.count})</span>}
+                  </button>
+                ))}
               </div>
+
+              {/* Feed */}
+              {(() => {
+                const posts = savedTab === "bookmarks" ? bookmarks : savedTab === "likes" ? likedPosts : repostedPosts;
+                const emptyIcon = savedTab === "bookmarks" ? <Bookmark className="h-10 w-10" /> : savedTab === "likes" ? <Heart className="h-10 w-10" /> : <Repeat2 className="h-10 w-10" />;
+                const emptyLabel = savedTab === "bookmarks" ? "No bookmarked posts" : savedTab === "likes" ? "No liked posts" : "No reposted posts";
+                const emptyHint = savedTab === "bookmarks" ? "Bookmark posts in Communities" : savedTab === "likes" ? "Like posts to save them here" : "Repost to share and save here";
+                return posts.length > 0 ? (
+                  <div className="divide-y divide-white/[0.04]">
+                    {posts.map((post: any) => (
+                      <div key={post.id} className="px-4 py-3 flex gap-3 hover:bg-white/[0.02] transition-colors cursor-pointer"
+                        onClick={() => navigate("/communities")}>
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/25 to-secondary/25 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                          {(post.username || "U")[0].toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-xs font-semibold">@{post.username || "user"}</span>
+                            <span className="text-[11px] text-white/30">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+                          </div>
+                          <p className="text-sm text-white/75 line-clamp-3 leading-relaxed">{post.content}</p>
+                          {post.image_url && (
+                            <img src={post.image_url} alt="" className="mt-2 rounded-xl max-h-32 w-full object-cover border border-white/10" onError={e => (e.target as HTMLImageElement).remove()} />
+                          )}
+                          <div className="flex items-center gap-4 mt-2">
+                            <span className="flex items-center gap-1 text-[11px] text-white/30"><Heart className="h-3 w-3" />{post.likes_count || 0}</span>
+                            <span className="flex items-center gap-1 text-[11px] text-white/30"><MessageCircle className="h-3 w-3" />{post.replies_count || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-16 text-center">
+                    <div className="text-white/15 mx-auto mb-3">{emptyIcon}</div>
+                    <p className="text-sm text-white/40">{emptyLabel}</p>
+                    <p className="text-xs text-white/25 mt-1">{emptyHint}</p>
+                  </div>
+                );
+              })()}
             </TabsContent>
           )}
 

@@ -181,6 +181,55 @@ const Admin = () => {
     await fetchUserTransactions(p.user_id);
   };
 
+  const banUser = async (userId: string, action: "ban" | "suspend" | "unban") => {
+    if (!user) return;
+    const label = action === "ban" ? "ban" : action === "suspend" ? "suspend" : "unban";
+    if (!confirm(`Are you sure you want to ${label} this user?`)) return;
+    const status = action === "unban" ? "active" : action;
+    try {
+      await supabase.from("profiles").update({ status }).eq("user_id", userId);
+      await supabase.from("admin_audit_log").insert({
+        admin_user_id: user.id,
+        action: `${label.charAt(0).toUpperCase() + label.slice(1)} user ${userId.slice(0, 8)}`,
+        target_type: "user", target_id: userId,
+        new_values: { status },
+      });
+      toast.success(`User ${label}ned`);
+      fetchUsers(); fetchAuditLogs();
+      if (selectedUser?.user_id === userId) {
+        setSelectedUser({ ...selectedUser, status } as any);
+      }
+    } catch { toast.error("Failed"); }
+  };
+
+  const deleteUserAccount = async (userId: string) => {
+    if (!user) return;
+    if (!confirm("PERMANENT DELETE — this user's data will be wiped. Continue?")) return;
+    if (prompt("Type DELETE to confirm:") !== "DELETE") { toast.error("Cancelled"); return; }
+    try {
+      await Promise.allSettled([
+        supabase.from("community_posts").delete().eq("user_id", userId),
+        supabase.from("community_members").delete().eq("user_id", userId),
+        supabase.from("community_post_likes").delete().eq("user_id", userId),
+        supabase.from("community_reposts").delete().eq("user_id", userId),
+        supabase.from("community_bookmarks").delete().eq("user_id", userId),
+        supabase.from("followers").delete().eq("follower_id", userId),
+        supabase.from("followers").delete().eq("followee_id", userId),
+        supabase.from("user_activities").delete().eq("user_id", userId),
+        supabase.from("user_credits").delete().eq("user_id", userId),
+        supabase.from("credit_transactions").delete().eq("user_id", userId),
+        supabase.from("profiles").delete().eq("user_id", userId),
+      ]);
+      await supabase.from("admin_audit_log").insert({
+        admin_user_id: user.id,
+        action: `Deleted user account ${userId.slice(0, 8)}`,
+        target_type: "user", target_id: userId,
+      });
+      toast.success("User account deleted");
+      setSelectedUser(null); fetchUsers(); fetchAuditLogs();
+    } catch { toast.error("Failed to delete"); }
+  };
+
   const updateUserCredits = async () => {
     if (!selectedUser || !user) return;
     const cur = userCredits[selectedUser.user_id];
@@ -339,6 +388,45 @@ const Admin = () => {
                 <StatCard icon={Activity} label="Actions" value={auditLogs.length} color="bg-secondary/20 text-secondary" />
                 <StatCard icon={Coins} label="Credits Used" value={`$${stats.totalCreditsUsed.toLocaleString()}`} color="bg-accent/20 text-accent" />
                 <StatCard icon={Headphones} label="Lobbies" value={stats.activeLobbies} color="bg-blue-500/20 text-blue-500" />
+              </div>
+
+              {/* Time-based stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  { label: "Today", days: 0 },
+                  { label: "This Week", days: 7 },
+                  { label: "This Month", days: 30 },
+                ].map(period => {
+                  const cutoff = subDays(new Date(), period.days);
+                  const newUsers = period.days === 0
+                    ? users.filter(u => new Date(u.created_at).toDateString() === new Date().toDateString()).length
+                    : users.filter(u => new Date(u.created_at) >= cutoff).length;
+                  const postsCount = 0; // would need separate query
+                  return (
+                    <Card key={period.label} className="og-glass-card">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-sm font-bold text-white/80">{period.label}</h3>
+                          <Badge variant="outline" className="text-[10px]">{period.label}</Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-2xl font-bold text-[#22d3ee]">{newUsers}</p>
+                            <p className="text-[10px] text-muted-foreground">New Users</p>
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold text-green-500">{
+                              period.days === 0
+                                ? auditLogs.filter(l => new Date(l.created_at).toDateString() === new Date().toDateString()).length
+                                : auditLogs.filter(l => new Date(l.created_at) >= cutoff).length
+                            }</p>
+                            <p className="text-[10px] text-muted-foreground">Admin Actions</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
 
               {/* Recent Activity */}
@@ -736,6 +824,40 @@ const Admin = () => {
                           </div>
                         )}
                       </ScrollArea>
+                    </CardContent>
+                  </Card>
+
+                  {/* Moderation Actions */}
+                  <Card className="og-glass-card border-destructive/30">
+                    <CardHeader className="pb-3"><CardTitle className="text-lg flex items-center gap-2"><Ban className="h-5 w-5 text-destructive" /> Moderation</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">Status:</span>
+                          <Badge variant={(selectedUser as any)?.status === "ban" ? "destructive" : (selectedUser as any)?.status === "suspend" ? "secondary" : "default"}>
+                            {(selectedUser as any)?.status || "active"}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(selectedUser as any)?.status === "ban" || (selectedUser as any)?.status === "suspend" ? (
+                            <Button size="sm" variant="outline" onClick={() => banUser(selectedUser.user_id, "unban")} className="border-green-500/30 text-green-500 hover:bg-green-500/10">
+                              <UserCheck className="h-4 w-4 mr-1" /> Unban / Reactivate
+                            </Button>
+                          ) : (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => banUser(selectedUser.user_id, "suspend")} className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10">
+                                <AlertTriangle className="h-4 w-4 mr-1" /> Suspend
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => banUser(selectedUser.user_id, "ban")} className="border-destructive/30 text-destructive hover:bg-destructive/10">
+                                <Ban className="h-4 w-4 mr-1" /> Ban
+                              </Button>
+                            </>
+                          )}
+                          <Button size="sm" variant="destructive" onClick={() => deleteUserAccount(selectedUser.user_id)}>
+                            <Trash2 className="h-4 w-4 mr-1" /> Delete Account
+                          </Button>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>

@@ -13,9 +13,12 @@ import {
   X,
   Menu,
   Sparkles,
+  Shield,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
+import { useAdmin } from "@/hooks/useAdmin";
 
 type TabId =
   | "overview"
@@ -92,6 +95,7 @@ export const AppSidebar = ({
   onNavigate: (t: string) => void;
 }) => {
   const location = useLocation();
+  const { isAdmin } = useAdmin();
 
   const tradingItems: ExternalNavItem[] = [
     { to: "/charts",          icon: LineChart,    label: "Charts",          eyebrow: "Live charts" },
@@ -106,6 +110,7 @@ export const AppSidebar = ({
     { to: "/advanced-tools",  icon: Wrench,       label: "Advanced Tools",  eyebrow: "30+ pro tools" },
     { to: "/pumpv5",          icon: Rocket,       label: "Launch Pad",      eyebrow: "Token listings" },
     { to: "/premium",         icon: Crown,        label: "Premium",         eyebrow: "Pro · AI · P&L" },
+    ...(isAdmin ? [{ to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Owner dashboard" } as ExternalNavItem] : []),
   ];
 
   return (

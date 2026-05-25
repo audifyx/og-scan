@@ -18,7 +18,8 @@ const Privacy = () => (
           { title: "7. Credits System", content: "Credit usage data is tracked to manage your monthly allowance of 10,000 credits with a 6,500 daily usable cap. Transaction history is retained for your reference." },
           { title: "8. Trading Risk Disclaimer", content: "Sol Tools provides analytical tools and information only. We do not provide financial advice. Cryptocurrency trading carries significant risk. Users are solely responsible for their trading decisions." },
           { title: "9. Community Data", content: "Posts, messages, and interactions in Communities and Trading Lobbies are visible to other members. Voice chat data is processed in real-time and not stored. Public profiles are visible to all users." },
-          { title: "10. Contact", content: "For privacy inquiries, reach us through in-app support or via our Telegram community at t.me/soltoolsv2." },
+          { title: "10. Account Deletion", content: "You can permanently delete your account at any time from your Profile → Settings tab. This will remove all your data including posts, community memberships, liked/bookmarked content, credits, and transaction history. This action is irreversible." },
+          { title: "11. Contact", content: "For privacy inquiries, reach us through in-app support or via our community channels." },
         ].map((s, i) => (
           <Card key={i} className="glass-card">
             <CardHeader><CardTitle className="text-base">{s.title}</CardTitle></CardHeader>
