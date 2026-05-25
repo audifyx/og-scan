@@ -99,7 +99,8 @@ const getSortValue = (t: TraderRow, key: SortKey): number => {
    Component
    ═══════════════════════════════════════════════════════════════ */
 
-const Leaderboard = () => {
+const Leaderboard = ({ inline = false }: { inline?: boolean }) => {
+  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
   const [sortBy, setSortBy] = useState<SortKey>("xp");
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -132,7 +133,7 @@ const Leaderboard = () => {
   const memberCount = sorted.length;
 
   return (
-    <AppLayout>
+    <Wrap>
       <PageHeader title="OG Leaderboard" description="The most active and successful OGs">
         <Tabs value={sortBy} onValueChange={v => setSortBy(v as SortKey)}>
           <TabsList className="bg-white/[0.04] h-10">
@@ -321,7 +322,7 @@ const Leaderboard = () => {
           </div>
         </div>
       </div>
-    </AppLayout>
+    </Wrap>
   );
 };
 

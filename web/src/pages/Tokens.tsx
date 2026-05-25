@@ -51,7 +51,8 @@ interface TrendingToken {
   image?: string;
 }
 
-const Tokens = () => {
+const Tokens = ({ inline = false }: { inline?: boolean }) => {
+  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
   const { user } = useAuth();
   const { spendCredits, canAfford } = useCredits();
   const [searchQuery, setSearchQuery] = useState("");
@@ -241,7 +242,7 @@ const Tokens = () => {
     });
 
   return (
-    <AppLayout>
+    <Wrap>
       <PageHeader title="Token Monitor" description="Real-time Solana token tracking & analysis">
         <div className="flex items-center gap-2">
           <CreditBalance compact />
@@ -462,7 +463,7 @@ const Tokens = () => {
       </div>
 
       <TokenDetailPopup tokenAddress={selectedToken || ""} open={showTokenPopup} onOpenChange={setShowTokenPopup} />
-    </AppLayout>
+    </Wrap>
   );
 };
 

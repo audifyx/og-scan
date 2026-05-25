@@ -46,7 +46,8 @@ const CRYPTO_AVATARS = [
 ];
 
 
-const TradingLobbies = () => {
+const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
+  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
@@ -221,7 +222,7 @@ const TradingLobbies = () => {
     const isCreator = activeLobby.created_by === user?.id;
 
     return (
-      <AppLayout>
+      <Wrap>
         <div className="flex flex-col h-[calc(100vh-60px)] lg:h-screen">
           {/* Header */}
           <div className="shrink-0 border-b border-primary/10 bg-background/80 backdrop-blur-xl p-3 flex items-center gap-3">
@@ -398,13 +399,13 @@ const TradingLobbies = () => {
             </div>
           </div>
         </div>
-      </AppLayout>
+      </Wrap>
     );
   }
 
   // Lobby list view
   return (
-    <AppLayout>
+    <Wrap>
       <div className="p-4 space-y-4 max-w-4xl mx-auto">
         <div className="flex items-center justify-between">
           <div>
@@ -521,7 +522,7 @@ const TradingLobbies = () => {
           </div>
         )}
       </div>
-    </AppLayout>
+    </Wrap>
   );
 };
 

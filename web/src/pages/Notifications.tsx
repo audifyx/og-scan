@@ -26,7 +26,8 @@ interface PriceAlert {
   id: string; token_address: string; symbol: string | null; condition: string; target_price: number; is_active: boolean; triggered_at: string | null; created_at: string;
 }
 
-const Notifications = () => {
+const Notifications = ({ inline = false }: { inline?: boolean }) => {
+  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
   const { user } = useAuth();
   const { permission, supported, requestPermission, sendNotification } = usePushNotifications();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -133,7 +134,7 @@ const Notifications = () => {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <AppLayout>
+    <Wrap>
       <PageHeader title="Alerts & Notifications" description="Manage alerts, automations, and notification preferences">
         {unreadCount > 0 && <Badge variant="secondary" className="bg-primary text-primary-foreground">{unreadCount} unread</Badge>}
       </PageHeader>
@@ -288,7 +289,7 @@ const Notifications = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </AppLayout>
+    </Wrap>
   );
 };
 

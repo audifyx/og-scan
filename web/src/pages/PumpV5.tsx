@@ -139,7 +139,8 @@ const formatPrice = (price: number | string | null | undefined) => {
   return `$${num.toFixed(4)}`;
 };
 
-const PumpV5 = () => {
+const PumpV5 = ({ inline = false }: { inline?: boolean }) => {
+  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
   const { user } = useAuth();
   const navigate = useNavigate();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -546,7 +547,7 @@ const PumpV5 = () => {
   const totalLiquidity = Object.values(liveTokenData).reduce((sum, t) => sum + (t.liquidity || 0), 0);
 
   return (
-    <AppLayout>
+    <Wrap>
       <div className="min-h-screen">
         {/* Epic Hero Section */}
         <div className="relative overflow-hidden">
@@ -1342,7 +1343,7 @@ const PumpV5 = () => {
           onClose={() => setSelectedToken(null)}
         />
       </div>
-    </AppLayout>
+    </Wrap>
   );
 };
 
