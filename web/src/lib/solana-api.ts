@@ -1,6 +1,12 @@
 /**
- * solana-api.ts — Wallet data via Helius + DexScreener direct APIs.
- * Replaces the broken supabase `solana-tracker` edge function.
+ * solana-api.ts — Wallet data via Helius DAS + DexScreener direct APIs.
+ *
+ * Uses Helius DAS `getAssetsByOwner` which returns ALL token types:
+ *   • SPL Token (Bonk, meme coins, etc.)
+ *   • Token-2022 (PumpFun, Printrr, Believe, etc.)
+ *   • NFTs, cNFTs, programmable NFTs
+ *
+ * No edge functions needed.
  */
 
 import { HELIUS_API_KEY, HELIUS_RPC } from "@/lib/og";
@@ -34,6 +40,7 @@ export interface TokenAsset {
   token_info?: {
     balance: number;
     decimals: number;
+    token_program?: string;
     price_info?: {
       price_per_token: number;
       total_price: number;
@@ -84,7 +91,7 @@ async function fetchSolPrice(): Promise<{ price: number; change24h: number }> {
 }
 
 /** Helius RPC call */
-async function heliusRpc(method: string, params: unknown[]): Promise<unknown> {
+async function heliusRpc(method: string, params: unknown): Promise<unknown> {
   const res = await fetch(HELIUS_RPC, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -96,74 +103,193 @@ async function heliusRpc(method: string, params: unknown[]): Promise<unknown> {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   API Functions
+   DAS — getAssetsByOwner  (catches ALL token programs)
    ═══════════════════════════════════════════════════════════════ */
 
-export async function getWalletOverview(walletAddress: string): Promise<WalletOverview> {
-  const [balResult, solData] = await Promise.all([
-    heliusRpc("getBalance", [walletAddress]) as Promise<{ value: number }>,
-    fetchSolPrice(),
-  ]);
+interface DasAsset {
+  id: string;
+  interface: string;
+  content?: {
+    metadata?: { name?: string; symbol?: string };
+    links?: { image?: string };
+    json_uri?: string;
+  };
+  token_info?: {
+    balance?: number;
+    decimals?: number;
+    token_program?: string;
+    associated_token_address?: string;
+    price_info?: {
+      price_per_token?: number;
+      total_price?: number;
+      currency?: string;
+    };
+  };
+  ownership?: { owner?: string };
+}
 
-  const solBalance = (balResult?.value ?? 0) / 1e9;
-  const usdValue = solBalance * solData.price;
-
-  // Get token accounts to count tokens
-  const tokenAccounts = (await heliusRpc("getTokenAccountsByOwner", [
-    walletAddress,
-    { programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
-    { encoding: "jsonParsed" },
-  ])) as { value: Array<unknown> };
-
-  const tokenCount = tokenAccounts?.value?.length ?? 0;
-
-  return {
-    balance: solBalance,
-    usdValue,
-    solPrice: solData.price,
-    priceChange24h: solData.change24h,
-    totalUsdValue: usdValue, // Will be enriched when assets are loaded
-    tokenCount,
-    nftCount: 0,
-    totalAssets: tokenCount,
+interface DasResponse {
+  total: number;
+  limit: number;
+  page: number;
+  items: DasAsset[];
+  nativeBalance?: {
+    lamports: number;
+    price_per_sol: number;
+    total_price: number;
   };
 }
 
+// Simple 10-second cache so parallel getWalletOverview + getAssets share one DAS call
+const _dasCache: Record<string, { data: DasResponse; ts: number }> = {};
+const DAS_CACHE_MS = 10_000;
+
+async function fetchAllDasAssets(walletAddress: string): Promise<DasResponse> {
+  const cached = _dasCache[walletAddress];
+  if (cached && Date.now() - cached.ts < DAS_CACHE_MS) return cached.data;
+  const allItems: DasAsset[] = [];
+  let page = 1;
+  let nativeBalance: DasResponse["nativeBalance"] = undefined;
+  let totalSeen = 0;
+
+  // Paginate through all assets (DAS max 1000 per page)
+  while (true) {
+    const res = (await heliusRpc("getAssetsByOwner", {
+      ownerAddress: walletAddress,
+      displayOptions: {
+        showFungible: true,
+        showNativeBalance: true,
+        showZeroBalance: false,
+      },
+      sortBy: { sortBy: "recent_action", sortDirection: "desc" },
+      page,
+      limit: 1000,
+    })) as DasResponse;
+
+    if (page === 1 && res.nativeBalance) {
+      nativeBalance = res.nativeBalance;
+    }
+
+    allItems.push(...(res.items ?? []));
+    totalSeen += res.items?.length ?? 0;
+
+    // Stop if we got fewer than the limit or hit a reasonable cap
+    if (!res.items || res.items.length < 1000 || totalSeen >= 5000) break;
+    page++;
+  }
+
+  const result: DasResponse = { total: allItems.length, limit: 1000, page: 1, items: allItems, nativeBalance };
+  _dasCache[walletAddress] = { data: result, ts: Date.now() };
+  return result;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   API Functions
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Full wallet overview using DAS — one call gets SOL balance + all token counts.
+ */
+export async function getWalletOverview(walletAddress: string): Promise<WalletOverview> {
+  const [dasData, solData] = await Promise.all([
+    fetchAllDasAssets(walletAddress),
+    fetchSolPrice(),
+  ]);
+
+  // SOL balance from DAS nativeBalance (in lamports)
+  const solBalance = (dasData.nativeBalance?.lamports ?? 0) / 1e9;
+  const solUsd = solBalance * solData.price;
+
+  // Separate fungible tokens from NFTs
+  const fungibleInterfaces = new Set(["FungibleToken", "FungibleAsset"]);
+  let tokenCount = 0;
+  let nftCount = 0;
+  let tokenUsdTotal = 0;
+
+  for (const item of dasData.items) {
+    if (fungibleInterfaces.has(item.interface)) {
+      // Only count tokens with actual balance
+      const bal = item.token_info?.balance ?? 0;
+      if (bal > 0) {
+        tokenCount++;
+        tokenUsdTotal += item.token_info?.price_info?.total_price ?? 0;
+      }
+    } else {
+      nftCount++;
+    }
+  }
+
+  return {
+    balance: solBalance,
+    usdValue: solUsd,
+    solPrice: solData.price,
+    priceChange24h: solData.change24h,
+    totalUsdValue: solUsd + tokenUsdTotal,
+    tokenCount,
+    nftCount,
+    totalAssets: tokenCount + nftCount,
+  };
+}
+
+/**
+ * Get token assets — uses DAS so Token-2022, PumpFun, Printrr, etc. are all included.
+ */
 export async function getAssets(walletAddress: string, page = 1, limit = 50): Promise<{ items: TokenAsset[]; total: number }> {
   try {
-    // Use Helius DAS API for assets
-    const res = await fetch(`https://api.helius.xyz/v0/addresses/${walletAddress}/balances?api-key=${HELIUS_API_KEY}`);
-    const data = await res.json();
+    const dasData = await fetchAllDasAssets(walletAddress);
 
-    const tokens: TokenAsset[] = (data.tokens ?? []).slice((page - 1) * limit, page * limit).map((t: Record<string, unknown>) => ({
-      id: t.mint as string,
+    // Filter to fungible tokens with balance > 0
+    const fungibleInterfaces = new Set(["FungibleToken", "FungibleAsset"]);
+    const fungible = dasData.items.filter(
+      (a) => fungibleInterfaces.has(a.interface) && (a.token_info?.balance ?? 0) > 0
+    );
+
+    // Sort by USD value descending (most valuable first)
+    fungible.sort((a, b) => {
+      const va = a.token_info?.price_info?.total_price ?? 0;
+      const vb = b.token_info?.price_info?.total_price ?? 0;
+      return vb - va;
+    });
+
+    // Paginate
+    const sliced = fungible.slice((page - 1) * limit, page * limit);
+
+    const tokens: TokenAsset[] = sliced.map((a) => ({
+      id: a.id,
       content: {
         metadata: {
-          name: (t.name as string) || (t.symbol as string) || "Unknown",
-          symbol: (t.symbol as string) || "???",
+          name: a.content?.metadata?.name || a.content?.metadata?.symbol || "Unknown",
+          symbol: a.content?.metadata?.symbol || "???",
         },
-        links: { image: (t.logoURI as string) || undefined },
+        links: {
+          image: a.content?.links?.image || undefined,
+        },
       },
       token_info: {
-        balance: Number(t.amount ?? 0),
-        decimals: Number(t.decimals ?? 0),
-        price_info: t.price
+        balance: a.token_info?.balance ?? 0,
+        decimals: a.token_info?.decimals ?? 0,
+        token_program: a.token_info?.token_program,
+        price_info: a.token_info?.price_info
           ? {
-              price_per_token: Number(t.price),
-              total_price: Number(t.amount ?? 0) / Math.pow(10, Number(t.decimals ?? 0)) * Number(t.price),
+              price_per_token: a.token_info.price_info.price_per_token ?? 0,
+              total_price: a.token_info.price_info.total_price ?? 0,
             }
           : undefined,
       },
-      interface: "FungibleToken",
+      interface: a.interface,
     }));
 
-    return { items: tokens, total: data.tokens?.length ?? 0 };
+    return { items: tokens, total: fungible.length };
   } catch (err) {
     console.error("[getAssets] error:", err);
     return { items: [], total: 0 };
   }
 }
 
+/**
+ * Parsed transaction history via Helius enhanced API.
+ * Already covers all programs (Token, Token-2022, system, etc.)
+ */
 export async function getTransactions(walletAddress: string, limit = 20): Promise<Transaction[]> {
   try {
     const res = await fetch(
