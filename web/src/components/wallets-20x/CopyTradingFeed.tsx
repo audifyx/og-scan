@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { shortAddr, fmtUsd, HELIUS_RPC } from "@/lib/og";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TrackedWallet {
   address: string;
@@ -41,11 +43,27 @@ function loadTrackedWallets(): TrackedWallet[] {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
 }
 function saveTrackedWallets(wallets: TrackedWallet[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(wallets));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(wallets)); } catch {}
 }
 
 export const CopyTradingFeed: React.FC<Props> = ({ onSelectMint }) => {
+  const { user } = useAuth();
   const [wallets, setWallets] = useState<TrackedWallet[]>(loadTrackedWallets);
+
+  // Load tracked wallets from Supabase
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("copy_trading_wallets").select("*").eq("user_id", user.id).then(({ data }) => {
+      if (data && data.length > 0) {
+        const loaded: TrackedWallet[] = data.map((r: any) => ({
+          address: r.wallet_address, label: r.label || "", addedAt: r.created_at,
+          lastActivity: r.last_activity, tradeCount: r.trade_count ?? 0,
+        }));
+        setWallets(loaded);
+        saveTrackedWallets(loaded);
+      }
+    });
+  }, [user?.id]);
   const [trades, setTrades] = useState<WalletTrade[]>([]);
   const [showAddWallet, setShowAddWallet] = useState(false);
   const [newAddress, setNewAddress] = useState("");
@@ -73,6 +91,11 @@ export const CopyTradingFeed: React.FC<Props> = ({ onSelectMint }) => {
       saveTrackedWallets(next);
       return next;
     });
+    if (user) {
+      supabase.from("copy_trading_wallets").insert({
+        user_id: user.id, wallet_address: wallet.address, label: wallet.label,
+      }).then(() => {});
+    }
     setNewAddress("");
     setNewLabel("");
     setShowAddWallet(false);
@@ -85,6 +108,7 @@ export const CopyTradingFeed: React.FC<Props> = ({ onSelectMint }) => {
       saveTrackedWallets(next);
       return next;
     });
+    if (user) supabase.from("copy_trading_wallets").delete().eq("user_id", user.id).eq("wallet_address", address).then(() => {});
   };
 
   // Fetch recent transactions for all tracked wallets

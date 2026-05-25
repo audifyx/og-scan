@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 import {
   AlertTriangle,
   Bell,
@@ -205,7 +207,7 @@ function mergeDefaultWatchList(saved: string[], defaults: string[]): string[] {
 
 function saveStringList(key: string, value: string[]): void {
   try {
-    localStorage.setItem(key, JSON.stringify(value.slice(0, 80)));
+    try { localStorage.setItem(key, JSON.stringify(value.slice(0, 80))); } catch {}
   } catch {
     /* noop */
   }
@@ -563,12 +565,31 @@ function launchToToken(launch: SnipeLaunch): JupTokenInfo {
 }
 
 export const SnipeFeed = ({ onSelect }: Props) => {
+  const { user } = useAuth();
   const [paused, setPaused] = useState<boolean>(false);
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
   const [selectedDev, setSelectedDev] = useState<string | null>(null);
   const [copiedMint, setCopiedMint] = useState<string | null>(null);
   const [watchedDevs, setWatchedDevs] = useState<string[]>(() => mergeDefaultWatchList(loadStringList(WATCHED_DEVS_STORAGE), DEFAULT_WATCHED_DEVS));
   const [watchedMints, setWatchedMints] = useState<string[]>(() => mergeDefaultWatchList(loadStringList(WATCHED_MINTS_STORAGE), DEFAULT_WATCHED_MINTS));
+
+  // Load watched devs/mints from Supabase
+  useEffect(() => {
+    if (!user) return;
+    Promise.all([
+      supabase.from("ogscan_watched_devs").select("wallet_address").eq("user_id", user.id),
+      supabase.from("ogscan_watched_mints").select("mint_address").eq("user_id", user.id),
+    ]).then(([devRes, mintRes]) => {
+      if (devRes.data && devRes.data.length > 0) {
+        const devAddrs = devRes.data.map((r: any) => r.wallet_address);
+        setWatchedDevs(mergeDefaultWatchList(devAddrs, DEFAULT_WATCHED_DEVS));
+      }
+      if (mintRes.data && mintRes.data.length > 0) {
+        const mintAddrs = mintRes.data.map((r: any) => r.mint_address);
+        setWatchedMints(mergeDefaultWatchList(mintAddrs, DEFAULT_WATCHED_MINTS));
+      }
+    });
+  }, [user?.id]);
 
   const { data, isFetching, error, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["snipe-feed-v2"],

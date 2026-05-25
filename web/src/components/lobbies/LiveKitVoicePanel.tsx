@@ -84,6 +84,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
   const roomRef = useRef<Room | null>(null);
   const presenceChannelRef = useRef<any>(null);
   const broadcastChannelRef = useRef<any>(null);
+  const dbPromoteChannelRef = useRef<any>(null);
   const connectedRef = useRef(false);
   const mutedRef = useRef(true);
   const roleRef = useRef<VoiceRole>(initialRole);
@@ -279,6 +280,10 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
       await supabase.removeChannel(broadcastChannelRef.current);
       broadcastChannelRef.current = null;
     }
+    if (dbPromoteChannelRef.current) {
+      await supabase.removeChannel(dbPromoteChannelRef.current);
+      dbPromoteChannelRef.current = null;
+    }
     setConnected(false);
     connectedRef.current = false;
     setParticipants([]);
@@ -330,14 +335,34 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
       handleCommand(payload.cmd, payload.from);
     }).subscribe();
     broadcastChannelRef.current = ch;
+
+    // Redundant DB-backed promote: subscribe to speaker_requests changes
+    // so promote works even if broadcast is missed
+    if (spaceId) {
+      const dbCh = supabase.channel(`lk-db-promote-${lobbyId}-${user.id}`)
+        .on("postgres_changes", {
+          event: "UPDATE",
+          schema: "public",
+          table: "speaker_requests",
+          filter: `space_id=eq.${spaceId}`,
+        }, (payload) => {
+          const row = payload.new as any;
+          if (row.user_id === user.id && row.status === "approved" && roleRef.current === "listener") {
+            handleCommand("promote", row.user_id);
+          }
+        }).subscribe();
+      dbPromoteChannelRef.current = dbCh;
+    }
   };
 
-  const handleCommand = async (cmd: string, from: string) => {
+  const handleCommand = async (cmd: string, _from: string) => {
     const room = roomRef.current;
     if (!room) return;
 
     switch (cmd) {
       case "promote":
+        // Idempotent: skip if already a speaker
+        if (roleRef.current === "speaker") return;
         setRole("speaker");
         roleRef.current = "speaker";
         await room.localParticipant.setMicrophoneEnabled(true);
@@ -452,7 +477,35 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
     leaveVoice,
     saveRecording: stopAndSaveRecording,
     getParticipants: () => participantsRef.current,
-    promoteToSpeaker: (userId: string) => sendCommand("promote", userId),
+    promoteToSpeaker: (userId: string) => {
+      // Broadcast for instant response
+      sendCommand("promote", userId);
+      // DB write as reliable fallback — update existing speaker_request OR insert one
+      if (spaceId) {
+        supabase.from("speaker_requests")
+          .update({ status: "approved" })
+          .eq("space_id", spaceId)
+          .eq("user_id", userId)
+          .eq("status", "pending")
+          .then(({ data, error }) => {
+            // If no pending request found, insert an approved one directly
+            if (!error) {
+              supabase.from("speaker_requests")
+                .select("id")
+                .eq("space_id", spaceId)
+                .eq("user_id", userId)
+                .eq("status", "approved")
+                .then(({ data: existing }) => {
+                  if (!existing?.length) {
+                    supabase.from("speaker_requests").insert({
+                      space_id: spaceId, user_id: userId, status: "approved", username: "promoted",
+                    }).then(() => {});
+                  }
+                });
+            }
+          });
+      }
+    },
     demoteToListener: (userId: string) => sendCommand("demote", userId),
     muteUser: (userId: string) => sendCommand("force-mute", userId),
     toggleMute,

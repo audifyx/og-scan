@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { jupSearchToken, jupPrice, fmtUsd, type JupTokenInfo, SOL_MINT } from "@/lib/og";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 
 interface PaperTrade {
   id: string;
@@ -65,11 +67,31 @@ function loadPortfolio(): PaperPortfolio {
   };
 }
 function savePortfolio(p: PaperPortfolio) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch {}
+  // Async Supabase upsert (fire-and-forget, user context checked by caller)
+  supabase.auth.getUser().then(({ data }) => {
+    if (!data?.user) return;
+    supabase.from("paper_trading").upsert(
+      { user_id: data.user.id, portfolio: p, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    ).then(() => {});
+  });
 }
 
 export const PaperTrading: React.FC<{ onSelectMint?: (m: string) => void }> = ({ onSelectMint }) => {
+  const { user } = useAuth();
   const [portfolio, setPortfolio] = useState<PaperPortfolio>(loadPortfolio);
+
+  // Load portfolio from Supabase
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("paper_trading").select("*").eq("user_id", user.id).maybeSingle().then(({ data }) => {
+      if (data?.portfolio) {
+        setPortfolio(data.portfolio);
+        savePortfolio(data.portfolio);
+      }
+    });
+  }, [user?.id]);
   const [showTrade, setShowTrade] = useState(false);
   const [tradeType, setTradeType] = useState<"buy" | "sell">("buy");
   const [query, setQuery] = useState("");

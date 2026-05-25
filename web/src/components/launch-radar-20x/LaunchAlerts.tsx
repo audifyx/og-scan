@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 import { jupTrending, fmtUsd, type JupTokenInfo } from "@/lib/og";
 
 interface AlertFilter {
@@ -56,13 +58,13 @@ function loadFilters(): AlertFilter[] {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
 }
 function saveFilters(filters: AlertFilter[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(filters)); } catch {}
 }
 function loadAlerts(): AlertMatch[] {
   try { return JSON.parse(localStorage.getItem(ALERTS_KEY) || "[]"); } catch { return []; }
 }
 function saveAlerts(alerts: AlertMatch[]) {
-  localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts.slice(0, 50)));
+  try { localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts.slice(0, 50))); } catch {}
 }
 
 function playAlertSound() {
@@ -95,7 +97,25 @@ function sendDesktopNotification(title: string, body: string) {
 }
 
 export const LaunchAlerts: React.FC<Props> = ({ onAlert }) => {
+  const { user } = useAuth();
   const [filters, setFilters] = useState<AlertFilter[]>(loadFilters);
+
+  // Load filters from Supabase
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("launch_alerts").select("*").eq("user_id", user.id).then(({ data }) => {
+      if (data && data.length > 0) {
+        const loaded: AlertFilter[] = data.map((r: any) => ({
+          id: r.id, name: r.name || "Filter", minLp: r.config?.minLp ?? 10000,
+          requireTwitter: r.config?.requireTwitter ?? true, requireWebsite: r.config?.requireWebsite ?? false,
+          requireLpLock: r.config?.requireLpLock ?? false, maxDevHolding: r.config?.maxDevHolding ?? 20,
+          enabled: r.enabled ?? true,
+        }));
+        setFilters(loaded);
+        saveFilters(loaded);
+      }
+    });
+  }, [user?.id]);
   const [alerts, setAlerts] = useState<AlertMatch[]>(loadAlerts);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [desktopEnabled, setDesktopEnabled] = useState(false);

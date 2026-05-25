@@ -361,6 +361,20 @@ async function fetchAllFresh(): Promise<JupTokenInfo[]> {
 }
 
 export const PairTracker = ({ onSelect }: Props) => {
+  const { user } = useAuth();
+
+  // Load config from Supabase on mount
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("pair_tracker_config").select("*").eq("user_id", user.id).maybeSingle().then(({ data }) => {
+      if (!data?.config) return;
+      const c = data.config;
+      if (c.tickers) setTickers(c.tickers);
+      if (c.mode) setMode(c.mode);
+      if (c.quality) setQuality({ ...DEFAULT_QUALITY, ...c.quality });
+    });
+  }, [user?.id]);
+
   const [tickers, setTickers] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_TICKERS);
@@ -436,6 +450,17 @@ export const PairTracker = ({ onSelect }: Props) => {
       /* noop */
     }
   }, [mode]);
+
+  // Sync config to Supabase when settings change
+  useEffect(() => {
+    if (!user) return;
+    const t = setTimeout(() => {
+      supabase.from("pair_tracker_config").upsert({
+        user_id: user.id, config: { tickers, mode, quality }, updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" }).then(() => {});
+    }, 2000); // Debounce 2s
+    return () => clearTimeout(t);
+  }, [user?.id, tickers, mode, quality]);
 
   const queryKey =
     mode === "tickers"

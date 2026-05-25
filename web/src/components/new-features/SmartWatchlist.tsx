@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { jupSearchToken, jupPrice, fmtUsd, shortAddr, type JupTokenInfo } from "@/lib/og";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 
 interface WatchlistItem {
   mint: string;
@@ -47,11 +49,29 @@ function loadWatchlist(): WatchlistItem[] {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
 }
 function saveWatchlist(items: WatchlistItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch {}
 }
 
 export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
+  const { user } = useAuth();
   const [items, setItems] = useState<WatchlistItem[]>(loadWatchlist);
+
+  // Load from Supabase on mount
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("smart_watchlist").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).then(({ data }) => {
+      if (data && data.length > 0) {
+        const loaded: WatchlistItem[] = data.map((r: any) => ({
+          mint: r.mint, symbol: r.symbol || "???", name: r.name || "", logoURI: r.logo_uri,
+          addedAt: r.created_at, addedPrice: r.added_price ?? 0, currentPrice: r.current_price ?? 0,
+          priceChange: r.price_change ?? 0, mcap: r.mcap ?? 0, tags: r.tags ?? [],
+          alertAbove: r.alert_above, alertBelow: r.alert_below, notes: r.notes ?? "",
+        }));
+        setItems(loaded);
+        saveWatchlist(loaded);
+      }
+    });
+  }, [user?.id]);
   const [showAdd, setShowAdd] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<JupTokenInfo[]>([]);
@@ -144,6 +164,14 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
       saveWatchlist(next);
       return next;
     });
+    // Persist to Supabase
+    if (user) {
+      supabase.from("smart_watchlist").insert({
+        user_id: user.id, mint: item.mint, symbol: item.symbol, name: item.name,
+        logo_uri: item.logoURI, added_price: item.addedPrice, current_price: item.currentPrice,
+        mcap: item.mcap, tags: item.tags, notes: item.notes,
+      }).then(() => {});
+    }
     setQuery("");
     setResults([]);
     setShowAdd(false);
@@ -156,6 +184,7 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
       saveWatchlist(next);
       return next;
     });
+    if (user) supabase.from("smart_watchlist").delete().eq("user_id", user.id).eq("mint", mint).then(() => {});
   };
 
   const toggleTag = (mint: string, tag: string) => {
