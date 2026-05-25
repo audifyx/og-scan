@@ -1,4 +1,3 @@
-import React from "react";
 import { useState, useEffect } from "react";
 import {
   Users, Plus, ChevronLeft, Lock, Globe, Search, LineChart,
@@ -47,8 +46,7 @@ const CRYPTO_AVATARS = [
 ];
 
 
-const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
-  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
+const TradingLobbies = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
@@ -223,7 +221,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
     const isCreator = activeLobby.created_by === user?.id;
 
     return (
-      <Wrap>
+      <AppLayout>
         <div className="flex flex-col h-[calc(100vh-60px)] lg:h-screen">
           {/* Header */}
           <div className="shrink-0 border-b border-primary/10 bg-background/80 backdrop-blur-xl p-3 flex items-center gap-3">
@@ -400,13 +398,13 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
             </div>
           </div>
         </div>
-      </Wrap>
+      </AppLayout>
     );
   }
 
   // Lobby list view
   return (
-    <Wrap>
+    <AppLayout>
       <div className="p-4 space-y-4 max-w-4xl mx-auto">
         <div className="flex items-center justify-between">
           <div>
@@ -523,7 +521,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
           </div>
         )}
       </div>
-    </Wrap>
+    </AppLayout>
   );
 };
 

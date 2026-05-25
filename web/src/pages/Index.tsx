@@ -80,18 +80,6 @@ const ToolsHub = lazy(() => import("./ToolsHub"));
 const ChartsPage = lazy(() => import("./Charts"));
 const LiveTradingPage = lazy(() => import("./LiveTrading"));
 const LiveFeedPage = lazy(() => import("./LiveFeed"));
-/* ─── Standalone page imports (rendered inline inside Index shell) ─── */
-const WalletsPage = lazy(() => import("./Wallets"));
-const TokensPage = lazy(() => import("./Tokens"));
-const SettingsPage = lazy(() => import("./Settings"));
-const NotificationsPage = lazy(() => import("./Notifications"));
-const AlphaChatPage = lazy(() => import("./AlphaChat"));
-const CalloutsPage = lazy(() => import("./Callouts"));
-const TradingLobbiesPage = lazy(() => import("./TradingLobbies"));
-const LeaderboardPage = lazy(() => import("./Leaderboard"));
-const PumpV5Page = lazy(() => import("./PumpV5"));
-const AdminPage = lazy(() => import("./Admin"));
-
 
 /* ─── 20x Feature imports ─── */
 const RugScore = lazy(() => import("@/components/scanner-20x/RugScore").then(m => ({ default: m.RugScore })));
@@ -171,17 +159,7 @@ type TabId =
   | "profile"
   | "charts"
   | "live-trading"
-  | "live-feed-page"
-  | "wallets"
-  | "tokens"
-  | "settings"
-  | "notifications"
-  | "alpha-chat"
-  | "callouts"
-  | "trading-lobbies"
-  | "leaderboard"
-  | "pumpv5"
-  | "admin";
+  | "live-feed-page";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
@@ -537,126 +515,6 @@ const TABS: TabConfig[] = [
     Icon: Radio,
     accent: "cyan",
     group: "Market",
-  },,
-  {
-    id: "wallets",
-    label: "Wallets",
-    slug: "wallets",
-    pageNumber: 28,
-    eyebrow: "Tracked wallets",
-    description: "Track wallet holdings, transactions, and portfolio overview.",
-    Icon: Wallet,
-    accent: "cyan",
-    group: "Market",
-    showInNav: false,
-  },
-  {
-    id: "tokens",
-    label: "Tokens",
-    slug: "tokens",
-    pageNumber: 29,
-    eyebrow: "Token tracker",
-    description: "Browse and manage tracked tokens.",
-    Icon: Coins,
-    accent: "gold",
-    group: "Market",
-    showInNav: false,
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    slug: "settings",
-    pageNumber: 30,
-    eyebrow: "Preferences",
-    description: "Configure your account, theme, and notification preferences.",
-    Icon: Wrench,
-    accent: "white",
-    group: "Main",
-    showInNav: false,
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    slug: "notifications",
-    pageNumber: 31,
-    eyebrow: "Your alerts",
-    description: "View and manage your notifications and alerts.",
-    Icon: Bell,
-    accent: "gold",
-    group: "Main",
-    showInNav: false,
-  },
-  {
-    id: "alpha-chat",
-    label: "Alpha Chat",
-    slug: "alpha-chat",
-    pageNumber: 32,
-    eyebrow: "AI assistant",
-    description: "Chat with the AI alpha assistant for market insights.",
-    Icon: Bot,
-    accent: "lime",
-    group: "Market",
-    showInNav: false,
-  },
-  {
-    id: "callouts",
-    label: "Callouts",
-    slug: "callouts",
-    pageNumber: 33,
-    eyebrow: "Trade alerts",
-    description: "Community trade callouts and performance tracking.",
-    Icon: Bell,
-    accent: "cyan",
-    group: "Market",
-    showInNav: false,
-  },
-  {
-    id: "trading-lobbies",
-    label: "Trading Lobbies",
-    slug: "trading-lobbies",
-    pageNumber: 34,
-    eyebrow: "Voice + charts",
-    description: "Live trading rooms with voice chat and shared charts.",
-    Icon: MessageSquare,
-    accent: "gold",
-    group: "Market",
-    showInNav: false,
-  },
-  {
-    id: "leaderboard",
-    label: "Leaderboard",
-    slug: "leaderboard",
-    pageNumber: 35,
-    eyebrow: "Top traders",
-    description: "Rankings by XP, PnL, streaks, and reputation.",
-    Icon: Trophy,
-    accent: "gold",
-    group: "Main",
-    showInNav: false,
-  },
-  {
-    id: "pumpv5",
-    label: "Launch Pad",
-    slug: "pumpv5",
-    pageNumber: 36,
-    eyebrow: "Token listings",
-    description: "Submit and browse token listings on the launchpad.",
-    Icon: Rocket,
-    accent: "lime",
-    group: "Market",
-    showInNav: false,
-  },
-  {
-    id: "admin",
-    label: "Admin",
-    slug: "admin",
-    pageNumber: 37,
-    eyebrow: "Admin panel",
-    description: "Platform administration and management tools.",
-    Icon: ShieldCheck,
-    accent: "gold",
-    group: "Main",
-    showInNav: false,
   },
 ];
 
@@ -703,17 +561,7 @@ const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
     social: "social",
     "social-hub": "social",
     socialhub: "social",
-    wallets: "wallets",
-    tokens: "tokens",
-    settings: "settings",
-    notifications: "notifications",
-    "alpha-chat": "alpha-chat",
-    "ai-chat": "alpha-chat",
-    callouts: "callouts",
-    "trading-lobbies": "trading-lobbies",
-    leaderboard: "leaderboard",
-    pumpv5: "pumpv5",
-    admin: "admin",
+    settings: "profile",
   },
 );
 
@@ -731,7 +579,7 @@ const getTabPath = (id: TabId): string => {
   return `/${TAB_BY_ID[id].slug}`;
 };
 
-const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, onNavigate?: (t: string) => void, profileViewUserId?: string, selectedWallet?: string, setSelectedWallet?: (w: string) => void): ReactNode => {
+const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, onNavigate?: (t: string) => void, profileViewUserId?: string): ReactNode => {
   if (tab === "our-coin") return <OurCoin />;
   if (tab === "roadmap") return <SolToolsRoadmap />;
   if (tab === "market-pulse") return <OgStats mint={mint} onSelect={updateMint} />;
@@ -744,12 +592,12 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "trending") return <Trending onSelect={updateMint} />;
   if (tab === "whales") return (
     <div className="space-y-4">
-      <Whales mint={mint} onSelectWallet={setSelectedWallet || (() => {})} />
-      {selectedWallet && selectedWallet.length > 0 ? (
+      <Whales mint={mint} onSelectWallet={setSelectedWallet} />
+      {selectedWallet ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-og-cyan">Wallet X-Ray: {shortAddr(selectedWallet ?? "")}</h3>
-            <button onClick={() => setSelectedWallet?.("")} className="text-[10px] text-white/40 hover:text-white">Clear</button>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-og-cyan">Wallet X-Ray: {shortAddr(selectedWallet)}</h3>
+            <button onClick={() => setSelectedWallet("")} className="text-[10px] text-white/40 hover:text-white">Clear</button>
           </div>
           <WalletXRay walletAddress={selectedWallet} compact={false} />
         </div>
@@ -780,16 +628,6 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "charts") return <ChartsPage />;
   if (tab === "live-trading") return <LiveTradingPage />;
   if (tab === "live-feed-page") return <LiveFeedPage />;
-  if (tab === "wallets") return <WalletsPage inline />;
-  if (tab === "tokens") return <TokensPage inline />;
-  if (tab === "settings") return <SettingsPage inline />;
-  if (tab === "notifications") return <NotificationsPage inline />;
-  if (tab === "alpha-chat") return <AlphaChatPage inline />;
-  if (tab === "callouts") return <CalloutsPage inline />;
-  if (tab === "trading-lobbies") return <TradingLobbiesPage inline />;
-  if (tab === "leaderboard") return <LeaderboardPage inline />;
-  if (tab === "pumpv5") return <PumpV5Page inline />;
-  if (tab === "admin") return <AdminPage inline />;
   return null;
 };
 
@@ -916,7 +754,7 @@ const Index = () => {
                 onSelectMint={updateMint}
               />
             ) : (
-              <ToolShell tab={activeTab}><Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>{renderTool(tab, mint, updateMint, switchTab, profileViewUserId, selectedWallet, setSelectedWallet)}</Suspense></ToolShell>
+              <ToolShell tab={activeTab}><Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>{renderTool(tab, mint, updateMint, switchTab, profileViewUserId)}</Suspense></ToolShell>
             )}
           </main>
         )}

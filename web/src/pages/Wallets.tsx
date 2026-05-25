@@ -1,4 +1,3 @@
-import React from "react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Plus, Eye, Trash2, RefreshCw, Send, Copy, ExternalLink, Zap, Clock, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Coins, Globe, Twitter, MessageCircle, Link as LinkIcon, Play, Pause, BarChart3, Droplets, Users, Shield, Check } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -15,8 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WalletCalloutButton } from "@/components/webhooks/WalletCalloutButton";
-import { CoinDetailDialog } from "@/components/CoinDetailDialog";
-import type { JupTokenInfo } from "@/lib/og";
+import { TokenDetailPopup } from "@/components/tokens/TokenDetailPopup";
 // CreditBalance removed — credits system disabled
 import { getWalletOverview, getAssets, getTransactions, WalletOverview, TokenAsset, Transaction, formatAddress, formatUsd } from "@/lib/solana-api";
 import { toast } from "@/hooks/use-toast";
@@ -65,23 +63,7 @@ interface EnrichedTransaction {
   isOutgoing?: boolean;
 }
 
-
-/* ─── Auto-opening token detail popup using CoinDetailDialog ─── */
-const WalletCoinPopup = ({ mint, onClose }: { mint: string; onClose: () => void }) => {
-  const btnRef = React.useRef<HTMLButtonElement>(null);
-  React.useEffect(() => { btnRef.current?.click(); }, []);
-  const token: JupTokenInfo = { id: mint, name: "", symbol: "", decimals: 9 };
-  return (
-    <CoinDetailDialog
-      token={token}
-      actionLabel="Full Analysis"
-      trigger={<button ref={btnRef} className="hidden" />}
-    />
-  );
-};
-
-const Wallets = ({ inline = false }: { inline?: boolean }) => {
-  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
+const Wallets = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeWallet, setActiveWallet] = useState<string | null>(null);
   const [trackedWallets, setTrackedWallets] = useState<TrackedWallet[]>([]);
@@ -309,7 +291,7 @@ const Wallets = ({ inline = false }: { inline?: boolean }) => {
   };
 
   return (
-    <Wrap>
+    <AppLayout>
       <PageHeader title="Wallet Tracker" description="Track any Solana wallet in real-time">
         <div className="flex items-center gap-2">
           {/* credits removed */}
@@ -565,12 +547,9 @@ const Wallets = ({ inline = false }: { inline?: boolean }) => {
       </div>
 
       {selectedToken && (
-        <WalletCoinPopup
-          mint={selectedToken}
-          onClose={() => setSelectedToken(null)}
-        />
+        <TokenDetailPopup tokenAddress={selectedToken} open={!!selectedToken} onOpenChange={(open) => !open && setSelectedToken(null)} />
       )}
-    </Wrap>
+    </AppLayout>
   );
 };
 

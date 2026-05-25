@@ -1,10 +1,8 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MessageSquare, Sparkles, Zap, Shield, Users, Bot } from "lucide-react";
 
-const AlphaChat = ({ inline = false }: { inline?: boolean }) => {
-  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
-  return (
-  <Wrap>
+const AlphaChat = () => (
+  <AppLayout>
     <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center">
       <div className="relative mb-8">
         <div className="absolute inset-0 bg-og-cyan/20 rounded-full blur-3xl animate-pulse" />
@@ -46,8 +44,7 @@ const AlphaChat = ({ inline = false }: { inline?: boolean }) => {
         We're rolling out features gradually. Alpha Chat will be available in an upcoming update.
       </p>
     </div>
-  </Wrap>
-  );
-};
+  </AppLayout>
+);
 
 export default AlphaChat;

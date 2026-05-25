@@ -1,4 +1,3 @@
-import React from "react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -82,8 +81,7 @@ const NAV_SECTIONS = [
 ] as const;
 
 /* ═══════════════════════ Component ═══════════════════════ */
-const Admin = ({ inline = false }: { inline?: boolean }) => {
-  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
+const Admin = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -310,12 +308,12 @@ const Admin = ({ inline = false }: { inline?: boolean }) => {
   }, [users, auditLogs]);
 
   /* ─── loading / denied ─── */
-  if (loading) return <Wrap><div className="flex items-center justify-center h-full"><Loader2 className="h-10 w-10 animate-spin text-[#22d3ee]" /></div></Wrap>;
-  if (!isAdmin) return <Wrap><div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center"><Shield className="h-14 w-14 text-red-500" /><h1 className="text-xl font-bold">Access Denied</h1><p className="text-sm text-white/40">Owner access only</p><Button onClick={() => navigate("/app")} size="sm">Go Home</Button></div></Wrap>;
+  if (loading) return <AppLayout><div className="flex items-center justify-center h-full"><Loader2 className="h-10 w-10 animate-spin text-[#22d3ee]" /></div></AppLayout>;
+  if (!isAdmin) return <AppLayout><div className="flex flex-col items-center justify-center h-full gap-4 px-6 text-center"><Shield className="h-14 w-14 text-red-500" /><h1 className="text-xl font-bold">Access Denied</h1><p className="text-sm text-white/40">Owner access only</p><Button onClick={() => navigate("/app")} size="sm">Go Home</Button></div></AppLayout>;
 
   /* ═══════════════════════ RENDER ═══════════════════════ */
   return (
-    <Wrap>
+    <AppLayout>
       <div className="flex flex-col h-[calc(100vh-60px)]">
 
         {/* ── Header ── */}
@@ -922,7 +920,7 @@ const Admin = ({ inline = false }: { inline?: boolean }) => {
           )}
         </DialogContent>
       </Dialog>
-    </Wrap>
+    </AppLayout>
   );
 };
 

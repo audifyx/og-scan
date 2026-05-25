@@ -1,4 +1,3 @@
-import React from "react";
 import { useState, useEffect, useRef } from "react";
 import { Send, Zap, Wallet, Coins, TrendingUp, Copy, ExternalLink, RefreshCw, Sparkles, Shield, AlertTriangle } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -118,8 +117,7 @@ const shortAddr = (a: string) => a ? `${a.slice(0, 6)}...${a.slice(-4)}` : "";
    Component
    ═══════════════════════════════════════════════════════════════ */
 
-const Callouts = ({ inline = false }: { inline?: boolean }) => {
-  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
+const Callouts = () => {
   const { user } = useAuth();
   const [input, setInput] = useState("");
   const [note, setNote] = useState("");
@@ -280,7 +278,7 @@ const Callouts = ({ inline = false }: { inline?: boolean }) => {
      JSX
      ═══════════════════════════════════════════════════════════ */
   return (
-    <Wrap>
+    <AppLayout>
       <PageHeader title="Alpha Callouts" description="Post token & wallet callouts to the community">
         <div className="flex items-center gap-2">
           <Badge className="bg-green-500/20 text-green-500 border-green-500/30 gap-1.5">
@@ -437,7 +435,7 @@ const Callouts = ({ inline = false }: { inline?: boolean }) => {
           </div>
         </div>
       </div>
-    </Wrap>
+    </AppLayout>
   );
 };
 

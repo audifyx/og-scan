@@ -1,4 +1,3 @@
-import React from "react";
 import { useState, useEffect } from "react";
 import { Bell, Check, Trash2, Wallet, TrendingUp, TrendingDown, Coins, AlertTriangle, BellRing, BellOff, Plus, Search, Zap } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -27,8 +26,7 @@ interface PriceAlert {
   id: string; token_address: string; symbol: string | null; condition: string; target_price: number; is_active: boolean; triggered_at: string | null; created_at: string;
 }
 
-const Notifications = ({ inline = false }: { inline?: boolean }) => {
-  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
+const Notifications = () => {
   const { user } = useAuth();
   const { permission, supported, requestPermission, sendNotification } = usePushNotifications();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -135,7 +133,7 @@ const Notifications = ({ inline = false }: { inline?: boolean }) => {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <Wrap>
+    <AppLayout>
       <PageHeader title="Alerts & Notifications" description="Manage alerts, automations, and notification preferences">
         {unreadCount > 0 && <Badge variant="secondary" className="bg-primary text-primary-foreground">{unreadCount} unread</Badge>}
       </PageHeader>
@@ -290,7 +288,7 @@ const Notifications = ({ inline = false }: { inline?: boolean }) => {
           </TabsContent>
         </Tabs>
       </div>
-    </Wrap>
+    </AppLayout>
   );
 };
 

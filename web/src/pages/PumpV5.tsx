@@ -1,4 +1,3 @@
-import React from "react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -140,8 +139,7 @@ const formatPrice = (price: number | string | null | undefined) => {
   return `$${num.toFixed(4)}`;
 };
 
-const PumpV5 = ({ inline = false }: { inline?: boolean }) => {
-  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
+const PumpV5 = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -548,7 +546,7 @@ const PumpV5 = ({ inline = false }: { inline?: boolean }) => {
   const totalLiquidity = Object.values(liveTokenData).reduce((sum, t) => sum + (t.liquidity || 0), 0);
 
   return (
-    <Wrap>
+    <AppLayout>
       <div className="min-h-screen">
         {/* Epic Hero Section */}
         <div className="relative overflow-hidden">
@@ -1344,7 +1342,7 @@ const PumpV5 = ({ inline = false }: { inline?: boolean }) => {
           onClose={() => setSelectedToken(null)}
         />
       </div>
-    </Wrap>
+    </AppLayout>
   );
 };
 

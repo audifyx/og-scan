@@ -12,14 +12,30 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Setup from "./pages/Setup";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import Wallets from "./pages/Wallets";
+import Tokens from "./pages/Tokens";
+import Tools from "./pages/Tools";
 // AdvancedTools removed
+import AlphaChat from "./pages/AlphaChat";
 // Credits page removed
 // Webhooks removed
+import TradingLobbies from "./pages/TradingLobbies";
+import Leaderboard from "./pages/Leaderboard";
+import Notifications from "./pages/Notifications";
 // Premium removed
 import OfficialToken from "./pages/OfficialToken";
+import PumpV5 from "./pages/PumpV5";
+import Callouts from "./pages/Callouts";
+import Charts from "./pages/Charts";
+import LiveFeed from "./pages/LiveFeed";
+import LiveTrading from "./pages/LiveTrading";
 import SupportCenter from "./pages/SupportCenter";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import Admin from "./pages/Admin";
+import ArtFeed from "./pages/ArtFeed";
 import SpaceReplay from "./pages/SpaceReplay";
 
 const queryClient = new QueryClient();
@@ -88,23 +104,23 @@ const App = () => (
             {/* ── Protected: User pages ── */}
             <Route path="/profile" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/profile/:userId" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/wallets" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/notifications" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/wallets" element={<ProtectedRoute><Wallets /></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
             {/* Credits removed */}
 
             {/* ── Protected: Tools & Features ── */}
-            <Route path="/tokens" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/tokens" element={<ProtectedRoute><Tokens /></ProtectedRoute>} />
             <Route path="/tools" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             {/* AdvancedTools removed */}
-            <Route path="/ai-chat" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/alpha-chat" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/ai-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
+            <Route path="/alpha-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
             {/* Webhooks removed */}
-            <Route path="/callouts" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/callouts" element={<ProtectedRoute><Callouts /></ProtectedRoute>} />
 
             {/* ── Protected: Community ── */}
-            <Route path="/trading-lobbies" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/leaderboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/trading-lobbies" element={<ProtectedRoute><TradingLobbies /></ProtectedRoute>} />
+            <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
 
             {/* Premium removed */}
 
@@ -112,11 +128,11 @@ const App = () => (
             <Route path="/live-trading" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/charts" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/live-feed-page" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/pumpv5" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/pumpv5" element={<ProtectedRoute><PumpV5 /></ProtectedRoute>} />
 
             {/* ── Protected: Admin ── */}
-            <Route path="/admin" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/art" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            <Route path="/art" element={<ProtectedRoute><ArtFeed /></ProtectedRoute>} />
 
             {/* ── Public: Project/legal ── */}
             <Route path="/official-token" element={<OfficialToken />} />

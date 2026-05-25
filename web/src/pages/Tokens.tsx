@@ -1,4 +1,3 @@
-import React from "react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Search, TrendingUp, TrendingDown, Star, StarOff, ExternalLink, RefreshCw, 
@@ -52,8 +51,7 @@ interface TrendingToken {
   image?: string;
 }
 
-const Tokens = ({ inline = false }: { inline?: boolean }) => {
-  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
+const Tokens = () => {
   const { user } = useAuth();
   const { spendCredits, canAfford } = useCredits();
   const [searchQuery, setSearchQuery] = useState("");
@@ -243,7 +241,7 @@ const Tokens = ({ inline = false }: { inline?: boolean }) => {
     });
 
   return (
-    <Wrap>
+    <AppLayout>
       <PageHeader title="Token Monitor" description="Real-time Solana token tracking & analysis">
         <div className="flex items-center gap-2">
           <CreditBalance compact />
@@ -464,7 +462,7 @@ const Tokens = ({ inline = false }: { inline?: boolean }) => {
       </div>
 
       <TokenDetailPopup tokenAddress={selectedToken || ""} open={showTokenPopup} onOpenChange={setShowTokenPopup} />
-    </Wrap>
+    </AppLayout>
   );
 };
 

@@ -1,4 +1,3 @@
-import React from "react";
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -40,8 +39,7 @@ interface ProfileData {
   theme_preset?: string;
 }
 
-const Settings = ({ inline = false }: { inline?: boolean }) => {
-  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
+const Settings = () => {
   const { user, signOut } = useAuth();
 
   // Profile state
@@ -213,17 +211,17 @@ const Settings = ({ inline = false }: { inline?: boolean }) => {
 
   if (loadingProfile) {
     return (
-      <Wrap>
+      <AppLayout>
         <PageHeader title="Settings" description="Manage your account" />
         <div className="flex items-center justify-center h-40">
           <Loader2 className="h-6 w-6 animate-spin text-white/30" />
         </div>
-      </Wrap>
+      </AppLayout>
     );
   }
 
   return (
-    <Wrap>
+    <AppLayout>
       <PageHeader title="Settings" description="Manage your account and preferences" />
       <div className="p-4 lg:p-6 relative z-10">
         <Tabs defaultValue="profile" className="w-full">
@@ -580,7 +578,7 @@ const Settings = ({ inline = false }: { inline?: boolean }) => {
           </TabsContent>
         </Tabs>
       </div>
-    </Wrap>
+    </AppLayout>
   );
 };
 

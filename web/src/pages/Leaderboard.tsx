@@ -1,4 +1,3 @@
-import React from "react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -100,8 +99,7 @@ const getSortValue = (t: TraderRow, key: SortKey): number => {
    Component
    ═══════════════════════════════════════════════════════════════ */
 
-const Leaderboard = ({ inline = false }: { inline?: boolean }) => {
-  const Wrap = inline ? ({ children }: { children: React.ReactNode }) => <>{children}</> : AppLayout;
+const Leaderboard = () => {
   const [sortBy, setSortBy] = useState<SortKey>("xp");
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -134,7 +132,7 @@ const Leaderboard = ({ inline = false }: { inline?: boolean }) => {
   const memberCount = sorted.length;
 
   return (
-    <Wrap>
+    <AppLayout>
       <PageHeader title="OG Leaderboard" description="The most active and successful OGs">
         <Tabs value={sortBy} onValueChange={v => setSortBy(v as SortKey)}>
           <TabsList className="bg-white/[0.04] h-10">
@@ -323,7 +321,7 @@ const Leaderboard = ({ inline = false }: { inline?: boolean }) => {
           </div>
         </div>
       </div>
-    </Wrap>
+    </AppLayout>
   );
 };
 
