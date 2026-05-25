@@ -24,7 +24,7 @@ const apps: AppItem[] = [
   { icon: Wrench, label: "Tools", path: "/tools", gradient: "from-slate-500 to-slate-700" },
   { icon: Cpu, label: "Advanced", path: "/advanced-tools", gradient: "from-violet-500 to-purple-700" },
   { icon: Rocket, label: "Launch Pad", path: "/pump-v5", gradient: "from-primary to-accent", badge: "NEW" },
-  { icon: Crown, label: "Premium", path: "/premium", gradient: "from-yellow-500 to-amber-700" },
+
   { icon: Bell, label: "Alerts", path: "/notifications", gradient: "from-rose-500 to-red-700" },
   { icon: MessageSquare, label: "Alpha Chat", path: "/alpha-chat", gradient: "from-cyan-500 to-blue-700" },
   { icon: Radio, label: "Live Feed", path: "/live-feed", gradient: "from-orange-500 to-red-600" },
@@ -43,7 +43,7 @@ const dockApps: AppItem[] = [
   { icon: Wallet, label: "Wallets", path: "/wallets", gradient: "from-primary to-amber-700" },
   { icon: Coins, label: "Tokens", path: "/tokens", gradient: "from-amber-600 to-yellow-700" },
   { icon: Rocket, label: "Launch Pad", path: "/pump-v5", gradient: "from-primary to-accent" },
-  { icon: Crown, label: "Premium", path: "/premium", gradient: "from-yellow-500 to-amber-700" },
+
 ];
 
 export const HomeScreen = () => {

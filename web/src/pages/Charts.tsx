@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 interface PairData {
   address: string;
+  pairAddress?: string;
   name: string;
   symbol: string;
   category: string;
@@ -50,6 +51,7 @@ const Charts = () => {
           if (pair) {
             updated[i] = {
               ...updated[i],
+              pairAddress: pair.pairAddress,
               image: pair.info?.imageUrl,
               price: pair.priceUsd,
               priceChange24h: pair.priceChange?.h24 || 0,
@@ -62,7 +64,10 @@ const Charts = () => {
     fetchPairData();
   }, []);
 
-  const getDexScreenerUrl = (address: string) => `https://dexscreener.com/solana/${address}?embed=1&theme=dark&trades=0&info=0`;
+  const getDexScreenerUrl = (token: PairData) => {
+    const addr = token.pairAddress || token.address;
+    return `https://dexscreener.com/solana/${addr}?embed=1&theme=dark&trades=0&info=0`;
+  };
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -82,6 +87,7 @@ const Charts = () => {
       }
       const newPair: PairData = {
         address: pair.baseToken?.address || searchQuery,
+        pairAddress: pair.pairAddress,
         name: `${pair.baseToken?.symbol}/${pair.quoteToken?.symbol}`,
         symbol: pair.baseToken?.symbol || searchQuery.slice(0, 4).toUpperCase(),
         category: "custom",
@@ -125,7 +131,7 @@ const Charts = () => {
           <Badge className="bg-og-cyan/10 text-og-cyan border-og-cyan/25">{selectedToken.symbol}</Badge>
           <Button variant="outline" size="icon" className="rounded-xl bg-[#070d14]/80 backdrop-blur-sm border-white/10" onClick={() => setIsFullscreen(false)}><X className="h-4 w-4" /></Button>
         </div>
-        <iframe src={getDexScreenerUrl(selectedToken.address)} className="w-full h-full border-0" title={`${selectedToken.name} Chart`} allow="clipboard-write" />
+        <iframe src={getDexScreenerUrl(selectedToken)} className="w-full h-full border-0" title={`${selectedToken.name} Chart`} allow="clipboard-write" />
       </div>
     );
   }
@@ -299,7 +305,7 @@ const Charts = () => {
           
           <div className="flex-1 relative bg-[#070d14]">
             <iframe
-              src={getDexScreenerUrl(selectedToken.address)}
+              src={getDexScreenerUrl(selectedToken)}
               className="absolute inset-0 w-full h-full border-0"
               title={`${selectedToken.name} Chart`}
               allow="clipboard-write"

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode, lazy, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, lazy, Suspense } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Activity,
@@ -44,7 +44,8 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { DEFAULT_OG_MINT, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr } from "@/lib/og";
+import { DEFAULT_OG_MINT, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr, type JupTokenInfo } from "@/lib/og";
+import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 import { AuthButton } from "@/components/AuthButton";
 import { AppTopBar } from "@/components/AppTopBar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -577,7 +578,7 @@ const getTabPath = (id: TabId): string => {
   return `/${TAB_BY_ID[id].slug}`;
 };
 
-const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, onNavigate?: (t: string) => void): ReactNode => {
+const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, onNavigate?: (t: string) => void, profileViewUserId?: string): ReactNode => {
   if (tab === "our-coin") return <OurCoin />;
   if (tab === "roadmap") return <SolToolsRoadmap />;
   if (tab === "market-pulse") return <OgStats mint={mint} onSelect={updateMint} />;
@@ -622,7 +623,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "spaces") return <SpacesPage />;
   if (tab === "social") return <SocialHub />;
   if (tab === "tools") return <ToolsHub onNavigate={onNavigate || (() => {})} />;
-  if (tab === "profile") return <UserProfile />;
+  if (tab === "profile") return <UserProfile viewUserId={profileViewUserId} />;
   if (tab === "charts") return <ChartsPage />;
   if (tab === "live-trading") return <LiveTradingPage />;
   if (tab === "live-feed-page") return <LiveFeedPage />;
@@ -653,6 +654,7 @@ const Index = () => {
   const pathSlug: string = location.pathname.replace(/^\/+|\/+$/g, "").split("/").pop() ?? "";
   /* /profile/:userId → always resolve to "profile" tab regardless of userId segment */
   const isProfileSubRoute = location.pathname.startsWith("/profile");
+  const profileViewUserId = isProfileSubRoute ? location.pathname.split("/profile/")[1]?.split(/[?#/]/)[0] || undefined : undefined;
   const routeSlug: string | undefined = isProfileSubRoute ? "profile" : (pageNumber ? `page-${pageNumber}` : toolSlug ?? pathSlug);
   const routeTab: TabId = useMemo<TabId>(() => getTabFromSlug(routeSlug) ?? "overview", [routeSlug]);
   const [mint, setMint] = useState<string>(DEFAULT_OG_MINT);
@@ -744,7 +746,7 @@ const Index = () => {
                 onSelectMint={updateMint}
               />
             ) : (
-              <ToolShell tab={activeTab}><Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>{renderTool(tab, mint, updateMint, switchTab)}</Suspense></ToolShell>
+              <ToolShell tab={activeTab}><Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>{renderTool(tab, mint, updateMint, switchTab, profileViewUserId)}</Suspense></ToolShell>
             )}
           </main>
         )}
@@ -766,6 +768,20 @@ const Index = () => {
 
 /* ─── Mobile nav placeholder ─── */
 
+/* ─── Token Detail Popup Wrapper (auto-open on mount, cleans up on close) ─── */
+const TokenDetailPopupWrapper = ({ token, onClose, onOpenScanner }: { token: JupTokenInfo; onClose: () => void; onOpenScanner: (m: string) => void }) => {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { btnRef.current?.click(); }, []);
+  return (
+    <CoinDetailDialog
+      token={token}
+      onOpenScanner={onOpenScanner}
+      actionLabel="Open Scanner"
+      trigger={<button ref={btnRef} className="hidden" />}
+    />
+  );
+};
+
 /* ─── Overview / Dashboard ─── */
 const OverviewPage = ({
   mint,
@@ -786,6 +802,9 @@ const OverviewPage = ({
     { label: "Profile", Icon: User, accent: "gold" as TabAccent, tab: "profile" as TabId },
     { label: "Community", Icon: MessageSquare, accent: "cyan" as TabAccent, tab: "community" as TabId },
   ];
+
+  const [popupMint, setPopupMint] = useState<string | null>(null);
+  const popupToken: JupTokenInfo | null = popupMint ? { id: popupMint, name: "", symbol: "", decimals: 9 } : null;
 
   const toolSections = [
     {
@@ -862,8 +881,8 @@ const OverviewPage = ({
 
       {/* ─── Intelligence Row ─── */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <OGDaily onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
-        <SmartWatchlist onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
+        <OGDaily onSelectMint={(m: string) => setPopupMint(m)} />
+        <SmartWatchlist onSelectMint={(m: string) => setPopupMint(m)} />
       </div>
 
       {/* ─── Tool Sections ─── */}
@@ -945,6 +964,15 @@ const OverviewPage = ({
       </div>
 
       <QuickCalc />
+
+      {/* Token Detail Popup — triggered by clicking tokens in OGDaily/SmartWatchlist */}
+      {popupToken && (
+        <TokenDetailPopupWrapper
+          token={popupToken}
+          onClose={() => setPopupMint(null)}
+          onOpenScanner={(m) => { setPopupMint(null); onSelectMint(m); onSwitchTab("scanner"); }}
+        />
+      )}
     </div>
   );
 };

@@ -39,7 +39,7 @@ const solToolsItems: NavItem[] = [
   { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
   { to: "/advanced-tools",  icon: Wrench,        label: "Advanced Tools",  eyebrow: "30+ pro tools" },
   { to: "/pumpv5",          icon: Rocket,        label: "Launch Pad",      eyebrow: "Token listings" },
-  { to: "/webhooks",        icon: Webhook,       label: "Webhooks",        eyebrow: "Push alerts" },
+
   { to: "/notifications",   icon: Bell,          label: "Notifications",   eyebrow: "Your alerts" },
 ];
 
@@ -178,29 +178,7 @@ export const Sidebar = () => {
             </div>
           </div>
 
-          {/* Premium callout */}
-          <div className="mt-5 px-1">
-            <NavLink
-              to="/premium"
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-xl border px-3 py-3 transition",
-                  isActive
-                    ? "border-og-lime/40 bg-og-lime/10"
-                    : "border-og-lime/25 bg-og-lime/8 hover:border-og-lime/40 hover:bg-og-lime/12",
-                )
-              }
-            >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-og-lime/40 bg-og-lime/15">
-                <Sparkles className="h-4 w-4 text-og-lime" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-black uppercase tracking-wide text-white">Pro Features</div>
-                <div className="text-[10px] text-white/50">AI · Alerts · P&L</div>
-              </div>
-              <Crown className="h-3.5 w-3.5 text-og-lime" />
-            </NavLink>
-          </div>
+          {/* Premium removed */}
 
           {/* Admin */}
           {isAdmin && (

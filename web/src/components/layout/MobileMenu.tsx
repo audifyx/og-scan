@@ -107,18 +107,6 @@ export const MobileMenu = () => {
           </div>
 
           <div className="mt-4 space-y-1.5">
-            <SheetClose asChild>
-              <NavLink to="/premium" className={({ isActive }) => cn(
-                "flex items-center gap-3 p-3 rounded-lg transition-all relative overflow-hidden",
-                isActive ? "bg-gradient-to-r from-primary/12 to-secondary/8 border border-primary/20" : "bg-primary/5 border border-primary/10 active:bg-primary/10"
-              )}>
-                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-primary/30 via-secondary/20 to-transparent" />
-                <div className="p-1.5 rounded-md bg-gradient-to-br from-primary to-secondary"><Crown className="h-3.5 w-3.5 text-primary-foreground" /></div>
-                <span className="font-bold text-[10px] gradient-text font-display tracking-wider">PRO FEATURES</span>
-                <Sparkles className="h-3 w-3 text-primary animate-pulse ml-auto" />
-              </NavLink>
-            </SheetClose>
-
             {isAdmin && (
               <SheetClose asChild>
                 <NavLink to="/admin" className={({ isActive }) => cn(
@@ -127,18 +115,6 @@ export const MobileMenu = () => {
                 )}>
                   <Shield className="h-3.5 w-3.5" />
                   <span className="font-semibold text-[10px] font-display tracking-wider">ADMIN</span>
-                </NavLink>
-              </SheetClose>
-            )}
-
-            {isOwner && (
-              <SheetClose asChild>
-                <NavLink to="/webhooks" className={({ isActive }) => cn(
-                  "flex items-center gap-3 p-2.5 rounded-lg transition-all",
-                  isActive ? "bg-secondary/10 border border-secondary/20 text-secondary" : "bg-muted/15 border border-border/20 text-muted-foreground active:bg-white/[0.04]"
-                )}>
-                  <Webhook className="h-3.5 w-3.5" />
-                  <span className="font-semibold text-[10px] font-display tracking-wider">WEBHOOKS</span>
                 </NavLink>
               </SheetClose>
             )}

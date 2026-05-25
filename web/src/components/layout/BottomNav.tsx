@@ -75,13 +75,13 @@ const routeToNav: Record<string, string> = {
   "/ai-chat": "/tools",
   "/advanced-tools": "/tools",
   "/callouts": "/tools",
-  "/webhooks": "/tools",
+
   "/pumpv5": "/tools",
 
   /* Profile — account, settings, premium */
   "/profile": "/profile",
   "/settings": "/profile",
-  "/premium": "/profile",
+
   "/notifications": "/profile",
   "/credits": "/profile",
   "/admin": "/profile",

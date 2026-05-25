@@ -109,7 +109,7 @@ export const AppSidebar = ({
     { to: "/alpha-chat",      icon: Bot,          label: "Alpha Chat",      eyebrow: "AI assistant" },
     { to: "/advanced-tools",  icon: Wrench,       label: "Advanced Tools",  eyebrow: "30+ pro tools" },
     { to: "/pumpv5",          icon: Rocket,       label: "Launch Pad",      eyebrow: "Token listings" },
-    { to: "/premium",         icon: Crown,        label: "Premium",         eyebrow: "Pro · AI · P&L" },
+
     ...(isAdmin ? [{ to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Owner dashboard" } as ExternalNavItem] : []),
   ];
 
@@ -174,24 +174,7 @@ export const AppSidebar = ({
         </button>
       </div>
 
-      <div className="border-t border-white/[0.07] px-3 pb-4 pt-3">
-        <Link
-          to="/premium"
-          onClick={onClose}
-          className="flex items-center gap-3 rounded-xl border border-og-lime/25 bg-og-lime/[0.08] px-3 py-3 transition hover:border-og-lime/40 hover:bg-og-lime/[0.12]"
-        >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-og-lime/40 bg-og-lime/15">
-            <Sparkles className="h-4 w-4 text-og-lime" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-[11px] font-black uppercase tracking-wide text-white">Pro Features</div>
-            <div className="text-[10px] text-white/50">AI · Alerts · P&L</div>
-          </div>
-          <div className="h-4 w-4 shrink-0">
-            <div className="h-2 w-2 rounded-full bg-og-lime shadow-[0_0_8px_hsl(var(--og-lime))]" />
-          </div>
-        </Link>
-      </div>
+      {/* Premium removed */}
 
       <div className="border-t border-white/[0.07] px-3 pb-4 pt-2">
         <div className="text-[9px] font-bold uppercase tracking-widest text-white/30">Official Token</div>
