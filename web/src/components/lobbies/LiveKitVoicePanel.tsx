@@ -201,10 +201,22 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
 
       room.on(RoomEvent.ParticipantConnected, updateParticipantList);
       room.on(RoomEvent.ParticipantDisconnected, updateParticipantList);
-      room.on(RoomEvent.TrackSubscribed, updateParticipantList);
-      room.on(RoomEvent.TrackUnsubscribed, updateParticipantList);
       room.on(RoomEvent.TrackMuted, updateParticipantList);
       room.on(RoomEvent.TrackUnmuted, updateParticipantList);
+
+      // Attach remote audio tracks for actual playback
+      room.on(RoomEvent.TrackSubscribed, (track, _pub, _participant) => {
+        if (track.kind === Track.Kind.Audio) {
+          const el = track.attach();
+          el.setAttribute("data-lk-participant", _participant.identity);
+          document.body.appendChild(el);
+        }
+        updateParticipantList();
+      });
+      room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        track.detach().forEach((el) => el.remove());
+        updateParticipantList();
+      });
 
       // Connect
       await room.connect(LIVEKIT_URL, token);
@@ -246,7 +258,16 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
       }
     } catch {}
     try {
-      roomRef.current?.disconnect();
+      // Detach all remote audio elements before disconnecting
+      const room = roomRef.current;
+      if (room) {
+        room.remoteParticipants.forEach((rp) => {
+          rp.audioTrackPublications.forEach((pub) => {
+            if (pub.track) pub.track.detach().forEach((el) => el.remove());
+          });
+        });
+        room.disconnect();
+      }
       roomRef.current = null;
     } catch {}
     if (presenceChannelRef.current) {

@@ -26,6 +26,7 @@ import {
   Room,
   RoomEvent,
   RemoteParticipant,
+  Track,
   ConnectionState,
 } from "livekit-client";
 import VoiceToolkit from "@/components/lobbies/VoiceToolkit";
@@ -836,7 +837,18 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
 
   /* ─── Disconnect current room ─── */
   const disconnect = useCallback(async () => {
-    try { roomRef.current?.disconnect(true); } catch {}
+    try {
+      // Detach all remote audio elements before disconnecting
+      const room = roomRef.current;
+      if (room) {
+        room.remoteParticipants.forEach((rp: RemoteParticipant) => {
+          rp.audioTrackPublications.forEach((pub) => {
+            if (pub.track) pub.track.detach().forEach((el: HTMLMediaElement) => el.remove());
+          });
+        });
+        room.disconnect(true);
+      }
+    } catch {}
     roomRef.current = null;
     if (mountedRef.current) { setConnected(false); setMuted(true); setParticipants([]); setActiveRoomLabel(null); }
   }, []);
@@ -866,13 +878,25 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
       room.on(RoomEvent.Disconnected, () => { if (mountedRef.current) { setConnected(false); setParticipants([]); } });
       room.on(RoomEvent.ParticipantConnected, syncParticipants);
       room.on(RoomEvent.ParticipantDisconnected, syncParticipants);
-      room.on(RoomEvent.TrackSubscribed, syncParticipants);
-      room.on(RoomEvent.TrackUnsubscribed, syncParticipants);
       room.on(RoomEvent.TrackMuted, syncParticipants);
       room.on(RoomEvent.TrackUnmuted, syncParticipants);
       room.on(RoomEvent.ActiveSpeakersChanged, syncParticipants);
       room.on(RoomEvent.LocalTrackPublished, syncParticipants);
       room.on(RoomEvent.LocalTrackUnpublished, syncParticipants);
+
+      // Attach remote audio tracks for actual playback
+      room.on(RoomEvent.TrackSubscribed, (track: any, _pub: any, _participant: any) => {
+        if (track.kind === Track.Kind.Audio) {
+          const el = track.attach();
+          el.setAttribute("data-lk-participant", _participant.identity);
+          document.body.appendChild(el);
+        }
+        syncParticipants();
+      });
+      room.on(RoomEvent.TrackUnsubscribed, (track: any) => {
+        track.detach().forEach((el: HTMLElement) => el.remove());
+        syncParticipants();
+      });
 
       roomRef.current = room;
       await room.connect(LK_URL, token);

@@ -8,6 +8,7 @@ import {
   Room,
   RoomEvent,
   RemoteParticipant,
+  Track,
   ConnectionState,
 } from "livekit-client";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
@@ -158,13 +159,25 @@ export function useLiveKit(options: UseLiveKitOptions) {
 
       room.on(RoomEvent.ParticipantConnected, () => syncParticipants());
       room.on(RoomEvent.ParticipantDisconnected, () => syncParticipants());
-      room.on(RoomEvent.TrackSubscribed, () => syncParticipants());
-      room.on(RoomEvent.TrackUnsubscribed, () => syncParticipants());
       room.on(RoomEvent.TrackMuted, () => syncParticipants());
       room.on(RoomEvent.TrackUnmuted, () => syncParticipants());
       room.on(RoomEvent.ActiveSpeakersChanged, () => syncParticipants());
       room.on(RoomEvent.LocalTrackPublished, () => syncParticipants());
       room.on(RoomEvent.LocalTrackUnpublished, () => syncParticipants());
+
+      // Attach remote audio tracks for actual playback
+      room.on(RoomEvent.TrackSubscribed, (track, _pub, _participant) => {
+        if (track.kind === Track.Kind.Audio) {
+          const el = track.attach();
+          el.setAttribute("data-lk-participant", _participant.identity);
+          document.body.appendChild(el);
+        }
+        syncParticipants();
+      });
+      room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        track.detach().forEach((el: HTMLMediaElement) => el.remove());
+        syncParticipants();
+      });
 
       room.on(RoomEvent.MediaDevicesError, (e: Error) => {
         console.warn("LiveKit media device error:", e);
@@ -198,6 +211,12 @@ export function useLiveKit(options: UseLiveKitOptions) {
   const leave = useCallback(async () => {
     const room = roomRef.current;
     if (room) {
+      // Detach all remote audio elements before disconnecting
+      room.remoteParticipants.forEach((p) => {
+        p.audioTrackPublications.forEach((pub) => {
+          if (pub.track) pub.track.detach().forEach((el) => el.remove());
+        });
+      });
       await room.disconnect(true);
       roomRef.current = null;
     }
