@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 import { jupTrending, jupTopTraded, fmtUsd, type JupTokenInfo } from "@/lib/og";
 
 interface FeedFilter {
@@ -103,7 +105,7 @@ function loadFeeds(): CustomFeed[] {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
 }
 function saveFeeds(feeds: CustomFeed[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(feeds));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(feeds)); } catch {}
 }
 
 function mapTokenToResult(t: JupTokenInfo): TokenResult {
@@ -159,7 +161,23 @@ function matchesFilter(token: TokenResult, filter: FeedFilter): boolean {
 }
 
 export const CustomFeedBuilder: React.FC<Props> = ({ onApplyFilters, onSelectMint }) => {
+  const { user } = useAuth();
   const [feeds, setFeeds] = useState<CustomFeed[]>(loadFeeds);
+
+  // Load feeds from Supabase
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("custom_feeds").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).then(({ data }) => {
+      if (data && data.length > 0) {
+        const loaded: CustomFeed[] = data.map((r: any) => ({
+          id: r.id, name: r.name || "Feed", filters: r.filters ?? [],
+          createdAt: r.created_at, enabled: r.enabled ?? true, matchCount: r.match_count ?? 0,
+        }));
+        setFeeds(loaded);
+        saveFeeds(loaded);
+      }
+    });
+  }, [user?.id]);
   const [expanded, setExpanded] = useState(false);
   const [currentFilters, setCurrentFilters] = useState<FeedFilter[]>([]);
   const [feedName, setFeedName] = useState("");
@@ -261,6 +279,12 @@ export const CustomFeedBuilder: React.FC<Props> = ({ onApplyFilters, onSelectMin
       saveFeeds(next);
       return next;
     });
+    if (user) {
+      supabase.from("custom_feeds").insert({
+        id: feed.id, user_id: user.id, name: feed.name, filters: feed.filters,
+        enabled: feed.enabled, match_count: feed.matchCount,
+      }).then(() => {});
+    }
     setFeedName("");
     toast.success("Feed saved!");
   };
@@ -271,6 +295,7 @@ export const CustomFeedBuilder: React.FC<Props> = ({ onApplyFilters, onSelectMin
       saveFeeds(next);
       return next;
     });
+    if (user) supabase.from("custom_feeds").delete().eq("id", id).then(() => {});
   };
 
   const applyPreset = (preset: typeof PRESETS[0]) => {
