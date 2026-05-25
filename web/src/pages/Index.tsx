@@ -602,7 +602,7 @@ const getTabPath = (id: TabId): string => {
   return `/${TAB_BY_ID[id].slug}`;
 };
 
-const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, onNavigate?: (t: string) => void, profileViewUserId?: string): ReactNode => {
+const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, onNavigate?: (t: string) => void, profileViewUserId?: string, listingMint?: string): ReactNode => {
   /* ─── Consolidated: About OGScan (token + roadmap + tech) ─── */
   if (tab === "our-coin") return <AboutOgScan initialTab="token" />;
   if (tab === "roadmap") return <AboutOgScan initialTab="roadmap" />;
@@ -638,7 +638,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "spaces") return <SpacesPage />;
   if (tab === "social") return <SocialHub />;
   if (tab === "tools") return <ToolsHub onNavigate={onNavigate || (() => {})} />;
-  if (tab === "listings") return <TokenListings />;
+  if (tab === "listings") return <TokenListings initialMint={listingMint} />;
   if (tab === "profile") return <UserProfile viewUserId={profileViewUserId} />;
   if (tab === "live-trading") return <LiveTradingPage />;
   if (tab === "live-feed-page") return <LiveFeedPage />;
@@ -664,14 +664,16 @@ const accentDot = (a: TabAccent): string =>
 /* ─── Main Index component ─── */
 const Index = () => {
   const { customWallpaper } = useTheme();
-  const { toolSlug, pageNumber } = useParams<{ toolSlug?: string; pageNumber?: string }>();
+  const { toolSlug, pageNumber, mintAddress: listingMint } = useParams<{ toolSlug?: string; pageNumber?: string; mintAddress?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const pathSlug: string = location.pathname.replace(/^\/+|\/+$/g, "").split("/").pop() ?? "";
   /* /profile/:userId → always resolve to "profile" tab regardless of userId segment */
   const isProfileSubRoute = location.pathname.startsWith("/profile");
   const profileViewUserId = isProfileSubRoute ? location.pathname.split("/profile/")[1]?.split(/[?#/]/)[0] || undefined : undefined;
-  const routeSlug: string | undefined = isProfileSubRoute ? "profile" : (pageNumber ? `page-${pageNumber}` : toolSlug ?? pathSlug);
+  /* /listings/:mintAddress → resolve to "listings" tab with deep-link */
+  const isListingSubRoute = location.pathname.startsWith("/listings/") && !!listingMint;
+  const routeSlug: string | undefined = isProfileSubRoute ? "profile" : isListingSubRoute ? "listings" : (pageNumber ? `page-${pageNumber}` : toolSlug ?? pathSlug);
   const routeTab: TabId = useMemo<TabId>(() => getTabFromSlug(routeSlug) ?? "overview", [routeSlug]);
   const [mint, setMint] = useState<string>(DEFAULT_OG_MINT);
   const [selectedWallet, setSelectedWallet] = useState<string>("");
@@ -768,7 +770,7 @@ const Index = () => {
                 onSelectMint={updateMint}
               />
             ) : (
-              <ToolShell tab={activeTab} onBack={() => switchTab("tools")}><Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>{renderTool(tab, mint, updateMint, switchTab, profileViewUserId)}</Suspense></ToolShell>
+              <ToolShell tab={activeTab} onBack={() => switchTab("tools")}><Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>{renderTool(tab, mint, updateMint, switchTab, profileViewUserId, isListingSubRoute ? listingMint : undefined)}</Suspense></ToolShell>
             )}
           </main>
         )}

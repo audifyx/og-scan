@@ -2,13 +2,14 @@
  * TokenListings — List & promote tokens on OG Scan.
  * Paste a CA → Helius + DexScreener pull all data → clean dedicated listing page.
  */
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus, Search, Loader2, ExternalLink, TrendingUp, TrendingDown, Minus,
   Users, Droplets, DollarSign, Shield, Copy, Check, ArrowUpRight,
   Star, Crown, Wallet, BarChart3, Globe, X as XIcon, ChevronDown,
   ChevronUp, Flame, AlertTriangle, Sparkles, Clock, Eye, RefreshCw,
-  Image as ImageIcon, Megaphone, Activity, Lock, Unlock, Info, Database, Zap,
+  Image as ImageIcon, Megaphone, Activity, Lock, Unlock, Info, Database, Zap, Share2, Link as LinkIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -559,6 +560,29 @@ const ListingDetail: React.FC<{
   listing: TokenListing;
   onBack: () => void;
 }> = ({ listing, onBack }) => {
+  const [linkCopied, setLinkCopied] = useState(false);
+  const shareUrl = `${window.location.origin}/listings/${listing.mint_address}`;
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  const shareNative = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${listing.name} ($${listing.symbol}) on OG Scan`,
+          text: `Check out ${listing.name} ($${listing.symbol}) — ${listing.analysis_verdict ?? "listed"} on OG Scan`,
+          url: shareUrl,
+        });
+      } catch { /* user cancelled */ }
+    } else {
+      copyLink();
+    }
+  };
+
   const m = listing.metadata || {};
   const change = listing.price_change_24h ?? 0;
   const isUp = change > 0;
@@ -585,10 +609,28 @@ const ListingDetail: React.FC<{
 
   return (
     <div className="space-y-3">
-      {/* Back button */}
-      <button onClick={onBack} className="flex items-center gap-1.5 text-[11px] font-bold text-white/40 hover:text-white/70 transition-colors">
-        <ChevronDown className="h-3.5 w-3.5 rotate-90" /> Back to Listings
-      </button>
+      {/* Back + Share bar */}
+      <div className="flex items-center justify-between">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-[11px] font-bold text-white/40 hover:text-white/70 transition-colors">
+          <ChevronDown className="h-3.5 w-3.5 rotate-90" /> Back to Listings
+        </button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={copyLink}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[10px] font-bold transition-all",
+              linkCopied
+                ? "border-og-lime/30 bg-og-lime/10 text-og-lime"
+                : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20",
+            )}>
+            {linkCopied ? <Check className="h-3 w-3" /> : <LinkIcon className="h-3 w-3" />}
+            {linkCopied ? "Link Copied!" : "Copy Link"}
+          </button>
+          <button onClick={shareNative}
+            className="flex items-center gap-1.5 rounded-lg border border-og-cyan/20 bg-og-cyan/5 px-3 py-1.5 text-[10px] font-bold text-og-cyan/60 hover:text-og-cyan hover:border-og-cyan/40 transition-all">
+            <Share2 className="h-3 w-3" /> Share
+          </button>
+        </div>
+      </div>
 
       {/* ═══ TOP ROW: Token header + banner + price stats ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr,auto] gap-3">
@@ -1051,14 +1093,16 @@ const ListTokenPanel: React.FC<{
    Main Component
    ═══════════════════════════════════════════════════════════════ */
 
-export const TokenListings: React.FC = () => {
+export const TokenListings: React.FC<{ initialMint?: string }> = ({ initialMint }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [listings, setListings] = useState<TokenListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [showListPanel, setShowListPanel] = useState(false);
   const [selectedListing, setSelectedListing] = useState<TokenListing | null>(null);
   const [filter, setFilter] = useState<"all" | "promoted" | "bullish" | "bearish" | "newest">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const initialMintHandled = useRef(false);
 
   const fetchListings = useCallback(async () => {
     setLoading(true);
@@ -1082,6 +1126,36 @@ export const TokenListings: React.FC = () => {
 
   useEffect(() => { fetchListings(); }, [fetchListings]);
 
+  /* Deep-link: auto-open a listing by mint address from URL */
+  useEffect(() => {
+    if (!initialMint || initialMintHandled.current || loading) return;
+    initialMintHandled.current = true;
+    // Try to find in already-loaded listings
+    const found = listings.find(l => l.mint_address.toLowerCase() === initialMint.toLowerCase());
+    if (found) { setSelectedListing(found); return; }
+    // Otherwise fetch it directly from Supabase
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("token_listings")
+          .select("*")
+          .eq("mint_address", initialMint)
+          .maybeSingle();
+        if (data) setSelectedListing(data as TokenListing);
+      } catch { /* ignore */ }
+    })();
+  }, [initialMint, listings, loading]);
+
+  /* Update browser URL when selecting / deselecting a listing */
+  const selectListing = useCallback((listing: TokenListing | null) => {
+    setSelectedListing(listing);
+    if (listing) {
+      navigate(`/listings/${listing.mint_address}`, { replace: true });
+    } else {
+      navigate("/listings", { replace: true });
+    }
+  }, [navigate]);
+
   const filtered = useMemo(() => {
     let result = listings;
     if (filter === "promoted") result = result.filter(l => l.is_promoted);
@@ -1101,7 +1175,7 @@ export const TokenListings: React.FC = () => {
 
   // Detail view
   if (selectedListing) {
-    return <ListingDetail listing={selectedListing} onBack={() => setSelectedListing(null)} />;
+    return <ListingDetail listing={selectedListing} onBack={() => selectListing(null)} />;
   }
 
   // List token panel
@@ -1184,7 +1258,7 @@ export const TokenListings: React.FC = () => {
       ) : (
         <div className="space-y-2.5">
           {filtered.map(listing => (
-            <ListingCard key={listing.id} listing={listing} onSelect={setSelectedListing} />
+            <ListingCard key={listing.id} listing={listing} onSelect={selectListing} />
           ))}
         </div>
       )}
