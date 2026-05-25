@@ -1,12 +1,13 @@
 /**
  * MomentumHeatmap — Visual grid of top tokens colored by momentum.
  * Green = pumping, red = dumping, size = volume. Click to dive in.
+ * Wired to: Jupiter trending API with real price change data.
  */
 import { useState, useEffect, useMemo } from "react";
-import { Flame, RefreshCw, Loader2, Maximize2, Minimize2, TrendingUp, TrendingDown } from "lucide-react";
+import { Flame, RefreshCw, Loader2, Maximize2, Minimize2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { jupTrending, type JupTokenInfo, fmtUsd, fmtPct, tokenEffectiveLiquidityUsd } from "@/lib/og";
+import { jupTrending, type JupTokenInfo, fmtUsd } from "@/lib/og";
 
 interface HeatmapCell {
   mint: string;
@@ -22,6 +23,13 @@ interface Props {
   onSelect?: (mint: string) => void;
   onSelectMint?: (mint: string) => void;
   tokens?: JupTokenInfo[];
+}
+
+function pctChange(t: JupTokenInfo): number {
+  return t.stats24h?.priceChange ?? (t as any).priceChange24h ?? 0;
+}
+function vol24h(t: JupTokenInfo): number {
+  return ((t.stats24h?.buyVolume ?? 0) + (t.stats24h?.sellVolume ?? 0)) || (t as any).volume24h || 0;
 }
 
 function getHeatColor(change: number): string {
@@ -48,44 +56,44 @@ export const MomentumHeatmap: React.FC<Props> = ({ onSelect, onSelectMint, token
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
+  const mapTokens = (list: JupTokenInfo[]): HeatmapCell[] =>
+    list.slice(0, 50).map(t => ({
+      mint: (t as any).address ?? t.id,
+      symbol: t.symbol || "???",
+      name: t.name || "",
+      priceChange: pctChange(t),
+      volume: vol24h(t),
+      mcap: t.mcap || 0,
+      logoURI: (t as any).logoURI ?? t.icon,
+    }));
+
+  const refresh = () => {
     if (externalTokens && externalTokens.length > 0) {
-      setTokens(externalTokens.slice(0, 50).map(t => ({
-        mint: t.address,
-        symbol: t.symbol || "???",
-        name: t.name || "",
-        priceChange: (t as any).priceChange24h || Math.random() * 100 - 50,
-        volume: (t as any).volume24h || 0,
-        mcap: t.mcap || 0,
-        logoURI: t.logoURI,
-      })));
+      setTokens(mapTokens(externalTokens));
       return;
     }
-
     setLoading(true);
     jupTrending("24h", 50)
-      .then(res => {
-        setTokens(res.map(t => ({
-          mint: t.address,
-          symbol: t.symbol || "???",
-          name: t.name || "",
-          priceChange: (t as any).priceChange24h || Math.random() * 100 - 50,
-          volume: (t as any).volume24h || 0,
-          mcap: t.mcap || 0,
-          logoURI: t.logoURI,
-        })));
-      })
+      .then(res => setTokens(mapTokens(res)))
+      .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { refresh(); }, [externalTokens]);
+
+  // Auto-refresh every 3 minutes
+  useEffect(() => {
+    if (externalTokens) return;
+    const iv = setInterval(refresh, 3 * 60 * 1000);
+    return () => clearInterval(iv);
   }, [externalTokens]);
 
-  // Sort by absolute change for visual interest
   const sorted = useMemo(() =>
     [...tokens].sort((a, b) => Math.abs(b.priceChange) - Math.abs(a.priceChange)),
     [tokens]
   );
 
   const displayCount = expanded ? sorted.length : Math.min(25, sorted.length);
-
   const gainers = tokens.filter(t => t.priceChange > 0).length;
   const losers = tokens.filter(t => t.priceChange <= 0).length;
 
@@ -103,6 +111,13 @@ export const MomentumHeatmap: React.FC<Props> = ({ onSelect, onSelectMint, token
         </div>
         <div className="flex items-center gap-1.5">
           <button
+            onClick={refresh}
+            disabled={loading}
+            className="p-1.5 rounded-lg border border-white/[0.06] text-white/20 hover:text-white/40 transition-colors"
+          >
+            <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
+          </button>
+          <button
             onClick={() => setExpanded(!expanded)}
             className="p-1.5 rounded-lg border border-white/[0.06] text-white/20 hover:text-white/40 transition-colors"
           >
@@ -111,7 +126,7 @@ export const MomentumHeatmap: React.FC<Props> = ({ onSelect, onSelectMint, token
         </div>
       </div>
 
-      {loading ? (
+      {loading && tokens.length === 0 ? (
         <div className="p-8 flex items-center justify-center">
           <Loader2 className="h-5 w-5 animate-spin text-white/20" />
         </div>
@@ -119,7 +134,6 @@ export const MomentumHeatmap: React.FC<Props> = ({ onSelect, onSelectMint, token
         <div className="p-3">
           <div className="flex flex-wrap gap-1.5">
             {sorted.slice(0, displayCount).map(token => {
-              // Cell size based on volume relative to max
               const maxVol = Math.max(...sorted.map(t => t.volume), 1);
               const sizeMultiplier = 0.7 + (token.volume / maxVol) * 0.5;
 
@@ -153,7 +167,6 @@ export const MomentumHeatmap: React.FC<Props> = ({ onSelect, onSelectMint, token
             })}
           </div>
 
-          {/* Legend */}
           <div className="flex items-center justify-center gap-2 mt-3 pt-2 border-t border-white/[0.04]">
             <span className="text-[8px] text-red-400">-50%+</span>
             <div className="flex h-1.5 rounded-full overflow-hidden w-32">
