@@ -97,7 +97,7 @@ const SpaceReplay = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
 
-  // Fetch space data
+  // Fetch space data — redirect to live space if still active
   useEffect(() => {
     if (!spaceId) { setError("No space ID provided"); setLoading(false); return; }
     const fetch = async () => {
@@ -107,6 +107,11 @@ const SpaceReplay = () => {
         .eq("id", spaceId)
         .single();
       if (err || !data) { setError("Space not found"); }
+      else if (!data.ended_at) {
+        // Space is still live — redirect to join it
+        window.location.href = `/spaces?join=${spaceId}`;
+        return;
+      }
       else { setSpace(data as Space); }
       setLoading(false);
     };

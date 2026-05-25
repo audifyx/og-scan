@@ -1010,14 +1010,17 @@ const SpeakerQueue = ({ spaceId, isHost, onRaiseHand, hasRaised, onPromote }: {
   }, [spaceId, isHost]);
 
   const handle = async (req: SpeakerRequest, s: "approved" | "denied") => {
-    await supabase.from("speaker_requests").update({ status: s }).eq("id", req.id);
-    setReqs(prev => prev.filter(r => r.id !== req.id));
-    if (s === "approved" && onPromote && req.user_id) {
-      onPromote(req.user_id);
+    if (s === "approved") {
+      // Update to approved (triggers listener's DB subscription), then promote
+      await supabase.from("speaker_requests").update({ status: "approved" }).eq("id", req.id);
+      if (onPromote && req.user_id) onPromote(req.user_id);
       toast.success(`${req.username || "User"} promoted to speaker! 🎙️`);
     } else {
-      toast.success(s === "approved" ? "Speaker approved! 🎙️" : "Request denied");
+      // Denied — delete the request entirely so user can re-raise
+      await supabase.from("speaker_requests").delete().eq("id", req.id);
+      toast.success("Request denied");
     }
+    setReqs(prev => prev.filter(r => r.id !== req.id));
   };
 
   if (!isHost) return (
@@ -1114,10 +1117,11 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
 
   const raiseHand = async () => {
     if (!user || hasRaised) return;
-    try {
-      await supabase.from("speaker_requests").insert({ space_id: space.id, user_id: user.id, username: profile?.username || null, avatar_url: safAvatar(profile?.avatar_url) ?? null, status: "pending" });
-      setHasRaised(true); toast("Hand raised! ✋");
-    } catch { toast.error("Failed to raise hand"); }
+    // Delete any old requests for this user in this space first (re-raise after demote/leave)
+    await supabase.from("speaker_requests").delete().eq("space_id", space.id).eq("user_id", user.id);
+    const { error } = await supabase.from("speaker_requests").insert({ space_id: space.id, user_id: user.id, username: profile?.username || null, avatar_url: safAvatar(profile?.avatar_url) ?? null, status: "pending" });
+    if (error) { console.error("Raise hand failed:", error); toast.error("Failed to raise hand"); return; }
+    setHasRaised(true); toast("Hand raised! ✋");
   };
 
   const endSpace = async () => {
@@ -1141,13 +1145,17 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
 
   const share = () => { navigator.clipboard.writeText(`${window.location.origin}/listen/${space.id}`); toast.success("Share link copied! 🔗"); };
 
-  const handlePinToken = (ca: string | null) => {
+  const handlePinToken = async (ca: string | null) => {
     setPinnedTokenCA(ca);
-    supabase.from("spaces").update({ pinned_token_ca: ca }).eq("id", space.id);
+    const { error } = await supabase.from("spaces").update({ pinned_token_ca: ca }).eq("id", space.id);
+    if (error) { console.error("Pin token failed:", error); toast.error("Failed to pin token"); }
+    else toast.success(ca ? "Token pinned! 📌" : "Token unpinned");
   };
-  const handlePinTweet = (url: string | null) => {
+  const handlePinTweet = async (url: string | null) => {
     setPinnedTweetUrl(url);
-    supabase.from("spaces").update({ pinned_tweet_url: url }).eq("id", space.id);
+    const { error } = await supabase.from("spaces").update({ pinned_tweet_url: url }).eq("id", space.id);
+    if (error) { console.error("Pin tweet failed:", error); toast.error("Failed to pin post"); }
+    else toast.success(url ? "Post pinned! 📌" : "Post unpinned");
   };
   const handleSpeakerTimeUp = (speakerId: string) => {
     if (isHost && voicePanelRef.current) {
@@ -1229,7 +1237,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
         <div className="mx-4 mt-3 px-3.5 py-2.5 rounded-xl bg-amber-400/[0.04] border border-amber-400/15 flex items-start gap-2 shrink-0 sp-slide-up">
           <Pin className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />
           <p className="text-[11px] text-amber-200/70 leading-relaxed flex-1 line-clamp-2">{pinnedMsg}</p>
-          {isHost && <button onClick={() => { setPinnedMsg(null); supabase.from("spaces").update({ pinned_message: null }).eq("id", space.id); }} className="p-0.5 hover:bg-white/10 rounded"><XIcon className="h-2.5 w-2.5 text-white/25" /></button>}
+          {isHost && <button onClick={async () => { setPinnedMsg(null); const { error } = await supabase.from("spaces").update({ pinned_message: null }).eq("id", space.id); if (error) toast.error("Failed to unpin"); }} className="p-0.5 hover:bg-white/10 rounded"><XIcon className="h-2.5 w-2.5 text-white/25" /></button>}
         </div>
       )}
 
@@ -1312,7 +1320,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
           )}
           <div className="flex gap-2">
             <Input placeholder="Announcement..." value={announcement} onChange={e => setAnnouncement(e.target.value)} className="bg-white/[0.04] border-white/[0.06] rounded-lg text-sm h-8 flex-1" />
-            <Button size="sm" disabled={!announcement.trim()} onClick={() => { setPinnedMsg(announcement.trim()); supabase.from("spaces").update({ pinned_message: announcement.trim() }).eq("id", space.id); setAnnouncement(""); }} className="rounded-lg h-8 px-3 text-[10px]">Pin</Button>
+            <Button size="sm" disabled={!announcement.trim()} onClick={async () => { const msg = announcement.trim(); setPinnedMsg(msg); setAnnouncement(""); const { error } = await supabase.from("spaces").update({ pinned_message: msg }).eq("id", space.id); if (error) { console.error("Pin announcement failed:", error); toast.error("Failed to pin"); } else toast.success("Pinned! 📌"); }} className="rounded-lg h-8 px-3 text-[10px]">Pin</Button>
           </div>
         </div>
       )}
@@ -1400,7 +1408,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
               maxSpeakers={MAX_SPEAKERS}
               onRecordingSaved={(url, dur) => { setCur(prev => ({ ...prev, recording_url: url, duration_seconds: dur })); supabase.from("spaces").update({ recording_url: url, duration_seconds: dur }).eq("id", space.id); }}
               onParticipantsChange={setVoiceParticipants}
-              onRoleChange={(r) => { setMyRole(r); if (r === "speaker") setMuted(false); if (r === "listener") setMuted(true); }}
+              onRoleChange={(r) => { setMyRole(r); if (r === "speaker") { setMuted(false); setHasRaised(false); } if (r === "listener") { setMuted(true); setHasRaised(false); } }}
               onMuteChange={setMuted}
             />
           </div>
