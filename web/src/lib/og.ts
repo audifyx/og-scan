@@ -2989,7 +2989,7 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   const merged: JupTokenInfo[] = mergeMultiChainTokenCandidates([...jupiterTokens, ...dexTokens, ...canonicalJupiterTokens, ...canonicalDexTokens]);
   const similar = merged
     .map((token: JupTokenInfo) => ({ token, similarity: tokenNarrativeSimilarity(token, normalizedQuery) }))
-    .filter((item) => item.similarity >= 0.58 || normalizeTickerSymbol(item.token.symbol).includes(normalizedQuery) || isCanonicalSolanaOriginForQuery(item.token, clean))
+    .filter((item) => item.similarity >= 0.58 || normalizeTickerSymbol(item.token.symbol).includes(normalizedQuery) || isCanonicalSolanaOriginForQuery(item.token, clean) || item.token.id.toLowerCase() === clean.toLowerCase())
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, 64)
     .map((item) => item.token);
