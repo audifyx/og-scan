@@ -38,6 +38,7 @@ import Privacy from "./pages/Privacy";
 import Admin from "./pages/Admin";
 import ArtFeed from "./pages/ArtFeed";
 import SpaceReplay from "./pages/SpaceReplay";
+import PublicSpaceListen from "./pages/PublicSpaceListen";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
@@ -157,6 +158,8 @@ const App = () => (
             <Route path="/official-token" element={<OfficialToken />} />
             <Route path="/support" element={<SupportCenter />} />
             <Route path="/listen/:spaceId" element={<SpaceReplay />} />
+            {/* ── Public: Live space listener (no auth required) ── */}
+            <Route path="/space/:spaceId" element={<PublicSpaceListen />} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
