@@ -1340,7 +1340,7 @@ export async function enrichTokensWithMarketIntel(
     const pairLpPulled: boolean = pair ? isPairLpPulled(pair) : false;
     const pairEffectiveLiquidity: number | undefined = pair ? pairEffectiveLiquidityUsd(pair) : undefined;
     const pairReportedLiquidity: number | undefined = pair?.liquidity?.usd;
-    const lpPulled: boolean = forcedLpBlocked || pairLpPulled || hasPulledOrDeadLiquidity({ ...token, id: token.id, effectiveLiquidityUsd: pairEffectiveLiquidity ?? token.effectiveLiquidityUsd, reportedLiquidity: pairReportedLiquidity ?? token.reportedLiquidity });
+    const lpPulled: boolean = forcedLpBlocked || pairLpPulled || hasPulledOrDeadLiquidity({ ...token, id: token.id, effectiveLiquidityUsd: pairEffectiveLiquidity ?? token.effectiveLiquidityUsd, reportedLiquidity: pairReportedLiquidity ?? token.reportedLiquidity, quoteLiquidityUsd: pair ? pairQuoteLiquidityUsd(pair) : token.quoteLiquidityUsd, lpPulled: false });
     const authorityAudit = authority
       ? {
           ...token.audit,
@@ -2962,8 +2962,6 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   };
   if (!clean || !normalizedQuery) return emptyReport;
 
-  console.log("[OG_DEBUG] forensicOgAttribution start", { clean, normalizedQuery: normalizedQuery.substring(0, 30) });
-
   const canonicalMint: string | undefined = canonicalSolanaOriginMintForQuery(clean);
   const [jupiterResult, dexResult, canonicalJupiterResult, canonicalDexResult] = await Promise.allSettled([
     jupSearchToken(clean),
@@ -2989,14 +2987,9 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     : [];
 
   const merged: JupTokenInfo[] = mergeMultiChainTokenCandidates([...jupiterTokens, ...dexTokens, ...canonicalJupiterTokens, ...canonicalDexTokens]);
-  console.log("[OG_DEBUG] merged", { jupCount: jupiterTokens.length, dexCount: dexTokens.length, mergedCount: merged.length, firstChain: merged[0]?.chainId, firstSymbol: merged[0]?.symbol, firstId: merged[0]?.id?.substring(0, 20) });
   const similar = merged
     .map((token: JupTokenInfo) => ({ token, similarity: tokenNarrativeSimilarity(token, normalizedQuery) }))
-    .filter((item) => {
-      const caMatch = item.token.id.toLowerCase() === clean.toLowerCase();
-      if (merged.length <= 5) console.log("[OG_DEBUG] filter", { symbol: item.token.symbol, similarity: item.similarity, caMatch, tokenId: item.token.id?.substring(0, 20), clean: clean.substring(0, 20) });
-      return item.similarity >= 0.58 || normalizeTickerSymbol(item.token.symbol).includes(normalizedQuery) || isCanonicalSolanaOriginForQuery(item.token, clean) || caMatch;
-    })
+    .filter((item) => item.similarity >= 0.58 || normalizeTickerSymbol(item.token.symbol).includes(normalizedQuery) || isCanonicalSolanaOriginForQuery(item.token, clean) || item.token.id.toLowerCase() === clean.toLowerCase())
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, 64)
     .map((item) => item.token);
@@ -3013,11 +3006,8 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     const bExact = normalizeTickerSymbol(b.symbol) === normalizedQuery ? 0 : 1;
     return aExact - bExact;
   });
-  console.log("[OG_DEBUG] pool ready", { poolSize: pool.length, firstSymbol: pool[0]?.symbol });
   const chainDatedPool: JupTokenInfo[] = await withOnChainCreationDates(pool);
-  console.log("[OG_DEBUG] chainDatedPool done", { size: chainDatedPool.length });
   const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: true, includeOnChainIntel: true, maxOnChain: 8, maxBirdeye: 16 });
-  console.log("[OG_DEBUG] enriched done", { size: enriched.length, firstLiq: enriched[0]?.liquidity, firstEffLiq: enriched[0]?.effectiveLiquidityUsd });
 
   // ── Safety filtering ────────────────────────────────────────────────────
   const liquidCandidates: JupTokenInfo[] = enriched.filter((token) => {
@@ -3034,26 +3024,6 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     return true;
   });
 
-  console.log("[OG_DEBUG] safety filtering", { liquidCount: liquidCandidates.length, originCount: originPool.length });
-  if (liquidCandidates.length === 0 && enriched.length > 0) {
-    const t = enriched[0];
-    console.log("[OG_DEBUG] WHY_FILTERED", {
-      id: t.id?.substring(0, 20),
-      chainId: t.chainId,
-      lpPulled: t.lpPulled,
-      liquidity: t.liquidity,
-      effectiveLiq: t.effectiveLiquidityUsd,
-      reportedLiq: t.reportedLiquidity,
-      quoteLiq: t.quoteLiquidityUsd,
-      mcap: t.mcap,
-      fdv: t.fdv,
-      effLiqCheck: tokenEffectiveLiquidityUsd(t),
-      hasPulled: hasPulledOrDeadLiquidity(t),
-      hasMinLiq: hasMinimumOgScanLiquidity(t),
-      mintAuth: t.audit?.mintAuthorityDisabled,
-      freezeAuth: t.audit?.freezeAuthorityDisabled,
-    });
-  }
   const rawCandidates: JupTokenInfo[] = originPool
     .filter((token) => isCanonicalSolanaOriginForQuery(token, clean) || isKnownCanonicalMint(token.id) || Number.isFinite(tokenCreatedAtMs(token)) || Number.isFinite(tokenPoolCreatedAtMs(token)))
     .sort(compareByOriginProofAndSafety)
