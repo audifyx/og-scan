@@ -387,7 +387,7 @@ async function fetchTokenData(mintAddress: string): Promise<FetchedTokenData> {
       // Pair / DEX
       pairAddress: dexPair?.pairAddress,
       dexId: dexPair?.dexId,
-      chainId: "solana",
+      chainId: dexPair?.chainId ?? "solana",
       decimals: dasAsset?.token_info?.decimals ?? dexPair?.baseToken?.decimals,
       quoteToken: dexPair?.quoteToken?.symbol || null,
       pairCreatedAt: dexPair?.pairCreatedAt || null,

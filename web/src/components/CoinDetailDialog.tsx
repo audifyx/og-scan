@@ -106,8 +106,9 @@ type CoinDetailDialogProps = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function fetchDexPairs(mint: string): Promise<DetailDexPair[]> {
-  const response = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${encodeURIComponent(mint)}`);
+async function fetchDexPairs(mint: string, chainId?: string): Promise<DetailDexPair[]> {
+  const dexChain = chainId || "solana";
+  const response = await fetch(`https://api.dexscreener.com/tokens/v1/${encodeURIComponent(dexChain)}/${encodeURIComponent(mint)}`);
   if (!response.ok) return [];
   const json = (await response.json()) as DetailDexPair[];
   return Array.isArray(json) ? json : [];
@@ -299,9 +300,9 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const chainId = token.chainId ?? "solana";
 
   const { data: dexPairs, isFetching: isFetchingPairs } = useQuery({
-    queryKey: ["coin-detail-dex-pairs", token.id],
-    queryFn: () => fetchDexPairs(token.id),
-    enabled: open && chainId === "solana" && Boolean(token.id),
+    queryKey: ["coin-detail-dex-pairs", chainId, token.id],
+    queryFn: () => fetchDexPairs(token.id, chainId),
+    enabled: open && Boolean(token.id),
     staleTime: 30_000,
   });
 

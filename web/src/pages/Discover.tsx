@@ -26,6 +26,7 @@ import { formatDistanceToNow } from "date-fns";
 import { fmtUsd, fmtNum } from "@/lib/og";
 import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 import type { JupTokenInfo } from "@/lib/og";
+import { getChain, isSolana } from "@/lib/chains";
 
 /* ═══════════════════════ Types ═══════════════════════ */
 
@@ -54,6 +55,7 @@ interface LaunchToken {
   upvotes: number;
   watchers: number;
   source: "dex" | "submission" | "boost";
+  chainId?: string;
 }
 
 type Section = "all" | "featured" | "hot" | "new" | "migrated" | "gainers" | "losers" | "volume" | "whales" | "mine";
@@ -115,26 +117,25 @@ async function fetchDexScreenerBoosted(): Promise<LaunchToken[]> {
     const res = await fetch("https://api.dexscreener.com/token-boosts/top/v1");
     if (!res.ok) return [];
     const data = await res.json();
-    const solTokens = (Array.isArray(data) ? data : [])
-      .filter((t: any) => t.chainId === "solana")
-      .slice(0, 20);
+    const allTokens = (Array.isArray(data) ? data : [])
+      .filter((t: any) => Boolean(t.tokenAddress))
+      .slice(0, 30);
 
     const tokens: LaunchToken[] = [];
     // Batch fetch details
-    const addresses = solTokens.map((t: any) => t.tokenAddress).filter(Boolean);
+    const items = allTokens.map((t: any) => ({ addr: t.tokenAddress, chain: t.chainId || "solana", icon: t.icon })).filter((t: any) => t.addr);
     const batchSize = 5;
-    for (let i = 0; i < addresses.length; i += batchSize) {
-      const batch = addresses.slice(i, i + batchSize);
-      const promises = batch.map(async (addr: string) => {
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const promises = batch.map(async (item: any) => {
         try {
-          const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${addr}`);
+          const r = await fetch(`https://api.dexscreener.com/tokens/v1/${item.chain}/${item.addr}`);
           if (!r.ok) return null;
           const d = await r.json();
           const pairs = Array.isArray(d) ? d : d?.pairs || [];
           const pair = pairs[0];
           if (!pair) return null;
-          const boost = solTokens.find((t: any) => t.tokenAddress === addr);
-          return pairToToken(pair, boost?.icon, "boost");
+          return pairToToken(pair, item.icon, "boost");
         } catch { return null; }
       });
       const results = await Promise.all(promises);
@@ -149,25 +150,24 @@ async function fetchDexScreenerLatest(): Promise<LaunchToken[]> {
     const res = await fetch("https://api.dexscreener.com/token-profiles/latest/v1");
     if (!res.ok) return [];
     const data = await res.json();
-    const solTokens = (Array.isArray(data) ? data : [])
-      .filter((t: any) => t.chainId === "solana")
-      .slice(0, 20);
+    const allTokens = (Array.isArray(data) ? data : [])
+      .filter((t: any) => Boolean(t.tokenAddress))
+      .slice(0, 30);
 
     const tokens: LaunchToken[] = [];
-    const addresses = solTokens.map((t: any) => t.tokenAddress).filter(Boolean);
+    const items = allTokens.map((t: any) => ({ addr: t.tokenAddress, chain: t.chainId || "solana", icon: t.icon })).filter((t: any) => t.addr);
     const batchSize = 5;
-    for (let i = 0; i < addresses.length; i += batchSize) {
-      const batch = addresses.slice(i, i + batchSize);
-      const promises = batch.map(async (addr: string) => {
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const promises = batch.map(async (item: any) => {
         try {
-          const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${addr}`);
+          const r = await fetch(`https://api.dexscreener.com/tokens/v1/${item.chain}/${item.addr}`);
           if (!r.ok) return null;
           const d = await r.json();
           const pairs = Array.isArray(d) ? d : d?.pairs || [];
           const pair = pairs[0];
           if (!pair) return null;
-          const profile = solTokens.find((t: any) => t.tokenAddress === addr);
-          return pairToToken(pair, profile?.icon, "dex");
+          return pairToToken(pair, item.icon, "dex");
         } catch { return null; }
       });
       const results = await Promise.all(promises);
@@ -182,7 +182,7 @@ async function searchDexScreener(query: string): Promise<LaunchToken[]> {
     const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`);
     if (!res.ok) return [];
     const data = await res.json();
-    const pairs = (data?.pairs || []).filter((p: any) => p.chainId === "solana").slice(0, 20);
+    const pairs = (data?.pairs || []).slice(0, 30);
     return pairs.map((p: any) => pairToToken(p, p.info?.imageUrl, "dex"));
   } catch { return []; }
 }
@@ -211,6 +211,11 @@ function pairToToken(pair: any, icon?: string, source: "dex" | "boost" = "dex"):
   else if (dexId.includes("raydium")) venue = "raydium";
   else if (dexId.includes("meteora")) venue = "meteora";
   else if (dexId.includes("moonshot")) venue = "moonshot";
+  else if (dexId.includes("uniswap")) venue = "uniswap";
+  else if (dexId.includes("pancakeswap")) venue = "pancakeswap";
+  else if (dexId.includes("sushiswap")) venue = "sushiswap";
+  else if (dexId.includes("camelot")) venue = "camelot";
+  else if (dexId.includes("aerodrome")) venue = "aerodrome";
 
   return {
     id: pair.baseToken?.address || pair.pairAddress || Math.random().toString(),
@@ -237,6 +242,7 @@ function pairToToken(pair: any, icon?: string, source: "dex" | "boost" = "dex"):
     upvotes: 0,
     watchers: 0,
     source,
+    chainId: pair.chainId ?? "solana",
   };
 }
 
@@ -480,6 +486,9 @@ const Discover = ({ inline = false }: { inline?: boolean }) => {
                           <p className="text-[11px] font-black text-white truncate">${t.ticker}</p>
                           <p className="text-[9px] text-white/20 truncate">{t.name}</p>
                         </div>
+                        {t.chainId && !isSolana(t.chainId) && (
+                          <span className="text-[8px] text-og-cyan/70 shrink-0" title={getChain(t.chainId).name}>{getChain(t.chainId).emoji}</span>
+                        )}
                         {t.featured && <Star className="h-3 w-3 text-yellow-400 fill-yellow-400 shrink-0" />}
                       </div>
                       <div className="flex items-center justify-between">

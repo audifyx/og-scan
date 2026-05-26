@@ -211,9 +211,10 @@ async function fetchDexFreshTokens(): Promise<DexFreshToken[]> {
   for (const result of results) {
     if (result.status !== "fulfilled") continue;
     for (const item of result.value) {
-      if (item.chainId !== "solana" || !item.tokenAddress) continue;
-      const previous = tokens.get(item.tokenAddress);
-      tokens.set(item.tokenAddress, {
+      if (!item.tokenAddress) continue;
+      const key = `${item.chainId ?? "solana"}:${item.tokenAddress}`;
+      const previous = tokens.get(key);
+      tokens.set(key, {
         mint: item.tokenAddress,
         icon: previous?.icon ?? item.icon,
         description: previous?.description ?? item.description,

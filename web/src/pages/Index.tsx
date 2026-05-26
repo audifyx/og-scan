@@ -135,6 +135,12 @@ const TokenExplorer = lazy(() => import("@/components/discover-20x/TokenExplorer
 const ViralFeed = lazy(() => import("@/components/discover-20x/ViralFeed").then(m => ({ default: m.ViralFeed })));
 const LaunchpadExplorer = lazy(() => import("@/components/discover-20x/LaunchpadExplorer").then(m => ({ default: m.LaunchpadExplorer })));
 const LaunchTracker = lazy(() => import("@/components/launchpad-20x/LaunchTracker").then(m => ({ default: m.LaunchTracker })));
+
+/* ─── Phase 31 imports (Multi-Chain Discover) ─── */
+const MultiChainTokenExplorer = lazy(() => import("@/components/multi-chain/MultiChainTokenExplorer").then(m => ({ default: m.MultiChainTokenExplorer })));
+const MultiChainLaunchpadExplorer = lazy(() => import("@/components/multi-chain/MultiChainLaunchpadExplorer").then(m => ({ default: m.MultiChainLaunchpadExplorer })));
+const MultiChainViralFeed = lazy(() => import("@/components/multi-chain/MultiChainViralFeed").then(m => ({ default: m.MultiChainViralFeed })));
+const MultiChainLaunchTracker = lazy(() => import("@/components/multi-chain/MultiChainLaunchTracker").then(m => ({ default: m.MultiChainLaunchTracker })));
 const MemeGallery = lazy(() => import("@/components/memes-20x/MemeGallery").then(m => ({ default: m.MemeGallery })));
 const ProDashboard = lazy(() => import("@/components/premium-20x/ProDashboard").then(m => ({ default: m.ProDashboard })));
 
@@ -1197,18 +1203,67 @@ const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: strin
 const CommunitiesInline = () => <CommunitiesPage />;
 
 const DiscoverInline = () => {
-  const [discoverTab, setDiscoverTab] = useState<"explore" | "launchpads" | "viral" | "launches">("explore");
-  const discoverTabs = [
+  const [discoverTab, setDiscoverTab] = useState<"explore" | "launchpads" | "viral" | "launches" | "mc-explore" | "mc-launchpads" | "mc-viral" | "mc-launches">("explore");
+  const [discoverMode, setDiscoverMode] = useState<"solana" | "multichain">("solana");
+
+  const solanaTabs = [
     { id: "explore" as const, label: "🔥 Explore", desc: "Trending tokens" },
     { id: "launchpads" as const, label: "🚀 Launchpads", desc: "Pump.fun, Moonshot, Believe" },
     { id: "viral" as const, label: "⚡ Viral", desc: "Going viral" },
     { id: "launches" as const, label: "🆕 Launches", desc: "New tokens" },
   ];
+
+  const multiChainTabs = [
+    { id: "mc-explore" as const, label: "🔥 Explore", desc: "All chains" },
+    { id: "mc-launchpads" as const, label: "🚀 Launchpads", desc: "All chain launchpads" },
+    { id: "mc-viral" as const, label: "⚡ Viral", desc: "Going viral" },
+    { id: "mc-launches" as const, label: "🆕 Launches", desc: "New tokens" },
+  ];
+
+  const activeTabs = discoverMode === "solana" ? solanaTabs : multiChainTabs;
+
+  // When switching modes, reset to the first tab of that mode
+  const handleModeSwitch = (mode: "solana" | "multichain") => {
+    setDiscoverMode(mode);
+    setDiscoverTab(mode === "solana" ? "explore" : "mc-explore");
+  };
+
   return (
     <div className="space-y-4">
+      {/* Mode switcher — Solana vs Multi-Chain */}
+      <div className="flex items-center gap-2">
+        <div className="flex rounded-xl border border-white/[0.08] bg-white/[0.02] p-0.5">
+          <button
+            onClick={() => handleModeSwitch("solana")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all",
+              discoverMode === "solana"
+                ? "bg-[#9945FF]/15 text-[#14F195] border border-[#9945FF]/25"
+                : "text-white/25 hover:text-white/40"
+            )}
+          >
+            <span>◎</span> Solana
+          </button>
+          <button
+            onClick={() => handleModeSwitch("multichain")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all",
+              discoverMode === "multichain"
+                ? "bg-primary/15 text-primary border border-primary/25"
+                : "text-white/25 hover:text-white/40"
+            )}
+          >
+            <span>🌐</span> All Chains
+          </button>
+        </div>
+        {discoverMode === "multichain" && (
+          <span className="text-[9px] text-white/15 ml-1">16 chains supported</span>
+        )}
+      </div>
+
       {/* Discover sub-nav */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-        {discoverTabs.map(t => (
+        {activeTabs.map(t => (
           <button key={t.id} onClick={() => setDiscoverTab(t.id)}
             className={cn("shrink-0 px-3 py-2 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap",
               discoverTab === t.id
@@ -1219,10 +1274,18 @@ const DiscoverInline = () => {
           </button>
         ))}
       </div>
+
+      {/* Solana mode (original components — untouched) */}
       {discoverTab === "explore" && <TokenExplorer />}
       {discoverTab === "launchpads" && <LaunchpadExplorer />}
       {discoverTab === "viral" && <ViralFeed />}
       {discoverTab === "launches" && <LaunchTracker />}
+
+      {/* Multi-chain mode (new components) */}
+      {discoverTab === "mc-explore" && <MultiChainTokenExplorer />}
+      {discoverTab === "mc-launchpads" && <MultiChainLaunchpadExplorer />}
+      {discoverTab === "mc-viral" && <MultiChainViralFeed />}
+      {discoverTab === "mc-launches" && <MultiChainLaunchTracker />}
     </div>
   );
 };

@@ -233,17 +233,17 @@ async function fetchProfilesAndBoosts(): Promise<{ profiles: DexTokenProfile[]; 
   ];
 
   return {
-    profiles: profiles.filter((item) => item.chainId === "solana" && Boolean(item.tokenAddress)).slice(0, 80),
-    boosts: boosts.filter((item) => item.chainId === "solana" && Boolean(item.tokenAddress)).slice(0, 80),
+    profiles: profiles.filter((item) => Boolean(item.tokenAddress)).slice(0, 80),
+    boosts: boosts.filter((item) => Boolean(item.tokenAddress)).slice(0, 80),
   };
 }
 
-async function fetchPairsForMints(mints: string[]): Promise<DexPair[]> {
+async function fetchPairsForMints(mints: string[], chainId: string = "solana"): Promise<DexPair[]> {
   const chunks: string[][] = [];
   for (let index = 0; index < mints.length; index += 30) chunks.push(mints.slice(index, index + 30));
 
   const responses = await Promise.allSettled(
-    chunks.map((chunk) => fetchJson<DexPair[]>(`https://api.dexscreener.com/tokens/v1/solana/${chunk.join(",")}`))
+    chunks.map((chunk) => fetchJson<DexPair[]>(`https://api.dexscreener.com/tokens/v1/${chainId}/${chunk.join(",")}`))
   );
 
   return responses.flatMap((response) => (response.status === "fulfilled" ? response.value : []));
@@ -258,11 +258,12 @@ function dedupeBestPairs(pairs: DexPair[]): DexPair[] {
   const best = new Map<string, DexPair>();
   for (const pair of pairs) {
     const mint = pair.baseToken?.address;
-    if (pair.chainId !== "solana" || !mint) continue;
-    const previous = best.get(mint);
+    if (!mint) continue;
+    const key = `${pair.chainId ?? "solana"}:${mint}`;
+    const previous = best.get(key);
     const previousScore = (previous?.liquidity?.usd ?? 0) + (previous?.volume?.h24 ?? 0) * 0.4;
     const nextScore = (pair.liquidity?.usd ?? 0) + (pair.volume?.h24 ?? 0) * 0.4;
-    if (!previous || nextScore >= previousScore) best.set(mint, pair);
+    if (!previous || nextScore >= previousScore) best.set(key, pair);
   }
   return Array.from(best.values());
 }
