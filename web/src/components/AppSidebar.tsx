@@ -12,6 +12,9 @@ import {
   Mail,
   MessageSquare,
   Shield,
+  Home,
+  Users,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
@@ -43,27 +46,43 @@ type TabId =
   | "tools"
   | "profile";
 
-export type ExternalNavItem = {
-  to: string;
+export type NavItem = {
+  id?: TabId;
+  to?: string;
   icon: ComponentType<{ className?: string }>;
   label: string;
   eyebrow: string;
 };
 
-const ExternalNavLink = ({ item, currentPath, onClose }: { item: ExternalNavItem; currentPath: string; onClose: () => void }) => {
-  const isActive = currentPath === item.to || currentPath.startsWith(item.to + "/");
-  return (
-    <Link
-      to={item.to}
-      onClick={onClose}
-      className={cn(
-        "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
-        isActive ? "bg-white/[0.09] text-white" : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
-      )}
-    >
+const NavRow = ({
+  item,
+  activeId,
+  currentPath,
+  onNavigate,
+  onClose,
+}: {
+  item: NavItem;
+  activeId: TabId;
+  currentPath: string;
+  onNavigate: (t: string) => void;
+  onClose: () => void;
+}) => {
+  const isTabActive = item.id && activeId === item.id;
+  const isPathActive = item.to && (currentPath === item.to || currentPath.startsWith(item.to + "/"));
+  const isActive = isTabActive || isPathActive;
+
+  const handleClick = () => {
+    onClose();
+    if (item.id) {
+      onNavigate(item.id);
+    }
+  };
+
+  const content = (
+    <>
       <span className={cn(
         "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition",
-        isActive ? "border-og-cyan/40 bg-og-cyan/10 text-og-cyan" : "border-white/10 bg-white/[0.04]",
+        isActive ? "border-og-lime/40 bg-og-lime/10 text-og-lime" : "border-white/10 bg-white/[0.04]",
       )}>
         <item.icon className="h-4 w-4" />
       </span>
@@ -71,8 +90,36 @@ const ExternalNavLink = ({ item, currentPath, onClose }: { item: ExternalNavItem
         <span className="block truncate text-[13px] font-semibold leading-tight">{item.label}</span>
         <span className="block truncate text-[10px] text-white/35">{item.eyebrow}</span>
       </span>
-      {isActive && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-cyan" />}
-    </Link>
+      {isActive && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-lime" />}
+    </>
+  );
+
+  if (item.to) {
+    return (
+      <Link
+        to={item.to}
+        onClick={onClose}
+        className={cn(
+          "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
+          isActive ? "bg-white/[0.09] text-white" : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
+        )}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className={cn(
+        "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
+        isActive ? "bg-white/[0.09] text-white" : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
+      )}
+    >
+      {content}
+    </button>
   );
 };
 
@@ -94,7 +141,14 @@ export const AppSidebar = ({
   const location = useLocation();
   const { isAdmin } = useAdmin();
 
-  const tradingItems: ExternalNavItem[] = [
+  const primaryItems: NavItem[] = [
+    { id: "overview",  icon: Home,   label: "Home",      eyebrow: "Command hub" },
+    { id: "community", icon: Users,  label: "Community", eyebrow: "Social & Voice" },
+    { id: "tools",     icon: Wrench, label: "Tools",     eyebrow: "Scanners & Feeds" },
+    { id: "profile",   icon: User,   label: "Profile",   eyebrow: "Your account" },
+  ];
+
+  const tradingItems: NavItem[] = [
     { to: "/wallets",         icon: Wallet,        label: "Wallets",         eyebrow: "Tracked wallets" },
     { to: "/charts",          icon: LineChart,      label: "Charts",          eyebrow: "Live charts" },
     { to: "/callouts",        icon: Bell,           label: "Callouts",        eyebrow: "Trade alerts" },
@@ -103,8 +157,8 @@ export const AppSidebar = ({
     { to: "/messages",        icon: Mail,           label: "Messages",        eyebrow: "Direct messages" },
   ];
 
-  const moreItems: ExternalNavItem[] = [
-    ...(isAdmin ? [{ to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Owner dashboard" } as ExternalNavItem] : []),
+  const moreItems: NavItem[] = [
+    ...(isAdmin ? [{ to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Owner dashboard" } as NavItem] : []),
   ];
 
   return (
@@ -135,21 +189,51 @@ export const AppSidebar = ({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
-        <div className="mb-1 mt-3">
+        <div className="mb-1 mt-2">
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Navigation</p>
+          <div className="space-y-0.5">
+            {primaryItems.map((item) => (
+              <NavRow
+                key={item.id}
+                item={item}
+                activeId={activeId}
+                currentPath={location.pathname}
+                onNavigate={onNavigate}
+                onClose={onClose}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-1 mt-4">
           <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Trading</p>
           <div className="space-y-0.5">
             {tradingItems.map((item) => (
-              <ExternalNavLink key={item.to} item={item} currentPath={location.pathname} onClose={onClose} />
+              <NavRow
+                key={item.to}
+                item={item}
+                activeId={activeId}
+                currentPath={location.pathname}
+                onNavigate={onNavigate}
+                onClose={onClose}
+              />
             ))}
           </div>
         </div>
 
         {moreItems.length > 0 && (
-          <div className="mb-1 mt-3">
+          <div className="mb-1 mt-4">
             <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">More</p>
             <div className="space-y-0.5">
               {moreItems.map((item) => (
-                <ExternalNavLink key={item.to} item={item} currentPath={location.pathname} onClose={onClose} />
+                <NavRow
+                  key={item.to}
+                  item={item}
+                  activeId={activeId}
+                  currentPath={location.pathname}
+                  onNavigate={onNavigate}
+                  onClose={onClose}
+                />
               ))}
             </div>
           </div>
