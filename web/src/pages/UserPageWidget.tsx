@@ -89,7 +89,7 @@ export default function UserPageWidget() {
   const load = useCallback(async () => {
     if (!username) return;
     const { data: p } = await supabase
-      .from("user_profiles")
+      .from("profiles")
       .select("user_id, username, display_name, avatar_url, page_accent")
       .eq("username", username)
       .single();

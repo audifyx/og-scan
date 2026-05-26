@@ -5,7 +5,7 @@
  *  1. Cross-post to X — when going live, auto-tweet with public listener link
  *  2. X Space Card — paste any X Space URL to create a card in the Spaces feed
  *  3. Schedule Sync — add X Spaces events to OGScan calendar
- *  4. X Handle linking (stored in user_profiles.twitter_handle)
+ *  4. X Handle linking (stored in profiles.twitter_handle)
  *
  * NOTE: We cannot bridge X Space audio (X API doesn't allow audio relay).
  * Instead we surface X Spaces as discoverable cards with deep-link join.
@@ -59,7 +59,7 @@ export default function XIntegration({ spaceId, spaceTitle, mode = "full", onClo
     async function load() {
       if (!user) return;
       const { data: profile } = await supabase
-        .from("user_profiles")
+        .from("profiles")
         .select("twitter_handle")
         .eq("user_id", user.id)
         .single();
@@ -90,7 +90,7 @@ export default function XIntegration({ spaceId, spaceTitle, mode = "full", onClo
     if (!user || !xHandle) return;
     setLoading(true);
     const clean = xHandle.replace("@", "").trim();
-    await supabase.from("user_profiles").update({ twitter_handle: clean }).eq("user_id", user.id);
+    await supabase.from("profiles").update({ twitter_handle: clean }).eq("user_id", user.id);
     setSavedHandle(clean);
     toast.success("X handle saved!");
     setLoading(false);

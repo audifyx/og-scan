@@ -377,7 +377,7 @@ export default function UserPublicPage() {
     setLoading(true);
 
     const { data: pData } = await supabase
-      .from("user_profiles")
+      .from("profiles")
       .select("*")
       .eq("username", username)
       .single();
