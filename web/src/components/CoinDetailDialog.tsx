@@ -60,6 +60,7 @@ import {
   type TokenHolderBundleIntel,
   type TokenPumpFunIntel,
 } from "@/lib/og";
+import { explorerAddressUrl, getChain } from "@/lib/chains";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -298,6 +299,7 @@ function linkHost(url: string | undefined): string {
 export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = "Scan", className, defaultOpen, onOpenChange: externalOnOpenChange }: CoinDetailDialogProps) => {
   const [open, setOpen] = useState<boolean>(defaultOpen ?? false);
   const chainId = token.chainId ?? "solana";
+  const isSolana = chainId === "solana";
 
   const { data: dexPairs, isFetching: isFetchingPairs } = useQuery({
     queryKey: ["coin-detail-dex-pairs", chainId, token.id],
@@ -363,14 +365,14 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const { data: devIntel, isFetching: isFetchingDevIntel } = useQuery({
     queryKey: ["coin-detail-dev-launch-intel", detailToken.chainId ?? "solana", detailToken.id],
     queryFn: (): Promise<TokenDevLaunchIntel> => tokenDevLaunchIntel(detailToken),
-    enabled: open && Boolean(detailToken.id),
+    enabled: open && isSolana && Boolean(detailToken.id),
     staleTime: 60_000,
   });
 
   const { data: bundleIntel, isFetching: isFetchingBundleIntel } = useQuery({
     queryKey: ["coin-detail-holder-bundle-intel", detailToken.chainId ?? "solana", detailToken.id],
     queryFn: (): Promise<TokenHolderBundleIntel> => tokenHolderBundleIntel(detailToken),
-    enabled: open && Boolean(detailToken.id),
+    enabled: open && isSolana && Boolean(detailToken.id),
     staleTime: 60_000,
   });
 
@@ -394,14 +396,15 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const links = useMemo(() => {
     const raw: { label: string; url: string }[] = [];
     raw.push({ label: "DexScreener Chart", url: chartUrl });
-    raw.push({ label: "Solscan", url: `https://solscan.io/token/${detailToken.id}` });
-    raw.push({ label: "Jupiter", url: `https://jup.ag/swap/SOL-${detailToken.id}` });
+    const chainCfg = getChain(chainId);
+    raw.push({ label: chainCfg.explorerUrl.replace(/^https?:\/\//, "").split("/")[0], url: explorerAddressUrl(chainId, detailToken.id) });
+    if (isSolana) raw.push({ label: "Jupiter", url: `https://jup.ag/swap/SOL-${detailToken.id}` });
     if (detailToken.pumpFun?.sourceUrl) raw.push({ label: "Pump.fun", url: detailToken.pumpFun.sourceUrl });
     for (const website of pair?.info?.websites ?? []) if (website.url) raw.push({ label: website.label ?? linkHost(website.url), url: website.url });
     for (const social of pair?.info?.socials ?? []) if (social.url) raw.push({ label: social.type ?? linkHost(social.url), url: social.url });
     const seen = new Set<string>();
     return raw.filter((item) => item.url && !seen.has(item.url) && seen.add(item.url)).slice(0, 8);
-  }, [chartUrl, detailToken.id, pair]);
+  }, [chartUrl, detailToken.id, pair, chainId, isSolana]);
 
   const riskAlerts = useMemo(() => buildTokenRiskAlerts(detailToken, forensicScore), [detailToken, forensicScore]);
 
@@ -636,10 +639,11 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
 
             {/* Intelligence panels grid */}
             <div className="grid gap-5 xl:grid-cols-2">
-              <DevLaunchPanel intel={devIntel} isLoading={isFetchingDevIntel} primaryLabel={primaryLabel} creatorFunding={detailToken.creatorFunding} pumpFun={detailToken.pumpFun} />
-              <HolderBundlePanel intel={bundleIntel} isLoading={isFetchingBundleIntel} token={detailToken} />
-              <OnChainIntelPanel token={detailToken} />
-              <PumpFunPanel pumpFun={detailToken.pumpFun} createdAt={createdAt} migratedAt={migratedAt} />
+              {isSolana && <DevLaunchPanel intel={devIntel} isLoading={isFetchingDevIntel} primaryLabel={primaryLabel} creatorFunding={detailToken.creatorFunding} pumpFun={detailToken.pumpFun} />}
+              {isSolana && <HolderBundlePanel intel={bundleIntel} isLoading={isFetchingBundleIntel} token={detailToken} />}
+              {isSolana && <OnChainIntelPanel token={detailToken} />}
+              {isSolana && <PumpFunPanel pumpFun={detailToken.pumpFun} createdAt={createdAt} migratedAt={migratedAt} />}
+              {!isSolana && <EvmChainInfoPanel token={detailToken} chainId={chainId} />}
             </div>
 
             {/* DEX pools */}
@@ -963,6 +967,37 @@ const PumpFunPanel = ({ pumpFun, createdAt, migratedAt }: { pumpFun?: TokenPumpF
     </div>
   </Section>
 );
+
+const EvmChainInfoPanel = ({ token, chainId }: { token: JupTokenInfo; chainId: string }) => {
+  const chainCfg = getChain(chainId);
+  const explorerHost = chainCfg.explorerUrl.replace(/^https?:\/\//, "").split("/")[0];
+  const createdAt = token.firstPool?.createdAt ?? token.migrationCreatedAt;
+  return (
+    <Section title={`${chainCfg.name} Token`} icon={<Globe className="h-3.5 w-3.5" />} accent="cyan"
+      badge={<span className="rounded-full border border-og-cyan/40 bg-og-cyan/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-og-cyan">{chainCfg.name}</span>}>
+      <div className="grid gap-1.5">
+        <DataRow label="Chain" value={chainCfg.name} />
+        <DataRow label="Contract" value={shortAddr(token.id, 8)} />
+        <DataRow label="First pool" value={shortDate(createdAt)} />
+        <DataRow label="DEX" value={token.pairDexId ?? "—"} />
+        <DataRow label="Liquidity" value={fmtUsd(tokenEffectiveLiquidityUsd(token))} highlight={tokenEffectiveLiquidityUsd(token) >= 10_000 ? "lime" : tokenEffectiveLiquidityUsd(token) >= 1_000 ? "gold" : "red"} />
+        <DataRow label="Market cap" value={fmtUsd(token.mcap ?? token.fdv)} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a href={explorerAddressUrl(chainId, token.id)} target="_blank" rel="noreferrer"
+          className="inline-flex items-center gap-1 rounded-full border border-og-cyan/30 bg-og-cyan/5 px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-og-cyan transition hover:bg-og-cyan/15">
+          <ExternalLink className="h-2.5 w-2.5" /> {explorerHost}
+        </a>
+        {token.dexUrl && (
+          <a href={token.dexUrl} target="_blank" rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded-full border border-og-gold/30 bg-og-gold/5 px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-og-gold transition hover:bg-og-gold/15">
+            <ExternalLink className="h-2.5 w-2.5" /> DexScreener
+          </a>
+        )}
+      </div>
+    </Section>
+  );
+};
 
 const DexPoolsPanel = ({ pools }: { pools: TokenDexPoolIntel[] }) => (
   <Section title="DEX Pools" icon={<CandlestickChart className="h-3.5 w-3.5" />} accent="gold"
