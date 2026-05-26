@@ -1090,6 +1090,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
   const [showQA, setShowQA] = useState(false);
   const [coHosts, setCoHosts] = useState<CoHost[]>([]);
   const [inGreenRoom, setInGreenRoom] = useState(false);
+  const [publicListenerCount, setPublicListenerCount] = useState(0);
   const voicePanelRef = useRef<VoicePanelHandle>(null);
   const isHost = user?.id === space.host_id;
   const isCoHost = coHosts.some(ch => ch.userId === user?.id);
@@ -1107,6 +1108,18 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
         .subscribe();
     } catch { /* */ }
     return () => { if (ch) supabase.removeChannel(ch); };
+  }, [space.id]);
+
+  // Track public (anonymous) listener count via Supabase presence on dedicated channel
+  useEffect(() => {
+    const pubCh = supabase.channel(`public-listeners-${space.id}`);
+    pubCh
+      .on("presence", { event: "sync" }, () => {
+        const state = pubCh.presenceState();
+        setPublicListenerCount(Object.keys(state).length);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(pubCh); };
   }, [space.id]);
 
   // Load co-hosts + granular permissions from DB on mount
@@ -1214,6 +1227,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
   };
 
   const share = () => { navigator.clipboard.writeText(`${window.location.origin}/listen/${space.id}`); toast.success("Share link copied! 🔗"); };
+  const sharePublicLink = () => { navigator.clipboard.writeText(`${window.location.origin}/space/${space.id}`); toast.success("Public listener link copied! 🌐 Anyone can join with this."); };
 
   const handlePinToken = async (ca: string | null) => {
     setPinnedTokenCA(ca);
@@ -1273,7 +1287,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
           </div>
           <div className="flex items-center gap-2 mt-0.5 ml-[18px]">
             <Globe className="h-3 w-3 text-white/20" />
-            <span className="text-[11px] text-white/30">{cur.is_private ? "private" : "public"} · {totalInRoom} connected</span>
+            <span className="text-[11px] text-white/30">{cur.is_private ? "private" : "public"} · {totalInRoom} connected{publicListenerCount > 0 ? ` · ${publicListenerCount} via public link` : ""}</span>
             {cur.is_recording && <span className="flex items-center gap-1 text-[9px] text-red-400/60 font-bold"><div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />REC</span>}
           </div>
         </div>
@@ -1393,6 +1407,25 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
           <div className="flex gap-2">
             <Input placeholder="Announcement..." value={announcement} onChange={e => setAnnouncement(e.target.value)} className="bg-white/[0.04] border-white/[0.06] rounded-lg text-sm h-8 flex-1" />
             <Button size="sm" disabled={!announcement.trim()} onClick={async () => { const msg = announcement.trim(); setPinnedMsg(msg); setAnnouncement(""); const { error } = await supabase.from("spaces").update({ pinned_message: msg }).eq("id", space.id); if (error) { console.error("Pin announcement failed:", error); toast.error("Failed to pin"); } else toast.success("Pinned! 📌"); }} className="rounded-lg h-8 px-3 text-[10px]">Pin</Button>
+          </div>
+
+          {/* ── Public listener link (host-only) ── */}
+          <div className="pt-3 border-t border-white/[0.05]">
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Globe className="h-3 w-3" /> Public Listener Link
+            </p>
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+              <code className="text-[10px] text-white/30 flex-1 truncate">{typeof window !== "undefined" ? `${window.location.origin}/space/${space.id}` : `/space/${space.id}`}</code>
+              <button
+                onClick={sharePublicLink}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[10px] font-bold hover:bg-cyan-500/20 transition whitespace-nowrap"
+              >
+                <Copy className="h-3 w-3" /> Copy
+              </button>
+            </div>
+            <p className="text-[9px] text-white/20 mt-1.5 leading-relaxed">
+              Anyone with this link can listen live — no account required. They'll appear as <span className="text-white/40">"X listening via public link"</span> in your space.
+            </p>
           </div>
         </div>
       )}
@@ -2454,7 +2487,12 @@ const Spaces = () => {
                   <div className="space-y-3">
                     {filteredScheduled.map(s => (
                       <ScheduledSpaceCard key={s.id} space={s} onRemind={() => toast.success("Reminder set! 🔔")}
-                        onStartNow={user?.id === s.host_id ? (sp) => { setActiveSpace(sp); } : undefined}
+                        onStartNow={user?.id === s.host_id ? async (sp) => {
+                          // Mark space as live in DB first, then open it
+                          const { error } = await supabase.from("spaces").update({ is_live: true, scheduled_for: null }).eq("id", sp.id);
+                          if (error) { toast.error("Failed to start space"); return; }
+                          setActiveSpace({ ...sp, is_live: true });
+                        } : undefined}
                         isOwner={user?.id === s.host_id} />
                     ))}
                   </div>
