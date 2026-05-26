@@ -726,16 +726,24 @@ function mergeTokenCandidate(existing: JupTokenInfo, next: JupTokenInfo): JupTok
   };
 }
 
-async function dexSearchPairs(query: string): Promise<DexSearchPair[]> {
+async function dexSearchPairs(query: string, chainFilter?: string): Promise<DexSearchPair[]> {
   const url = `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`;
   const response = await jget<DexSearchResponse>(url);
-  return (response.pairs ?? []).filter((pair) => isSolanaChainId(pair.chainId) && Boolean(pair.baseToken?.address));
+  return (response.pairs ?? []).filter((pair) => {
+    if (!pair.baseToken?.address) return false;
+    if (chainFilter && chainFilter !== "all") return isSolanaChainId(pair.chainId) ? chainFilter === "solana" : pair.chainId === chainFilter;
+    return true;
+  });
 }
 
-async function dexSearchAllPairs(query: string): Promise<DexSearchPair[]> {
+async function dexSearchAllPairs(query: string, chainFilter?: string): Promise<DexSearchPair[]> {
   const url = `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`;
   const response = await jget<DexSearchResponse>(url);
-  return (response.pairs ?? []).filter((pair) => isSolanaChainId(pair.chainId) && Boolean(pair.baseToken?.address));
+  return (response.pairs ?? []).filter((pair) => {
+    if (!pair.baseToken?.address) return false;
+    if (chainFilter && chainFilter !== "all") return isSolanaChainId(pair.chainId) ? chainFilter === "solana" : pair.chainId === chainFilter;
+    return true;
+  });
 }
 
 function dexPairToToken(pair: DexSearchPair): JupTokenInfo | null {
@@ -890,7 +898,7 @@ function bestPairByMint(pairs: DexSearchPair[]): Map<string, DexSearchPair> {
   const byMint = new Map<string, DexSearchPair>();
   for (const pair of pairs) {
     const mint: string | undefined = pair.baseToken?.address;
-    if (!isSolanaChainId(pair.chainId) || !mint) continue;
+    if (!mint) continue;
     const currentScore: number = (pairEffectiveLiquidityUsd(pair) ?? 0) + (pair.volume?.h24 ?? 0) * 0.4;
     const previous: DexSearchPair | undefined = byMint.get(mint);
     const previousScore: number = previous ? (pairEffectiveLiquidityUsd(previous) ?? 0) + (previous.volume?.h24 ?? 0) * 0.4 : 0;
@@ -904,7 +912,7 @@ function oldestCrediblePairByMint(pairs: DexSearchPair[]): Map<string, DexSearch
   for (const pair of pairs) {
     const mint: string | undefined = pair.baseToken?.address;
     const pairCreatedAt: number | undefined = pair.pairCreatedAt;
-    if (!isSolanaChainId(pair.chainId) || !mint || pairCreatedAt == null || !Number.isFinite(pairCreatedAt)) continue;
+    if (!mint || pairCreatedAt == null || !Number.isFinite(pairCreatedAt)) continue;
     if (isPairLpPulled(pair)) continue;
 
     const previous: DexSearchPair | undefined = byMint.get(mint);
@@ -914,7 +922,7 @@ function oldestCrediblePairByMint(pairs: DexSearchPair[]): Map<string, DexSearch
   return byMint;
 }
 
-export async function dexPairsForMints(mints: string[]): Promise<DexSearchPair[]> {
+export async function dexPairsForMints(mints: string[], chainId: string = SOLANA_CHAIN_ID): Promise<DexSearchPair[]> {
   const cleanMints: string[] = Array.from(new Set(mints.filter(Boolean))).slice(0, 60);
   if (cleanMints.length === 0) return [];
 
@@ -922,7 +930,7 @@ export async function dexPairsForMints(mints: string[]): Promise<DexSearchPair[]
   for (let index = 0; index < cleanMints.length; index += 30) chunks.push(cleanMints.slice(index, index + 30));
 
   const responses = await Promise.allSettled(
-    chunks.map((chunk) => jget<DexSearchPair[]>(`https://api.dexscreener.com/tokens/v1/${SOLANA_CHAIN_ID}/${chunk.join(",")}`))
+    chunks.map((chunk) => jget<DexSearchPair[]>(`https://api.dexscreener.com/tokens/v1/${chainId}/${chunk.join(",")}`))
   );
 
   return responses.flatMap((response) => (response.status === "fulfilled" ? response.value : []));
@@ -952,7 +960,7 @@ function dexPoolsByMint(pairs: DexSearchPair[]): Map<string, TokenDexPoolIntel[]
   const byMint = new Map<string, TokenDexPoolIntel[]>();
   for (const pair of pairs) {
     const mint: string | undefined = pair.baseToken?.address;
-    if (!mint || !isSolanaChainId(pair.chainId)) continue;
+    if (!mint) continue;
     const current = byMint.get(mint) ?? [];
     current.push(dexPoolIntelFromPair(pair));
     byMint.set(mint, current);
@@ -981,7 +989,7 @@ export async function dexBoostsByMint(): Promise<Map<string, DexBoostInfo>> {
     for (const response of responses) {
       if (response.status !== "fulfilled") continue;
       for (const boost of response.value) {
-        if (!isSolanaChainId(boost.chainId) || !boost.tokenAddress) continue;
+        if (!boost.tokenAddress) continue;
         const previous: DexBoostInfo | undefined = byMint.get(boost.tokenAddress);
         const previousPaid: number = previous?.totalAmount ?? previous?.amount ?? 0;
         const nextPaid: number = boost.totalAmount ?? boost.amount ?? 0;
@@ -1265,12 +1273,18 @@ export async function enrichTokensWithMarketIntel(
 ): Promise<JupTokenInfo[]> {
   if (tokens.length === 0) return [];
 
-  const mints: string[] = tokens
-    .filter((token) => isSolanaChainId(token.chainId))
-    .map((token) => token.id)
-    .filter(Boolean);
-  const [pairsResult, boostsResult] = await Promise.allSettled([dexPairsForMints(mints), dexBoostsByMint()]);
-  const allPairs: DexSearchPair[] = pairsResult.status === "fulfilled" ? pairsResult.value : [];
+  // Group mints by chain for multi-chain pair fetching
+  const mintsByChain = new Map<string, string[]>();
+  for (const token of tokens) {
+    const chainId = token.chainId ?? SOLANA_CHAIN_ID;
+    if (!token.id) continue;
+    const list = mintsByChain.get(chainId) ?? [];
+    list.push(token.id);
+    mintsByChain.set(chainId, list);
+  }
+  const pairFetches = Array.from(mintsByChain.entries()).map(([chain, mints]) => dexPairsForMints(mints, chain));
+  const [pairsResults, boostsResult] = await Promise.allSettled([Promise.allSettled(pairFetches).then(results => results.flatMap(r => r.status === "fulfilled" ? r.value : [])), dexBoostsByMint()]);
+  const allPairs: DexSearchPair[] = pairsResults.status === "fulfilled" ? pairsResults.value : [];
   const pairByMint: Map<string, DexSearchPair> = bestPairByMint(allPairs);
   const oldestPairByMint: Map<string, DexSearchPair> = oldestCrediblePairByMint(allPairs);
   const poolsByMint: Map<string, TokenDexPoolIntel[]> = dexPoolsByMint(allPairs);
@@ -2181,10 +2195,10 @@ function tokenKey(token: JupTokenInfo): string {
 function mergeMultiChainTokenCandidates(tokens: JupTokenInfo[]): JupTokenInfo[] {
   const byKey = new Map<string, JupTokenInfo>();
   for (const token of tokens) {
-    if (!isSolanaChainId(token.chainId)) continue;
-    const chainId: string = SOLANA_CHAIN_ID;
-    const existing: JupTokenInfo | undefined = byKey.get(`${chainId}:${token.id}`);
-    byKey.set(`${chainId}:${token.id}`, existing ? mergeTokenCandidate(existing, { ...token, chainId }) : { ...token, chainId });
+    const chainId: string = token.chainId ?? SOLANA_CHAIN_ID;
+    const key = `${chainId}:${token.id}`;
+    const existing: JupTokenInfo | undefined = byKey.get(key);
+    byKey.set(key, existing ? mergeTokenCandidate(existing, { ...token, chainId }) : { ...token, chainId });
   }
   return Array.from(byKey.values());
 }
@@ -2973,7 +2987,6 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
 
   const merged: JupTokenInfo[] = mergeMultiChainTokenCandidates([...jupiterTokens, ...dexTokens, ...canonicalJupiterTokens, ...canonicalDexTokens]);
   const similar = merged
-    .filter((token: JupTokenInfo): boolean => isSolanaChainId(token.chainId))
     .map((token: JupTokenInfo) => ({ token, similarity: tokenNarrativeSimilarity(token, normalizedQuery) }))
     .filter((item) => item.similarity >= 0.58 || normalizeTickerSymbol(item.token.symbol).includes(normalizedQuery) || isCanonicalSolanaOriginForQuery(item.token, clean))
     .sort((a, b) => b.similarity - a.similarity)

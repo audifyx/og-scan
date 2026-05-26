@@ -49,6 +49,8 @@ import {
 import { cn } from "@/lib/utils";
 import { HelpLabel, ScoreMeter, TokenTruthLegend, labelToneClass, scoreTextClass } from "@/components/TokenTruthKit";
 
+import { getChain, explorerAddressUrl, isSolana } from "@/lib/chains";
+
 const PUMPFUN_BASE_URL = "https://pump.fun/coin";
 const SOLSCAN_BASE_URL = "https://solscan.io/token";
 
@@ -221,7 +223,6 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
 
       const tokens: JupTokenInfo[] = await jupSearchToken(debounced);
       const fallbackCandidates: JupTokenInfo[] = (await enrichTokensWithMarketIntel(tokens, { includeAth: false, maxBirdeye: 12 }))
-        .filter((token: JupTokenInfo): boolean => (token.chainId ?? "solana") === "solana")
         .filter(isTrustedOgScanCandidate);
       return { ...report, candidates: fallbackCandidates, copycats: fallbackCandidates.slice(1) };
     },
@@ -252,7 +253,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <span className="text-og-cyan text-glow">MINT</span>
           </h2>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Search any Solana ticker, meme, brand, narrative, or CA. The scanner now layers OG proof, dominance, holder concentration, liquidity authenticity, authority status, DEX paid signals, and quick investigation tools into one triage board.
+            Search any ticker, meme, brand, narrative, or CA across 16+ chains. The scanner layers OG proof, dominance, holder concentration, liquidity authenticity, authority status, DEX paid signals, and quick investigation tools into one triage board.
           </p>
         </div>
 
@@ -347,7 +348,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
           <>
             <div className="mt-4 grid gap-2 border border-og-cyan/35 bg-og-cyan/5 p-3 sm:grid-cols-2 xl:grid-cols-6">
               <ForensicStat icon={Fingerprint} label="Narrative ID" value={report.narrativeFingerprintId} accent="text-og-cyan" />
-              <ForensicStat icon={GitBranch} label="Cluster" value={`${report.summary.candidateCount} Solana tokens`} accent="text-og-gold" />
+              <ForensicStat icon={GitBranch} label="Cluster" value={`${report.summary.candidateCount} tokens · ${report.summary.chainCount} chain${report.summary.chainCount !== 1 ? "s" : ""}`} accent="text-og-gold" />
               <ForensicStat icon={ShieldCheck} label="Primary" value={primaryToken ? `$${primaryToken.symbol}` : "Unknown"} accent="text-og-lime" />
               <ForensicStat icon={Calendar} label="First Mint" value={firstMintToken ? shortDate(tokenOgCreatedAtIso(firstMintToken)) : "Unknown"} accent="text-og-gold" />
               <ForensicStat icon={Gauge} label="Primary Score" value={report.summary.primaryDominanceScore != null ? `${report.summary.primaryDominanceScore}%` : "—"} accent="text-og-cyan" />
@@ -504,7 +505,10 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
             {lpPulled && <span className="rounded-full bg-og-blood/20 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest text-og-blood flex-none">LP PULLED</span>}
             {score?.isPrimaryToken && !lpPulled && <span className="rounded-full bg-og-gold/15 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-widest text-og-gold flex-none"><Crown className="inline h-2.5 w-2.5 mr-0.5" />PRIMARY</span>}
           </div>
-          <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground truncate">{t.name} · {shortAddr(t.id, 4)}</div>
+          <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground truncate">
+            {!isSolana(t.chainId ?? "solana") && <span className="text-og-cyan mr-1">{getChain(t.chainId ?? "solana").emoji} {getChain(t.chainId ?? "solana").shortName} ·</span>}
+            {t.name} · {shortAddr(t.id, 4)}
+          </div>
         </div>
 
         {/* Price + change */}
@@ -551,8 +555,8 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
         <span className={dexPaid === "—" ? "text-muted-foreground" : "text-og-lime"}><BadgeDollarSign className="inline h-2.5 w-2.5 mr-0.5" />{dexDisplay}</span>
         <span className="ml-auto flex items-center gap-1.5">
           <QuickTool href={chartUrl} icon={<BarChart3 className="h-3 w-3" />} label="Chart" />
-          <QuickTool href={`${SOLSCAN_BASE_URL}/${t.id}`} icon={<ExternalLink className="h-3 w-3" />} label="Scan" />
-          <QuickTool href={`${PUMPFUN_BASE_URL}/${t.id}`} icon={<Flame className="h-3 w-3" />} label="Pump" />
+          <QuickTool href={explorerAddressUrl(t.chainId ?? "solana", t.id)} icon={<ExternalLink className="h-3 w-3" />} label="Explorer" />
+          {isSolana(t.chainId ?? "solana") && <QuickTool href={`${PUMPFUN_BASE_URL}/${t.id}`} icon={<Flame className="h-3 w-3" />} label="Pump" />}
           <CoinDetailDialog token={t} onOpenScanner={() => onSelect()} actionLabel="Intel" className="collector-action px-2 py-1" />
           <CopyMintButton mint={t.id} label="Copy" copiedLabel="✓" className="collector-action border-og-cyan/45 px-2 py-1 text-og-cyan" />
         </span>

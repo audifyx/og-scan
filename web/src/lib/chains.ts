@@ -423,3 +423,16 @@ export function explorerTxUrl(chainId: string, hash: string): string {
   if (chain.id === "solana") return `${chain.explorerUrl}/tx/${hash}`;
   return `${chain.explorerUrl}/tx/${hash}`;
 }
+
+/** Set of all supported DexScreener chain slugs for fast filtering */
+export const SUPPORTED_DEX_SLUGS = new Set(SUPPORTED_CHAINS.map((c) => c.dexScreenerSlug));
+
+/** Resolve a DexScreener chainId slug to our chain config (if supported) */
+export function chainFromDexSlug(slug: string): ChainConfig | undefined {
+  return SUPPORTED_CHAINS.find((c) => c.dexScreenerSlug === slug);
+}
+
+/** Check if a DexScreener chainId slug is in our supported set */
+export function isSupportedDexChain(slug: string): boolean {
+  return SUPPORTED_DEX_SLUGS.has(slug);
+}
