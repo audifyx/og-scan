@@ -764,8 +764,8 @@ function dexPairToToken(pair: DexSearchPair): JupTokenInfo | null {
 
   return {
     id: mint,
-    chainId: SOLANA_CHAIN_ID,
-    name: pair.baseToken?.name ?? "Solana token",
+    chainId: pair.chainId ?? SOLANA_CHAIN_ID,
+    name: pair.baseToken?.name ?? "Unknown token",
     symbol: pair.baseToken?.symbol ?? "TOKEN",
     icon: pair.info?.imageUrl,
     decimals: 0,
@@ -1300,14 +1300,15 @@ export async function enrichTokensWithMarketIntel(
 
   return mapWithConcurrency(tokens, 8, async (token) => {
     const isSolanaToken: boolean = isSolanaChainId(token.chainId);
-    const pair: DexSearchPair | undefined = isSolanaToken ? pairByMint.get(token.id) : undefined;
-    const oldestPair: DexSearchPair | undefined = isSolanaToken ? oldestPairByMint.get(token.id) : undefined;
-    const pools: TokenDexPoolIntel[] = isSolanaToken ? poolsByMint.get(token.id) ?? [] : [];
+    const tokenChainId: string = token.chainId ?? SOLANA_CHAIN_ID;
+    const pair: DexSearchPair | undefined = pairByMint.get(token.id);
+    const oldestPair: DexSearchPair | undefined = oldestPairByMint.get(token.id);
+    const pools: TokenDexPoolIntel[] = poolsByMint.get(token.id) ?? [];
     const boost: DexBoostInfo | undefined = boostByMint.get(token.id);
     const migrationCreatedAt: string | undefined = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : token.migrationCreatedAt ?? token.firstPool?.createdAt;
     const oldestPoolMs: number = Math.min(tokenPoolCreatedAtMs(token), oldestPair?.pairCreatedAt ?? Number.POSITIVE_INFINITY);
     const oldestPoolCreatedAt: string | undefined = createdAtIsoFromMs(oldestPoolMs);
-    const orders: DexPaidOrderSummary | undefined = isSolanaToken ? await dexPaidOrdersForToken(SOLANA_CHAIN_ID, token.id) : undefined;
+    const orders: DexPaidOrderSummary | undefined = isSolanaToken ? await dexPaidOrdersForToken(SOLANA_CHAIN_ID, token.id) : await dexPaidOrdersForToken(tokenChainId, token.id).catch(() => undefined);
     const overview: Record<string, unknown> | null = isSolanaToken && birdeyeMints.has(token.id) ? await birdeyeTokenOverview(token.id) : null;
     const marketPatch = birdeyeMarketPatch(overview);
     const overviewAth: PriceExtreme = athFromOverview(overview);
