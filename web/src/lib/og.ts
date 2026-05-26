@@ -3604,17 +3604,23 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
     const orderSummaries = orderResults.status === "fulfilled" ? orderResults.value : [];
     const bondedMints = new Set<string>();
     const activeBoostedMints = new Set<string>();
+    // Use EFFECTIVE liquidity (quote-backed) as the real measure — not reported.
+    // A coin with a $10 dead pool and a $200k live pool should use $200k.
     const liquidityByMint = new Map<string, number>();
+    const reportedLiqByMint = new Map<string, number>();
     const volumeByMint = new Map<string, number>();
 
     for (const pair of pairs) {
       const mint = pair.baseToken?.address;
       if (!mint) continue;
-      const liquidity: number = pair.liquidity?.usd ?? 0;
+      const reported: number = pair.liquidity?.usd ?? 0;
+      const effective: number = pairEffectiveLiquidityUsd(pair) ?? reported;
       const volume24h: number = pair.volume?.h24 ?? 0;
-      if (pair.pairAddress || pair.pairCreatedAt || liquidity > 0) bondedMints.add(mint);
+      if (pair.pairAddress || pair.pairCreatedAt || reported > 0) bondedMints.add(mint);
       if ((pair.boosts?.active ?? 0) > 0) activeBoostedMints.add(mint);
-      liquidityByMint.set(mint, Math.max(liquidityByMint.get(mint) ?? 0, liquidity));
+      // Always use the BEST pool (highest effective liquidity / most volume)
+      liquidityByMint.set(mint, Math.max(liquidityByMint.get(mint) ?? 0, effective));
+      reportedLiqByMint.set(mint, Math.max(reportedLiqByMint.get(mint) ?? 0, reported));
       volumeByMint.set(mint, Math.max(volumeByMint.get(mint) ?? 0, volume24h));
     }
     for (const mint of sampleMints) {
@@ -3631,13 +3637,10 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
 
     // Classify each coin properly: rug vs lp_pull vs dead vs alive
     const fdvByMint = new Map<string, number>();
-    const reportedLiqByMint = new Map<string, number>();
     for (const pair of pairs) {
       const mint = pair.baseToken?.address;
       if (!mint) continue;
       fdvByMint.set(mint, Math.max(fdvByMint.get(mint) ?? 0, pair.fdv ?? pair.marketCap ?? 0));
-      // Reported liquidity = total pool value (includes base token, may be inflated)
-      reportedLiqByMint.set(mint, Math.max(reportedLiqByMint.get(mint) ?? 0, pair.liquidity?.usd ?? 0));
     }
     const coinClasses = sampleMints.map((mint) => classifyDevCoin(
       mint,
