@@ -888,8 +888,8 @@ const DevLaunchPanel = ({ intel, isLoading, primaryLabel, creatorFunding, pumpFu
         <DataRow label="Recent mints" value={fmtNum(intel?.recentTokenMints)} />
         <DataRow label="Bonded coins" value={fmtNum(intel?.bondedCoinCount)} />
         <DataRow label="DEX-paid coins" value={fmtNum(intel?.dexPaidCoinCount)} />
-        <DataRow label="Dev risk" value={intel?.devRiskLabel ? `${intel.devRiskLabel} · rug ${fmtNum(intel.rugRiskScore)}` : "—"} highlight={intel?.devRiskLabel === "severe" || intel?.devRiskLabel === "high" ? "red" : undefined} />
-        <DataRow label="Dead coins" value={`${fmtNum(intel?.ruggedCoinCount)} rugged · ${fmtNum(intel?.lowLiquidityCoinCount)} low LP`} />
+        <DataRow label="Dev risk" value={intel?.devRiskLabel ? `${intel.devRiskLabel} · risk ${fmtNum(intel.rugRiskScore)}` : "—"} highlight={intel?.devRiskLabel === "severe" || intel?.devRiskLabel === "high" ? "red" : undefined} />
+        <DataRow label="Dead coins" value={`${fmtNum(intel?.ruggedCoinCount)} dead · ${fmtNum(intel?.lowLiquidityCoinCount)} low LP`} />
       </div>
       {(intel?.riskNotes?.[0] ?? intel?.notes?.[0]) && (
         <p className="mt-3 text-xs leading-relaxed text-white/35">{intel?.riskNotes?.[0] ?? intel?.notes?.[0]}</p>
