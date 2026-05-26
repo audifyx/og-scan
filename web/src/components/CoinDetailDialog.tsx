@@ -61,6 +61,7 @@ import {
   type TokenPumpFunIntel,
 } from "@/lib/og";
 import { explorerAddressUrl, getChain } from "@/lib/chains";
+import { fetchEvmTokenSecurity, type EvmTokenSecurity } from "@/lib/evm-intel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -376,6 +377,13 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
     staleTime: 60_000,
   });
 
+  const { data: evmSecurity, isFetching: isFetchingEvmSecurity } = useQuery({
+    queryKey: ["coin-detail-evm-security", chainId, detailToken.id],
+    queryFn: () => fetchEvmTokenSecurity(chainId, detailToken.id),
+    enabled: open && !isSolana && Boolean(detailToken.id),
+    staleTime: 60_000,
+  });
+
   const forensicKey = `${detailToken.chainId ?? "solana"}:${detailToken.id}`;
   const forensicScore = classificationReport?.tokenScores[forensicKey];
   const primaryLabel: string = forensicScore?.classification.primary_label ?? "SCANNING";
@@ -643,7 +651,10 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
               {isSolana && <HolderBundlePanel intel={bundleIntel} isLoading={isFetchingBundleIntel} token={detailToken} />}
               {isSolana && <OnChainIntelPanel token={detailToken} />}
               {isSolana && <PumpFunPanel pumpFun={detailToken.pumpFun} createdAt={createdAt} migratedAt={migratedAt} />}
-              {!isSolana && <EvmChainInfoPanel token={detailToken} chainId={chainId} />}
+              {!isSolana && <EvmContractSecurityPanel security={evmSecurity} isLoading={isFetchingEvmSecurity} />}
+              {!isSolana && <EvmHolderPanel security={evmSecurity} isLoading={isFetchingEvmSecurity} />}
+              {!isSolana && <EvmTradingSecurityPanel security={evmSecurity} isLoading={isFetchingEvmSecurity} />}
+              {!isSolana && <EvmChainInfoPanel token={detailToken} chainId={chainId} security={evmSecurity} />}
             </div>
 
             {/* DEX pools */}
@@ -968,7 +979,86 @@ const PumpFunPanel = ({ pumpFun, createdAt, migratedAt }: { pumpFun?: TokenPumpF
   </Section>
 );
 
-const EvmChainInfoPanel = ({ token, chainId }: { token: JupTokenInfo; chainId: string }) => {
+// ─── EVM Intelligence Panels ──────────────────────────────────────────────────
+
+const EvmSecurityFlag = ({ ok, label }: { ok: boolean; label: string }) => (
+  <span className={cn("rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest", ok ? "border-og-lime/35 bg-og-lime/10 text-og-lime" : "border-red-500/35 bg-red-500/10 text-red-400")}>{label}</span>
+);
+
+const EvmContractSecurityPanel = ({ security, isLoading }: { security?: EvmTokenSecurity | null; isLoading: boolean }) => {
+  const verified = security?.isOpenSource === true;
+  const safe = verified && !security?.isMintable && !security?.canSelfDestruct && !security?.hiddenOwner && !security?.canTakeBackOwnership;
+  return (
+    <Section title="Contract Security" icon={<ShieldCheck className="h-3.5 w-3.5" />} accent="lime"
+      badge={isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-white/30" /> : <span className={cn("rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest", safe ? "border-og-lime/40 bg-og-lime/10 text-og-lime" : security ? "border-red-500/40 bg-red-500/10 text-red-400" : "border-white/10 text-white/40")}>{safe ? "Safe" : security ? "Risks found" : "Scanning"}</span>}>
+      <div className="grid gap-1.5">
+        <DataRow label="Source verified" value={security ? (verified ? "Yes ✓" : "No ✗") : "—"} highlight={verified ? "lime" : "red"} />
+        <DataRow label="Proxy contract" value={security ? (security.isProxy ? "Yes ⚠" : "No ✓") : "—"} highlight={security?.isProxy ? "red" : "lime"} />
+        <DataRow label="Mintable" value={security ? (security.isMintable ? "Yes ⚠" : "No ✓") : "—"} highlight={security?.isMintable ? "red" : "lime"} />
+        <DataRow label="Self-destruct" value={security ? (security.canSelfDestruct ? "Yes ⚠" : "No ✓") : "—"} highlight={security?.canSelfDestruct ? "red" : "lime"} />
+        <DataRow label="Hidden owner" value={security ? (security.hiddenOwner ? "Yes ⚠" : "No ✓") : "—"} highlight={security?.hiddenOwner ? "red" : "lime"} />
+        <DataRow label="Can reclaim ownership" value={security ? (security.canTakeBackOwnership ? "Yes ⚠" : "No ✓") : "—"} highlight={security?.canTakeBackOwnership ? "red" : "lime"} />
+      </div>
+      {security && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <EvmSecurityFlag ok={verified} label="Verified" />
+          <EvmSecurityFlag ok={!security.isMintable} label="Not mintable" />
+          <EvmSecurityFlag ok={!security.isProxy} label="Not proxy" />
+          <EvmSecurityFlag ok={!security.canSelfDestruct} label="No destruct" />
+        </div>
+      )}
+    </Section>
+  );
+};
+
+const EvmTradingSecurityPanel = ({ security, isLoading }: { security?: EvmTokenSecurity | null; isLoading: boolean }) => {
+  const honeypot = security?.isHoneypot === true;
+  const hasTax = (security?.buyTax && parseFloat(security.buyTax) > 0) || (security?.sellTax && parseFloat(security.sellTax) > 0);
+  const safe = security && !honeypot && !hasTax && !security.cannotBuy && !security.transferPausable && !security.slippageModifiable;
+  return (
+    <Section title="Trading Safety" icon={<ShieldAlert className="h-3.5 w-3.5" />} accent="gold"
+      badge={isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-white/30" /> : <span className={cn("rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest", honeypot ? "border-red-500/40 bg-red-500/10 text-red-400" : safe ? "border-og-lime/40 bg-og-lime/10 text-og-lime" : "border-og-gold/40 bg-og-gold/10 text-og-gold")}>{honeypot ? "HONEYPOT ⚠" : safe ? "Safe" : security ? "Caution" : "Scanning"}</span>}>
+      <div className="grid gap-1.5">
+        <DataRow label="Honeypot" value={security ? (honeypot ? "YES ⚠" : "No ✓") : "—"} highlight={honeypot ? "red" : "lime"} />
+        <DataRow label="Buy tax" value={security?.buyTax ? `${(parseFloat(security.buyTax) * 100).toFixed(1)}%` : "—"} highlight={security?.buyTax && parseFloat(security.buyTax) > 0.05 ? "red" : undefined} />
+        <DataRow label="Sell tax" value={security?.sellTax ? `${(parseFloat(security.sellTax) * 100).toFixed(1)}%` : "—"} highlight={security?.sellTax && parseFloat(security.sellTax) > 0.05 ? "red" : undefined} />
+        <DataRow label="Cannot buy" value={security ? (security.cannotBuy ? "Yes ⚠" : "No ✓") : "—"} highlight={security?.cannotBuy ? "red" : "lime"} />
+        <DataRow label="Transfer pausable" value={security ? (security.transferPausable ? "Yes ⚠" : "No ✓") : "—"} highlight={security?.transferPausable ? "red" : "lime"} />
+        <DataRow label="Slippage modifiable" value={security ? (security.slippageModifiable ? "Yes ⚠" : "No ✓") : "—"} highlight={security?.slippageModifiable ? "red" : "lime"} />
+        <DataRow label="Blacklist" value={security ? (security.isBlacklisted ? "Yes ⚠" : "No") : "—"} highlight={security?.isBlacklisted ? "red" : undefined} />
+        <DataRow label="Trading cooldown" value={security ? (security.tradingCooldown ? "Yes" : "No") : "—"} />
+      </div>
+    </Section>
+  );
+};
+
+const EvmHolderPanel = ({ security, isLoading }: { security?: EvmTokenSecurity | null; isLoading: boolean }) => (
+  <Section title="Holder Analysis" icon={<ShieldAlert className="h-3.5 w-3.5" />} accent="gold"
+    badge={isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-white/30" /> : <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white/35">{security ? fmtNum(security.holderCount) + " holders" : "Scanning"}</span>}>
+    <div className="grid gap-1.5">
+      <DataRow label="Holders" value={security ? fmtNum(security.holderCount) : "—"} />
+      <DataRow label="Top holder" value={security ? `${security.topHolderPercent.toFixed(1)}%` : "—"} highlight={security && security.topHolderPercent > 20 ? "red" : security && security.topHolderPercent > 10 ? "gold" : undefined} />
+      <DataRow label="Top 10" value={security ? `${security.top10Percent.toFixed(1)}%` : "—"} highlight={security && security.top10Percent > 50 ? "red" : security && security.top10Percent > 30 ? "gold" : undefined} />
+      <DataRow label="Creator" value={shortAddr(security?.creatorAddress ?? undefined, 6)} />
+      <DataRow label="Creator %" value={security ? `${security.creatorPercent.toFixed(2)}%` : "—"} />
+      <DataRow label="Owner" value={shortAddr(security?.ownerAddress ?? undefined, 6)} />
+      <DataRow label="Owner %" value={security ? `${security.ownerPercent.toFixed(2)}%` : "—"} />
+    </div>
+    {(security?.topHolders ?? []).length > 0 && (
+      <div className="mt-3 grid gap-1.5">
+        {(security?.topHolders ?? []).slice(0, 5).map((holder) => (
+          <div key={holder.address}
+            className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.07] bg-white/[0.025] px-3 py-2 font-mono text-[9px] uppercase tracking-widest">
+            <span className="truncate text-white/35">{holder.isContract ? "📄 " : "👤 "}{holder.tag || shortAddr(holder.address, 4)}</span>
+            <span className={cn("shrink-0", holder.percent > 10 ? "text-red-400" : "text-og-gold")}>{holder.percent.toFixed(1)}%{holder.isLocked ? " 🔒" : ""}</span>
+          </div>
+        ))}
+      </div>
+    )}
+  </Section>
+);
+
+const EvmChainInfoPanel = ({ token, chainId, security }: { token: JupTokenInfo; chainId: string; security?: EvmTokenSecurity | null }) => {
   const chainCfg = getChain(chainId);
   const explorerHost = chainCfg.explorerUrl.replace(/^https?:\/\//, "").split("/")[0];
   const createdAt = token.firstPool?.createdAt ?? token.migrationCreatedAt;
@@ -982,6 +1072,7 @@ const EvmChainInfoPanel = ({ token, chainId }: { token: JupTokenInfo; chainId: s
         <DataRow label="DEX" value={token.pairDexId ?? "—"} />
         <DataRow label="Liquidity" value={fmtUsd(tokenEffectiveLiquidityUsd(token))} highlight={tokenEffectiveLiquidityUsd(token) >= 10_000 ? "lime" : tokenEffectiveLiquidityUsd(token) >= 1_000 ? "gold" : "red"} />
         <DataRow label="Market cap" value={fmtUsd(token.mcap ?? token.fdv)} />
+        {security?.honeypotWithSameCreator && <DataRow label="⚠ Same creator honeypots" value="Yes" highlight="red" />}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <a href={explorerAddressUrl(chainId, token.id)} target="_blank" rel="noreferrer"
