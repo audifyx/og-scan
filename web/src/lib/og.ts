@@ -3013,8 +3013,11 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     const bExact = normalizeTickerSymbol(b.symbol) === normalizedQuery ? 0 : 1;
     return aExact - bExact;
   });
+  console.log("[OG_DEBUG] pool ready", { poolSize: pool.length, firstSymbol: pool[0]?.symbol });
   const chainDatedPool: JupTokenInfo[] = await withOnChainCreationDates(pool);
+  console.log("[OG_DEBUG] chainDatedPool done", { size: chainDatedPool.length });
   const enriched: JupTokenInfo[] = await enrichTokensWithMarketIntel(chainDatedPool, { includeAth: true, includeOnChainIntel: true, maxOnChain: 8, maxBirdeye: 16 });
+  console.log("[OG_DEBUG] enriched done", { size: enriched.length, firstLiq: enriched[0]?.liquidity, firstEffLiq: enriched[0]?.effectiveLiquidityUsd });
 
   // ── Safety filtering ────────────────────────────────────────────────────
   const liquidCandidates: JupTokenInfo[] = enriched.filter((token) => {
@@ -3031,6 +3034,7 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     return true;
   });
 
+  console.log("[OG_DEBUG] safety filtering", { liquidCount: liquidCandidates.length, originCount: originPool.length });
   const rawCandidates: JupTokenInfo[] = originPool
     .filter((token) => isCanonicalSolanaOriginForQuery(token, clean) || isKnownCanonicalMint(token.id) || Number.isFinite(tokenCreatedAtMs(token)) || Number.isFinite(tokenPoolCreatedAtMs(token)))
     .sort(compareByOriginProofAndSafety)
