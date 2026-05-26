@@ -1020,6 +1020,8 @@ const EvmTradingSecurityPanel = ({ security, isLoading }: { security?: EvmTokenS
       badge={isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-white/30" /> : <span className={cn("rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest", honeypot ? "border-red-500/40 bg-red-500/10 text-red-400" : safe ? "border-og-lime/40 bg-og-lime/10 text-og-lime" : "border-og-gold/40 bg-og-gold/10 text-og-gold")}>{honeypot ? "HONEYPOT ⚠" : safe ? "Safe" : security ? "Caution" : "Scanning"}</span>}>
       <div className="grid gap-1.5">
         <DataRow label="Honeypot" value={security ? (honeypot ? "YES ⚠" : "No ✓") : "—"} highlight={honeypot ? "red" : "lime"} />
+        {honeypot && security?.honeypotReason && <DataRow label="Reason" value={security.honeypotReason} highlight="red" />}
+        {honeypot && security?.honeypotRiskLevel != null && <DataRow label="Risk level" value={`${security.honeypotRiskLevel}/100`} highlight="red" />}
         <DataRow label="Buy tax" value={security?.buyTax ? `${(parseFloat(security.buyTax) * 100).toFixed(1)}%` : "—"} highlight={security?.buyTax && parseFloat(security.buyTax) > 0.05 ? "red" : undefined} />
         <DataRow label="Sell tax" value={security?.sellTax ? `${(parseFloat(security.sellTax) * 100).toFixed(1)}%` : "—"} highlight={security?.sellTax && parseFloat(security.sellTax) > 0.05 ? "red" : undefined} />
         <DataRow label="Cannot buy" value={security ? (security.cannotBuy ? "Yes ⚠" : "No ✓") : "—"} highlight={security?.cannotBuy ? "red" : "lime"} />

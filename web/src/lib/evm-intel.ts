@@ -23,6 +23,8 @@ export interface EvmTokenSecurity {
 
   // Trading
   isHoneypot: boolean;
+  honeypotReason: string;
+  honeypotRiskLevel: number;
   buyTax: string;
   sellTax: string;
   cannotBuy: boolean;
@@ -61,9 +63,21 @@ export interface EvmHolder {
   isLocked: boolean;
 }
 
+// ─── Honeypot.is types ────────────────────────────────────────────────────────
+
+interface HoneypotIsResult {
+  isHoneypot: boolean;
+  honeypotReason: string;
+  riskLevel: number;
+  flags: { flag: string; description: string; severity: string }[];
+  sellTax: number;
+  buyTax: number;
+}
+
 // ─── Cache ────────────────────────────────────────────────────────────────────
 
 const securityCache = new Map<string, Promise<EvmTokenSecurity | null>>();
+const honeypotCache = new Map<string, Promise<HoneypotIsResult | null>>();
 
 // ─── GoPlus API ───────────────────────────────────────────────────────────────
 
@@ -74,6 +88,45 @@ function goPlusChainId(dexScreenerChainId: string): number | null {
 
 function flag(val: string | number | undefined | null): boolean {
   return val === "1" || val === 1;
+}
+
+async function fetchHoneypotIs(
+  chainId: string,
+  contractAddress: string,
+): Promise<HoneypotIsResult | null> {
+  const cacheKey = `${chainId}:${contractAddress.toLowerCase()}`;
+  const cached = honeypotCache.get(cacheKey);
+  if (cached) return cached;
+
+  const task = (async (): Promise<HoneypotIsResult | null> => {
+    const numericChainId = goPlusChainId(chainId);
+    if (numericChainId == null) return null;
+    try {
+      const url = `https://api.honeypot.is/v2/IsHoneypot?address=${contractAddress.toLowerCase()}&chainID=${numericChainId}`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const json = await res.json();
+      const result = json.honeypotResult ?? {};
+      const sim = json.simulationResult ?? {};
+      return {
+        isHoneypot: result.isHoneypot === true,
+        honeypotReason: result.honeypotReason ?? "",
+        riskLevel: json.summary?.riskLevel ?? 0,
+        flags: (json.summary?.flags ?? []).map((f: Record<string, string>) => ({
+          flag: f.flag ?? "",
+          description: f.description ?? "",
+          severity: f.severity ?? "",
+        })),
+        sellTax: sim.sellTax ?? 0,
+        buyTax: sim.buyTax ?? 0,
+      };
+    } catch {
+      return null;
+    }
+  })();
+
+  honeypotCache.set(cacheKey, task);
+  return task;
 }
 
 export async function fetchEvmTokenSecurity(
@@ -111,6 +164,14 @@ export async function fetchEvmTokenSecurity(
     const top10Pct = holders.reduce((sum, h) => sum + h.percent, 0);
     const topHolderPct = holders.length > 0 ? holders[0].percent : 0;
 
+    // Cross-check with honeypot.is for more accurate honeypot detection
+    const hpIs = await fetchHoneypotIs(chainId, contractAddress).catch(() => null);
+    const goPlusHoneypot = flag(data.is_honeypot);
+    const honeypotIsHoneypot = hpIs?.isHoneypot === true;
+    // Also flag as honeypot if GoPlus returns empty sell_tax (can't simulate sell)
+    const sellTaxEmpty = data.sell_tax === "" || data.sell_tax == null;
+    const isHoneypot = goPlusHoneypot || honeypotIsHoneypot || (sellTaxEmpty && !goPlusHoneypot && flag(data.is_in_dex));
+
     return {
       isOpenSource: flag(data.is_open_source),
       isProxy: flag(data.is_proxy),
@@ -120,9 +181,11 @@ export async function fetchEvmTokenSecurity(
       hiddenOwner: flag(data.hidden_owner),
       canTakeBackOwnership: flag(data.can_take_back_ownership),
 
-      isHoneypot: flag(data.is_honeypot),
-      buyTax: String(data.buy_tax ?? ""),
-      sellTax: String(data.sell_tax ?? ""),
+      isHoneypot,
+      honeypotReason: honeypotIsHoneypot ? (hpIs?.honeypotReason ?? "Honeypot detected") : sellTaxEmpty ? "Sell simulation failed — cannot sell" : "",
+      honeypotRiskLevel: hpIs?.riskLevel ?? (isHoneypot ? 100 : 0),
+      buyTax: hpIs ? String(hpIs.buyTax) : String(data.buy_tax ?? ""),
+      sellTax: hpIs ? String(hpIs.sellTax) : String(data.sell_tax ?? ""),
       cannotBuy: flag(data.cannot_buy),
       slippageModifiable: flag(data.slippage_modifiable),
       isAntiWhale: flag(data.is_anti_whale),
