@@ -3,7 +3,7 @@
  * Provides offline caching, background sync, Web Push notifications, and PWA install support.
  */
 
-const CACHE_NAME = "ogscan-v2";
+const CACHE_NAME = "ogscan-v3";
 const STATIC_ASSETS = [
   "/",
   "/app",
