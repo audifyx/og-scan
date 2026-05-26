@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Global iOS / mobile input fixes ─── */
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari: ensure all inputs are tappable and show keyboard */
+  input, textarea, select, [contenteditable] {
+    font-size: 16px !important; /* prevent iOS auto-zoom */
+    -webkit-appearance: none;
+    -webkit-user-select: text;
+    touch-action: manipulation;
+  }
+}
+
 /* OG SCANNER — theme-aware dark UI
    Defaults match og-hacker preset. ThemeProvider overrides on mount. */
 
@@ -402,6 +413,15 @@
   box-shadow: none !important;
   color: rgb(255 255 255 / 0.96) !important;
   outline: none !important;
+  /* iOS fixes — prevent zoom, ensure tappable, allow keyboard */
+  font-size: 16px !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .og-search-input::placeholder,
@@ -452,6 +472,9 @@
   border: 1px solid rgb(255 255 255 / 0.12) !important;
   background: rgb(0 0 0 / 0.22) !important;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08) !important;
+  font-size: 16px !important;
+  -webkit-appearance: none !important;
+  touch-action: manipulation !important;
 }
 
 .og-filter-input:focus,
