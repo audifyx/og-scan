@@ -862,9 +862,11 @@ function pairQuoteLiquidityUsd(pair: DexSearchPair): number | undefined {
   // Stablecoin quotes: amount IS the USD value
   if ((quoteMint && STABLE_QUOTE_MINTS.has(quoteMint)) || STABLE_QUOTE_SYMBOLS.has(quoteSymbol)) return quoteAmount;
 
-  // SOL-quoted pairs: derive USD from the pair's reported USD liquidity.
-  // In an x*y=k AMM pool the quote side is ~half the reported USD liquidity.
-  if (quoteMint === SOL_MINT || quoteSymbol === "SOL" || quoteSymbol === "WSOL") {
+  // Native-asset-quoted pairs (SOL, ETH, WETH, BNB, etc.): derive USD from
+  // the pair's reported USD liquidity.  In an x*y=k AMM pool the quote side
+  // is ~half the reported USD liquidity.
+  const NATIVE_QUOTE_SYMBOLS = new Set(["SOL", "WSOL", "ETH", "WETH", "BNB", "WBNB", "MATIC", "WMATIC", "AVAX", "WAVAX", "FTM", "WFTM"]);
+  if (quoteMint === SOL_MINT || NATIVE_QUOTE_SYMBOLS.has(quoteSymbol)) {
     const reportedUsd: number | undefined = pair.liquidity?.usd;
     if (reportedUsd != null && Number.isFinite(reportedUsd) && reportedUsd > 0) {
       return reportedUsd / 2;
@@ -1363,7 +1365,7 @@ export async function enrichTokensWithMarketIntel(
       liquidity: pair ? pairEffectiveLiquidity ?? marketPatch.effectiveLiquidityUsd ?? token.effectiveLiquidityUsd ?? token.liquidity : marketPatch.effectiveLiquidityUsd ?? token.effectiveLiquidityUsd ?? token.liquidity,
       reportedLiquidity: bestLiquidityUsd(token.reportedLiquidity ?? token.liquidity, pairReportedLiquidity, marketPatch.liquidity),
       effectiveLiquidityUsd: pair ? pairEffectiveLiquidity ?? marketPatch.effectiveLiquidityUsd ?? token.effectiveLiquidityUsd ?? token.liquidity : marketPatch.effectiveLiquidityUsd ?? token.effectiveLiquidityUsd ?? token.liquidity,
-      quoteLiquidityUsd: pairQuoteLiquidityUsd(pair ?? ({} as DexSearchPair)) ?? token.quoteLiquidityUsd,
+      quoteLiquidityUsd: pair ? pairQuoteLiquidityUsd(pair) : token.quoteLiquidityUsd,
       lpPulled,
       lpPullReason: forcedLpBlocked
         ? "Known LP-pulled/scam mint: blocked from TRUE OG selection even if it is first on-chain."
