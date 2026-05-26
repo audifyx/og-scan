@@ -24,7 +24,7 @@ const LINKS = {
 };
 
 const FEE_BREAKDOWN = [
-  { label: "Platform & Development", percent: 50, desc: "API credits, tools, infrastructure, and continuous development", color: "from-primary to-accent", icon: Zap },
+  { label: "Platform & Development", percent: 50, desc: "AI tools, high-performance infrastructure, and continuous platform evolution", color: "from-primary to-accent", icon: Zap },
   { label: "Team, Marketing & Community", percent: 25, desc: "Team compensation, marketing campaigns, community events, and ecosystem growth", color: "from-blue-500 to-cyan-500", icon: Users },
   { label: "Buybacks, Burns & Ads", percent: 25, desc: "Token buybacks, burns to reduce supply, DEX boosts, and project advertising", color: "from-green-500 to-emerald-500", icon: Flame },
 ];
@@ -167,7 +167,7 @@ const OfficialToken = () => {
                   { icon: Target, label: "Real-time analytics" },
                   { icon: Users, label: "Social trading lobbies" },
                   { icon: Zap, label: "Token sniping tools" },
-                  { icon: Coins, label: "Free credit system" },
+                  { icon: Coins, label: "No paywalls or subscriptions" },
                 ].map((f, i) => (
                   <div key={i} className="flex items-center gap-2 p-3 rounded-xl bg-white/[0.04] border border-border/30">
                     <f.icon className="h-4 w-4 text-[#22d3ee]" />
@@ -267,7 +267,7 @@ const OfficialToken = () => {
             <CardContent className="space-y-4">
               {[
                 { q: "Is Sol Tools really free?", a: "Yes! Sol Tools is completely free forever. The $SOLTOOLS token funds platform development through transaction fees." },
-                { q: "How do credits work?", a: "Every user gets 10,000 credits monthly with a 6,500 daily usable cap. Tool usage costs 1-12 credits depending on the feature." },
+                { q: "Is the platform really free?", a: "Yes. Every tool on OG Scan is free to use. We don't believe in paywalls or restricting access to the intelligence you need to trade safely." },
                 { q: "What is the $SOLTOOLS token?", a: "It's the utility token that powers the Sol Tools ecosystem. Transaction fees are used to fund development, marketing, and buybacks." },
                 { q: "How do I get started?", a: "Simply create an account, and you'll have instant access to 30+ Solana trading tools, social lobbies, and analytics." },
                 { q: "Is my data safe?", a: "Yes. We use enterprise-grade encryption and never store private keys. Your wallet address is used only for read-only tracking." },
