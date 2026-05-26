@@ -98,7 +98,6 @@ const SOURCES: Source[] = [
     query: "pumpswap",
     desc: "Bonding curves that graduated → PumpSwap / Raydium",
     matches: (p) =>
-      p.chainId === "solana" &&
       (p.dexId === "pumpswap" ||
         (p.labels ?? []).some((l) => /pump/i.test(l)) ||
         /pump/i.test(p.dexId)),
@@ -111,7 +110,6 @@ const SOURCES: Source[] = [
     query: "moonshot",
     desc: "Moonshot launches that hit the curve",
     matches: (p) =>
-      p.chainId === "solana" &&
       (p.dexId === "moonshot" ||
         (p.labels ?? []).some((l) => /moonshot/i.test(l))),
   },
@@ -123,9 +121,17 @@ const SOURCES: Source[] = [
     query: "meteora",
     desc: "Jupiter Studio / Meteora DLMM fresh launches",
     matches: (p) =>
-      p.chainId === "solana" &&
       (p.dexId === "meteora" ||
         (p.labels ?? []).some((l) => /dlmm|dynamic/i.test(l))),
+  },
+  {
+    id: "uniswap",
+    label: "UNISWAP",
+    Icon: Sparkles,
+    color: "text-[#FF007A]",
+    query: "uniswap",
+    desc: "Uniswap V2/V3 new pairs across EVM chains",
+    matches: (p) => /uniswap/i.test(p.dexId),
   },
   {
     id: "all",
@@ -133,8 +139,8 @@ const SOURCES: Source[] = [
     Icon: Sparkles,
     color: "text-og-lime",
     query: "SOL",
-    desc: "Every new SOL pair, ranked by quality + recency",
-    matches: (p) => p.chainId === "solana",
+    desc: "Every new pair across all chains, ranked by quality + recency",
+    matches: () => true,
   },
 ];
 

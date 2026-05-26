@@ -136,13 +136,13 @@ function passesTrendFilters(coin: TrendCoin, interval: TrendInterval, filters: T
 function dedupePairsByToken(pairs: DexPair[]): DexPair[] {
   const best = new Map<string, DexPair>();
   for (const pair of pairs) {
-    if (pair.chainId !== "solana") continue;
     const tokenAddress = pair.baseToken?.address;
     if (!tokenAddress) continue;
-    const previous = best.get(tokenAddress);
+    const key = `${pair.chainId ?? "solana"}:${tokenAddress}`;
+    const previous = best.get(key);
     const previousVolume = previous?.volume?.h24 ?? 0;
     const currentVolume = pair.volume?.h24 ?? 0;
-    if (!previous || currentVolume > previousVolume) best.set(tokenAddress, pair);
+    if (!previous || currentVolume > previousVolume) best.set(key, pair);
   }
   return Array.from(best.values());
 }
@@ -165,7 +165,7 @@ async function fetchDexBoosts(): Promise<DexBoost[]> {
   for (const response of responses) {
     if (response.status !== "fulfilled") continue;
     for (const boost of response.value) {
-      if (boost.chainId !== "solana" || !boost.tokenAddress) continue;
+      if (!boost.tokenAddress) continue;
       const previous = boosts.get(boost.tokenAddress);
       const previousAmount = previous?.amount ?? previous?.totalAmount ?? 0;
       const nextAmount = boost.amount ?? boost.totalAmount ?? 0;

@@ -96,8 +96,8 @@ const Tools = () => {
         marketCap: pair?.fdv || data?.marketCap || 0,
         image: pair?.info?.imageUrl || data?.image,
         links,
-        dexUrl: `https://dexscreener.com/solana/${tokenAddress}`,
-        solscanUrl: `https://solscan.io/token/${tokenAddress}`,
+        dexUrl: pair?.chainId ? `https://dexscreener.com/${pair.chainId}/${tokenAddress}` : `https://dexscreener.com/solana/${tokenAddress}`,
+        solscanUrl: pair?.chainId && pair.chainId !== "solana" ? `https://etherscan.io/token/${tokenAddress}` : `https://solscan.io/token/${tokenAddress}`,
         rugcheckUrl: `https://rugcheck.xyz/tokens/${tokenAddress}`,
       });
       toast.success(`Analyzed ${pair?.baseToken?.symbol || data?.symbol || 'token'}`);
