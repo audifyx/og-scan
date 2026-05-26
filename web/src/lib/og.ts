@@ -2962,6 +2962,8 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   };
   if (!clean || !normalizedQuery) return emptyReport;
 
+  console.log("[OG_DEBUG] forensicOgAttribution start", { clean, normalizedQuery: normalizedQuery.substring(0, 30) });
+
   const canonicalMint: string | undefined = canonicalSolanaOriginMintForQuery(clean);
   const [jupiterResult, dexResult, canonicalJupiterResult, canonicalDexResult] = await Promise.allSettled([
     jupSearchToken(clean),
@@ -2987,9 +2989,14 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
     : [];
 
   const merged: JupTokenInfo[] = mergeMultiChainTokenCandidates([...jupiterTokens, ...dexTokens, ...canonicalJupiterTokens, ...canonicalDexTokens]);
+  console.log("[OG_DEBUG] merged", { jupCount: jupiterTokens.length, dexCount: dexTokens.length, mergedCount: merged.length, firstChain: merged[0]?.chainId, firstSymbol: merged[0]?.symbol, firstId: merged[0]?.id?.substring(0, 20) });
   const similar = merged
     .map((token: JupTokenInfo) => ({ token, similarity: tokenNarrativeSimilarity(token, normalizedQuery) }))
-    .filter((item) => item.similarity >= 0.58 || normalizeTickerSymbol(item.token.symbol).includes(normalizedQuery) || isCanonicalSolanaOriginForQuery(item.token, clean) || item.token.id.toLowerCase() === clean.toLowerCase())
+    .filter((item) => {
+      const caMatch = item.token.id.toLowerCase() === clean.toLowerCase();
+      if (merged.length <= 5) console.log("[OG_DEBUG] filter", { symbol: item.token.symbol, similarity: item.similarity, caMatch, tokenId: item.token.id?.substring(0, 20), clean: clean.substring(0, 20) });
+      return item.similarity >= 0.58 || normalizeTickerSymbol(item.token.symbol).includes(normalizedQuery) || isCanonicalSolanaOriginForQuery(item.token, clean) || caMatch;
+    })
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, 64)
     .map((item) => item.token);
