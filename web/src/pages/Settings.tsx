@@ -100,7 +100,7 @@ const Settings = () => {
       // Get referral leaderboard entry (it's a view)
       const { data: lb } = await supabase
         .from("referral_leaderboard")
-        .select("invited, credits_earned")
+        .select("invited, xp_earned:credits_earned")
         .eq("inviter_id", user.id)
         .maybeSingle();
       // Get recent invites with usernames
@@ -118,7 +118,7 @@ const Settings = () => {
         const nameMap = new Map((profs || []).map(p => [p.user_id, p.username || "Anonymous"]));
         recentInvites = recent.map(r => ({ username: nameMap.get(r.invitee_id) || "Anonymous", created_at: r.created_at }));
       }
-      setInviteStats({ invited: lb?.invited || 0, xpEarned: lb?.credits_earned || 0, recentInvites });
+      setInviteStats({ invited: lb?.invited || 0, xpEarned: lb?.xp_earned || 0, recentInvites });
       setLoadingInvite(false);
     };
     loadInviteStats();

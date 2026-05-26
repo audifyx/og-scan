@@ -52,7 +52,7 @@ interface TraderRow {
 interface InviteLeaderRow {
   inviter_id: string;
   invited: number;
-  credits_earned: number;
+  xp_earned: number;
   username?: string;
   avatar_url?: string;
 }
@@ -160,7 +160,7 @@ const Leaderboard = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("referral_leaderboard")
-        .select("inviter_id, invited, credits_earned")
+        .select("inviter_id, invited, xp_earned:credits_earned")
         .order("invited", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -233,7 +233,7 @@ const Leaderboard = () => {
               {[
                 { label: "Total Inviters", value: String(inviteRows?.length || 0), icon: Users, color: "text-og-cyan" },
                 { label: "Total Invites", value: (inviteRows || []).reduce((s, r) => s + r.invited, 0).toLocaleString(), icon: Gift, color: "text-og-lime" },
-                { label: "XP Awarded", value: (inviteRows || []).reduce((s, r) => s + r.credits_earned, 0).toLocaleString(), icon: Zap, color: "text-amber-400" },
+                { label: "XP Awarded", value: (inviteRows || []).reduce((s, r) => s + r.xp_earned, 0).toLocaleString(), icon: Zap, color: "text-amber-400" },
               ].map((s, i) => (
                 <div key={i} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -303,7 +303,7 @@ const Leaderboard = () => {
                           <p className="text-[8px] text-white/20 md:hidden">invited</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-black text-amber-400">{row.credits_earned.toLocaleString()}</p>
+                          <p className="text-sm font-black text-amber-400">{row.xp_earned.toLocaleString()}</p>
                           <p className="text-[8px] text-white/20 md:hidden">XP</p>
                         </div>
                       </div>

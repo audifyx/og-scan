@@ -1,15 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, Sparkles, DollarSign } from "lucide-react";
+import { Send, Bot, User, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/hooks/use-toast";
-import { useCredits } from "@/hooks/useCredits";
-import { CreditBalance } from "@/components/credits/CreditBalance";
-import { CREDIT_PRICING, formatCreditCost } from "@/lib/credit-pricing";
 
 interface Message {
   role: "user" | "assistant";
@@ -33,9 +29,6 @@ export const AIChat = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { spendCredits, canAfford } = useCredits();
-
-  const chatCost = CREDIT_PRICING['ai-chat'].cost;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -46,29 +39,12 @@ export const AIChat = () => {
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
 
-    // Check if user can afford
-    if (!canAfford('ai-chat')) {
-      toast({
-        title: "Insufficient Credits",
-        description: `AI Chat costs ${formatCreditCost(chatCost)} per message`,
-        variant: "destructive",
-      });
-      return;
-    }
-
     const userMessage: Message = { role: "user", content: text };
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
     try {
-      // Spend credits first
-      const spent = await spendCredits('ai-chat', `Chat: ${text.slice(0, 50)}...`);
-      if (!spent) {
-        setIsLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke("ai-analyzer", {
         body: {
           action: "chat",
@@ -111,12 +87,6 @@ export const AIChat = () => {
             <h3 className="font-semibold text-sm">SolanaGPT</h3>
             <p className="text-[10px] text-muted-foreground">AI Trading Assistant</p>
           </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.5">
-            <DollarSign className="h-2.5 w-2.5 mr-0.5" />
-            {chatCost.toFixed(0)}/msg
-          </Badge>
         </div>
       </div>
 
