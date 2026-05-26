@@ -18,7 +18,7 @@ import {
   TrendingUp, Heart, ThumbsUp, Eye, BarChart3, Copy, Zap,
   Shield, Play, Pause, Minimize2, Maximize2, ChevronRight,
   AlertCircle, CheckCircle2, Repeat2, ExternalLink, UserPlus,
-  Timer, MessageCircleQuestion, Twitter, Trash2,
+  Timer, MessageCircleQuestion, Twitter, Trash2, Code2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -1426,6 +1426,63 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
             <p className="text-[9px] text-white/20 mt-1.5 leading-relaxed">
               Anyone with this link can listen live — no account required. They'll appear as <span className="text-white/40">"X listening via public link"</span> in your space.
             </p>
+          </div>
+
+          {/* ── Embed this space ── */}
+          <div className="pt-3 border-t border-white/[0.05]">
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Code2 className="h-3 w-3" /> Embed This Space
+            </p>
+            <div className="bg-black/30 rounded-xl border border-white/[0.06] p-3">
+              <pre className="text-[9px] text-emerald-400/70 whitespace-pre-wrap break-all font-mono leading-relaxed">{`<iframe\n  src="${typeof window !== "undefined" ? window.location.origin : "https://ogscan.fun"}/embed/space/${space.id}"\n  width="340" height="260"\n  frameborder="0"\n  allow="autoplay"\n  style="border-radius:16px;border:none;"\n></iframe>`}</pre>
+            </div>
+            <button
+              onClick={() => {
+                const code = `<iframe\n  src="${window.location.origin}/embed/space/${space.id}"\n  width="340" height="260"\n  frameborder="0"\n  allow="autoplay"\n  style="border-radius:16px;border:none;"\n></iframe>`;
+                navigator.clipboard.writeText(code);
+                toast.success("Embed code copied! 📋");
+              }}
+              className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/40 text-[10px] hover:bg-white/[0.08] transition"
+            >
+              <Copy className="h-3 w-3" /> Copy Embed Code
+            </button>
+          </div>
+
+          {/* ── Your profile page ── */}
+          {user && (
+            <div className="pt-3 border-t border-white/[0.05]">
+              <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Users className="h-3 w-3" /> Your Public Page
+              </p>
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <code className="text-[10px] text-white/30 flex-1 truncate">ogscan.fun/u/{space.host_username || "you"}</code>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/u/${space.host_username}`); toast.success("Profile page link copied!"); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-400 text-[10px] font-bold hover:bg-violet-500/20 transition whitespace-nowrap"
+                >
+                  <Copy className="h-3 w-3" /> Copy
+                </button>
+              </div>
+              <p className="text-[9px] text-white/20 mt-1.5">
+                Your page auto-shows a live banner whenever you're hosting. Embed it on your website too.
+              </p>
+            </div>
+          )}
+
+          {/* ── Cross-post to X ── */}
+          <div className="pt-3 border-t border-white/[0.05]">
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Twitter className="h-3 w-3" /> Post to X / Twitter
+            </p>
+            <button
+              onClick={() => {
+                const tweet = `🎙️ I'm live on OGScan Spaces!\n\n"${space.title}"\n\nAnyone can listen — no login needed:\n${window.location.origin}/space/${space.id}\n\n#OGScan #CryptoSpaces`;
+                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, "_blank", "width=600,height=500");
+              }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#1d9bf0]/10 border border-[#1d9bf0]/20 text-[#1d9bf0] text-[10px] font-bold hover:bg-[#1d9bf0]/20 transition w-full justify-center"
+            >
+              <Twitter className="h-3.5 w-3.5" /> Announce on X
+            </button>
           </div>
         </div>
       )}

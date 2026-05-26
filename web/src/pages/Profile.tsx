@@ -60,6 +60,7 @@ interface UserProfile {
   verified?: boolean;
   location?: string | null;
   created_at?: string;
+  page_accent?: string | null;
 }
 
 interface UserActivity {
@@ -396,6 +397,7 @@ const Profile = () => {
         twitter_handle: editedProfile.twitter_handle, discord_handle: editedProfile.discord_handle,
         website: editedProfile.website, is_public: editedProfile.is_public,
         wallet_address: editedProfile.wallet_address,
+        page_accent: editedProfile.page_accent,
       }).eq("user_id", user.id);
       if (error) throw error;
       setProfile({ ...profile, ...editedProfile } as UserProfile);
@@ -677,6 +679,47 @@ const Profile = () => {
                   <Label className="text-xs text-white/50 flex items-center gap-1"><Wallet className="h-3 w-3" /> Solana Wallet</Label>
                   <Input value={editedProfile.wallet_address || ""} onChange={e => setEditedProfile({ ...editedProfile, wallet_address: e.target.value })} className="h-9 rounded-xl text-sm font-mono" placeholder="Wallet address for live stats" />
                 </div>
+
+                {/* ── Page Accent Color ── */}
+                <div className="col-span-2 space-y-2">
+                  <Label className="text-xs text-white/50">Your Page Accent Color</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { key: "violet",  hex: "#7c3aed" },
+                      { key: "sky",     hex: "#0284c7" },
+                      { key: "emerald", hex: "#059669" },
+                      { key: "amber",   hex: "#d97706" },
+                      { key: "rose",    hex: "#e11d48" },
+                      { key: "cyan",    hex: "#0891b2" },
+                      { key: "pink",    hex: "#db2777" },
+                      { key: "indigo",  hex: "#4f46e5" },
+                    ].map(({ key, hex }) => (
+                      <button
+                        key={key}
+                        onClick={() => setEditedProfile({ ...editedProfile, page_accent: key })}
+                        className={`h-7 w-7 rounded-full border-2 transition-all ${(editedProfile.page_accent || "violet") === key ? "border-white scale-110 shadow-lg" : "border-white/20 hover:border-white/50"}`}
+                        style={{ backgroundColor: hex }}
+                        title={key}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Your Public Page URL ── */}
+                {editedProfile.username && (
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs text-white/50">Your Public Page</Label>
+                    <div className="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+                      <code className="text-xs text-white/45 flex-1 truncate">ogscan.fun/u/{editedProfile.username}</code>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(`https://ogscan.fun/u/${editedProfile.username}`); toast.success("Page URL copied!"); }}
+                        className="text-white/30 hover:text-white/60 transition-colors"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center gap-2">

@@ -39,6 +39,9 @@ import Admin from "./pages/Admin";
 import ArtFeed from "./pages/ArtFeed";
 import SpaceReplay from "./pages/SpaceReplay";
 import PublicSpaceListen from "./pages/PublicSpaceListen";
+import UserPublicPage from "./pages/UserPublicPage";
+import UserPageWidget from "./pages/UserPageWidget";
+import EmbedSpace from "./pages/EmbedSpace";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
@@ -160,6 +163,13 @@ const App = () => (
             <Route path="/listen/:spaceId" element={<SpaceReplay />} />
             {/* ── Public: Live space listener (no auth required) ── */}
             <Route path="/space/:spaceId" element={<PublicSpaceListen />} />
+
+            {/* ── Public: User profile pages + widgets (no auth) ── */}
+            <Route path="/u/:username" element={<UserPublicPage />} />
+            <Route path="/u/:username/widget" element={<UserPageWidget />} />
+
+            {/* ── Public: Embeddable space player (no auth, no chrome) ── */}
+            <Route path="/embed/space/:spaceId" element={<EmbedSpace />} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
