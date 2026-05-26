@@ -15,7 +15,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/lib/supabase";
+import { solanaTracker, analyzeToken as analyzeTokenDirect, getTokenHolders, getLiquidityPools, getWalletOverview, getWalletPnL, getTransactions } from "@/lib/solana-tools";
+import { getChain, explorerAddressUrl, isSolana } from "@/lib/chains";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useCredits } from "@/hooks/useCredits";
@@ -54,6 +55,54 @@ const Tools = () => {
   const [activeTool, setActiveTool] = useState("rug-checker");
   const { spendCredits, canAfford } = useCredits();
 
+  // Wallet Profiler state
+  const [walletAddress, setWalletAddress] = useState("");
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletData, setWalletData] = useState<any>(null);
+
+  // Holder Scanner state
+  const [holderToken, setHolderToken] = useState("");
+  const [holderLoading, setHolderLoading] = useState(false);
+  const [holderData, setHolderData] = useState<any[]>([]);
+
+  // Liquidity Scanner state
+  const [liqToken, setLiqToken] = useState("");
+  const [liqLoading, setLiqLoading] = useState(false);
+  const [liqData, setLiqData] = useState<any[]>([]);
+
+  const runWalletProfile = async () => {
+    if (!walletAddress || walletAddress.length < 32) { toast.error("Enter a valid wallet address"); return; }
+    setWalletLoading(true); setWalletData(null);
+    try {
+      const [overview, pnl] = await Promise.allSettled([getWalletOverview(walletAddress), getWalletPnL(walletAddress)]);
+      setWalletData({ overview: overview.status === "fulfilled" ? overview.value : null, pnl: pnl.status === "fulfilled" ? pnl.value : null });
+      toast.success("Wallet profiled!");
+    } catch { toast.error("Failed to profile wallet"); }
+    finally { setWalletLoading(false); }
+  };
+
+  const runHolderScan = async () => {
+    if (!holderToken || holderToken.length < 32) { toast.error("Enter a valid token address"); return; }
+    setHolderLoading(true); setHolderData([]);
+    try {
+      const holders = await getTokenHolders(holderToken, 20);
+      setHolderData(holders || []);
+      toast.success(`Found ${(holders || []).length} holders`);
+    } catch { toast.error("Failed to scan holders"); }
+    finally { setHolderLoading(false); }
+  };
+
+  const runLiqScan = async () => {
+    if (!liqToken || liqToken.length < 32) { toast.error("Enter a valid token address"); return; }
+    setLiqLoading(true); setLiqData([]);
+    try {
+      const pools = await getLiquidityPools(liqToken);
+      setLiqData(pools || []);
+      toast.success(`Found ${(pools || []).length} pools`);
+    } catch { toast.error("Failed to scan liquidity"); }
+    finally { setLiqLoading(false); }
+  };
+
   const rugCost = CREDIT_PRICING['rug-detector']?.cost || 10;
 
   const analyzeToken = async () => {
@@ -71,8 +120,8 @@ const Tools = () => {
       const dexData = await dexRes.json();
       const pair = dexData.pairs?.[0];
 
-      const { data, error } = await supabase.functions.invoke('solana-tracker', { body: { action: 'analyzeToken', tokenAddress } });
-      if (error) throw error;
+      const { data, error } = await solanaTracker('analyzeToken', { tokenAddress });
+      if (error) throw new Error(error.message);
 
       const links: TokenAnalysis['links'] = {};
       if (pair?.info?.websites?.[0]?.url) links.website = pair.info.websites[0].url;
@@ -97,7 +146,7 @@ const Tools = () => {
         image: pair?.info?.imageUrl || data?.image,
         links,
         dexUrl: pair?.chainId ? `https://dexscreener.com/${pair.chainId}/${tokenAddress}` : `https://dexscreener.com/solana/${tokenAddress}`,
-        solscanUrl: pair?.chainId && pair.chainId !== "solana" ? `https://etherscan.io/token/${tokenAddress}` : `https://solscan.io/token/${tokenAddress}`,
+        solscanUrl: explorerAddressUrl(pair?.chainId ?? "solana", tokenAddress),
         rugcheckUrl: `https://rugcheck.xyz/tokens/${tokenAddress}`,
       });
       toast.success(`Analyzed ${pair?.baseToken?.symbol || data?.symbol || 'token'}`);
@@ -120,7 +169,7 @@ const Tools = () => {
 
   return (
     <AppLayout>
-      <PageHeader title="Sol Tools" description="Professional Solana analysis toolkit">
+      <PageHeader title="OG Tools" description="Multi-chain analysis toolkit — 16+ chains">
         <div className="flex items-center gap-2">
           <CreditBalance compact />
         </div>
@@ -326,7 +375,7 @@ const Tools = () => {
                       <div className="grid gap-2 sm:grid-cols-2">
                         {[
                           analysis.dexUrl && { icon: BarChart3, label: "DexScreener", url: analysis.dexUrl, color: "text-[#22d3ee]" },
-                          analysis.solscanUrl && { icon: ExternalLink, label: "Solscan Explorer", url: analysis.solscanUrl, color: "text-white/60" },
+                          analysis.solscanUrl && { icon: ExternalLink, label: "Block Explorer", url: analysis.solscanUrl, color: "text-white/60" },
                           analysis.rugcheckUrl && { icon: Shield, label: "RugCheck", url: analysis.rugcheckUrl, color: "text-emerald-400" },
                           analysis.links?.website && { icon: Globe, label: "Website", url: analysis.links.website, color: "text-white/60" },
                           analysis.links?.twitter && { icon: Twitter, label: "Twitter / X", url: analysis.links.twitter, color: "text-white/60" },
@@ -382,7 +431,7 @@ const Tools = () => {
                   <Shield className="h-10 w-10 text-[#22d3ee]" />
                 </div>
                 <h3 className="text-lg font-black text-white mb-2">Token Safety Scanner</h3>
-                <p className="text-sm text-white/35 max-w-sm mx-auto">Paste any Solana token mint address above to run a comprehensive on-chain safety analysis.</p>
+                <p className="text-sm text-white/35 max-w-sm mx-auto">Paste any token address (Solana, ETH, Base, BSC, or any supported chain) above to run a comprehensive on-chain safety analysis.</p>
                 <div className="flex items-center justify-center gap-6 mt-6">
                   {["Mint Authority", "LP Status", "Top Holders", "Risk Score"].map((f) => (
                     <div key={f} className="flex items-center gap-1.5 text-xs text-white/30">
@@ -395,73 +444,157 @@ const Tools = () => {
           </div>
         )}
 
-        {/* ── Wallet Profiler redirect ── */}
+        {/* ── Wallet Profiler ── */}
         {activeTool === "wallet-profiler" && (
-          <div className="og-glass-card p-12 text-center">
-            <div className="p-4 rounded-3xl bg-[#eab308]/10 border border-[#eab308]/20 inline-flex mb-5">
-              <Wallet className="h-10 w-10 text-[#eab308]" />
+          <div className="space-y-5">
+            <div className="og-search-box px-4">
+              <Wallet className="og-search-icon h-5 w-5 text-[#eab308] shrink-0" />
+              <input className="og-search-input text-sm" placeholder="Paste wallet address to profile…" value={walletAddress} onChange={(e) => setWalletAddress(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runWalletProfile()} />
+              <button onClick={runWalletProfile} disabled={walletLoading} className="og-search-action flex items-center gap-2 px-5 text-sm font-bold text-white/80 hover:text-[hsl(var(--og-ink))] transition-colors">
+                {walletLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wallet className="h-4 w-4" /><span className="hidden sm:inline">Profile</span></>}
+              </button>
             </div>
-            <h3 className="text-lg font-black text-white mb-2">Wallet Profiler</h3>
-            <p className="text-sm text-white/35 max-w-sm mx-auto">Full wallet profiling with live tracking, token holdings, and transaction history.</p>
-            <button onClick={() => window.location.href = "/wallets"} className="ios-primary-button mt-6 gap-2">
-              <ArrowRight className="h-4 w-4" /> Open Wallet Tracker
-            </button>
+            {walletData && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="og-glass-card p-4"><div className="flex items-center gap-2 text-white/35 mb-1.5"><DollarSign className="h-3.5 w-3.5" /><span className="text-[10px] uppercase tracking-wider font-bold">SOL Balance</span></div><p className="text-lg font-black text-white">{walletData.overview?.sol?.toFixed(4) ?? "N/A"}</p><p className="text-[10px] text-white/30">{walletData.overview?.solUsd ? formatNumber(walletData.overview.solUsd) : ""}</p></div>
+                <div className="og-glass-card p-4"><div className="flex items-center gap-2 text-white/35 mb-1.5"><BarChart3 className="h-3.5 w-3.5" /><span className="text-[10px] uppercase tracking-wider font-bold">Portfolio Value</span></div><p className="text-lg font-black text-white">{walletData.overview?.totalValueUsd ? formatNumber(walletData.overview.totalValueUsd) : "N/A"}</p></div>
+                <div className="og-glass-card p-4"><div className="flex items-center gap-2 text-white/35 mb-1.5"><Activity className="h-3.5 w-3.5" /><span className="text-[10px] uppercase tracking-wider font-bold">Tokens</span></div><p className="text-lg font-black text-white">{walletData.overview?.tokenCount ?? "N/A"}</p></div>
+                <div className="og-glass-card p-4"><div className="flex items-center gap-2 text-white/35 mb-1.5"><TrendingUp className="h-3.5 w-3.5" /><span className="text-[10px] uppercase tracking-wider font-bold">Net Flow (SOL)</span></div><p className={`text-lg font-black ${(walletData.pnl?.netSol ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{walletData.pnl?.netSol != null ? `${walletData.pnl.netSol >= 0 ? "+" : ""}${walletData.pnl.netSol.toFixed(4)}` : "N/A"}</p><p className="text-[10px] text-white/30">{walletData.pnl?.swapCount ? `${walletData.pnl.swapCount} swaps` : ""}</p></div>
+              </div>
+            )}
+            {!walletData && !walletLoading && (
+              <div className="og-glass-card p-12 text-center">
+                <div className="p-4 rounded-3xl bg-[#eab308]/10 border border-[#eab308]/20 inline-flex mb-5"><Wallet className="h-10 w-10 text-[#eab308]" /></div>
+                <h3 className="text-lg font-black text-white mb-2">Wallet Profiler</h3>
+                <p className="text-sm text-white/35 max-w-sm mx-auto">Paste any wallet address above to see SOL balance, token holdings, portfolio value, and realized PnL.</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── Holder Scanner redirect ── */}
+        {/* ── Holder Scanner ── */}
         {activeTool === "holder-scanner" && (
-          <div className="og-glass-card p-12 text-center">
-            <div className="p-4 rounded-3xl bg-[#22d3ee]/10 border border-[#22d3ee]/20 inline-flex mb-5">
-              <Users className="h-10 w-10 text-[#22d3ee]" />
+          <div className="space-y-5">
+            <div className="og-search-box px-4">
+              <Users className="og-search-icon h-5 w-5 text-[#22d3ee] shrink-0" />
+              <input className="og-search-input text-sm" placeholder="Paste token address to scan holders…" value={holderToken} onChange={(e) => setHolderToken(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runHolderScan()} />
+              <button onClick={runHolderScan} disabled={holderLoading} className="og-search-action flex items-center gap-2 px-5 text-sm font-bold text-white/80 hover:text-[hsl(var(--og-ink))] transition-colors">
+                {holderLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Users className="h-4 w-4" /><span className="hidden sm:inline">Scan</span></>}
+              </button>
             </div>
-            <h3 className="text-lg font-black text-white mb-2">Holder Scanner</h3>
-            <p className="text-sm text-white/35 max-w-sm mx-auto">Run a Rug Check on any token to see full holder distribution, top 10 holders, and concentration metrics.</p>
-            <button onClick={() => setActiveTool("rug-checker")} className="ios-primary-button mt-6 gap-2">
-              <Shield className="h-4 w-4" /> Open Rug Checker
-            </button>
+            {holderData.length > 0 && (
+              <div className="og-glass-card p-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4 flex items-center gap-2"><Users className="h-4 w-4 text-[#22d3ee]" /> Top {holderData.length} Holders</h3>
+                <div className="space-y-2">
+                  {holderData.map((h: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.07] transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-black text-[#22d3ee] w-5 text-center">#{h.rank}</span>
+                        <button className="font-mono text-xs text-white/50 hover:text-white flex items-center gap-1" onClick={() => copyAddress(h.address)}>{formatAddr(h.address)}<Copy className="h-2.5 w-2.5" /></button>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-sm text-white">{h.percentage?.toFixed(2)}%</p>
+                        <p className="text-[10px] text-white/30">{h.value ? formatNumber(h.value) : `${h.amount?.toLocaleString()} tokens`}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {holderData.length === 0 && !holderLoading && (
+              <div className="og-glass-card p-12 text-center">
+                <div className="p-4 rounded-3xl bg-[#22d3ee]/10 border border-[#22d3ee]/20 inline-flex mb-5"><Users className="h-10 w-10 text-[#22d3ee]" /></div>
+                <h3 className="text-lg font-black text-white mb-2">Holder Scanner</h3>
+                <p className="text-sm text-white/35 max-w-sm mx-auto">Paste any token address to see the top holders, their percentages, and USD values.</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── Liquidity Scanner redirect ── */}
+        {/* ── Liquidity Scanner ── */}
         {activeTool === "liquidity-scanner" && (
-          <div className="og-glass-card p-12 text-center">
-            <div className="p-4 rounded-3xl bg-[#eab308]/10 border border-[#eab308]/20 inline-flex mb-5">
-              <Droplets className="h-10 w-10 text-[#eab308]" />
+          <div className="space-y-5">
+            <div className="og-search-box px-4">
+              <Droplets className="og-search-icon h-5 w-5 text-[#eab308] shrink-0" />
+              <input className="og-search-input text-sm" placeholder="Paste token address to scan liquidity pools…" value={liqToken} onChange={(e) => setLiqToken(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runLiqScan()} />
+              <button onClick={runLiqScan} disabled={liqLoading} className="og-search-action flex items-center gap-2 px-5 text-sm font-bold text-white/80 hover:text-[hsl(var(--og-ink))] transition-colors">
+                {liqLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Droplets className="h-4 w-4" /><span className="hidden sm:inline">Scan</span></>}
+              </button>
             </div>
-            <h3 className="text-lg font-black text-white mb-2">Liquidity Scanner</h3>
-            <p className="text-sm text-white/35 max-w-sm mx-auto">LP position analysis and yield tracking in Advanced Tools.</p>
-            <button onClick={() => window.location.href = "/advanced-tools"} className="ios-primary-button mt-6 gap-2">
-              <Wrench className="h-4 w-4" /> Go to Advanced Tools
-            </button>
+            {liqData.length > 0 && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                {liqData.map((pool: any, i: number) => (
+                  <div key={i} className="og-glass-card p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-[#22d3ee]/10 text-[#22d3ee] border-[#22d3ee]/20 text-xs font-bold">{pool.dex || "DEX"}</Badge>
+                        <span className="text-sm font-bold text-white">{pool.baseToken?.symbol}/{pool.quoteToken?.symbol}</span>
+                      </div>
+                      {pool.pairAddress && <button className="font-mono text-[10px] text-white/30 hover:text-white/60" onClick={() => copyAddress(pool.pairAddress)}>{formatAddr(pool.pairAddress)}</button>}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div><span className="text-[10px] text-white/35 uppercase font-bold">Liquidity</span><p className="text-sm font-black text-white">{formatNumber(pool.liquidity || 0)}</p></div>
+                      <div><span className="text-[10px] text-white/35 uppercase font-bold">24h Volume</span><p className="text-sm font-black text-white">{formatNumber(pool.volume24h || 0)}</p></div>
+                      <div><span className="text-[10px] text-white/35 uppercase font-bold">FDV</span><p className="text-sm font-black text-white">{formatNumber(pool.fdv || 0)}</p></div>
+                      <div><span className="text-[10px] text-white/35 uppercase font-bold">Price</span><p className="text-sm font-black text-white">${parseFloat(pool.priceUsd || 0) < 0.01 ? parseFloat(pool.priceUsd || 0).toExponential(2) : parseFloat(pool.priceUsd || 0).toFixed(6)}</p></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {liqData.length === 0 && !liqLoading && (
+              <div className="og-glass-card p-12 text-center">
+                <div className="p-4 rounded-3xl bg-[#eab308]/10 border border-[#eab308]/20 inline-flex mb-5"><Droplets className="h-10 w-10 text-[#eab308]" /></div>
+                <h3 className="text-lg font-black text-white mb-2">Liquidity Scanner</h3>
+                <p className="text-sm text-white/35 max-w-sm mx-auto">Paste any token address to see all liquidity pools, their depth, volume, and FDV across DEXes.</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── Staking Calculator redirect ── */}
+        {/* ── Staking Calculator ── */}
         {activeTool === "staking-calc" && (
-          <div className="og-glass-card p-12 text-center">
-            <div className="p-4 rounded-3xl bg-[#22d3ee]/10 border border-[#22d3ee]/20 inline-flex mb-5">
-              <Calculator className="h-10 w-10 text-[#22d3ee]" />
+          <div className="og-glass-card p-8 text-center space-y-4">
+            <div className="p-4 rounded-3xl bg-[#22d3ee]/10 border border-[#22d3ee]/20 inline-flex mb-2"><Calculator className="h-10 w-10 text-[#22d3ee]" /></div>
+            <h3 className="text-lg font-black text-white">Staking Calculator</h3>
+            <p className="text-sm text-white/35 max-w-md mx-auto">Solana staking currently yields ~7-8% APY. Enter your SOL amount below:</p>
+            <div className="max-w-xs mx-auto space-y-3">
+              <Input type="number" placeholder="SOL amount" className="bg-white/5 border-white/10 text-white text-center" id="stakeAmt" />
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="og-glass-card p-3"><span className="text-[10px] text-white/35 uppercase font-bold block">30 days</span><p className="text-sm font-black text-[#22d3ee]" id="stake30">—</p></div>
+                <div className="og-glass-card p-3"><span className="text-[10px] text-white/35 uppercase font-bold block">6 months</span><p className="text-sm font-black text-[#22d3ee]" id="stake180">—</p></div>
+                <div className="og-glass-card p-3"><span className="text-[10px] text-white/35 uppercase font-bold block">1 year</span><p className="text-sm font-black text-[#22d3ee]" id="stake365">—</p></div>
+              </div>
+              <Button className="w-full" onClick={() => {
+                const amt = parseFloat((document.getElementById("stakeAmt") as HTMLInputElement)?.value || "0");
+                if (!amt) { toast.error("Enter an amount"); return; }
+                const apy = 0.075;
+                const d30 = document.getElementById("stake30"); if (d30) d30.textContent = `+${(amt * apy * 30/365).toFixed(4)} SOL`;
+                const d180 = document.getElementById("stake180"); if (d180) d180.textContent = `+${(amt * apy * 180/365).toFixed(4)} SOL`;
+                const d365 = document.getElementById("stake365"); if (d365) d365.textContent = `+${(amt * apy).toFixed(4)} SOL`;
+                toast.success("Calculated!");
+              }}>Calculate Rewards</Button>
             </div>
-            <h3 className="text-lg font-black text-white mb-2">Staking Calculator</h3>
-            <p className="text-sm text-white/35 max-w-sm mx-auto">APY estimates and reward projections in Advanced Tools.</p>
-            <button onClick={() => window.location.href = "/advanced-tools"} className="ios-primary-button mt-6 gap-2">
-              <Wrench className="h-4 w-4" /> Go to Advanced Tools
-            </button>
           </div>
         )}
 
-        {/* ── Token Sniper redirect ── */}
+        {/* ── Token Sniper → Snipe Feed ── */}
         {activeTool === "token-sniper" && (
           <div className="og-glass-card p-12 text-center">
-            <div className="p-4 rounded-3xl bg-[#eab308]/10 border border-[#eab308]/20 inline-flex mb-5">
-              <Crosshair className="h-10 w-10 text-[#eab308]" />
-            </div>
+            <div className="p-4 rounded-3xl bg-[#eab308]/10 border border-[#eab308]/20 inline-flex mb-5"><Crosshair className="h-10 w-10 text-[#eab308]" /></div>
             <h3 className="text-lg font-black text-white mb-2">Token Sniper</h3>
-            <p className="text-sm text-white/35 max-w-sm mx-auto">Full Token Sniper and Liquidity Sniper suite in Advanced Tools.</p>
-            <button onClick={() => window.location.href = "/advanced-tools"} className="ios-primary-button mt-6 gap-2">
-              <Wrench className="h-4 w-4" /> Go to Advanced Tools
-            </button>
+            <p className="text-sm text-white/35 max-w-sm mx-auto">Real-time snipe detection across all chains. Use the Snipe Feed for live alerts.</p>
+            <button onClick={() => window.location.href = "/snipe-feed"} className="ios-primary-button mt-6 gap-2"><Crosshair className="h-4 w-4" /> Open Snipe Feed</button>
+          </div>
+        )}
+
+        {/* ── MEV Tracker → Migrations ── */}
+        {activeTool === "mev-tracker" && (
+          <div className="og-glass-card p-12 text-center">
+            <div className="p-4 rounded-3xl bg-[#22d3ee]/10 border border-[#22d3ee]/20 inline-flex mb-5"><Cpu className="h-10 w-10 text-[#22d3ee]" /></div>
+            <h3 className="text-lg font-black text-white mb-2">MEV Tracker</h3>
+            <p className="text-sm text-white/35 max-w-sm mx-auto">Track sandwich attacks and MEV activity. Use the Migrations page for real-time on-chain flow tracking.</p>
+            <button onClick={() => window.location.href = "/migrations"} className="ios-primary-button mt-6 gap-2"><Activity className="h-4 w-4" /> Open Migrations</button>
           </div>
         )}
 
