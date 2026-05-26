@@ -3035,6 +3035,25 @@ export async function forensicOgAttribution(ticker: string): Promise<ForensicOgR
   });
 
   console.log("[OG_DEBUG] safety filtering", { liquidCount: liquidCandidates.length, originCount: originPool.length });
+  if (liquidCandidates.length === 0 && enriched.length > 0) {
+    const t = enriched[0];
+    console.log("[OG_DEBUG] WHY_FILTERED", {
+      id: t.id?.substring(0, 20),
+      chainId: t.chainId,
+      lpPulled: t.lpPulled,
+      liquidity: t.liquidity,
+      effectiveLiq: t.effectiveLiquidityUsd,
+      reportedLiq: t.reportedLiquidity,
+      quoteLiq: t.quoteLiquidityUsd,
+      mcap: t.mcap,
+      fdv: t.fdv,
+      effLiqCheck: tokenEffectiveLiquidityUsd(t),
+      hasPulled: hasPulledOrDeadLiquidity(t),
+      hasMinLiq: hasMinimumOgScanLiquidity(t),
+      mintAuth: t.audit?.mintAuthorityDisabled,
+      freezeAuth: t.audit?.freezeAuthorityDisabled,
+    });
+  }
   const rawCandidates: JupTokenInfo[] = originPool
     .filter((token) => isCanonicalSolanaOriginForQuery(token, clean) || isKnownCanonicalMint(token.id) || Number.isFinite(tokenCreatedAtMs(token)) || Number.isFinite(tokenPoolCreatedAtMs(token)))
     .sort(compareByOriginProofAndSafety)
