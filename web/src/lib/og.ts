@@ -3271,6 +3271,7 @@ export type TokenDevLaunchIntel = {
   rugRiskScore?: number;
   devRiskLabel?: "low" | "watch" | "high" | "severe";
   ruggedCoinCount?: number;
+  lpPullCount?: number;
   deadCoinCount?: number;
   suspiciousCoinCount?: number;
   lowLiquidityCoinCount?: number;
@@ -3414,7 +3415,7 @@ function txLastSeenIso(txs: HeliusTx[]): string | undefined {
  * DEAD = coin just faded — low liquidity, low volume, but no suspicious dev dump pattern.
  * ALIVE = still actively trading.
  */
-type CoinClassification = "rug" | "dead" | "alive";
+type CoinClassification = "rug" | "lp_pull" | "dead" | "alive";
 
 function classifyDevCoin(
   mint: string,
@@ -3423,6 +3424,7 @@ function classifyDevCoin(
   liquidityUsd: number,
   volumeH24: number,
   fdv: number,
+  reportedLiquidity: number,
   isBonded: boolean,
 ): CoinClassification {
   if (!isBonded) return "dead";
@@ -3430,16 +3432,36 @@ function classifyDevCoin(
   // Alive: meaningful liquidity or volume
   if (liquidityUsd >= 1_000 || volumeH24 >= 2_000) return "alive";
 
-  // Analyze dev's sell behavior for this mint from tx history
+  // ── LP Pull detection ──
+  // Signature: reported liquidity is high (pool exists) but actual quote-side is near zero.
+  // OR: dev wallet has "remove liquidity" type transactions for this mint.
+  const lpPullSignal = (reportedLiquidity >= 5_000 && liquidityUsd < 500)
+    || (reportedLiquidity >= 50_000 && liquidityUsd < MIN_OGSCAN_LIQUIDITY_USD);
+
+  // Also check tx history for explicit LP removal events
+  let hasLpRemovalTx = false;
+  for (const tx of devTxs) {
+    const desc = `${tx.type} ${tx.description ?? ""}`.toLowerCase();
+    if (desc.includes("remove") && desc.includes("liquidity")) {
+      // Check if this tx involved our mint
+      const involvesMint = (tx.tokenTransfers ?? []).some((t) => t.mint === mint);
+      if (involvesMint) { hasLpRemovalTx = true; break; }
+    }
+  }
+
+  if (lpPullSignal || (hasLpRemovalTx && liquidityUsd < 500)) {
+    return "lp_pull";
+  }
+
+  // ── Rug detection ──
+  // Dev sold a large % of supply while coin went to near-zero
   let devSoldAmount = 0;
   let devReceivedAmount = 0;
-
   for (const tx of devTxs) {
     for (const transfer of tx.tokenTransfers ?? []) {
       if (transfer.mint !== mint) continue;
       const amount = transfer.tokenAmount ?? 0;
       if (amount <= 0) continue;
-
       if (transfer.fromUserAccount?.toLowerCase() === devWallet.toLowerCase()) {
         devSoldAmount += amount;
       }
@@ -3449,7 +3471,6 @@ function classifyDevCoin(
     }
   }
 
-  // If dev sold more than 50% of what they received, and the coin is now near-dead → rug signal
   const sellRatio = devReceivedAmount > 0 ? devSoldAmount / devReceivedAmount : 0;
   const coinIsDead = liquidityUsd < 400 && volumeH24 < 1_000;
 
@@ -3608,12 +3629,15 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
     const ctoOrderCount = orderSummaries.filter((summary) => summary.communityTakeoverPaid).length;
     const lowLiquidityCoinCount: number = sampleMints.filter((mint: string): boolean => (liquidityByMint.get(mint) ?? 0) > 0 && (liquidityByMint.get(mint) ?? 0) < 1_500).length;
 
-    // Classify each coin properly: rug vs dead vs alive
+    // Classify each coin properly: rug vs lp_pull vs dead vs alive
     const fdvByMint = new Map<string, number>();
+    const reportedLiqByMint = new Map<string, number>();
     for (const pair of pairs) {
       const mint = pair.baseToken?.address;
       if (!mint) continue;
       fdvByMint.set(mint, Math.max(fdvByMint.get(mint) ?? 0, pair.fdv ?? pair.marketCap ?? 0));
+      // Reported liquidity = total pool value (includes base token, may be inflated)
+      reportedLiqByMint.set(mint, Math.max(reportedLiqByMint.get(mint) ?? 0, pair.liquidity?.usd ?? 0));
     }
     const coinClasses = sampleMints.map((mint) => classifyDevCoin(
       mint,
@@ -3622,12 +3646,14 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
       liquidityByMint.get(mint) ?? 0,
       volumeByMint.get(mint) ?? 0,
       fdvByMint.get(mint) ?? 0,
+      reportedLiqByMint.get(mint) ?? 0,
       bondedMints.has(mint),
     ));
     const actualRugCount = coinClasses.filter((c) => c === "rug").length;
+    const lpPullCount = coinClasses.filter((c) => c === "lp_pull").length;
     const deadCoinCount = coinClasses.filter((c) => c === "dead").length;
-    // Keep deadBondedCoinCount for backward compat scoring but use actualRugCount for display
-    const deadBondedCoinCount: number = actualRugCount + deadCoinCount;
+    // Combined bad-actor count for scoring
+    const deadBondedCoinCount: number = actualRugCount + lpPullCount + deadCoinCount;
     const suspiciousCoinCount: number = sampleMints.filter((mint: string, index: number): boolean => {
       const liquidity: number = liquidityByMint.get(mint) ?? 0;
       const volume: number = volumeByMint.get(mint) ?? 0;
@@ -3637,12 +3663,13 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
     const liquidityValues: number[] = sampleMints.map((mint: string): number => liquidityByMint.get(mint) ?? 0).filter((value: number): boolean => value > 0);
     const averageLiquidity: number = liquidityValues.length ? liquidityValues.reduce((sum: number, value: number): number => sum + value, 0) / liquidityValues.length : 0;
     const farmingRiskScore: number = clampScore(sampleMints.length * 4 + Math.max(0, sampleMints.length - bondedMints.size) * 3 + dexPaidCoinCount * 5 + lowLiquidityCoinCount * 7);
-    const rugRiskScore: number = clampScore(deadBondedCoinCount * 18 + lowLiquidityCoinCount * 10 + suspiciousCoinCount * 5 + (averageLiquidity > 0 && averageLiquidity < 2_000 ? 16 : 0));
+    const rugRiskScore: number = clampScore(actualRugCount * 25 + lpPullCount * 30 + deadCoinCount * 8 + lowLiquidityCoinCount * 10 + suspiciousCoinCount * 5 + (averageLiquidity > 0 && averageLiquidity < 2_000 ? 16 : 0));
     const combinedDevRisk: number = clampScore(farmingRiskScore * 0.55 + rugRiskScore * 0.45);
     const devRiskLabel: TokenDevLaunchIntel["devRiskLabel"] = combinedDevRisk >= 78 ? "severe" : combinedDevRisk >= 58 ? "high" : combinedDevRisk >= 34 ? "watch" : "low";
     const riskNotes: string[] = [];
     if (sampleMints.length >= 10) riskNotes.push(`${sampleMints.length} recent token mints linked to inferred creator wallet`);
     if (actualRugCount > 0) riskNotes.push(`${actualRugCount} coin${actualRugCount > 1 ? "s" : ""} show rug pattern (dev sold > 50% supply, coin is dead)`);
+    if (lpPullCount > 0) riskNotes.push(`${lpPullCount} coin${lpPullCount > 1 ? "s" : ""} had liquidity pulled (LP removed while pool had value)`);
     if (deadCoinCount > 0) riskNotes.push(`${deadCoinCount} coin${deadCoinCount > 1 ? "s" : ""} faded naturally (low liquidity, no suspicious dev sell)`);
     if (lowLiquidityCoinCount > 0) riskNotes.push(`${lowLiquidityCoinCount} linked coins have low liquidity`);
     if (dexPaidCoinCount > 2) riskNotes.push(`${Math.min(sampleMints.length, dexPaidCoinCount)} linked coins used DEX paid/boost orders`);
@@ -3669,6 +3696,7 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
       rugRiskScore,
       devRiskLabel,
       ruggedCoinCount: actualRugCount,
+      lpPullCount,
       deadCoinCount,
       suspiciousCoinCount,
       lowLiquidityCoinCount,
