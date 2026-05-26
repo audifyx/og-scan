@@ -3406,14 +3406,35 @@ function txLastSeenIso(txs: HeliusTx[]): string | undefined {
   return latest ? new Date(latest * 1000).toISOString() : undefined;
 }
 
+/**
+ * Extract token mints the wallet likely CREATED or DEPLOYED — not just interacted with.
+ *
+ * A mint is counted only when the wallet was the fee-payer (initiated the tx)
+ * AND was the *sender* in the first token transfer for that mint (deployer pattern).
+ * Airdrops / random receives (wallet is toUserAccount but not feePayer) are excluded.
+ */
 function tokenMintsFromWalletTxs(txs: HeliusTx[], targetMint: string): string[] {
   const ignored = new Set<string>([SOL_MINT, USDC_MINT]);
   const mints = new Set<string>([targetMint]);
+  const creationTypes = /create|initialize|mint|pool|liquidity|pump|bond|deploy|launch/i;
+
   for (const tx of txs) {
+    // Only count txs the wallet actually initiated (paid gas for)
+    const wallet = tx.feePayer;
+    if (!wallet) continue;
+
     for (const transfer of tx.tokenTransfers ?? []) {
       if (!transfer.mint || ignored.has(transfer.mint)) continue;
       if ((transfer.tokenAmount ?? 0) <= 0) continue;
-      mints.add(transfer.mint);
+
+      // Wallet must be the SENDER (creator/deployer pattern) — not the receiver (airdrop)
+      const walletIsSender = transfer.fromUserAccount?.toLowerCase() === wallet.toLowerCase();
+      // Also accept creation-type txs even if sender field is different (some programs)
+      const isCreationTx = creationTypes.test(`${tx.type} ${tx.description ?? ""}`);
+
+      if (walletIsSender || isCreationTx) {
+        mints.add(transfer.mint);
+      }
     }
   }
   return Array.from(mints).slice(0, 24);
@@ -3545,7 +3566,7 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
     const devRiskLabel: TokenDevLaunchIntel["devRiskLabel"] = combinedDevRisk >= 78 ? "severe" : combinedDevRisk >= 58 ? "high" : combinedDevRisk >= 34 ? "watch" : "low";
     const riskNotes: string[] = [];
     if (sampleMints.length >= 10) riskNotes.push(`${sampleMints.length} recent token mints linked to inferred creator wallet`);
-    if (deadBondedCoinCount > 0) riskNotes.push(`${deadBondedCoinCount} bonded coins look dead/thin-liquidity`);
+    if (deadBondedCoinCount > 0) riskNotes.push(`${deadBondedCoinCount} of ${bondedMints.size} bonded coins are dead (< $400 liquidity)`);
     if (lowLiquidityCoinCount > 0) riskNotes.push(`${lowLiquidityCoinCount} linked coins have low liquidity`);
     if (dexPaidCoinCount > 2) riskNotes.push(`${Math.min(sampleMints.length, dexPaidCoinCount)} linked coins used DEX paid/boost orders`);
     if (riskNotes.length === 0) riskNotes.push("No strong public farming/rug pattern in sampled wallet activity.");
