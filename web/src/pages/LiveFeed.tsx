@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { heliusTxs, type HeliusTx, HELIUS_API_KEY, type JupTokenInfo } from "@/lib/og";
 import { CoinDetailDialog } from "@/components/CoinDetailDialog";
+import { chainFromDexSlug, type ChainConfig } from "@/lib/chains";
 
 /* ═══════════════════════════════════════════════════════════════
    Types
@@ -62,13 +63,23 @@ const LAUNCH_PLATFORMS = [
   { id: "pump.fun", name: "Pump.fun", icon: Rocket },
   { id: "raydium", name: "Raydium", icon: Zap },
   { id: "jupiter", name: "Jupiter", icon: TrendingUp },
+  { id: "uniswap", name: "Uniswap", icon: Repeat },
+  { id: "pancakeswap", name: "PancakeSwap", icon: Zap },
+  { id: "aerodrome", name: "Aerodrome", icon: TrendingUp },
 ];
 
 const detectLaunchPlatform = (dexId: string, url: string): string => {
-  if (url?.includes("pump.fun") || dexId?.includes("pump")) return "pump.fun";
-  if (dexId?.includes("raydium")) return "raydium";
-  if (dexId?.includes("orca")) return "orca";
-  if (dexId?.includes("meteora")) return "meteora";
+  const d = (dexId || "").toLowerCase();
+  if (url?.includes("pump.fun") || d.includes("pump")) return "pump.fun";
+  if (d.includes("raydium")) return "raydium";
+  if (d.includes("orca")) return "orca";
+  if (d.includes("meteora")) return "meteora";
+  if (d.includes("uniswap")) return "uniswap";
+  if (d.includes("pancakeswap") || d.includes("pancake")) return "pancakeswap";
+  if (d.includes("aerodrome")) return "aerodrome";
+  if (d.includes("sushiswap") || d.includes("sushi")) return "sushiswap";
+  if (d.includes("camelot")) return "camelot";
+  if (d.includes("trader_joe") || d.includes("traderjoe")) return "traderjoe";
   return dexId || "Unknown";
 };
 
@@ -77,6 +88,10 @@ const getPlatformColor = (platform: string): string => {
     case "pump.fun": return "bg-pink-500/10 text-pink-400 border-pink-500/30";
     case "raydium": return "bg-purple-500/10 text-purple-400 border-purple-500/30";
     case "jupiter": return "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+    case "uniswap": return "bg-pink-400/10 text-pink-300 border-pink-400/30";
+    case "pancakeswap": return "bg-amber-500/10 text-amber-400 border-amber-500/30";
+    case "aerodrome": return "bg-blue-500/10 text-blue-400 border-blue-500/30";
+    case "sushiswap": return "bg-indigo-500/10 text-indigo-400 border-indigo-500/30";
     default: return "bg-white/5 text-white/40 border-white/10";
   }
 };
@@ -147,48 +162,74 @@ async function fetchNewTokensBatch(): Promise<NewToken[]> {
   const res = await fetch("https://api.dexscreener.com/token-profiles/latest/v1");
   if (!res.ok) return [];
   const profiles: any[] = await res.json();
-  const solana = profiles.filter((p: any) => p.chainId === "solana").slice(0, 30);
-  if (solana.length === 0) return [];
+  if (!Array.isArray(profiles) || profiles.length === 0) return [];
 
-  // Batch all addresses into one DexScreener call (comma-separated, max 30)
-  const addresses = solana.map((p: any) => p.tokenAddress);
-  const batchUrl = `https://api.dexscreener.com/tokens/v1/solana/${addresses.join(",")}`;
-  const pairRes = await fetch(batchUrl);
-  if (!pairRes.ok) return [];
-  const pairs: any[] = await pairRes.json();
-  if (!Array.isArray(pairs)) return [];
+  // Group profiles by chainId (all chains, not just Solana)
+  const byChain = new Map<string, any[]>();
+  for (const p of profiles) {
+    if (!p.chainId || !p.tokenAddress) continue;
+    const list = byChain.get(p.chainId) ?? [];
+    list.push(p);
+    byChain.set(p.chainId, list);
+  }
 
-  // Group pairs by base token address, take best pair per token
+  // Fetch pairs per chain in parallel (DexScreener supports max 30 addresses per call)
+  const iconMap = new Map(profiles.map((p: any) => [`${p.chainId}:${p.tokenAddress}`, p.icon]));
+  const allPairs: any[] = [];
+
+  const chainFetches = Array.from(byChain.entries()).map(async ([chainId, chainProfiles]) => {
+    // Take up to 30 per chain
+    const batch = chainProfiles.slice(0, 30);
+    const addresses = batch.map((p: any) => p.tokenAddress).join(",");
+    try {
+      const pairRes = await fetch(`https://api.dexscreener.com/tokens/v1/${chainId}/${addresses}`);
+      if (!pairRes.ok) return [];
+      const pairs = await pairRes.json();
+      return Array.isArray(pairs) ? pairs : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const results = await Promise.allSettled(chainFetches);
+  for (const r of results) {
+    if (r.status === "fulfilled") allPairs.push(...r.value);
+  }
+
+  // Group pairs by (chainId + base address), take best pair per token
   const bestPairByToken = new Map<string, any>();
-  for (const pair of pairs) {
+  for (const pair of allPairs) {
     const addr = pair.baseToken?.address;
-    if (!addr) continue;
-    const existing = bestPairByToken.get(addr);
+    const chain = pair.chainId;
+    if (!addr || !chain) continue;
+    const key = `${chain}:${addr}`;
+    const existing = bestPairByToken.get(key);
     if (!existing || (pair.liquidity?.usd ?? 0) > (existing.liquidity?.usd ?? 0)) {
-      bestPairByToken.set(addr, pair);
+      bestPairByToken.set(key, pair);
     }
   }
 
-  const iconMap = new Map(solana.map((p: any) => [p.tokenAddress, p.icon]));
-
-  return Array.from(bestPairByToken.entries()).map(([addr, pair]) => ({
-    id: addr,
-    address: addr,
-    name: pair.baseToken?.name || "Unknown",
-    symbol: pair.baseToken?.symbol || "???",
-    pairAddress: pair.pairAddress,
-    chainId: pair.chainId,
-    dexId: pair.dexId,
-    priceUsd: pair.priceUsd || "0",
-    priceChange24h: pair.priceChange?.h24 || 0,
-    volume24h: pair.volume?.h24 || 0,
-    liquidity: pair.liquidity?.usd || 0,
-    fdv: pair.fdv || 0,
-    pairCreatedAt: pair.pairCreatedAt || Date.now(),
-    url: pair.url,
-    imageUrl: iconMap.get(addr),
-    launchPlatform: detectLaunchPlatform(pair.dexId, pair.url),
-  }));
+  return Array.from(bestPairByToken.entries()).map(([key, pair]) => {
+    const addr = pair.baseToken?.address;
+    return {
+      id: key,
+      address: addr,
+      name: pair.baseToken?.name || "Unknown",
+      symbol: pair.baseToken?.symbol || "???",
+      pairAddress: pair.pairAddress,
+      chainId: pair.chainId,
+      dexId: pair.dexId,
+      priceUsd: pair.priceUsd || "0",
+      priceChange24h: pair.priceChange?.h24 || 0,
+      volume24h: pair.volume?.h24 || 0,
+      liquidity: pair.liquidity?.usd || 0,
+      fdv: pair.fdv || 0,
+      pairCreatedAt: pair.pairCreatedAt || Date.now(),
+      url: pair.url,
+      imageUrl: iconMap.get(key),
+      launchPlatform: detectLaunchPlatform(pair.dexId, pair.url),
+    };
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -204,6 +245,7 @@ const LiveFeed = () => {
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const [chainFilter, setChainFilter] = useState<string>("all");
   const [minLiquidity, setMinLiquidity] = useState<string>("0");
   const [walletInput, setWalletInput] = useState("");
   const [walletLabel, setWalletLabel] = useState("");
@@ -305,6 +347,7 @@ const LiveFeed = () => {
     const minLiq = parseInt(minLiquidity) || 0;
     if (t.liquidity < minLiq) return false;
     if (platformFilter !== "all" && t.launchPlatform?.toLowerCase() !== platformFilter.toLowerCase()) return false;
+    if (chainFilter !== "all" && t.chainId !== chainFilter) return false;
     return true;
   });
 
@@ -367,7 +410,7 @@ const LiveFeed = () => {
             {/* Feed Controls */}
             {activeTab === "launches" && (
               <div className="p-3 border-b border-white/[0.07] flex flex-wrap gap-2">
-                <div className="flex-1 min-w-[150px]">
+                <div className="flex-1 min-w-[120px]">
                   <Select value={platformFilter} onValueChange={setPlatformFilter}>
                     <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-[10px] uppercase font-black tracking-widest">
                       <SelectValue placeholder="PLATFORM" />
@@ -379,7 +422,27 @@ const LiveFeed = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex-1 min-w-[150px]">
+                <div className="flex-1 min-w-[120px]">
+                  <Select value={chainFilter} onValueChange={setChainFilter}>
+                    <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-[10px] uppercase font-black tracking-widest">
+                      <SelectValue placeholder="CHAIN" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border-white/10 text-[10px] font-black uppercase">
+                      <SelectItem value="all">All Chains</SelectItem>
+                      <SelectItem value="solana">Solana</SelectItem>
+                      <SelectItem value="ethereum">Ethereum</SelectItem>
+                      <SelectItem value="base">Base</SelectItem>
+                      <SelectItem value="bsc">BNB Chain</SelectItem>
+                      <SelectItem value="arbitrum">Arbitrum</SelectItem>
+                      <SelectItem value="polygon">Polygon</SelectItem>
+                      <SelectItem value="avalanche">Avalanche</SelectItem>
+                      <SelectItem value="optimism">Optimism</SelectItem>
+                      <SelectItem value="blast">Blast</SelectItem>
+                      <SelectItem value="sonic">Sonic</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1 min-w-[120px]">
                   <Select value={minLiquidity} onValueChange={setMinLiquidity}>
                     <SelectTrigger className="h-9 rounded-lg bg-white/5 border-white/10 text-[10px] uppercase font-black tracking-widest">
                       <SelectValue placeholder="LIQUIDITY" />
@@ -406,12 +469,14 @@ const LiveFeed = () => {
               ) : activeTab === "launches" ? (
                 <div className="divide-y divide-white/[0.05]">
                   {filteredTokens.map((token) => {
+                    const chain: ChainConfig | undefined = chainFromDexSlug(token.chainId);
                     const jupToken: JupTokenInfo = {
                       id: token.address,
                       name: token.name,
                       symbol: token.symbol,
                       icon: token.imageUrl,
                       decimals: 9,
+                      chainId: chain?.id,
                       usdPrice: parseFloat(token.priceUsd) || 0,
                       fdv: token.fdv,
                       liquidity: token.liquidity,
@@ -440,6 +505,11 @@ const LiveFeed = () => {
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-black text-white">{token.symbol}</span>
+                              {chain && chain.id !== "solana" && (
+                                <Badge className="text-[7px] px-1 py-0 bg-white/5 text-white/40 border-white/10 font-black">
+                                  {chain.shortName}
+                                </Badge>
+                              )}
                               <span className="text-[10px] text-white/30 truncate hidden sm:inline">{token.name}</span>
                             </div>
                             <div className="flex items-center gap-2 mt-1">
