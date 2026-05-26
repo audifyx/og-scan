@@ -3271,6 +3271,7 @@ export type TokenDevLaunchIntel = {
   rugRiskScore?: number;
   devRiskLabel?: "low" | "watch" | "high" | "severe";
   ruggedCoinCount?: number;
+  deadCoinCount?: number;
   suspiciousCoinCount?: number;
   lowLiquidityCoinCount?: number;
   averageLiquidity?: number;
@@ -3404,6 +3405,61 @@ function txLastSeenIso(txs: HeliusTx[]): string | undefined {
     return Math.max(current ?? tx.timestamp, tx.timestamp);
   }, null);
   return latest ? new Date(latest * 1000).toISOString() : undefined;
+}
+
+/**
+ * Classify a dev's coin as "rug", "dead", or "alive" based on actual on-chain behavior.
+ *
+ * RUG = dev sold a large % of supply while MC was meaningful, then coin went to near-zero.
+ * DEAD = coin just faded — low liquidity, low volume, but no suspicious dev dump pattern.
+ * ALIVE = still actively trading.
+ */
+type CoinClassification = "rug" | "dead" | "alive";
+
+function classifyDevCoin(
+  mint: string,
+  devWallet: string,
+  devTxs: HeliusTx[],
+  liquidityUsd: number,
+  volumeH24: number,
+  fdv: number,
+  isBonded: boolean,
+): CoinClassification {
+  if (!isBonded) return "dead";
+
+  // Alive: meaningful liquidity or volume
+  if (liquidityUsd >= 1_000 || volumeH24 >= 2_000) return "alive";
+
+  // Analyze dev's sell behavior for this mint from tx history
+  let devSoldAmount = 0;
+  let devReceivedAmount = 0;
+
+  for (const tx of devTxs) {
+    for (const transfer of tx.tokenTransfers ?? []) {
+      if (transfer.mint !== mint) continue;
+      const amount = transfer.tokenAmount ?? 0;
+      if (amount <= 0) continue;
+
+      if (transfer.fromUserAccount?.toLowerCase() === devWallet.toLowerCase()) {
+        devSoldAmount += amount;
+      }
+      if (transfer.toUserAccount?.toLowerCase() === devWallet.toLowerCase()) {
+        devReceivedAmount += amount;
+      }
+    }
+  }
+
+  // If dev sold more than 50% of what they received, and the coin is now near-dead → rug signal
+  const sellRatio = devReceivedAmount > 0 ? devSoldAmount / devReceivedAmount : 0;
+  const coinIsDead = liquidityUsd < 400 && volumeH24 < 1_000;
+
+  if (coinIsDead && sellRatio > 0.5 && fdv < 500) {
+    return "rug";
+  }
+
+  if (coinIsDead) return "dead";
+
+  return "alive";
 }
 
 /**
@@ -3551,7 +3607,27 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
     }).length;
     const ctoOrderCount = orderSummaries.filter((summary) => summary.communityTakeoverPaid).length;
     const lowLiquidityCoinCount: number = sampleMints.filter((mint: string): boolean => (liquidityByMint.get(mint) ?? 0) > 0 && (liquidityByMint.get(mint) ?? 0) < 1_500).length;
-    const deadBondedCoinCount: number = sampleMints.filter((mint: string): boolean => bondedMints.has(mint) && (liquidityByMint.get(mint) ?? 0) < 400 && (volumeByMint.get(mint) ?? 0) < 1_000).length;
+
+    // Classify each coin properly: rug vs dead vs alive
+    const fdvByMint = new Map<string, number>();
+    for (const pair of pairs) {
+      const mint = pair.baseToken?.address;
+      if (!mint) continue;
+      fdvByMint.set(mint, Math.max(fdvByMint.get(mint) ?? 0, pair.fdv ?? pair.marketCap ?? 0));
+    }
+    const coinClasses = sampleMints.map((mint) => classifyDevCoin(
+      mint,
+      creator.wallet!,
+      devTxs,
+      liquidityByMint.get(mint) ?? 0,
+      volumeByMint.get(mint) ?? 0,
+      fdvByMint.get(mint) ?? 0,
+      bondedMints.has(mint),
+    ));
+    const actualRugCount = coinClasses.filter((c) => c === "rug").length;
+    const deadCoinCount = coinClasses.filter((c) => c === "dead").length;
+    // Keep deadBondedCoinCount for backward compat scoring but use actualRugCount for display
+    const deadBondedCoinCount: number = actualRugCount + deadCoinCount;
     const suspiciousCoinCount: number = sampleMints.filter((mint: string, index: number): boolean => {
       const liquidity: number = liquidityByMint.get(mint) ?? 0;
       const volume: number = volumeByMint.get(mint) ?? 0;
@@ -3566,7 +3642,8 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
     const devRiskLabel: TokenDevLaunchIntel["devRiskLabel"] = combinedDevRisk >= 78 ? "severe" : combinedDevRisk >= 58 ? "high" : combinedDevRisk >= 34 ? "watch" : "low";
     const riskNotes: string[] = [];
     if (sampleMints.length >= 10) riskNotes.push(`${sampleMints.length} recent token mints linked to inferred creator wallet`);
-    if (deadBondedCoinCount > 0) riskNotes.push(`${deadBondedCoinCount} of ${bondedMints.size} bonded coins are dead (< $400 liquidity)`);
+    if (actualRugCount > 0) riskNotes.push(`${actualRugCount} coin${actualRugCount > 1 ? "s" : ""} show rug pattern (dev sold > 50% supply, coin is dead)`);
+    if (deadCoinCount > 0) riskNotes.push(`${deadCoinCount} coin${deadCoinCount > 1 ? "s" : ""} faded naturally (low liquidity, no suspicious dev sell)`);
     if (lowLiquidityCoinCount > 0) riskNotes.push(`${lowLiquidityCoinCount} linked coins have low liquidity`);
     if (dexPaidCoinCount > 2) riskNotes.push(`${Math.min(sampleMints.length, dexPaidCoinCount)} linked coins used DEX paid/boost orders`);
     if (riskNotes.length === 0) riskNotes.push("No strong public farming/rug pattern in sampled wallet activity.");
@@ -3591,7 +3668,8 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
       farmingRiskScore,
       rugRiskScore,
       devRiskLabel,
-      ruggedCoinCount: deadBondedCoinCount,
+      ruggedCoinCount: actualRugCount,
+      deadCoinCount,
       suspiciousCoinCount,
       lowLiquidityCoinCount,
       averageLiquidity,

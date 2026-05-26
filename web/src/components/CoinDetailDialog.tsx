@@ -889,7 +889,9 @@ const DevLaunchPanel = ({ intel, isLoading, primaryLabel, creatorFunding, pumpFu
         <DataRow label="Bonded coins" value={fmtNum(intel?.bondedCoinCount)} />
         <DataRow label="DEX-paid coins" value={fmtNum(intel?.dexPaidCoinCount)} />
         <DataRow label="Dev risk" value={intel?.devRiskLabel ? `${intel.devRiskLabel} · risk ${fmtNum(intel.rugRiskScore)}` : "—"} highlight={intel?.devRiskLabel === "severe" || intel?.devRiskLabel === "high" ? "red" : undefined} />
-        <DataRow label="Dead coins" value={`${fmtNum(intel?.ruggedCoinCount)} dead · ${fmtNum(intel?.lowLiquidityCoinCount)} low LP`} />
+        <DataRow label="Rug pulls" value={fmtNum(intel?.ruggedCoinCount)} highlight={(intel?.ruggedCoinCount ?? 0) > 0 ? "red" : "lime"} />
+        <DataRow label="Dead coins" value={fmtNum(intel?.deadCoinCount)} />
+        <DataRow label="Low LP coins" value={fmtNum(intel?.lowLiquidityCoinCount)} highlight={(intel?.lowLiquidityCoinCount ?? 0) > 3 ? "gold" : undefined} />
       </div>
       {(intel?.riskNotes?.[0] ?? intel?.notes?.[0]) && (
         <p className="mt-3 text-xs leading-relaxed text-white/35">{intel?.riskNotes?.[0] ?? intel?.notes?.[0]}</p>
