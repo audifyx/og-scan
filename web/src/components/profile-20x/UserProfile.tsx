@@ -545,7 +545,7 @@ function PostCard({
   const official = Boolean(authorOverride?.official);
 
   return (
-    <article className="border-b border-white/10 px-4 py-4 transition hover:bg-white/[0.02] sm:px-5">
+    <article className="border-b border-white/10 bg-black px-4 py-4 transition sm:px-5">
       {showPinned ? (
         <div className="mb-3 flex items-center gap-2 pl-14 text-[13px] font-semibold text-white/45">
           <Star className="h-3.5 w-3.5" />
@@ -572,7 +572,7 @@ function PostCard({
           </div>
           <p className="mt-1.5 whitespace-pre-wrap text-[15px] leading-6 text-white/88">{post.content || "No text attached."}</p>
           {post.image_url ? (
-            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+            <div className="mt-3 overflow-hidden rounded-none border border-white/10 bg-black">
               <img src={post.image_url} alt="" className="h-auto max-h-[420px] w-full object-cover" />
             </div>
           ) : null}
