@@ -44,6 +44,7 @@ const Settings = () => {
   const { user, signOut } = useAuth();
 
   // Profile state
+  const [activeTab, setActiveTab] = useState("profile");
   const [profile, setProfile] = useState<ProfileData>({});
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -255,33 +256,71 @@ const Settings = () => {
     );
   }
 
+  const settingsNav = [
+    { value: "profile",       icon: User,         label: "Profile",           mobileLabel: "Profile"   },
+    { value: "account",       icon: Shield,       label: "Account",           mobileLabel: "Account"   },
+    { value: "themes",        icon: Palette,      label: "Themes",            mobileLabel: "Themes"    },
+    { value: "invite",        icon: Gift,         label: "Invite & Referrals",mobileLabel: "Invite"    },
+    { value: "notifications", icon: Bell,         label: "Notifications",     mobileLabel: "Alerts"    },
+    { value: "webhooks",      icon: Webhook,      label: "Webhooks",          mobileLabel: "Webhooks"  },
+    { value: "embed",         icon: Code2,        label: "Embed",             mobileLabel: "Embed"     },
+  ] as const;
+
   return (
     <AppLayout>
-      <PageHeader title="OG SETTINGS" description="Manage your account and preferences" />
-      <div className="p-4 lg:p-6 relative z-10">
-        <Tabs defaultValue="profile" className="w-full">
-          <div className="overflow-x-auto">
-            <TabsList className="flex w-max min-w-full max-w-3xl bg-white/[0.04] mb-6">
-              {[
-                { value: "profile", icon: User, label: "Profile" },
-                { value: "account", icon: Shield, label: "Account" },
-                { value: "themes", icon: Palette, label: "Themes" },
+      <div className="relative z-10 flex min-h-screen">
 
-                { value: "invite", icon: Gift, label: "Invite" },
-                { value: "notifications", icon: Bell, label: "Alerts" },
-                { value: "webhooks", icon: Webhook, label: "Webhooks" },
-                { value: "embed", icon: Code2, label: "Embed" },
-              ].map(({ value, icon: Icon, label }) => (
-                <TabsTrigger key={value} value={value} className="flex items-center gap-1.5 text-xs sm:text-sm px-3 py-2">
-                  <Icon className="h-3.5 w-3.5" />
-                  {label}
-                </TabsTrigger>
+        {/* ── Left sidebar nav (desktop only) ── */}
+        <aside className="hidden lg:flex flex-col w-[240px] xl:w-[260px] shrink-0 border-r border-white/[0.06] pt-6 pb-10 px-2 sticky top-0 self-start h-screen overflow-y-auto">
+          <div className="px-3 mb-6">
+            <h1 className="text-[20px] font-extrabold tracking-tight">Settings</h1>
+          </div>
+          <nav className="flex flex-col gap-0.5">
+            {settingsNav.map(({ value, icon: Icon, label }) => (
+              <button
+                key={value}
+                onClick={() => setActiveTab(value)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-full text-[16px] transition-all text-left
+                  ${activeTab === value
+                    ? "bg-white/[0.08] text-white font-bold"
+                    : "text-white/55 font-medium hover:bg-white/[0.04] hover:text-white/80"}`}>
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+                {label}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        {/* ── Right pane: mobile tabs + content ── */}
+        <div className="flex-1 min-w-0 flex flex-col">
+
+          {/* Mobile tab bar */}
+          <div className="lg:hidden overflow-x-auto border-b border-white/[0.06] sticky top-0 z-20 bg-background/90 backdrop-blur-xl">
+            <div className="flex w-max">
+              {settingsNav.map(({ value, icon: Icon, mobileLabel }) => (
+                <button
+                  key={value}
+                  onClick={() => setActiveTab(value)}
+                  className={`flex items-center gap-1.5 px-4 py-4 text-[13px] font-medium border-b-[3px] transition-all whitespace-nowrap
+                    ${activeTab === value
+                      ? "text-white border-white"
+                      : "text-white/40 border-transparent hover:text-white/70 hover:bg-white/[0.03]"}`}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  {mobileLabel}
+                </button>
               ))}
-            </TabsList>
+            </div>
           </div>
 
+          {/* Content area */}
+          <div className="flex-1 px-4 lg:px-8 pt-6 pb-10">
+
           {/* ── Profile Tab ── */}
-          <TabsContent value="profile">
+          {activeTab === "profile" && (<div className="tab-content">
+            <div className="hidden lg:flex items-center gap-3 mb-6 border-b border-white/[0.06] pb-4">
+              <User className="h-5 w-5 text-white/40" />
+              <h2 className="text-[20px] font-bold">Profile</h2>
+            </div>
             <div className="max-w-2xl space-y-4">
               {/* Stats strip */}
               <Card className="p-4 glass-card">
@@ -384,10 +423,14 @@ const Settings = () => {
                 {savingProfile ? "Saving..." : "Save Profile"}
               </Button>
             </div>
-          </TabsContent>
+          </div>)}
 
           {/* ── Invite Tab ── */}
-          <TabsContent value="invite">
+          {activeTab === "invite" && (<div className="tab-content">
+            <div className="hidden lg:flex items-center gap-3 mb-6 border-b border-white/[0.06] pb-4">
+              <Gift className="h-5 w-5 text-white/40" />
+              <h2 className="text-[20px] font-bold">Invite &amp; Referrals</h2>
+            </div>
             <div className="max-w-2xl space-y-4">
               {/* Invite Link Card */}
               <Card className="p-6 glass-card">
@@ -465,10 +508,14 @@ const Settings = () => {
                 </div>
               )}
             </div>
-          </TabsContent>
+          </div>)}
 
           {/* ── Account Tab ── */}
-          <TabsContent value="account">
+          {activeTab === "account" && (<div className="tab-content">
+            <div className="hidden lg:flex items-center gap-3 mb-6 border-b border-white/[0.06] pb-4">
+              <Shield className="h-5 w-5 text-white/40" />
+              <h2 className="text-[20px] font-bold">Account</h2>
+            </div>
             <div className="max-w-2xl space-y-4">
               {/* Email */}
               <Card className="p-6 glass-card">
@@ -564,16 +611,22 @@ const Settings = () => {
                 </Button>
               </Card>
             </div>
-          </TabsContent>
+          </div>)}
 
-          <TabsContent value="themes">
+          {activeTab === "themes" && (<div className="tab-content">
+            <div className="hidden lg:flex items-center gap-3 mb-6 border-b border-white/[0.06] pb-4">
+              <Palette className="h-5 w-5 text-white/40" />
+              <h2 className="text-[20px] font-bold">Themes</h2>
+            </div>
             <div className="max-w-4xl"><ThemePicker /></div>
-          </TabsContent>
-
-          {/* Credits removed */}
+          </div>)}
 
           {/* ── Notifications Tab ── */}
-          <TabsContent value="notifications">
+          {activeTab === "notifications" && (<div className="tab-content">
+            <div className="hidden lg:flex items-center gap-3 mb-6 border-b border-white/[0.06] pb-4">
+              <Bell className="h-5 w-5 text-white/40" />
+              <h2 className="text-[20px] font-bold">Notifications</h2>
+            </div>
             <div className="max-w-2xl space-y-4">
               <Card className="p-6 glass-card">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -645,10 +698,14 @@ const Settings = () => {
                 </div>
               </Card>
             </div>
-          </TabsContent>
+          </div>)}
 
           {/* ── Webhooks Tab ── */}
-          <TabsContent value="webhooks">
+          {activeTab === "webhooks" && (<div className="tab-content">
+            <div className="hidden lg:flex items-center gap-3 mb-6 border-b border-white/[0.06] pb-4">
+              <Webhook className="h-5 w-5 text-white/40" />
+              <h2 className="text-[20px] font-bold">Webhooks</h2>
+            </div>
             <Card className="p-6 max-w-2xl glass-card">
               <h3 className="font-semibold mb-4 flex items-center gap-2">
                 <Webhook className="h-5 w-5 text-[#22d3ee]" /> Discord Webhook
@@ -672,14 +729,19 @@ const Settings = () => {
                 </Button>
               </div>
             </Card>
-          </TabsContent>
+          </div>)}
 
           {/* ── Embed Settings Tab ── */}
-          <TabsContent value="embed">
+          {activeTab === "embed" && (<div className="tab-content">
+            <div className="hidden lg:flex items-center gap-3 mb-6 border-b border-white/[0.06] pb-4">
+              <Code2 className="h-5 w-5 text-white/40" />
+              <h2 className="text-[20px] font-bold">Embed</h2>
+            </div>
             <EmbedSettingsTab username={profile.username} />
-          </TabsContent>
-        </Tabs>
-      </div>
+          </div>)}
+          </div>{/* end content area */}
+        </div>{/* end right pane */}
+      </div>{/* end flex row */}
     </AppLayout>
   );
 };
