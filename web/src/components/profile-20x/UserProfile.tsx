@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowUpRight,
@@ -41,6 +41,7 @@ import {
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
+import { AvatarSelector } from "@/components/avatars/AvatarSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -834,6 +835,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const [editLocation, setEditLocation] = useState("");
   const [editWebsite, setEditWebsite] = useState("");
   const [editWallet, setEditWallet] = useState("");
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const bannerFileRef = useRef<HTMLInputElement | null>(null);
 
   const hydrateEditors = useCallback((profile: ProfileData) => {
     setEditUsername(profile.username || "");
@@ -1152,6 +1155,49 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
     }
   };
 
+  const handleAvatarUpdate = async (url: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase.from("profiles").update({ avatar_url: url }).eq("user_id", user.id);
+      if (error) throw error;
+      setProfileData((current) => current ? { ...current, avatar_url: url } : current);
+      toast.success("Profile image updated");
+    } catch (error) {
+      console.error(error);
+      toast.error("Could not update profile image");
+    }
+  };
+
+  const handleBannerUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setUploadingBanner(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${user.id}/banner-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("profile-media").upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from("profile-media").getPublicUrl(path);
+      const bannerUrl = data.publicUrl;
+      const { error: updateError } = await supabase.from("profiles").update({ banner_url: bannerUrl }).eq("user_id", user.id);
+      if (updateError) throw updateError;
+
+      setProfileData((current) => current ? { ...current, banner_url: bannerUrl } : current);
+      toast.success("Banner updated");
+    } catch (error) {
+      console.error(error);
+      toast.error("Could not update banner");
+    } finally {
+      setUploadingBanner(false);
+      if (bannerFileRef.current) bannerFileRef.current.value = "";
+    }
+  };
+
   const getPublicProfileUrl = () => {
     if (typeof window === "undefined") return "";
     if (profileData?.username) return `${window.location.origin}/u/${profileData.username}`;
@@ -1441,6 +1487,21 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
             )}
             <div className="absolute inset-0 bg-black/30" />
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black" />
+            {isOwnProfile ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => bannerFileRef.current?.click()}
+                  className="absolute bottom-3 right-3 h-9 rounded-full border-white/15 bg-black/70 px-3 text-white backdrop-blur hover:bg-black/90 hover:text-white"
+                >
+                  {uploadingBanner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageIcon className="mr-2 h-4 w-4" />}
+                  Edit banner
+                </Button>
+                <input ref={bannerFileRef} type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} />
+              </>
+            ) : null}
           </div>
 
           <div className="relative -mt-12 px-4 pb-4">
@@ -1449,6 +1510,24 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 <img src={avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
               </div>
               <div className="absolute bottom-1.5 right-1.5 h-4 w-4 rounded-full border-2 border-black bg-emerald-400" />
+              {isOwnProfile ? (
+                <div className="absolute -bottom-2 -right-2">
+                  <AvatarSelector
+                    currentAvatar={profileData?.avatar_url}
+                    userId={user?.id}
+                    onSelect={(url) => void handleAvatarUpdate(url)}
+                    trigger={
+                      <button
+                        type="button"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/80 text-white backdrop-blur transition hover:bg-black"
+                        aria-label="Edit profile image"
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                      </button>
+                    }
+                  />
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-3 space-y-3">
@@ -1464,9 +1543,22 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 <div className="flex flex-wrap gap-2">
                   {roleTags.map((badge) => {
                     const Icon = badge.icon;
+                    const accentClass = badge.tone === "gold"
+                      ? "border-amber-400/25 bg-amber-400/10 text-amber-100"
+                      : badge.tone === "blue"
+                        ? "border-sky-400/25 bg-sky-400/10 text-sky-100"
+                        : badge.tone === "green"
+                          ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-100"
+                          : badge.tone === "red"
+                            ? "border-rose-400/25 bg-rose-400/10 text-rose-100"
+                            : badge.tone === "legendary"
+                              ? "border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-100"
+                              : "border-violet-400/25 bg-violet-400/10 text-violet-100";
                     return (
-                      <span key={badge.key} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/72">
-                        <Icon className="h-3 w-3" />
+                      <span key={badge.key} className={cn("inline-flex items-center gap-2 border px-2.5 py-1.5 text-[11px] font-black uppercase tracking-[0.14em]", accentClass)}>
+                        <span className="inline-flex h-5 w-5 items-center justify-center border border-current/20 bg-black/30">
+                          <Icon className="h-3 w-3" />
+                        </span>
                         {badge.label}
                       </span>
                     );
@@ -1853,10 +1945,39 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                     </Panel>
 
                     <Panel className="border-white/10 bg-white/[0.03]">
-                      <SectionHeading icon={Sparkles} title="Upgrade paths" subtitle="Built for scalable backend-powered cosmetics and identity upgrades." />
+                      <SectionHeading icon={Sparkles} title="Profile media" subtitle="Update the main visuals shown across your profile and embeds." />
                       <div className="space-y-3 text-sm text-white/60">
-                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">Animated GIF banners and video banners can slot into the current banner surface using the existing `banner_url` pathway.</div>
-                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">Tiered badges already support stacking, hover tooltips, and future frame/cosmetic unlocks.</div>
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-[0.16em] text-white/40">Profile image</p>
+                              <p className="mt-2 text-sm text-white/65">Upload a new avatar or pick one from the selector.</p>
+                            </div>
+                            <AvatarSelector
+                              currentAvatar={profileData?.avatar_url}
+                              userId={user?.id}
+                              onSelect={(url) => void handleAvatarUpdate(url)}
+                              trigger={<Button variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">Edit image</Button>}
+                            />
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-[0.16em] text-white/40">Banner</p>
+                              <p className="mt-2 text-sm text-white/65">Replace the cover image used at the top of your profile.</p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => bannerFileRef.current?.click()}
+                              className="rounded-full border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white"
+                            >
+                              {uploadingBanner ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageIcon className="mr-2 h-4 w-4" />}
+                              Edit banner
+                            </Button>
+                          </div>
+                        </div>
                         <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">Wallet connection feeds holder verification, on-chain stats, and future rarity/frame unlock logic.</div>
                       </div>
                     </Panel>

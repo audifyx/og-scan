@@ -1,5 +1,5 @@
 import {
-  Bell, LineChart, LogOut, Mail,
+  Bell, Headset, LineChart, LogOut, Mail,
   MessageSquare, Settings, Trophy,
   User, Wallet, X, Shield, Menu, Users, Wrench, Home,
 } from "lucide-react";
@@ -29,6 +29,7 @@ const tradingItems: NavItem[] = [
   { to: "/trading-lobbies", icon: MessageSquare, label: "Trading Lobbies", eyebrow: "Voice + charts" },
   { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
   { to: "/messages",        icon: Mail,          label: "Messages",        eyebrow: "Direct messages" },
+  { to: "/support",         icon: Headset,       label: "Support Chat",    eyebrow: "Tickets + live help" },
 ];
 
 // ── NavRow ────────────────────────────────────────────────────────────────

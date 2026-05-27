@@ -15,6 +15,7 @@ import {
   Home,
   Users,
   User,
+  Headset,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
@@ -155,6 +156,7 @@ export const AppSidebar = ({
     { to: "/trading-lobbies", icon: MessageSquare,  label: "Trading Lobbies", eyebrow: "Voice + charts" },
     { to: "/leaderboard",     icon: Trophy,         label: "Leaderboard",     eyebrow: "Top traders" },
     { to: "/messages",        icon: Mail,           label: "Messages",        eyebrow: "Direct messages" },
+    { to: "/support",         icon: Headset,        label: "Support Chat",    eyebrow: "Tickets + live help" },
   ];
 
   // Admin entry point — individual admin apps now live inside the admin dashboard hub

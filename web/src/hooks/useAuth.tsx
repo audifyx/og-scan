@@ -7,7 +7,11 @@ export interface Profile {
   user_id: string;
   username: string | null;
   avatar_url: string | null;
+  banner_url?: string | null;
   display_name?: string | null;
+  verified?: boolean | null;
+  is_official_account?: boolean | null;
+  affiliate_org_id?: string | null;
   reputation_score?: number | null;
   current_level?: number | null;
   daily_streak?: number | null;
