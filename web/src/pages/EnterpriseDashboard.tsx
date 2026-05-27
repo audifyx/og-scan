@@ -18,7 +18,7 @@ import {
   AlertTriangle, Building2, Key, Eye, EyeOff, Copy, Download,
   Settings, Plus, Trash2, ChevronRight, ExternalLink, Globe,
   Cpu, Activity, Server, ToggleLeft, ToggleRight, Fingerprint,
-  ClipboardList, HardDrive, Award, Zap
+  ClipboardList, HardDrive, Award, Zap, ArrowLeft
 } from "lucide-react";
 
 interface AuditLog {

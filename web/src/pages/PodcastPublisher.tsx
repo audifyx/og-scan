@@ -18,6 +18,7 @@ import {
   Music, Apple, Globe, ChevronRight, Play, Hash, Star,
   Upload, Eye, RefreshCw, X as XIcon, Plus, CheckCircle2,
   Clock, BookOpen, Radio,
+  ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";

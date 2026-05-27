@@ -20,7 +20,7 @@ import {
   MessageSquare, TrendingUp, Settings, Plus, Trash2, Eye,
   EyeOff, Copy, Check, AlertCircle, Zap, BarChart2,
   Signal, SignalHigh, Wifi, WifiOff, Play, Square,
-  ChevronRight, ExternalLink, RefreshCw, Heart, Share2
+  ChevronRight, ExternalLink, RefreshCw, Heart, Share2, ArrowLeft
 } from "lucide-react";
 
 interface Platform {

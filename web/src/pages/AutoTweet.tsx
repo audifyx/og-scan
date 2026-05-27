@@ -16,6 +16,7 @@ import {
   Bell, Zap, Settings, Eye, ChevronRight, Radio,
   Copy, ExternalLink, Plus, Trash2, Globe, Lock,
   RefreshCw, Hash, Toggle, X as XIcon,
+  ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";

@@ -14,6 +14,7 @@ import {
   Bell, BellOff, Mail, Smartphone, Clock, Check, Calendar,
   ChevronRight, Radio, Users, Trash2, Plus, Toggle, Loader2,
   AlertCircle, BellRing, Settings, Globe, Send,
+  ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";

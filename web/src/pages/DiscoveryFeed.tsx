@@ -15,6 +15,7 @@ import {
   Play, Clock, TrendingUp, ChevronRight, Filter, X, Mic,
   Headphones, Calendar, ExternalLink, RefreshCw, Sparkles,
   BookOpen, Layers, MessageSquare, ArrowUpRight,
+  ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";

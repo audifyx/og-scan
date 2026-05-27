@@ -14,6 +14,7 @@ import {
   ExternalLink, Plus, Trash2, Loader2, Globe, Tv, Youtube,
   Linkedin, Play, Radio, X, CheckCircle2, AlertCircle, RefreshCw,
   Link as LinkIcon, Eye, Clock, ToggleLeft, ToggleRight,
+  ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
