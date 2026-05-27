@@ -9,14 +9,14 @@ import {
   BarChart3, Users, Globe2, Shield, Headphones, Rocket, Mic,
   Headset, MessageSquare, Bell, AlertTriangle, Wallet,
   Image, Settings, FileText, TrendingUp, ChevronLeft,
-  LayoutDashboard, Wrench,
+  LayoutDashboard, Wrench, UserCheck,
 } from "lucide-react";
 import type { AdminSection } from "./types";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   BarChart3, Users, Globe2, Shield, Headphones, Rocket, Mic,
   Headset, MessageSquare, Bell, AlertTriangle, Wallet,
-  Image, Settings, FileText, TrendingUp, LayoutDashboard, Wrench,
+  Image, Settings, FileText, TrendingUp, LayoutDashboard, Wrench, UserCheck,
 };
 
 interface SectionItem {
@@ -55,6 +55,12 @@ const SECTIONS: { group: string; items: SectionItem[] }[] = [
       { id: "notifications", label: "Notifications", icon: "Bell" },
       { id: "alerts", label: "Price Alerts", icon: "AlertTriangle" },
       { id: "wallets", label: "Wallets & Trades", icon: "Wallet" },
+    ],
+  },
+  {
+    group: "Growth",
+    items: [
+      { id: "affiliates", label: "Affiliates", icon: "UserCheck" },
     ],
   },
   {
