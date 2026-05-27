@@ -22,10 +22,10 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let alive = true;
 
-    // Safety timeout — if Supabase doesn't respond in 4s, default to OFF
+    // Safety timeout — if Supabase doesn't respond in 2s, default to OFF
     const timeout = setTimeout(() => {
       if (alive) setMaintenanceEnabled(false);
-    }, 4000);
+    }, 2000);
 
     (async () => {
       try {
