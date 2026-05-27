@@ -28,7 +28,7 @@ import {
 import {
   Radio, Users, Globe, Twitter, MessageSquare, Clock,
   Headphones, Copy, Check, ExternalLink, Mic, Play,
-  Share2, Code2, ArrowRight, Star, Zap, Crown, Shield,
+  Share2, Code2, ArrowRight, ArrowLeft, Star, Zap, Crown, Shield,
   Calendar, BarChart3, Heart, ChevronRight, Loader2,
   Volume2, VolumeX, X as XIcon, Send, Sparkles,
   TrendingUp, Award, Eye, Bell, BellOff, Link as LinkIcon,
