@@ -1,6 +1,6 @@
 /**
  * usePresence — Global online presence heartbeat.
- * Updates `is_online = true` + `last_seen_at = now()` every 60s.
+ * Updates `is_online = true` + `last_seen_at = now()` every 15s.
  * Sets `is_online = false` on page hide/unload.
  * Also recalculates `current_level` from `xp` on each heartbeat.
  */
@@ -8,7 +8,7 @@ import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./useAuth";
 
-const HEARTBEAT_MS = 60_000; // 1 minute
+const HEARTBEAT_MS = 15_000; // 15 seconds
 
 /** XP thresholds: level N requires N*N*100 XP */
 function levelFromXp(xp: number): number {

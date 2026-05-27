@@ -81,6 +81,8 @@ interface ProfileData {
   following_count?: number | null;
   created_at?: string | null;
   is_online?: boolean | null;
+  last_seen_at?: string | null;
+  last_active_at?: string | null;
   xp?: number | null;
   total_xp?: number | null;
   current_level?: number | null;
@@ -371,6 +373,39 @@ function VerificationBadge({ tone = "blue", className }: { tone?: "blue" | "gold
       <path d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.274-.586-.705-1.084-1.246-1.439-.54-.354-1.17-.551-1.816-.569-.646.018-1.275.215-1.816.57-.54.354-.972.852-1.246 1.438-.607-.223-1.264-.27-1.897-.14-.634.131-1.218.437-1.687.882-.445.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.705-1.439 1.246-.354.54-.551 1.17-.569 1.816.018.646.215 1.275.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.218.882 1.687.47.445 1.053.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.646-.018 1.275-.215 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.218-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z" />
     </svg>
   );
+}
+
+const PRESENCE_STALE_MS = 45_000;
+const PRESENCE_TICK_MS = 15_000;
+
+function getPresenceTimestamp(profile?: Pick<ProfileData, "last_active_at" | "last_seen_at"> | null) {
+  return profile?.last_active_at || profile?.last_seen_at || null;
+}
+
+function isProfileCurrentlyOnline(profile?: Pick<ProfileData, "is_online" | "last_active_at" | "last_seen_at"> | null, now = Date.now()) {
+  if (!profile) return false;
+
+  const timestamp = getPresenceTimestamp(profile);
+  if (!timestamp) return Boolean(profile.is_online);
+
+  const seenAt = new Date(timestamp).getTime();
+  if (Number.isNaN(seenAt)) return Boolean(profile.is_online);
+  if (profile.is_online === false) return false;
+
+  return now - seenAt <= PRESENCE_STALE_MS;
+}
+
+function getPresenceSubtitle(profile?: Pick<ProfileData, "is_online" | "last_active_at" | "last_seen_at"> | null, now = Date.now()) {
+  if (!profile) return "Presence updates automatically while the account is active.";
+  if (isProfileCurrentlyOnline(profile, now)) return "Presence updates in real time while the account is active.";
+
+  const timestamp = getPresenceTimestamp(profile);
+  if (!timestamp) return "Presence updates automatically while the account is active.";
+
+  const seenAt = new Date(timestamp).getTime();
+  if (Number.isNaN(seenAt)) return "Presence updates automatically while the account is active.";
+
+  return `Last active ${formatDistanceToNow(new Date(timestamp), { addSuffix: true })}.`;
 }
 
 function Panel({ className, children }: { className?: string; children: React.ReactNode }) {
@@ -758,6 +793,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const [tokenHoldings, setTokenHoldings] = useState<TokenHolding[]>([]);
   const [followerPreview, setFollowerPreview] = useState<FollowerRecord[]>([]);
   const [followingPreview, setFollowingPreview] = useState<FollowerRecord[]>([]);
+  const [presenceNow, setPresenceNow] = useState(() => Date.now());
 
   const [editUsername, setEditUsername] = useState("");
   const [editDisplayName, setEditDisplayName] = useState("");
@@ -774,6 +810,35 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
     setEditWebsite(profile.website_url || profile.website || "");
     setEditWallet(profile.wallet_address || profile.sol_wallet || "");
   }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setPresenceNow(Date.now()), PRESENCE_TICK_MS);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!targetUserId) return;
+
+    const channel = supabase
+      .channel(`profile-presence-${targetUserId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${targetUserId}` },
+        (payload) => {
+          const next = payload.new as Partial<ProfileData>;
+          setPresenceNow(Date.now());
+          setProfileData((current) => {
+            if (!current) return current;
+            return { ...current, ...next };
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [targetUserId]);
 
   const fetchSavedPosts = useCallback(async (table: "community_bookmarks" | "community_post_likes" | "community_reposts", field: string) => {
     if (!user) return [] as PostRecord[];
@@ -1209,6 +1274,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const roleTags = identityBadges.slice(0, 5);
   const goldVerified = isGoldVerifiedProfile(profileData, Boolean(isOwnProfile && isOwner));
   const blueVerified = Boolean(profileData?.verified && !goldVerified);
+  const profileIsOnline = isProfileCurrentlyOnline(profileData, presenceNow);
+  const profilePresenceSubtitle = getPresenceSubtitle(profileData, presenceNow);
 
   const statCards = [
     { label: "Followers", value: followerCount, hint: "Social gravity across OG Scan", icon: Users, accent: "cyan" as const, formatter: compact },
@@ -1783,8 +1850,11 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
               <div className="space-y-3">
                 <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Account status</p>
-                  <p className="mt-2 text-lg font-black text-white">{profileData.is_online ? "Online" : "Offline"}</p>
-                  <p className="mt-2 text-xs text-white/45">Presence, verification, and role signals appear on the main profile header.</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className={cn("h-2.5 w-2.5 rounded-full", profileIsOnline ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" : "bg-white/20")} />
+                    <p className="text-lg font-black text-white">{profileIsOnline ? "Online" : "Offline"}</p>
+                  </div>
+                  <p className="mt-2 text-xs text-white/45">{profilePresenceSubtitle}</p>
                 </div>
                 <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Badges</p>
