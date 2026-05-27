@@ -1324,3 +1324,4 @@ export function applyThemeVars(themeId: string) {
     localStorage.removeItem("og-theme-gradient");
   }
 }
+
