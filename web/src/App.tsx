@@ -46,6 +46,8 @@ import DiscoveryFeed from "./pages/DiscoveryFeed";
 import SpaceClips from "./pages/SpaceClips";
 import SpaceScheduler from "./pages/SpaceScheduler";
 import ExternalStreams from "./pages/ExternalStreams";
+import HostAnalyticsDashboard from "./pages/HostAnalyticsDashboard";
+import CommunityRooms from "./pages/CommunityRooms";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
@@ -184,6 +186,12 @@ const App = () => (
             <Route path="/spaces-schedule" element={<ProtectedRoute><SpaceScheduler /></ProtectedRoute>} />
             <Route path="/streams" element={<ProtectedRoute><ExternalStreams /></ProtectedRoute>} />
             <Route path="/external-streams" element={<ProtectedRoute><ExternalStreams /></ProtectedRoute>} />
+
+            {/* ── Protected: Spaces — Phase 2: Analytics & Community ── */}
+            <Route path="/host-analytics" element={<ProtectedRoute><HostAnalyticsDashboard /></ProtectedRoute>} />
+            <Route path="/analytics/spaces" element={<ProtectedRoute><HostAnalyticsDashboard /></ProtectedRoute>} />
+            <Route path="/rooms" element={<ProtectedRoute><CommunityRooms /></ProtectedRoute>} />
+            <Route path="/community-rooms" element={<ProtectedRoute><CommunityRooms /></ProtectedRoute>} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
