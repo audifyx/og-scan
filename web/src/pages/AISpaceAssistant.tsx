@@ -19,7 +19,7 @@ import {
   Mic, FileText, BookOpen, Tag, Bell, Search, Play, Clock,
   Sparkles, Zap, ChevronDown, ChevronUp, Plus, Trash2, Check,
   Copy, Download, Share2, Eye, TrendingUp, Hash, Brain,
-  AlignLeft, Bookmark, ListChecks, Volume2
+  AlignLeft, Bookmark, ListChecks, Volume2, ArrowLeft
 } from "lucide-react";
 
 interface TranscriptSegment {

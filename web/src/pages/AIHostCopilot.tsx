@@ -15,8 +15,9 @@ import {
   Brain, Mic, TrendingUp, TrendingDown, Users, MessageSquare,
   Lightbulb, AlertTriangle, CheckCircle, Star, Zap, Heart,
   BarChart2, Volume2, VolumeX, Clock, Award, ChevronRight,
-  ArrowUp, ArrowDown, Radio, Activity, Sparkles
+  ArrowUp, ArrowDown, Radio, Activity, Sparkles, ArrowLeft
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface CopilotSuggestion {
   id: string;

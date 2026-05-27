@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   Play, Pause, Heart, Share2, Scissors, Clock, Download,
   Twitter, Copy, X, Plus, ChevronLeft, ChevronRight,

@@ -18,6 +18,7 @@ import {
   Layers, Type, Palette, Maximize2, Square, Minimize2,
   Sparkles, Radio, Clock, Heart, ExternalLink, Smartphone,
   Film, Zap,
+  ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";

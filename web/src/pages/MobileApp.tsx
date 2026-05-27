@@ -154,7 +154,6 @@ function PhoneMockup() {
 export default function MobileApp() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
-  const navigate = useNavigate();
   const [platform, setPlatform] = useState<"ios" | "android" | "both">("both");
   const [joining, setJoining] = useState(false);
   const [joined, setJoined] = useState(false);
