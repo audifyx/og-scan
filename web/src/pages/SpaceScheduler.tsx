@@ -13,12 +13,12 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Calendar, Clock, Plus, Bell, Users, ChevronRight, Trash2,
   Radio, Star, ExternalLink, Check, RefreshCw, MapPin, Repeat2,
   Lock, Globe, Hash, X, Edit3, CalendarPlus, CheckCircle2,
-  AlertCircle, Loader2, ChevronDown, Flame,
+  AlertCircle, Loader2, ChevronDown, Flame, ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -266,7 +266,6 @@ function SpaceCard({
 function CreateScheduleModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { user } = useAuth();
   const [title, setTitle] = useState("");
-  const navigate = useNavigate();
   const [description, setDescription] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
   const [category, setCategory] = useState("");
@@ -486,6 +485,7 @@ type FilterType = "upcoming" | "mine" | "today";
 
 export default function SpaceScheduler() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [spaces, setSpaces] = useState<ScheduledSpace[]>([]);
   const [myRsvps, setMyRsvps] = useState<MyRsvp[]>([]);
   const [loading, setLoading] = useState(true);
