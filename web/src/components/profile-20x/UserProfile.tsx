@@ -238,14 +238,14 @@ interface Props {
 
 const PROFILE_TABS: Array<{ id: ProfileTab; label: string }> = [
   { id: "posts", label: "Posts" },
-  { id: "calls", label: "Calls" },
-  { id: "holdings", label: "Holdings" },
-  { id: "communities", label: "Communities" },
-  { id: "spaces", label: "Spaces" },
-  { id: "achievements", label: "Achievements" },
+  { id: "activity", label: "Replies" },
+  { id: "achievements", label: "Highlights" },
+  { id: "calls", label: "Articles" },
   { id: "media", label: "Media" },
-  { id: "activity", label: "Activity" },
-  { id: "saved", label: "Saved Alpha" },
+  { id: "spaces", label: "Spaces" },
+  { id: "communities", label: "Communities" },
+  { id: "holdings", label: "Holdings" },
+  { id: "saved", label: "Saved" },
 ];
 
 const dices = (seed: string) => `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(seed)}`;
@@ -524,26 +524,60 @@ function MiniFollowerCard({
   );
 }
 
-function PostCard({ post }: { post: PostRecord }) {
-  const avatar = safeAvatarUrl(post.avatar_url) || dices(post.username || post.user_id || "ogscan-post");
+function PostCard({
+  post,
+  authorOverride,
+  showPinned = false,
+}: {
+  post: PostRecord;
+  authorOverride?: {
+    displayName: string;
+    handle: string;
+    avatarUrl: string;
+    verified?: boolean | null;
+    official?: boolean | null;
+  };
+  showPinned?: boolean;
+}) {
+  const avatar = authorOverride?.avatarUrl || safeAvatarUrl(post.avatar_url) || dices(post.username || post.user_id || "ogscan-post");
+  const displayName = authorOverride?.displayName || post.username || "OG Scan";
+  const handle = authorOverride?.handle || (post.username ? `@${post.username}` : "@ogscan");
+  const verified = Boolean(authorOverride?.verified);
+  const official = Boolean(authorOverride?.official);
 
   return (
     <article className="border-b border-white/10 px-4 py-4 transition hover:bg-white/[0.02] sm:px-5">
+      {showPinned ? (
+        <div className="mb-3 flex items-center gap-2 pl-14 text-[13px] font-semibold text-white/45">
+          <Star className="h-3.5 w-3.5" />
+          <span>Pinned</span>
+        </div>
+      ) : null}
       <div className="flex items-start gap-3">
         <img src={avatar} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <p className="font-bold text-white">{post.username ? `@${post.username}` : "OG Scan"}</p>
-            <span className="text-white/35">·</span>
-            <p className="text-white/40">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[15px] leading-none">
+                <p className="truncate font-bold text-white">{displayName}</p>
+                {verified ? <Shield className="h-4 w-4 shrink-0 text-sky-400" /> : null}
+                {official ? <Crown className="h-4 w-4 shrink-0 text-amber-400" /> : null}
+                <p className="truncate text-white/40">{handle}</p>
+                <span className="text-white/30">·</span>
+                <p className="shrink-0 text-white/40">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
+              </div>
+            </div>
+            <button type="button" className="shrink-0 text-white/35 transition hover:text-white/70" aria-label="Post actions">
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
           </div>
-          <p className="mt-2 whitespace-pre-wrap text-[15px] leading-6 text-white/82">{post.content || "No text attached."}</p>
+          <p className="mt-1.5 whitespace-pre-wrap text-[15px] leading-6 text-white/88">{post.content || "No text attached."}</p>
           {post.image_url ? (
-            <div className="mt-3 overflow-hidden rounded-lg border border-white/10 bg-black/20">
+            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
               <img src={post.image_url} alt="" className="h-auto max-h-[420px] w-full object-cover" />
             </div>
           ) : null}
-          <div className="mt-3 flex items-center gap-6 text-sm text-white/40">
+          <div className="mt-3 flex max-w-[420px] items-center justify-between text-sm text-white/40">
             <span className="inline-flex items-center gap-2"><MessageDots className="h-4 w-4" /> {compact(post.replies_count ?? 0)}</span>
             <span className="inline-flex items-center gap-2"><Heart className="h-4 w-4" /> {compact(post.likes_count ?? 0)}</span>
           </div>
@@ -1004,12 +1038,12 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const mutualCount = isOwnProfile ? friends.mutualCount : networkFollowers.filter((follower) => networkFollowing.some((person) => person.user_id === follower.user_id)).length;
 
   const avatarUrl = safeAvatarUrl(profileData?.avatar_url) || dices(profileData?.username || profileData?.user_id || "ogscan");
-  const bannerUrl = safeAvatarUrl(profileData?.banner_url);
+  const specialProfileMode = Boolean(profileData?.is_official_account || profileData?.affiliate_org_id || (isOwnProfile && (isAdmin || isOwner)));
+  const bannerUrl = safeAvatarUrl(profileData?.banner_url) || (specialProfileMode ? "/og-brand.jpg" : null);
   const displayName = profileData?.display_name || profileData?.username || "OG User";
   const handle = profileData?.username ? `@${profileData.username}` : "@ogscan";
   const website = profileData?.website_url || profileData?.website;
   const walletAddress = profileData?.wallet_address || profileData?.sol_wallet || null;
-  const specialProfileMode = Boolean(profileData?.is_official_account || profileData?.affiliate_org_id || (isOwnProfile && (isAdmin || isOwner)));
   const totalXp = profileData?.xp ?? profileData?.total_xp ?? null;
   const level = profileData?.current_level ?? 1;
   const levelProgress = getProgress(totalXp, level);
@@ -1210,45 +1244,49 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
   return (
     <TooltipProvider delayDuration={120}>
-      <div className="mx-auto w-full max-w-[1520px] space-y-6 pb-10">
-        <Panel className="overflow-hidden p-0">
-          <div className="relative overflow-hidden rounded-none">
-            <div className={cn("og-profile-hero relative h-[180px] overflow-hidden sm:h-[240px] lg:h-[320px]", specialProfileMode && "og-profile-hero--official", isOwnProfile && isOwner && "og-profile-hero--owner")}>
+      <div className="mx-auto w-full max-w-[1520px] space-y-2 pb-10">
+        <Panel className="overflow-hidden border-0 bg-transparent p-0 shadow-none">
+          <div className="relative">
+            <div className="relative h-[180px] overflow-hidden bg-black sm:h-[220px] lg:h-[280px]">
               {bannerUrl ? (
-                <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-90" />
+                <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
               ) : (
-                <div className="absolute inset-0 bg-[linear-gradient(135deg,#101827_0%,#18263b_45%,#0b111c_100%)]" />
+                <div className="absolute inset-0 bg-black" />
               )}
-
-              <div className="og-profile-grid absolute inset-0 opacity-20" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_28%),linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.24)_50%,rgba(8,16,27,0.9)_100%)]" />
-              {specialProfileMode ? <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(250,204,21,0.08),transparent_38%,rgba(34,211,238,0.08)_100%)]" /> : null}
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/90" />
             </div>
 
-            <div className="relative z-10 -mt-14 sm:-mt-16 lg:-mt-20">
-              <div className={cn("border-t border-white/10 bg-[#08101b]/98", specialProfileMode && "og-profile-operator-shell")}>
-                <div className="flex justify-end gap-2 px-4 pt-3 sm:px-6 sm:pt-4 lg:px-8">
+            <div className="relative -mt-14 px-4 sm:-mt-16 sm:px-6 lg:px-8">
+              <div className="flex items-start justify-between gap-4">
+                <div className="relative h-24 w-24 shrink-0 sm:h-32 sm:w-32 lg:h-[140px] lg:w-[140px]">
+                  <div className="overflow-hidden rounded-full border-4 border-black bg-black">
+                    <img src={avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                  </div>
+                  <div className="absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-black bg-emerald-400" />
+                </div>
+
+                <div className="mt-[68px] flex shrink-0 items-center gap-2 sm:mt-[88px] lg:mt-[96px]">
                   {!isOwnProfile ? (
                     <Button
                       onClick={handleFollowToggle}
                       disabled={followBusy}
                       className={cn(
-                        "h-10 rounded-full px-5 text-sm font-bold",
-                        isFollowing ? "bg-white text-[#061019] hover:bg-white/90" : "bg-transparent text-white ring-1 ring-white/20 hover:bg-white/10",
+                        "h-9 rounded-full border border-white/20 bg-black/70 px-4 text-sm font-bold text-white shadow-none backdrop-blur-sm",
+                        isFollowing ? "hover:bg-white/12" : "hover:bg-white/10",
                       )}
                     >
                       {followBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       {isFollowing ? "Following" : "Follow"}
                     </Button>
                   ) : (
-                    <Button onClick={() => setActiveTab("settings")} variant="outline" className="h-10 rounded-full border-white/15 bg-transparent px-5 text-sm font-bold text-white hover:bg-white/10 hover:text-white">
+                    <Button onClick={() => setActiveTab("settings")} variant="outline" className="h-9 rounded-full border-white/20 bg-black/70 px-4 text-sm font-bold text-white shadow-none hover:bg-white/10 hover:text-white">
                       Edit profile
                     </Button>
                   )}
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                      <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border-white/20 bg-black/70 text-white shadow-none hover:bg-white/10 hover:text-white">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -1267,70 +1305,54 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+              </div>
 
-                <div className="-mt-12 px-4 pb-5 sm:-mt-16 sm:px-6 sm:pb-6 lg:px-8 lg:pb-8">
-                  <div className="relative inline-flex">
-                    <div className="og-profile-avatar-ring rounded-full p-[4px]">
-                      <div className="overflow-hidden rounded-full border-4 border-[#08101b] bg-[#08101b]">
-                        <img src={avatarUrl} alt="" className="h-24 w-24 rounded-full object-cover sm:h-32 sm:w-32 lg:h-[140px] lg:w-[140px]" />
-                      </div>
-                    </div>
-                    <div className="absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-[#08101b] bg-emerald-400" />
+              <div className="mt-3 max-w-[720px] space-y-3 pb-4 sm:pb-5 lg:pb-6">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-[30px] font-black leading-none tracking-tight text-white sm:text-[34px]">{displayName}</h1>
+                    {identityBadges.map((badge) => (
+                      <IdentityBadgeChip key={badge.key} badge={badge} />
+                    ))}
                   </div>
-
-                  <div className="mt-4 space-y-3 sm:space-y-4">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="text-[28px] font-black leading-none tracking-tight text-white sm:text-[32px]">{displayName}</h1>
-                        {identityBadges.map((badge) => (
-                          <IdentityBadgeChip key={badge.key} badge={badge} />
-                        ))}
-                      </div>
-                      <p className="mt-1 text-[15px] text-white/45">{handle}</p>
-                    </div>
-
-                    {profileData.bio ? <p className="max-w-4xl whitespace-pre-wrap text-[15px] leading-6 text-white/82">{profileData.bio}</p> : null}
-
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-white/55">
-                      {profileData.location ? <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profileData.location}</span> : null}
-                      {website ? (
-                        <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-cyan-300 transition hover:text-cyan-200">
-                          <Link2 className="h-4 w-4" /> {website.replace(/^https?:\/\//, "")}
-                        </a>
-                      ) : null}
-                      <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4" /> {profileData.created_at ? `Joined ${format(new Date(profileData.created_at), "MMMM yyyy")}` : "Joined OG Scan"}</span>
-                      {walletAddress ? <span className="inline-flex items-center gap-1.5"><Wallet className="h-4 w-4" /> {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}</span> : null}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-5 text-[15px] text-white/72">
-                      <span><span className="font-bold text-white">{compact(followingCount)}</span> Following</span>
-                      <span><span className="font-bold text-white">{compact(followerCount)}</span> Followers</span>
-                      {mutualCount > 0 ? <span><span className="font-bold text-white">{compact(mutualCount)}</span> Mutuals</span> : null}
-                      {leaderboardRank ? <span><span className="font-bold text-white">#{leaderboardRank}</span> Trending</span> : null}
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-2 rounded-md bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
-                        <Zap className="h-3.5 w-3.5 text-cyan-300" /> Level {level}
-                      </span>
-                      <span className="inline-flex items-center gap-2 rounded-md bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
-                        <BarChart3 className="h-3.5 w-3.5 text-emerald-300" /> Reputation {compact(profileData.reputation_score ?? derivedOgScore)}
-                      </span>
-                      {profileData.is_official_account ? <span className="inline-flex items-center gap-2 rounded-md bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Crown className="h-3.5 w-3.5" /> Official OG Scan</span> : null}
-                      {profileData.affiliate_org_id ? <span className="inline-flex items-center gap-2 rounded-md bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Shield className="h-3.5 w-3.5" /> Official Team</span> : null}
-                      {walletAddress ? <span className="inline-flex items-center gap-2 rounded-md bg-emerald-400/12 px-3 py-1.5 text-[12px] font-bold text-emerald-100"><Wallet className="h-3.5 w-3.5" /> Holder linked</span> : null}
-                    </div>
-                  </div>
+                  <p className="mt-1 text-[15px] text-white/40">{handle}</p>
                 </div>
+
+                {profileData.bio ? <p className="max-w-3xl whitespace-pre-wrap text-[15px] leading-6 text-white/88">{profileData.bio}</p> : null}
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-white/50">
+                  {profileData.location ? <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profileData.location}</span> : null}
+                  {website ? (
+                    <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-cyan-300 transition hover:text-cyan-200">
+                      <Link2 className="h-4 w-4" /> {website.replace(/^https?:\/\//, "")}
+                    </a>
+                  ) : null}
+                  <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4" /> {profileData.created_at ? `Joined ${format(new Date(profileData.created_at), "MMMM yyyy")}` : "Joined OG Scan"}</span>
+                  {walletAddress ? <span className="inline-flex items-center gap-1.5"><Wallet className="h-4 w-4" /> {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}</span> : null}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-5 text-[15px] text-white/78">
+                  <span><span className="font-bold text-white">{compact(followingCount)}</span> Following</span>
+                  <span><span className="font-bold text-white">{compact(followerCount)}</span> Followers</span>
+                  {mutualCount > 0 ? <span><span className="font-bold text-white">{compact(mutualCount)}</span> Mutuals</span> : null}
+                  {leaderboardRank ? <span><span className="font-bold text-white">#{leaderboardRank}</span> Trending</span> : null}
+                </div>
+
+                {profileData.is_official_account || profileData.affiliate_org_id ? (
+                  <div className="flex flex-wrap items-center gap-3 text-[13px] text-white/55">
+                    {profileData.is_official_account ? <span className="inline-flex items-center gap-1.5"><Crown className="h-3.5 w-3.5 text-amber-400" /> Official OG Scan</span> : null}
+                    {profileData.affiliate_org_id ? <span className="inline-flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-amber-400" /> Official team</span> : null}
+                    {walletAddress ? <span className="inline-flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5 text-emerald-300" /> Holder linked</span> : null}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
-
         </Panel>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="space-y-6">
-            <Panel className="overflow-hidden p-0">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-4">
+            <Panel className="overflow-hidden rounded-none border-x-0 border-y border-white/10 bg-transparent p-0 shadow-none">
               <div className="-mx-0 overflow-x-auto border-b border-white/10">
                 <div className="flex min-w-max">
                   {PROFILE_TABS.filter((tab) => isOwnProfile || tab.id !== "saved").map((tab) => (
@@ -1339,7 +1361,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
                       className={cn(
-                        "relative min-w-[112px] shrink-0 border-b-2 border-transparent px-4 py-4 text-sm font-bold text-white/55 transition hover:bg-white/[0.03] hover:text-white",
+                        "relative min-w-[96px] shrink-0 border-b-2 border-transparent px-4 py-3 text-[15px] font-bold text-white/50 transition hover:bg-white/[0.02] hover:text-white",
                         activeTab === tab.id && "border-cyan-300 text-white",
                       )}
                     >
@@ -1351,7 +1373,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                       type="button"
                       onClick={() => setActiveTab("settings")}
                       className={cn(
-                        "relative min-w-[112px] shrink-0 border-b-2 border-transparent px-4 py-4 text-sm font-bold text-white/55 transition hover:bg-white/[0.03] hover:text-white",
+                        "relative min-w-[96px] shrink-0 border-b-2 border-transparent px-4 py-3 text-[15px] font-bold text-white/50 transition hover:bg-white/[0.02] hover:text-white",
                         activeTab === "settings" && "border-cyan-300 text-white",
                       )}
                     >
@@ -1361,11 +1383,24 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 </div>
               </div>
 
-              <div className="mt-6 space-y-4">
+              <div className="space-y-4">
                 {activeTab === "posts" ? (
                   posts.length > 0 ? (
-                    <div className="overflow-hidden rounded-none border-y border-white/10 bg-transparent">
-                      {posts.map((post) => <PostCard key={post.id} post={post} />)}
+                    <div className="overflow-hidden rounded-none bg-transparent">
+                      {posts.map((post, index) => (
+                        <PostCard
+                          key={post.id}
+                          post={post}
+                          authorOverride={post.user_id === targetUserId ? {
+                            displayName,
+                            handle,
+                            avatarUrl,
+                            verified: profileData?.verified,
+                            official: Boolean(profileData?.is_official_account || profileData?.affiliate_org_id),
+                          } : undefined}
+                          showPinned={index === 0 && Boolean(profileData?.is_official_account || profileData?.affiliate_org_id)}
+                        />
+                      ))}
                     </div>
                   ) : (
                     <EmptyState icon={Radio} title="No posts yet" body="When this account publishes posts, they will appear here in the main profile feed." />
@@ -1374,38 +1409,33 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
                 {activeTab === "calls" ? (
                   tradeHistory.length > 0 ? (
-                    <div className="space-y-3">
-                      <Panel className="border-white/10 bg-white/[0.03] p-4">
-                        <SectionHeading icon={Target} title="Top signals" subtitle="Best callouts and strongest realized moves from synced trade history." />
-                        {topTrade ? (
-                          <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-4">
-                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100/80">Legendary moment</p>
-                            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                              <div>
-                                <h4 className="text-2xl font-black tracking-tight text-white">{topTrade.token_symbol || topTrade.token_name || "Top signal"}</h4>
-                                <p className="mt-2 text-sm text-white/70">{topTrade.action} · {formatDistanceToNow(new Date(topTrade.created_at), { addSuffix: true })}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100/80">Best PNL</p>
-                                <p className="mt-2 text-2xl font-black tracking-tight text-white">{formatUsd(topTrade.pnl)}</p>
-                              </div>
+                    <div className="border-y border-white/10">
+                      {topTrade ? (
+                        <div className="border-b border-white/10 px-4 py-4 sm:px-5">
+                          <p className="text-[13px] font-semibold text-white/45">Pinned article</p>
+                          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                              <h4 className="text-[20px] font-black tracking-tight text-white">{topTrade.token_symbol || topTrade.token_name || "Top signal"}</h4>
+                              <p className="mt-1 text-sm text-white/55">{topTrade.action} · {formatDistanceToNow(new Date(topTrade.created_at), { addSuffix: true })}</p>
+                            </div>
+                            <div className="text-left sm:text-right">
+                              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/35">PNL</p>
+                              <p className="mt-1 text-xl font-black tracking-tight text-white">{formatUsd(topTrade.pnl)}</p>
                             </div>
                           </div>
-                        ) : (
-                          <EmptyState icon={TrendingUp} title="No positive calls yet" body="Calls populate here once profitable call history is detected." />
-                        )}
-                      </Panel>
+                        </div>
+                      ) : null}
                       {tradeHistory.map((trade) => (
-                        <div key={trade.id} className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-4">
+                        <div key={trade.id} className="border-b border-white/10 px-4 py-4 last:border-b-0 sm:px-5">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                              <p className="text-lg font-bold text-white">{trade.token_symbol || trade.token_name || "Signal"}</p>
-                              <p className="mt-1 text-xs text-white/45">{trade.action} · {formatDistanceToNow(new Date(trade.created_at), { addSuffix: true })}</p>
+                              <p className="text-[17px] font-bold text-white">{trade.token_symbol || trade.token_name || "Signal"}</p>
+                              <p className="mt-1 text-sm text-white/45">{trade.action} · {formatDistanceToNow(new Date(trade.created_at), { addSuffix: true })}</p>
                             </div>
-                            <div className="flex flex-wrap gap-2 text-xs">
-                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-white/60">Size {compact(trade.amount)}</span>
-                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-white/60">Price {formatUsd(trade.price)}</span>
-                              <span className={cn("rounded-full border px-3 py-1.5 font-semibold", (trade.pnl ?? 0) >= 0 ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : "border-rose-400/20 bg-rose-400/10 text-rose-200")}>{trade.pnl != null ? formatUsd(trade.pnl) : "PNL pending"}</span>
+                            <div className="flex flex-wrap gap-3 text-sm text-white/60">
+                              <span>Size {compact(trade.amount)}</span>
+                              <span>Price {formatUsd(trade.price)}</span>
+                              <span className={cn("font-semibold", (trade.pnl ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300")}>{trade.pnl != null ? formatUsd(trade.pnl) : "PNL pending"}</span>
                             </div>
                           </div>
                         </div>
@@ -1507,10 +1537,23 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
                 {activeTab === "achievements" ? (
                   allBadges.length > 0 ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {allBadges.map((badge) => (
-                        <AchievementCard key={badge.key} title={badge.title} body={badge.body} tone={badge.tone as IdentityBadge["tone"]} icon={badge.icon} />
-                      ))}
+                    <div className="border-y border-white/10">
+                      {allBadges.map((badge, index) => {
+                        const Icon = badge.icon;
+                        return (
+                          <div key={badge.key} className={cn("px-4 py-4 sm:px-5", index !== allBadges.length - 1 && "border-b border-white/10")}>
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 text-cyan-300">
+                                <Icon className="h-5 w-5" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[16px] font-bold text-white">{badge.title}</p>
+                                <p className="mt-1 text-sm leading-6 text-white/58">{badge.body}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <EmptyState icon={Award} title="No achievements unlocked yet" body="As the profile gains badges, progression status, and activity milestones, they will appear here with rarity styling." />
@@ -1519,14 +1562,10 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
                 {activeTab === "media" ? (
                   mediaPosts.length > 0 ? (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-px bg-white/10 sm:grid-cols-3 xl:grid-cols-4">
                       {mediaPosts.map((post) => (
-                        <article key={post.id} className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.035]">
+                        <article key={post.id} className="bg-black">
                           {post.image_url ? <img src={post.image_url} alt="" className="aspect-square w-full object-cover" /> : null}
-                          <div className="p-4">
-                            <p className="line-clamp-3 text-sm leading-6 text-white/72">{post.content || "Media post"}</p>
-                            <p className="mt-3 text-xs text-white/40">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
-                          </div>
                         </article>
                       ))}
                     </div>
@@ -1537,23 +1576,25 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
                 {activeTab === "activity" ? (
                   activities.length > 0 ? (
-                    activities.map((activity) => (
-                      <div key={activity.id} className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-cyan-300">
-                            <Activity className="h-4.5 w-4.5" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <p className="text-sm font-semibold text-white">{activity.title}</p>
-                              <span className="text-xs text-white/40">{formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}</span>
+                    <div className="border-y border-white/10">
+                      {activities.map((activity, index) => (
+                        <div key={activity.id} className={cn("px-4 py-4 sm:px-5", index !== activities.length - 1 && "border-b border-white/10")}>
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5 text-cyan-300">
+                              <Activity className="h-4.5 w-4.5" />
                             </div>
-                            {activity.description ? <p className="mt-2 text-sm leading-6 text-white/55">{activity.description}</p> : null}
-                            <p className="mt-2 text-[11px] font-black uppercase tracking-[0.16em] text-white/30">{activity.activity_type}</p>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <p className="text-[15px] font-semibold text-white">{activity.title}</p>
+                                <span className="text-xs text-white/40">{formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}</span>
+                              </div>
+                              {activity.description ? <p className="mt-1.5 text-sm leading-6 text-white/58">{activity.description}</p> : null}
+                              <p className="mt-2 text-[11px] font-black uppercase tracking-[0.16em] text-white/30">{activity.activity_type}</p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   ) : (
                     <EmptyState icon={Activity} title="No activity yet" body="Profile activity, achievements, and on-platform actions will stream here once there is activity to render." />
                   )
