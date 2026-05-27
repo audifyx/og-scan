@@ -42,6 +42,8 @@ import PublicSpaceListen from "./pages/PublicSpaceListen";
 import UserPublicPage from "./pages/UserPublicPage";
 import UserPageWidget from "./pages/UserPageWidget";
 import EmbedSpace from "./pages/EmbedSpace";
+import EmbedProfile from "./pages/EmbedProfile";
+import EmbedSpaces from "./pages/EmbedSpaces";
 import DiscoveryFeed from "./pages/DiscoveryFeed";
 import SpaceClips from "./pages/SpaceClips";
 import SpaceScheduler from "./pages/SpaceScheduler";
@@ -194,6 +196,10 @@ const App = () => (
 
             {/* ── Public: Embeddable space player (no auth, no chrome) ── */}
             <Route path="/embed/space/:spaceId" element={<EmbedSpace />} />
+
+            {/* ── Public: Embeddable profile & spaces widgets ── */}
+            <Route path="/embed/profile/:username" element={<EmbedProfile />} />
+            <Route path="/embed/spaces/:username" element={<EmbedSpaces />} />
 
             {/* ── Protected: Spaces — advanced features ── */}
             <Route path="/discovery" element={<ProtectedRoute><DiscoveryFeed /></ProtectedRoute>} />

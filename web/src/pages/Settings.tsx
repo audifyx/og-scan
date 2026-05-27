@@ -19,6 +19,7 @@ import {
   DollarSign, Bell, User, Shield, Webhook, Palette, LogOut, Eye, EyeOff,
   Check, Loader2, KeyRound, Mail, Link, Twitter, MessageSquare, Globe,
   Wallet, Star, Copy, Flame, Trophy, Zap, Clock, ChevronRight, Users, Gift, Share2,
+  Code2, Radio, Maximize2, ExternalLink,
 } from "lucide-react";
 
 interface ProfileData {
@@ -269,6 +270,7 @@ const Settings = () => {
                 { value: "invite", icon: Gift, label: "Invite" },
                 { value: "notifications", icon: Bell, label: "Alerts" },
                 { value: "webhooks", icon: Webhook, label: "Webhooks" },
+                { value: "embed", icon: Code2, label: "Embed" },
               ].map(({ value, icon: Icon, label }) => (
                 <TabsTrigger key={value} value={value} className="flex items-center gap-1.5 text-xs sm:text-sm px-3 py-2">
                   <Icon className="h-3.5 w-3.5" />
@@ -671,10 +673,253 @@ const Settings = () => {
               </div>
             </Card>
           </TabsContent>
+
+          {/* ── Embed Settings Tab ── */}
+          <TabsContent value="embed">
+            <EmbedSettingsTab username={profile.username} />
+          </TabsContent>
         </Tabs>
       </div>
     </AppLayout>
   );
 };
+
+/* ─────────────────────────────────────────────────────────────
+   Embed Settings Panel (inline component so it can use profile)
+   ───────────────────────────────────────────────────────────── */
+function EmbedSettingsTab({ username }: { username?: string }) {
+  const [copiedProfile, setCopiedProfile] = useState(false);
+  const [copiedSpaces, setCopiedSpaces] = useState(false);
+  const [profileSize, setProfileSize] = useState<"compact" | "standard" | "tall">("standard");
+  const [spacesSize, setSpacesSize] = useState<"compact" | "standard" | "wide">("compact");
+
+  if (!username) {
+    return (
+      <div className="max-w-2xl">
+        <Card className="p-6 glass-card">
+          <p className="text-white/40 text-sm">Set a username in your Profile tab first to get your embed codes.</p>
+        </Card>
+      </div>
+    );
+  }
+
+  const profileBaseUrl = `https://ogscan.fun/embed/profile/${username}`;
+  const spacesBaseUrl = `https://ogscan.fun/embed/spaces/${username}`;
+
+  const profileSizes = {
+    compact: { width: 340, height: 480 },
+    standard: { width: 420, height: 600 },
+    tall: { width: 480, height: 720 },
+  };
+  const spacesSizes = {
+    compact: { width: 340, height: 260 },
+    standard: { width: 420, height: 320 },
+    wide: { width: 560, height: 280 },
+  };
+
+  const ps = profileSizes[profileSize];
+  const ss = spacesSizes[spacesSize];
+
+  const profileCode = `<iframe
+  src="${profileBaseUrl}"
+  width="${ps.width}"
+  height="${ps.height}"
+  frameborder="0"
+  scrolling="no"
+  allow="autoplay"
+  style="border-radius:16px;overflow:hidden;border:none;"
+></iframe>`;
+
+  const spacesCode = `<iframe
+  src="${spacesBaseUrl}"
+  width="${ss.width}"
+  height="${ss.height}"
+  frameborder="0"
+  scrolling="no"
+  allow="autoplay"
+  style="border-radius:16px;overflow:hidden;border:none;"
+></iframe>`;
+
+  const copy = (code: string, which: "profile" | "spaces") => {
+    navigator.clipboard.writeText(code);
+    if (which === "profile") { setCopiedProfile(true); setTimeout(() => setCopiedProfile(false), 2000); }
+    else { setCopiedSpaces(true); setTimeout(() => setCopiedSpaces(false), 2000); }
+  };
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      {/* Header */}
+      <Card className="p-5 glass-card">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-xl bg-violet-500/15 flex items-center justify-center flex-shrink-0">
+            <Code2 className="h-5 w-5 text-violet-400" />
+          </div>
+          <div>
+            <h3 className="font-bold text-white mb-1">Embed Your Profile</h3>
+            <p className="text-xs text-white/45 leading-relaxed">
+              Paste these widgets on your website, blog, or X bio link.
+              They update live — when you go live on a space, your site visitors see it instantly.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* ── Widget 1 — Full Profile ── */}
+      <Card className="p-6 glass-card">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-semibold text-white flex items-center gap-2">
+            <Radio className="h-4 w-4 text-violet-400" />
+            Profile Widget
+          </h3>
+          <a
+            href={`${profileBaseUrl}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-[11px] text-white/30 hover:text-violet-400 transition-colors"
+          >
+            <ExternalLink className="h-3 w-3" /> Preview
+          </a>
+        </div>
+        <p className="text-xs text-white/40 mb-4">
+          Shows your banner, photo, bio, social links, live space (when active), and past spaces.
+        </p>
+
+        {/* Size picker */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-[10px] text-white/30 uppercase tracking-wider mr-1">Size</span>
+          {(["compact", "standard", "tall"] as const).map(sz => (
+            <button
+              key={sz}
+              onClick={() => setProfileSize(sz)}
+              className={`px-3 py-1 rounded-lg text-[11px] font-medium transition-all border ${
+                profileSize === sz
+                  ? "bg-violet-500/20 border-violet-500/40 text-violet-300"
+                  : "bg-white/[0.04] border-white/[0.08] text-white/35 hover:text-white/60"
+              }`}
+            >
+              {sz.charAt(0).toUpperCase() + sz.slice(1)}
+              <span className="text-[9px] opacity-60 ml-1">
+                {profileSizes[sz].width}×{profileSizes[sz].height}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Code block */}
+        <div className="relative">
+          <pre className="bg-black/40 border border-white/[0.08] rounded-xl p-4 text-[11px] text-white/60 font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap break-all">
+            {profileCode}
+          </pre>
+          <button
+            onClick={() => copy(profileCode, "profile")}
+            className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-[11px] font-semibold transition-all"
+          >
+            {copiedProfile ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            {copiedProfile ? "Copied!" : "Copy"}
+          </button>
+        </div>
+
+        {/* Tips */}
+        <div className="mt-3 text-[10px] text-white/25 space-y-0.5">
+          <p>• Works on any website — paste the iframe code in your HTML or page builder</p>
+          <p>• Auto-updates live — your visitors see when you go live without refreshing</p>
+        </div>
+      </Card>
+
+      {/* ── Widget 2 — Spaces Only ── */}
+      <Card className="p-6 glass-card">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-semibold text-white flex items-center gap-2">
+            <Radio className="h-4 w-4 text-cyan-400" />
+            Live Spaces Widget
+          </h3>
+          <a
+            href={`${spacesBaseUrl}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-[11px] text-white/30 hover:text-cyan-400 transition-colors"
+          >
+            <ExternalLink className="h-3 w-3" /> Preview
+          </a>
+        </div>
+        <p className="text-xs text-white/40 mb-4">
+          Spaces-only widget. Shows a bold LIVE card when you're hosting. Perfect for sidebars and footers.
+        </p>
+
+        {/* Size picker */}
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-[10px] text-white/30 uppercase tracking-wider mr-1">Size</span>
+          {(["compact", "standard", "wide"] as const).map(sz => (
+            <button
+              key={sz}
+              onClick={() => setSpacesSize(sz)}
+              className={`px-3 py-1 rounded-lg text-[11px] font-medium transition-all border ${
+                spacesSize === sz
+                  ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
+                  : "bg-white/[0.04] border-white/[0.08] text-white/35 hover:text-white/60"
+              }`}
+            >
+              {sz.charAt(0).toUpperCase() + sz.slice(1)}
+              <span className="text-[9px] opacity-60 ml-1">
+                {spacesSizes[sz].width}×{spacesSizes[sz].height}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Code block */}
+        <div className="relative">
+          <pre className="bg-black/40 border border-white/[0.08] rounded-xl p-4 text-[11px] text-white/60 font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap break-all">
+            {spacesCode}
+          </pre>
+          <button
+            onClick={() => copy(spacesCode, "spaces")}
+            className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-semibold transition-all"
+          >
+            {copiedSpaces ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            {copiedSpaces ? "Copied!" : "Copy"}
+          </button>
+        </div>
+
+        {/* Tips */}
+        <div className="mt-3 text-[10px] text-white/25 space-y-0.5">
+          <p>• Ideal for embedding in your website sidebar or above-the-fold</p>
+          <p>• Shows upcoming scheduled spaces when you're not live</p>
+          <p>• Visitors can click straight into your live space</p>
+        </div>
+      </Card>
+
+      {/* Your profile link */}
+      <Card className="p-5 glass-card">
+        <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+          <Maximize2 className="h-4 w-4 text-white/40" />
+          Your Public Profile Page
+        </h3>
+        <p className="text-xs text-white/40 mb-3">
+          Share your full profile page directly — anyone can follow you and see your spaces without embedding.
+        </p>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 px-3 py-2 rounded-lg bg-black/30 border border-white/[0.08] font-mono text-xs text-white/50 overflow-hidden text-ellipsis whitespace-nowrap">
+            https://ogscan.fun/u/{username}
+          </div>
+          <button
+            onClick={() => { navigator.clipboard.writeText(`https://ogscan.fun/u/${username}`); }}
+            className="flex-shrink-0 px-3 py-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.08] text-white/50 hover:text-white text-[11px] transition-all flex items-center gap-1.5"
+          >
+            <Copy className="h-3 w-3" /> Copy
+          </button>
+          <a
+            href={`https://ogscan.fun/u/${username}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-shrink-0 px-3 py-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.08] text-white/50 hover:text-white transition-all"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        </div>
+      </Card>
+    </div>
+  );
+}
 
 export default Settings;
