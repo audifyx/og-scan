@@ -14,7 +14,7 @@ import {
   Users, Rocket, Activity, Coins, Headphones, Clock,
   Globe2, MessageSquare, Mic, ShieldCheck, Zap,
   TrendingUp, AlertTriangle, FileText, RefreshCw,
-  Loader2, ArrowUpRight, ArrowDownRight, Database,
+  Loader2, ArrowUpRight, ArrowDownRight, Database, PanelTop,
 } from "lucide-react";
 import type { AdminSection } from "../types";
 
@@ -227,7 +227,7 @@ export const OverviewSection = ({ onNavigate }: Props) => {
                 { label: "Review Tokens", icon: Rocket, section: "tokens" as AdminSection },
                 { label: "Moderate", icon: ShieldCheck, section: "moderation" as AdminSection },
                 { label: "Support", icon: MessageSquare, section: "support" as AdminSection },
-                { label: "Announcements", icon: FileText, section: "notifications" as AdminSection },
+                { label: "Admin Apps", icon: PanelTop, section: "admin_apps" as AdminSection },
                 { label: "Settings", icon: Database, section: "settings" as AdminSection },
               ].map((a) => (
                 <Button

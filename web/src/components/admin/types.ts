@@ -181,7 +181,7 @@ export interface AdminRole {
 
 /* ── Section navigation ── */
 export type AdminSection =
-  | "overview" | "users" | "communities" | "moderation"
+  | "overview" | "admin_apps" | "users" | "communities" | "moderation"
   | "lobbies" | "tokens" | "spaces" | "support"
   | "chat" | "notifications" | "alerts" | "wallets"
   | "media" | "settings" | "audit" | "analytics" | "tools"

@@ -3,7 +3,6 @@ import {
   MessageSquare, Settings, Trophy,
   User, Wallet, X, Shield, Menu, Users, Wrench, Home,
   Radio, Brain, Sparkles, Signal, Building2, Code2,
-  Smartphone, BellRing, Twitter, Mic, Film,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -178,18 +177,12 @@ export const Sidebar = () => {
 
           {isAdmin && (
             <div className="mb-1 mt-4">
-              <SectionLabel label="Admin Apps" />
+              <SectionLabel label="Admin" />
               <div className="space-y-0.5">
-                {[
-                  { to: "/admin",       icon: Shield,     label: "Admin Panel",       eyebrow: "Owner dashboard" },
-                  { to: "/mobile-app",  icon: Smartphone, label: "Mobile App",        eyebrow: "iOS & Android" },
-                  { to: "/reminders",   icon: BellRing,   label: "Space Reminders",   eyebrow: "15-min / 1-hour alerts" },
-                  { to: "/auto-tweet",  icon: Twitter,    label: "Auto-Tweet",        eyebrow: "Tweet when you go live" },
-                  { to: "/podcasts",    icon: Mic,        label: "Podcast Publisher", eyebrow: "RSS → Spotify & Apple" },
-                  { to: "/clip-export", icon: Film,       label: "Clip → Video",      eyebrow: "Export to X & TikTok" },
-                ].map(({ to, icon: Icon, label, eyebrow }) => (
-                  <NavRow key={to} item={{ to, icon: Icon, label, eyebrow }} onClick={closeMobile} />
-                ))}
+                <NavRow
+                  item={{ to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Dashboard + apps hub" }}
+                  onClick={closeMobile}
+                />
               </div>
             </div>
           )}

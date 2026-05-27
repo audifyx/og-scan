@@ -15,11 +15,6 @@ import {
   Home,
   Users,
   User,
-  Smartphone,
-  Twitter,
-  Mic,
-  Film,
-  BellRing,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
@@ -162,14 +157,9 @@ export const AppSidebar = ({
     { to: "/messages",        icon: Mail,           label: "Messages",        eyebrow: "Direct messages" },
   ];
 
-  // Admin Apps = Admin Panel + Mobile & Growth — shown ONLY to audifyx@gmail.com
+  // Admin entry point — individual admin apps now live inside the admin dashboard hub
   const adminAppsItems: NavItem[] = [
-    { to: "/admin",       icon: Shield,     label: "Admin Panel",       eyebrow: "Owner dashboard" },
-    { to: "/mobile-app",  icon: Smartphone, label: "Mobile App",        eyebrow: "iOS & Android" },
-    { to: "/reminders",   icon: BellRing,   label: "Space Reminders",   eyebrow: "15-min / 1-hour alerts" },
-    { to: "/auto-tweet",  icon: Twitter,    label: "Auto-Tweet",        eyebrow: "Tweet when you go live" },
-    { to: "/podcasts",    icon: Mic,        label: "Podcast Publisher", eyebrow: "RSS → Spotify & Apple" },
-    { to: "/clip-export", icon: Film,       label: "Clip → Video",      eyebrow: "Export to X & TikTok" },
+    { to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Dashboard + apps hub" },
   ];
 
   return (
