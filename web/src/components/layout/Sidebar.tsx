@@ -3,6 +3,7 @@ import {
   MessageSquare, Settings, Trophy,
   User, Wallet, X, Shield, Menu,
   Radio, Brain, Sparkles, Signal, Building2, Code2,
+  Smartphone, BellRing, Twitter, Mic, Film,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -163,28 +164,18 @@ export const Sidebar = () => {
 
           {isAdmin && (
             <div className="mb-1 mt-3">
-              <SectionLabel label="Admin" />
+              <SectionLabel label="Admin Apps" />
               <div className="space-y-0.5">
-                <NavLink
-                  to="/admin"
-                  onClick={closeMobile}
-                  className={({ isActive }) =>
-                    cn(
-                      "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
-                      isActive
-                        ? "bg-white/[0.09] text-white"
-                        : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
-                    )
-                  }
-                >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] transition">
-                    <Shield className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold leading-tight">Admin Panel</span>
-                    <span className="block truncate text-[10px] text-white/35">Owner dashboard</span>
-                  </span>
-                </NavLink>
+                {[
+                  { to: "/admin",       icon: Shield,     label: "Admin Panel",       eyebrow: "Owner dashboard" },
+                  { to: "/mobile-app",  icon: Smartphone, label: "Mobile App",        eyebrow: "iOS & Android" },
+                  { to: "/reminders",   icon: BellRing,   label: "Space Reminders",   eyebrow: "15-min / 1-hour alerts" },
+                  { to: "/auto-tweet",  icon: Twitter,    label: "Auto-Tweet",        eyebrow: "Tweet when you go live" },
+                  { to: "/podcasts",    icon: Mic,        label: "Podcast Publisher", eyebrow: "RSS → Spotify & Apple" },
+                  { to: "/clip-export", icon: Film,       label: "Clip → Video",      eyebrow: "Export to X & TikTok" },
+                ].map(({ to, icon: Icon, label, eyebrow }) => (
+                  <NavRow key={to} item={{ to, icon: Icon, label, eyebrow }} onClick={closeMobile} />
+                ))}
               </div>
             </div>
           )}

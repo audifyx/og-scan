@@ -162,16 +162,14 @@ export const AppSidebar = ({
     { to: "/messages",        icon: Mail,           label: "Messages",        eyebrow: "Direct messages" },
   ];
 
-  const mobileSpacesItems: NavItem[] = [
-    { to: "/mobile-app",    icon: Smartphone,  label: "Mobile App",       eyebrow: "iOS & Android" },
-    { to: "/reminders",     icon: BellRing,    label: "Space Reminders",  eyebrow: "15-min / 1-hour alerts" },
-    { to: "/auto-tweet",    icon: Twitter,     label: "Auto-Tweet",       eyebrow: "Tweet when you go live" },
-    { to: "/podcasts",      icon: Mic,         label: "Podcast Publisher",eyebrow: "RSS → Spotify & Apple" },
-    { to: "/clip-export",   icon: Film,        label: "Clip → Video",     eyebrow: "Export to X & TikTok" },
-  ];
-
-  const moreItems: NavItem[] = [
-    ...(isAdmin ? [{ to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Owner dashboard" } as NavItem] : []),
+  // Admin Apps = Admin Panel + Mobile & Growth — shown ONLY to audifyx@gmail.com
+  const adminAppsItems: NavItem[] = [
+    { to: "/admin",       icon: Shield,     label: "Admin Panel",       eyebrow: "Owner dashboard" },
+    { to: "/mobile-app",  icon: Smartphone, label: "Mobile App",        eyebrow: "iOS & Android" },
+    { to: "/reminders",   icon: BellRing,   label: "Space Reminders",   eyebrow: "15-min / 1-hour alerts" },
+    { to: "/auto-tweet",  icon: Twitter,    label: "Auto-Tweet",        eyebrow: "Tweet when you go live" },
+    { to: "/podcasts",    icon: Mic,        label: "Podcast Publisher", eyebrow: "RSS → Spotify & Apple" },
+    { to: "/clip-export", icon: Film,       label: "Clip → Video",      eyebrow: "Export to X & TikTok" },
   ];
 
   return (
@@ -234,27 +232,12 @@ export const AppSidebar = ({
           </div>
         </div>
 
-        <div className="mb-1 mt-4">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Mobile &amp; Growth</p>
-          <div className="space-y-0.5">
-            {mobileSpacesItems.map((item) => (
-              <NavRow
-                key={item.to}
-                item={item}
-                activeId={activeId}
-                currentPath={location.pathname}
-                onNavigate={onNavigate}
-                onClose={onClose}
-              />
-            ))}
-          </div>
-        </div>
-
-        {moreItems.length > 0 && (
+        {/* Admin Apps — ONLY visible to audifyx@gmail.com */}
+        {isAdmin && (
           <div className="mb-1 mt-4">
-            <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">More</p>
+            <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Admin Apps</p>
             <div className="space-y-0.5">
-              {moreItems.map((item) => (
+              {adminAppsItems.map((item) => (
                 <NavRow
                   key={item.to}
                   item={item}
