@@ -63,6 +63,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let resolved = false;
+
+    // Safety timeout — if Supabase auth doesn't resolve in 5s, unblock the app
+    const safetyTimeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        setLoading(false);
+      }
+    }, 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
@@ -71,6 +81,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setProfile(null);
       }
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(safetyTimeout);
+      }
       setLoading(false);
     });
 
@@ -78,10 +92,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) fetchProfile(sess.user.id, sess.user.email, sess.user.user_metadata);
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(safetyTimeout);
+      }
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, username: string) => {
