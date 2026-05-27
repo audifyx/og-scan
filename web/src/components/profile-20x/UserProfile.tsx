@@ -6,7 +6,6 @@ import {
   Award,
   BarChart3,
   BookMarked,
-  Brain,
   Calendar,
   Check,
   ChevronLeft,
@@ -25,7 +24,6 @@ import {
   MapPin,
   Medal,
   MoreHorizontal,
-  Music4,
   Radio,
   Search,
   Settings,
@@ -238,15 +236,6 @@ interface IdentityBadge {
 interface Props {
   viewUserId?: string;
 }
-
-const HERO_MESSAGES = [
-  "SIGNAL DETECTED",
-  "SCANNING CHAIN",
-  "WELCOME BACK",
-  "OG ONLINE",
-  "MARKET ACTIVE",
-  "NEW META FORMING",
-];
 
 const PROFILE_TABS: Array<{ id: ProfileTab; label: string }> = [
   { id: "posts", label: "Posts" },
@@ -538,26 +527,29 @@ function MiniFollowerCard({
 }
 
 function PostCard({ post }: { post: PostRecord }) {
+  const avatar = safeAvatarUrl(post.avatar_url) || dices(post.username || post.user_id || "ogscan-post");
+
   return (
-    <article className="rounded-[24px] border border-white/[0.08] bg-white/[0.035] p-4 transition duration-300 hover:border-white/[0.14] hover:bg-white/[0.05]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-white">{post.username ? `@${post.username}` : "OG Scan Post"}</p>
-          <p className="mt-1 text-xs text-white/40">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
+    <article className="border-b border-white/10 px-4 py-4 transition hover:bg-white/[0.02] sm:px-5">
+      <div className="flex items-start gap-3">
+        <img src={avatar} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <p className="font-bold text-white">{post.username ? `@${post.username}` : "OG Scan"}</p>
+            <span className="text-white/35">·</span>
+            <p className="text-white/40">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-[15px] leading-6 text-white/82">{post.content || "No text attached."}</p>
+          {post.image_url ? (
+            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+              <img src={post.image_url} alt="" className="h-auto max-h-[420px] w-full object-cover" />
+            </div>
+          ) : null}
+          <div className="mt-3 flex items-center gap-6 text-sm text-white/40">
+            <span className="inline-flex items-center gap-2"><MessageDots className="h-4 w-4" /> {compact(post.replies_count ?? 0)}</span>
+            <span className="inline-flex items-center gap-2"><Heart className="h-4 w-4" /> {compact(post.likes_count ?? 0)}</span>
+          </div>
         </div>
-        <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/50">
-          <Heart className="h-3 w-3" /> {compact(post.likes_count ?? 0)}
-        </div>
-      </div>
-      <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-white/78">{post.content || "No text attached."}</p>
-      {post.image_url ? (
-        <div className="mt-4 overflow-hidden rounded-[20px] border border-white/10 bg-black/20">
-          <img src={post.image_url} alt="" className="h-auto max-h-[360px] w-full object-cover" />
-        </div>
-      ) : null}
-      <div className="mt-4 flex items-center gap-4 text-xs text-white/42">
-        <span className="inline-flex items-center gap-1"><Heart className="h-3.5 w-3.5" /> {compact(post.likes_count ?? 0)} likes</span>
-        <span className="inline-flex items-center gap-1"><MessageDots className="h-3.5 w-3.5" /> {compact(post.replies_count ?? 0)} replies</span>
       </div>
     </article>
   );
@@ -673,7 +665,6 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const [saving, setSaving] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
-  const [messageIndex, setMessageIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewingUser, setViewingUser] = useState<string | null>(null);
 
@@ -697,13 +688,6 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const [editLocation, setEditLocation] = useState("");
   const [editWebsite, setEditWebsite] = useState("");
   const [editWallet, setEditWallet] = useState("");
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setMessageIndex((current) => (current + 1) % HERO_MESSAGES.length);
-    }, 3200);
-    return () => window.clearInterval(id);
-  }, []);
 
   const hydrateEditors = useCallback((profile: ProfileData) => {
     setEditUsername(profile.username || "");
@@ -1233,287 +1217,181 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
           <div className="relative overflow-hidden rounded-[30px]">
             <div className={cn("og-profile-hero relative h-[300px] overflow-hidden sm:h-[360px] lg:h-[420px]", specialProfileMode && "og-profile-hero--official", isOwnProfile && isOwner && "og-profile-hero--owner")}>
               {bannerUrl ? (
-                <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-75" />
+                <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-90" />
               ) : (
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(34,211,238,0.24),transparent_24%),radial-gradient(circle_at_86%_12%,rgba(168,85,247,0.18),transparent_26%),radial-gradient(circle_at_82%_72%,rgba(251,191,36,0.14),transparent_28%),linear-gradient(135deg,#07101b_0%,#0a1523_36%,#08101b_100%)]" />
+                <div className="absolute inset-0 bg-[linear-gradient(135deg,#101827_0%,#18263b_45%,#0b111c_100%)]" />
               )}
 
-              <div className="og-profile-grid absolute inset-0 opacity-35" />
-              <div className="og-profile-scanlines absolute inset-0 opacity-40" />
-              <div className="og-profile-noise absolute inset-0 opacity-25" />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,10,18,0.18),rgba(5,10,18,0.28),rgba(5,10,18,0.78))]" />
-
-              <svg viewBox="0 0 1200 420" className="absolute inset-x-0 bottom-[-14%] h-[90%] w-full opacity-[0.34] blur-[0.2px]">
-                <defs>
-                  <linearGradient id="og-profile-line" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="rgba(34,211,238,0.1)" />
-                    <stop offset="50%" stopColor="rgba(34,211,238,0.9)" />
-                    <stop offset="100%" stopColor="rgba(250,204,21,0.3)" />
-                  </linearGradient>
-                </defs>
-                <path d="M0 300 C95 280 100 228 180 220 S320 280 410 236 560 108 690 138 790 220 900 198 1040 100 1200 132" fill="none" stroke="url(#og-profile-line)" strokeWidth="4" strokeLinecap="round" className="og-profile-chart-line" />
-                <path d="M0 334 C100 314 106 248 182 242 S330 296 412 258 562 146 690 170 790 248 898 224 1048 136 1200 166 V420 H0 Z" fill="url(#og-profile-line)" opacity="0.12" />
-              </svg>
-
-              {[...Array(10)].map((_, index) => (
-                <span
-                  key={index}
-                  className="og-profile-particle absolute rounded-full bg-cyan-300/65"
-                  style={{
-                    left: `${8 + index * 9}%`,
-                    top: `${18 + (index % 4) * 13}%`,
-                    width: `${index % 3 === 0 ? 6 : 4}px`,
-                    height: `${index % 3 === 0 ? 6 : 4}px`,
-                    animationDelay: `${index * 0.7}s`,
-                    animationDuration: `${6 + (index % 4)}s`,
-                  }}
-                />
-              ))}
-
-              <div className="absolute left-4 right-4 top-4 flex flex-col gap-3 sm:left-6 sm:right-6 sm:top-6 lg:flex-row lg:items-start lg:justify-between">
-                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-cyan-400/20 bg-[#08101b]/60 px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-cyan-100 shadow-[0_16px_36px_-28px_rgba(34,211,238,0.85)] backdrop-blur-xl">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                  </span>
-                  {HERO_MESSAGES[messageIndex]}
-                </div>
-
-                <div className="grid w-full max-w-[430px] gap-2 sm:grid-cols-2 lg:w-auto">
-                  <div className="rounded-2xl border border-white/10 bg-[#08101b]/55 px-3 py-3 backdrop-blur-xl">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">Live signal</p>
-                    <p className="mt-1 text-sm font-semibold text-white">{profileData.is_online ? "Operator online" : "Standby mode"}</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-[#08101b]/55 px-3 py-3 backdrop-blur-xl">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35">Banner mode</p>
-                    <p className="mt-1 text-sm font-semibold text-white">Static now · GIF/video ready</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="absolute bottom-4 left-4 right-4 grid gap-2 sm:bottom-6 sm:left-6 sm:right-6 sm:grid-cols-3 lg:max-w-[700px]">
-                <div className="rounded-2xl border border-white/10 bg-[#08101b]/55 px-3 py-3 backdrop-blur-xl">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Trend state</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{leaderboardRank ? `Trending #${leaderboardRank}` : "Building momentum"}</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-[#08101b]/55 px-3 py-3 backdrop-blur-xl">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Community reach</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{compact(followerCount)} followers</p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-[#08101b]/55 px-3 py-3 backdrop-blur-xl">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Spaces presence</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{liveSpace ? "Hosting live" : `${pastSpaces.length} archived sessions`}</p>
-                </div>
-              </div>
+              <div className="og-profile-grid absolute inset-0 opacity-20" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_28%),linear-gradient(180deg,rgba(0,0,0,0.08)_0%,rgba(0,0,0,0.24)_50%,rgba(8,16,27,0.9)_100%)]" />
+              {specialProfileMode ? <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(250,204,21,0.08),transparent_38%,rgba(34,211,238,0.08)_100%)]" /> : null}
             </div>
 
-            <div className="relative z-10 -mt-20 px-4 pb-4 sm:-mt-24 sm:px-6 sm:pb-6 lg:-mt-28">
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <div className={cn("rounded-[30px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(8,16,27,0.95),rgba(8,16,27,0.88))] p-4 shadow-[0_40px_100px_-70px_rgba(34,211,238,0.45)] backdrop-blur-2xl sm:p-5 lg:p-6", specialProfileMode && "og-profile-operator-shell")}>
-                  <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-                      <div className="relative shrink-0">
-                        <div className="og-profile-avatar-ring rounded-[34px] p-[3px]">
-                          <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#08101b] p-1.5">
-                            <img src={avatarUrl} alt="" className="h-28 w-28 rounded-[26px] object-cover sm:h-32 sm:w-32 lg:h-36 lg:w-36" />
-                          </div>
-                        </div>
-                        <div className="absolute -bottom-1.5 -right-1.5 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-[#061019] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200 shadow-[0_0_24px_-14px_rgba(16,185,129,0.85)]">
-                          <span className="relative flex h-2.5 w-2.5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                          </span>
-                          {profileData.is_online ? "Online" : "Idle"}
-                        </div>
-                      </div>
+            <div className="relative z-10 -mt-16 px-4 pb-4 sm:-mt-20 sm:px-6 sm:pb-6 lg:-mt-24">
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className={cn("rounded-[30px] border border-white/[0.08] bg-[#08101b]/96 p-4 shadow-[0_40px_100px_-70px_rgba(15,23,42,0.95)] backdrop-blur-2xl sm:p-5 lg:p-6", specialProfileMode && "og-profile-operator-shell")}>
+                  <div className="flex justify-end gap-2">
+                    {!isOwnProfile ? (
+                      <Button
+                        onClick={handleFollowToggle}
+                        disabled={followBusy}
+                        className={cn(
+                          "h-10 rounded-full px-5 text-sm font-bold",
+                          isFollowing ? "bg-white text-[#061019] hover:bg-white/90" : "bg-transparent text-white ring-1 ring-white/20 hover:bg-white/10",
+                        )}
+                      >
+                        {followBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isFollowing ? "Following" : "Follow"}
+                      </Button>
+                    ) : (
+                      <Button onClick={() => setActiveTab("settings")} variant="outline" className="h-10 rounded-full border-white/15 bg-transparent px-5 text-sm font-bold text-white hover:bg-white/10 hover:text-white">
+                        Edit profile
+                      </Button>
+                    )}
 
-                      <div className="min-w-0 space-y-3">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl lg:text-[2.25rem]">{displayName}</h1>
-                            {identityBadges.map((badge) => (
-                              <IdentityBadgeChip key={badge.key} badge={badge} />
-                            ))}
-                          </div>
-                          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/45">
-                            <span>{handle}</span>
-                            <span className="hidden h-1 w-1 rounded-full bg-white/20 sm:inline-block" />
-                            <span className="inline-flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {profileData.created_at ? `Joined ${format(new Date(profileData.created_at), "MMM yyyy")}` : "Identity active"}</span>
-                            {profileData.location ? <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> {profileData.location}</span> : null}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-white/70">
-                            <Zap className="h-3.5 w-3.5 text-cyan-300" /> Level {level} · {getLevelTitle(level)}
-                          </span>
-                          {leaderboardRank ? (
-                            <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-amber-100">
-                              <Flame className="h-3.5 w-3.5" /> Trending #{leaderboardRank} this cycle
-                            </span>
-                          ) : null}
-                          {mutualCount > 0 ? (
-                            <span className="inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-400/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-violet-100">
-                              <Users className="h-3.5 w-3.5" /> {compact(mutualCount)} mutuals
-                            </span>
-                          ) : null}
-                        </div>
-
-                        {profileData.bio ? <p className="max-w-4xl whitespace-pre-wrap text-sm leading-7 text-white/75">{profileData.bio}</p> : null}
-
-                        <div className="flex flex-wrap gap-2 text-xs text-white/60">
-                          {website ? (
-                            <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white">
-                              <Link2 className="h-3.5 w-3.5 text-cyan-300" /> {website.replace(/^https?:\/\//, "")}
-                            </a>
-                          ) : null}
-                          {walletAddress ? (
-                            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-2">
-                              <Wallet className="h-3.5 w-3.5 text-emerald-300" /> {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
-                            </span>
-                          ) : null}
-                          {profileData.daily_streak ? (
-                            <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-2">
-                              <Flame className="h-3.5 w-3.5 text-amber-300" /> {profileData.daily_streak} day streak
-                            </span>
-                          ) : null}
-                          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
-                            <Music4 className="h-3.5 w-3.5 text-violet-300" /> Listening to market noise
-                          </span>
-                          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
-                            <Brain className="h-3.5 w-3.5 text-cyan-300" /> Conviction: {topTrade?.token_symbol || "Awaiting next setup"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-3 sm:flex-row xl:flex-col xl:items-stretch">
-                      {!isOwnProfile ? (
-                        <Button
-                          onClick={handleFollowToggle}
-                          disabled={followBusy}
-                          className={cn(
-                            "h-12 rounded-2xl px-5 text-sm font-black shadow-[0_24px_40px_-28px_rgba(34,211,238,0.7)]",
-                            isFollowing ? "bg-white/10 text-white hover:bg-white/15" : "bg-cyan-300 text-[#061019] hover:bg-white",
-                          )}
-                        >
-                          {followBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                          {isFollowing ? "Following" : "Follow Signal"}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                          <MoreHorizontal className="h-4 w-4" />
                         </Button>
-                      ) : (
-                        <Button onClick={() => setActiveTab("settings")} className="h-12 rounded-2xl bg-cyan-300 px-5 text-sm font-black text-[#061019] hover:bg-white">
-                          <Settings className="mr-2 h-4 w-4" /> Edit Profile
-                        </Button>
-                      )}
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="h-12 rounded-2xl border-white/10 bg-white/[0.04] px-4 text-white hover:bg-white/[0.08] hover:text-white">
-                            <MoreHorizontal className="mr-2 h-4 w-4" /> Actions
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56 rounded-2xl border-white/10 bg-[#08101b] text-white">
-                          <DropdownMenuItem onClick={copyProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
-                            <Copy className="mr-2 h-4 w-4" /> Copy profile link
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56 rounded-2xl border-white/10 bg-[#08101b] text-white">
+                        <DropdownMenuItem onClick={copyProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
+                          <Copy className="mr-2 h-4 w-4" /> Copy profile link
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={openProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
+                          <ExternalLink className="mr-2 h-4 w-4" /> Open public profile
+                        </DropdownMenuItem>
+                        {isOwnProfile ? (
+                          <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer rounded-xl text-rose-300 focus:bg-rose-500/10 focus:text-rose-200">
+                            <LogOut className="mr-2 h-4 w-4" /> Sign out
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={openProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
-                            <ExternalLink className="mr-2 h-4 w-4" /> Open public profile
-                          </DropdownMenuItem>
-                          {isOwnProfile ? (
-                            <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer rounded-xl text-rose-300 focus:bg-rose-500/10 focus:text-rose-200">
-                              <LogOut className="mr-2 h-4 w-4" /> Sign out
-                            </DropdownMenuItem>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                        ) : null}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Level progress</p>
-                      <p className="mt-2 text-lg font-black tracking-tight text-white">Level {level}</p>
-                      <p className="mt-1 text-xs text-white/45">{getLevelTitle(level)}</p>
-                      <div className="mt-4">
-                        <Progress value={levelProgress.progress} className="h-2.5 bg-white/10" />
+                  <div className="-mt-10 sm:-mt-14">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+                        <div className="relative shrink-0">
+                          <div className="og-profile-avatar-ring rounded-full p-[4px]">
+                            <div className="overflow-hidden rounded-full border-4 border-[#08101b] bg-[#08101b]">
+                              <img src={avatarUrl} alt="" className="h-24 w-24 rounded-full object-cover sm:h-32 sm:w-32 lg:h-[136px] lg:w-[136px]" />
+                            </div>
+                          </div>
+                          <div className="absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-[#08101b] bg-emerald-400" />
+                        </div>
+
+                        <div className="min-w-0 space-y-3 pb-1">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h1 className="text-[28px] font-black leading-none tracking-tight text-white sm:text-[32px]">{displayName}</h1>
+                              {identityBadges.map((badge) => (
+                                <IdentityBadgeChip key={badge.key} badge={badge} />
+                              ))}
+                            </div>
+                            <p className="mt-1 text-[15px] text-white/45">{handle}</p>
+                          </div>
+
+                          {profileData.bio ? <p className="max-w-4xl whitespace-pre-wrap text-[15px] leading-6 text-white/82">{profileData.bio}</p> : null}
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-white/55">
+                            {profileData.location ? <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profileData.location}</span> : null}
+                            {website ? (
+                              <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-cyan-300 transition hover:text-cyan-200">
+                                <Link2 className="h-4 w-4" /> {website.replace(/^https?:\/\//, "")}
+                              </a>
+                            ) : null}
+                            <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4" /> {profileData.created_at ? `Joined ${format(new Date(profileData.created_at), "MMMM yyyy")}` : "Joined OG Scan"}</span>
+                            {walletAddress ? <span className="inline-flex items-center gap-1.5"><Wallet className="h-4 w-4" /> {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}</span> : null}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-5 text-[15px] text-white/72">
+                            <span><span className="font-bold text-white">{compact(followingCount)}</span> Following</span>
+                            <span><span className="font-bold text-white">{compact(followerCount)}</span> Followers</span>
+                            {mutualCount > 0 ? <span><span className="font-bold text-white">{compact(mutualCount)}</span> Mutuals</span> : null}
+                            {leaderboardRank ? <span><span className="font-bold text-white">#{leaderboardRank}</span> Trending</span> : null}
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
+                              <Zap className="h-3.5 w-3.5 text-cyan-300" /> Level {level}
+                            </span>
+                            <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
+                              <BarChart3 className="h-3.5 w-3.5 text-emerald-300" /> Reputation {compact(profileData.reputation_score ?? derivedOgScore)}
+                            </span>
+                            {profileData.is_official_account ? <span className="inline-flex items-center gap-2 rounded-full bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Crown className="h-3.5 w-3.5" /> Official OG Scan</span> : null}
+                            {profileData.affiliate_org_id ? <span className="inline-flex items-center gap-2 rounded-full bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Shield className="h-3.5 w-3.5" /> Official Team</span> : null}
+                            {walletAddress ? <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/12 px-3 py-1.5 text-[12px] font-bold text-emerald-100"><Wallet className="h-3.5 w-3.5" /> Holder linked</span> : null}
+                          </div>
+                        </div>
                       </div>
-                      <p className="mt-2 text-xs text-white/45">{levelProgress.toNext.toLocaleString()} XP to next rarity upgrade</p>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Social proof</p>
-                      <p className="mt-2 text-lg font-black tracking-tight text-white">{leaderboardRank ? `#${leaderboardRank}` : "Rising"}</p>
-                      <p className="mt-1 text-xs text-white/45">Weekly reputation lane</p>
-                      <div className="mt-4 flex items-center gap-2 text-xs text-white/60">
-                        <TrendingUp className="h-3.5 w-3.5 text-emerald-300" /> {compact(profileData.reputation_score ?? derivedOgScore)} reputation pulse
+
+                    <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Level</p>
+                        <p className="mt-2 text-lg font-black text-white">{level} · {getLevelTitle(level)}</p>
+                        <div className="mt-3">
+                          <Progress value={levelProgress.progress} className="h-2 bg-white/10" />
+                        </div>
+                        <p className="mt-2 text-xs text-white/45">{levelProgress.toNext.toLocaleString()} XP to next level</p>
                       </div>
-                    </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">On-chain identity</p>
-                      <p className="mt-2 text-lg font-black tracking-tight text-white">{walletAddress ? "Verified" : "Pending"}</p>
-                      <p className="mt-1 text-xs text-white/45">Wallet linked, holder cosmetics ready</p>
-                      <div className="mt-4 flex items-center gap-2 text-xs text-white/60">
-                        <Wallet className="h-3.5 w-3.5 text-cyan-300" /> {walletStats ? formatUsd(walletStats.totalUsdValue) : "Connect wallet to unlock"}
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Best call</p>
+                        <p className="mt-2 text-lg font-black text-white">{topTrade?.token_symbol || "No signal yet"}</p>
+                        <p className="mt-2 text-xs text-white/45">{topTrade?.pnl != null ? `${formatUsd(topTrade.pnl)} realized` : "Best call fills from real trade history."}</p>
                       </div>
-                    </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Signature flex</p>
-                      <p className="mt-2 text-lg font-black tracking-tight text-white">{topTrade?.token_symbol || "No top signal yet"}</p>
-                      <p className="mt-1 text-xs text-white/45">Best call surfaced from real trade history</p>
-                      <div className="mt-4 flex items-center gap-2 text-xs text-white/60">
-                        <ArrowUpRight className="h-3.5 w-3.5 text-amber-300" /> {topTrade?.pnl != null ? formatUsd(topTrade.pnl) : "Waiting for positive call data"}
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Spaces</p>
+                        <p className="mt-2 text-lg font-black text-white">{liveSpace ? "Live now" : `${pastSpaces.length} archived`}</p>
+                        <p className="mt-2 text-xs text-white/45">{compact(totalListeners)} total listeners reached</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Wallet</p>
+                        <p className="mt-2 text-lg font-black text-white">{walletAddress ? "Connected" : "Not linked"}</p>
+                        <p className="mt-2 text-xs text-white/45">{walletStats ? formatUsd(walletStats.totalUsdValue) : "Connect wallet to show holdings"}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="rounded-[30px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(8,16,27,0.94),rgba(8,16,27,0.84))] p-4 shadow-[0_40px_100px_-70px_rgba(168,85,247,0.45)] backdrop-blur-2xl sm:p-5">
-                  <SectionHeading icon={Waves} title="Live social proof" subtitle="Real-time trust, rank, and presence signals." />
+                <div className="rounded-[30px] border border-white/[0.08] bg-[#08101b]/96 p-4 shadow-[0_40px_100px_-70px_rgba(15,23,42,0.95)] backdrop-blur-2xl sm:p-5">
+                  <SectionHeading icon={Waves} title="Profile highlights" subtitle="Key trust, rank, and account signals." />
                   <div className="space-y-3">
-                    <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Trending lane</p>
-                          <p className="mt-2 text-xl font-black text-white">{leaderboardRank ? `#${leaderboardRank}` : "—"}</p>
-                        </div>
-                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 text-amber-200">
-                          <Flame className="h-5 w-5" />
-                        </div>
-                      </div>
-                      <p className="mt-3 text-xs leading-5 text-white/45">{leaderboardRank ? "Trending rank sourced from leaderboard performance." : "Ranking appears when leaderboard data is available."}</p>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Account status</p>
+                      <p className="mt-2 text-lg font-black text-white">{profileData.is_online ? "Online" : "Offline"}</p>
+                      <p className="mt-2 text-xs text-white/45">Presence, verification, and role signals appear on the main profile header.</p>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                      <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Active now</p>
-                        <p className="mt-2 text-lg font-black text-white">{profileData.is_online ? "OG online" : "Monitoring"}</p>
-                        <p className="mt-2 text-xs text-white/45">Live pulse indicator tied to account presence.</p>
-                      </div>
-                      <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Listeners reached</p>
-                        <p className="mt-2 text-lg font-black text-white">{compact(totalListeners)}</p>
-                        <p className="mt-2 text-xs text-white/45">Cumulative peak listeners from hosted spaces.</p>
-                      </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Badges</p>
+                      <p className="mt-2 text-lg font-black text-white">{compact(allBadges.length)}</p>
+                      <p className="mt-2 text-xs text-white/45">Earned verification, team, pioneer, and wallet-linked identity markers.</p>
                     </div>
-                    <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Community roles</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {profileData.is_official_account ? <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-amber-100"><Crown className="h-3.5 w-3.5" /> OG Team</span> : null}
-                        {profileData.affiliate_org_id ? <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-amber-100"><Shield className="h-3.5 w-3.5" /> Official Team</span> : null}
-                        {profileData.verified ? <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-sky-100"><Shield className="h-3.5 w-3.5" /> Verified</span> : null}
-                        {walletAddress ? <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-100"><Wallet className="h-3.5 w-3.5" /> Holder linked</span> : null}
-                        {!profileData.is_official_account && !profileData.affiliate_org_id && !profileData.verified && !walletAddress ? <span className="text-xs text-white/40">Role and wallet badges will appear here as data syncs.</span> : null}
-                      </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Communities</p>
+                      <p className="mt-2 text-lg font-black text-white">{compact(communities.length)}</p>
+                      <p className="mt-2 text-xs text-white/45">Joined groups and roles tied to this account.</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Weekly trend</p>
+                      <p className="mt-2 text-lg font-black text-white">{leaderboardRank ? `#${leaderboardRank}` : "Unranked"}</p>
+                      <p className="mt-2 text-xs text-white/45">Leaderboard placement appears automatically when rank data exists.</p>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
         </Panel>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-6">
             <Panel>
-              <SectionHeading icon={BarChart3} title="Crypto-native identity metrics" subtitle="Live profile metrics designed for a progression-driven social trading identity." />
+              <SectionHeading icon={BarChart3} title="Profile overview" subtitle="Live stats from profile, wallet, trade, community, and spaces data." />
               <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                 {statCards.map((card) => (
                   <MetricCard key={card.label} {...card} />
@@ -1524,9 +1402,9 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
             <Panel>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">Profile systems</p>
-                  <h2 className="mt-2 text-xl font-black tracking-tight text-white">Identity modules</h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-white/50">Posts, signals, holdings, communities, spaces, achievements, activity, and saved alpha all live inside one premium profile operating system.</p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">Profile timeline</p>
+                  <h2 className="mt-2 text-xl font-black tracking-tight text-white">Posts, calls, media, and account data</h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-white/50">Same profile shell, but with OG Scan-specific tabs for trades, holdings, spaces, achievements, and saved items.</p>
                 </div>
                 {isOwnProfile ? (
                   <Button variant="outline" onClick={() => setActiveTab("settings")} className="rounded-2xl border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">
@@ -1535,44 +1413,44 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 ) : null}
               </div>
 
-              <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
-                {PROFILE_TABS.filter((tab) => isOwnProfile || tab.id !== "saved").map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={cn(
-                      "shrink-0 rounded-full border px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition duration-300",
-                      activeTab === tab.id
-                        ? "border-cyan-300/40 bg-cyan-300/12 text-cyan-100 shadow-[0_0_28px_-16px_rgba(34,211,238,0.9)]"
-                        : "border-white/10 bg-white/[0.03] text-white/50 hover:border-white/20 hover:bg-white/[0.06] hover:text-white",
-                    )}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-                {isOwnProfile ? (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("settings")}
-                    className={cn(
-                      "shrink-0 rounded-full border px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] transition duration-300",
-                      activeTab === "settings"
-                        ? "border-cyan-300/40 bg-cyan-300/12 text-cyan-100 shadow-[0_0_28px_-16px_rgba(34,211,238,0.9)]"
-                        : "border-white/10 bg-white/[0.03] text-white/50 hover:border-white/20 hover:bg-white/[0.06] hover:text-white",
-                    )}
-                  >
-                    Settings
-                  </button>
-                ) : null}
+              <div className="mt-5 -mx-4 overflow-x-auto border-y border-white/10 sm:-mx-5 lg:-mx-6">
+                <div className="flex min-w-max">
+                  {PROFILE_TABS.filter((tab) => isOwnProfile || tab.id !== "saved").map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={cn(
+                        "relative min-w-[112px] shrink-0 border-b-2 border-transparent px-4 py-4 text-sm font-bold text-white/55 transition hover:bg-white/[0.03] hover:text-white",
+                        activeTab === tab.id && "border-cyan-300 text-white",
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                  {isOwnProfile ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("settings")}
+                      className={cn(
+                        "relative min-w-[112px] shrink-0 border-b-2 border-transparent px-4 py-4 text-sm font-bold text-white/55 transition hover:bg-white/[0.03] hover:text-white",
+                        activeTab === "settings" && "border-cyan-300 text-white",
+                      )}
+                    >
+                      Settings
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="mt-6 space-y-4">
                 {activeTab === "posts" ? (
                   posts.length > 0 ? (
-                    posts.map((post) => <PostCard key={post.id} post={post} />)
+                    <div className="overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.02]">
+                      {posts.map((post) => <PostCard key={post.id} post={post} />)}
+                    </div>
                   ) : (
-                    <EmptyState icon={Radio} title="No posts yet" body="When this account publishes community posts, they will land here with media, engagement, and richer identity context." />
+                    <EmptyState icon={Radio} title="No posts yet" body="When this account publishes posts, they will appear here in the main profile feed." />
                   )
                 ) : null}
 
