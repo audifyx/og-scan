@@ -2,7 +2,6 @@ import {
   Bell, LineChart, LogOut, Mail,
   MessageSquare, Settings, Trophy,
   User, Wallet, X, Shield, Menu, Users, Wrench, Home,
-  Radio, Brain, Sparkles, Signal, Building2, Code2,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -15,17 +14,6 @@ import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
 // ── nav sections ────────────────────────────────────────────────────────
 
 type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; label: string; eyebrow: string };
-
-// ── Admin-only: hidden from all users except owner (audifyx@gmail.com) ──
-const adminOnlyItems: NavItem[] = [
-  { to: "/discovery",    icon: Radio,      label: "Live Spaces",     eyebrow: "Discovery feed" },
-  { to: "/shows",        icon: Radio,      label: "Shows",           eyebrow: "Podcast-style series" },
-  { to: "/ai-assistant", icon: Brain,      label: "AI Assistant",    eyebrow: "Transcripts + notes" },
-  { to: "/host-copilot", icon: Sparkles,   label: "Host Copilot",    eyebrow: "Live suggestions + coaching" },
-  { to: "/simulcast",    icon: Signal,     label: "Simulcast",       eyebrow: "Broadcast everywhere" },
-  { to: "/enterprise",   icon: Building2,  label: "Enterprise",      eyebrow: "HIPAA + SSO + compliance" },
-  { to: "/dev-portal",   icon: Code2,      label: "Developer Portal",eyebrow: "API, webhooks, marketplace" },
-];
 
 const mainItems: NavItem[] = [
   { to: "/app",        icon: Home,          label: "Home",      eyebrow: "Command hub" },
@@ -164,16 +152,6 @@ export const Sidebar = () => {
               {tradingItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
             </div>
           </div>
-
-          {/* Admin-only section */}
-          {isAdmin && (
-            <div className="mb-1 mt-4">
-              <SectionLabel label="Spaces & AI" />
-              <div className="space-y-0.5">
-                {adminOnlyItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
-              </div>
-            </div>
-          )}
 
           {isAdmin && (
             <div className="mb-1 mt-4">

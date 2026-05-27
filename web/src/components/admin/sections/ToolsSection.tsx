@@ -138,7 +138,7 @@ export const ToolsSection = () => {
           <div>
             <p className="text-[13px] font-bold text-yellow-400">Owner-Only Access</p>
             <p className="text-[12px] text-white/40 mt-0.5">
-              These tools are hidden from the sidebar for all regular users. Only <span className="text-white/70 font-mono">audifyx@gmail.com</span> can see this section and the Spaces & AI sidebar items.
+              These tools are owner-only. Regular users do not see them in the main navigation, and owner access is now grouped inside the admin dashboard instead of separate sidebar app links.
             </p>
           </div>
         </div>
