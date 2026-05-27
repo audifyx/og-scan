@@ -20,7 +20,6 @@ import {
   Image as ImageIcon,
   Link2,
   Loader2,
-  LogOut,
   MapPin,
   Medal,
   MoreHorizontal,
@@ -28,7 +27,6 @@ import {
   Search,
   Settings,
   Shield,
-  SquarePen,
   Sparkles,
   Star,
   Target,
@@ -44,10 +42,10 @@ import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { FollowerRecord, useFriends } from "@/hooks/useFriends";
@@ -682,8 +680,10 @@ function AchievementCard({
 }
 
 export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { isAdmin, isOwner } = useAdmin();
+  const navigate = useNavigate();
+  const location = useLocation();
   const friends = useFriends();
 
   const isOwnProfile = !viewUserId || viewUserId === user?.id;
@@ -1005,10 +1005,6 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-  };
-
   const getPublicProfileUrl = () => {
     if (typeof window === "undefined") return "";
     if (profileData?.username) return `${window.location.origin}/u/${profileData.username}`;
@@ -1256,7 +1252,15 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 setViewingUser(null);
                 return;
               }
-              window.history.back();
+              if (window.history.length > 1) {
+                navigate(-1);
+                return;
+              }
+              if (location.pathname.startsWith("/profile/")) {
+                navigate("/profile");
+                return;
+              }
+              navigate("/overview");
             }}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
             aria-label="Go back"
@@ -1264,51 +1268,12 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
             <ChevronLeft className="h-5 w-5" />
           </button>
 
-          <div className="min-w-0 px-3 text-center">
+          <div className="min-w-0 flex-1 px-3 text-center">
             <p className="truncate text-[15px] font-semibold text-white">{displayName}</p>
             <p className="truncate text-[12px] text-white/40">{handle}</p>
           </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => { window.location.href = "/scanner"; }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
-              aria-label="Search"
-            >
-              <Search className="h-4.5 w-4.5" />
-            </button>
-            {isOwnProfile ? (
-              <button
-                type="button"
-                onClick={() => setActiveTab("settings")}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
-                aria-label="Edit profile"
-              >
-                <SquarePen className="h-4.5 w-4.5" />
-              </button>
-            ) : null}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10" aria-label="More options">
-                  <MoreHorizontal className="h-4.5 w-4.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 rounded-2xl border-white/10 bg-[#08101b] text-white">
-                <DropdownMenuItem onClick={copyProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
-                  <Copy className="mr-2 h-4 w-4" /> Copy profile link
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={openProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
-                  <ExternalLink className="mr-2 h-4 w-4" /> Open public profile
-                </DropdownMenuItem>
-                {isOwnProfile ? (
-                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer rounded-xl text-rose-300 focus:bg-rose-500/10 focus:text-rose-200">
-                    <LogOut className="mr-2 h-4 w-4" /> Sign out
-                  </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <div className="h-9 w-9 shrink-0" />
         </div>
 
         <div className="relative">
