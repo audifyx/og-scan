@@ -969,19 +969,19 @@ const OverviewPage = ({
       </div>
 
       {/* ─── Advanced: charts, alpha, leaderboard ─── */}
-      <MultiChartView onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
+      <Suspense fallback={<div className="h-48 rounded-xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}><MultiChartView onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} /></Suspense>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <AlphaCallouts onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
-        <PlatformLeaderboard />
+        <Suspense fallback={<div className="h-32 rounded-xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-gold border-t-transparent rounded-full animate-spin" /></div>}><AlphaCallouts onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} /></Suspense>
+        <Suspense fallback={<div className="h-32 rounded-xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-lime border-t-transparent rounded-full animate-spin" /></div>}><PlatformLeaderboard /></Suspense>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <PaperTrading onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
-        <CryptoCalendar />
+        <Suspense fallback={<div className="h-32 rounded-xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}><PaperTrading onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} /></Suspense>
+        <Suspense fallback={<div className="h-32 rounded-xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}><CryptoCalendar /></Suspense>
       </div>
 
-      <QuickCalc />
+      <Suspense fallback={null}><QuickCalc /></Suspense>
 
       {/* Token Detail Popup — triggered by clicking tokens in OGDaily/SmartWatchlist */}
       {popupToken && (
