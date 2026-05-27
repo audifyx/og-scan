@@ -6,9 +6,13 @@ export interface FollowerRecord {
   id: string;
   user_id: string;
   username: string | null;
+  display_name?: string | null;
   avatar_url: string | null;
   bio: string | null;
   badge: string | null;
+  verified?: boolean;
+  is_official_account?: boolean;
+  affiliate_org_id?: string | null;
 }
 
 export const useFriends = () => {
@@ -30,7 +34,6 @@ export const useFriends = () => {
     setLoading(true);
 
     try {
-      // People who follow me
       const { data: followerRows, error: followerError } = await supabase
         .from("followers")
         .select("follower_id")
@@ -39,7 +42,6 @@ export const useFriends = () => {
 
       const followerIds = followerRows?.map(r => r.follower_id) || [];
 
-      // People I follow
       const { data: followingRows, error: followingError } = await supabase
         .from("followers")
         .select("followee_id")
@@ -48,7 +50,6 @@ export const useFriends = () => {
 
       const followingIds = followingRows?.map(r => r.followee_id) || [];
 
-      // Fetch profiles for both sets
       const allIds = [...new Set([...followerIds, ...followingIds])];
       if (allIds.length === 0) {
         setFollowers([]);
@@ -59,7 +60,7 @@ export const useFriends = () => {
 
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
-        .select("user_id, username, avatar_url, bio, badge")
+        .select("user_id, username, display_name, avatar_url, bio, badge, verified, is_official_account, affiliate_org_id")
         .in("user_id", allIds);
       if (profilesError) throw profilesError;
 
@@ -72,9 +73,13 @@ export const useFriends = () => {
             id,
             user_id: id,
             username: p?.username || null,
+            display_name: p?.display_name || null,
             avatar_url: p?.avatar_url || null,
             bio: p?.bio || null,
             badge: p?.badge || null,
+            verified: Boolean(p?.verified),
+            is_official_account: Boolean(p?.is_official_account),
+            affiliate_org_id: p?.affiliate_org_id || null,
           };
         });
 
@@ -89,7 +94,6 @@ export const useFriends = () => {
       setFollowing(followingList);
       setMutuals(mutualList);
 
-      // Update profile follower/following counts (fire-and-forget)
       supabase.from("profiles").update({
         followers_count: followerIds.length,
         following_count: followingIds.length,
