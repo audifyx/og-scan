@@ -333,7 +333,7 @@ function Panel({ className, children }: { className?: string; children: React.Re
   return (
     <section
       className={cn(
-        "og-profile-panel relative overflow-hidden rounded-[28px] border border-white/[0.09] bg-[linear-gradient(180deg,rgba(8,16,27,0.95),rgba(8,16,27,0.76))] p-4 shadow-[0_30px_90px_-60px_rgba(34,211,238,0.35)] backdrop-blur-xl sm:p-5",
+        "og-profile-panel relative overflow-hidden rounded-none border border-white/[0.09] bg-[#08101b] p-4 shadow-none backdrop-blur-xl sm:p-5",
         className,
       )}
     >
@@ -356,7 +356,7 @@ function SectionHeading({
   return (
     <div className="mb-4 flex items-start justify-between gap-3">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04]">
           <Icon className="h-[18px] w-[18px] text-cyan-300" />
         </div>
         <div>
@@ -432,7 +432,7 @@ function MetricCard({
   } as const;
 
   return (
-    <div className="group relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.04] p-4 transition duration-300 hover:-translate-y-0.5 hover:border-white/[0.16] hover:bg-white/[0.055]">
+    <div className="group relative overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.03] p-4 transition duration-300 hover:border-white/[0.16] hover:bg-white/[0.05]">
       <div className={cn("absolute inset-x-0 top-0 h-px bg-gradient-to-r opacity-80", accentClasses[accent])} />
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -442,7 +442,7 @@ function MetricCard({
           </div>
           <p className="mt-2 text-xs leading-5 text-white/45">{hint}</p>
         </div>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-white/75 transition duration-300 group-hover:scale-105 group-hover:text-white">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-white/75 transition duration-300 group-hover:text-white">
           <Icon className="h-4.5 w-4.5" />
         </div>
       </div>
@@ -462,8 +462,8 @@ function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.025] px-5 py-10 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
+    <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-5 py-10 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-md border border-white/10 bg-white/[0.04]">
         <Icon className="h-6 w-6 text-white/45" />
       </div>
       <h4 className="mt-4 text-sm font-bold text-white">{title}</h4>
@@ -481,15 +481,14 @@ function IdentityBadgeChip({ badge }: { badge: IdentityBadge }) {
         <button
           type="button"
           className={cn(
-            "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] transition duration-300 hover:-translate-y-0.5 hover:brightness-110",
+            "inline-flex h-6 w-6 items-center justify-center rounded-full border transition duration-300 hover:brightness-110",
             getBadgeToneClasses(badge.tone),
           )}
         >
           <Icon className="h-3.5 w-3.5" />
-          <span>{badge.label}</span>
-        </button>
+                  </button>
       </TooltipTrigger>
-      <TooltipContent className="max-w-[220px] rounded-2xl border-white/10 bg-[#08101b] px-3 py-2 text-xs leading-5 text-white/80">
+      <TooltipContent className="max-w-[220px] rounded-md border-white/10 bg-[#08101b] px-3 py-2 text-xs leading-5 text-white/80">
         {badge.description}
       </TooltipContent>
     </Tooltip>
@@ -510,9 +509,9 @@ function MiniFollowerCard({
     <button
       type="button"
       onClick={() => onOpen(record.user_id)}
-      className="flex w-full items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-3 text-left transition duration-300 hover:border-white/[0.15] hover:bg-white/[0.05]"
+      className="flex w-full items-center gap-3 rounded-lg border border-white/[0.07] bg-white/[0.03] p-3 text-left transition duration-300 hover:border-white/[0.15] hover:bg-white/[0.05]"
     >
-      <img src={avatar} alt="" className="h-11 w-11 rounded-2xl object-cover" />
+      <img src={avatar} alt="" className="h-11 w-11 rounded-lg object-cover" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-sm font-semibold text-white">{record.display_name || record.username || "OG User"}</p>
@@ -540,7 +539,7 @@ function PostCard({ post }: { post: PostRecord }) {
           </div>
           <p className="mt-2 whitespace-pre-wrap text-[15px] leading-6 text-white/82">{post.content || "No text attached."}</p>
           {post.image_url ? (
-            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+            <div className="mt-3 overflow-hidden rounded-lg border border-white/10 bg-black/20">
               <img src={post.image_url} alt="" className="h-auto max-h-[420px] w-full object-cover" />
             </div>
           ) : null}
@@ -560,7 +559,7 @@ function MessageDots({ className }: { className?: string }) {
 
 function SpaceCard({ space }: { space: SpaceRecord }) {
   return (
-    <div className="rounded-[24px] border border-white/[0.08] bg-white/[0.035] p-4 transition duration-300 hover:border-white/[0.14] hover:bg-white/[0.05]">
+    <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-4 transition duration-300 hover:border-white/[0.14] hover:bg-white/[0.05]">
       <div className="flex flex-wrap items-center gap-2">
         {space.is_live ? (
           <span className="inline-flex items-center gap-2 rounded-full border border-rose-400/30 bg-rose-400/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-rose-200">
@@ -578,15 +577,15 @@ function SpaceCard({ space }: { space: SpaceRecord }) {
       <h4 className="mt-4 text-lg font-bold tracking-tight text-white">{space.title}</h4>
       {space.description ? <p className="mt-2 text-sm leading-6 text-white/55">{space.description}</p> : null}
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+        <div className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-3">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Listeners</p>
           <p className="mt-2 text-sm font-semibold text-white">{compact(space.listener_count ?? 0)}</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+        <div className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-3">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Peak</p>
           <p className="mt-2 text-sm font-semibold text-white">{compact(space.peak_listeners ?? 0)}</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+        <div className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-3">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Duration</p>
           <p className="mt-2 text-sm font-semibold text-white">{formatDuration(space.duration_seconds)}</p>
         </div>
@@ -604,8 +603,8 @@ function WalletHoldingCard({ holding }: { holding: TokenHolding }) {
   const img = holding.content?.links?.image;
 
   return (
-    <div className="flex items-center gap-3 rounded-[22px] border border-white/[0.08] bg-white/[0.035] p-3 transition duration-300 hover:border-white/[0.14] hover:bg-white/[0.05]">
-      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05]">
+    <div className="flex items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] p-3 transition duration-300 hover:border-white/[0.14] hover:bg-white/[0.05]">
+      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/[0.05]">
         {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : <Wallet className="h-5 w-5 text-white/45" />}
       </div>
       <div className="min-w-0 flex-1">
@@ -632,14 +631,14 @@ function AchievementCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className={cn("rounded-[24px] border p-4", getBadgeToneClasses(tone))}>
+    <div className={cn("rounded-lg border p-4", getBadgeToneClasses(tone))}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em] opacity-75">Achievement</p>
           <h4 className="mt-2 text-sm font-bold text-white">{title}</h4>
           <p className="mt-2 text-xs leading-5 text-white/75">{body}</p>
         </div>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-white/15 bg-white/10">
           <Icon className="h-5 w-5" />
         </div>
       </div>
@@ -1213,7 +1212,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
     <TooltipProvider delayDuration={120}>
       <div className="mx-auto w-full max-w-[1520px] space-y-6 pb-10">
         <Panel className="overflow-hidden p-0">
-          <div className="relative overflow-hidden rounded-[30px]">
+          <div className="relative overflow-hidden rounded-none">
             <div className={cn("og-profile-hero relative h-[180px] overflow-hidden sm:h-[240px] lg:h-[320px]", specialProfileMode && "og-profile-hero--official", isOwnProfile && isOwner && "og-profile-hero--owner")}>
               {bannerUrl ? (
                 <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-90" />
@@ -1311,15 +1310,15 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
+                      <span className="inline-flex items-center gap-2 rounded-md bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
                         <Zap className="h-3.5 w-3.5 text-cyan-300" /> Level {level}
                       </span>
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
+                      <span className="inline-flex items-center gap-2 rounded-md bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
                         <BarChart3 className="h-3.5 w-3.5 text-emerald-300" /> Reputation {compact(profileData.reputation_score ?? derivedOgScore)}
                       </span>
-                      {profileData.is_official_account ? <span className="inline-flex items-center gap-2 rounded-full bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Crown className="h-3.5 w-3.5" /> Official OG Scan</span> : null}
-                      {profileData.affiliate_org_id ? <span className="inline-flex items-center gap-2 rounded-full bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Shield className="h-3.5 w-3.5" /> Official Team</span> : null}
-                      {walletAddress ? <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/12 px-3 py-1.5 text-[12px] font-bold text-emerald-100"><Wallet className="h-3.5 w-3.5" /> Holder linked</span> : null}
+                      {profileData.is_official_account ? <span className="inline-flex items-center gap-2 rounded-md bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Crown className="h-3.5 w-3.5" /> Official OG Scan</span> : null}
+                      {profileData.affiliate_org_id ? <span className="inline-flex items-center gap-2 rounded-md bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Shield className="h-3.5 w-3.5" /> Official Team</span> : null}
+                      {walletAddress ? <span className="inline-flex items-center gap-2 rounded-md bg-emerald-400/12 px-3 py-1.5 text-[12px] font-bold text-emerald-100"><Wallet className="h-3.5 w-3.5" /> Holder linked</span> : null}
                     </div>
                   </div>
                 </div>
@@ -1329,7 +1328,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
         </Panel>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
             <Panel className="overflow-hidden p-0">
               <div className="-mx-0 overflow-x-auto border-b border-white/10">
@@ -1365,7 +1364,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
               <div className="mt-6 space-y-4">
                 {activeTab === "posts" ? (
                   posts.length > 0 ? (
-                    <div className="overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.02]">
+                    <div className="overflow-hidden rounded-none border-y border-white/10 bg-transparent">
                       {posts.map((post) => <PostCard key={post.id} post={post} />)}
                     </div>
                   ) : (
@@ -1379,7 +1378,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                       <Panel className="border-white/10 bg-white/[0.03] p-4">
                         <SectionHeading icon={Target} title="Top signals" subtitle="Best callouts and strongest realized moves from synced trade history." />
                         {topTrade ? (
-                          <div className="rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 p-4">
+                          <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 p-4">
                             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100/80">Legendary moment</p>
                             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                               <div>
@@ -1397,7 +1396,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                         )}
                       </Panel>
                       {tradeHistory.map((trade) => (
-                        <div key={trade.id} className="rounded-[24px] border border-white/[0.08] bg-white/[0.035] p-4">
+                        <div key={trade.id} className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-4">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <p className="text-lg font-bold text-white">{trade.token_symbol || trade.token_name || "Signal"}</p>
@@ -1421,24 +1420,24 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                   walletAddress ? (
                     <div className="space-y-4">
                       <div className="grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Wallet value</p>
                           <p className="mt-2 text-xl font-black text-white">{walletStats ? formatUsd(walletStats.totalUsdValue) : walletLoading ? "Syncing…" : "—"}</p>
                           <p className="mt-2 text-xs text-white/45">Live wallet overview via on-chain sync.</p>
                         </div>
-                        <div className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Assets tracked</p>
                           <p className="mt-2 text-xl font-black text-white">{walletStats ? compact(walletStats.totalAssets) : walletLoading ? "Syncing…" : "—"}</p>
                           <p className="mt-2 text-xs text-white/45">Fungible + NFT footprint available from wallet sync.</p>
                         </div>
-                        <div className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">SOL balance</p>
                           <p className="mt-2 text-xl font-black text-white">{walletStats ? walletStats.balance.toFixed(2) : walletLoading ? "Syncing…" : "—"}</p>
                           <p className="mt-2 text-xs text-white/45">Wallet-linked identity balance.</p>
                         </div>
                       </div>
                       {walletLoading ? (
-                        <div className="flex items-center gap-2 rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-white/55"><Loader2 className="h-4 w-4 animate-spin" /> Syncing wallet data…</div>
+                        <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-white/55"><Loader2 className="h-4 w-4 animate-spin" /> Syncing wallet data…</div>
                       ) : tokenHoldings.length > 0 ? (
                         tokenHoldings.map((holding) => <WalletHoldingCard key={holding.id} holding={holding} />)
                       ) : (
@@ -1453,9 +1452,9 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 {activeTab === "communities" ? (
                   communities.length > 0 ? (
                     communities.map((entry) => (
-                      <div key={entry.id} className="rounded-[24px] border border-white/[0.08] bg-white/[0.035] p-4">
+                      <div key={entry.id} className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-4">
                         <div className="flex items-start gap-4">
-                          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.05]">
+                          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/[0.05]">
                             {entry.community?.icon ? <img src={entry.community.icon} alt="" className="h-full w-full object-cover" /> : <Users className="h-5 w-5 text-white/45" />}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -1539,7 +1538,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 {activeTab === "activity" ? (
                   activities.length > 0 ? (
                     activities.map((activity) => (
-                      <div key={activity.id} className="rounded-[24px] border border-white/[0.08] bg-white/[0.035] p-4">
+                      <div key={activity.id} className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-4">
                         <div className="flex items-start gap-3">
                           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-cyan-300">
                             <Activity className="h-4.5 w-4.5" />
@@ -1564,15 +1563,15 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                   savedAlpha.bookmarks.length > 0 || savedAlpha.likes.length > 0 || savedAlpha.reposts.length > 0 ? (
                     <div className="space-y-4">
                       <div className="grid gap-3 md:grid-cols-3">
-                        <div className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Bookmarks</p>
                           <p className="mt-2 text-xl font-black text-white">{compact(savedAlpha.bookmarks.length)}</p>
                         </div>
-                        <div className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Likes</p>
                           <p className="mt-2 text-xl font-black text-white">{compact(savedAlpha.likes.length)}</p>
                         </div>
-                        <div className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Reposts</p>
                           <p className="mt-2 text-xl font-black text-white">{compact(savedAlpha.reposts.length)}</p>
                         </div>
@@ -1629,9 +1628,9 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                     <Panel className="border-white/10 bg-white/[0.03]">
                       <SectionHeading icon={Sparkles} title="Upgrade paths" subtitle="Built for scalable backend-powered cosmetics and identity upgrades." />
                       <div className="space-y-3 text-sm text-white/60">
-                        <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">Animated GIF banners and video banners can slot into the current banner surface using the existing `banner_url` pathway.</div>
-                        <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">Tiered badges already support stacking, hover tooltips, and future frame/cosmetic unlocks.</div>
-                        <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">Wallet connection feeds holder verification, on-chain stats, and future rarity/frame unlock logic.</div>
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">Animated GIF banners and video banners can slot into the current banner surface using the existing `banner_url` pathway.</div>
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">Tiered badges already support stacking, hover tooltips, and future frame/cosmetic unlocks.</div>
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">Wallet connection feeds holder verification, on-chain stats, and future rarity/frame unlock logic.</div>
                       </div>
                     </Panel>
                   </div>
@@ -1653,22 +1652,22 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
             <Panel>
               <SectionHeading icon={Waves} title="Profile highlights" subtitle="Key trust, rank, and account signals." />
               <div className="space-y-3">
-                <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Account status</p>
                   <p className="mt-2 text-lg font-black text-white">{profileData.is_online ? "Online" : "Offline"}</p>
                   <p className="mt-2 text-xs text-white/45">Presence, verification, and role signals appear on the main profile header.</p>
                 </div>
-                <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Badges</p>
                   <p className="mt-2 text-lg font-black text-white">{compact(allBadges.length)}</p>
                   <p className="mt-2 text-xs text-white/45">Earned verification, team, pioneer, and wallet-linked identity markers.</p>
                 </div>
-                <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Communities</p>
                   <p className="mt-2 text-lg font-black text-white">{compact(communities.length)}</p>
                   <p className="mt-2 text-xs text-white/45">Joined groups and roles tied to this account.</p>
                 </div>
-                <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Weekly trend</p>
                   <p className="mt-2 text-lg font-black text-white">{leaderboardRank ? `#${leaderboardRank}` : "Unranked"}</p>
                   <p className="mt-2 text-xs text-white/45">Leaderboard placement appears automatically when rank data exists.</p>
@@ -1685,12 +1684,12 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                   <p className="mt-2 text-sm text-white/70">{topTrade?.pnl != null ? `${formatUsd(topTrade.pnl)} realized from best detected trade.` : "This panel auto-fills from real trade history once standout calls are detected."}</p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Best reach</p>
                     <p className="mt-2 text-lg font-black text-white">{compact(totalListeners)}</p>
                     <p className="mt-2 text-xs text-white/45">Peak listeners across hosted spaces.</p>
                   </div>
-                  <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Community footprint</p>
                     <p className="mt-2 text-lg font-black text-white">{compact(communities.length)}</p>
                     <p className="mt-2 text-xs text-white/45">Joined communities and ecosystem roles.</p>
@@ -1735,17 +1734,17 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
             <Panel>
               <SectionHeading icon={Wallet} title="On-chain wallet system" subtitle="Wallet presence, holder verification, and asset sync state." />
               <div className="space-y-3">
-                <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Wallet state</p>
                   <p className="mt-2 text-lg font-black text-white">{walletAddress ? "Connected" : "Disconnected"}</p>
                   <p className="mt-2 text-xs text-white/45">{walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : "Connect a wallet to unlock holder badges and identity metrics."}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Token count</p>
                     <p className="mt-2 text-lg font-black text-white">{walletStats ? compact(walletStats.tokenCount) : "—"}</p>
                   </div>
-                  <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">NFT count</p>
                     <p className="mt-2 text-lg font-black text-white">{walletStats ? compact(walletStats.nftCount) : "—"}</p>
                   </div>
