@@ -30,6 +30,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useAuth } from "@/hooks/useAuth";
+import { notifyUser, notifyUsers } from "@/lib/notifications";
 import { supabase } from "@/lib/supabase";
 import { cn, safeAvatarUrl } from "@/lib/utils";
 
@@ -479,6 +480,20 @@ const SupportCenter = () => {
       setActiveTicket(data as Ticket);
       toast.success("Support ticket created");
       refreshTickets(true);
+
+      const agentIds = supportAgents
+        .map((agent) => agent.user_id)
+        .filter((agentId) => agentId && agentId !== user.id);
+
+      if (agentIds.length > 0) {
+        void notifyUsers(agentIds, {
+          type: "support_ticket",
+          title: `🎫 New support ticket from ${profile?.username || displayHandle}`,
+          message: subject.trim(),
+          url: "/support",
+          data: { ticketId: data.id },
+        });
+      }
     } catch (error) {
       console.error("failed to create ticket", error);
       toast.error("Could not create support ticket");
@@ -510,6 +525,31 @@ const SupportCenter = () => {
       setDraftMessage("");
       await updateRoomPresence(false);
       refreshTickets(true);
+
+      if (isSupportAgent) {
+        void notifyUser({
+          userId: activeTicket.user_id,
+          type: "support_reply",
+          title: "💬 Support replied to your ticket",
+          message: messageBody.slice(0, 140),
+          url: "/support",
+          data: { ticketId: activeTicket.id },
+        });
+      } else {
+        const agentIds = supportAgents
+          .map((agent) => agent.user_id)
+          .filter((agentId) => agentId && agentId !== user.id);
+
+        if (agentIds.length > 0) {
+          void notifyUsers(agentIds, {
+            type: "support_reply",
+            title: `💬 New support message from ${profile?.username || displayHandle}`,
+            message: messageBody.slice(0, 140),
+            url: "/support",
+            data: { ticketId: activeTicket.id },
+          });
+        }
+      }
     } catch (error) {
       console.error("failed to send support message", error);
       toast.error("Could not send message");

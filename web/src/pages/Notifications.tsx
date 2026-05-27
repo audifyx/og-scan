@@ -28,15 +28,32 @@ interface PriceAlert {
 
 const Notifications = () => {
   const { user } = useAuth();
-  const { permission, supported, requestPermission, sendNotification } = usePushNotifications();
+  const {
+    permission,
+    supported,
+    isRegistered,
+    isSyncing,
+    requestPermission,
+    unsubscribe,
+    sendTestPush,
+  } = usePushNotifications();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateAlert, setShowCreateAlert] = useState(false);
   const [alertForm, setAlertForm] = useState({ address: "", symbol: "", condition: "above", targetPrice: "" });
   const [creatingAlert, setCreatingAlert] = useState(false);
+  const [testingPush, setTestingPush] = useState(false);
 
-  useEffect(() => { if (user) { fetchNotifications(); fetchPriceAlerts(); subscribeToNotifications(); } }, [user]);
+  useEffect(() => {
+    if (!user) return;
+
+    fetchNotifications();
+    fetchPriceAlerts();
+    const unsubscribeRealtime = subscribeToNotifications();
+
+    return unsubscribeRealtime;
+  }, [user]);
 
   const fetchNotifications = async () => {
     try {
@@ -56,12 +73,21 @@ const Notifications = () => {
   };
 
   const subscribeToNotifications = () => {
-    const channel = supabase.channel("notifications-channel").on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user?.id}` }, (payload) => {
-      const n = payload.new as Notification;
-      setNotifications((prev) => [n, ...prev]);
-      toast.info(n.title, { description: n.message });
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const channel = supabase
+      .channel(`notifications-page-${user?.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user?.id}` },
+        (payload) => {
+          const n = payload.new as Notification;
+          setNotifications((prev) => (prev.some((existing) => existing.id === n.id) ? prev : [n, ...prev]));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   };
 
   const markAsRead = async (id: string) => {
@@ -119,6 +145,43 @@ const Notifications = () => {
     if (!error) { setPriceAlerts(prev => prev.filter(a => a.id !== id)); toast.success("Alert deleted"); }
   };
 
+  const handlePushToggle = async (checked: boolean) => {
+    if (checked) {
+      const granted = await requestPermission();
+      if (granted) {
+        toast.success("Push notifications enabled on this device");
+      } else {
+        toast.error("Push notifications were not enabled");
+      }
+      return;
+    }
+
+    const disabled = await unsubscribe();
+    if (disabled) {
+      toast.success("Push notifications disabled on this device");
+    } else {
+      toast.error("Could not disable push notifications");
+    }
+  };
+
+  const handleTestPush = async () => {
+    setTestingPush(true);
+    const result = await sendTestPush();
+    setTestingPush(false);
+
+    if (!result.ok) {
+      toast.error("Could not send test push");
+      return;
+    }
+
+    if (result.total === 0 || result.reason === "no_tokens") {
+      toast.error("This browser is not registered for push yet");
+      return;
+    }
+
+    toast.success(result.sent > 0 ? "Test push sent" : "Push queued, but nothing was delivered");
+  };
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "wallet_sell": return <TrendingDown className="h-5 w-5 text-destructive" />;
@@ -142,17 +205,46 @@ const Notifications = () => {
         {/* Push Notification Settings */}
         {supported && (
           <Card className="og-glass-card border-primary/20">
-            <CardContent className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">{permission === "granted" ? <BellRing className="h-5 w-5 text-[#22d3ee]" /> : <BellOff className="h-5 w-5 text-muted-foreground" />}</div>
-                <div>
-                  <p className="font-semibold text-sm">Push Notifications</p>
-                  <p className="text-xs text-muted-foreground">{permission === "granted" ? "Active — alerts for price changes & whales" : permission === "denied" ? "Blocked — enable in browser" : "Enable for real-time alerts"}</p>
+            <CardContent className="space-y-4 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    {permission === "granted" && isRegistered ? (
+                      <BellRing className="h-5 w-5 text-[#22d3ee]" />
+                    ) : (
+                      <BellOff className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Push Notifications</p>
+                    <p className="text-xs text-muted-foreground">
+                      {permission === "denied"
+                        ? "Blocked in this browser — re-enable notifications in browser settings first"
+                        : permission === "granted" && isRegistered
+                          ? "This device is registered for real push delivery"
+                          : permission === "granted"
+                            ? "Permission granted, but this device is still syncing"
+                            : "Enable real push notifications for messages, spaces, and alerts"}
+                    </p>
+                  </div>
                 </div>
+
+                <Switch
+                  checked={permission === "granted" && isRegistered}
+                  disabled={permission === "denied" || isSyncing}
+                  onCheckedChange={handlePushToggle}
+                />
               </div>
-              <div className="flex items-center gap-2">
-                {permission === "granted" && <Button variant="ghost" size="sm" className="text-xs" onClick={() => sendNotification("🔔 Test", { body: "Notifications working!" })}>Test</Button>}
-                <Switch checked={permission === "granted"} disabled={permission === "denied"} onCheckedChange={async (checked) => { if (checked) { const granted = await requestPermission(); if (granted) toast.success("Enabled!"); else toast.error("Denied"); } }} />
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="text-xs">
+                  {permission === "granted" ? (isRegistered ? "Connected" : "Syncing") : permission === "denied" ? "Blocked" : "Not enabled"}
+                </Badge>
+                {permission === "granted" && isRegistered && (
+                  <Button variant="outline" size="sm" onClick={handleTestPush} disabled={testingPush || isSyncing}>
+                    {testingPush ? "Sending test..." : "Send real test push"}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

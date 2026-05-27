@@ -69,6 +69,7 @@ import ClipVideoExport from "./pages/ClipVideoExport";
 import InstallApp from "./pages/InstallApp";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
+import { PushNotificationPrompt } from "./components/notifications/PushNotificationPrompt";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
 import { SecurityTracker } from "./components/SecurityTracker";
 
@@ -92,6 +93,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <NotificationListener />
+        <PushNotificationPrompt />
         <PresenceHeartbeat />
         <SecurityTracker />
         <BrowserRouter>
