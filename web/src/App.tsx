@@ -52,6 +52,11 @@ import SpaceShows from "./pages/SpaceShows";
 import CoHostingManager from "./pages/CoHostingManager";
 import WhiteLabelConfig from "./pages/WhiteLabelConfig";
 import DeveloperAPI from "./pages/DeveloperAPI";
+import DevPortal from "./pages/DevPortal";
+import AISpaceAssistant from "./pages/AISpaceAssistant";
+import AIHostCopilot from "./pages/AIHostCopilot";
+import Simulcast from "./pages/Simulcast";
+import EnterpriseDashboard from "./pages/EnterpriseDashboard";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
@@ -208,6 +213,16 @@ const App = () => (
             <Route path="/brand" element={<ProtectedRoute><WhiteLabelConfig /></ProtectedRoute>} />
             <Route path="/developer" element={<ProtectedRoute><DeveloperAPI /></ProtectedRoute>} />
             <Route path="/api-keys" element={<ProtectedRoute><DeveloperAPI /></ProtectedRoute>} />
+            <Route path="/dev-portal" element={<ProtectedRoute><DevPortal /></ProtectedRoute>} />
+            <Route path="/marketplace" element={<ProtectedRoute><DevPortal /></ProtectedRoute>} />
+            <Route path="/ai-assistant" element={<ProtectedRoute><AISpaceAssistant /></ProtectedRoute>} />
+            <Route path="/space-assistant" element={<ProtectedRoute><AISpaceAssistant /></ProtectedRoute>} />
+            <Route path="/host-copilot" element={<ProtectedRoute><AIHostCopilot /></ProtectedRoute>} />
+            <Route path="/ai-copilot" element={<ProtectedRoute><AIHostCopilot /></ProtectedRoute>} />
+            <Route path="/simulcast" element={<ProtectedRoute><Simulcast /></ProtectedRoute>} />
+            <Route path="/multistream" element={<ProtectedRoute><Simulcast /></ProtectedRoute>} />
+            <Route path="/enterprise" element={<ProtectedRoute><EnterpriseDashboard /></ProtectedRoute>} />
+            <Route path="/compliance" element={<ProtectedRoute><EnterpriseDashboard /></ProtectedRoute>} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />

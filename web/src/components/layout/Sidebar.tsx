@@ -2,6 +2,7 @@ import {
   Bell, LineChart, LogOut, Mail,
   MessageSquare, Settings, Trophy,
   User, Wallet, X, Shield, Menu,
+  Radio, Brain, Sparkles, Signal, Building2, Code2,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,16 @@ import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
 // ── nav sections — MUST match AppSidebar exactly ────────────────────────
 
 type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; label: string; eyebrow: string };
+
+const spacesAiItems: NavItem[] = [
+  { to: "/discovery",     icon: Radio,       label: "Live Spaces",      eyebrow: "Discovery feed" },
+  { to: "/shows",         icon: Radio,       label: "Shows",            eyebrow: "Podcast-style series" },
+  { to: "/ai-assistant",  icon: Brain,       label: "AI Assistant",     eyebrow: "Transcripts + notes" },
+  { to: "/host-copilot",  icon: Sparkles,    label: "Host Copilot",     eyebrow: "Live suggestions + coaching" },
+  { to: "/simulcast",     icon: Signal,      label: "Simulcast",        eyebrow: "Broadcast everywhere" },
+  { to: "/enterprise",    icon: Building2,   label: "Enterprise",       eyebrow: "HIPAA + SSO + compliance" },
+  { to: "/dev-portal",    icon: Code2,       label: "Developer Portal", eyebrow: "API, webhooks, marketplace" },
+];
 
 const tradingItems: NavItem[] = [
   { to: "/wallets",         icon: Wallet,        label: "Wallets",         eyebrow: "Tracked wallets" },
@@ -136,6 +147,13 @@ export const Sidebar = () => {
 
         {/* Nav — TRADING + MORE only */}
         <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
+          <div className="mb-1 mt-3">
+            <SectionLabel label="Spaces & AI" />
+            <div className="space-y-0.5">
+              {spacesAiItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
+            </div>
+          </div>
+
           <div className="mb-1 mt-3">
             <SectionLabel label="Trading" />
             <div className="space-y-0.5">
