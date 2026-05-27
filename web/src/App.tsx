@@ -45,6 +45,7 @@ import EmbedSpace from "./pages/EmbedSpace";
 import EmbedProfile from "./pages/EmbedProfile";
 import EmbedSpaces from "./pages/EmbedSpaces";
 import EmbedSpacePlayer from "./pages/EmbedSpacePlayer";
+import EmbedCombined from "./pages/EmbedCombined";
 import DiscoveryFeed from "./pages/DiscoveryFeed";
 import SpaceClips from "./pages/SpaceClips";
 import SpaceScheduler from "./pages/SpaceScheduler";
@@ -203,6 +204,9 @@ const App = () => (
             {/* ── Public: Embeddable profile & spaces widgets ── */}
             <Route path="/embed/profile/:username" element={<EmbedProfile />} />
             <Route path="/embed/spaces/:username" element={<EmbedSpaces />} />
+            {/* ── Public: Combined embed (Spaces + Profile) ── */}
+            <Route path="/embed/combined/:username" element={<EmbedCombined />} />
+            <Route path="/embed/w/:username" element={<EmbedCombined />} />
 
             {/* ── Protected: Spaces — advanced features ── */}
             <Route path="/discovery" element={<ProtectedRoute><DiscoveryFeed /></ProtectedRoute>} />
