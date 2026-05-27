@@ -50,6 +50,8 @@ import HostAnalyticsDashboard from "./pages/HostAnalyticsDashboard";
 import CommunityRooms from "./pages/CommunityRooms";
 import SpaceShows from "./pages/SpaceShows";
 import CoHostingManager from "./pages/CoHostingManager";
+import WhiteLabelConfig from "./pages/WhiteLabelConfig";
+import DeveloperAPI from "./pages/DeveloperAPI";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
@@ -200,6 +202,12 @@ const App = () => (
             <Route path="/space-shows" element={<ProtectedRoute><SpaceShows /></ProtectedRoute>} />
             <Route path="/spaces/:spaceId/cohosts" element={<ProtectedRoute><CoHostingManager /></ProtectedRoute>} />
             <Route path="/co-hosting/:spaceId" element={<ProtectedRoute><CoHostingManager /></ProtectedRoute>} />
+
+            {/* ── Protected: Platform — Phase 4: White-label & API ── */}
+            <Route path="/white-label" element={<ProtectedRoute><WhiteLabelConfig /></ProtectedRoute>} />
+            <Route path="/brand" element={<ProtectedRoute><WhiteLabelConfig /></ProtectedRoute>} />
+            <Route path="/developer" element={<ProtectedRoute><DeveloperAPI /></ProtectedRoute>} />
+            <Route path="/api-keys" element={<ProtectedRoute><DeveloperAPI /></ProtectedRoute>} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
