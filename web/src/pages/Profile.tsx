@@ -468,39 +468,43 @@ const Profile = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-lg mx-auto">
+      <div className="max-w-[600px] mx-auto">
 
         {/* ── BANNER + AVATAR ──────────────────────────────────────────────── */}
         <div className="relative">
-          {/* Banner */}
-          <div className="h-32 sm:h-40 bg-gradient-to-br from-primary/40 via-secondary/20 to-primary/20 relative overflow-hidden">
+          {/* Banner — taller, X-style 3:1 ratio */}
+          <div className="h-44 sm:h-52 bg-gradient-to-br from-primary/50 via-secondary/30 to-primary/20 relative overflow-hidden">
             {safeAvatarUrl(profile.banner_url) && (
               <img src={safeAvatarUrl(profile.banner_url)} alt="" className="absolute inset-0 w-full h-full object-cover"
                 onError={e => (e.target as HTMLImageElement).style.display = "none"} />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f]/80 via-transparent to-transparent" />
+            {/* subtle dark vignette at bottom so avatar ring pops */}
+            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/90 to-transparent" />
             {isOwnProfile && (
               <>
                 <button onClick={() => bannerFileRef.current?.click()}
-                  className="absolute bottom-2 right-3 h-7 w-7 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center border border-white/20 transition-all">
+                  className="absolute bottom-3 right-3 h-8 w-8 rounded-full bg-black/70 hover:bg-black/90 flex items-center justify-center border border-white/25 backdrop-blur-sm transition-all">
                   {uploadingBanner ? <RefreshCw className="h-3.5 w-3.5 text-white animate-spin" /> : <Camera className="h-3.5 w-3.5 text-white" />}
                 </button>
                 <input ref={bannerFileRef} type="file" accept="image/*" className="hidden" onChange={handleBannerUpload} />
               </>
             )}
-            {/* Rank badge */}
+            {/* Rank badge — top-left */}
             {leaderboardRank && leaderboardRank <= 100 && (
-              <div className="absolute top-2.5 left-3 flex items-center gap-1 bg-black/70 backdrop-blur-sm border border-amber-500/30 text-amber-400 text-[11px] font-bold px-2 py-0.5 rounded-full">
+              <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/70 backdrop-blur-sm border border-amber-500/30 text-amber-400 text-[11px] font-bold px-2.5 py-1 rounded-full">
                 {leaderboardRank === 1 ? <Crown className="h-3 w-3" /> : leaderboardRank <= 3 ? <Medal className="h-3 w-3" /> : <Trophy className="h-3 w-3" />}
                 #{leaderboardRank}
               </div>
             )}
           </div>
 
-          {/* Avatar row */}
-          <div className="px-4 flex items-end justify-between -mt-10 mb-3 relative z-10">
-            <div className="relative">
-              {renderAvatar(profile.avatar_url, profile.username, "lg")}
+          {/* Avatar row — avatar overlaps banner, actions on right */}
+          <div className="px-4 flex items-start justify-between -mt-12 mb-3 relative z-10">
+            {/* Big avatar with ring */}
+            <div className="relative shrink-0">
+              <div className="rounded-full border-4 border-background shadow-xl overflow-hidden h-[76px] w-[76px] sm:h-[84px] sm:w-[84px]">
+                {renderAvatar(profile.avatar_url, profile.username, "lg")}
+              </div>
               {isOwnProfile && (
                 <div className="absolute -bottom-1 -right-1">
                   <AvatarSelector
@@ -512,7 +516,7 @@ const Profile = () => {
                       toast.success("Avatar updated!");
                     }}
                     trigger={
-                      <button className="h-6 w-6 rounded-full bg-primary flex items-center justify-center shadow-lg border-2 border-[#0a0a0f]">
+                      <button className="h-6 w-6 rounded-full bg-primary flex items-center justify-center shadow-lg border-2 border-background">
                         <Camera className="h-3 w-3 text-white" />
                       </button>
                     }
@@ -521,36 +525,48 @@ const Profile = () => {
               )}
             </div>
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 pb-1">
+            {/* Action buttons — X-style, float right, aligned to top */}
+            <div className="flex items-center gap-2 mt-14">
+              {/* Share / copy link icon button */}
               <button onClick={copyProfileLink}
-                className="h-8 w-8 rounded-full border border-white/20 bg-black/40 hover:bg-white/10 flex items-center justify-center transition-all">
-                {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5 text-white/60" />}
+                className="h-9 w-9 rounded-full border border-white/20 bg-transparent hover:bg-white/[0.06] flex items-center justify-center transition-all">
+                {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4 text-white/70" />}
               </button>
               {isOwnProfile ? (
-                <Button size="sm" variant="outline" onClick={() => setEditing(!editing)}
-                  className="rounded-full h-8 px-4 text-xs border-white/20 bg-transparent hover:bg-white/10">
+                <button onClick={() => setEditing(!editing)}
+                  className="h-9 px-4 rounded-full border border-white/25 bg-transparent hover:bg-white/[0.06] text-sm font-bold text-white transition-all">
                   {editing ? "Cancel" : "Edit profile"}
-                </Button>
+                </button>
               ) : (
-                <Button size="sm" onClick={handleFollow}
-                  className={`rounded-full h-8 px-4 text-xs font-semibold ${isFollowing ? "bg-transparent border border-white/20 hover:border-red-500/50 hover:text-red-400 text-white" : "bg-white text-black hover:bg-white/90"}`}>
+                <button onClick={handleFollow}
+                  className={`h-9 px-5 rounded-full text-sm font-bold transition-all ${
+                    isFollowing
+                      ? "border border-white/25 bg-transparent text-white hover:border-red-500/50 hover:text-red-400"
+                      : "bg-white text-black hover:bg-white/90"
+                  }`}>
                   {isFollowing ? "Following" : "Follow"}
-                </Button>
+                </button>
               )}
             </div>
           </div>
         </div>
 
         {/* ── IDENTITY ─────────────────────────────────────────────────────── */}
-        <div className="px-4 pb-4 border-b border-white/[0.07]">
+        <div className="px-4 pb-4 border-b border-white/[0.06]">
+          {/* Name + verification + badges */}
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-bold leading-tight">{profile.display_name || profile.username || "Anonymous"}</h1>
-            {profile.verified && <CheckCircle className="h-4.5 w-4.5 text-blue-400 shrink-0" />}
-            {profile.is_pioneer && <span className="text-sm">⭐</span>}
+            <h1 className="text-[22px] font-extrabold leading-tight tracking-tight">
+              {profile.display_name || profile.username || "Anonymous"}
+            </h1>
+            {profile.verified && (
+              <svg className="h-5 w-5 text-[#1d9bf0] shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.66-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91c-1.31.67-2.2 1.91-2.2 3.34s.89 2.67 2.2 3.34c-.46 1.39-.21 2.9.8 3.91s2.52 1.26 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.68-.88 3.34-2.19c1.39.45 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2L6.8 12.46l1.41-1.42 2.26 2.26 4.8-5.23 1.47 1.36-6.2 6.77z"/>
+              </svg>
+            )}
+            {profile.is_pioneer && <span className="text-base" title="OG Pioneer">⭐</span>}
             {profile.badge && (
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r ${getBadgeGradient(profile.badge)} text-white`}>
-                {profile.badge.toUpperCase()}
+              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-gradient-to-r ${getBadgeGradient(profile.badge)} text-white uppercase tracking-wide`}>
+                {profile.badge}
               </span>
             )}
             {profile.is_official_account && (
@@ -564,137 +580,139 @@ const Profile = () => {
               </span>
             )}
           </div>
-          {profile.username && profile.display_name && (
-            <p className="text-sm text-white/40 mt-0.5">@{profile.username}</p>
-          )}
-          {!profile.display_name && profile.username && (
-            <p className="text-sm text-white/40 mt-0.5">@{profile.username}</p>
+
+          {/* @username */}
+          <p className="text-[15px] text-white/40 mt-0.5">
+            @{profile.username || "anonymous"}
+          </p>
+
+          {/* Bio */}
+          {profile.bio && (
+            <p className="text-[15px] text-white/85 leading-relaxed mt-3">{profile.bio}</p>
           )}
 
-          {/* Level + streak badges */}
-          <div className="flex items-center gap-1.5 flex-wrap mt-2">
-            <span className="flex items-center gap-1 text-[11px] bg-white/[0.07] px-2 py-0.5 rounded-full text-white/70">
-              <Zap className="h-3 w-3 text-yellow-400" /> Lv {level} {getLevelTitle(level)}
+          {/* Meta info row — location, website, twitter, join date */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3">
+            {profile.location && (
+              <span className="flex items-center gap-1 text-[14px] text-white/45">
+                <MapPin className="h-3.5 w-3.5" /> {profile.location}
+              </span>
+            )}
+            {website && (
+              <a href={website} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[14px] text-primary hover:underline transition-colors">
+                <LinkIcon className="h-3.5 w-3.5" /> {website.replace(/^https?:\/\//, "").split("/")[0]}
+              </a>
+            )}
+            {profile.twitter_handle && (
+              <a href={`https://twitter.com/${profile.twitter_handle}`} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[14px] text-white/45 hover:text-sky-400 transition-colors">
+                <Twitter className="h-3.5 w-3.5" /> @{profile.twitter_handle}
+              </a>
+            )}
+            {profile.created_at && (
+              <span className="flex items-center gap-1 text-[14px] text-white/35">
+                <Calendar className="h-3.5 w-3.5" /> Joined {format(new Date(profile.created_at), "MMMM yyyy")}
+              </span>
+            )}
+          </div>
+
+          {/* Pill badges row — level, streak, private */}
+          <div className="flex items-center gap-1.5 flex-wrap mt-3">
+            <span className="flex items-center gap-1 text-[11px] bg-white/[0.06] px-2.5 py-1 rounded-full text-white/60 font-medium">
+              <Zap className="h-3 w-3 text-yellow-400" /> Lv {level} · {getLevelTitle(level)}
             </span>
             {(profile.daily_streak || 0) > 0 && (
-              <span className="flex items-center gap-1 text-[11px] bg-orange-500/10 px-2 py-0.5 rounded-full text-orange-400">
-                <Flame className="h-3 w-3" /> {profile.daily_streak}d
+              <span className="flex items-center gap-1 text-[11px] bg-orange-500/10 px-2.5 py-1 rounded-full text-orange-400 font-medium">
+                <Flame className="h-3 w-3" /> {profile.daily_streak}d streak
               </span>
             )}
             {(profile.holder_streak || 0) > 0 && (
-              <span className="flex items-center gap-1 text-[11px] bg-emerald-500/10 px-2 py-0.5 rounded-full text-emerald-400">
-                💎 {profile.holder_streak}d
+              <span className="flex items-center gap-1 text-[11px] bg-emerald-500/10 px-2.5 py-1 rounded-full text-emerald-400 font-medium">
+                💎 {profile.holder_streak}d holder
               </span>
             )}
             {!profile.is_public && (
-              <span className="flex items-center gap-1 text-[11px] bg-white/[0.05] px-2 py-0.5 rounded-full text-white/40">
+              <span className="flex items-center gap-1 text-[11px] bg-white/[0.05] px-2.5 py-1 rounded-full text-white/35 font-medium">
                 <Lock className="h-3 w-3" /> Private
               </span>
             )}
           </div>
 
-          {/* Bio */}
-          {profile.bio && (
-            <p className="text-sm text-white/80 leading-relaxed mt-3">{profile.bio}</p>
-          )}
-
-          {/* Meta links */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3">
-            {profile.location && (
-              <span className="flex items-center gap-1 text-xs text-white/40">
-                <MapPin className="h-3 w-3" /> {profile.location}
-              </span>
-            )}
-            {website && (
-              <a href={website} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors">
-                <LinkIcon className="h-3 w-3" /> {website.replace(/^https?:\/\//, "").split("/")[0]}
-              </a>
-            )}
-            {profile.twitter_handle && (
-              <a href={`https://twitter.com/${profile.twitter_handle}`} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-white/40 hover:text-sky-400 transition-colors">
-                <Twitter className="h-3 w-3" /> @{profile.twitter_handle}
-              </a>
-            )}
-            {profile.created_at && (
-              <span className="flex items-center gap-1 text-xs text-white/30">
-                <Calendar className="h-3 w-3" /> Joined {format(new Date(profile.created_at), "MMM yyyy")}
-              </span>
-            )}
-          </div>
-
-          {/* XP bar */}
+          {/* XP progress bar */}
           {rep > 0 && (
-            <div className="mt-3">
-              <div className="flex justify-between text-[11px] text-white/30 mb-1">
-                <span>XP Progress</span>
-                <span>{rep.toLocaleString()} XP</span>
+            <div className="mt-3.5">
+              <div className="flex justify-between text-[11px] text-white/30 mb-1.5">
+                <span className="font-medium">Level {level} XP</span>
+                <span>{rep.toLocaleString()} / {(Math.ceil(rep / 1000) * 1000).toLocaleString()}</span>
               </div>
-              <div className="h-1 rounded-full bg-white/10 overflow-hidden">
-                <div className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all" style={{ width: `${levelPct}%` }} />
+              <div className="h-1 rounded-full bg-white/[0.08] overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500" style={{ width: `${levelPct}%` }} />
               </div>
             </div>
           )}
 
-          {/* Stats row */}
+          {/* Stats row — X-style: number bold, label muted, hover underline */}
           <div className="flex items-center gap-5 mt-4">
-            <button onClick={() => {}} className="text-left group">
-              <span className="text-sm font-bold text-white">{shortNum(profile.followers_count || 0)}</span>
-              <span className="text-xs text-white/40 ml-1 group-hover:text-white/60 transition-colors">Followers</span>
+            <button className="text-left group hover:underline decoration-white/20">
+              <span className="text-[15px] font-bold text-white">{shortNum(profile.following_count || 0)}</span>
+              <span className="text-[15px] text-white/45 ml-1">Following</span>
             </button>
-            <button onClick={() => {}} className="text-left group">
-              <span className="text-sm font-bold text-white">{shortNum(profile.following_count || 0)}</span>
-              <span className="text-xs text-white/40 ml-1 group-hover:text-white/60 transition-colors">Following</span>
+            <button className="text-left group hover:underline decoration-white/20">
+              <span className="text-[15px] font-bold text-white">{shortNum(profile.followers_count || 0)}</span>
+              <span className="text-[15px] text-white/45 ml-1">Followers</span>
             </button>
             <span className="text-left">
-              <span className="text-sm font-bold text-white">{communities.length}</span>
-              <span className="text-xs text-white/40 ml-1">Communities</span>
+              <span className="text-[15px] font-bold text-white">{communities.length}</span>
+              <span className="text-[15px] text-white/45 ml-1">Communities</span>
             </span>
             {walletStats && (
               <span className="text-left ml-auto">
-                <span className="text-sm font-bold text-primary">{shortUsd(walletStats.totalUsdValue || 0)}</span>
-                <span className="text-xs text-white/40 ml-1">Portfolio</span>
+                <span className="text-[15px] font-bold text-primary">{shortUsd(walletStats.totalUsdValue || 0)}</span>
+                <span className="text-[13px] text-white/35 ml-1">Portfolio</span>
               </span>
             )}
           </div>
         </div>
 
-        {/* ── EDIT PANEL ───────────────────────────────────────────────────── */}
+        {/* ── EDIT PANEL — slide-down drawer style ─────────────────────────── */}
         {editing && (
-          <div className="border-b border-white/[0.07] bg-white/[0.02]">
-            <div className="px-4 py-4 space-y-4">
+          <div className="border-b border-white/[0.06] bg-white/[0.015] backdrop-blur-sm">
+            <div className="px-4 py-5 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-sm">Edit Profile</h3>
-                <button onClick={() => setEditing(false)} className="text-white/40 hover:text-white transition-colors">
+                <h3 className="font-bold text-base">Edit profile</h3>
+                <button onClick={() => setEditing(false)} className="h-8 w-8 rounded-full hover:bg-white/[0.07] flex items-center justify-center text-white/50 hover:text-white transition-all">
                   <XIcon className="h-4 w-4" />
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2 space-y-1">
-                  <Label className="text-xs text-white/50">Username</Label>
-                  <Input value={editedProfile.username || ""} onChange={e => setEditedProfile({ ...editedProfile, username: e.target.value })} className="h-9 rounded-xl text-sm" placeholder="your_username" />
+                <div className="col-span-2 space-y-1.5">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Username</Label>
+                  <Input value={editedProfile.username || ""} onChange={e => setEditedProfile({ ...editedProfile, username: e.target.value })} className="h-10 rounded-xl text-sm" placeholder="your_username" />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-white/50">Twitter</Label>
-                  <Input value={editedProfile.twitter_handle || ""} onChange={e => setEditedProfile({ ...editedProfile, twitter_handle: e.target.value })} className="h-9 rounded-xl text-sm" placeholder="@handle" />
+                <div className="space-y-1.5">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Twitter / X</Label>
+                  <Input value={editedProfile.twitter_handle || ""} onChange={e => setEditedProfile({ ...editedProfile, twitter_handle: e.target.value })} className="h-10 rounded-xl text-sm" placeholder="handle (no @)" />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-white/50">Website</Label>
-                  <Input value={editedProfile.website || ""} onChange={e => setEditedProfile({ ...editedProfile, website: e.target.value })} className="h-9 rounded-xl text-sm" placeholder="https://" />
+                <div className="space-y-1.5">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Website</Label>
+                  <Input value={editedProfile.website || ""} onChange={e => setEditedProfile({ ...editedProfile, website: e.target.value })} className="h-10 rounded-xl text-sm" placeholder="https://" />
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <Label className="text-xs text-white/50">Bio</Label>
-                  <Textarea value={editedProfile.bio || ""} onChange={e => setEditedProfile({ ...editedProfile, bio: e.target.value })} className="rounded-xl text-sm resize-none" rows={2} placeholder="Tell the world who you are…" />
+                <div className="col-span-2 space-y-1.5">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Bio</Label>
+                  <Textarea value={editedProfile.bio || ""} onChange={e => setEditedProfile({ ...editedProfile, bio: e.target.value })} className="rounded-xl text-[15px] resize-none" rows={3} placeholder="Tell the world who you are…" maxLength={160} />
+                  <p className="text-[11px] text-white/25 text-right">{(editedProfile.bio || "").length}/160</p>
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <Label className="text-xs text-white/50 flex items-center gap-1"><Wallet className="h-3 w-3" /> Solana Wallet</Label>
-                  <Input value={editedProfile.wallet_address || ""} onChange={e => setEditedProfile({ ...editedProfile, wallet_address: e.target.value })} className="h-9 rounded-xl text-sm font-mono" placeholder="Wallet address for live stats" />
+                <div className="col-span-2 space-y-1.5">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                    <Wallet className="h-3 w-3" /> Solana Wallet
+                  </Label>
+                  <Input value={editedProfile.wallet_address || ""} onChange={e => setEditedProfile({ ...editedProfile, wallet_address: e.target.value })} className="h-10 rounded-xl text-sm font-mono" placeholder="Wallet address for live stats" />
                 </div>
 
-                {/* ── Page Accent Color ── */}
+                {/* ── Accent Color ── */}
                 <div className="col-span-2 space-y-2">
-                  <Label className="text-xs text-white/50">Your Page Accent Color</Label>
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Accent color</Label>
                   <div className="flex flex-wrap gap-2">
                     {[
                       { key: "violet",  hex: "#7c3aed" },
@@ -709,7 +727,7 @@ const Profile = () => {
                       <button
                         key={key}
                         onClick={() => setEditedProfile({ ...editedProfile, page_accent: key })}
-                        className={`h-7 w-7 rounded-full border-2 transition-all ${(editedProfile.page_accent || "violet") === key ? "border-white scale-110 shadow-lg" : "border-white/20 hover:border-white/50"}`}
+                        className={`h-7 w-7 rounded-full border-2 transition-all ${(editedProfile.page_accent || "violet") === key ? "border-white scale-110 shadow-lg" : "border-white/15 hover:border-white/40"}`}
                         style={{ backgroundColor: hex }}
                         title={key}
                       />
@@ -717,14 +735,14 @@ const Profile = () => {
                   </div>
                 </div>
 
-                {/* ── Your Public Page URL ── */}
+                {/* ── Public page URL ── */}
                 {editedProfile.username && (
-                  <div className="col-span-2 space-y-1">
-                    <Label className="text-xs text-white/50">Your Public Page</Label>
-                    <div className="flex items-center gap-2 h-9 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08]">
-                      <code className="text-xs text-white/45 flex-1 truncate">ogscan.fun/u/{editedProfile.username}</code>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Your public page</Label>
+                    <div className="flex items-center gap-2 h-10 px-3 rounded-xl bg-white/[0.04] border border-white/[0.07]">
+                      <code className="text-xs text-white/40 flex-1 truncate">ogscan.fun/u/{editedProfile.username}</code>
                       <button
-                        onClick={() => { navigator.clipboard.writeText(`https://ogscan.fun/u/${editedProfile.username}`); toast.success("Page URL copied!"); }}
+                        onClick={() => { navigator.clipboard.writeText(`https://ogscan.fun/u/${editedProfile.username}`); toast.success("Copied!"); }}
                         className="text-white/30 hover:text-white/60 transition-colors"
                       >
                         <Copy className="h-3.5 w-3.5" />
@@ -733,31 +751,32 @@ const Profile = () => {
                   </div>
                 )}
               </div>
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center justify-between pt-2">
                 <div className="flex items-center gap-2">
                   <Switch checked={editedProfile.is_public ?? true} onCheckedChange={c => setEditedProfile({ ...editedProfile, is_public: c })} />
-                  <Label className="text-xs text-white/60">Public profile</Label>
+                  <Label className="text-sm text-white/55">Public profile</Label>
                 </div>
-                <Button size="sm" onClick={saveProfile} className="rounded-full px-5 h-8 text-xs">Save</Button>
+                <button onClick={saveProfile} className="h-9 px-6 rounded-full bg-white text-black text-sm font-bold hover:bg-white/90 transition-all">
+                  Save
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ── TABS ─────────────────────────────────────────────────────────── */}
+        {/* ── TABS — X-style sticky underline tabs ─────────────────────────── */}
         <Tabs defaultValue="activity">
-          <TabsList className="w-full flex overflow-x-auto bg-transparent border-b border-white/[0.07] rounded-none p-0 gap-0 h-auto">
+          <TabsList className="w-full flex overflow-x-auto bg-transparent border-b border-white/[0.06] rounded-none p-0 gap-0 h-auto sticky top-0 z-20 backdrop-blur-xl bg-background/80">
             {[
-              { value: "activity",  label: "Activity",  icon: <Activity className="h-3.5 w-3.5" /> },
-              { value: "portfolio", label: "Portfolio", icon: <Wallet className="h-3.5 w-3.5" /> },
-              { value: "social",    label: "Social",    icon: <Users className="h-3.5 w-3.5" /> },
-              ...(isOwnProfile ? [{ value: "saved", label: "Saved", icon: <Bookmark className="h-3.5 w-3.5" /> }] : []),
-              ...(isOwnProfile ? [{ value: "settings", label: "Settings", icon: <Settings className="h-3.5 w-3.5" /> }] : []),
-              { value: "stats",     label: "Stats",     icon: <TrendingUp className="h-3.5 w-3.5" /> },
+              { value: "activity",  label: "Activity" },
+              { value: "portfolio", label: "Portfolio" },
+              { value: "social",    label: "Social" },
+              ...(isOwnProfile ? [{ value: "saved", label: "Saved" }] : []),
+              { value: "stats",     label: "Stats" },
             ].map(t => (
               <TabsTrigger key={t.value} value={t.value}
-                className="flex-1 min-w-[4.5rem] flex items-center justify-center gap-1.5 py-3 px-2 text-xs font-medium rounded-none border-b-2 border-transparent text-white/40 data-[state=active]:text-white data-[state=active]:border-primary bg-transparent data-[state=active]:bg-transparent hover:text-white/70 transition-all">
-                {t.icon} <span className="hidden sm:inline">{t.label}</span>
+                className="flex-1 min-w-[4rem] flex items-center justify-center py-4 px-1 text-[15px] font-medium rounded-none border-b-[3px] border-transparent text-white/40 data-[state=active]:text-white data-[state=active]:border-white bg-transparent data-[state=active]:bg-transparent hover:bg-white/[0.04] hover:text-white/70 transition-all">
+                {t.label}
               </TabsTrigger>
             ))}
           </TabsList>

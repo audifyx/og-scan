@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   OG Scan · Admin Dashboard (v3 — mobile-responsive)
+   OG Scan · Admin Dashboard (v2 — 17 sections)
    ══════════════════════════════════════════════════════════════
    Modular admin panel with sidebar navigation.
    Each section lives in components/admin/sections/*
@@ -7,7 +7,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Loader2, Menu, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -32,6 +32,7 @@ const AuditLog = lazy(() => import("@/components/admin/sections/AuditLog").then(
 const Analytics = lazy(() => import("@/components/admin/sections/Analytics").then((m) => ({ default: m.Analytics })));
 const ToolsSection = lazy(() => import("@/components/admin/sections/ToolsSection").then((m) => ({ default: m.ToolsSection })));
 const OrgAffiliates = lazy(() => import("@/components/admin/sections/OrgAffiliates").then((m) => ({ default: m.OrgAffiliates })));
+const AffiliateManagement = lazy(() => import("@/components/admin/sections/AffiliateManagement").then((m) => ({ default: m.AffiliateManagement })));
 
 const SECTION_MAP: Record<AdminSection, React.LazyExoticComponent<React.FC>> = {
   overview: OverviewSection,
@@ -52,6 +53,7 @@ const SECTION_MAP: Record<AdminSection, React.LazyExoticComponent<React.FC>> = {
   analytics: Analytics,
   tools: ToolsSection,
   org_affiliates: OrgAffiliates,
+  affiliates: AffiliateManagement,
 };
 
 const Fallback = () => (
@@ -65,8 +67,7 @@ export default function Admin() {
   const { user } = useAuth();
   const [section, setSection] = useState<AdminSection>("overview");
   const [badges, setBadges] = useState<Partial<Record<AdminSection, number>>>({});
-  // Desktop: sidebar open by default; mobile: closed by default
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Quick badge counts for sidebar
   useEffect(() => {
@@ -82,63 +83,37 @@ export default function Admin() {
     })();
   }, [section]);
 
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-
-  const handleSectionChange = (s: AdminSection) => {
-    setSection(s);
-    // Auto-close sidebar on mobile after selecting a section
-    if (window.innerWidth < 768) setSidebarOpen(false);
-  };
-
   const ActiveSection = SECTION_MAP[section];
 
   return (
     <AppLayout>
-      <div className="flex h-[calc(100vh-60px)] overflow-hidden relative">
-
-        {/* ── Mobile overlay backdrop ── */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 z-20 bg-black/60 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-
-        {/* ── Sidebar ──
-            Desktop: static, pushes content.
-            Mobile: fixed overlay, slides in from left. */}
+      <div className="flex h-[calc(100vh-60px)] overflow-hidden">
+        {/* Sidebar */}
         <div
-          className={[
-            "flex-shrink-0 h-full z-30 transition-all duration-300",
-            // Mobile: fixed overlay
-            "fixed md:static",
-            sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-            sidebarOpen ? "w-[240px]" : "md:w-0 w-[240px]",
-            !sidebarOpen && "md:overflow-hidden",
-          ].join(" ")}
+          className={`transition-all duration-300 flex-shrink-0 ${
+            sidebarOpen ? "w-[240px]" : "w-0 overflow-hidden"
+          }`}
         >
           <AdminSidebar
             active={section}
-            onChange={handleSectionChange}
+            onChange={setSection}
             badges={badges}
             onBack={() => navigate("/")}
           />
         </div>
 
-        {/* ── Main content area ── */}
-        <div className="flex-1 overflow-auto min-w-0">
-          {/* Mobile top bar */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] md:hidden">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-1.5 rounded-lg bg-white/[0.06] border border-white/10 text-white/60 hover:text-white transition"
-            >
-              {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </button>
-            <span className="text-sm font-semibold capitalize text-white/80">{section}</span>
-          </div>
+        {/* Toggle button */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="absolute left-0 top-1/2 z-30 -translate-y-1/2 p-1 rounded-r-lg bg-white/[0.04] border border-white/10 border-l-0 text-white/40 hover:text-white/80 transition md:hidden"
+          style={{ left: sidebarOpen ? "240px" : "0px" }}
+        >
+          {sidebarOpen ? "‹" : "›"}
+        </button>
 
-          <div className="max-w-7xl mx-auto p-4 md:p-6">
+        {/* Main content area */}
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-7xl mx-auto p-6">
             <Suspense fallback={<Fallback />}>
               <ActiveSection />
             </Suspense>
