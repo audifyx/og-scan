@@ -42,6 +42,10 @@ import PublicSpaceListen from "./pages/PublicSpaceListen";
 import UserPublicPage from "./pages/UserPublicPage";
 import UserPageWidget from "./pages/UserPageWidget";
 import EmbedSpace from "./pages/EmbedSpace";
+import DiscoveryFeed from "./pages/DiscoveryFeed";
+import SpaceClips from "./pages/SpaceClips";
+import SpaceScheduler from "./pages/SpaceScheduler";
+import ExternalStreams from "./pages/ExternalStreams";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
@@ -170,6 +174,16 @@ const App = () => (
 
             {/* ── Public: Embeddable space player (no auth, no chrome) ── */}
             <Route path="/embed/space/:spaceId" element={<EmbedSpace />} />
+
+            {/* ── Protected: Spaces — advanced features ── */}
+            <Route path="/discovery" element={<ProtectedRoute><DiscoveryFeed /></ProtectedRoute>} />
+            <Route path="/spaces-discovery" element={<ProtectedRoute><DiscoveryFeed /></ProtectedRoute>} />
+            <Route path="/clips" element={<ProtectedRoute><SpaceClips /></ProtectedRoute>} />
+            <Route path="/space-clips" element={<ProtectedRoute><SpaceClips /></ProtectedRoute>} />
+            <Route path="/schedule" element={<ProtectedRoute><SpaceScheduler /></ProtectedRoute>} />
+            <Route path="/spaces-schedule" element={<ProtectedRoute><SpaceScheduler /></ProtectedRoute>} />
+            <Route path="/streams" element={<ProtectedRoute><ExternalStreams /></ProtectedRoute>} />
+            <Route path="/external-streams" element={<ProtectedRoute><ExternalStreams /></ProtectedRoute>} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
