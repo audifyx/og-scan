@@ -31,6 +31,7 @@ const PlatformSettings = lazy(() => import("@/components/admin/sections/Platform
 const AuditLog = lazy(() => import("@/components/admin/sections/AuditLog").then((m) => ({ default: m.AuditLog })));
 const Analytics = lazy(() => import("@/components/admin/sections/Analytics").then((m) => ({ default: m.Analytics })));
 const ToolsSection = lazy(() => import("@/components/admin/sections/ToolsSection").then((m) => ({ default: m.ToolsSection })));
+const OrgAffiliates = lazy(() => import("@/components/admin/sections/OrgAffiliates").then((m) => ({ default: m.OrgAffiliates })));
 
 const SECTION_MAP: Record<AdminSection, React.LazyExoticComponent<React.FC>> = {
   overview: OverviewSection,
@@ -50,6 +51,7 @@ const SECTION_MAP: Record<AdminSection, React.LazyExoticComponent<React.FC>> = {
   audit: AuditLog,
   analytics: Analytics,
   tools: ToolsSection,
+  org_affiliates: OrgAffiliates,
 };
 
 const Fallback = () => (

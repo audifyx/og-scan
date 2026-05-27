@@ -62,6 +62,8 @@ interface Profile {
   badge: string | null;
   verified?: boolean;
   page_accent?: string | null;
+  is_official_account?: boolean;
+  affiliate_org_id?: string | null;
   total_xp?: number | null;
   current_level?: number | null;
   is_pioneer?: boolean;
@@ -624,6 +626,16 @@ export default function UserPublicPage() {
                 {profile.badge && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-white/8 text-white/50 border border-white/10">
                     {profile.badge}
+                  </span>
+                )}
+                {profile.is_official_account && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-black shadow-md shadow-amber-500/20">
+                    ✦ OFFICIAL
+                  </span>
+                )}
+                {profile.affiliate_org_id && !profile.is_official_account && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-gradient-to-r from-violet-600 to-indigo-500 text-white shadow-md shadow-violet-500/20">
+                    🏷 OG SCAN AFFILIATE
                   </span>
                 )}
                 {(profile.current_level ?? 0) > 0 && (

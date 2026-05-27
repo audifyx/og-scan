@@ -61,6 +61,8 @@ interface UserProfile {
   location?: string | null;
   created_at?: string;
   page_accent?: string | null;
+  is_official_account?: boolean;
+  affiliate_org_id?: string | null;
 }
 
 interface UserActivity {
@@ -549,6 +551,16 @@ const Profile = () => {
             {profile.badge && (
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r ${getBadgeGradient(profile.badge)} text-white`}>
                 {profile.badge.toUpperCase()}
+              </span>
+            )}
+            {profile.is_official_account && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-black shrink-0">
+                ✦ OFFICIAL
+              </span>
+            )}
+            {profile.affiliate_org_id && !profile.is_official_account && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-violet-600 to-indigo-500 text-white shrink-0">
+                🏷 OG SCAN AFFILIATE
               </span>
             )}
           </div>
