@@ -28,6 +28,7 @@ import {
   Search,
   Settings,
   Shield,
+  SquarePen,
   Sparkles,
   Star,
   Target,
@@ -1155,6 +1156,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
     return list;
   }, [isAdmin, isOwnProfile, isOwner, leaderboardRank, profileData?.affiliate_org_id, profileData?.current_level, profileData?.is_official_account, profileData?.is_pioneer, profileData?.trades_count, profileData?.verified, userBadges, walletAddress]);
 
+  const roleTags = identityBadges.slice(0, 5);
+
   const statCards = [
     { label: "Followers", value: followerCount, hint: "Social gravity across OG Scan", icon: Users, accent: "cyan" as const, formatter: compact },
     { label: "Following", value: followingCount, hint: "Curated signal graph", icon: User, accent: "violet" as const, formatter: compact },
@@ -1244,113 +1247,163 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
   return (
     <TooltipProvider delayDuration={120}>
-      <div className="mx-auto w-full max-w-[1520px] space-y-2 pb-10">
-        <Panel className="overflow-hidden border-0 bg-transparent p-0 shadow-none">
-          <div className="relative">
-            <div className="relative h-[180px] overflow-hidden bg-black sm:h-[220px] lg:h-[280px]">
-              {bannerUrl ? (
-                <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-              ) : (
-                <div className="absolute inset-0 bg-black" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/90" />
+      <div className="mx-auto w-full max-w-[680px] pb-16">
+        <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 bg-black/85 px-4 backdrop-blur-xl">
+          <button
+            type="button"
+            onClick={() => {
+              if (viewingUser) {
+                setViewingUser(null);
+                return;
+              }
+              window.history.back();
+            }}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+            aria-label="Go back"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+
+          <div className="min-w-0 px-3 text-center">
+            <p className="truncate text-[15px] font-semibold text-white">{displayName}</p>
+            <p className="truncate text-[12px] text-white/40">{handle}</p>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => { window.location.href = "/scanner"; }}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+              aria-label="Search"
+            >
+              <Search className="h-4.5 w-4.5" />
+            </button>
+            {isOwnProfile ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab("settings")}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+                aria-label="Edit profile"
+              >
+                <SquarePen className="h-4.5 w-4.5" />
+              </button>
+            ) : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10" aria-label="More options">
+                  <MoreHorizontal className="h-4.5 w-4.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 rounded-2xl border-white/10 bg-[#08101b] text-white">
+                <DropdownMenuItem onClick={copyProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
+                  <Copy className="mr-2 h-4 w-4" /> Copy profile link
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={openProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
+                  <ExternalLink className="mr-2 h-4 w-4" /> Open public profile
+                </DropdownMenuItem>
+                {isOwnProfile ? (
+                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer rounded-xl text-rose-300 focus:bg-rose-500/10 focus:text-rose-200">
+                    <LogOut className="mr-2 h-4 w-4" /> Sign out
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="relative">
+          <div className="relative h-[176px] overflow-hidden bg-black sm:h-[210px]">
+            {bannerUrl ? (
+              <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 bg-black" />
+            )}
+            <div className="absolute inset-0 bg-black/30" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black" />
+          </div>
+
+          <div className="relative -mt-12 px-4 pb-4">
+            <div className="relative h-[96px] w-[96px]">
+              <div className="overflow-hidden rounded-full border-4 border-black bg-black">
+                <img src={avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+              </div>
+              <div className="absolute bottom-1.5 right-1.5 h-4 w-4 rounded-full border-2 border-black bg-emerald-400" />
             </div>
 
-            <div className="relative -mt-14 px-4 sm:-mt-16 sm:px-6 lg:px-8">
-              <div className="flex items-start justify-between gap-4">
-                <div className="relative h-24 w-24 shrink-0 sm:h-32 sm:w-32 lg:h-[140px] lg:w-[140px]">
-                  <div className="overflow-hidden rounded-full border-4 border-black bg-black">
-                    <img src={avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
-                  </div>
-                  <div className="absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-black bg-emerald-400" />
+            <div className="mt-3 space-y-3">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-[32px] font-extrabold leading-none tracking-tight text-white">{displayName}</h1>
+                  {profileData.verified ? <Shield className="h-5 w-5 text-sky-400" /> : null}
+                  {profileData.is_official_account || profileData.affiliate_org_id || (isOwnProfile && (isOwner || isAdmin)) ? <Crown className="h-5 w-5 text-amber-400" /> : null}
                 </div>
+                <p className="mt-1 text-[15px] text-white/40">{handle}</p>
+              </div>
 
-                <div className="mt-[68px] flex shrink-0 items-center gap-2 sm:mt-[88px] lg:mt-[96px]">
-                  {!isOwnProfile ? (
+              {roleTags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {roleTags.map((badge) => {
+                    const Icon = badge.icon;
+                    return (
+                      <span key={badge.key} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/72">
+                        <Icon className="h-3 w-3" />
+                        {badge.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              {profileData.bio ? <p className="whitespace-pre-wrap text-[15px] leading-6 text-white/92">{profileData.bio}</p> : null}
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-white/50">
+                {profileData.location ? <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profileData.location}</span> : null}
+                {website ? (
+                  <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-cyan-300 transition hover:text-cyan-200">
+                    <Link2 className="h-4 w-4" /> {website.replace(/^https?:\/\//, "")}
+                  </a>
+                ) : null}
+                <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4" /> {profileData.created_at ? `Joined ${format(new Date(profileData.created_at), "MMMM yyyy")}` : "Joined OG Scan"}</span>
+                {walletAddress ? <span className="inline-flex items-center gap-1.5"><Wallet className="h-4 w-4" /> {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}</span> : null}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-5 text-[15px] text-white/80">
+                <span><span className="font-bold text-white">{compact(followingCount)}</span> Following</span>
+                <span><span className="font-bold text-white">{compact(followerCount)}</span> Followers</span>
+                <span><span className="font-bold text-white">{compact(posts.length)}</span> Posts</span>
+                {totalXp > 0 ? <span><span className="font-bold text-white">{compact(totalXp)}</span> XP</span> : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                {isOwnProfile ? (
+                  <>
+                    <Button onClick={() => setActiveTab("settings")} className="h-9 rounded-full bg-white px-4 text-sm font-bold text-black hover:bg-white/90">Edit profile</Button>
+                    <Button variant="outline" onClick={copyProfileLink} className="h-9 rounded-full border-white/20 bg-transparent px-4 text-sm font-bold text-white hover:bg-white/10 hover:text-white">Share</Button>
+                    <Button variant="outline" onClick={openProfileLink} className="h-9 rounded-full border-white/20 bg-transparent px-4 text-sm font-bold text-white hover:bg-white/10 hover:text-white">Open</Button>
+                  </>
+                ) : (
+                  <>
                     <Button
                       onClick={handleFollowToggle}
                       disabled={followBusy}
                       className={cn(
-                        "h-9 rounded-full border border-white/20 bg-black/70 px-4 text-sm font-bold text-white shadow-none backdrop-blur-sm",
-                        isFollowing ? "hover:bg-white/12" : "hover:bg-white/10",
+                        "h-9 rounded-full bg-white px-4 text-sm font-bold text-black hover:bg-white/90",
+                        followBusy && "opacity-80",
                       )}
                     >
                       {followBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       {isFollowing ? "Following" : "Follow"}
                     </Button>
-                  ) : (
-                    <Button onClick={() => setActiveTab("settings")} variant="outline" className="h-9 rounded-full border-white/20 bg-black/70 px-4 text-sm font-bold text-white shadow-none hover:bg-white/10 hover:text-white">
-                      Edit profile
-                    </Button>
-                  )}
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" className="h-9 w-9 rounded-full border-white/20 bg-black/70 text-white shadow-none hover:bg-white/10 hover:text-white">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 rounded-2xl border-white/10 bg-[#08101b] text-white">
-                      <DropdownMenuItem onClick={copyProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
-                        <Copy className="mr-2 h-4 w-4" /> Copy profile link
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={openProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
-                        <ExternalLink className="mr-2 h-4 w-4" /> Open public profile
-                      </DropdownMenuItem>
-                      {isOwnProfile ? (
-                        <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer rounded-xl text-rose-300 focus:bg-rose-500/10 focus:text-rose-200">
-                          <LogOut className="mr-2 h-4 w-4" /> Sign out
-                        </DropdownMenuItem>
-                      ) : null}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-
-              <div className="mt-3 max-w-[720px] space-y-3 pb-4 sm:pb-5 lg:pb-6">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-[30px] font-black leading-none tracking-tight text-white sm:text-[34px]">{displayName}</h1>
-                    {identityBadges.map((badge) => (
-                      <IdentityBadgeChip key={badge.key} badge={badge} />
-                    ))}
-                  </div>
-                  <p className="mt-1 text-[15px] text-white/40">{handle}</p>
-                </div>
-
-                {profileData.bio ? <p className="max-w-3xl whitespace-pre-wrap text-[15px] leading-6 text-white/88">{profileData.bio}</p> : null}
-
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-white/50">
-                  {profileData.location ? <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profileData.location}</span> : null}
-                  {website ? (
-                    <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-cyan-300 transition hover:text-cyan-200">
-                      <Link2 className="h-4 w-4" /> {website.replace(/^https?:\/\//, "")}
-                    </a>
-                  ) : null}
-                  <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4" /> {profileData.created_at ? `Joined ${format(new Date(profileData.created_at), "MMMM yyyy")}` : "Joined OG Scan"}</span>
-                  {walletAddress ? <span className="inline-flex items-center gap-1.5"><Wallet className="h-4 w-4" /> {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}</span> : null}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-5 text-[15px] text-white/78">
-                  <span><span className="font-bold text-white">{compact(followingCount)}</span> Following</span>
-                  <span><span className="font-bold text-white">{compact(followerCount)}</span> Followers</span>
-                  {mutualCount > 0 ? <span><span className="font-bold text-white">{compact(mutualCount)}</span> Mutuals</span> : null}
-                  {leaderboardRank ? <span><span className="font-bold text-white">#{leaderboardRank}</span> Trending</span> : null}
-                </div>
-
-                {profileData.is_official_account || profileData.affiliate_org_id ? (
-                  <div className="flex flex-wrap items-center gap-3 text-[13px] text-white/55">
-                    {profileData.is_official_account ? <span className="inline-flex items-center gap-1.5"><Crown className="h-3.5 w-3.5 text-amber-400" /> Official OG Scan</span> : null}
-                    {profileData.affiliate_org_id ? <span className="inline-flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-amber-400" /> Official team</span> : null}
-                    {walletAddress ? <span className="inline-flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5 text-emerald-300" /> Holder linked</span> : null}
-                  </div>
-                ) : null}
+                    <Button variant="outline" onClick={copyProfileLink} className="h-9 rounded-full border-white/20 bg-transparent px-4 text-sm font-bold text-white hover:bg-white/10 hover:text-white">Share</Button>
+                    <Button variant="outline" onClick={openProfileLink} className="h-9 rounded-full border-white/20 bg-transparent px-4 text-sm font-bold text-white hover:bg-white/10 hover:text-white">View</Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
-        </Panel>
+        </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="block">
           <div className="space-y-4">
             <Panel className="overflow-hidden rounded-none border-x-0 border-y border-white/10 bg-transparent p-0 shadow-none">
               <div className="-mx-0 overflow-x-auto border-b border-white/10">
@@ -1361,7 +1414,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
                       className={cn(
-                        "relative min-w-[96px] shrink-0 border-b-2 border-transparent px-4 py-3 text-[15px] font-bold text-white/50 transition hover:bg-white/[0.02] hover:text-white",
+                        "relative min-w-[94px] shrink-0 border-b-2 border-transparent px-3.5 py-4 text-[16px] font-semibold text-white/50 transition hover:bg-white/[0.02] hover:text-white",
                         activeTab === tab.id && "border-cyan-300 text-white",
                       )}
                     >
@@ -1680,7 +1733,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
             </Panel>
           </div>
 
-          <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+          <div className="hidden space-y-6 xl:sticky xl:top-6 xl:self-start">
             <Panel>
               <SectionHeading icon={BarChart3} title="Profile overview" subtitle="Live stats from profile, wallet, trade, community, and spaces data." />
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
