@@ -809,7 +809,10 @@ const Index = () => {
             <CommunityHub />
           </main>
         ) : (
-          <main className="min-h-0 flex-1 overflow-x-hidden px-3 pb-28 pt-4 sm:px-5 lg:px-6 lg:pb-8">
+          <main className={cn(
+            "min-h-0 flex-1 overflow-x-hidden pb-28 lg:pb-8",
+            tab === "profile" ? "px-0 pt-0" : "px-3 pt-4 sm:px-5 lg:px-6",
+          )}>
             {tab === "overview" ? (
               <OverviewPage
                 mint={mint}
@@ -818,6 +821,10 @@ const Index = () => {
                 onChangeMint={promptMint}
                 onSelectMint={updateMint}
               />
+            ) : tab === "profile" ? (
+              <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>
+                {renderTool(tab, mint, updateMint, switchTab, profileViewUserId, isListingSubRoute ? listingMint : undefined)}
+              </Suspense>
             ) : (
               <ToolShell tab={activeTab} onBack={() => switchTab("tools")}><Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>{renderTool(tab, mint, updateMint, switchTab, profileViewUserId, isListingSubRoute ? listingMint : undefined)}</Suspense></ToolShell>
             )}
