@@ -48,6 +48,8 @@ import SpaceScheduler from "./pages/SpaceScheduler";
 import ExternalStreams from "./pages/ExternalStreams";
 import HostAnalyticsDashboard from "./pages/HostAnalyticsDashboard";
 import CommunityRooms from "./pages/CommunityRooms";
+import SpaceShows from "./pages/SpaceShows";
+import CoHostingManager from "./pages/CoHostingManager";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
@@ -192,6 +194,12 @@ const App = () => (
             <Route path="/analytics/spaces" element={<ProtectedRoute><HostAnalyticsDashboard /></ProtectedRoute>} />
             <Route path="/rooms" element={<ProtectedRoute><CommunityRooms /></ProtectedRoute>} />
             <Route path="/community-rooms" element={<ProtectedRoute><CommunityRooms /></ProtectedRoute>} />
+
+            {/* ── Protected: Spaces — Phase 3: Shows + Co-hosting ── */}
+            <Route path="/shows" element={<ProtectedRoute><SpaceShows /></ProtectedRoute>} />
+            <Route path="/space-shows" element={<ProtectedRoute><SpaceShows /></ProtectedRoute>} />
+            <Route path="/spaces/:spaceId/cohosts" element={<ProtectedRoute><CoHostingManager /></ProtectedRoute>} />
+            <Route path="/co-hosting/:spaceId" element={<ProtectedRoute><CoHostingManager /></ProtectedRoute>} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
