@@ -40,15 +40,26 @@ export function OrgAffiliates() {
   /* ── Load all relevant profiles ── */
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("user_id, username, display_name, avatar_url, is_official_account, affiliate_org_id")
-      .or("is_official_account.eq.true,affiliate_org_id.not.is.null")
-      .order("is_official_account", { ascending: false });
-    const list = (data as Profile[]) || [];
-    setProfiles(list);
-    setOfficialProfile(list.find(p => p.is_official_account) ?? null);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, username, display_name, avatar_url, is_official_account, affiliate_org_id")
+        .or("is_official_account.eq.true,affiliate_org_id.not.is.null")
+        .order("is_official_account", { ascending: false });
+
+      if (error) throw error;
+
+      const list = (data as Profile[]) || [];
+      setProfiles(list);
+      setOfficialProfile(list.find(p => p.is_official_account) ?? null);
+    } catch (error) {
+      console.error("Failed to load org affiliates", error);
+      toast.error("Failed to load org affiliates");
+      setProfiles([]);
+      setOfficialProfile(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -56,15 +67,29 @@ export function OrgAffiliates() {
   /* ── Search for users to add ── */
   const handleAddSearch = async (q: string) => {
     setAddSearch(q);
-    if (q.length < 2) { setAddResults([]); return; }
+    if (q.length < 2) {
+      setAddResults([]);
+      setSearching(false);
+      return;
+    }
+
     setSearching(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("user_id, username, display_name, avatar_url, is_official_account, affiliate_org_id")
-      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
-      .limit(8);
-    setAddResults((data as Profile[]) || []);
-    setSearching(false);
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, username, display_name, avatar_url, is_official_account, affiliate_org_id")
+        .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+        .limit(8);
+
+      if (error) throw error;
+      setAddResults((data as Profile[]) || []);
+    } catch (error) {
+      console.error("Failed to search affiliate candidates", error);
+      toast.error("Failed to search users");
+      setAddResults([]);
+    } finally {
+      setSearching(false);
+    }
   };
 
   /* ── Set official account ── */

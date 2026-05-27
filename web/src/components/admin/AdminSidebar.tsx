@@ -67,6 +67,8 @@ const SECTIONS: { group: string; items: SectionItem[] }[] = [
   {
     group: "System",
     items: [
+      { id: "org_affiliates", label: "Org Affiliates", icon: "Users" },
+      { id: "affiliates", label: "Affiliate Mgmt", icon: "TrendingUp" },
       { id: "settings", label: "Settings", icon: "Settings" },
       { id: "audit", label: "Audit Log", icon: "FileText" },
     ],

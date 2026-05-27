@@ -128,16 +128,27 @@ export const AffiliateManagement = () => {
   // ── Fetch ──────────────────────────────────────────────────
   const fetchAffiliates = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("affiliates")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) {
+    try {
+      const result = await Promise.race([
+        supabase
+          .from("affiliates")
+          .select("*")
+          .order("created_at", { ascending: false }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Affiliate request timed out")), 15000),
+        ),
+      ]);
+
+      const { data, error } = result as { data: Affiliate[] | null; error: { message?: string } | null };
+      if (error) throw new Error(error.message || "Failed to load affiliates");
+      setAffiliates((data as Affiliate[]) || []);
+    } catch (error) {
+      console.error("Failed to load affiliates", error);
+      setAffiliates([]);
       toast.error("Failed to load affiliates");
-    } else {
-      setAffiliates(data as Affiliate[]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { fetchAffiliates(); }, [fetchAffiliates]);
