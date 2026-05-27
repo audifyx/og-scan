@@ -99,29 +99,44 @@ const Settings = () => {
     if (!user) return;
     const loadInviteStats = async () => {
       setLoadingInvite(true);
-      // Get referral leaderboard entry (it's a view)
-      const { data: lb } = await supabase
-        .from("referral_leaderboard")
-        .select("invited, xp_earned:credits_earned")
-        .eq("inviter_id", user.id)
-        .maybeSingle();
-      // Get recent invites with usernames
-      const { data: recent } = await supabase
-        .from("referrals")
-        .select("invitee_id, created_at")
-        .eq("inviter_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      // Fetch usernames for recent invites
-      let recentInvites: { username: string; created_at: string }[] = [];
-      if (recent && recent.length > 0) {
-        const ids = recent.map(r => r.invitee_id);
-        const { data: profs } = await supabase.from("profiles").select("user_id, username").in("user_id", ids);
-        const nameMap = new Map((profs || []).map(p => [p.user_id, p.username || "Anonymous"]));
-        recentInvites = recent.map(r => ({ username: nameMap.get(r.invitee_id) || "Anonymous", created_at: r.created_at }));
+      try {
+        // Get referral leaderboard entry (it's a view)
+        const { data: lb, error: leaderboardError } = await supabase
+          .from("referral_leaderboard")
+          .select("invited, xp_earned:credits_earned")
+          .eq("inviter_id", user.id)
+          .maybeSingle();
+        if (leaderboardError) throw leaderboardError;
+
+        // Get recent invites with usernames
+        const { data: recent, error: recentError } = await supabase
+          .from("referrals")
+          .select("invitee_id, created_at")
+          .eq("inviter_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        if (recentError) throw recentError;
+
+        // Fetch usernames for recent invites
+        let recentInvites: { username: string; created_at: string }[] = [];
+        if (recent && recent.length > 0) {
+          const ids = recent.map(r => r.invitee_id);
+          const { data: profs, error: profilesError } = await supabase
+            .from("profiles")
+            .select("user_id, username")
+            .in("user_id", ids);
+          if (profilesError) throw profilesError;
+          const nameMap = new Map((profs || []).map(p => [p.user_id, p.username || "Anonymous"]));
+          recentInvites = recent.map(r => ({ username: nameMap.get(r.invitee_id) || "Anonymous", created_at: r.created_at }));
+        }
+
+        setInviteStats({ invited: lb?.invited || 0, xpEarned: lb?.xp_earned || 0, recentInvites });
+      } catch (error) {
+        console.error("Failed to load referral stats", error);
+        setInviteStats({ invited: 0, xpEarned: 0, recentInvites: [] });
+      } finally {
+        setLoadingInvite(false);
       }
-      setInviteStats({ invited: lb?.invited || 0, xpEarned: lb?.xp_earned || 0, recentInvites });
-      setLoadingInvite(false);
     };
     loadInviteStats();
   }, [user]);
@@ -769,14 +784,14 @@ function EmbedSettingsTab({ username }: { username?: string }) {
   const spacesBaseUrl = `https://ogscan.fun/embed/spaces/${username}`;
 
   const profileSizes = {
-    compact: { width: 340, height: 480 },
-    standard: { width: 420, height: 600 },
-    tall: { width: 480, height: 720 },
+    compact: { width: 360, height: 560 },
+    standard: { width: 440, height: 700 },
+    tall: { width: 520, height: 860 },
   };
   const spacesSizes = {
-    compact: { width: 340, height: 260 },
-    standard: { width: 420, height: 320 },
-    wide: { width: 560, height: 280 },
+    compact: { width: 360, height: 340 },
+    standard: { width: 440, height: 420 },
+    wide: { width: 560, height: 420 },
   };
 
   const ps = profileSizes[profileSize];

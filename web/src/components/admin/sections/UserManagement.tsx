@@ -97,7 +97,7 @@ export const UserManagement = () => {
     // Fetch related data in parallel
     const [txR, followersR, followingR, actR] = await Promise.all([
       supabase.from("credit_transactions").select("*").eq("user_id", p.user_id).order("created_at", { ascending: false }).limit(100),
-      supabase.from("followers").select("*").eq("following_id", p.user_id).limit(100),
+      supabase.from("followers").select("*").eq("followee_id", p.user_id).limit(100),
       supabase.from("followers").select("*").eq("follower_id", p.user_id).limit(100),
       supabase.from("user_activity").select("*").eq("user_id", p.user_id).order("created_at", { ascending: false }).limit(50),
     ]);
@@ -185,7 +185,7 @@ export const UserManagement = () => {
       supabase.from("user_credits").delete().eq("user_id", userId),
       supabase.from("user_activity").delete().eq("user_id", userId),
       supabase.from("followers").delete().eq("follower_id", userId),
-      supabase.from("followers").delete().eq("following_id", userId),
+      supabase.from("followers").delete().eq("followee_id", userId),
       supabase.from("notifications").delete().eq("user_id", userId),
       supabase.from("price_alerts").delete().eq("user_id", userId),
       supabase.from("tracked_wallets").delete().eq("user_id", userId),
@@ -602,7 +602,7 @@ export const UserManagement = () => {
                         <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> Following ({userFollowing.length})</CardTitle></CardHeader>
                         <CardContent><ScrollArea className="h-[150px]">
                           {userFollowing.length === 0 ? <p className="text-xs text-muted-foreground text-center py-4">Not following anyone</p> : userFollowing.map((f) => (
-                            <div key={f.id} className="flex items-center gap-2 py-1.5"><Users className="h-3 w-3 text-muted-foreground" /><code className="text-xs">{shortId(f.following_id)}</code></div>
+                            <div key={f.id} className="flex items-center gap-2 py-1.5"><Users className="h-3 w-3 text-muted-foreground" /><code className="text-xs">{shortId(f.followee_id)}</code></div>
                           ))}
                         </ScrollArea></CardContent>
                       </Card>

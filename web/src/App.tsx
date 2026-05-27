@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,7 +37,6 @@ import SupportCenter from "./pages/SupportCenter";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Admin from "./pages/Admin";
-import ArtFeed from "./pages/ArtFeed";
 import SpaceReplay from "./pages/SpaceReplay";
 import PublicSpaceListen from "./pages/PublicSpaceListen";
 import UserPublicPage from "./pages/UserPublicPage";
@@ -81,6 +81,7 @@ const DirectMessagesPage = () => (
 );
 
 const queryClient = new QueryClient();
+const ArtFeedPage = lazy(() => import("./pages/ArtFeed"));
 
 const App = () => (
   <MaintenanceLock>
@@ -183,7 +184,7 @@ const App = () => (
 
             {/* ── Protected: Admin ── */}
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-            <Route path="/art" element={<ProtectedRoute><ArtFeed /></ProtectedRoute>} />
+            <Route path="/art" element={<ProtectedRoute><Suspense fallback={null}><ArtFeedPage /></Suspense></ProtectedRoute>} />
 
             {/* ── Public: Project/legal ── */}
             <Route path="/official-token" element={<OfficialToken />} />

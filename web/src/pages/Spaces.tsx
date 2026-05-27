@@ -1434,11 +1434,11 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
               <Code2 className="h-3 w-3" /> Embed This Space
             </p>
             <div className="bg-black/30 rounded-xl border border-white/[0.06] p-3">
-              <pre className="text-[9px] text-emerald-400/70 whitespace-pre-wrap break-all font-mono leading-relaxed">{`<iframe\n  src="${typeof window !== "undefined" ? window.location.origin : "https://ogscan.fun"}/embed/space/${space.id}"\n  width="340" height="260"\n  frameborder="0"\n  allow="autoplay"\n  style="border-radius:16px;border:none;"\n></iframe>`}</pre>
+              <pre className="text-[9px] text-emerald-400/70 whitespace-pre-wrap break-all font-mono leading-relaxed">{`<iframe\n  src="${typeof window !== "undefined" ? window.location.origin : "https://ogscan.fun"}/embed/space/${space.id}"\n  width="420" height="360"\n  frameborder="0"\n  allow="autoplay"\n  style="border-radius:16px;border:none;"\n></iframe>`}</pre>
             </div>
             <button
               onClick={() => {
-                const code = `<iframe\n  src="${window.location.origin}/embed/space/${space.id}"\n  width="340" height="260"\n  frameborder="0"\n  allow="autoplay"\n  style="border-radius:16px;border:none;"\n></iframe>`;
+                const code = `<iframe\n  src="${window.location.origin}/embed/space/${space.id}"\n  width="420" height="360"\n  frameborder="0"\n  allow="autoplay"\n  style="border-radius:16px;border:none;"\n></iframe>`;
                 navigator.clipboard.writeText(code);
                 toast.success("Embed code copied! 📋");
               }}
