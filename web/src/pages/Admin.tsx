@@ -7,7 +7,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Loader2 } from "lucide-react";
+import { Loader2, PanelLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -62,12 +62,57 @@ const Fallback = () => (
   </div>
 );
 
+const SECTION_LABELS: Record<AdminSection, string> = {
+  overview: "Dashboard Overview",
+  users: "User Management",
+  communities: "Community Management",
+  moderation: "Content Moderation",
+  lobbies: "Lobby Management",
+  tokens: "Token Submissions",
+  spaces: "Spaces Management",
+  support: "Support Center",
+  chat: "Chat Management",
+  notifications: "Notifications",
+  alerts: "Price Alerts",
+  wallets: "Wallet Trade Management",
+  media: "Media Management",
+  settings: "Platform Settings",
+  audit: "Audit Log",
+  analytics: "Analytics",
+  tools: "Tools",
+  org_affiliates: "Org Affiliates",
+  affiliates: "Affiliates",
+};
+
 export default function Admin() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [section, setSection] = useState<AdminSection>("overview");
   const [badges, setBadges] = useState<Partial<Record<AdminSection, number>>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const media = window.matchMedia("(max-width: 767px)");
+    const syncLayout = (matches: boolean) => {
+      setIsMobile(matches);
+      setSidebarOpen(!matches);
+    };
+
+    syncLayout(media.matches);
+
+    const handleChange = (event: MediaQueryListEvent) => syncLayout(event.matches);
+
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", handleChange);
+      return () => media.removeEventListener("change", handleChange);
+    }
+
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
+  }, []);
 
   // Quick badge counts for sidebar
   useEffect(() => {
@@ -84,36 +129,60 @@ export default function Admin() {
   }, [section]);
 
   const ActiveSection = SECTION_MAP[section];
+  const activeSectionLabel = SECTION_LABELS[section];
 
   return (
     <AppLayout>
-      <div className="flex h-[calc(100vh-60px)] overflow-hidden">
+      <div className="relative flex h-[calc(100vh-60px)] overflow-hidden">
+        {isMobile && sidebarOpen && (
+          <button
+            type="button"
+            aria-label="Close admin navigation"
+            className="fixed inset-0 z-30 bg-black/55 backdrop-blur-sm md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
         <div
-          className={`transition-all duration-300 flex-shrink-0 ${
-            sidebarOpen ? "w-[240px]" : "w-0 overflow-hidden"
-          }`}
+          className={[
+            "transition-all duration-300 flex-shrink-0",
+            isMobile
+              ? `fixed inset-y-0 left-0 z-40 w-[240px] ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`
+              : "w-[240px]",
+          ].join(" ")}
         >
           <AdminSidebar
             active={section}
-            onChange={setSection}
+            onChange={(next) => {
+              setSection(next);
+              if (isMobile) setSidebarOpen(false);
+            }}
             badges={badges}
             onBack={() => navigate("/")}
           />
         </div>
 
-        {/* Toggle button */}
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute left-0 top-1/2 z-30 -translate-y-1/2 p-1 rounded-r-lg bg-white/[0.04] border border-white/10 border-l-0 text-white/40 hover:text-white/80 transition md:hidden"
-          style={{ left: sidebarOpen ? "240px" : "0px" }}
-        >
-          {sidebarOpen ? "‹" : "›"}
-        </button>
-
         {/* Main content area */}
         <div className="flex-1 overflow-auto">
-          <div className="max-w-7xl mx-auto p-6">
+          <div className="mx-auto max-w-7xl p-4 pt-16 sm:p-6 md:pt-6">
+            {isMobile && (
+              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-3 md:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(true)}
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[#0b1420] text-white/70 transition hover:bg-white/[0.06] hover:text-white"
+                  aria-label="Open admin navigation"
+                >
+                  <PanelLeft className="h-5 w-5" />
+                </button>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">Admin navigation</p>
+                  <p className="truncate text-sm font-semibold text-white/85">{activeSectionLabel}</p>
+                </div>
+              </div>
+            )}
+
             <Suspense fallback={<Fallback />}>
               <ActiveSection />
             </Suspense>
