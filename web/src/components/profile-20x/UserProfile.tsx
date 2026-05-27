@@ -162,11 +162,32 @@ interface PostRecord {
   image_url: string | null;
   likes_count: number | null;
   replies_count: number | null;
+  reposts_count?: number | null;
+  views_count?: number | null;
   created_at: string;
   user_id: string | null;
   username: string | null;
   avatar_url: string | null;
   community_id: string | null;
+  post_type?: string | null;
+  thread_id?: string | null;
+  thread_order?: number | null;
+  is_article?: boolean | null;
+  article_title?: string | null;
+  article_cover_url?: string | null;
+  is_pinned?: boolean | null;
+  video_url?: string | null;
+}
+
+interface ReplyRecord {
+  id: string;
+  post_id: string;
+  user_id: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  content: string;
+  likes_count: number | null;
+  created_at: string;
 }
 
 interface SpaceRecord {
@@ -327,6 +348,30 @@ const getCommunityPrivacyLabel = (privacy: string | null | undefined) => {
   if (privacy === "holder_only") return "Holder Only";
   return "Open";
 };
+
+
+const isGoldVerifiedProfile = (profile: Pick<ProfileData, "is_official_account" | "affiliate_org_id"> | null | undefined, isOwnerProfile = false) => {
+  return Boolean(profile?.is_official_account || profile?.affiliate_org_id || isOwnerProfile);
+};
+
+function VerificationBadge({ tone = "blue", className }: { tone?: "blue" | "gold"; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 22 22"
+      className={cn(
+        "shrink-0",
+        tone === "gold"
+          ? "text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.4)]"
+          : "text-sky-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.35)]",
+        className,
+      )}
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.274-.586-.705-1.084-1.246-1.439-.54-.354-1.17-.551-1.816-.569-.646.018-1.275.215-1.816.57-.54.354-.972.852-1.246 1.438-.607-.223-1.264-.27-1.897-.14-.634.131-1.218.437-1.687.882-.445.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.705-1.439 1.246-.354.54-.551 1.17-.569 1.816.018.646.215 1.275.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.218.882 1.687.47.445 1.053.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.646-.018 1.275-.215 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.218-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z" />
+    </svg>
+  );
+}
 
 function Panel({ className, children }: { className?: string; children: React.ReactNode }) {
   return (
@@ -514,8 +559,7 @@ function MiniFollowerCard({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-sm font-semibold text-white">{record.display_name || record.username || "OG User"}</p>
-          {record.verified ? <Shield className="h-3.5 w-3.5 text-sky-400" /> : null}
-          {isTeam ? <Crown className="h-3.5 w-3.5 text-amber-400" /> : null}
+          {isTeam ? <VerificationBadge tone="gold" className="h-3.5 w-3.5" /> : record.verified ? <VerificationBadge tone="blue" className="h-3.5 w-3.5" /> : null}
         </div>
         <p className="truncate text-xs text-white/40">{record.username ? `@${record.username}` : record.user_id}</p>
       </div>
@@ -541,8 +585,8 @@ function PostCard({
   const avatar = authorOverride?.avatarUrl || safeAvatarUrl(post.avatar_url) || dices(post.username || post.user_id || "ogscan-post");
   const displayName = authorOverride?.displayName || post.username || "OG Scan";
   const handle = authorOverride?.handle || (post.username ? `@${post.username}` : "@ogscan");
-  const verified = Boolean(authorOverride?.verified);
   const official = Boolean(authorOverride?.official);
+  const verified = Boolean(authorOverride?.verified) && !official;
 
   return (
     <article className="border-b border-white/10 bg-black px-4 py-4 transition sm:px-5">
@@ -559,8 +603,7 @@ function PostCard({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[15px] leading-none">
                 <p className="truncate font-bold text-white">{displayName}</p>
-                {verified ? <Shield className="h-4 w-4 shrink-0 text-sky-400" /> : null}
-                {official ? <Crown className="h-4 w-4 shrink-0 text-amber-400" /> : null}
+                {official ? <VerificationBadge tone="gold" className="h-4 w-4" /> : verified ? <VerificationBadge tone="blue" className="h-4 w-4" /> : null}
                 <p className="truncate text-white/40">{handle}</p>
                 <span className="text-white/30">·</span>
                 <p className="shrink-0 text-white/40">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
@@ -708,6 +751,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryRow[]>([]);
   const [posts, setPosts] = useState<PostRecord[]>([]);
+  const [replies, setReplies] = useState<ReplyRecord[]>([]);
   const [savedAlpha, setSavedAlpha] = useState<SavedAlphaState>({ bookmarks: [], likes: [], reposts: [] });
   const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
   const [walletStats, setWalletStats] = useState<WalletStats | null>(null);
@@ -846,11 +890,12 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
         supabase.from("community_members").select("id, community_id, role, joined_at, communities:community_id(id, name, description, icon, banner_url, member_count, privacy, category)").eq("user_id", targetUserId).limit(20),
         supabase.from("user_activity").select("id, activity_type, title, description, data, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
         supabase.from("trade_history").select("id, token_symbol, token_name, action, amount, price, pnl, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
-        supabase.from("community_posts").select("id, content, image_url, likes_count, replies_count, created_at, user_id, username, avatar_url, community_id").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
+        supabase.from("community_posts").select("id, content, image_url, likes_count, replies_count, reposts_count, views_count, created_at, user_id, username, avatar_url, community_id, post_type, thread_id, thread_order, is_article, article_title, article_cover_url, is_pinned, video_url").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(40),
+        supabase.from("community_post_replies").select("id, post_id, user_id, username, avatar_url, content, likes_count, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(40),
         supabase.from("leaderboard").select("user_id, total_pnl").order("total_pnl", { ascending: false }),
       ]);
 
-      const [ubResult, pbResult, liveResult, scheduledResult, pastResult, communitiesResult, activitiesResult, tradesResult, postsResult, leaderboardResult] = results;
+      const [ubResult, pbResult, liveResult, scheduledResult, pastResult, communitiesResult, activitiesResult, tradesResult, postsResult, repliesResult, leaderboardResult] = results;
 
       if (ubResult.status === "fulfilled") {
         setUserBadges((ubResult.value.data || []).map((row: any) => ({
@@ -895,6 +940,9 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
       if (postsResult.status === "fulfilled") setPosts((postsResult.value.data as PostRecord[]) || []);
       else setPosts([]);
+
+      if (repliesResult.status === "fulfilled") setReplies((repliesResult.value.data as ReplyRecord[]) || []);
+      else setReplies([]);
 
       if (leaderboardResult.status === "fulfilled") {
         const entries = leaderboardResult.value.data || [];
@@ -942,6 +990,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
       setActivities([]);
       setTradeHistory([]);
       setPosts([]);
+      setReplies([]);
       setSavedAlpha({ bookmarks: [], likes: [], reposts: [] });
       setLeaderboardRank(null);
       setWalletStats(null);
@@ -1052,7 +1101,12 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const totalListeners = [...scheduledSpaces, ...pastSpaces, ...(liveSpace ? [liveSpace] : [])].reduce((sum, space) => sum + (space.peak_listeners || 0), 0);
   const totalHostedSeconds = pastSpaces.reduce((sum, space) => sum + (space.duration_seconds || 0), 0);
   const totalHostedHours = totalHostedSeconds > 0 ? totalHostedSeconds / 3600 : 0;
-  const mediaPosts = posts.filter((post) => Boolean(post.image_url));
+  const articlePosts = posts.filter((post) => Boolean(post.is_article || post.post_type === "article" || post.article_title));
+  const standardPosts = posts.filter((post) => !articlePosts.some((article) => article.id === post.id));
+  const mediaPosts = posts.filter((post) => Boolean(post.image_url || post.article_cover_url || post.video_url));
+  const highlightPosts = [...posts]
+    .sort((a, b) => ((b.likes_count || 0) + (b.replies_count || 0) + (b.views_count || 0)) - ((a.likes_count || 0) + (a.replies_count || 0) + (a.views_count || 0)))
+    .slice(0, 6);
   const derivedOgScore = useMemo(() => {
     const score =
       Math.min(35, (profileData?.current_level ?? 0) * 1.8) +
@@ -1153,6 +1207,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   }, [isAdmin, isOwnProfile, isOwner, leaderboardRank, profileData?.affiliate_org_id, profileData?.current_level, profileData?.is_official_account, profileData?.is_pioneer, profileData?.trades_count, profileData?.verified, userBadges, walletAddress]);
 
   const roleTags = identityBadges.slice(0, 5);
+  const goldVerified = isGoldVerifiedProfile(profileData, Boolean(isOwnProfile && isOwner));
+  const blueVerified = Boolean(profileData?.verified && !goldVerified);
 
   const statCards = [
     { label: "Followers", value: followerCount, hint: "Social gravity across OG Scan", icon: Users, accent: "cyan" as const, formatter: compact },
@@ -1299,8 +1355,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-[32px] font-extrabold leading-none tracking-tight text-white">{displayName}</h1>
-                  {profileData.verified ? <Shield className="h-5 w-5 text-sky-400" /> : null}
-                  {profileData.is_official_account || profileData.affiliate_org_id || (isOwnProfile && (isOwner || isAdmin)) ? <Crown className="h-5 w-5 text-amber-400" /> : null}
+                  {goldVerified ? <VerificationBadge tone="gold" className="h-5 w-5" /> : blueVerified ? <VerificationBadge tone="blue" className="h-5 w-5" /> : null}
                 </div>
                 <p className="mt-1 text-[15px] text-white/40">{handle}</p>
               </div>
@@ -1403,9 +1458,9 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
               <div className="space-y-4">
                 {activeTab === "posts" ? (
-                  posts.length > 0 ? (
+                  standardPosts.length > 0 ? (
                     <div className="overflow-hidden rounded-none bg-transparent">
-                      {posts.map((post, index) => (
+                      {standardPosts.map((post, index) => (
                         <PostCard
                           key={post.id}
                           post={post}
@@ -1426,41 +1481,38 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 ) : null}
 
                 {activeTab === "calls" ? (
-                  tradeHistory.length > 0 ? (
+                  articlePosts.length > 0 ? (
                     <div className="border-y border-white/10">
-                      {topTrade ? (
-                        <div className="border-b border-white/10 px-4 py-4 sm:px-5">
-                          <p className="text-[13px] font-semibold text-white/45">Pinned article</p>
-                          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                            <div>
-                              <h4 className="text-[20px] font-black tracking-tight text-white">{topTrade.token_symbol || topTrade.token_name || "Top signal"}</h4>
-                              <p className="mt-1 text-sm text-white/55">{topTrade.action} · {formatDistanceToNow(new Date(topTrade.created_at), { addSuffix: true })}</p>
+                      {articlePosts.map((post, index) => (
+                        <article key={post.id} className={cn("px-4 py-4 sm:px-5", index !== articlePosts.length - 1 && "border-b border-white/10")}>
+                          {post.article_cover_url ? (
+                            <div className="mb-3 overflow-hidden rounded-none bg-black">
+                              <img src={post.article_cover_url} alt="" className="aspect-[2/1] w-full object-cover" />
                             </div>
-                            <div className="text-left sm:text-right">
-                              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/35">PNL</p>
-                              <p className="mt-1 text-xl font-black tracking-tight text-white">{formatUsd(topTrade.pnl)}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ) : null}
-                      {tradeHistory.map((trade) => (
-                        <div key={trade.id} className="border-b border-white/10 px-4 py-4 last:border-b-0 sm:px-5">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <p className="text-[17px] font-bold text-white">{trade.token_symbol || trade.token_name || "Signal"}</p>
-                              <p className="mt-1 text-sm text-white/45">{trade.action} · {formatDistanceToNow(new Date(trade.created_at), { addSuffix: true })}</p>
-                            </div>
-                            <div className="flex flex-wrap gap-3 text-sm text-white/60">
-                              <span>Size {compact(trade.amount)}</span>
-                              <span>Price {formatUsd(trade.price)}</span>
-                              <span className={cn("font-semibold", (trade.pnl ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300")}>{trade.pnl != null ? formatUsd(trade.pnl) : "PNL pending"}</span>
+                          ) : null}
+                          <div className="flex items-start gap-3">
+                            <img src={safeAvatarUrl(post.avatar_url) || dices(post.username || post.user_id || "ogscan-article")} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[15px] leading-none">
+                                <p className="truncate font-bold text-white">{post.username || displayName}</p>
+                                <p className="truncate text-white/40">{post.username ? `@${post.username}` : handle}</p>
+                                <span className="text-white/30">·</span>
+                                <p className="shrink-0 text-white/40">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
+                              </div>
+                              <h4 className="mt-3 text-[20px] font-black tracking-tight text-white">{post.article_title || post.content || "Article"}</h4>
+                              {post.content ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/58">{post.content}</p> : null}
+                              <div className="mt-3 flex flex-wrap gap-3 text-xs text-white/40">
+                                <span>{compact(post.likes_count)} likes</span>
+                                <span>{compact(post.replies_count)} replies</span>
+                                <span>{compact(post.views_count)} views</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </article>
                       ))}
                     </div>
                   ) : (
-                    <EmptyState icon={Target} title="No calls synced yet" body="This section will turn into a full signal ledger once trade/call history is available for the profile." />
+                    <EmptyState icon={Target} title="No articles yet" body="Published profile articles show here automatically when article posts exist for this account." />
                   )
                 ) : null}
 
@@ -1554,27 +1606,43 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 ) : null}
 
                 {activeTab === "achievements" ? (
-                  allBadges.length > 0 ? (
+                  highlightPosts.length > 0 || topTrade || liveSpace || pastSpaces.length > 0 ? (
                     <div className="border-y border-white/10">
-                      {allBadges.map((badge, index) => {
-                        const Icon = badge.icon;
-                        return (
-                          <div key={badge.key} className={cn("px-4 py-4 sm:px-5", index !== allBadges.length - 1 && "border-b border-white/10")}>
-                            <div className="flex items-start gap-3">
-                              <div className="mt-0.5 text-cyan-300">
-                                <Icon className="h-5 w-5" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[16px] font-bold text-white">{badge.title}</p>
-                                <p className="mt-1 text-sm leading-6 text-white/58">{badge.body}</p>
-                              </div>
-                            </div>
+                      {highlightPosts.map((post, index) => (
+                        <div key={post.id} className={cn("px-4 py-4 sm:px-5", (index !== highlightPosts.length - 1 || topTrade || liveSpace || pastSpaces.length > 0) && "border-b border-white/10")}>
+                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/30">Top post highlight</p>
+                          <p className="mt-2 text-[16px] font-bold text-white">{post.article_title || post.content || "Profile highlight"}</p>
+                          <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/45">
+                            <span>{compact(post.likes_count)} likes</span>
+                            <span>{compact(post.replies_count)} replies</span>
+                            <span>{compact(post.views_count)} views</span>
                           </div>
-                        );
-                      })}
+                        </div>
+                      ))}
+                      {topTrade ? (
+                        <div className={cn("px-4 py-4 sm:px-5", (liveSpace || pastSpaces.length > 0) && "border-b border-white/10")}>
+                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/30">Best trade highlight</p>
+                          <p className="mt-2 text-[16px] font-bold text-white">{topTrade.token_symbol || topTrade.token_name || "Trade highlight"}</p>
+                          <p className="mt-1 text-sm text-white/58">{topTrade.action} • {formatUsd(topTrade.pnl)} • {formatDistanceToNow(new Date(topTrade.created_at), { addSuffix: true })}</p>
+                        </div>
+                      ) : null}
+                      {liveSpace ? (
+                        <div className={cn("px-4 py-4 sm:px-5", pastSpaces.length > 0 && "border-b border-white/10")}>
+                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/30">Live space highlight</p>
+                          <p className="mt-2 text-[16px] font-bold text-white">{liveSpace.title || "Live now"}</p>
+                          <p className="mt-1 text-sm text-white/58">{compact(liveSpace.listener_count)} listening live right now.</p>
+                        </div>
+                      ) : null}
+                      {pastSpaces[0] ? (
+                        <div className="px-4 py-4 sm:px-5">
+                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/30">Top archive highlight</p>
+                          <p className="mt-2 text-[16px] font-bold text-white">{pastSpaces[0].title || "Recorded space"}</p>
+                          <p className="mt-1 text-sm text-white/58">{compact(pastSpaces[0].peak_listeners)} peak listeners • {formatDuration(pastSpaces[0].duration_seconds)}</p>
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
-                    <EmptyState icon={Award} title="No achievements unlocked yet" body="As the profile gains badges, progression status, and activity milestones, they will appear here with rarity styling." />
+                    <EmptyState icon={Award} title="No highlights yet" body="Highlights fill automatically from top posts, articles, trades, and spaces tied to this profile." />
                   )
                 ) : null}
 
@@ -1583,38 +1651,40 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                     <div className="grid grid-cols-2 gap-px bg-white/10 sm:grid-cols-3 xl:grid-cols-4">
                       {mediaPosts.map((post) => (
                         <article key={post.id} className="bg-black">
-                          {post.image_url ? <img src={post.image_url} alt="" className="aspect-square w-full object-cover" /> : null}
+                          {post.image_url ? <img src={post.image_url} alt="" className="aspect-square w-full object-cover" /> : post.article_cover_url ? <img src={post.article_cover_url} alt="" className="aspect-square w-full object-cover" /> : <div className="flex aspect-square items-center justify-center text-white/35"><Activity className="h-6 w-6" /></div>}
                         </article>
                       ))}
                     </div>
                   ) : (
-                    <EmptyState icon={ImageIcon} title="No media yet" body="Images, GIF posts, highlights, and other media will appear here once they are published." />
+                    <EmptyState icon={ImageIcon} title="No media yet" body="Media from posts and articles shows here automatically once this profile publishes images or covers." />
                   )
                 ) : null}
 
                 {activeTab === "activity" ? (
-                  activities.length > 0 ? (
+                  replies.length > 0 ? (
                     <div className="border-y border-white/10">
-                      {activities.map((activity, index) => (
-                        <div key={activity.id} className={cn("px-4 py-4 sm:px-5", index !== activities.length - 1 && "border-b border-white/10")}>
+                      {replies.map((reply, index) => (
+                        <article key={reply.id} className={cn("bg-black px-4 py-4 sm:px-5", index !== replies.length - 1 && "border-b border-white/10")}>
                           <div className="flex items-start gap-3">
-                            <div className="mt-0.5 text-cyan-300">
-                              <Activity className="h-4.5 w-4.5" />
-                            </div>
+                            <img src={safeAvatarUrl(reply.avatar_url) || dices(reply.username || reply.user_id || "ogscan-reply")} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />
                             <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <p className="text-[15px] font-semibold text-white">{activity.title}</p>
-                                <span className="text-xs text-white/40">{formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}</span>
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[15px] leading-none">
+                                <p className="truncate font-bold text-white">{reply.username || displayName}</p>
+                                <p className="truncate text-white/40">{reply.username ? `@${reply.username}` : handle}</p>
+                                <span className="text-white/30">·</span>
+                                <p className="shrink-0 text-white/40">{formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}</p>
                               </div>
-                              {activity.description ? <p className="mt-1.5 text-sm leading-6 text-white/58">{activity.description}</p> : null}
-                              <p className="mt-2 text-[11px] font-black uppercase tracking-[0.16em] text-white/30">{activity.activity_type}</p>
+                              <p className="mt-3 whitespace-pre-wrap text-[15px] leading-6 text-white">{reply.content}</p>
+                              <div className="mt-3 flex flex-wrap gap-3 text-xs text-white/40">
+                                <span>{compact(reply.likes_count)} likes</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </article>
                       ))}
                     </div>
                   ) : (
-                    <EmptyState icon={Activity} title="No activity yet" body="Profile activity, achievements, and on-platform actions will stream here once there is activity to render." />
+                    <EmptyState icon={Activity} title="No replies yet" body="Real replies from community conversations show here automatically when this profile has posted replies." />
                   )
                 ) : null}
 
