@@ -57,6 +57,11 @@ import AISpaceAssistant from "./pages/AISpaceAssistant";
 import AIHostCopilot from "./pages/AIHostCopilot";
 import Simulcast from "./pages/Simulcast";
 import EnterpriseDashboard from "./pages/EnterpriseDashboard";
+import MobileApp from "./pages/MobileApp";
+import SpaceReminders from "./pages/SpaceReminders";
+import AutoTweet from "./pages/AutoTweet";
+import PodcastPublisher from "./pages/PodcastPublisher";
+import ClipVideoExport from "./pages/ClipVideoExport";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
@@ -223,6 +228,24 @@ const App = () => (
             <Route path="/multistream" element={<ProtectedRoute><Simulcast /></ProtectedRoute>} />
             <Route path="/enterprise" element={<ProtectedRoute><EnterpriseDashboard /></ProtectedRoute>} />
             <Route path="/compliance" element={<ProtectedRoute><EnterpriseDashboard /></ProtectedRoute>} />
+            {/* Feature 16 — Native Mobile App */}
+            <Route path="/mobile-app" element={<MobileApp />} />
+            <Route path="/mobile" element={<MobileApp />} />
+            <Route path="/app-download" element={<MobileApp />} />
+            {/* Push/Email Reminders */}
+            <Route path="/reminders" element={<ProtectedRoute><SpaceReminders /></ProtectedRoute>} />
+            <Route path="/space-reminders" element={<ProtectedRoute><SpaceReminders /></ProtectedRoute>} />
+            {/* Auto-Tweet */}
+            <Route path="/auto-tweet" element={<ProtectedRoute><AutoTweet /></ProtectedRoute>} />
+            <Route path="/tweet-settings" element={<ProtectedRoute><AutoTweet /></ProtectedRoute>} />
+            {/* Podcast Publisher */}
+            <Route path="/podcasts" element={<ProtectedRoute><PodcastPublisher /></ProtectedRoute>} />
+            <Route path="/podcast-publisher" element={<ProtectedRoute><PodcastPublisher /></ProtectedRoute>} />
+            <Route path="/rss" element={<ProtectedRoute><PodcastPublisher /></ProtectedRoute>} />
+            {/* Clip → Video Export */}
+            <Route path="/clip-export" element={<ProtectedRoute><ClipVideoExport /></ProtectedRoute>} />
+            <Route path="/video-export" element={<ProtectedRoute><ClipVideoExport /></ProtectedRoute>} />
+            <Route path="/export-clips" element={<ProtectedRoute><ClipVideoExport /></ProtectedRoute>} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />

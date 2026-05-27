@@ -15,6 +15,11 @@ import {
   Home,
   Users,
   User,
+  Smartphone,
+  Twitter,
+  Mic,
+  Film,
+  BellRing,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
@@ -157,6 +162,14 @@ export const AppSidebar = ({
     { to: "/messages",        icon: Mail,           label: "Messages",        eyebrow: "Direct messages" },
   ];
 
+  const mobileSpacesItems: NavItem[] = [
+    { to: "/mobile-app",    icon: Smartphone,  label: "Mobile App",       eyebrow: "iOS & Android" },
+    { to: "/reminders",     icon: BellRing,    label: "Space Reminders",  eyebrow: "15-min / 1-hour alerts" },
+    { to: "/auto-tweet",    icon: Twitter,     label: "Auto-Tweet",       eyebrow: "Tweet when you go live" },
+    { to: "/podcasts",      icon: Mic,         label: "Podcast Publisher",eyebrow: "RSS → Spotify & Apple" },
+    { to: "/clip-export",   icon: Film,        label: "Clip → Video",     eyebrow: "Export to X & TikTok" },
+  ];
+
   const moreItems: NavItem[] = [
     ...(isAdmin ? [{ to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Owner dashboard" } as NavItem] : []),
   ];
@@ -209,6 +222,22 @@ export const AppSidebar = ({
           <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Trading</p>
           <div className="space-y-0.5">
             {tradingItems.map((item) => (
+              <NavRow
+                key={item.to}
+                item={item}
+                activeId={activeId}
+                currentPath={location.pathname}
+                onNavigate={onNavigate}
+                onClose={onClose}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-1 mt-4">
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Mobile &amp; Growth</p>
+          <div className="space-y-0.5">
+            {mobileSpacesItems.map((item) => (
               <NavRow
                 key={item.to}
                 item={item}
