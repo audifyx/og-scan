@@ -6,7 +6,7 @@ import {
   RefreshCw, ExternalLink, Percent, Flame, Camera, Shield, Star, Hash, Lock,
   BarChart3, Crown, Medal, Award, Zap, Heart, Clock, ChevronRight, Edit3,
   Image as ImageIcon, CheckCircle, XCircle, AlertCircle, Bookmark, ChevronLeft,
-  MapPin, Link as LinkIcon, Calendar, X as XIcon, Repeat2, Settings,
+  MapPin, Link as LinkIcon, Calendar, X as XIcon, Repeat2,
 } from "lucide-react";
 import { AvatarSelector, renderAvatar } from "@/components/avatars/AvatarSelector";
 import { safeAvatarUrl } from "@/lib/utils";
