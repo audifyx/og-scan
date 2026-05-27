@@ -340,7 +340,7 @@ export default function EmbedSpaces() {
 
   if (loading) {
     return (
-      <div className="w-full min-h-[200px] bg-[#07090f] flex items-center justify-center">
+      <div className="w-full min-h-screen bg-[#07090f] flex items-center justify-center">
         <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
       </div>
     );
@@ -348,17 +348,17 @@ export default function EmbedSpaces() {
 
   if (!profile) {
     return (
-      <div className="w-full min-h-[200px] bg-[#07090f] flex items-center justify-center p-6">
+      <div className="w-full min-h-screen bg-[#07090f] flex items-center justify-center p-6">
         <p className="text-white/25 text-sm text-center">@{username} not found</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full bg-[#07090f] font-sans text-white overflow-hidden relative" style={{ fontFamily: "system-ui,-apple-system,sans-serif" }}>
+    <div className="w-full min-h-screen bg-[#07090f] font-sans text-white overflow-y-auto overflow-x-hidden relative" style={{ fontFamily: "system-ui,-apple-system,sans-serif" }}>
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #07090f; overflow-x: hidden; }
+        html, body { background: #07090f; overflow-x: hidden; overflow-y: auto; height: 100%; }
         a { text-decoration: none; color: inherit; }
         @keyframes ping { 75%,100% { transform:scale(2); opacity:0; } }
         .animate-ping { animation: ping 1s cubic-bezier(0,0,.2,1) infinite; }
