@@ -130,7 +130,7 @@ export const ContentModeration = () => {
         <Button onClick={fetch} variant="outline" size="sm" className="gap-2"><RefreshCw className="h-3.5 w-3.5" /></Button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatBadge icon={MessageSquare} label="Posts" value={stats.totalPosts} />
         <StatBadge icon={MessageSquare} label="Replies" value={stats.totalReplies} />
         <StatBadge icon={Repeat} label="Reposts" value={stats.totalReposts} />

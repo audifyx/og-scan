@@ -141,7 +141,7 @@ export const SupportCenter = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: "Open", count: openCount, icon: Clock, color: "text-blue-400" },
           { label: "In Progress", count: inProgressCount, icon: ArrowUpCircle, color: "text-yellow-400" },

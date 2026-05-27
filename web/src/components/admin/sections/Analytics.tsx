@@ -191,7 +191,7 @@ export const Analytics = () => {
         <MetricCard icon={MessageSquare} label={`Posts (${days}d)`} value={posts.length} color="bg-pink-500/20 text-pink-400" />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <MetricCard icon={Globe2} label="Communities" value={communities.length} sub={`${totalMembers} members`} color="bg-emerald-500/20 text-emerald-400" />
         <MetricCard icon={Target} label="Active Lobbies" value={lobbies.filter((l) => l.is_active).length} sub={`${lobbies.length} total`} color="bg-blue-500/20 text-blue-400" />
         <MetricCard icon={Zap} label={`Submissions (${days}d)`} value={submissions.length} sub={`${submissions.filter((s) => s.status === "pending").length} pending`} color="bg-yellow-500/20 text-yellow-400" />
@@ -209,7 +209,7 @@ export const Analytics = () => {
       <Card className="og-glass-card">
         <CardHeader className="pb-3"><CardTitle className="text-sm">Submission Breakdown ({days}d)</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {["pending", "approved", "live", "rejected"].map((status) => {
               const count = submissions.filter((s) => s.status === status).length;
               const pct = submissions.length > 0 ? Math.round((count / submissions.length) * 100) : 0;

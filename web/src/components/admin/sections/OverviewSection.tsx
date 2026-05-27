@@ -160,7 +160,7 @@ export const OverviewSection = ({ onNavigate }: Props) => {
           onClick={() => onNavigate("communities")} />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatCard icon={Headphones} label="Lobbies" value={`${stats.activeLobbies} / ${stats.totalLobbies}`}
           color="bg-blue-500/20 text-blue-400" onClick={() => onNavigate("lobbies")} />
         <StatCard icon={Mic} label="Spaces" value={`${stats.activeSpaces} live`}
