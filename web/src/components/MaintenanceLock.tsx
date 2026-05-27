@@ -21,24 +21,41 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let alive = true;
+
+    // Safety timeout — if Supabase doesn't respond in 4s, default to OFF
+    const timeout = setTimeout(() => {
+      if (alive) setMaintenanceEnabled(false);
+    }, 4000);
+
     (async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("site_settings")
           .select("value")
           .eq("key", "maintenance_mode")
           .single();
-        if (alive) {
+        if (!alive) return;
+        clearTimeout(timeout);
+        if (error || !data) {
+          // Table doesn't exist or row missing → maintenance is OFF
+          setMaintenanceEnabled(false);
+        } else {
           // value is stored as jsonb boolean
           const isOn = data?.value === true || data?.value === "true";
           setMaintenanceEnabled(isOn);
         }
       } catch {
-        // If table doesn't exist or query fails, default to maintenance ON
-        if (alive) setMaintenanceEnabled(true);
+        // If query fails for any reason, default to maintenance OFF
+        if (alive) {
+          clearTimeout(timeout);
+          setMaintenanceEnabled(false);
+        }
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      clearTimeout(timeout);
+    };
   }, []);
 
   const [code, setCode] = useState("");
