@@ -332,7 +332,7 @@ function Panel({ className, children }: { className?: string; children: React.Re
   return (
     <section
       className={cn(
-        "og-profile-panel relative overflow-hidden rounded-none border border-white/[0.09] bg-[#08101b] p-4 shadow-none backdrop-blur-xl sm:p-5",
+        "og-profile-panel relative overflow-hidden rounded-none border border-white/10 bg-black p-4 shadow-none sm:p-5",
         className,
       )}
     >

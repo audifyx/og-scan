@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 /* ═══════════════════════════════════════════════════════════════
    Types
@@ -320,6 +321,7 @@ async function enrichPostProfiles(posts: Post[]): Promise<Post[]> {
 
 const Communities = () => {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [mainView, setMainView] = useState<MainView>("home");
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -395,6 +397,15 @@ const Communities = () => {
     setSelectedPost(p);
   };
 
+  const openUserProfile = useCallback((userId?: string | null) => {
+    if (!userId) return;
+    if (user && userId === user.id) {
+      navigate("/profile");
+      return;
+    }
+    navigate(`/profile/${userId}`);
+  }, [navigate, user]);
+
   const goBack = () => {
     if (selectedPost) {
       setSelectedPost(null);
@@ -422,6 +433,7 @@ const Communities = () => {
           post={selectedPost}
           user={user}
           onBack={() => setSelectedPost(null)}
+          onOpenProfile={openUserProfile}
           isGlobalAdmin={isGlobalAdmin}
           canModerate={(() => { const r = myMemberships.get(selectedPost.community_id)?.role; return r === "creator" || r === "moderator" || isGlobalAdmin; })()}
         />
@@ -432,12 +444,13 @@ const Communities = () => {
           myRole={myRoleIn(selectedCommunity.id)}
           isMember={myMemberships.has(selectedCommunity.id)}
           onSelectPost={openPost}
+          onOpenProfile={openUserProfile}
           onCompose={() => setShowCompose(true)}
           onJoin={() => joinCommunity(selectedCommunity.id)}
           onLeave={() => leaveCommunity(selectedCommunity.id)}
         />
       ) : mainView === "news" ? (
-        <NewsFeed user={user} onSelectPost={openPost} />
+        <NewsFeed user={user} onSelectPost={openPost} onOpenProfile={openUserProfile} />
       ) : mainView === "explore" ? (
         <ExploreCommunities
           user={user}
@@ -449,6 +462,7 @@ const Communities = () => {
           user={user}
           onSelectPost={openPost}
           onSelectCommunity={openCommunity}
+          onOpenProfile={openUserProfile}
           joinedCommunityIds={Array.from(myMemberships.keys())}
         />
       )}
@@ -553,11 +567,12 @@ function TopNav({
    ═══════════════════════════════════════════════════════════════ */
 
 function HomeFeed({
-  user, onSelectPost, onSelectCommunity, joinedCommunityIds
+  user, onSelectPost, onSelectCommunity, onOpenProfile, joinedCommunityIds
 }: {
   user: any;
   onSelectPost: (p: Post) => void;
   onSelectCommunity: (c: Community) => void;
+  onOpenProfile: (userId?: string | null) => void;
   joinedCommunityIds: string[];
 }) {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -689,6 +704,7 @@ function HomeFeed({
                   post={post}
                   user={user}
                   onClick={() => onSelectPost(post)}
+                  onOpenProfile={onOpenProfile}
                   onUpdate={fetchHomeFeed}
                 />
               </div>
@@ -931,7 +947,7 @@ function CommunityCard({ community: c, onClick, variant = "list" }: { community:
    News Feed — Articles only
    ═══════════════════════════════════════════════════════════════ */
 
-function NewsFeed({ user, onSelectPost }: { user: any; onSelectPost: (p: Post) => void }) {
+function NewsFeed({ user, onSelectPost, onOpenProfile }: { user: any; onSelectPost: (p: Post) => void; onOpenProfile: (userId?: string | null) => void }) {
   const [articles, setArticles] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -980,8 +996,20 @@ function NewsFeed({ user, onSelectPost }: { user: any; onSelectPost: (p: Post) =
                 {article.content.slice(0, 200)}
               </p>
               <div className="flex items-center gap-2 mt-2">
-                <Avatar url={article.avatar_url} name={article.username} size="xs" />
-                <span className="text-[10px] text-white/30">{article.username || "Anonymous"}</span>
+                <Avatar url={article.avatar_url} name={article.username} size="xs" onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenProfile(article.user_id);
+                }} />
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpenProfile(article.user_id);
+                  }}
+                  className="text-[10px] text-white/30 hover:text-white transition-colors"
+                >
+                  {article.username || "Anonymous"}
+                </button>
                 <span className="text-[10px] text-white/15">·</span>
                 <span className="text-[10px] text-white/15">
                   {formatDistanceToNow(new Date(article.created_at), { addSuffix: true })}
@@ -1004,13 +1032,14 @@ function NewsFeed({ user, onSelectPost }: { user: any; onSelectPost: (p: Post) =
    ═══════════════════════════════════════════════════════════════ */
 
 function CommunityFeed({
-  community, user, myRole, isMember, onSelectPost, onCompose, onJoin, onLeave
+  community, user, myRole, isMember, onSelectPost, onOpenProfile, onCompose, onJoin, onLeave
 }: {
   community: Community;
   user: any;
   myRole: CommunityMember["role"] | null;
   isMember: boolean;
   onSelectPost: (p: Post) => void;
+  onOpenProfile: (userId?: string | null) => void;
   onCompose: () => void;
   onJoin: () => void;
   onLeave: () => void;
@@ -1260,9 +1289,9 @@ function CommunityFeed({
               <div className="space-y-2">
                 {members.filter(m => m.role === "moderator" || m.role === "creator").map(m => (
                   <div key={m.id} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                    <Avatar url={m.avatar_url} name={m.username} size="sm" />
+                    <Avatar url={m.avatar_url} name={m.username} size="sm" onClick={() => onOpenProfile(m.user_id)} />
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-bold text-white">{m.username || "User"}</span>
+                      <button type="button" onClick={() => onOpenProfile(m.user_id)} className="text-sm font-bold text-white hover:text-og-cyan transition-colors">{m.username || "User"}</button>
                       <span className={cn("ml-2 text-[8px] font-black px-1.5 py-0.5 rounded-full border",
                         m.role === "creator" ? "text-og-gold bg-og-gold/10 border-og-gold/20" : "text-og-cyan bg-og-cyan/10 border-og-cyan/20"
                       )}>{m.role === "creator" ? "OWNER" : "MOD"}</span>
@@ -1280,8 +1309,8 @@ function CommunityFeed({
                   <label className="text-[10px] text-white/20 uppercase tracking-wider mb-2 block">All Members</label>
                   {members.filter(m => m.role === "member").slice(0, 20).map(m => (
                     <div key={m.id} className="flex items-center gap-3 px-3 py-2 hover:bg-white/[0.02] rounded-lg">
-                      <Avatar url={m.avatar_url} name={m.username} size="sm" />
-                      <span className="text-sm text-white/60 flex-1">{m.username || "User"}</span>
+                      <Avatar url={m.avatar_url} name={m.username} size="sm" onClick={() => onOpenProfile(m.user_id)} />
+                      <button type="button" onClick={() => onOpenProfile(m.user_id)} className="text-sm text-white/60 flex-1 text-left hover:text-white transition-colors">{m.username || "User"}</button>
                       {(isCreator || isGlobalAdmin) && (
                         <button onClick={() => toggleMod(m)}
                           className="p-1.5 rounded-lg text-white/15 hover:text-og-cyan hover:bg-og-cyan/10 transition-colors" title="Make moderator">
@@ -1304,10 +1333,10 @@ function CommunityFeed({
           <div className="divide-y divide-white/[0.03]">
             {members.map(m => (
               <div key={m.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02]">
-                <Avatar url={m.avatar_url} name={m.username} size="md" />
+                <Avatar url={m.avatar_url} name={m.username} size="md" onClick={() => onOpenProfile(m.user_id)} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-bold text-white truncate">{m.username || "User"}</span>
+                    <button type="button" onClick={() => onOpenProfile(m.user_id)} className="text-sm font-bold text-white truncate hover:text-og-cyan transition-colors">{m.username || "User"}</button>
                     {m.role === "creator" && (
                       <span className="flex items-center gap-0.5 text-[8px] font-black text-og-gold bg-og-gold/10 px-1.5 py-0.5 rounded-full border border-og-gold/20">
                         <Crown className="h-2.5 w-2.5" /> OWNER
@@ -1359,6 +1388,7 @@ function CommunityFeed({
               post={post}
               user={user}
               onClick={() => onSelectPost(post)}
+              onOpenProfile={onOpenProfile}
               onUpdate={fetchPosts}
               canModerate={canModerate}
               communityOwnerId={community.created_by}
@@ -1377,11 +1407,12 @@ function CommunityFeed({
    ═══════════════════════════════════════════════════════════════ */
 
 function PostCard({
-  post, user, onClick, onUpdate, compact = false, canModerate = false, communityOwnerId, isGlobalAdmin = false, onPin
+  post, user, onClick, onOpenProfile, onUpdate, compact = false, canModerate = false, communityOwnerId, isGlobalAdmin = false, onPin
 }: {
   post: Post;
   user: any;
   onClick?: () => void;
+  onOpenProfile?: (userId?: string | null) => void;
   onUpdate?: () => void;
   compact?: boolean;
   canModerate?: boolean;
@@ -1447,10 +1478,22 @@ function PostCard({
         <div className="flex items-center gap-1 ml-12 mb-1 text-[10px] text-white/20"><Pin className="h-3 w-3" /> Pinned</div>
       )}
       <div className="flex gap-3">
-        <Avatar url={post.avatar_url} name={post.username} size="md" />
+        <Avatar url={post.avatar_url} name={post.username} size="md" onClick={onOpenProfile ? (event) => {
+          event.stopPropagation();
+          onOpenProfile(post.user_id);
+        } : undefined} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-bold text-white truncate">{post.username || "Anonymous"}</span>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenProfile?.(post.user_id);
+              }}
+              className="truncate text-sm font-bold text-white transition-colors hover:text-og-cyan"
+            >
+              {post.username || "Anonymous"}
+            </button>
             <span className="text-xs text-white/15">·</span>
             <span className="text-xs text-white/15 shrink-0">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
             {isThread && <Badge className="text-[7px] bg-blue-500/10 text-blue-400 border-blue-500/20 ml-1">Thread</Badge>}
@@ -1681,7 +1724,7 @@ function ActionBtn({
    Post Detail — Full post with replies
    ═══════════════════════════════════════════════════════════════ */
 
-function PostDetail({ post, user, onBack, isGlobalAdmin = false, canModerate = false }: { post: Post; user: any; onBack: () => void; isGlobalAdmin?: boolean; canModerate?: boolean }) {
+function PostDetail({ post, user, onBack, onOpenProfile, isGlobalAdmin = false, canModerate = false }: { post: Post; user: any; onBack: () => void; onOpenProfile: (userId?: string | null) => void; isGlobalAdmin?: boolean; canModerate?: boolean }) {
   const [replies, setReplies] = useState<PostReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [replyText, setReplyText] = useState("");
@@ -1793,9 +1836,9 @@ function PostDetail({ post, user, onBack, isGlobalAdmin = false, canModerate = f
       {/* Main post */}
       <div className="px-4 pt-3 pb-3 border-b border-white/[0.06]">
         <div className="flex items-center gap-3 mb-3">
-          <Avatar url={post.avatar_url} name={post.username} size="lg" />
+          <Avatar url={post.avatar_url} name={post.username} size="lg" onClick={() => onOpenProfile(post.user_id)} />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white">{post.username || "Anonymous"}</p>
+            <button type="button" onClick={() => onOpenProfile(post.user_id)} className="text-sm font-bold text-white hover:text-og-cyan transition-colors">{post.username || "Anonymous"}</button>
             <p className="text-xs text-white/20">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</p>
           </div>
           {user && (canModerate || post.user_id === user.id) && (
@@ -1879,7 +1922,7 @@ function PostDetail({ post, user, onBack, isGlobalAdmin = false, canModerate = f
               )}
               <div className="flex gap-3 py-3">
                 <div className="flex flex-col items-center relative z-10">
-                  <Avatar url={tp.avatar_url} name={tp.username} size="sm" />
+                  <Avatar url={tp.avatar_url} name={tp.username} size="sm" onClick={() => onOpenProfile(tp.user_id)} />
                   {/* Line going down to next post */}
                   {i < threadPosts.length - 1 && (
                     <div className="w-0.5 flex-1 bg-white/[0.08] mt-1 min-h-[12px]" />
@@ -1887,7 +1930,7 @@ function PostDetail({ post, user, onBack, isGlobalAdmin = false, canModerate = f
                 </div>
                 <div className="flex-1 min-w-0 pb-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[13px] font-bold text-white">{tp.username}</span>
+                    <button type="button" onClick={() => onOpenProfile(tp.user_id)} className="text-[13px] font-bold text-white hover:text-og-cyan transition-colors">{tp.username}</button>
                     <span className="text-[10px] text-white/20">·</span>
                     <span className="text-[10px] text-white/20">
                       {formatDistanceToNow(new Date(tp.created_at), { addSuffix: true })}
@@ -1953,10 +1996,10 @@ function PostDetail({ post, user, onBack, isGlobalAdmin = false, canModerate = f
           {replies.map(reply => (
             <div key={reply.id} className="px-4 py-3 hover:bg-white/[0.01]">
               <div className="flex gap-3">
-                <Avatar url={reply.avatar_url} name={reply.username} size="sm" />
+                <Avatar url={reply.avatar_url} name={reply.username} size="sm" onClick={() => onOpenProfile(reply.user_id)} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-white">{reply.username || "Anonymous"}</span>
+                    <button type="button" onClick={() => onOpenProfile(reply.user_id)} className="text-xs font-bold text-white hover:text-og-cyan transition-colors">{reply.username || "Anonymous"}</button>
                     <span className="text-[10px] text-white/15">
                       {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
                     </span>
@@ -2400,14 +2443,16 @@ function CreateCommunityModal({
    Shared Components
    ═══════════════════════════════════════════════════════════════ */
 
-function Avatar({ url, name, size = "md" }: { url?: string | null; name?: string | null; size?: "xs" | "sm" | "md" | "lg" }) {
+function Avatar({ url, name, size = "md", onClick }: { url?: string | null; name?: string | null; size?: "xs" | "sm" | "md" | "lg"; onClick?: (event: React.MouseEvent) => void }) {
   const sizeClass = size === "xs" ? "w-5 h-5" : size === "sm" ? "w-8 h-8" : size === "lg" ? "w-12 h-12" : "w-10 h-10";
   const textSize = size === "xs" ? "text-[7px]" : size === "sm" ? "text-[9px]" : size === "lg" ? "text-sm" : "text-[10px]";
+  const interactiveClass = onClick ? "cursor-pointer transition-opacity hover:opacity-85" : "";
+
   if (url) {
-    return <img src={url} className={cn(sizeClass, "rounded-full object-cover shrink-0")} alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />;
+    return <img src={url} className={cn(sizeClass, "rounded-full object-cover shrink-0", interactiveClass)} alt="" onClick={onClick} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />;
   }
   return (
-    <div className={cn(sizeClass, "rounded-full bg-gradient-to-br from-og-cyan/20 to-purple-500/10 flex items-center justify-center shrink-0 border border-white/10", textSize, "font-black text-white/40 uppercase")}>
+    <div onClick={onClick} className={cn(sizeClass, "rounded-full bg-gradient-to-br from-og-cyan/20 to-purple-500/10 flex items-center justify-center shrink-0 border border-white/10", textSize, "font-black text-white/40 uppercase", interactiveClass)}>
       {(name || "?").charAt(0)}
     </div>
   );
