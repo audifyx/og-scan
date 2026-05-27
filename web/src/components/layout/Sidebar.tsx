@@ -12,18 +12,19 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
 
-// ── nav sections — MUST match AppSidebar exactly ────────────────────────
+// ── nav sections ────────────────────────────────────────────────────────
 
 type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; label: string; eyebrow: string };
 
-const spacesAiItems: NavItem[] = [
-  { to: "/discovery",     icon: Radio,       label: "Live Spaces",      eyebrow: "Discovery feed" },
-  { to: "/shows",         icon: Radio,       label: "Shows",            eyebrow: "Podcast-style series" },
-  { to: "/ai-assistant",  icon: Brain,       label: "AI Assistant",     eyebrow: "Transcripts + notes" },
-  { to: "/host-copilot",  icon: Sparkles,    label: "Host Copilot",     eyebrow: "Live suggestions + coaching" },
-  { to: "/simulcast",     icon: Signal,      label: "Simulcast",        eyebrow: "Broadcast everywhere" },
-  { to: "/enterprise",    icon: Building2,   label: "Enterprise",       eyebrow: "HIPAA + SSO + compliance" },
-  { to: "/dev-portal",    icon: Code2,       label: "Developer Portal", eyebrow: "API, webhooks, marketplace" },
+// ── Admin-only: hidden from all users except owner (audifyx@gmail.com) ──
+const adminOnlyItems: NavItem[] = [
+  { to: "/discovery",    icon: Radio,      label: "Live Spaces",     eyebrow: "Discovery feed" },
+  { to: "/shows",        icon: Radio,      label: "Shows",           eyebrow: "Podcast-style series" },
+  { to: "/ai-assistant", icon: Brain,      label: "AI Assistant",    eyebrow: "Transcripts + notes" },
+  { to: "/host-copilot", icon: Sparkles,   label: "Host Copilot",    eyebrow: "Live suggestions + coaching" },
+  { to: "/simulcast",    icon: Signal,     label: "Simulcast",       eyebrow: "Broadcast everywhere" },
+  { to: "/enterprise",   icon: Building2,  label: "Enterprise",      eyebrow: "HIPAA + SSO + compliance" },
+  { to: "/dev-portal",   icon: Code2,      label: "Developer Portal",eyebrow: "API, webhooks, marketplace" },
 ];
 
 const tradingItems: NavItem[] = [
@@ -80,10 +81,6 @@ const SectionLabel = ({ label }: { label: string }) => (
 );
 
 // ── Sidebar ───────────────────────────────────────────────────────────────
-// Matches AppSidebar: TRADING section + Admin only.
-// All other pages (Dashboard, Scanner, Feed, Community, etc.) are reachable
-// via the bottom nav (Home / Community / Tools / Profile) and the scrolling
-// tab strip inside Index — they do NOT belong in the sidebar.
 
 export const Sidebar = () => {
   const { user, profile, signOut } = useAuth();
@@ -124,7 +121,7 @@ export const Sidebar = () => {
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        {/* Logo — matches AppSidebar header */}
+        {/* Logo */}
         <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-4">
           <NavLink to="/app" onClick={closeMobile} className="flex items-center gap-3 text-left">
             <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-og-lime/50 bg-og-lime/10">
@@ -145,15 +142,8 @@ export const Sidebar = () => {
           </button>
         </div>
 
-        {/* Nav — TRADING + MORE only */}
+        {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
-          <div className="mb-1 mt-3">
-            <SectionLabel label="Spaces & AI" />
-            <div className="space-y-0.5">
-              {spacesAiItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
-            </div>
-          </div>
-
           <div className="mb-1 mt-3">
             <SectionLabel label="Trading" />
             <div className="space-y-0.5">
@@ -161,9 +151,19 @@ export const Sidebar = () => {
             </div>
           </div>
 
+          {/* Admin-only section */}
           {isAdmin && (
             <div className="mb-1 mt-3">
-              <SectionLabel label="More" />
+              <SectionLabel label="Spaces & AI" />
+              <div className="space-y-0.5">
+                {adminOnlyItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
+              </div>
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="mb-1 mt-3">
+              <SectionLabel label="Admin" />
               <div className="space-y-0.5">
                 <NavLink
                   to="/admin"
@@ -190,7 +190,7 @@ export const Sidebar = () => {
           )}
         </nav>
 
-        {/* Official token — matches AppSidebar footer */}
+        {/* Official token */}
         <div className="border-t border-white/[0.07] px-3 pb-4 pt-2">
           <div className="text-[9px] font-bold uppercase tracking-widest text-white/30">Official Token</div>
           <div className="mt-1 font-mono text-[10px] text-white/50">

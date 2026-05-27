@@ -62,6 +62,7 @@ import SpaceReminders from "./pages/SpaceReminders";
 import AutoTweet from "./pages/AutoTweet";
 import PodcastPublisher from "./pages/PodcastPublisher";
 import ClipVideoExport from "./pages/ClipVideoExport";
+import InstallApp from "./pages/InstallApp";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
@@ -96,6 +97,9 @@ const App = () => (
             <Route path="/setup" element={<Setup />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
+
+            {/* ── Public: App install page ── */}
+            <Route path="/install" element={<InstallApp />} />
 
             {/* ── Protected: App shell ── */}
             <Route path="/app" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -260,3 +264,4 @@ const App = () => (
 );
 
 export default App;
+

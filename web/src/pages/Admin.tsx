@@ -1,8 +1,8 @@
 /* ══════════════════════════════════════════════════════════════
-   OG Scan · Admin Dashboard (v2 — 16 sections, 120+ features)
+   OG Scan · Admin Dashboard (v2 — 17 sections)
    ══════════════════════════════════════════════════════════════
    Modular admin panel with sidebar navigation.
-   Each section lives in components/admin/sections/*.
+   Each section lives in components/admin/sections/*
    ══════════════════════════════════════════════════════════════ */
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
@@ -30,6 +30,7 @@ const MediaManagement = lazy(() => import("@/components/admin/sections/MediaMana
 const PlatformSettings = lazy(() => import("@/components/admin/sections/PlatformSettings").then((m) => ({ default: m.PlatformSettings })));
 const AuditLog = lazy(() => import("@/components/admin/sections/AuditLog").then((m) => ({ default: m.AuditLog })));
 const Analytics = lazy(() => import("@/components/admin/sections/Analytics").then((m) => ({ default: m.Analytics })));
+const ToolsSection = lazy(() => import("@/components/admin/sections/ToolsSection").then((m) => ({ default: m.ToolsSection })));
 
 const SECTION_MAP: Record<AdminSection, React.LazyExoticComponent<React.FC>> = {
   overview: OverviewSection,
@@ -48,6 +49,7 @@ const SECTION_MAP: Record<AdminSection, React.LazyExoticComponent<React.FC>> = {
   settings: PlatformSettings,
   audit: AuditLog,
   analytics: Analytics,
+  tools: ToolsSection,
 };
 
 const Fallback = () => (

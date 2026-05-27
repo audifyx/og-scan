@@ -182,7 +182,7 @@ export type AdminSection =
   | "overview" | "users" | "communities" | "moderation"
   | "lobbies" | "tokens" | "spaces" | "support"
   | "chat" | "notifications" | "alerts" | "wallets"
-  | "media" | "settings" | "audit" | "analytics";
+  | "media" | "settings" | "audit" | "analytics" | "tools";
 
 export interface AdminSectionDef {
   id: AdminSection;
