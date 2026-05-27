@@ -8,9 +8,17 @@ interface AppLayoutProps {
 }
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
-  const { customWallpaper } = useTheme();
+  const { customWallpaper, themeGradient } = useTheme();
   return (
     <div className="min-h-screen bg-background text-foreground flex relative">
+      {/* Theme gradient layer — subtle ambient glow from active theme */}
+      {themeGradient && (
+        <div
+          className="pointer-events-none fixed inset-0 z-0 opacity-100"
+          style={{ background: themeGradient }}
+        />
+      )}
+
       {/* Wallpaper layer — very subtle, pushed far back */}
       {customWallpaper && (
         <div
