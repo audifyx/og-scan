@@ -44,6 +44,7 @@ import UserPageWidget from "./pages/UserPageWidget";
 import EmbedSpace from "./pages/EmbedSpace";
 import EmbedProfile from "./pages/EmbedProfile";
 import EmbedSpaces from "./pages/EmbedSpaces";
+import EmbedSpacePlayer from "./pages/EmbedSpacePlayer";
 import DiscoveryFeed from "./pages/DiscoveryFeed";
 import SpaceClips from "./pages/SpaceClips";
 import SpaceScheduler from "./pages/SpaceScheduler";
@@ -196,6 +197,8 @@ const App = () => (
 
             {/* ── Public: Embeddable space player (no auth, no chrome) ── */}
             <Route path="/embed/space/:spaceId" element={<EmbedSpace />} />
+            {/* ── Public: Advanced full-featured embeddable space player ── */}
+            <Route path="/embed/space-player/:spaceId" element={<EmbedSpacePlayer />} />
 
             {/* ── Public: Embeddable profile & spaces widgets ── */}
             <Route path="/embed/profile/:username" element={<EmbedProfile />} />

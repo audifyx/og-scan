@@ -16,11 +16,11 @@ import { useParams } from "react-router-dom";
 import {
   Radio, Headphones, Mic, Loader2, Globe, Twitter,
   MessageSquare, Clock, ExternalLink, Play, Users,
-  Calendar, ArrowRight,
+  Calendar, ArrowRight, Bell, TrendingUp,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { safeAvatarUrl, cn } from "@/lib/utils";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface Profile {
@@ -47,6 +47,22 @@ interface Space {
   scheduled_for: string | null;
   peak_listeners: number | null;
   duration_seconds: number | null;
+}
+
+function Countdown({ target }: { target: string }) {
+  const [label, setLabel] = React.useState("");
+  React.useEffect(() => {
+    const update = () => {
+      const diff = new Date(target).getTime() - Date.now();
+      if (diff <= 0) { setLabel("Starting soon"); return; }
+      const h = Math.floor(diff / 3.6e6), m = Math.floor((diff % 3.6e6) / 6e4), s = Math.floor((diff % 6e4) / 1e3);
+      setLabel(h > 0 ? `in ${h}h ${m}m` : m > 0 ? `in ${m}m ${s}s` : `in ${s}s`);
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [target]);
+  return <span>{label}</span>;
 }
 
 /* ─── Accent palette ─────────────────────────────────────── */
@@ -88,6 +104,7 @@ export default function EmbedProfile() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [liveSpace, setLiveSpace] = useState<Space | null>(null);
   const [pastSpaces, setPastSpaces] = useState<Space[]>([]);
+  const [upcomingSpaces, setUpcomingSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -121,6 +138,19 @@ export default function EmbedProfile() {
       .limit(5);
 
     setPastSpaces((past as Space[]) || []);
+
+    const { data: upcom } = await supabase
+      .from("spaces")
+      .select("id, title, topic, is_live, listener_count, ended_at, scheduled_for, peak_listeners, duration_seconds")
+      .eq("host_id", p.user_id)
+      .eq("is_live", false)
+      .is("ended_at", null)
+      .not("scheduled_for", "is", null)
+      .gt("scheduled_for", new Date().toISOString())
+      .order("scheduled_for", { ascending: true })
+      .limit(3);
+
+    setUpcomingSpaces((upcom as Space[]) || []);
     setLoading(false);
   }, [username]);
 
@@ -307,6 +337,38 @@ export default function EmbedProfile() {
 
         {/* ── Past Spaces ──────────────────────────────── */}
         {pastSpaces.length > 0 && (
+          {/* ── Upcoming spaces ── */}
+          {upcomingSpaces.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 mb-2.5">
+                <Bell className="h-3 w-3 text-white/25" />
+                <p className="text-[10px] text-white/25 uppercase tracking-widest font-semibold">Upcoming Spaces</p>
+              </div>
+              <div className="space-y-2">
+                {upcomingSpaces.map(sp => (
+                  <a
+                    key={sp.id}
+                    href={`https://ogscan.fun/u/${username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block p-2.5 rounded-lg bg-violet-500/[0.06] border border-violet-500/20 hover:bg-violet-500/[0.1] transition-all"
+                  >
+                    <p className="text-xs font-medium text-white/75 line-clamp-1">{sp.title}</p>
+                    {sp.topic && <p className="text-[10px] text-violet-400/70 mt-0.5">{sp.topic}</p>}
+                    {sp.scheduled_for && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-white/30">
+                        <Calendar className="h-2.5 w-2.5" />
+                        <span className="text-violet-400 font-semibold"><Countdown target={sp.scheduled_for} /></span>
+                        <span>·</span>
+                        <span>{format(new Date(sp.scheduled_for), "MMM d, h:mm a")}</span>
+                      </div>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mb-4">
             <div className="flex items-center gap-1.5 mb-2.5">
               <Clock className="h-3 w-3 text-white/25" />
