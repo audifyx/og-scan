@@ -82,6 +82,7 @@ function NotificationSettingsPanel({ onSave }: { onSave: () => void }) {
     remind_1hour_default: true,
     email_address: user?.email ?? "",
   });
+  const navigate = useNavigate();
   const [pushPermission, setPushPermission] = useState<string>(
     typeof window !== "undefined" && "Notification" in window
       ? Notification.permission
@@ -387,6 +388,13 @@ export default function SpaceReminders() {
       {/* Header */}
       <div className="border-b border-white/[0.07] bg-[#0a0a14] px-4 py-5">
         <div className="mx-auto max-w-3xl">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+            Back
+          </button>
           <div className="flex items-center gap-3 mb-1">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-violet-500/30 bg-violet-500/10">
               <BellRing className="h-4.5 w-4.5 text-violet-400" style={{ height: 18, width: 18 }} />

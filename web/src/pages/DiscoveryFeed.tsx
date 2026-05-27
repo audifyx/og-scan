@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Search, Flame, Zap, Users, Radio, Globe, Star, Hash,
   Play, Clock, TrendingUp, ChevronRight, Filter, X, Mic,
@@ -269,6 +269,7 @@ function ShowCardView({ show }: { show: ShowCard }) {
 export default function DiscoveryFeed() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<FeedTab>("foryou");
+  const navigate = useNavigate();
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -402,6 +403,9 @@ export default function DiscoveryFeed() {
       <div className="sticky top-0 z-30 bg-[#0f0f1a]/90 backdrop-blur-xl border-b border-white/[0.06]">
         <div className="max-w-3xl mx-auto px-4">
           <div className="flex items-center gap-3 py-3">
+            <button onClick={() => navigate(-1)} className="shrink-0 flex items-center gap-1 text-sm text-white/40 hover:text-white transition-colors group">
+              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+            </button>
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
               <input

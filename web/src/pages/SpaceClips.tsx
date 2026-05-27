@@ -111,6 +111,7 @@ function WaveformBar({
 // ────────────────────────────────────────────────────────────────────────────
 function ClipCard({ clip, onLike }: { clip: Clip; onLike: (id: string) => void }) {
   const [playing, setPlaying] = useState(false);
+  const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
   const [muted, setMuted] = useState(false);
   const [liked, setLiked] = useState(false);
@@ -238,6 +239,13 @@ function ClipCard({ clip, onLike }: { clip: Clip; onLike: (id: string) => void }
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-1 border-t border-white/[0.05]">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group mb-4"
+        >
+          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+          Back
+        </button>
         <div className="flex items-center gap-3">
           <button
             onClick={handleLike}

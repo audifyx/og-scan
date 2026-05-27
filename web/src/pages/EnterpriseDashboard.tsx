@@ -70,6 +70,7 @@ const RETENTION_OPTIONS = ["30 days", "90 days", "1 year", "3 years", "7 years",
 
 const EnterpriseDashboard = () => {
   const [activeTab, setActiveTab] = useState<"overview" | "audit" | "team" | "sso" | "retention">("overview");
+  const navigate = useNavigate();
   const [encryptedSpaces, setEncryptedSpaces] = useState(true);
   const [hipaaMode, setHipaaMode] = useState(true);
   const [zeroMetadata, setZeroMetadata] = useState(false);
@@ -99,6 +100,15 @@ const EnterpriseDashboard = () => {
         {/* Header */}
         <div className="border-b border-white/[0.06] bg-gradient-to-r from-slate-900/40 via-[#080a0f] to-emerald-900/10">
           <div className="max-w-5xl mx-auto px-4 py-8">
+            <div className="flex items-center gap-3 mb-5">
+              <button
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group"
+              >
+                <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+                Back
+              </button>
+            </div>
             <div className="flex items-start gap-4">
               <div className="p-3 rounded-2xl bg-gradient-to-br from-slate-500/20 to-emerald-500/10 border border-slate-500/20">
                 <Building2 className="h-7 w-7 text-slate-300" />

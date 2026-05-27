@@ -10,8 +10,9 @@
  */
 
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Smartphone, Apple, Music, Bell, Mic2, Car, Star, Zap,
+  Smartphone, Apple, Music, Bell, Mic2, Car, Star, Zap, ArrowLeft,
   CheckCircle2, ArrowRight, Loader2, Mail, Globe, Play,
   Volume2, Home, MessageSquare, Radio, Sparkles, ChevronDown,
 } from "lucide-react";
@@ -151,7 +152,9 @@ function PhoneMockup() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function MobileApp() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
+  const navigate = useNavigate();
   const [platform, setPlatform] = useState<"ios" | "android" | "both">("both");
   const [joining, setJoining] = useState(false);
   const [joined, setJoined] = useState(false);
@@ -179,6 +182,13 @@ export default function MobileApp() {
     <div className="min-h-screen bg-[#07070f] text-white overflow-hidden">
       <Toaster position="top-right" />
 
+      {/* Back button */}
+      <div className="px-4 pt-4 pb-0 max-w-5xl mx-auto">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group">
+          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+          Back
+        </button>
+      </div>
       {/* Hero */}
       <div className="relative border-b border-white/[0.06] bg-[#09091a]">
         <div className="absolute inset-0 bg-gradient-radial from-violet-900/20 via-transparent to-transparent" />

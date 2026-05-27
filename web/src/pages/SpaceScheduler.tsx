@@ -266,6 +266,7 @@ function SpaceCard({
 function CreateScheduleModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { user } = useAuth();
   const [title, setTitle] = useState("");
+  const navigate = useNavigate();
   const [description, setDescription] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
   const [category, setCategory] = useState("");
@@ -603,7 +604,15 @@ export default function SpaceScheduler() {
       {/* Header */}
       <div className="sticky top-0 z-20 bg-[#080810]/95 backdrop-blur-md border-b border-white/5 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group"
+              >
+                <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+                Back
+              </button>
+            <div className="w-px h-4 bg-white/10" />
             <Calendar className="h-5 w-5 text-purple-400" />
             <h1 className="text-base font-bold text-white">Schedule</h1>
           </div>

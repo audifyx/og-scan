@@ -82,6 +82,7 @@ const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().p
 
 const AIHostCopilot = () => {
   const [activeTab, setActiveTab] = useState<"live" | "reports">("live");
+  const navigate = useNavigate();
   const [isLive, setIsLive] = useState(false);
   const [sentimentScore, setSentimentScore] = useState(72); // 0-100
   const [listenerCount, setListenerCount] = useState(0);
@@ -144,6 +145,15 @@ const AIHostCopilot = () => {
         {/* Header */}
         <div className="border-b border-white/[0.06] bg-gradient-to-r from-blue-900/10 via-[#080a0f] to-violet-900/10">
           <div className="max-w-5xl mx-auto px-4 py-8">
+            <div className="flex items-center gap-3 mb-5">
+              <button
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group"
+              >
+                <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+                Back
+              </button>
+            </div>
             <div className="flex items-start gap-4">
               <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500/20 to-violet-500/10 border border-blue-500/20">
                 <Sparkles className="h-7 w-7 text-blue-400" />

@@ -191,6 +191,7 @@ function PlatformCard({
 export default function PodcastPublisher() {
   const { user } = useAuth();
   const [shows, setShows] = useState<Show[]>([]);
+  const navigate = useNavigate();
   const [selectedShow, setSelectedShow] = useState<Show | null>(null);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<PlatformStatus[]>([
@@ -290,6 +291,13 @@ export default function PodcastPublisher() {
       {/* Header */}
       <div className="border-b border-white/[0.07] bg-[#0a0a14] px-4 py-5">
         <div className="mx-auto max-w-5xl">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+            Back
+          </button>
           <div className="flex items-center gap-3 mb-1">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/10">
               <Mic className="h-4.5 w-4.5 text-rose-400" style={{ height: 18, width: 18 }} />

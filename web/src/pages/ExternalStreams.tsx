@@ -124,6 +124,7 @@ async function fetchStreamMeta(url: string, platform: StreamCard["platform"]): P
 function AddStreamModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
   const { user } = useAuth();
   const [url, setUrl] = useState("");
+  const navigate = useNavigate();
   const [detecting, setDetecting] = useState(false);
   const [meta, setMeta] = useState<{ title: string; thumbnail: string | null } | null>(null);
   const [platform, setPlatform] = useState<StreamCard["platform"] | null>(null);
@@ -460,6 +461,10 @@ export default function ExternalStreams() {
       {/* Header */}
       <div className="sticky top-0 z-20 bg-[#080810]/95 backdrop-blur-md border-b border-white/5 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group mb-4">
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+            Back
+          </button>
           <div className="flex items-center gap-2">
             <Radio className="h-5 w-5 text-purple-400" />
             <h1 className="text-base font-bold text-white">External Streams</h1>

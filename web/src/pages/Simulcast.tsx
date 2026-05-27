@@ -69,6 +69,7 @@ const initialPlatforms: Platform[] = [
 const Simulcast = () => {
   const { user } = useAuth();
   const [platforms, setPlatforms] = useState<Platform[]>(initialPlatforms);
+  const navigate = useNavigate();
   const [isSimulcasting, setIsSimulcasting] = useState(false);
   const [messages, setMessages] = useState<UnifiedMessage[]>([]);
   const [showKeys, setShowKeys] = useState<Set<string>>(new Set());
@@ -134,7 +135,16 @@ const Simulcast = () => {
         <div className="border-b border-white/[0.06] bg-gradient-to-r from-red-900/10 via-[#080a0f] to-blue-900/10">
           <div className="max-w-5xl mx-auto px-4 py-8">
             <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
+              <div className="flex items-center gap-3 mb-5">
+              <button
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group"
+              >
+                <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+                Back
+              </button>
+            </div>
+            <div className="flex items-start gap-4">
                 <div className="p-3 rounded-2xl bg-gradient-to-br from-red-500/15 to-violet-500/10 border border-red-500/20">
                   <Signal className="h-7 w-7 text-red-400" />
                 </div>

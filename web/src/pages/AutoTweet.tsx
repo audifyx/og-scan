@@ -106,6 +106,7 @@ const SAMPLE_VARS: Record<string, string> = {
 
 function TweetLogRow({ log }: { log: TweetLog }) {
   const [expanded, setExpanded] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="rounded-xl border border-white/[0.07] bg-white/[0.03] p-4">
@@ -291,6 +292,13 @@ export default function AutoTweet() {
       {/* Header */}
       <div className="border-b border-white/[0.07] bg-[#0a0a14] px-4 py-5">
         <div className="mx-auto max-w-5xl">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+            Back
+          </button>
           <div className="flex items-center gap-3 mb-1">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/10">
               <Twitter className="h-4.5 w-4.5 text-sky-400" style={{ height: 18, width: 18 }} />

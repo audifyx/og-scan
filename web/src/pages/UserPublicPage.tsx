@@ -158,6 +158,7 @@ function LiveDot({ color = "bg-red-500", size = "h-2.5 w-2.5" }: { color?: strin
 
 function CopyBtn({ text, label, className }: { text: string; label?: string; className?: string }) {
   const [copied, setCopied] = useState(false);
+  const navigate = useNavigate();
   const doCopy = () => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
@@ -555,6 +556,13 @@ export default function UserPublicPage() {
           </div>
         )}
 
+        {/* Back button */}
+        <div className="absolute top-4 left-4">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white bg-black/30 backdrop-blur px-3 py-1.5 rounded-lg border border-white/10 transition-colors group">
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+            Back
+          </button>
+        </div>
         {/* OGScan nav top-right */}
         <div className="absolute top-4 right-4 flex items-center gap-2">
           {liveSpace && (

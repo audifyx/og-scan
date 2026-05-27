@@ -231,6 +231,7 @@ function VideoPreviewCanvas({
 export default function ClipVideoExport() {
   const { user } = useAuth();
   const [clips, setClips] = useState<Clip[]>([]);
+  const navigate = useNavigate();
   const [selectedClip, setSelectedClip] = useState<Clip | null>(null);
   const [ratio, setRatio] = useState<AspectRatio>("16:9");
   const [bgStyle, setBgStyle] = useState<BackgroundStyle>("waveform");
@@ -300,6 +301,13 @@ export default function ClipVideoExport() {
       {/* Header */}
       <div className="border-b border-white/[0.07] bg-[#0a0a14] px-4 py-5">
         <div className="mx-auto max-w-6xl">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white transition-colors group mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+            Back
+          </button>
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/10">
               <Film className="h-4.5 w-4.5 text-rose-400" style={{ height: 18, width: 18 }} />
