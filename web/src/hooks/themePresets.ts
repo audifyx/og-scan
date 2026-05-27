@@ -1323,3 +1323,4 @@ export function applyThemeVars(themeId: string) {
     root.style.removeProperty("--theme-gradient");
     localStorage.removeItem("og-theme-gradient");
   }
+}
