@@ -195,35 +195,37 @@ const Leaderboard = () => {
 
   return (
     <AppLayout>
-      <PageHeader title="OG Leaderboard" description="The most active and successful OGs">
-        <div className="flex flex-col gap-2">
-          {/* Main tab: Rankings vs Invites */}
+      <PageHeader title="OG Leaderboard" description="The most active and successful OGs" />
+
+      <div className="p-4 lg:p-6 space-y-6">
+        <div className="space-y-3 rounded-3xl border border-white/[0.07] bg-white/[0.03] p-3 sm:p-4">
           <Tabs value={mainTab} onValueChange={v => setMainTab(v as MainTab)}>
-            <TabsList className="bg-white/[0.04] h-10">
-              <TabsTrigger value="rankings" className="flex items-center gap-1.5 text-xs px-3">
-                <Trophy className="h-3.5 w-3.5" /> Rankings
+            <TabsList className="grid h-auto w-full grid-cols-2 bg-white/[0.04] p-1">
+              <TabsTrigger value="rankings" className="flex min-w-0 items-center justify-center gap-1.5 px-3 py-2 text-xs">
+                <Trophy className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Rankings</span>
               </TabsTrigger>
-              <TabsTrigger value="invites" className="flex items-center gap-1.5 text-xs px-3">
-                <Gift className="h-3.5 w-3.5" /> Invites
+              <TabsTrigger value="invites" className="flex min-w-0 items-center justify-center gap-1.5 px-3 py-2 text-xs">
+                <Gift className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Invites</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          {/* Sort options for rankings */}
+
           {mainTab === "rankings" && (
             <Tabs value={sortBy} onValueChange={v => setSortBy(v as SortKey)}>
-              <TabsList className="bg-white/[0.04] h-10">
+              <TabsList className="flex h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
                 {SORT_OPTIONS.map(o => (
-                  <TabsTrigger key={o.key} value={o.key} className="flex items-center gap-1.5 text-xs px-3">
-                    <o.icon className="h-3.5 w-3.5" /> {o.label}
+                  <TabsTrigger
+                    key={o.key}
+                    value={o.key}
+                    className="flex min-w-fit items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs data-[state=active]:border-white/[0.14] data-[state=active]:bg-white/[0.10]"
+                  >
+                    <o.icon className="h-3.5 w-3.5 shrink-0" /> {o.label}
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
           )}
         </div>
-      </PageHeader>
-
-      <div className="p-4 lg:p-6 space-y-6">
 
         {/* ═══ INVITE LEADERBOARD ═══ */}
         {mainTab === "invites" && (

@@ -556,7 +556,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-5">
                 <Surface>
-                  <SectionTitle icon={MessageSquare} title="Profile overview" subtitle="X-style profile layout with OG Scan identity and team status built in." />
+                  <SectionTitle icon={MessageSquare} title="Profile overview" subtitle="OG Scan profile layout with team status and account identity built in." />
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-2xl border border-white/[0.08] bg-[#0b1420] p-4">
                       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/28">Followers</p>
