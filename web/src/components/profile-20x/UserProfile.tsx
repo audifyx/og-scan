@@ -45,7 +45,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -1215,7 +1214,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
       <div className="mx-auto w-full max-w-[1520px] space-y-6 pb-10">
         <Panel className="overflow-hidden p-0">
           <div className="relative overflow-hidden rounded-[30px]">
-            <div className={cn("og-profile-hero relative h-[300px] overflow-hidden sm:h-[360px] lg:h-[420px]", specialProfileMode && "og-profile-hero--official", isOwnProfile && isOwner && "og-profile-hero--owner")}>
+            <div className={cn("og-profile-hero relative h-[180px] overflow-hidden sm:h-[240px] lg:h-[320px]", specialProfileMode && "og-profile-hero--official", isOwnProfile && isOwner && "og-profile-hero--owner")}>
               {bannerUrl ? (
                 <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-90" />
               ) : (
@@ -1227,158 +1226,100 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
               {specialProfileMode ? <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(250,204,21,0.08),transparent_38%,rgba(34,211,238,0.08)_100%)]" /> : null}
             </div>
 
-            <div className="relative z-10 -mt-16 px-4 pb-4 sm:-mt-20 sm:px-6 sm:pb-6 lg:-mt-24">
-              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <div className={cn("rounded-[30px] border border-white/[0.08] bg-[#08101b]/96 p-4 shadow-[0_40px_100px_-70px_rgba(15,23,42,0.95)] backdrop-blur-2xl sm:p-5 lg:p-6", specialProfileMode && "og-profile-operator-shell")}>
-                  <div className="flex justify-end gap-2">
-                    {!isOwnProfile ? (
-                      <Button
-                        onClick={handleFollowToggle}
-                        disabled={followBusy}
-                        className={cn(
-                          "h-10 rounded-full px-5 text-sm font-bold",
-                          isFollowing ? "bg-white text-[#061019] hover:bg-white/90" : "bg-transparent text-white ring-1 ring-white/20 hover:bg-white/10",
-                        )}
-                      >
-                        {followBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {isFollowing ? "Following" : "Follow"}
+            <div className="relative z-10 -mt-14 sm:-mt-16 lg:-mt-20">
+              <div className={cn("border-t border-white/10 bg-[#08101b]/98", specialProfileMode && "og-profile-operator-shell")}>
+                <div className="flex justify-end gap-2 px-4 pt-3 sm:px-6 sm:pt-4 lg:px-8">
+                  {!isOwnProfile ? (
+                    <Button
+                      onClick={handleFollowToggle}
+                      disabled={followBusy}
+                      className={cn(
+                        "h-10 rounded-full px-5 text-sm font-bold",
+                        isFollowing ? "bg-white text-[#061019] hover:bg-white/90" : "bg-transparent text-white ring-1 ring-white/20 hover:bg-white/10",
+                      )}
+                    >
+                      {followBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      {isFollowing ? "Following" : "Follow"}
+                    </Button>
+                  ) : (
+                    <Button onClick={() => setActiveTab("settings")} variant="outline" className="h-10 rounded-full border-white/15 bg-transparent px-5 text-sm font-bold text-white hover:bg-white/10 hover:text-white">
+                      Edit profile
+                    </Button>
+                  )}
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                        <MoreHorizontal className="h-4 w-4" />
                       </Button>
-                    ) : (
-                      <Button onClick={() => setActiveTab("settings")} variant="outline" className="h-10 rounded-full border-white/15 bg-transparent px-5 text-sm font-bold text-white hover:bg-white/10 hover:text-white">
-                        Edit profile
-                      </Button>
-                    )}
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 rounded-2xl border-white/10 bg-[#08101b] text-white">
-                        <DropdownMenuItem onClick={copyProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
-                          <Copy className="mr-2 h-4 w-4" /> Copy profile link
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 rounded-2xl border-white/10 bg-[#08101b] text-white">
+                      <DropdownMenuItem onClick={copyProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
+                        <Copy className="mr-2 h-4 w-4" /> Copy profile link
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={openProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
+                        <ExternalLink className="mr-2 h-4 w-4" /> Open public profile
+                      </DropdownMenuItem>
+                      {isOwnProfile ? (
+                        <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer rounded-xl text-rose-300 focus:bg-rose-500/10 focus:text-rose-200">
+                          <LogOut className="mr-2 h-4 w-4" /> Sign out
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={openProfileLink} className="cursor-pointer rounded-xl focus:bg-white/10 focus:text-white">
-                          <ExternalLink className="mr-2 h-4 w-4" /> Open public profile
-                        </DropdownMenuItem>
-                        {isOwnProfile ? (
-                          <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer rounded-xl text-rose-300 focus:bg-rose-500/10 focus:text-rose-200">
-                            <LogOut className="mr-2 h-4 w-4" /> Sign out
-                          </DropdownMenuItem>
-                        ) : null}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-
-                  <div className="-mt-10 sm:-mt-14">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-                        <div className="relative shrink-0">
-                          <div className="og-profile-avatar-ring rounded-full p-[4px]">
-                            <div className="overflow-hidden rounded-full border-4 border-[#08101b] bg-[#08101b]">
-                              <img src={avatarUrl} alt="" className="h-24 w-24 rounded-full object-cover sm:h-32 sm:w-32 lg:h-[136px] lg:w-[136px]" />
-                            </div>
-                          </div>
-                          <div className="absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-[#08101b] bg-emerald-400" />
-                        </div>
-
-                        <div className="min-w-0 space-y-3 pb-1">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h1 className="text-[28px] font-black leading-none tracking-tight text-white sm:text-[32px]">{displayName}</h1>
-                              {identityBadges.map((badge) => (
-                                <IdentityBadgeChip key={badge.key} badge={badge} />
-                              ))}
-                            </div>
-                            <p className="mt-1 text-[15px] text-white/45">{handle}</p>
-                          </div>
-
-                          {profileData.bio ? <p className="max-w-4xl whitespace-pre-wrap text-[15px] leading-6 text-white/82">{profileData.bio}</p> : null}
-
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-white/55">
-                            {profileData.location ? <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profileData.location}</span> : null}
-                            {website ? (
-                              <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-cyan-300 transition hover:text-cyan-200">
-                                <Link2 className="h-4 w-4" /> {website.replace(/^https?:\/\//, "")}
-                              </a>
-                            ) : null}
-                            <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4" /> {profileData.created_at ? `Joined ${format(new Date(profileData.created_at), "MMMM yyyy")}` : "Joined OG Scan"}</span>
-                            {walletAddress ? <span className="inline-flex items-center gap-1.5"><Wallet className="h-4 w-4" /> {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}</span> : null}
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-5 text-[15px] text-white/72">
-                            <span><span className="font-bold text-white">{compact(followingCount)}</span> Following</span>
-                            <span><span className="font-bold text-white">{compact(followerCount)}</span> Followers</span>
-                            {mutualCount > 0 ? <span><span className="font-bold text-white">{compact(mutualCount)}</span> Mutuals</span> : null}
-                            {leaderboardRank ? <span><span className="font-bold text-white">#{leaderboardRank}</span> Trending</span> : null}
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
-                              <Zap className="h-3.5 w-3.5 text-cyan-300" /> Level {level}
-                            </span>
-                            <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
-                              <BarChart3 className="h-3.5 w-3.5 text-emerald-300" /> Reputation {compact(profileData.reputation_score ?? derivedOgScore)}
-                            </span>
-                            {profileData.is_official_account ? <span className="inline-flex items-center gap-2 rounded-full bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Crown className="h-3.5 w-3.5" /> Official OG Scan</span> : null}
-                            {profileData.affiliate_org_id ? <span className="inline-flex items-center gap-2 rounded-full bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Shield className="h-3.5 w-3.5" /> Official Team</span> : null}
-                            {walletAddress ? <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/12 px-3 py-1.5 text-[12px] font-bold text-emerald-100"><Wallet className="h-3.5 w-3.5" /> Holder linked</span> : null}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Level</p>
-                        <p className="mt-2 text-lg font-black text-white">{level} · {getLevelTitle(level)}</p>
-                        <div className="mt-3">
-                          <Progress value={levelProgress.progress} className="h-2 bg-white/10" />
-                        </div>
-                        <p className="mt-2 text-xs text-white/45">{levelProgress.toNext.toLocaleString()} XP to next level</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Best call</p>
-                        <p className="mt-2 text-lg font-black text-white">{topTrade?.token_symbol || "No signal yet"}</p>
-                        <p className="mt-2 text-xs text-white/45">{topTrade?.pnl != null ? `${formatUsd(topTrade.pnl)} realized` : "Best call fills from real trade history."}</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Spaces</p>
-                        <p className="mt-2 text-lg font-black text-white">{liveSpace ? "Live now" : `${pastSpaces.length} archived`}</p>
-                        <p className="mt-2 text-xs text-white/45">{compact(totalListeners)} total listeners reached</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Wallet</p>
-                        <p className="mt-2 text-lg font-black text-white">{walletAddress ? "Connected" : "Not linked"}</p>
-                        <p className="mt-2 text-xs text-white/45">{walletStats ? formatUsd(walletStats.totalUsdValue) : "Connect wallet to show holdings"}</p>
-                      </div>
-                    </div>
-                  </div>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
 
-                <div className="rounded-[30px] border border-white/[0.08] bg-[#08101b]/96 p-4 shadow-[0_40px_100px_-70px_rgba(15,23,42,0.95)] backdrop-blur-2xl sm:p-5">
-                  <SectionHeading icon={Waves} title="Profile highlights" subtitle="Key trust, rank, and account signals." />
-                  <div className="space-y-3">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Account status</p>
-                      <p className="mt-2 text-lg font-black text-white">{profileData.is_online ? "Online" : "Offline"}</p>
-                      <p className="mt-2 text-xs text-white/45">Presence, verification, and role signals appear on the main profile header.</p>
+                <div className="-mt-12 px-4 pb-5 sm:-mt-16 sm:px-6 sm:pb-6 lg:px-8 lg:pb-8">
+                  <div className="relative inline-flex">
+                    <div className="og-profile-avatar-ring rounded-full p-[4px]">
+                      <div className="overflow-hidden rounded-full border-4 border-[#08101b] bg-[#08101b]">
+                        <img src={avatarUrl} alt="" className="h-24 w-24 rounded-full object-cover sm:h-32 sm:w-32 lg:h-[140px] lg:w-[140px]" />
+                      </div>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Badges</p>
-                      <p className="mt-2 text-lg font-black text-white">{compact(allBadges.length)}</p>
-                      <p className="mt-2 text-xs text-white/45">Earned verification, team, pioneer, and wallet-linked identity markers.</p>
+                    <div className="absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-[#08101b] bg-emerald-400" />
+                  </div>
+
+                  <div className="mt-4 space-y-3 sm:space-y-4">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h1 className="text-[28px] font-black leading-none tracking-tight text-white sm:text-[32px]">{displayName}</h1>
+                        {identityBadges.map((badge) => (
+                          <IdentityBadgeChip key={badge.key} badge={badge} />
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[15px] text-white/45">{handle}</p>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Communities</p>
-                      <p className="mt-2 text-lg font-black text-white">{compact(communities.length)}</p>
-                      <p className="mt-2 text-xs text-white/45">Joined groups and roles tied to this account.</p>
+
+                    {profileData.bio ? <p className="max-w-4xl whitespace-pre-wrap text-[15px] leading-6 text-white/82">{profileData.bio}</p> : null}
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] text-white/55">
+                      {profileData.location ? <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profileData.location}</span> : null}
+                      {website ? (
+                        <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-cyan-300 transition hover:text-cyan-200">
+                          <Link2 className="h-4 w-4" /> {website.replace(/^https?:\/\//, "")}
+                        </a>
+                      ) : null}
+                      <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4" /> {profileData.created_at ? `Joined ${format(new Date(profileData.created_at), "MMMM yyyy")}` : "Joined OG Scan"}</span>
+                      {walletAddress ? <span className="inline-flex items-center gap-1.5"><Wallet className="h-4 w-4" /> {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}</span> : null}
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/35">Weekly trend</p>
-                      <p className="mt-2 text-lg font-black text-white">{leaderboardRank ? `#${leaderboardRank}` : "Unranked"}</p>
-                      <p className="mt-2 text-xs text-white/45">Leaderboard placement appears automatically when rank data exists.</p>
+
+                    <div className="flex flex-wrap items-center gap-5 text-[15px] text-white/72">
+                      <span><span className="font-bold text-white">{compact(followingCount)}</span> Following</span>
+                      <span><span className="font-bold text-white">{compact(followerCount)}</span> Followers</span>
+                      {mutualCount > 0 ? <span><span className="font-bold text-white">{compact(mutualCount)}</span> Mutuals</span> : null}
+                      {leaderboardRank ? <span><span className="font-bold text-white">#{leaderboardRank}</span> Trending</span> : null}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
+                        <Zap className="h-3.5 w-3.5 text-cyan-300" /> Level {level}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1.5 text-[12px] font-bold text-white/85">
+                        <BarChart3 className="h-3.5 w-3.5 text-emerald-300" /> Reputation {compact(profileData.reputation_score ?? derivedOgScore)}
+                      </span>
+                      {profileData.is_official_account ? <span className="inline-flex items-center gap-2 rounded-full bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Crown className="h-3.5 w-3.5" /> Official OG Scan</span> : null}
+                      {profileData.affiliate_org_id ? <span className="inline-flex items-center gap-2 rounded-full bg-amber-400/12 px-3 py-1.5 text-[12px] font-bold text-amber-100"><Shield className="h-3.5 w-3.5" /> Official Team</span> : null}
+                      {walletAddress ? <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/12 px-3 py-1.5 text-[12px] font-bold text-emerald-100"><Wallet className="h-3.5 w-3.5" /> Holder linked</span> : null}
                     </div>
                   </div>
                 </div>
@@ -1390,30 +1331,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-6">
-            <Panel>
-              <SectionHeading icon={BarChart3} title="Profile overview" subtitle="Live stats from profile, wallet, trade, community, and spaces data." />
-              <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-                {statCards.map((card) => (
-                  <MetricCard key={card.label} {...card} />
-                ))}
-              </div>
-            </Panel>
-
-            <Panel>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">Profile timeline</p>
-                  <h2 className="mt-2 text-xl font-black tracking-tight text-white">Posts, calls, media, and account data</h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-white/50">Same profile shell, but with OG Scan-specific tabs for trades, holdings, spaces, achievements, and saved items.</p>
-                </div>
-                {isOwnProfile ? (
-                  <Button variant="outline" onClick={() => setActiveTab("settings")} className="rounded-2xl border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08] hover:text-white">
-                    <Settings className="mr-2 h-4 w-4" /> Profile settings
-                  </Button>
-                ) : null}
-              </div>
-
-              <div className="mt-5 -mx-4 overflow-x-auto border-y border-white/10 sm:-mx-5 lg:-mx-6">
+            <Panel className="overflow-hidden p-0">
+              <div className="-mx-0 overflow-x-auto border-b border-white/10">
                 <div className="flex min-w-max">
                   {PROFILE_TABS.filter((tab) => isOwnProfile || tab.id !== "saved").map((tab) => (
                     <button
@@ -1722,6 +1641,41 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
           </div>
 
           <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+            <Panel>
+              <SectionHeading icon={BarChart3} title="Profile overview" subtitle="Live stats from profile, wallet, trade, community, and spaces data." />
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                {statCards.map((card) => (
+                  <MetricCard key={card.label} {...card} />
+                ))}
+              </div>
+            </Panel>
+
+            <Panel>
+              <SectionHeading icon={Waves} title="Profile highlights" subtitle="Key trust, rank, and account signals." />
+              <div className="space-y-3">
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Account status</p>
+                  <p className="mt-2 text-lg font-black text-white">{profileData.is_online ? "Online" : "Offline"}</p>
+                  <p className="mt-2 text-xs text-white/45">Presence, verification, and role signals appear on the main profile header.</p>
+                </div>
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Badges</p>
+                  <p className="mt-2 text-lg font-black text-white">{compact(allBadges.length)}</p>
+                  <p className="mt-2 text-xs text-white/45">Earned verification, team, pioneer, and wallet-linked identity markers.</p>
+                </div>
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Communities</p>
+                  <p className="mt-2 text-lg font-black text-white">{compact(communities.length)}</p>
+                  <p className="mt-2 text-xs text-white/45">Joined groups and roles tied to this account.</p>
+                </div>
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">Weekly trend</p>
+                  <p className="mt-2 text-lg font-black text-white">{leaderboardRank ? `#${leaderboardRank}` : "Unranked"}</p>
+                  <p className="mt-2 text-xs text-white/45">Leaderboard placement appears automatically when rank data exists.</p>
+                </div>
+              </div>
+            </Panel>
+
             <Panel>
               <SectionHeading icon={Crown} title="Signature showcase" subtitle="Flex area for best calls, rare moments, and social proof." />
               <div className="space-y-3">
