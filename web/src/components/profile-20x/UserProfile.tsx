@@ -131,6 +131,7 @@ interface CommunityRecord {
     name: string;
     description: string | null;
     icon: string | null;
+    avatar_url?: string | null;
     banner_url: string | null;
     member_count: number;
     privacy: string;
@@ -351,6 +352,38 @@ const getCommunityPrivacyLabel = (privacy: string | null | undefined) => {
   return "Open";
 };
 
+function CommunityProfileImage({
+  community,
+  className,
+}: {
+  community: CommunityRecord["community"];
+  className?: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const rawIcon = community?.icon?.trim() || "";
+  const emojiIcon = rawIcon && rawIcon.length <= 4 && !safeAvatarUrl(rawIcon) ? rawIcon : null;
+  const imageUrl = imageFailed
+    ? undefined
+    : safeAvatarUrl(community?.avatar_url) || safeAvatarUrl(rawIcon);
+  const initial = (community?.name || "Community").trim().charAt(0).toUpperCase() || "C";
+
+  return (
+    <div className={cn("flex items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/[0.05] text-white/55", className)}>
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={community?.name || "Community"}
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : emojiIcon ? (
+        <span className="text-xl leading-none">{emojiIcon}</span>
+      ) : (
+        <span className="text-base font-black">{initial}</span>
+      )}
+    </div>
+  );
+}
 
 const isGoldVerifiedProfile = (profile: Pick<ProfileData, "is_official_account" | "affiliate_org_id"> | null | undefined, isOwnerProfile = false) => {
   return Boolean(profile?.is_official_account || profile?.affiliate_org_id || isOwnerProfile);
@@ -952,7 +985,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
         supabase.from("spaces").select("id, title, description, topic, is_live, listener_count, peak_listeners, scheduled_for, created_at, ended_at, duration_seconds, recording_url, tags").eq("host_id", targetUserId).eq("is_live", true).limit(1).single(),
         supabase.from("spaces").select("id, title, description, topic, is_live, listener_count, peak_listeners, scheduled_for, created_at, ended_at, duration_seconds, recording_url, tags").eq("host_id", targetUserId).eq("is_live", false).is("ended_at", null).not("scheduled_for", "is", null).gte("scheduled_for", new Date().toISOString()).order("scheduled_for", { ascending: true }).limit(6),
         supabase.from("spaces").select("id, title, description, topic, is_live, listener_count, peak_listeners, scheduled_for, created_at, ended_at, duration_seconds, recording_url, tags").eq("host_id", targetUserId).eq("is_live", false).not("ended_at", "is", null).order("ended_at", { ascending: false }).limit(10),
-        supabase.from("community_members").select("id, community_id, role, joined_at, communities:community_id(id, name, description, icon, banner_url, member_count, privacy, category)").eq("user_id", targetUserId).limit(20),
+        supabase.from("community_members").select("id, community_id, role, joined_at, communities:community_id(id, name, description, icon, avatar_url, banner_url, member_count, privacy, category)").eq("user_id", targetUserId).limit(20),
         supabase.from("user_activity").select("id, activity_type, title, description, data, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
         supabase.from("trade_history").select("id, token_symbol, token_name, action, amount, price, pnl, created_at").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(20),
         supabase.from("community_posts").select("id, content, image_url, likes_count, replies_count, reposts_count, views_count, created_at, user_id, username, avatar_url, community_id, post_type, thread_id, thread_order, is_article, article_title, article_cover_url, is_pinned, video_url").eq("user_id", targetUserId).order("created_at", { ascending: false }).limit(40),
@@ -1621,9 +1654,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                     communities.map((entry) => (
                       <div key={entry.id} className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-4">
                         <div className="flex items-start gap-4">
-                          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/[0.05]">
-                            {entry.community?.icon ? <img src={entry.community.icon} alt="" className="h-full w-full object-cover" /> : <Users className="h-5 w-5 text-white/45" />}
-                          </div>
+                          <CommunityProfileImage community={entry.community} className="h-14 w-14" />
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <h4 className="text-lg font-bold text-white">{entry.community?.name || "Community"}</h4>
