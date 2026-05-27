@@ -199,7 +199,7 @@ export const AppSidebar = ({
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
+      <nav className="sidebar-scrollbar flex-1 overflow-y-auto px-2 py-3 pr-1">
         <div className="mb-1 mt-2">
           <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Navigation</p>
           <div className="space-y-0.5">

@@ -106,7 +106,7 @@ export const AdminSidebar = ({ active, onChange, badges = {}, onBack }: Props) =
     </div>
 
     {/* Nav sections */}
-    <ScrollArea className="flex-1 px-2 py-3">
+    <ScrollArea className="sidebar-scrollbar flex-1 px-2 py-3 pr-1">
       {SECTIONS.map((group) => (
         <div key={group.group} className="mb-4">
           <p className="px-3 mb-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-white/25">

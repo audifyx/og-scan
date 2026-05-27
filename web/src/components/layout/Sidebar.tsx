@@ -1,7 +1,7 @@
 import {
   Bell, LineChart, LogOut, Mail,
   MessageSquare, Settings, Trophy,
-  User, Wallet, X, Shield, Menu,
+  User, Wallet, X, Shield, Menu, Users, Wrench, Home,
   Radio, Brain, Sparkles, Signal, Building2, Code2,
   Smartphone, BellRing, Twitter, Mic, Film,
 } from "lucide-react";
@@ -28,13 +28,20 @@ const adminOnlyItems: NavItem[] = [
   { to: "/dev-portal",   icon: Code2,      label: "Developer Portal",eyebrow: "API, webhooks, marketplace" },
 ];
 
+const mainItems: NavItem[] = [
+  { to: "/app",        icon: Home,          label: "Home",      eyebrow: "Command hub" },
+  { to: "/community",  icon: Users,         label: "Community", eyebrow: "Social & voice" },
+  { to: "/tools",      icon: Wrench,        label: "Tools",     eyebrow: "Scanners & feeds" },
+  { to: "/profile",    icon: User,          label: "Profile",   eyebrow: "Your account" },
+];
+
 const tradingItems: NavItem[] = [
   { to: "/wallets",         icon: Wallet,        label: "Wallets",         eyebrow: "Tracked wallets" },
-  { to: "/charts",          icon: LineChart,      label: "Charts",          eyebrow: "Live charts" },
-  { to: "/callouts",        icon: Bell,           label: "Callouts",        eyebrow: "Trade alerts" },
-  { to: "/trading-lobbies", icon: MessageSquare,  label: "Trading Lobbies", eyebrow: "Voice + charts" },
-  { to: "/leaderboard",     icon: Trophy,         label: "Leaderboard",     eyebrow: "Top traders" },
-  { to: "/messages",        icon: Mail,           label: "Messages",        eyebrow: "Direct messages" },
+  { to: "/charts",          icon: LineChart,     label: "Charts",          eyebrow: "Live charts" },
+  { to: "/callouts",        icon: Bell,          label: "Callouts",        eyebrow: "Trade alerts" },
+  { to: "/trading-lobbies", icon: MessageSquare, label: "Trading Lobbies", eyebrow: "Voice + charts" },
+  { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
+  { to: "/messages",        icon: Mail,          label: "Messages",        eyebrow: "Direct messages" },
 ];
 
 // ── NavRow ────────────────────────────────────────────────────────────────
@@ -144,8 +151,15 @@ export const Sidebar = () => {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3" style={{ scrollbarWidth: "none" }}>
+        <nav className="sidebar-scrollbar flex-1 overflow-y-auto px-2 py-3 pr-1">
           <div className="mb-1 mt-3">
+            <SectionLabel label="Main" />
+            <div className="space-y-0.5">
+              {mainItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
+            </div>
+          </div>
+
+          <div className="mb-1 mt-4">
             <SectionLabel label="Trading" />
             <div className="space-y-0.5">
               {tradingItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
@@ -154,7 +168,7 @@ export const Sidebar = () => {
 
           {/* Admin-only section */}
           {isAdmin && (
-            <div className="mb-1 mt-3">
+            <div className="mb-1 mt-4">
               <SectionLabel label="Spaces & AI" />
               <div className="space-y-0.5">
                 {adminOnlyItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
@@ -163,7 +177,7 @@ export const Sidebar = () => {
           )}
 
           {isAdmin && (
-            <div className="mb-1 mt-3">
+            <div className="mb-1 mt-4">
               <SectionLabel label="Admin Apps" />
               <div className="space-y-0.5">
                 {[

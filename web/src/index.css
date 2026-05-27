@@ -250,6 +250,48 @@
   .ios-scroll::-webkit-scrollbar {
     display: none;
   }
+
+  .sidebar-scrollbar {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  @media (max-width: 1023px) {
+    .sidebar-scrollbar {
+      scrollbar-width: none;
+    }
+
+    .sidebar-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .sidebar-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+    }
+
+    .sidebar-scrollbar::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .sidebar-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .sidebar-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background-clip: padding-box;
+    }
+
+    .sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.28);
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+  }
 }
 
 .ios-tool-surface section,
