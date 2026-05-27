@@ -283,8 +283,9 @@ function LiveAudioPanel({
 function EmbedModal({ username, accent, onClose }: { username: string; accent: typeof ACCENTS[string]; onClose: () => void }) {
   const [tab, setTab] = useState<"widget" | "space">("widget");
   const widgetUrl = `https://ogscan.fun/u/${username}/widget`;
-  const widgetCode = `<iframe\n  src="${widgetUrl}"\n  width="340"\n  height="200"\n  frameborder="0"\n  allow="autoplay"\n  style="border-radius:16px;border:none;overflow:hidden;"\n></iframe>`;
-  const profileCode = `<iframe\n  src="https://ogscan.fun/u/${username}"\n  width="640"\n  height="600"\n  frameborder="0"\n  style="border-radius:20px;border:none;overflow:hidden;"\n></iframe>`;
+  const profileEmbedUrl = `https://ogscan.fun/embed/profile/${username}`;
+  const widgetCode = `<iframe\n  src="${widgetUrl}"\n  width="360"\n  height="220"\n  frameborder="0"\n  allow="autoplay"\n  style="border-radius:16px;border:none;overflow:hidden;"\n></iframe>`;
+  const profileCode = `<iframe\n  src="${profileEmbedUrl}"\n  width="480"\n  height="760"\n  frameborder="0"\n  allow="autoplay"\n  style="border-radius:20px;border:none;overflow:hidden;"\n></iframe>`;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -316,9 +317,9 @@ function EmbedModal({ username, accent, onClose }: { username: string; accent: t
         </div>
 
         {/* Preview */}
-        <div className="rounded-xl overflow-hidden border border-white/10 mb-4 bg-[#080c18]" style={{ height: tab === "widget" ? 200 : 380 }}>
+        <div className="rounded-xl overflow-hidden border border-white/10 mb-4 bg-[#080c18]" style={{ height: tab === "widget" ? 220 : 520 }}>
           <iframe
-            src={tab === "widget" ? widgetUrl : `https://ogscan.fun/u/${username}`}
+            src={tab === "widget" ? widgetUrl : profileEmbedUrl}
             width="100%"
             height="100%"
             frameBorder="0"

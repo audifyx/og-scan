@@ -163,7 +163,9 @@ export interface WallpaperData {
 }
 
 export interface FollowerData {
-  id: string; follower_id: string; following_id: string;
+  id: string;
+  follower_id: string;
+  followee_id: string;
   created_at: string;
 }
 

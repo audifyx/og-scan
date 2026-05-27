@@ -1,4 +1,32 @@
 {
+  "headers": [
+    {
+      "source": "/embed/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors *;"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "ALLOWALL"
+        }
+      ]
+    },
+    {
+      "source": "/u/(.*)/widget",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors *;"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "ALLOWALL"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",

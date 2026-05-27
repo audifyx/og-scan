@@ -72,20 +72,32 @@ const NewsSignal = lazy(() => import("@/components/NewsSignal").then(m => ({ def
 const SolToolsRoadmap = lazy(() => import("@/components/SolToolsRoadmap").then(m => ({ default: m.SolToolsRoadmap })));
 
 /* ─── Merged tool imports ─── */
-const AboutOgScan = lazy(() => import("@/components/AboutOgScan").then(m => ({ default: m.AboutOgScan })));
-const TokenIntel = lazy(() => import("@/components/TokenIntel").then(m => ({ default: m.TokenIntel })));
+const importAboutOgScan = () => import("@/components/AboutOgScan");
+const importTokenIntel = () => import("@/components/TokenIntel");
+const AboutOgScan = lazy(() => importAboutOgScan().then(m => ({ default: m.AboutOgScan })));
+const TokenIntel = lazy(() => importTokenIntel().then(m => ({ default: m.TokenIntel })));
 
 /* ─── Page imports ─── */
-const CommunitiesPage = lazy(() => import("./Communities"));
-const DiscoverPage = lazy(() => import("./Discover"));
-const ArtFeed = lazy(() => import("./ArtFeed"));
-const SpacesPage = lazy(() => import("./Spaces"));
-const SocialHub = lazy(() => import("./SocialHub"));
-const CommunityHub = lazy(() => import("./CommunityHub"));
-const ToolsHub = lazy(() => import("./ToolsHub"));
-const ChartsPage = lazy(() => import("./Charts"));
-const LiveTradingPage = lazy(() => import("./LiveTrading"));
-const LiveFeedPage = lazy(() => import("./LiveFeed"));
+const importCommunitiesPage = () => import("./Communities");
+const importDiscoverPage = () => import("./Discover");
+const importArtFeedPage = () => import("./ArtFeed");
+const importSpacesPage = () => import("./Spaces");
+const importSocialHubPage = () => import("./SocialHub");
+const importCommunityHubPage = () => import("./CommunityHub");
+const importToolsHubPage = () => import("./ToolsHub");
+const importChartsPage = () => import("./Charts");
+const importLiveTradingPage = () => import("./LiveTrading");
+const importLiveFeedPage = () => import("./LiveFeed");
+const CommunitiesPage = lazy(importCommunitiesPage);
+const DiscoverPage = lazy(importDiscoverPage);
+const ArtFeed = lazy(importArtFeedPage);
+const SpacesPage = lazy(importSpacesPage);
+const SocialHub = lazy(importSocialHubPage);
+const CommunityHub = lazy(importCommunityHubPage);
+const ToolsHub = lazy(importToolsHubPage);
+const ChartsPage = lazy(importChartsPage);
+const LiveTradingPage = lazy(importLiveTradingPage);
+const LiveFeedPage = lazy(importLiveFeedPage);
 
 /* ─── 20x Feature imports ─── */
 const RugScore = lazy(() => import("@/components/scanner-20x/RugScore").then(m => ({ default: m.RugScore })));
@@ -701,7 +713,38 @@ const Index = () => {
     if (routeSlug && !getTabFromSlug(routeSlug)) navigate("/app", { replace: true });
   }, [navigate, routeSlug]);
 
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [location.pathname, tab]);
+  useEffect(() => {
+    const preload = () => {
+      void importAboutOgScan();
+      void importTokenIntel();
+      void importCommunitiesPage();
+      void importDiscoverPage();
+      void importArtFeedPage();
+      void importSpacesPage();
+      void importSocialHubPage();
+      void importCommunityHubPage();
+      void importToolsHubPage();
+      void importChartsPage();
+      void importLiveTradingPage();
+      void importLiveFeedPage();
+    };
+
+    if (typeof window === "undefined") {
+      preload();
+      return;
+    }
+
+    const idleWindow = window as Window & { requestIdleCallback?: (cb: () => void) => number; cancelIdleCallback?: (id: number) => void };
+    if (idleWindow.requestIdleCallback) {
+      const id = idleWindow.requestIdleCallback(preload);
+      return () => idleWindow.cancelIdleCallback?.(id);
+    }
+
+    const timeoutId = window.setTimeout(preload, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "auto" }); }, [location.pathname, tab]);
 
   const activeTab = useMemo<TabConfig>(() => TABS.find((t) => t.id === tab) ?? TABS[0], [tab]);
 
