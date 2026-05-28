@@ -81,9 +81,10 @@ const DirectMessages: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const scrollToBottom = useCallback((smooth = true) => {
-    bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" });
+    bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
   }, []);
 
   /* ─── Fetch conversations ─── */
@@ -218,7 +219,20 @@ const DirectMessages: React.FC = () => {
 
   /* ─── Typing indicator ─── */
   useEffect(() => {
-    if (!activeConvo || !user) return;
+    if (!activeConvo || !user) {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (typingChannelRef.current) {
+        typingChannelRef.current.untrack?.();
+        supabase.removeChannel(typingChannelRef.current);
+        typingChannelRef.current = null;
+      }
+      setTypingUsers(new Set());
+      return;
+    }
+
     const channel = supabase.channel(`dm-typing-${activeConvo.id}`, {
       config: { presence: { key: user.id } },
     });
@@ -234,17 +248,35 @@ const DirectMessages: React.FC = () => {
       setTypingUsers(typing);
     });
 
-    channel.subscribe();
-    return () => { supabase.removeChannel(channel); };
+    channel.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await channel.track({ typing: false });
+      }
+    });
+
+    typingChannelRef.current = channel;
+
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      channel.untrack?.();
+      supabase.removeChannel(channel);
+      if (typingChannelRef.current === channel) {
+        typingChannelRef.current = null;
+      }
+      setTypingUsers(new Set());
+    };
   }, [activeConvo, user]);
 
   const broadcastTyping = useCallback(() => {
-    if (!activeConvo || !user) return;
-    const ch = supabase.channel(`dm-typing-${activeConvo.id}`);
-    ch.track({ typing: true });
+    if (!activeConvo || !user || !typingChannelRef.current) return;
+    void typingChannelRef.current.track({ typing: true });
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
-      ch.track({ typing: false });
+      void typingChannelRef.current?.track({ typing: false });
+      typingTimeoutRef.current = null;
     }, 2000);
   }, [activeConvo, user]);
 
@@ -284,6 +316,12 @@ const DirectMessages: React.FC = () => {
       read: false,
       message_type: "text",
     });
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    void typingChannelRef.current?.track({ typing: false });
 
     if (error) {
       // Remove optimistic message on failure
