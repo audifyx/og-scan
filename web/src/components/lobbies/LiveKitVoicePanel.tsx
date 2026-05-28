@@ -228,33 +228,43 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
         if (!roomRef.current) return;
         const r = roomRef.current;
         const allP: VoiceParticipant[] = [];
+        const prevById = new Map(participantsRef.current.map((participant) => [participant.id, participant]));
+        const presenceState = presenceChannelRef.current?.presenceState?.() ?? {};
+        const getLatestPresence = (participantId: string) => {
+          const entries = presenceState[participantId] as any[] | undefined;
+          return entries && entries.length > 0 ? entries[entries.length - 1] : null;
+        };
 
         // Local participant
         const lp = r.localParticipant;
         if (lp) {
+          const prevLocal = prevById.get(lp.identity);
+          const localPresence = getLatestPresence(lp.identity);
           allP.push({
             id: lp.identity,
             user_id: user.id,
-            username: lp.name || "You",
-            avatar_url: null,
+            username: profile?.username || localPresence?.username || lp.name || prevLocal?.username || "You",
+            avatar_url: profile?.avatar_url ?? localPresence?.avatar_url ?? prevLocal?.avatar_url ?? null,
             is_speaking: lp.isSpeaking,
             is_muted: !lp.isMicrophoneEnabled,
             role: roleRef.current,
-            joined_at: new Date().toISOString(),
+            joined_at: prevLocal?.joined_at || localPresence?.joined_at || new Date().toISOString(),
           });
         }
 
         // Remote participants
         r.remoteParticipants.forEach((rp) => {
+          const prevRemote = prevById.get(rp.identity);
+          const remotePresence = getLatestPresence(rp.identity);
           allP.push({
             id: rp.identity,
             user_id: getUserIdFromIdentity(rp.identity),
-            username: rp.name || "Anon",
-            avatar_url: null,
+            username: remotePresence?.username || prevRemote?.username || rp.name || "Anon",
+            avatar_url: remotePresence?.avatar_url || prevRemote?.avatar_url || null,
             is_speaking: rp.isSpeaking,
             is_muted: !rp.isMicrophoneEnabled,
-            role: "listener", // Updated to real role by presence sync
-            joined_at: new Date().toISOString(),
+            role: remotePresence?.role || prevRemote?.role || "listener",
+            joined_at: prevRemote?.joined_at || remotePresence?.joined_at || new Date().toISOString(),
           });
         });
         setParticipants(allP);
