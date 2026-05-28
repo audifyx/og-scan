@@ -178,25 +178,19 @@ export const UserManagement = () => {
   };
 
   const deleteUser = async (userId: string) => {
-    if (!adminUser || !window.confirm("DELETE this user permanently? This removes their profile, credits, activity, and all associated data. This cannot be undone.")) return;
-    // Delete from related tables first
-    await Promise.all([
-      supabase.from("credit_transactions").delete().eq("user_id", userId),
-      supabase.from("user_credits").delete().eq("user_id", userId),
-      supabase.from("user_activity").delete().eq("user_id", userId),
-      supabase.from("followers").delete().eq("follower_id", userId),
-      supabase.from("followers").delete().eq("followee_id", userId),
-      supabase.from("notifications").delete().eq("user_id", userId),
-      supabase.from("price_alerts").delete().eq("user_id", userId),
-      supabase.from("tracked_wallets").delete().eq("user_id", userId),
-      supabase.from("tracked_tokens").delete().eq("user_id", userId),
-      supabase.from("trade_history").delete().eq("user_id", userId),
-      supabase.from("community_members").delete().eq("user_id", userId),
-      supabase.from("lobby_members").delete().eq("user_id", userId),
-      supabase.from("admin_roles").delete().eq("user_id", userId),
-    ]);
-    await supabase.from("profiles").delete().eq("user_id", userId);
-    await logAudit(adminUser.id, "Deleted user account", "profiles", userId);
+    if (!adminUser || !window.confirm("DELETE this user permanently? This removes their profile, auth account, credits, activity, messages, and associated data. This cannot be undone.")) return;
+
+    const { data, error } = await supabase.functions.invoke("delete-user", {
+      body: { userId },
+    });
+
+    if (error || !data?.ok) {
+      const message = data?.error || error?.message || "Delete failed";
+      toast.error(typeof message === "string" ? message : "Delete failed");
+      return;
+    }
+
+    await logAudit(adminUser.id, "Deleted user account", "profiles", userId, undefined, data?.cleanupResults);
     toast.success("User deleted");
     setSelectedUser(null);
     fetchUsers();
@@ -217,11 +211,27 @@ export const UserManagement = () => {
   const bulkDelete = async () => {
     if (!adminUser || selectedUsers.size === 0) return;
     if (!window.confirm(`DELETE ${selectedUsers.size} users permanently? Cannot be undone!`)) return;
+
+    let successCount = 0;
+    let failureCount = 0;
+
     for (const uid of selectedUsers) {
-      await supabase.from("profiles").delete().eq("user_id", uid);
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { userId: uid },
+      });
+
+      if (error || !data?.ok) failureCount += 1;
+      else successCount += 1;
     }
-    await logAudit(adminUser.id, `Bulk deleted ${selectedUsers.size} users`, "profiles");
-    toast.success(`${selectedUsers.size} users deleted`);
+
+    await logAudit(adminUser.id, `Bulk deleted ${successCount} users`, "profiles", undefined, undefined, {
+      attempted: selectedUsers.size,
+      successCount,
+      failureCount,
+    });
+
+    if (successCount > 0) toast.success(`${successCount} users deleted`);
+    if (failureCount > 0) toast.error(`${failureCount} users failed to delete`);
     setSelectedUsers(new Set());
     fetchUsers();
   };
