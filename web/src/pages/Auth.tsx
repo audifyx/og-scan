@@ -234,7 +234,7 @@ const Auth = () => {
                 <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                   <p className="font-mono text-[10px] uppercase tracking-widest text-og-lime">Signup security</p>
                   <p className="text-xs text-muted-foreground">
-                    One account per device per year. One account per network per year. Human verification required.
+                    One account per device per year. Human verification required. Shared Wi‑Fi will not block real new users.
                   </p>
                   <div className="space-y-1.5">
                     <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Type OGSCAN to verify</Label>
