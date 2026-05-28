@@ -1302,8 +1302,21 @@ export const THEME_PRESETS: ThemePreset[] = [
   }, gradient: "radial-gradient(circle at 50% 50%, rgba(0,255,180,0.08) 0%, transparent 40%), radial-gradient(circle at 50% 50%, rgba(200,0,255,0.06) 0%, transparent 60%)"},
 ];
 
+// ── Extra presets (auto-generated) ──
+import { THEME_PRESETS_EXTRA } from "./themePresetsExtra";
+
+// ── Custom user themes registry (in-memory, loaded from localStorage by useTheme) ──
+let CUSTOM_THEMES: ThemePreset[] = [];
+export function setCustomThemes(themes: ThemePreset[]) { CUSTOM_THEMES = themes; }
+export function getCustomThemes(): ThemePreset[] { return CUSTOM_THEMES; }
+
+// Combined list — used by UI and apply function
+export function getAllThemes(): ThemePreset[] {
+  return [...THEME_PRESETS, ...THEME_PRESETS_EXTRA, ...CUSTOM_THEMES];
+}
+
 export function applyThemeVars(themeId: string) {
-  const preset = THEME_PRESETS.find(t => t.id === themeId);
+  const preset = getAllThemes().find(t => t.id === themeId);
   if (!preset) return;
   const root = document.documentElement;
   Object.entries(preset.vars).forEach(([key, val]) => {

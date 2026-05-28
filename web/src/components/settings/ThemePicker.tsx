@@ -1,22 +1,30 @@
 import { useState, useRef } from "react";
-import { useTheme, THEME_PRESETS } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Check, Upload, Trash2, Palette, Sparkles, Image } from "lucide-react";
+import { Check, Upload, Trash2, Palette, Sparkles, Image, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { CustomThemeCreator } from "./CustomThemeCreator";
 
 export const ThemePicker = () => {
-  const { currentTheme, customWallpaper, setTheme, setCustomWallpaper, uploadWallpaper } = useTheme();
+  const { currentTheme, customWallpaper, setTheme, setCustomWallpaper, uploadWallpaper, allThemes } = useTheme();
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [blurAmount, setBlurAmount] = useState(12);
+  const [search, setSearch] = useState("");
 
-  const categories = [...new Set(THEME_PRESETS.map(t => t.category))];
+  const themes = search.trim()
+    ? allThemes.filter(t =>
+        t.name.toLowerCase().includes(search.toLowerCase()) ||
+        t.category.toLowerCase().includes(search.toLowerCase()))
+    : allThemes;
+  const categories = [...new Set(themes.map(t => t.category))];
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,15 +90,31 @@ export const ThemePicker = () => {
         </div>
       </Card>
 
+      {/* Custom theme creator */}
+      <CustomThemeCreator />
+
+      {/* Search bar */}
+      <Card className="p-3 glass-card border-border/30">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={`Search ${allThemes.length} themes…`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 rounded-xl"
+          />
+        </div>
+      </Card>
+
       {/* Theme Presets */}
       {categories.map(cat => (
         <div key={cat}>
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
             <Palette className="h-4 w-4" />
-            {cat} ({THEME_PRESETS.filter(t => t.category === cat).length})
+            {cat} ({themes.filter(t => t.category === cat).length})
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {THEME_PRESETS.filter(t => t.category === cat).map(theme => {
+            {themes.filter(t => t.category === cat).map(theme => {
               const isActive = currentTheme === theme.id;
               const primary = theme.vars["--primary"];
               const bg = theme.vars["--background"];
