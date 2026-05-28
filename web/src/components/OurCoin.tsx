@@ -299,18 +299,6 @@ export const OurCoin = memo(() => {
                 </div>
               </div>
 
-              <div className={panelClass}>
-                <div className="grid gap-3 p-4 sm:grid-cols-[120px_minmax(0,1fr)]">
-                  <img src={BRAND_LOGO} alt="OG Scan crest" className="aspect-square w-full border border-og-lime/25 bg-black/80 object-cover" />
-                  <div>
-                    <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-og-lime">Custom art pack</div>
-                    <h3 className="mt-1 text-lg font-black uppercase tracking-tight text-white">Banner + logo wired into the tab</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-white/70">
-                      This room now uses your submitted OG Scan banner and logo as the official visual identity instead of generic token art.
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
