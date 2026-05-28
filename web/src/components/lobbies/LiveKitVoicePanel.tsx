@@ -111,6 +111,16 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
   useEffect(() => { mutedRef.current = muted; onMuteChange?.(muted); }, [muted]);
   useEffect(() => { userIdRef.current = user?.id ?? ""; }, [user?.id]);
   useEffect(() => { roleRef.current = role; onRoleChange?.(role); }, [role]);
+  useEffect(() => {
+    if (!user || !presenceChannelRef.current) return;
+    presenceChannelRef.current.track({
+      user_id: user.id,
+      username: profile?.username || "Anon",
+      avatar_url: profile?.avatar_url,
+      role,
+      joined_at: new Date().toISOString(),
+    });
+  }, [user?.id, profile?.username, profile?.avatar_url, role]);
   useEffect(() => { participantsRef.current = participants; onParticipantsChange?.(participants); }, [participants]);
 
   /* ─── Fetch LiveKit token ─── */
@@ -311,13 +321,27 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
       // Merge presence roles into participants
       setParticipants((prev) =>
         prev.map((p) => {
-          const presenceData = state[p.user_id]?.[0] as any;
-          if (presenceData) {
+          const presenceEntries = state[p.user_id] as any[] | undefined;
+          const latestPresence = presenceEntries && presenceEntries.length > 0
+            ? presenceEntries[presenceEntries.length - 1]
+            : null;
+
+          if (p.user_id === user.id) {
             return {
               ...p,
-              username: presenceData.username || p.username,
-              avatar_url: presenceData.avatar_url || p.avatar_url,
-              role: presenceData.role || p.role,
+              username: profile?.username || latestPresence?.username || p.username,
+              avatar_url: profile?.avatar_url ?? latestPresence?.avatar_url ?? p.avatar_url,
+              role: roleRef.current,
+              is_muted: mutedRef.current,
+            };
+          }
+
+          if (latestPresence) {
+            return {
+              ...p,
+              username: latestPresence.username || p.username,
+              avatar_url: latestPresence.avatar_url || p.avatar_url,
+              role: latestPresence.role || p.role,
             };
           }
           return p;
