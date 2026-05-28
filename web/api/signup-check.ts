@@ -97,11 +97,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sinceIso = new Date(Date.now() - YEAR_MS).toISOString();
     const clientIp = getClientIp(req);
 
-    const [deviceMatch, lastIpMatch, firstIpMatch, usernameMatch] = await Promise.all([
+    const [deviceMatch, usernameMatch, lastIpMatch, firstIpMatch] = await Promise.all([
       fetchFirstProfileMatch("last_fingerprint", fingerprint, sinceIso),
+      fetchFirstProfileMatch("username", username, "1970-01-01T00:00:00.000Z"),
       clientIp !== "unknown" ? fetchFirstProfileMatch("last_ip", clientIp, sinceIso) : Promise.resolve(null),
       clientIp !== "unknown" ? fetchFirstProfileMatch("first_seen_ip", clientIp, sinceIso) : Promise.resolve(null),
-      fetchFirstProfileMatch("username", username, "1970-01-01T00:00:00.000Z"),
     ]);
 
     if (deviceMatch) {
@@ -109,15 +109,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         allowed: false,
         code: "device_limit",
         message: "This device already created an account in the last year.",
-      });
-      return;
-    }
-
-    if (lastIpMatch || firstIpMatch) {
-      res.status(200).json({
-        allowed: false,
-        code: "ip_limit",
-        message: "Only one account can be created from the same network each year.",
       });
       return;
     }
@@ -135,8 +126,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       allowed: true,
       rules: {
         oneAccountPerDevicePerYear: true,
-        oneAccountPerIpPerYear: true,
+        oneAccountPerIpPerYear: false,
         humanVerificationRequired: true,
+      },
+      ipSignals: {
+        detected: clientIp !== "unknown",
+        recentLastIpMatch: Boolean(lastIpMatch),
+        recentFirstSeenIpMatch: Boolean(firstIpMatch),
       },
     });
   } catch (error) {
