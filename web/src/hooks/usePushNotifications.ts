@@ -263,6 +263,7 @@ export const usePushNotifications = () => {
       const notification = new Notification(title, {
         icon: "/icon-192x192.png",
         badge: "/favicon.png",
+        tag: options?.tag || "group-system",
         ...options,
       });
       notification.onclick = () => {
@@ -288,7 +289,12 @@ export const usePushNotifications = () => {
           title: "OG Scan push notifications are on",
           body: "This device is now connected for real push notifications.",
           url: "/notifications",
-          tag: `test-push-${Date.now()}`,
+          tag: "group-system",
+          image: "/og-brand.jpg",
+          actions: [
+            { action: "open_notifications", title: "Open alerts", url: "/notifications" },
+            { action: "open_app", title: "Open app", url: "/app" },
+          ],
           data: { kind: "test_push" },
         },
       });

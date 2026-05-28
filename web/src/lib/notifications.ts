@@ -9,6 +9,12 @@
  */
 import { supabase } from "@/lib/supabase";
 
+interface NotificationAction {
+  action: string;
+  title: string;
+  url?: string;
+}
+
 interface NotifyOptions {
   /** Target user ID */
   userId: string;
@@ -22,13 +28,32 @@ interface NotifyOptions {
   url?: string;
   /** Extra JSON data */
   data?: Record<string, unknown>;
+  /** Optional notification image */
+  image?: string;
+  /** Optional action buttons */
+  actions?: NotificationAction[];
+  /** Collapse/group tag for native notifications */
+  tag?: string;
+  /** Keep notification visible until user interacts */
+  requireInteraction?: boolean;
 }
 
 /**
  * Send a notification to a user — in-app + push.
  * Fire-and-forget: errors are logged but don't throw.
  */
-export async function notifyUser({ userId, type, title, message, url, data }: NotifyOptions) {
+export async function notifyUser({
+  userId,
+  type,
+  title,
+  message,
+  url,
+  data,
+  image,
+  actions,
+  tag,
+  requireInteraction,
+}: NotifyOptions) {
   try {
     const { error } = await supabase.functions.invoke("send-push", {
       body: {
@@ -37,8 +62,11 @@ export async function notifyUser({ userId, type, title, message, url, data }: No
         title,
         body: message,
         url: url || "/app",
-        tag: `${type}-${Date.now()}`,
+        tag,
         data,
+        image,
+        actions,
+        requireInteraction,
       },
     });
     if (error) console.error("[notify] Edge function failed:", error);
