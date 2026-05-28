@@ -26,6 +26,7 @@ import {
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const LIVEKIT_URL = "wss://new-7unnd5e1.livekit.cloud";
 
@@ -486,15 +487,15 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
     if (!room) return;
 
     switch (cmd) {
-      case "promote":
+      case "promote": {
         // Idempotent: skip if already a speaker
         if (roleRef.current === "speaker") return;
         setRole("speaker");
         roleRef.current = "speaker";
-        updateLocalParticipant({ role: "speaker", is_muted: false });
-        await room.localParticipant.setMicrophoneEnabled(true);
-        setMuted(false);
-        // Update presence
+        setMuted(true);
+        updateLocalParticipant({ role: "speaker", is_muted: true });
+
+        // Mark the user as on stage immediately even if mic access/publish takes a moment.
         presenceChannelRef.current?.track({
           user_id: user!.id,
           session_id: getParticipantIdentity(user!.id),
@@ -503,11 +504,22 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
           role: "speaker",
           joined_at: new Date().toISOString(),
         });
+
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true);
+          setMuted(false);
+          updateLocalParticipant({ is_muted: false });
+        } catch (err) {
+          console.error("[LiveKit] Promote mic enable failed:", err);
+          toast("You were brought to stage — allow mic access or tap unmute to speak.");
+        }
+
         // Clean up speaker_request so user can re-raise later if demoted
         if (spaceId) {
           supabase.from("speaker_requests").delete().eq("space_id", spaceId).eq("user_id", user!.id);
         }
         break;
+      }
       case "demote":
         setRole("listener");
         roleRef.current = "listener";
