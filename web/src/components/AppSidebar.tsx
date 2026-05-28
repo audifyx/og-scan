@@ -1,21 +1,21 @@
 import { ComponentType } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  LineChart,
-  Radio,
-  Wallet,
-  Trophy,
-  Wrench,
-  X,
-  Menu,
   Bell,
+  Coins,
+  Headset,
+  Home,
+  LineChart,
   Mail,
+  Menu,
   MessageSquare,
   Shield,
-  Home,
-  Users,
+  Trophy,
   User,
-  Headset,
+  Users,
+  Wallet,
+  Wrench,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
@@ -75,9 +75,7 @@ const NavRow = ({
 
   const handleClick = () => {
     onClose();
-    if (item.id) {
-      onNavigate(item.id);
-    }
+    if (item.id) onNavigate(item.id);
   };
 
   const content = (
@@ -144,26 +142,31 @@ export const AppSidebar = ({
   const { isAdmin } = useAdmin();
 
   const primaryItems: NavItem[] = [
-    { id: "overview",  icon: Home,   label: "Home",      eyebrow: "Command hub" },
-    { id: "community", icon: Users,  label: "Community", eyebrow: "Social & Voice" },
-    { id: "tools",     icon: Wrench, label: "Tools",     eyebrow: "Scanners & Feeds" },
-    { id: "profile",   icon: User,   label: "Profile",   eyebrow: "Your account" },
+    { id: "overview", icon: Home, label: "Home", eyebrow: "Command hub" },
+    { id: "our-coin", icon: Coins, label: "OUR COIN", eyebrow: "Official token room" },
+    { id: "community", icon: Users, label: "Community", eyebrow: "Social & Voice" },
+    { id: "tools", icon: Wrench, label: "Tools", eyebrow: "Scanners & Feeds" },
+    { id: "profile", icon: User, label: "Profile", eyebrow: "Your account" },
   ];
 
   const tradingItems: NavItem[] = [
-    { to: "/wallets",         icon: Wallet,        label: "Wallets",         eyebrow: "Tracked wallets" },
-    { to: "/charts",          icon: LineChart,      label: "Charts",          eyebrow: "Live charts" },
-    { to: "/callouts",        icon: Bell,           label: "Callouts",        eyebrow: "Trade alerts" },
-    { to: "/trading-lobbies", icon: MessageSquare,  label: "Trading Lobbies", eyebrow: "Voice + charts" },
-    { to: "/leaderboard",     icon: Trophy,         label: "Leaderboard",     eyebrow: "Top traders" },
-    { to: "/messages",        icon: Mail,           label: "Messages",        eyebrow: "Direct messages" },
-    { to: "/support",         icon: Headset,        label: "Support Chat",    eyebrow: "Tickets + live help" },
+    { to: "/wallets", icon: Wallet, label: "Wallets", eyebrow: "Tracked wallets" },
+    { to: "/charts", icon: LineChart, label: "Charts", eyebrow: "Live charts" },
+    { to: "/callouts", icon: Bell, label: "Callouts", eyebrow: "Trade alerts" },
+    { to: "/trading-lobbies", icon: MessageSquare, label: "Trading Lobbies", eyebrow: "Voice + charts" },
+    { to: "/leaderboard", icon: Trophy, label: "Leaderboard", eyebrow: "Top traders" },
+    { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
+    { to: "/support", icon: Headset, label: "Support Chat", eyebrow: "Tickets + live help" },
   ];
 
-  // Admin entry point — individual admin apps now live inside the admin dashboard hub
   const adminAppsItems: NavItem[] = [
     { to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Dashboard + apps hub" },
   ];
+
+  const openOurCoin = () => {
+    onClose();
+    onNavigate("our-coin");
+  };
 
   return (
     <aside
@@ -209,6 +212,25 @@ export const AppSidebar = ({
           </div>
         </div>
 
+        <div className="mt-4 border border-og-lime/20 bg-[linear-gradient(180deg,rgba(93,255,0,0.08),rgba(0,0,0,0.2))] p-3">
+          <button type="button" onClick={openOurCoin} className="block w-full text-left">
+            <div className="flex items-start gap-3">
+              <img src="/ogscan-our-coin-logo.webp" alt="OUR COIN" className="h-14 w-14 shrink-0 border border-og-lime/30 object-cover" />
+              <div className="min-w-0">
+                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-og-gold">Official room</div>
+                <div className="mt-1 text-sm font-black uppercase tracking-[0.08em] text-white">OUR COIN</div>
+                <div className="mt-1 font-mono text-[10px] text-white/55">{shortAddr(OGSCAN_TOKEN_MINT, 6)}</div>
+              </div>
+            </div>
+            <div className="mt-3 border border-white/10 bg-black/40 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-og-lime transition hover:border-og-lime/40">
+              Open full tab
+            </div>
+          </button>
+          <div className="mt-3 overflow-hidden border border-white/10 bg-black/35">
+            <OurCoinBuyFeed mint={OGSCAN_TOKEN_MINT} limit={8} compact buysOnly alertOnNewBuys={false} title="Live OG buys" />
+          </div>
+        </div>
+
         <div className="mb-1 mt-4">
           <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Trading</p>
           <div className="space-y-0.5">
@@ -225,7 +247,6 @@ export const AppSidebar = ({
           </div>
         </div>
 
-        {/* Admin Apps — ONLY visible to audifyx@gmail.com */}
         {isAdmin && (
           <div className="mb-1 mt-4">
             <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Admin Apps</p>
@@ -257,24 +278,6 @@ export const AppSidebar = ({
           </div>
           <Menu className="h-3.5 w-3.5 text-white/30" />
         </button>
-      </div>
-
-      <div className="border-t border-white/[0.07] px-3 py-3">
-        <OurCoinBuyFeed
-          mint={OGSCAN_TOKEN_MINT}
-          limit={10}
-          compact
-          buysOnly
-          alertOnNewBuys
-          title="OUR COIN live buys"
-        />
-      </div>
-
-      <div className="border-t border-white/[0.07] px-3 pb-4 pt-2">
-        <div className="text-[9px] font-bold uppercase tracking-widest text-white/30">Official Token</div>
-        <div className="mt-1 font-mono text-[10px] text-white/50">
-          CA {shortAddr(OGSCAN_TOKEN_MINT, 5)}
-        </div>
       </div>
     </aside>
   );
