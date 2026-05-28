@@ -1094,6 +1094,10 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
   const voicePanelRef = useRef<VoicePanelHandle>(null);
   const isHost = user?.id === space.host_id;
   const isCoHost = coHosts.some(ch => ch.userId === user?.id);
+
+  useEffect(() => {
+    if (isHost) setMyRole("speaker");
+  }, [isHost]);
   const tm = topicOf(cur.topic);
   const rxId = useRef(0);
   const MAX_SPEAKERS = 10;

@@ -112,6 +112,29 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
   useEffect(() => { userIdRef.current = user?.id ?? ""; }, [user?.id]);
   useEffect(() => { roleRef.current = role; onRoleChange?.(role); }, [role]);
   useEffect(() => {
+    if (initialRole !== "speaker" || roleRef.current === "speaker") return;
+
+    roleRef.current = "speaker";
+    setRole("speaker");
+    updateLocalParticipant({ role: "speaker", is_muted: false });
+
+    const room = roomRef.current;
+    if (room) {
+      room.localParticipant.setMicrophoneEnabled(true).catch((err) => {
+        console.error("[LiveKit] Failed to sync host mic after role update:", err);
+      });
+      setMuted(false);
+    }
+
+    presenceChannelRef.current?.track({
+      user_id: user?.id || userIdRef.current,
+      username: profile?.username || "Anon",
+      avatar_url: profile?.avatar_url,
+      role: "speaker",
+      joined_at: new Date().toISOString(),
+    });
+  }, [initialRole, profile?.avatar_url, profile?.username, updateLocalParticipant, user?.id]);
+  useEffect(() => {
     if (!user || !presenceChannelRef.current) return;
     presenceChannelRef.current.track({
       user_id: user.id,
