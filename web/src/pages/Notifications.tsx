@@ -203,52 +203,59 @@ const Notifications = () => {
 
       <div className="p-4 lg:p-6 space-y-4">
         {/* Push Notification Settings */}
-        {supported && (
-          <Card className="og-glass-card border-primary/20">
-            <CardContent className="space-y-4 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-primary/10 p-2">
-                    {permission === "granted" && isRegistered ? (
-                      <BellRing className="h-5 w-5 text-[#22d3ee]" />
-                    ) : (
-                      <BellOff className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">Push Notifications</p>
-                    <p className="text-xs text-muted-foreground">
-                      {permission === "denied"
+        <Card className="og-glass-card border-primary/20">
+          <CardContent className="space-y-4 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-primary/10 p-2">
+                  {supported && permission === "granted" && isRegistered ? (
+                    <BellRing className="h-5 w-5 text-[#22d3ee]" />
+                  ) : (
+                    <BellOff className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Push Notifications</p>
+                  <p className="text-xs text-muted-foreground">
+                    {!supported
+                      ? "This device/browser is not registered for web push here yet. On iPhone, install OG Scan to the home screen, open the installed app, then enable notifications there."
+                      : permission === "denied"
                         ? "Blocked in this browser — re-enable notifications in browser settings first"
                         : permission === "granted" && isRegistered
-                          ? "This device is registered for real push delivery"
+                          ? "This specific device is registered for real push delivery"
                           : permission === "granted"
                             ? "Permission granted, but this device is still syncing"
-                            : "Enable real push notifications for messages, spaces, and alerts"}
-                    </p>
-                  </div>
+                            : "Enable real push notifications for this device for messages, spaces, and alerts"}
+                  </p>
                 </div>
-
-                <Switch
-                  checked={permission === "granted" && isRegistered}
-                  disabled={permission === "denied" || isSyncing}
-                  onCheckedChange={handlePushToggle}
-                />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="text-xs">
-                  {permission === "granted" ? (isRegistered ? "Connected" : "Syncing") : permission === "denied" ? "Blocked" : "Not enabled"}
-                </Badge>
-                {permission === "granted" && isRegistered && (
-                  <Button variant="outline" size="sm" onClick={handleTestPush} disabled={testingPush || isSyncing}>
-                    {testingPush ? "Sending test..." : "Send real test push"}
-                  </Button>
-                )}
+              <Switch
+                checked={supported && permission === "granted" && isRegistered}
+                disabled={!supported || permission === "denied" || isSyncing}
+                onCheckedChange={handlePushToggle}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                {!supported ? "Unsupported here" : permission === "granted" ? (isRegistered ? "Connected" : "Syncing") : permission === "denied" ? "Blocked" : "Not enabled"}
+              </Badge>
+              <Badge variant="outline" className="text-xs">Per-device delivery</Badge>
+              {supported && permission === "granted" && isRegistered && (
+                <Button variant="outline" size="sm" onClick={handleTestPush} disabled={testingPush || isSyncing}>
+                  {testingPush ? "Sending test..." : "Send real test push"}
+                </Button>
+              )}
+            </div>
+
+            {!supported ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-muted-foreground">
+                Push is not tied to user ID alone — the phone itself must register a push subscription first. If you want phone notifications, open OG Scan on the phone, install it to the home screen if needed, then enable push from the Notifications page on that phone.
               </div>
-            </CardContent>
-          </Card>
-        )}
+            ) : null}
+          </CardContent>
+        </Card>
 
         <Tabs defaultValue="notifications" className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2 bg-white/[0.04]">
