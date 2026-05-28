@@ -18,11 +18,12 @@ interface FloatingReaction {
 interface ReactionOverlayProps {
   spaceId: string;
   userId: string;
+  onReact?: (emoji: string) => void;
 }
 
 const FLOAT_DURATION = 2500; // ms
 
-const ReactionOverlay: React.FC<ReactionOverlayProps> = ({ spaceId, userId }) => {
+const ReactionOverlay: React.FC<ReactionOverlayProps> = ({ spaceId, userId, onReact }) => {
   const [floating, setFloating] = useState<FloatingReaction[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -47,8 +48,9 @@ const ReactionOverlay: React.FC<ReactionOverlayProps> = ({ spaceId, userId }) =>
     return () => clearInterval(iv);
   }, []);
 
-  // Subscribe to broadcast channel
+  // Subscribe to broadcast channel when managing reactions internally
   useEffect(() => {
+    if (onReact) return;
     const channel = supabase.channel(`reactions-${spaceId}`)
       .on("broadcast", { event: "reaction" }, (payload: any) => {
         if (payload.payload?.emoji) addFloating(payload.payload.emoji);
@@ -56,12 +58,19 @@ const ReactionOverlay: React.FC<ReactionOverlayProps> = ({ spaceId, userId }) =>
       .subscribe();
     channelRef.current = channel;
     return () => { supabase.removeChannel(channel); };
-  }, [spaceId, addFloating]);
+  }, [spaceId, addFloating, onReact]);
 
   // Send reaction
   const send = (emoji: string) => {
     if (Date.now() - cooldownRef.current < 300) return; // Rate limit
     cooldownRef.current = Date.now();
+
+    if (onReact) {
+      onReact(emoji);
+      setShowPicker(false);
+      return;
+    }
+
     addFloating(emoji);
     channelRef.current?.send({ type: "broadcast", event: "reaction", payload: { emoji, userId } });
     setShowPicker(false);
@@ -70,26 +79,28 @@ const ReactionOverlay: React.FC<ReactionOverlayProps> = ({ spaceId, userId }) =>
   return (
     <>
       {/* Floating reactions overlay */}
-      <div className="pointer-events-none fixed inset-0 z-[90] overflow-hidden">
-        {floating.map(r => {
-          const age = (Date.now() - r.createdAt) / FLOAT_DURATION;
-          return (
-            <div
-              key={r.id}
-              className="absolute text-2xl sm:text-3xl transition-none"
-              style={{
-                left: `${r.x}%`,
-                bottom: `${10 + age * 70}%`,
-                opacity: Math.max(0, 1 - age * 1.2),
-                transform: `scale(${1 - age * 0.3}) translateX(${Math.sin(age * 8) * 15}px)`,
-                pointerEvents: "none",
-              }}
-            >
-              {r.emoji}
-            </div>
-          );
-        })}
-      </div>
+      {!onReact && (
+        <div className="pointer-events-none fixed inset-0 z-[90] overflow-hidden">
+          {floating.map(r => {
+            const age = (Date.now() - r.createdAt) / FLOAT_DURATION;
+            return (
+              <div
+                key={r.id}
+                className="absolute text-2xl sm:text-3xl transition-none"
+                style={{
+                  left: `${r.x}%`,
+                  bottom: `${10 + age * 70}%`,
+                  opacity: Math.max(0, 1 - age * 1.2),
+                  transform: `scale(${1 - age * 0.3}) translateX(${Math.sin(age * 8) * 15}px)`,
+                  pointerEvents: "none",
+                }}
+              >
+                {r.emoji}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Reaction button + picker (positioned by parent) */}
       <div className="relative">

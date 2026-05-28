@@ -1092,6 +1092,8 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
   const [inGreenRoom, setInGreenRoom] = useState(false);
   const [publicListenerCount, setPublicListenerCount] = useState(0);
   const voicePanelRef = useRef<VoicePanelHandle>(null);
+  const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const seenReactionIdsRef = useRef<Set<string>>(new Set());
   const isHost = user?.id === space.host_id;
   const isCoHost = coHosts.some(ch => ch.userId === user?.id);
 
@@ -1173,11 +1175,43 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
     };
   }, [space.id, user?.id]);
 
-  const react = (emoji: string) => {
+  const addFloatingReaction = useCallback((emoji: string, reactionId?: string) => {
+    const dedupeKey = reactionId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    if (seenReactionIdsRef.current.has(dedupeKey)) return;
+    seenReactionIdsRef.current.add(dedupeKey);
+
     const id = rxId.current++;
     setReactions(prev => [...prev, { id, emoji, x: 10 + Math.random() * 80, delay: Math.random() * 0.8, size: 20 + Math.random() * 12 }]);
-    setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3500);
-  };
+    setTimeout(() => {
+      setReactions(prev => prev.filter(r => r.id !== id));
+      seenReactionIdsRef.current.delete(dedupeKey);
+    }, 3500);
+  }, []);
+
+  useEffect(() => {
+    const ch = supabase.channel(`reactions-${space.id}`)
+      .on("broadcast", { event: "reaction" }, ({ payload }: any) => {
+        if (!payload?.emoji) return;
+        addFloatingReaction(payload.emoji, payload.reactionId);
+      })
+      .subscribe();
+
+    reactionChannelRef.current = ch;
+    return () => {
+      if (reactionChannelRef.current === ch) reactionChannelRef.current = null;
+      supabase.removeChannel(ch);
+    };
+  }, [space.id, addFloatingReaction]);
+
+  const react = useCallback((emoji: string) => {
+    const reactionId = `${space.id}-${user?.id || "anon"}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    addFloatingReaction(emoji, reactionId);
+    reactionChannelRef.current?.send({
+      type: "broadcast",
+      event: "reaction",
+      payload: { emoji, userId: user?.id, reactionId },
+    });
+  }, [addFloatingReaction, space.id, user?.id]);
 
   const raiseHand = async () => {
     if (!user) return;
@@ -1721,7 +1755,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
               {e}
             </button>
           ))}
-          <ReactionOverlayNew spaceId={space.id} userId={user?.id || ""} />
+          <ReactionOverlayNew spaceId={space.id} userId={user?.id || ""} onReact={react} />
         </div>
 
         {/* Main controls — centered rounded squares */}
