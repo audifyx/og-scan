@@ -90,16 +90,29 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
   const roleRef = useRef<VoiceRole>(initialRole);
   const participantsRef = useRef<VoiceParticipant[]>([]);
   const userIdRef = useRef<string>("");
+  const sessionIdRef = useRef<string>(typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+
+  const getParticipantIdentity = useCallback((userId?: string | null) => {
+    const baseUserId = userId || userIdRef.current;
+    return baseUserId ? `${baseUserId}:${sessionIdRef.current}` : "";
+  }, []);
+
+  const getUserIdFromIdentity = useCallback((identity: string) => {
+    const [baseUserId] = identity.split(":");
+    return baseUserId || identity;
+  }, []);
 
   const updateLocalParticipant = useCallback((patch: Partial<VoiceParticipant>) => {
-    const localUserId = userIdRef.current;
-    if (!localUserId) return;
+    const localParticipantId = getParticipantIdentity();
+    if (!localParticipantId) return;
     setParticipants((prev) => prev.map((participant) =>
-      participant.user_id === localUserId
+      participant.id === localParticipantId
         ? { ...participant, ...patch }
         : participant
     ));
-  }, []);
+  }, [getParticipantIdentity]);
 
   // Recording refs
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -128,22 +141,24 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
 
     presenceChannelRef.current?.track({
       user_id: user?.id || userIdRef.current,
+      session_id: getParticipantIdentity(user?.id),
       username: profile?.username || "Anon",
       avatar_url: profile?.avatar_url,
       role: "speaker",
       joined_at: new Date().toISOString(),
     });
-  }, [initialRole, profile?.avatar_url, profile?.username, updateLocalParticipant, user?.id]);
+  }, [getParticipantIdentity, initialRole, profile?.avatar_url, profile?.username, updateLocalParticipant, user?.id]);
   useEffect(() => {
     if (!user || !presenceChannelRef.current) return;
     presenceChannelRef.current.track({
       user_id: user.id,
+      session_id: getParticipantIdentity(user.id),
       username: profile?.username || "Anon",
       avatar_url: profile?.avatar_url,
       role,
       joined_at: new Date().toISOString(),
     });
-  }, [user?.id, profile?.username, profile?.avatar_url, role]);
+  }, [getParticipantIdentity, user?.id, profile?.username, profile?.avatar_url, role]);
   useEffect(() => { participantsRef.current = participants; onParticipantsChange?.(participants); }, [participants]);
 
   /* ─── Fetch LiveKit token ─── */
@@ -171,7 +186,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
     try {
       const token = await fetchToken(
         `space-${lobbyId}`,
-        user.id,
+        getParticipantIdentity(user.id),
         profile?.username || "Anon",
       );
       if (!token) throw new Error("Failed to get LiveKit token");
@@ -202,7 +217,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
         setParticipants((prev) =>
           prev.map((p) => ({
             ...p,
-            is_speaking: speakerIds.has(p.user_id),
+            is_speaking: speakerIds.has(p.id),
           }))
         );
       });
@@ -218,7 +233,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
         if (lp) {
           allP.push({
             id: lp.identity,
-            user_id: lp.identity,
+            user_id: user.id,
             username: lp.name || "You",
             avatar_url: null,
             is_speaking: lp.isSpeaking,
@@ -232,7 +247,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
         r.remoteParticipants.forEach((rp) => {
           allP.push({
             id: rp.identity,
-            user_id: rp.identity,
+            user_id: getUserIdFromIdentity(rp.identity),
             username: rp.name || "Anon",
             avatar_url: null,
             is_speaking: rp.isSpeaking,
@@ -291,7 +306,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
     } catch (err: any) {
       console.error("LiveKit join error:", err);
     }
-  }, [user, lobbyId, profile, initialRole, isRecording]);
+  }, [getParticipantIdentity, getUserIdFromIdentity, user, lobbyId, profile, initialRole, isRecording]);
 
   /* ─── Leave voice ─── */
   const leaveVoice = useCallback(async () => {
@@ -336,20 +351,21 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
   /* ─── Supabase Presence for roles ─── */
   const setupPresence = () => {
     if (!user) return;
+    const participantIdentity = getParticipantIdentity(user.id);
     const ch = supabase.channel(`lk-presence-${lobbyId}`, {
-      config: { presence: { key: user.id } },
+      config: { presence: { key: participantIdentity } },
     });
     ch.on("presence", { event: "sync" }, () => {
       const state = ch.presenceState();
       // Merge presence roles into participants
       setParticipants((prev) =>
         prev.map((p) => {
-          const presenceEntries = state[p.user_id] as any[] | undefined;
+          const presenceEntries = state[p.id] as any[] | undefined;
           const latestPresence = presenceEntries && presenceEntries.length > 0
             ? presenceEntries[presenceEntries.length - 1]
             : null;
 
-          if (p.user_id === user.id) {
+          if (p.id === participantIdentity) {
             return {
               ...p,
               username: profile?.username || latestPresence?.username || p.username,
@@ -374,6 +390,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
       if (status === "SUBSCRIBED") {
         await ch.track({
           user_id: user.id,
+          session_id: participantIdentity,
           username: profile?.username || "Anon",
           avatar_url: profile?.avatar_url,
           role: roleRef.current,
@@ -480,6 +497,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
         // Update presence
         presenceChannelRef.current?.track({
           user_id: user!.id,
+          session_id: getParticipantIdentity(user!.id),
           username: profile?.username || "Anon",
           avatar_url: profile?.avatar_url,
           role: "speaker",
@@ -498,6 +516,7 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
         setMuted(true);
         presenceChannelRef.current?.track({
           user_id: user!.id,
+          session_id: getParticipantIdentity(user!.id),
           username: profile?.username || "Anon",
           avatar_url: profile?.avatar_url,
           role: "listener",
