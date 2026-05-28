@@ -55,7 +55,6 @@ import CommunityRooms from "./pages/CommunityRooms";
 import SpaceShows from "./pages/SpaceShows";
 import CoHostingManager from "./pages/CoHostingManager";
 import WhiteLabelConfig from "./pages/WhiteLabelConfig";
-import DeveloperAPI from "./pages/DeveloperAPI";
 import DevPortal from "./pages/DevPortal";
 import AISpaceAssistant from "./pages/AISpaceAssistant";
 import AIHostCopilot from "./pages/AIHostCopilot";
@@ -236,8 +235,8 @@ const App = () => (
             {/* ── Protected: Platform — Phase 4: White-label & API ── */}
             <Route path="/white-label" element={<ProtectedRoute><WhiteLabelConfig /></ProtectedRoute>} />
             <Route path="/brand" element={<ProtectedRoute><WhiteLabelConfig /></ProtectedRoute>} />
-            <Route path="/developer" element={<ProtectedRoute><DeveloperAPI /></ProtectedRoute>} />
-            <Route path="/api-keys" element={<ProtectedRoute><DeveloperAPI /></ProtectedRoute>} />
+            <Route path="/developer" element={<ProtectedRoute><DevPortal /></ProtectedRoute>} />
+            <Route path="/api-keys" element={<ProtectedRoute><DevPortal /></ProtectedRoute>} />
             <Route path="/dev-portal" element={<ProtectedRoute><DevPortal /></ProtectedRoute>} />
             <Route path="/marketplace" element={<ProtectedRoute><DevPortal /></ProtectedRoute>} />
             <Route path="/ai-assistant" element={<ProtectedRoute><AISpaceAssistant /></ProtectedRoute>} />
