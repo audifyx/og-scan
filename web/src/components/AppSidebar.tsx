@@ -61,12 +61,14 @@ const NavRow = ({
   currentPath,
   onNavigate,
   onClose,
+  onPrefetch,
 }: {
   item: NavItem;
   activeId: TabId;
   currentPath: string;
   onNavigate: (t: string) => void;
   onClose: () => void;
+  onPrefetch?: (t: string) => void;
 }) => {
   const isTabActive = item.id && activeId === item.id;
   const isPathActive = item.to && (currentPath === item.to || currentPath.startsWith(item.to + "/"));
@@ -98,6 +100,9 @@ const NavRow = ({
       <Link
         to={item.to}
         onClick={onClose}
+        onMouseEnter={() => item.id && onPrefetch?.(item.id)}
+        onFocus={() => item.id && onPrefetch?.(item.id)}
+        onTouchStart={() => item.id && onPrefetch?.(item.id)}
         className={cn(
           "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
           isActive ? "bg-white/[0.09] text-white" : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
@@ -112,6 +117,9 @@ const NavRow = ({
     <button
       type="button"
       onClick={handleClick}
+      onMouseEnter={() => item.id && onPrefetch?.(item.id)}
+      onFocus={() => item.id && onPrefetch?.(item.id)}
+      onTouchStart={() => item.id && onPrefetch?.(item.id)}
       className={cn(
         "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
         isActive ? "bg-white/[0.09] text-white" : "text-white/55 hover:bg-white/[0.04] hover:text-white/90",
@@ -129,6 +137,7 @@ export const AppSidebar = ({
   onClose,
   onChangeMint,
   onNavigate,
+  onPrefetch,
 }: {
   activeId: TabId;
   mint: string;
@@ -136,6 +145,7 @@ export const AppSidebar = ({
   onClose: () => void;
   onChangeMint: () => void;
   onNavigate: (t: string) => void;
+  onPrefetch?: (t: string) => void;
 }) => {
   const location = useLocation();
   const { isAdmin } = useAdmin();
@@ -201,6 +211,7 @@ export const AppSidebar = ({
                 currentPath={location.pathname}
                 onNavigate={onNavigate}
                 onClose={onClose}
+                onPrefetch={onPrefetch}
               />
             ))}
           </div>
@@ -217,6 +228,7 @@ export const AppSidebar = ({
                 currentPath={location.pathname}
                 onNavigate={onNavigate}
                 onClose={onClose}
+                onPrefetch={onPrefetch}
               />
             ))}
           </div>

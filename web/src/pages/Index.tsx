@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, lazy, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ComponentType, type ReactNode, lazy, Suspense } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -663,6 +663,96 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   return null;
 };
 
+const preloadTab = (tab: TabId): void => {
+  switch (tab) {
+    case "our-coin":
+      void import("@/components/OurCoin");
+      return;
+    case "roadmap":
+    case "tech":
+      void importAboutOgScan();
+      return;
+    case "market-pulse":
+    case "pairs":
+    case "whales":
+    case "tx-feed":
+    case "charts":
+      void importTokenIntel();
+      return;
+    case "communities":
+      void importCommunitiesPage();
+      return;
+    case "discover":
+      void importDiscoverPage();
+      return;
+    case "memes":
+      void importArtFeedPage();
+      return;
+    case "spaces":
+      void importSpacesPage();
+      return;
+    case "social":
+      void importSocialHubPage();
+      return;
+    case "community":
+      void importCommunityHubPage();
+      return;
+    case "tools":
+      void importToolsHubPage();
+      return;
+    case "profile":
+      void import("@/components/profile-20x/UserProfile");
+      return;
+    case "listings":
+      void import("@/components/TokenListings");
+      return;
+    case "live-trading":
+      void importLiveTradingPage();
+      return;
+    case "live-feed-page":
+      void importLiveFeedPage();
+      return;
+    case "scanner":
+    case "og-finder":
+      void import("@/components/scanner-20x/RugScore");
+      void import("@/components/scanner-20x/DevWalletDNA");
+      void import("@/components/scanner-20x/ScanHistory");
+      void import("@/components/scanner-20x/BundleVisual");
+      void import("@/components/scanner-20x/ComparativeScan");
+      void import("@/components/scanner-20x/ScanShare");
+      return;
+    case "snipe-feed":
+    case "migrations":
+      void import("@/components/launch-radar-20x/LaunchQualityScore");
+      void import("@/components/launch-radar-20x/CreatorPatterns");
+      void import("@/components/launch-radar-20x/MigrationTimer");
+      void import("@/components/launch-radar-20x/FirstBuyersForensics");
+      void import("@/components/launch-radar-20x/LaunchAlerts");
+      return;
+    case "feed":
+    case "trending":
+    case "news-signal":
+      void import("@/components/Feed");
+      void import("@/components/Trending");
+      void import("@/components/NewsSignal");
+      return;
+    default:
+      return;
+  }
+};
+
+const toolFallback = (
+  <div className="min-h-[52vh] rounded-[28px] border border-white/[0.06] bg-white/[0.02] px-6 py-16">
+    <div className="flex h-full min-h-[32vh] flex-col items-center justify-center gap-4 text-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-og-cyan/40 border-t-og-cyan" />
+      <div>
+        <p className="text-sm font-bold text-white/75">Loading tab…</p>
+        <p className="mt-1 text-xs text-white/35">Keeping navigation warm so switches don’t drop into a blank screen.</p>
+      </div>
+    </div>
+  </div>
+);
+
 /* ─── accent helpers ─── */
 const accentText = (a: TabAccent): string =>
   a === "gold" ? "text-og-gold" : a === "cyan" ? "text-og-cyan" : a === "white" ? "text-white" : "text-og-lime";
@@ -697,6 +787,7 @@ const Index = () => {
   const [selectedWallet, setSelectedWallet] = useState<string>("");
   const [tab, setTab] = useState<TabId>(routeTab);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isTabPending, startTabTransition] = useTransition();
 
 
   useEffect(() => {
@@ -707,7 +798,11 @@ const Index = () => {
     } catch { /* noop */ }
   }, []);
 
-  useEffect(() => { setTab(routeTab); }, [routeTab]);
+  useEffect(() => {
+    preloadTab(routeTab);
+    if (routeTab === tab) return;
+    startTabTransition(() => setTab(routeTab));
+  }, [routeTab, tab]);
 
   useEffect(() => {
     if (routeSlug && !getTabFromSlug(routeSlug)) navigate("/app", { replace: true });
@@ -727,6 +822,10 @@ const Index = () => {
       void importChartsPage();
       void importLiveTradingPage();
       void importLiveFeedPage();
+      preloadTab("profile");
+      preloadTab("our-coin");
+      preloadTab("scanner");
+      preloadTab("feed");
     };
 
     if (typeof window === "undefined") {
@@ -750,9 +849,17 @@ const Index = () => {
 
   const switchTab = (next: string): void => {
     const safe: TabId = TABS.some((t) => t.id === next) ? (next as TabId) : "overview";
-    setTab(safe);
+    const targetPath = getTabPath(safe);
+
+    preloadTab(safe);
     try { localStorage.setItem(STORAGE_TAB, safe); } catch { /* noop */ }
-    navigate(getTabPath(safe));
+
+    if (safe === tab && location.pathname === targetPath) return;
+
+    startTabTransition(() => {
+      setTab(safe);
+      navigate(targetPath);
+    });
   };
 
   const updateMint = (next: string): void => {
@@ -781,6 +888,7 @@ const Index = () => {
         onClose={() => setSidebarOpen(false)}
         onChangeMint={promptMint}
         onNavigate={(t) => { setSidebarOpen(false); switchTab(t); }}
+        onPrefetch={(t) => preloadTab(t as TabId)}
       />
 
       {/* Overlay for mobile sidebar */}
@@ -803,6 +911,12 @@ const Index = () => {
           onNavigate={switchTab}
         />
 
+        {isTabPending && (
+          <div className="sticky top-16 z-20 h-1 w-full overflow-hidden bg-white/[0.03]">
+            <div className="h-full w-full animate-pulse bg-gradient-to-r from-transparent via-og-cyan/70 to-transparent" />
+          </div>
+        )}
+
         {/* Page content */}
         {tab === "community" || tab === "social" ? (
           <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
@@ -822,11 +936,11 @@ const Index = () => {
                 onSelectMint={updateMint}
               />
             ) : tab === "profile" ? (
-              <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>
+              <Suspense fallback={toolFallback}>
                 {renderTool(tab, mint, updateMint, switchTab, profileViewUserId, isListingSubRoute ? listingMint : undefined)}
               </Suspense>
             ) : (
-              <ToolShell tab={activeTab} onBack={() => switchTab("tools")}><Suspense fallback={<div className="flex items-center justify-center py-20"><div className="h-6 w-6 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" /></div>}>{renderTool(tab, mint, updateMint, switchTab, profileViewUserId, isListingSubRoute ? listingMint : undefined)}</Suspense></ToolShell>
+              <ToolShell tab={activeTab} onBack={() => switchTab("tools")}><Suspense fallback={toolFallback}>{renderTool(tab, mint, updateMint, switchTab, profileViewUserId, isListingSubRoute ? listingMint : undefined)}</Suspense></ToolShell>
             )}
           </main>
         )}
