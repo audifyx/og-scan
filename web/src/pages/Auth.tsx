@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
+import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -28,9 +29,12 @@ const Auth = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [humanCode, setHumanCode] = useState("");
+  const [honeypot, setHoneypot] = useState("");
+  const [formStartedAt] = useState(() => Date.now());
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; username?: string; password?: string; confirm?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; username?: string; password?: string; confirm?: string; humanCode?: string }>({});
 
   // Capture ?ref=CODE into localStorage
   useEffect(() => {
@@ -56,6 +60,7 @@ const Auth = () => {
       try { passwordSchema.parse(password); } catch (e) { if (e instanceof z.ZodError) newErrors.password = e.errors[0].message; }
     }
     if (mode === "signup" && password !== confirmPassword) newErrors.confirm = "Passwords do not match";
+    if (mode === "signup" && humanCode.trim().toUpperCase() !== "OGSCAN") newErrors.humanCode = "Type OGSCAN exactly to verify you are human";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -71,9 +76,32 @@ const Auth = () => {
         else { toast.success("Welcome back!"); navigate(searchParams.get("next") || "/app"); }
       } else if (mode === "signup") {
         const clean = username.replace(/^@/, "");
+        const guardResponse = await fetch("/api/signup-check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            username: clean,
+            fingerprint: getDeviceFingerprint(),
+            honeypot,
+            humanCode,
+            elapsedMs: Date.now() - formStartedAt,
+          }),
+        });
+
+        const guard = await guardResponse.json().catch(() => null);
+        if (!guardResponse.ok || !guard?.allowed) {
+          toast.error(guard?.message || "Signup security check failed. Please try again.");
+          return;
+        }
+
         const { error } = await signUp(email, password, clean);
-        if (error) toast.error(error.message.includes("already registered") ? "This email is already registered" : error.message);
-        else { toast.success(`Welcome @${clean}!`); navigate("/setup"); }
+        if (error) {
+          toast.error(error.message.includes("already registered") ? "This email is already registered" : error.message);
+        } else {
+          toast.success(`Welcome @${clean}! Check your email to verify your account.`);
+          navigate("/setup");
+        }
       } else {
         const { error } = await resetPassword(email);
         if (error) toast.error(error.message);
@@ -187,20 +215,49 @@ const Auth = () => {
             )}
 
             {mode === "signup" && (
-              <div className="space-y-1.5">
-                <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Confirm Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10 h-12 rounded-xl border-white/10 bg-white/[0.04] font-mono text-sm focus:border-og-lime focus:ring-og-lime/20"
-                  />
+              <>
+                <div className="space-y-1.5">
+                  <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Confirm Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pl-10 h-12 rounded-xl border-white/10 bg-white/[0.04] font-mono text-sm focus:border-og-lime focus:ring-og-lime/20"
+                    />
+                  </div>
+                  {errors.confirm && <p className="font-mono text-[10px] text-og-blood">{errors.confirm}</p>}
                 </div>
-                {errors.confirm && <p className="font-mono text-[10px] text-og-blood">{errors.confirm}</p>}
-              </div>
+
+                <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-og-lime">Signup security</p>
+                  <p className="text-xs text-muted-foreground">
+                    One account per device per year. One account per network per year. Human verification required.
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Type OGSCAN to verify</Label>
+                    <Input
+                      type="text"
+                      placeholder="OGSCAN"
+                      value={humanCode}
+                      onChange={(e) => setHumanCode(e.target.value.toUpperCase())}
+                      className="h-12 rounded-xl border-white/10 bg-white/[0.04] font-mono text-sm uppercase tracking-[0.2em] focus:border-og-lime focus:ring-og-lime/20"
+                    />
+                  </div>
+                  {errors.humanCode && <p className="font-mono text-[10px] text-og-blood">{errors.humanCode}</p>}
+                  <div className="hidden" aria-hidden="true">
+                    <Label>Leave this field empty</Label>
+                    <Input
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={honeypot}
+                      onChange={(e) => setHoneypot(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
             <Button
