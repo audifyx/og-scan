@@ -15,6 +15,7 @@ import { ThemePicker } from "@/components/settings/ThemePicker";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { DEFAULT_NOTIFICATION_PREFERENCES, normalizeNotificationPreferences } from "@/lib/notificationSettings";
 import {
   DollarSign, Bell, User, Shield, Webhook, Palette, LogOut, Eye, EyeOff,
   Check, Loader2, KeyRound, Mail, Link, Twitter, MessageSquare, Globe,
@@ -59,11 +60,7 @@ const Settings = () => {
   const [changingEmail, setChangingEmail] = useState(false);
 
   // Notifications state
-  const [notifications, setNotifications] = useState({
-    priceAlerts: true, whaleAlerts: true, walletActivity: true,
-    communityPosts: true, newFollowers: true,
-    tradeSignals: true, lobbyInvites: true,
-  });
+  const [notifications, setNotifications] = useState(DEFAULT_NOTIFICATION_PREFERENCES);
   const [savingNotifs, setSavingNotifs] = useState(false);
 
   // Webhook state
@@ -86,7 +83,7 @@ const Settings = () => {
         setProfile(data);
         setDiscordWebhook(data.discord_handle || "");
         if (data.notification_preferences) {
-          setNotifications((prev) => ({ ...prev, ...data.notification_preferences }));
+          setNotifications(normalizeNotificationPreferences(data.notification_preferences));
         }
       }
       setLoadingProfile(false);

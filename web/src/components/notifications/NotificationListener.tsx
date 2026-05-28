@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { updateAppBadge } from "@/lib/appBadge";
 
 export const NotificationListener = () => {
   const { user } = useAuth();
@@ -9,6 +10,18 @@ export const NotificationListener = () => {
 
   useEffect(() => {
     if (!user) return;
+
+    const syncUnreadBadge = async () => {
+      const { count } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false);
+
+      await updateAppBadge(count || 0);
+    };
+
+    void syncUnreadBadge();
 
     const channel = supabase
       .channel(`notifications-${user.id}`)
@@ -20,12 +33,20 @@ export const NotificationListener = () => {
           table: "notifications",
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
+        async (payload) => {
           const notification = payload.new as {
             id: string;
             title: string;
             message: string;
           };
+
+          const { count } = await supabase
+            .from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("is_read", false);
+
+          await updateAppBadge(count || 0);
 
           if (typeof document !== "undefined" && document.visibilityState === "visible") {
             toast.info(notification.title, {
