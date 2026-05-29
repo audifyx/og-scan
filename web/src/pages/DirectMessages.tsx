@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   MessageSquare, Send, ArrowLeft, Search, Plus, MoreHorizontal,
   Trash2, Check, CheckCheck, Image, Smile, Reply, X as XIcon,
-  Loader2, UserPlus, Edit2
+  Loader2, UserPlus, Edit2, Copy, Pin
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
 import { notifyUser } from "@/lib/notifications";
+
+const DM_QUICK_REACTIONS = ["👀", "🚀", "💎", "🔥"];
 
 /* ═══════════════════════════════════════════════════════════════
    Types
@@ -406,8 +408,12 @@ const DirectMessages: React.FC = () => {
 
   /* ─── Delete message ─── */
   const deleteMessage = async (msgId: string) => {
-    await supabase.from("dm_messages").update({ deleted_at: new Date().toISOString() }).eq("id", msgId);
     setMessages(prev => prev.filter(m => m.id !== msgId));
+    const { error } = await supabase.from("dm_messages").delete().eq("id", msgId);
+    if (error) {
+      toast.error("Could not delete message");
+      if (activeConvo) fetchMessages(activeConvo.id);
+    }
   };
 
   /* ─── Edit message ─── */
@@ -426,6 +432,13 @@ const DirectMessages: React.FC = () => {
     setEditingId(null);
     setEditText("");
   };
+
+  const copyMessageText = async (body: string | null) => {
+    if (!body?.trim()) { toast.error("Nothing to copy"); return; }
+    try { await navigator.clipboard.writeText(body); toast.success("Copied"); } catch { toast.error("Could not copy"); }
+  };
+
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const formatMsgTime = (ts: string) => {
     const d = new Date(ts);
@@ -664,25 +677,40 @@ const DirectMessages: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Hover actions */}
+                        {/* Action toolbar */}
                         <div className={cn(
-                          "absolute top-0 flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100",
-                          isMe ? "-left-16" : "-right-16",
+                          "absolute -top-8 flex items-center gap-0.5 rounded-xl border border-white/[0.08] bg-[#0d1117]/95 px-1 py-0.5 shadow-xl backdrop-blur opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100",
+                          isMe ? "right-0" : "left-0",
                         )}>
-                          <button onClick={() => setReplyTo(msg)} className="rounded p-1 text-white/20 hover:bg-white/[0.06] hover:text-white/50">
-                            <Reply className="h-3 w-3" />
+                          <button onClick={() => setMenuOpenId(menuOpenId === msg.id ? null : msg.id)} className="rounded-full bg-white/[0.04] px-1.5 py-1 text-white/32 hover:bg-white/[0.08] hover:text-white/70" title="More">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
                           </button>
-                          {isMe && (
-                            <>
-                              <button onClick={() => startEdit(msg)} className="rounded p-1 text-white/20 hover:bg-white/[0.06] hover:text-white/50">
-                                <Edit2 className="h-3 w-3" />
-                              </button>
-                              <button onClick={() => deleteMessage(msg.id)} className="rounded p-1 text-white/20 hover:bg-red-500/20 hover:text-red-400/60">
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            </>
-                          )}
+                          <button onClick={() => setReplyTo(msg)} className="rounded-full bg-white/[0.04] px-1.5 py-1 text-white/32 hover:bg-white/[0.08] hover:text-white/70" title="Reply">
+                            <Reply className="h-3.5 w-3.5" />
+                          </button>
+                          {DM_QUICK_REACTIONS.map(emoji => (
+                            <button key={emoji} onClick={() => { copyMessageText(emoji + " " + (msg.body || "").slice(0, 20)); }} className="rounded-full px-1.5 py-0.5 text-sm bg-white/[0.04] text-white/85 hover:bg-white/[0.08] transition-colors" title={`React ${emoji}`}>
+                              {emoji}
+                            </button>
+                          ))}
                         </div>
+                        {menuOpenId === msg.id && (
+                          <div className={cn("absolute z-30 min-w-[160px] rounded-2xl border border-white/10 bg-[#11111a] p-1.5 shadow-2xl", isMe ? "right-0 -top-[7.5rem]" : "left-0 -top-[7.5rem]")}>
+                            <button onClick={() => { copyMessageText(msg.body); setMenuOpenId(null); }} className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs text-white/60 hover:bg-white/[0.05] hover:text-white">
+                              <Copy className="h-3.5 w-3.5" /> Copy text
+                            </button>
+                            {isMe && (
+                              <button onClick={() => { startEdit(msg); setMenuOpenId(null); }} className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs text-white/60 hover:bg-white/[0.05] hover:text-white">
+                                <Edit2 className="h-3.5 w-3.5" /> Edit
+                              </button>
+                            )}
+                            {isMe && (
+                              <button onClick={() => { deleteMessage(msg.id); setMenuOpenId(null); }} className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs text-red-300 hover:bg-red-400/10">
+                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

@@ -351,9 +351,6 @@ function MessageRow({
             )}
           >
             {msg.is_pinned && <Pin className="mr-1 inline h-3 w-3 text-og-gold" />}
-            {msg.is_deleted ? (
-              <span className="italic text-white/30">Message deleted</span>
-            ) : (
               <div className="space-y-2">
                 {msg.replyPreview && (
                   <button
@@ -384,7 +381,6 @@ function MessageRow({
                   )
                 )}
               </div>
-            )}
           </div>
 
           {!!msg.reactions?.length && (
@@ -599,6 +595,8 @@ const CommunityRooms: React.FC = () => {
       .from("community_room_messages")
       .select("*")
       .eq("room_id", roomId)
+      .eq("is_deleted", false)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(80);
     if (error) {
@@ -835,15 +833,18 @@ const CommunityRooms: React.FC = () => {
 
   const deleteMessage = async (message: Message) => {
     if (!activeRoom || (!canModerate && message.sender_id !== user?.id)) return;
+    // Optimistic removal — hide immediately
+    setMessages(prev => prev.filter(m => m.id !== message.id));
     if (canModerate) {
       await supabase.from("community_room_moderation_actions").insert({ room_id: activeRoom.id, moderator_id: user?.id, target_user_id: message.sender_id, message_id: message.id, action_type: "message_deleted" });
     }
     const { error } = await supabase.from("community_room_messages").delete().eq("id", message.id);
     if (error) {
       toast.error(error.message || "Could not delete message");
+      // Restore on failure
+      loadMessages(activeRoom.id);
       return;
     }
-    loadMessages(activeRoom.id);
   };
 
   const reportMessage = async (message: Message) => {
