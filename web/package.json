@@ -13,6 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@coin-communities/sdk": "^0.4.2",
     "@hookform/resolvers": "^3.10.0",
     "@livekit/components-react": "^2.6.7",
     "@radix-ui/react-accordion": "^1.2.11",
