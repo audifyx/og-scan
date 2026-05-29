@@ -139,11 +139,15 @@ export async function ccHandleTwitterCallback(
  * CC native app deep-links to ogscan.fun?cc_challenge=CODE after login.
  */
 export async function ccHandleChallengeExchange(challengeCode: string): Promise<void> {
-  ccConfigureAnon();
-  const result = await api.twitterChallengeExchange({ body: { challengeCode } });
-  if (result.error) throw new Error((result.error as { message?: string }).message ?? "Auth failed");
-  const d = result.data as { accessToken: string; refreshToken: string; user: CCUser };
-  ccSaveSession(d.accessToken, d.refreshToken, d.user);
+  // Use direct fetch — SDK doesn't forward X-Api-Key header correctly
+  const resp = await fetch(`${BASE_URL}/api/v1/users/twitter/challenge/exchange`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Api-Key": CC_API_KEY },
+    body: JSON.stringify({ challengeCode }),
+  });
+  const json = await resp.json() as { accessToken?: string; refreshToken?: string; user?: CCUser; message?: string };
+  if (!resp.ok || !json.accessToken) throw new Error(json.message ?? "Auth failed");
+  ccSaveSession(json.accessToken, json.refreshToken!, json.user!);
 }
 
 /** Refresh the access token silently */
