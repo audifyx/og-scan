@@ -7,7 +7,7 @@
  *   - Posts feed / empty state
  *   - Green "+" FAB to post (requires X auth + wallet)
  */
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   MessageSquare,
@@ -308,8 +308,17 @@ export const CoinCommunityFull = ({
   const [activeTab, setActiveTab] = useState<SortTab>("top");
   const [showCompose, setShowCompose] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
   const [ccUser, setCcUser] = useState<CCUser | null>(() => ccGetStoredUser());
+
+  // Keep in sync with global X auth changes (e.g. user connects in Settings)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ user: CCUser | null }>).detail;
+      setCcUser(detail.user);
+    };
+    window.addEventListener("cc-auth-changed", handler);
+    return () => window.removeEventListener("cc-auth-changed", handler);
+  }, []);
   const qc = useQueryClient();
 
   // ── Queries ─────────────────────────────────────────────────────────────────
@@ -344,25 +353,10 @@ export const CoinCommunityFull = ({
 
   // ── Auth ─────────────────────────────────────────────────────────────────────
 
-  const handleXLogin = useCallback(async () => {
-    setAuthLoading(true);
-    await ccStartXLogin(
-      CC_CALLBACK_URL,
-      (user) => {
-        setCcUser(user);
-        setAuthLoading(false);
-        setShowAuthPrompt(false);
-      },
-      (_errMsg) => {
-        // Same-tab redirect failed — nothing to show here since page will reload or error is surfaced upstream
-        setAuthLoading(false);
-      },
-    );
-  }, []);
-
   const handleLogout = useCallback(() => {
     ccClearAuth();
     setCcUser(null);
+    window.dispatchEvent(new CustomEvent("cc-auth-changed", { detail: { user: null } }));
   }, []);
 
   const handleFabClick = useCallback(() => {
@@ -534,16 +528,11 @@ export const CoinCommunityFull = ({
               Sign in with X (Twitter) to post in the <span className="text-og-lime font-semibold">${tokenSymbol}</span> community. You must hold tokens to post.
             </p>
             <button
-              onClick={handleXLogin}
-              disabled={authLoading}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white text-black font-bold text-[14px] hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-60"
+              onClick={() => { window.location.href = "/settings?tab=connections"; }}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white text-black font-bold text-[14px] hover:bg-white/90 active:scale-[0.98] transition-all"
             >
-              {authLoading ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-black"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
-              )}
-              {authLoading ? "Opening X..." : "Sign in with X"}
+              <svg viewBox="0 0 24 24" className="w-4 h-4 fill-black"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+              Connect X in Settings
             </button>
             <button
               onClick={() => setShowAuthPrompt(false)}

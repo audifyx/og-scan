@@ -26,8 +26,20 @@ import {
   DollarSign, Bell, User, Shield, Webhook, Palette, LogOut, Eye, EyeOff,
   Check, Loader2, KeyRound, Mail, Link, Twitter, MessageSquare, Globe,
   Wallet, Star, Copy, Flame, Trophy, Zap, Clock, ChevronRight, Users, Gift, Share2,
-  Code2, Radio, Maximize2, ExternalLink,
+  Code2, Radio, Maximize2, ExternalLink, Plug,
 } from "lucide-react";
+import {
+  ccGetStoredUser,
+  ccClearAuth,
+  ccStartXLogin,
+  type CCUser,
+} from "@/lib/ccAuth";
+import {
+  xStartLogin,
+  xGetStoredUser,
+  xSetStoredUser,
+  type XUser,
+} from "@/lib/xAuth";
 
 interface ProfileData {
   username?: string;
@@ -283,6 +295,7 @@ const Settings = () => {
 
   const settingsNav = [
     { value: "profile",       icon: User,         label: "Profile",           mobileLabel: "Profile"   },
+    { value: "connections",   icon: Plug,         label: "Connections",       mobileLabel: "Connect"   },
     { value: "account",       icon: Shield,       label: "Account",           mobileLabel: "Account"   },
     { value: "themes",        icon: Palette,      label: "Themes",            mobileLabel: "Themes"    },
     { value: "invite",        icon: Gift,         label: "Invite & Referrals",mobileLabel: "Invite"    },
@@ -536,6 +549,10 @@ const Settings = () => {
           </div>)}
 
           {/* ── Account Tab ── */}
+          {activeTab === "connections" && (
+            <ConnectionsTab />
+          )}
+
           {activeTab === "account" && (<div className="tab-content">
             <div className="hidden lg:flex items-center gap-3 mb-6 border-b border-white/[0.06] pb-4">
               <Shield className="h-5 w-5 text-white/40" />
@@ -1003,6 +1020,210 @@ function EmbedSettingsTab({ username }: { username?: string }) {
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Connections Tab — global account integrations
+   ───────────────────────────────────────────────────────────── */
+const CC_CALLBACK_URL = `${window.location.origin}/cc-callback`;
+
+function ConnectionsTab() {
+  const [ccUser, setCcUser] = useState<CCUser | null>(() => ccGetStoredUser());
+  const [xUser, setXUser] = useState<XUser | null>(() => xGetStoredUser());
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Listen for global X auth changes (e.g. from /x-callback redirect)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ user: XUser | null }>).detail;
+      setXUser(detail.user);
+      xSetStoredUser(detail.user);
+    };
+    window.addEventListener("x-auth-changed", handler);
+    return () => window.removeEventListener("x-auth-changed", handler);
+  }, []);
+
+  const handleCCConnect = async () => {
+    setAuthLoading(true);
+    setAuthError(null);
+    await ccStartXLogin(
+      CC_CALLBACK_URL,
+      (user) => {
+        setCcUser(user);
+        setAuthLoading(false);
+        window.dispatchEvent(new CustomEvent("cc-auth-changed", { detail: { user } }));
+        toast.success("X account connected to communities!");
+      },
+      (msg) => {
+        setAuthLoading(false);
+        setAuthError(msg);
+      },
+    );
+  };
+
+  const handleCCDisconnect = () => {
+    ccClearAuth();
+    setCcUser(null);
+    window.dispatchEvent(new CustomEvent("cc-auth-changed", { detail: { user: null } }));
+    toast.success("X communities disconnected");
+  };
+
+  const handleXConnect = () => {
+    // Redirects to Twitter OAuth 2.0 PKCE flow → /x-callback
+    xStartLogin();
+  };
+
+  const handleXDisconnect = () => {
+    xSetStoredUser(null);
+    setXUser(null);
+    window.dispatchEvent(new CustomEvent("x-auth-changed", { detail: { user: null } }));
+    toast.success("X posting disconnected");
+  };
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div className="hidden lg:flex items-center gap-3 mb-6 border-b border-white/[0.06] pb-4">
+        <Plug className="h-5 w-5 text-white/40" />
+        <h2 className="text-[20px] font-bold">Connections</h2>
+      </div>
+
+      {/* Card 1: X Communities (CC OAuth — for posting in CC token communities) */}
+      <Card className="p-5 glass-card">
+        <div className="flex items-start gap-4">
+          <div className="h-11 w-11 rounded-2xl bg-white/[0.07] border border-white/10 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h3 className="font-bold text-white text-[15px]">X Communities</h3>
+              {ccUser ? (
+                <span className="rounded-full bg-og-lime/15 border border-og-lime/25 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-og-lime">Connected</span>
+              ) : (
+                <span className="rounded-full bg-white/[0.06] px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white/30">CC Feed</span>
+              )}
+            </div>
+            {ccUser ? (
+              <div className="flex items-center gap-2.5 mt-2">
+                {ccUser.profileImageUrl && (
+                  <img src={ccUser.profileImageUrl} alt={ccUser.displayName} className="w-8 h-8 rounded-full ring-1 ring-white/10" />
+                )}
+                <div>
+                  <div className="text-white/80 text-[13px] font-semibold">{ccUser.displayName}</div>
+                  <div className="text-white/40 font-mono text-[11px]">@{ccUser.username}</div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-white/45 text-[13px] leading-relaxed mt-1">
+                Post and interact in token communities on the CC Feed tab.
+              </p>
+            )}
+            {authError && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2 text-red-400 text-[11px]">
+                <span className="shrink-0 mt-0.5">⚠</span>
+                <span>{authError}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 mt-4">
+              {ccUser ? (
+                <Button variant="outline" size="sm" onClick={handleCCDisconnect}
+                  className="text-red-400 border-red-400/20 hover:bg-red-400/10 hover:text-red-300 rounded-xl">
+                  <LogOut className="h-3.5 w-3.5 mr-1.5" />
+                  Disconnect
+                </Button>
+              ) : (
+                <button onClick={handleCCConnect} disabled={authLoading}
+                  className="flex items-center gap-2 rounded-xl bg-white text-black font-bold text-[13px] px-4 py-2 hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-60">
+                  {authLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <svg viewBox="0 0 24 24" className="w-4 h-4 fill-black"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>}
+                  {authLoading ? "Connecting…" : "Connect X"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Card 2: X Cross-Posting (native OAuth 2.0 — tweet.write for posting from OG Scan → X) */}
+      <Card className="p-5 glass-card">
+        <div className="flex items-start gap-4">
+          <div className="h-11 w-11 rounded-2xl bg-og-lime/10 border border-og-lime/20 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-og-lime"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h3 className="font-bold text-white text-[15px]">X Cross-Posting</h3>
+              {xUser ? (
+                <span className="rounded-full bg-og-lime/15 border border-og-lime/25 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-og-lime">Connected</span>
+              ) : (
+                <span className="rounded-full bg-og-lime/[0.08] px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-og-lime/50">tweet.write</span>
+              )}
+            </div>
+            {xUser ? (
+              <div className="flex items-center gap-2.5 mt-2">
+                {xUser.profileImageUrl && (
+                  <img src={xUser.profileImageUrl} alt={xUser.displayName} className="w-8 h-8 rounded-full ring-1 ring-og-lime/20" />
+                )}
+                <div>
+                  <div className="text-white/80 text-[13px] font-semibold">{xUser.displayName}</div>
+                  <div className="text-og-lime/70 font-mono text-[11px]">@{xUser.username}</div>
+                  <div className="text-white/30 text-[10px] mt-0.5">Posts you compose will appear on X when toggle is on</div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-white/45 text-[13px] leading-relaxed mt-1">
+                When composing a post, toggle "Also post to X" to cross-publish to your X feed. Requires tweet.write permission.
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-2 mt-4">
+              {xUser ? (
+                <Button variant="outline" size="sm" onClick={handleXDisconnect}
+                  className="text-red-400 border-red-400/20 hover:bg-red-400/10 hover:text-red-300 rounded-xl">
+                  <LogOut className="h-3.5 w-3.5 mr-1.5" />
+                  Disconnect
+                </Button>
+              ) : (
+                <button onClick={handleXConnect}
+                  className="flex items-center gap-2 rounded-xl bg-og-lime text-black font-bold text-[13px] px-4 py-2 hover:bg-og-lime/90 active:scale-[0.98] transition-all">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-black"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                  Connect for Cross-Posting
+                </button>
+              )}
+            </div>
+            {!xUser && (
+              <ul className="mt-4 space-y-1.5">
+                {[
+                  "Your OG posts cross-publish to X in one tap",
+                  "X icon badge on cross-posted community posts",
+                  "View on X link for each cross-posted post",
+                ].map(t => (
+                  <li key={t} className="flex items-center gap-2 text-white/35 text-[12px]">
+                    <Zap className="h-3 w-3 text-og-lime/50 shrink-0" />
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* More integrations coming soon */}
+      <Card className="p-5 glass-card border-white/[0.04] opacity-60">
+        <div className="flex items-center gap-3">
+          <div className="h-11 w-11 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center shrink-0">
+            <Zap className="h-5 w-5 text-white/20" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-white/50 text-[14px]">More integrations</h3>
+              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 font-mono text-[8px] uppercase tracking-widest text-white/30">Soon</span>
+            </div>
+            <p className="text-white/30 text-[12px] mt-0.5">Telegram, Discord, and more on the way.</p>
+          </div>
         </div>
       </Card>
     </div>

@@ -37,6 +37,7 @@ import SupportCenter from "./pages/SupportCenter";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
+import { XCallbackPage } from "./pages/XCallbackPage";
 import Admin from "./pages/Admin";
 import SpaceReplay from "./pages/SpaceReplay";
 import PublicSpaceListen from "./pages/PublicSpaceListen";
@@ -105,6 +106,7 @@ const App = () => (
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/cc-callback" element={<CCCallbackPage />} />
+            <Route path="/x-callback" element={<XCallbackPage />} />
 
             {/* ── Public: App install page ── */}
             <Route path="/install" element={<InstallApp />} />

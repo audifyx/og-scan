@@ -3,7 +3,7 @@
  * Shows: top communities grid + live cross-community public feed.
  * Route: /coin-communities
  */
-import { useState, useCallback, lazy, Suspense } from "react";
+import { useState, useCallback, lazy, Suspense, useEffect } from "react";
 const CoinCommunityFull = lazy(() => import("@/components/CoinCommunityFull").then(m => ({ default: m.CoinCommunityFull })));
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,13 +16,11 @@ import {
   TrendingUp,
   Flame,
   Clock,
-  LogOut,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   ccGetStoredUser,
-  ccClearAuth,
-  ccStartXLogin,
   type CCUser,
 } from "@/lib/ccAuth";
 import {
@@ -212,28 +210,21 @@ const TABS = [
   { id: "top" as View, label: "Top Communities", icon: TrendingUp },
 ] as const;
 
-const CC_CALLBACK_URL = `${window.location.origin}/cc-callback`;
+
 
 export const CoinCommunitiesPage = () => {
   const [activeView, setActiveView] = useState<View>("feed");
   const [selectedToken, setSelectedToken] = useState<{ address: string; symbol: string } | null>(null);
   const [ccUser, setCcUser] = useState<CCUser | null>(() => ccGetStoredUser());
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
 
-  const handleXLogin = useCallback(async () => {
-    setAuthLoading(true);
-    setAuthError(null);
-    await ccStartXLogin(
-      CC_CALLBACK_URL,
-      (user) => { setCcUser(user); setAuthLoading(false); },
-      (msg) => { setAuthLoading(false); setAuthError(msg); },
-    );
-  }, []);
-
-  const handleLogout = useCallback(() => {
-    ccClearAuth();
-    setCcUser(null);
+  // Listen for global X auth state changes (from Settings → Connections tab)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ user: CCUser | null }>).detail;
+      setCcUser(detail.user);
+    };
+    window.addEventListener("cc-auth-changed", handler);
+    return () => window.removeEventListener("cc-auth-changed", handler);
   }, []);
 
   const {
@@ -306,37 +297,24 @@ export const CoinCommunitiesPage = () => {
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
 
-          {/* X auth */}
+          {/* X connected pill — read from global state */}
           {ccUser ? (
-            <div className="flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/10 pl-1 pr-2 py-1 shrink-0">
+            <div className="flex items-center gap-1.5 rounded-full bg-og-lime/10 border border-og-lime/20 pl-1 pr-2 py-1 shrink-0">
               {ccUser.profileImageUrl && (
                 <img src={ccUser.profileImageUrl} alt={ccUser.displayName} className="w-5 h-5 rounded-full" />
               )}
-              <span className="font-mono text-[9px] text-white/60 max-w-[70px] truncate">@{ccUser.username}</span>
-              <button onClick={handleLogout} title="Disconnect X" className="text-white/25 hover:text-red-400 transition-colors">
-                <LogOut className="h-3 w-3" />
-              </button>
+              <span className="font-mono text-[9px] text-og-lime max-w-[70px] truncate">@{ccUser.username}</span>
             </div>
           ) : (
             <button
-              onClick={handleXLogin}
-              disabled={authLoading}
-              className="flex items-center gap-1.5 rounded-full bg-white text-black font-bold text-[10px] px-2.5 py-1.5 hover:bg-white/90 active:scale-95 transition-all disabled:opacity-60 shrink-0"
+              onClick={() => { window.location.href = "/settings?tab=connections"; }}
+              className="flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/10 px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-widest text-white/40 hover:border-og-lime/30 hover:text-og-lime transition-colors shrink-0"
             >
-              {authLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <svg viewBox="0 0 24 24" className="w-3 h-3 fill-black shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>}
-              {authLoading ? "…" : "Sign in"}
+              <Settings className="h-3 w-3" />
+              Connect X
             </button>
           )}
         </div>
-
-        {/* Auth error banner */}
-        {authError && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-mono flex items-start gap-2">
-            <span className="shrink-0 mt-0.5">⚠</span>
-            <span className="leading-snug">{authError}</span>
-            <button onClick={() => setAuthError(null)} className="ml-auto shrink-0 opacity-60 hover:opacity-100 text-base leading-none">×</button>
-          </div>
-        )}
 
         {/* Tab bar — only on main feed/top views */}
         {!selectedToken && (
