@@ -72,7 +72,26 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
     fetchLobbies();
     const channel = supabase
       .channel(`lobbies-realtime-${Date.now()}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "trading_lobbies" }, () => fetchLobbies())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "trading_lobbies" }, (payload) => {
+        const newLobby = payload.new as Lobby;
+        if (!newLobby.is_active && newLobby.is_active !== undefined) return;
+        setLobbies(prev => {
+          if (prev.some(l => l.id === newLobby.id)) return prev;
+          return [newLobby, ...prev];
+        });
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "trading_lobbies" }, (payload) => {
+        const updated = payload.new as Lobby;
+        if (!updated.is_active) {
+          setLobbies(prev => prev.filter(l => l.id !== updated.id));
+        } else {
+          setLobbies(prev => prev.map(l => l.id === updated.id ? { ...l, ...updated } : l));
+        }
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "trading_lobbies" }, (payload) => {
+        const deleted = payload.old as Lobby;
+        setLobbies(prev => prev.filter(l => l.id !== deleted.id));
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
@@ -157,6 +176,11 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
         user_id: user.id,
         role: "creator",
       });
+      // Optimistically add to list (realtime may also fire but dedup handles it)
+      setLobbies(prev => {
+        if (prev.some(l => l.id === data.id)) return prev;
+        return [data as Lobby, ...prev];
+      });
       setActiveLobby(data);
       setShowCreate(false);
       setNewName("");
@@ -185,6 +209,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
 
   const deleteLobby = async (id: string) => {
     await supabase.from("trading_lobbies").delete().eq("id", id);
+    setLobbies(prev => prev.filter(l => l.id !== id));
     if (activeLobby?.id === id) setActiveLobby(null);
     toast.success("Lobby deleted");
   };
