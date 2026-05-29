@@ -722,6 +722,8 @@ const CommunityRooms: React.FC = () => {
     loadRooms();
   };
 
+  const sidePanelLabel = sidePanel === "info" ? "Room Info" : sidePanel === "members" ? "Members" : sidePanel === "moderation" ? "Moderation" : "";
+
   const sidePanelContent = sidePanel === "info" ? (
     <div className="space-y-4">
       <div>
@@ -778,9 +780,9 @@ const CommunityRooms: React.FC = () => {
     </div>
   ) : sidePanel === "members" ? (
     <div>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-[10px] font-black uppercase tracking-widest text-white/25">Members ({members.length})</p>
-        <button onClick={copyRoomLink} className="rounded-lg p-1.5 text-white/25 hover:bg-white/[0.05] hover:text-white" title="Copy room invite link">
+      <div className="relative mb-4 flex items-center justify-center">
+        <p className="text-center text-[10px] font-black uppercase tracking-widest text-white/25">Members ({members.length})</p>
+        <button onClick={copyRoomLink} className="absolute right-0 rounded-lg p-1.5 text-white/25 hover:bg-white/[0.05] hover:text-white" title="Copy room invite link">
           <UserPlus className="h-4 w-4" />
         </button>
       </div>
@@ -1025,15 +1027,17 @@ const CommunityRooms: React.FC = () => {
                   <aside className="hidden w-[320px] shrink-0 overflow-y-auto border-l border-white/[0.06] bg-[#0d0f15] p-4 lg:block">
                     {sidePanelContent}
                   </aside>
-                  <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden" onClick={() => setSidePanel(null)}>
-                    <div className="absolute inset-x-0 bottom-0 max-h-[78vh] overflow-y-auto rounded-t-3xl border-t border-white/[0.08] bg-[#0d0f15] p-4 shadow-2xl" onClick={event => event.stopPropagation()}>
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/28">{sidePanel}</p>
-                        <button onClick={() => setSidePanel(null)} className="rounded-lg p-1.5 text-white/35 hover:bg-white/[0.05] hover:text-white">
+                  <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/78 p-4 pb-[calc(env(safe-area-inset-bottom,0px)+88px)] pt-[max(env(safe-area-inset-top,0px),16px)] backdrop-blur-sm lg:hidden" onClick={() => setSidePanel(null)}>
+                    <div className="relative flex max-h-[min(78vh,calc(100vh-132px))] w-full max-w-[420px] flex-col overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#0d0f15] shadow-[0_30px_90px_rgba(0,0,0,0.55)]" onClick={event => event.stopPropagation()}>
+                      <div className="relative border-b border-white/[0.06] px-5 pb-3 pt-5 text-center">
+                        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-white/28">{sidePanelLabel}</p>
+                        <button onClick={() => setSidePanel(null)} className="absolute right-4 top-4 rounded-lg p-1.5 text-white/35 hover:bg-white/[0.05] hover:text-white">
                           <X className="h-4 w-4" />
                         </button>
                       </div>
-                      {sidePanelContent}
+                      <div className="overflow-y-auto px-5 py-4">
+                        {sidePanelContent}
+                      </div>
                     </div>
                   </div>
                 </>
