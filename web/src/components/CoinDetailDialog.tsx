@@ -62,7 +62,7 @@ import {
 } from "@/lib/og";
 import { explorerAddressUrl, getChain } from "@/lib/chains";
 import { fetchEvmTokenSecurity, type EvmTokenSecurity } from "@/lib/evm-intel";
-import { CoinCommunityPanel } from "@/components/CoinCommunityPanel";
+import { CoinCommunityFull } from "@/components/CoinCommunityFull";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -701,8 +701,19 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
               </a>
             </div>
 
-            {/* CoinCommunities chat panel (pump.fun style community section) */}
-            <CoinCommunityPanel tokenAddress={detailToken.id} tokenSymbol={detailToken.symbol ?? "—"} />
+            {/* CoinCommunities — full pump.fun-style community section */}
+            <div className="rounded-xl overflow-hidden border border-white/[0.07] bg-[#080f1a]" style={{ height: 480 }}>
+              <CoinCommunityFull
+                tokenAddress={detailToken.id}
+                tokenSymbol={detailToken.symbol ?? "—"}
+                tokenName={detailToken.name}
+                tokenImageUrl={detailToken.logoURI}
+                marketCap={marketCap || undefined}
+                priceChange={change24 || undefined}
+                description={detailToken.description}
+                embedded
+              />
+            </div>
 
             {/* Market data */}
             <SidePanel title="Market Data" icon={<CandlestickChart className="h-3.5 w-3.5" />} accent="gold">

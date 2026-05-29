@@ -3,7 +3,8 @@
  * Shows: top communities grid + live cross-community public feed.
  * Route: /coin-communities
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, lazy, Suspense } from "react";
+const CoinCommunityFull = lazy(() => import("@/components/CoinCommunityFull").then(m => ({ default: m.CoinCommunityFull })));
 import { useQuery } from "@tanstack/react-query";
 import {
   Users,
@@ -294,13 +295,27 @@ export const CoinCommunitiesPage = () => {
 
       {/* ── Content ── */}
       <div className="flex-1">
-        {/* Token-specific feed */}
+        {/* Token-specific community — full pump.fun-style page with X login + posting */}
         {selectedToken && (
-          <TokenFeed
-            tokenAddress={selectedToken.address}
-            tokenSymbol={selectedToken.symbol}
-            onBack={handleBack}
-          />
+          <div className="flex flex-col h-full">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] shrink-0">
+              <button
+                onClick={handleBack}
+                className="text-white/40 hover:text-white/80 font-mono text-[10px] uppercase tracking-widest transition-colors"
+              >
+                ← Back
+              </button>
+              <span className="font-bold text-white text-sm">${selectedToken.symbol} Community</span>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}>
+                <CoinCommunityFull
+                  tokenAddress={selectedToken.address}
+                  tokenSymbol={selectedToken.symbol}
+                />
+              </Suspense>
+            </div>
+          </div>
         )}
 
         {/* Live cross-community feed */}
