@@ -16,8 +16,15 @@ import {
   TrendingUp,
   Flame,
   Clock,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  ccGetStoredUser,
+  ccClearAuth,
+  ccStartXLogin,
+  type CCUser,
+} from "@/lib/ccAuth";
 import {
   ccGetTopCommunities,
   ccGetPublicFeed,
@@ -205,9 +212,27 @@ const TABS = [
   { id: "top" as View, label: "Top Communities", icon: TrendingUp },
 ] as const;
 
+const CC_CALLBACK_URL = `${window.location.origin}/cc-callback`;
+
 export const CoinCommunitiesPage = () => {
   const [activeView, setActiveView] = useState<View>("feed");
   const [selectedToken, setSelectedToken] = useState<{ address: string; symbol: string } | null>(null);
+  const [ccUser, setCcUser] = useState<CCUser | null>(() => ccGetStoredUser());
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const handleXLogin = useCallback(async () => {
+    setAuthLoading(true);
+    await ccStartXLogin(
+      CC_CALLBACK_URL,
+      (user) => { setCcUser(user); setAuthLoading(false); },
+      () => setAuthLoading(false),
+    );
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    ccClearAuth();
+    setCcUser(null);
+  }, []);
 
   const {
     data: feed = [],
@@ -261,14 +286,31 @@ export const CoinCommunitiesPage = () => {
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
-          <a
-            href="https://coincommunities.org"
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-widest text-white/50 transition hover:border-og-cyan/40 hover:text-og-cyan"
-          >
-            Visit <ExternalLink className="h-3 w-3" />
-          </a>
+          {/* X auth — logged-in user pill or sign-in button */}
+          {ccUser ? (
+            <div className="flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/10 pl-1 pr-2.5 py-1">
+              {ccUser.profileImageUrl && (
+                <img src={ccUser.profileImageUrl} alt={ccUser.displayName} className="w-5 h-5 rounded-full" />
+              )}
+              <span className="font-mono text-[9px] text-white/60 max-w-[80px] truncate">@{ccUser.username}</span>
+              <button onClick={handleLogout} title="Disconnect X" className="text-white/25 hover:text-red-400 transition-colors ml-0.5">
+                <LogOut className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleXLogin}
+              disabled={authLoading}
+              className="flex items-center gap-1.5 rounded-full bg-white text-black font-bold text-[10px] px-3 py-1.5 hover:bg-white/90 active:scale-95 transition-all disabled:opacity-60 shrink-0"
+            >
+              {authLoading ? (
+                <RefreshCw className="h-3 w-3 animate-spin" />
+              ) : (
+                <svg viewBox="0 0 24 24" className="w-3 h-3 fill-black shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+              )}
+              {authLoading ? "Opening…" : "Sign in with X"}
+            </button>
+          )}
         </div>
 
         {/* Tab bar */}
