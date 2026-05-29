@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import { DEFAULT_OG_MINT, OGSCAN_TOKEN_MINT, SOL_MINT, STORAGE_OG_MINT, shortAddr, type JupTokenInfo } from "@/lib/og";
 import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 import { AuthButton } from "@/components/AuthButton";
@@ -993,15 +994,10 @@ const OverviewPage = ({
   onChangeMint: () => void;
   onSelectMint: (m: string) => void;
 }) => {
-  const quickActions = [
-    { label: "Scan Token", Icon: Search, accent: "lime" as TabAccent, tab: "scanner" as TabId },
-    { label: "Listings", Icon: Star, accent: "gold" as TabAccent, tab: "listings" as TabId },
-    { label: "Launch Radar", Icon: Target, accent: "cyan" as TabAccent, tab: "snipe-feed" as TabId },
-    { label: "Community", Icon: MessageSquare, accent: "cyan" as TabAccent, tab: "community" as TabId },
-  ];
-
+  const { user, profile } = useAuth();
   const [popupMint, setPopupMint] = useState<string | null>(null);
   const popupToken: JupTokenInfo | null = popupMint ? { id: popupMint, name: "", symbol: "", decimals: 9 } : null;
+
   const openCommunitySub = (sub: CommunitySubTab) => {
     try {
       localStorage.setItem(COMMUNITY_SUB_STORAGE_KEY, sub);
@@ -1009,157 +1005,205 @@ const OverviewPage = ({
     } catch { /* noop */ }
     onSwitchTab("community");
   };
-  const appHomeCards = [
-    { label: "Truth Scan", value: "Ready", sub: "Token forensic mode", Icon: Search, accent: "lime" as TabAccent, tab: "scanner" as TabId },
-    { label: "Launch Radar", value: "Live", sub: "Fresh mint stream", Icon: Target, accent: "cyan" as TabAccent, tab: "snipe-feed" as TabId },
-    { label: "Market Pulse", value: "Hot", sub: "Narratives and whales", Icon: Flame, accent: "gold" as TabAccent, tab: "feed" as TabId },
-    { label: "Spaces", value: "Open", sub: "Voice rooms and alpha", Icon: Radio, accent: "cyan" as TabAccent, tab: "community" as TabId, communitySub: "spaces" as CommunitySubTab },
+
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
+  })();
+
+  const displayName = profile?.display_name || profile?.username || "OG";
+
+  // Feature highlight cards — the 4 main entry points
+  const featureCards = [
+    {
+      eyebrow: "FORENSICS",
+      title: "Truth Scanner",
+      desc: "Rug score, dev wallet DNA, holder risk, bundle detection",
+      Icon: Search,
+      accent: "lime" as TabAccent,
+      tab: "scanner" as TabId,
+      badge: "LIVE",
+      gradient: "from-og-lime/10 to-og-lime/[0.02]",
+      glow: "shadow-[0_8px_32px_-12px_hsl(var(--og-lime)/0.4)]",
+    },
+    {
+      eyebrow: "LAUNCHES",
+      title: "Launch Radar",
+      desc: "Fresh mints, migrations, repeat dev flags, snipe alerts",
+      Icon: Rocket,
+      accent: "cyan" as TabAccent,
+      tab: "snipe-feed" as TabId,
+      badge: "STREAMING",
+      gradient: "from-og-cyan/10 to-og-cyan/[0.02]",
+      glow: "shadow-[0_8px_32px_-12px_hsl(var(--og-cyan)/0.4)]",
+    },
+    {
+      eyebrow: "MARKET",
+      title: "Market Feed",
+      desc: "Trending tokens, whale moves, narratives, news signals",
+      Icon: Flame,
+      accent: "gold" as TabAccent,
+      tab: "feed" as TabId,
+      badge: "HOT",
+      gradient: "from-og-gold/10 to-og-gold/[0.02]",
+      glow: "shadow-[0_8px_32px_-12px_hsl(var(--og-gold)/0.4)]",
+    },
+    {
+      eyebrow: "COMMUNITY",
+      title: "OG Spaces",
+      desc: "Voice rooms, live alpha calls, trader communities",
+      Icon: Radio,
+      accent: "cyan" as TabAccent,
+      tab: "community" as TabId,
+      communitySub: "spaces" as CommunitySubTab,
+      badge: "OPEN",
+      gradient: "from-purple-500/10 to-purple-500/[0.02]",
+      glow: "shadow-[0_8px_32px_-12px_rgba(168,85,247,0.4)]",
+    },
   ];
 
-  const toolSections = [
-    {
-      title: "Forensics",
-      accent: "lime" as TabAccent,
-      items: [
-        { ...TAB_BY_ID.scanner, shortDesc: "Rug score, dev wallet, holder risk" },
-        { ...TAB_BY_ID["snipe-feed"], shortDesc: "New coins, repeat creators, alerts" },
-      ],
-    },
-    {
-      title: "Market",
-      accent: "cyan" as TabAccent,
-      items: [
-        { ...TAB_BY_ID.feed, shortDesc: "Trending, pairs, whale activity" },
-        { ...TAB_BY_ID["news-signal"], shortDesc: "Influencer mentions, early signals" },
-      ],
-    },
-    {
-      title: "Trading",
-      accent: "gold" as TabAccent,
-      items: [
-        { ...TAB_BY_ID.trending, shortDesc: "Live momentum & catalysts" },
-      ],
-    },
+  // Community quick links — compact horizontal strip
+  const communityLinks = [
+    { label: "Social Feed", Icon: MessageSquare, sub: "social" as CommunitySubTab, accent: "lime" as TabAccent },
+    { label: "Rooms", Icon: Hash, sub: "rooms" as CommunitySubTab, accent: "white" as TabAccent },
+    { label: "Spaces", Icon: Radio, sub: "spaces" as CommunitySubTab, accent: "cyan" as TabAccent },
+    { label: "Groups", Icon: Users, sub: "communities" as CommunitySubTab, accent: "gold" as TabAccent },
+    { label: "Discover", Icon: Compass, sub: "discover" as CommunitySubTab, accent: "cyan" as TabAccent },
+  ];
+
+  // Forensic tools — compact list
+  const forensicTools = [
+    { label: "Token Scanner", Icon: Search, tab: "scanner" as TabId, accent: "lime" as TabAccent, desc: "Risk & rug analysis" },
+    { label: "OG Finder", Icon: Crosshair, tab: "og-finder" as TabId, accent: "white" as TabAccent, desc: "Origin & clone check" },
+    { label: "Dev Wallet", Icon: Wallet, tab: "dev-wallet-radar" as TabId, accent: "gold" as TabAccent, desc: "Wallet DNA radar" },
+    { label: "Snipe Feed", Icon: Target, tab: "snipe-feed" as TabId, accent: "cyan" as TabAccent, desc: "New launches live" },
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0b1423] p-4 shadow-[0_24px_80px_-58px_hsl(var(--og-cyan)/0.95)] sm:p-5">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_0%,hsl(var(--og-cyan)/0.16),transparent_30%),radial-gradient(circle_at_90%_16%,hsl(var(--og-lime)/0.12),transparent_30%),radial-gradient(circle_at_50%_100%,rgba(244,114,182,0.1),transparent_34%)]" />
-        <div className="relative flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/15 bg-white/10">
-              <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" />
+    <div className="space-y-4 pb-6">
+
+      {/* ── HERO HEADER: Greeting + Active Mint ── */}
+      <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.09] bg-[#080e1a] p-5">
+        {/* ambient glow */}
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_0%_0%,hsl(var(--og-cyan)/0.14),transparent_50%),radial-gradient(ellipse_at_100%_100%,hsl(var(--og-lime)/0.10),transparent_50%)]" />
+
+        {/* Top row: greeting + avatar */}
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Logo or user avatar */}
+            <div className="relative shrink-0">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="h-12 w-12 rounded-2xl border border-white/15 object-cover" />
+              ) : (
+                <div className="h-12 w-12 rounded-2xl border border-white/15 bg-white/[0.08] flex items-center justify-center text-xl font-black text-og-cyan">
+                  {displayName[0]?.toUpperCase()}
+                </div>
+              )}
+              {/* online dot */}
+              <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-og-lime border-2 border-[#080e1a]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-og-cyan">Command home</p>
-              <h1 className="truncate text-2xl font-black tracking-normal text-white sm:text-3xl">OGScan</h1>
+              <p className="text-[11px] font-bold text-white/40 uppercase tracking-widest">{greeting}</p>
+              <h1 className="text-2xl font-black text-white truncate">{displayName} <span className="text-og-cyan">⚡</span></h1>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onChangeMint}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.07] text-white/55 transition hover:text-white"
-            aria-label="Change active mint"
-          >
-            <Wallet className="h-4 w-4" />
-          </button>
+          {/* profile stats pill */}
+          <div className="shrink-0 flex items-center gap-2">
+            {profile?.current_level && (
+              <div className="flex items-center gap-1.5 rounded-xl border border-og-gold/25 bg-og-gold/[0.08] px-3 py-1.5">
+                <Trophy className="h-3.5 w-3.5 text-og-gold" />
+                <span className="text-[11px] font-black text-og-gold">LVL {profile.current_level}</span>
+              </div>
+            )}
+            {profile?.daily_streak && profile.daily_streak > 0 && (
+              <div className="flex items-center gap-1.5 rounded-xl border border-og-lime/25 bg-og-lime/[0.08] px-3 py-1.5">
+                <Flame className="h-3.5 w-3.5 text-og-lime" />
+                <span className="text-[11px] font-black text-og-lime">{profile.daily_streak}d</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="relative mt-4 rounded-[1.35rem] border border-white/10 bg-black/20 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-bold text-white/45">Active mint</p>
-              <p className="mt-1 font-mono text-sm font-black text-white">{shortAddr(mint, 6)}</p>
-            </div>
+        {/* Active mint row */}
+        <div className="relative mt-4 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold text-white/35 uppercase tracking-widest mb-0.5">Active Mint</p>
+            <p className="font-mono text-sm font-black text-white truncate">{shortAddr(mint, 8)}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onChangeMint}
+              className="h-9 px-3 rounded-xl border border-white/10 bg-white/[0.06] text-[11px] font-bold text-white/50 transition hover:bg-white/[0.1] hover:text-white"
+            >
+              Change
+            </button>
             <button
               type="button"
               onClick={onScanClick}
-              className="flex min-h-11 items-center gap-2 rounded-2xl bg-og-lime px-4 text-sm font-black text-og-ink transition active:scale-95"
+              className="h-9 px-4 rounded-xl bg-og-lime text-og-ink text-[12px] font-black transition hover:brightness-110 active:scale-95 flex items-center gap-1.5"
             >
-              <Search className="h-4 w-4" />
+              <Search className="h-3.5 w-3.5" />
               Scan
             </button>
           </div>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full w-[78%] rounded-full bg-gradient-to-r from-og-lime via-og-cyan to-[#f472b6]" />
-          </div>
         </div>
+      </div>
 
-        <div className="relative mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {appHomeCards.map((card) => (
+      {/* ── FEATURE CARDS: 2x2 grid of main platform pillars ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[13px] font-black text-white uppercase tracking-widest">Platform</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {featureCards.map((card) => (
             <button
-              key={card.label}
+              key={card.title}
               type="button"
               onClick={() => card.communitySub ? openCommunitySub(card.communitySub) : onSwitchTab(card.tab)}
-              className="group rounded-[1.15rem] border border-white/10 bg-white/[0.055] p-3 text-left transition hover:bg-white/[0.08] active:scale-[0.98]"
+              className={cn(
+                "group relative overflow-hidden rounded-[1.35rem] border border-white/[0.08] bg-gradient-to-br text-left transition hover:border-white/[0.14] active:scale-[0.97]",
+                card.gradient,
+                card.glow,
+              )}
             >
-              <div className={cn("mb-3 grid h-10 w-10 place-items-center rounded-2xl border", accentIcon(card.accent))}>
-                <card.Icon className="h-5 w-5" />
+              <div className="p-4">
+                {/* icon + badge row */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl border", accentIcon(card.accent))}>
+                    <card.Icon className="h-5 w-5" />
+                  </div>
+                  <span className={cn(
+                    "rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border",
+                    card.accent === "gold" ? "border-og-gold/30 bg-og-gold/10 text-og-gold"
+                    : card.accent === "lime" ? "border-og-lime/30 bg-og-lime/10 text-og-lime"
+                    : "border-og-cyan/30 bg-og-cyan/10 text-og-cyan"
+                  )}>
+                    {card.badge}
+                  </span>
+                </div>
+                {/* eyebrow */}
+                <p className={cn("text-[9px] font-black uppercase tracking-[0.15em] mb-0.5", accentText(card.accent))}>{card.eyebrow}</p>
+                {/* title */}
+                <p className="text-[15px] font-black text-white leading-tight">{card.title}</p>
+                {/* desc */}
+                <p className="text-[10px] text-white/40 mt-1 leading-relaxed line-clamp-2">{card.desc}</p>
               </div>
-              <p className="text-xl font-black text-white">{card.value}</p>
-              <p className="mt-0.5 text-[12px] font-bold text-white/70">{card.label}</p>
-              <p className="text-[10px] text-white/36">{card.sub}</p>
+              {/* arrow */}
+              <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition">
+                <ArrowUpRight className={cn("h-4 w-4", accentText(card.accent))} />
+              </div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* ─── Hero ─── */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-br from-og-lime/[0.04] via-white/[0.03] to-og-cyan/[0.03]">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-og-lime/[0.06] blur-[80px]" />
-        <div className="pointer-events-none absolute -bottom-12 left-0 h-44 w-44 rounded-full bg-og-cyan/[0.05] blur-[60px]" />
-        <div className="relative px-5 py-5 sm:px-7 sm:py-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-og-lime/25 bg-og-lime/[0.08] px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest text-og-lime">
-                <div className="h-1.5 w-1.5 rounded-full bg-og-lime animate-pulse" /> Live
-              </div>
-              <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-                OG Scan
-              </h1>
-              <p className="mt-1.5 max-w-md text-[13px] leading-relaxed text-white/45">
-                Solana token intelligence — forensics, market data, and community in one place.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onChangeMint}
-              className="mt-1 shrink-0 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-mono text-white/40 transition hover:bg-white/[0.08] hover:text-white/60"
-            >
-              {shortAddr(mint, 4)}
-            </button>
-          </div>
-
-          {/* Quick action buttons */}
-          <div className="mt-4 grid grid-cols-4 gap-2 sm:flex sm:gap-3">
-            {quickActions.map((action) => (
-              <button
-                key={action.tab}
-                type="button"
-                onClick={() => action.tab === "scanner" ? onScanClick() : onSwitchTab(action.tab)}
-                className="group flex flex-col items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.03] px-2 py-3 transition hover:border-white/[0.12] hover:bg-white/[0.06] active:scale-[0.97] sm:flex-row sm:gap-2 sm:px-4 sm:py-2.5"
-              >
-                <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg border sm:h-7 sm:w-7", accentIcon(action.accent))}>
-                  <action.Icon className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-                </div>
-                <span className="text-[10px] font-bold text-white/50 group-hover:text-white/80 sm:text-[11px]">{action.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Intelligence Row ─── */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <OGDaily onSelectMint={(m: string) => setPopupMint(m)} />
-        <SmartWatchlist onSelectMint={(m: string) => setPopupMint(m)} />
-      </div>
-
-      {/* ─── Quick Tools Grid ─── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-black text-white">Quick Tools</h2>
+      {/* ── FORENSIC TOOLS: compact horizontal tool strip ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[13px] font-black text-white uppercase tracking-widest">Forensic Tools</h2>
           <button
             type="button"
             onClick={() => onSwitchTab("tools")}
@@ -1168,65 +1212,110 @@ const OverviewPage = ({
             All tools <ChevronRight className="h-3 w-3" />
           </button>
         </div>
-        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
-          {toolSections.flatMap(s => s.items).map((tool) => (
+        <div className="grid grid-cols-2 gap-2.5">
+          {forensicTools.map((tool) => (
             <button
-              key={tool.id}
+              key={tool.label}
               type="button"
-              onClick={() => onSwitchTab(tool.id)}
-              className="group flex flex-col items-center gap-2 py-3 px-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-all hover:bg-white/[0.06] hover:border-white/[0.12] hover:scale-[1.04] active:scale-95"
+              onClick={() => onSwitchTab(tool.tab)}
+              className="group flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3.5 text-left transition hover:bg-white/[0.05] hover:border-white/[0.12] active:scale-[0.98]"
             >
-              <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl border", accentIcon(tool.accent))}>
-                <tool.Icon className="h-5 w-5" />
+              <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border", accentIcon(tool.accent))}>
+                <tool.Icon className="h-4 w-4" />
               </div>
-              <span className="text-[10px] font-bold text-white/60 group-hover:text-white transition-colors text-center leading-tight">{tool.label}</span>
+              <div className="min-w-0">
+                <p className="text-[12px] font-black text-white truncate">{tool.label}</p>
+                <p className="text-[10px] text-white/40 truncate">{tool.desc}</p>
+              </div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* ─── Community & Activity ─── */}
-      <div className="space-y-3">
-        <h2 className="text-[15px] font-black text-white">Community & Activity</h2>
-        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
-          {[
-            { label: "Chat", Icon: MessageSquare, accent: "lime" as TabAccent, communitySub: "social" as CommunitySubTab },
-            { label: "Rooms", Icon: Hash, accent: "white" as TabAccent, communitySub: "rooms" as CommunitySubTab },
-            { label: "Spaces", Icon: Radio, accent: "cyan" as TabAccent, communitySub: "spaces" as CommunitySubTab },
-            { label: "Groups", Icon: Users, accent: "gold" as TabAccent, communitySub: "communities" as CommunitySubTab },
-            { label: "Discover", Icon: Compass, accent: "cyan" as TabAccent, communitySub: "discover" as CommunitySubTab },
-          ].map((item) => (
+      {/* ── MARKET INTELLIGENCE: OGDaily + SmartWatchlist ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[13px] font-black text-white uppercase tracking-widest">Market Intelligence</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Suspense fallback={<div className="h-36 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}>
+            <OGDaily onSelectMint={(m: string) => setPopupMint(m)} />
+          </Suspense>
+          <Suspense fallback={<div className="h-36 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-lime border-t-transparent rounded-full animate-spin" /></div>}>
+            <SmartWatchlist onSelectMint={(m: string) => setPopupMint(m)} />
+          </Suspense>
+        </div>
+      </div>
+
+      {/* ── ALPHA + LEADERBOARD ROW ── */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Suspense fallback={<div className="h-36 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-gold border-t-transparent rounded-full animate-spin" /></div>}>
+          <AlphaCallouts onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
+        </Suspense>
+        <Suspense fallback={<div className="h-36 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-lime border-t-transparent rounded-full animate-spin" /></div>}>
+          <PlatformLeaderboard />
+        </Suspense>
+      </div>
+
+      {/* ── COMMUNITY QUICK ACCESS ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[13px] font-black text-white uppercase tracking-widest">Community</h2>
+          <button
+            type="button"
+            onClick={() => onSwitchTab("community")}
+            className="flex items-center gap-1 text-[11px] font-semibold text-white/35 transition hover:text-white/60"
+          >
+            Open <ChevronRight className="h-3 w-3" />
+          </button>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+          {communityLinks.map((item) => (
             <button
               key={item.label}
               type="button"
-              onClick={() => openCommunitySub(item.communitySub)}
-              className="group flex flex-col items-center gap-2 py-3 px-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-all hover:bg-white/[0.06] hover:border-white/[0.12] hover:scale-[1.04] active:scale-95"
+              onClick={() => openCommunitySub(item.sub)}
+              className="group shrink-0 flex flex-col items-center gap-2 rounded-[1.15rem] border border-white/[0.07] bg-white/[0.025] px-4 py-3.5 transition hover:bg-white/[0.05] hover:border-white/[0.12] hover:scale-[1.03] active:scale-95"
             >
-              <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl border", accentIcon(item.accent))}>
+              <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl border", accentIcon(item.accent))}>
                 <item.Icon className="h-5 w-5" />
               </div>
-              <span className="text-[10px] font-bold text-white/60 group-hover:text-white transition-colors text-center leading-tight">{item.label}</span>
+              <span className="text-[10px] font-bold text-white/55 group-hover:text-white transition-colors whitespace-nowrap">{item.label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* ─── Advanced: charts, alpha, leaderboard ─── */}
-      <Suspense fallback={<div className="h-48 rounded-xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}><MultiChartView onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} /></Suspense>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Suspense fallback={<div className="h-32 rounded-xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-gold border-t-transparent rounded-full animate-spin" /></div>}><AlphaCallouts onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} /></Suspense>
-        <Suspense fallback={<div className="h-32 rounded-xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-lime border-t-transparent rounded-full animate-spin" /></div>}><PlatformLeaderboard /></Suspense>
+      {/* ── CHARTS: full-width section ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[13px] font-black text-white uppercase tracking-widest">Charts</h2>
+          <button
+            type="button"
+            onClick={() => onSwitchTab("charts")}
+            className="flex items-center gap-1 text-[11px] font-semibold text-white/35 transition hover:text-white/60"
+          >
+            Full view <ChevronRight className="h-3 w-3" />
+          </button>
+        </div>
+        <Suspense fallback={<div className="h-48 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}>
+          <MultiChartView onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
+        </Suspense>
       </div>
 
+      {/* ── UTILITIES ROW ── */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Suspense fallback={<div className="h-32 rounded-xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}><PaperTrading onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} /></Suspense>
-        <Suspense fallback={<div className="h-32 rounded-xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}><CryptoCalendar /></Suspense>
+        <Suspense fallback={<div className="h-32 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}>
+          <PaperTrading onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
+        </Suspense>
+        <Suspense fallback={<div className="h-32 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}>
+          <CryptoCalendar />
+        </Suspense>
       </div>
 
       <Suspense fallback={null}><QuickCalc /></Suspense>
 
-      {/* Token Detail Popup — triggered by clicking tokens in OGDaily/SmartWatchlist */}
+      {/* Token Detail Popup */}
       {popupToken && (
         <TokenDetailPopupWrapper
           token={popupToken}
@@ -1237,6 +1326,7 @@ const OverviewPage = ({
     </div>
   );
 };
+
 
 const QuickToolCard = ({ tool, onClick }: { tool: TabConfig; onClick: () => void }) => (
   <button
