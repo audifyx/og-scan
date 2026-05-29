@@ -78,15 +78,19 @@ export function ccClearAuth() {
 // ─── Auth flow ────────────────────────────────────────────────────────────────
 
 /**
- * Step 1 — get the Twitter OAuth URL from CC and open it in a popup.
+ * Step 1 — get the Twitter OAuth URL from CC and redirect in the same tab.
+ * Same-tab redirect avoids popup blockers entirely.
+ * After auth, CCCallbackPage navigates back to cc_return_to in sessionStorage.
+ *
  * @param redirectUrl  Must be whitelisted in CC business dashboard.
- * @returns The opened popup window (or null if blocked).
+ * @param onSuccess    Called if user is already logged in (should not happen here).
+ * @param onError      Called with human-readable error if CC rejects the request.
  */
 export async function ccStartXLogin(
   redirectUrl: string,
   onSuccess: (user: CCUser) => void,
   onError?: (msg: string) => void,
-): Promise<Window | null> {
+): Promise<void> {
   ccConfigureAnon();
   const { verifier } = await pkce();
   localStorage.setItem(LS_VERIFIER, verifier);
@@ -96,35 +100,12 @@ export async function ccStartXLogin(
   if (result.error) {
     const msg = (result.error as { message?: string }).message ?? "Failed to get auth URL";
     onError?.(msg);
-    return null;
+    return;
   }
 
   const authUrl = (result.data as { authUrl: string }).authUrl;
-  const popup = window.open(authUrl, "cc_x_auth", "width=540,height=720,left=200,top=80");
-
-  // Listen for postMessage from the callback page
-  const handler = (e: MessageEvent) => {
-    if (e.origin !== window.location.origin) return;
-    if (e.data?.type === "CC_AUTH_SUCCESS") {
-      window.removeEventListener("message", handler);
-      clearInterval(poll);
-      const u = ccGetStoredUser();
-      if (u) onSuccess(u);
-    }
-  };
-  window.addEventListener("message", handler);
-
-  // Fallback: poll for popup close
-  const poll = setInterval(() => {
-    if (popup?.closed) {
-      clearInterval(poll);
-      window.removeEventListener("message", handler);
-      const u = ccGetStoredUser();
-      if (u) onSuccess(u);
-    }
-  }, 500);
-
-  return popup;
+  // Full-page redirect — no popup, no browser block
+  window.location.href = authUrl;
 }
 
 /**

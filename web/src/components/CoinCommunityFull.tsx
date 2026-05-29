@@ -318,22 +318,18 @@ export const CoinCommunityFull = ({
 
   const handleXLogin = useCallback(async () => {
     setAuthLoading(true);
-    try {
-      await ccStartXLogin(
-        CC_CALLBACK_URL,
-        (user) => {
-          setCcUser(user);
-          setAuthLoading(false);
-          setShowAuthPrompt(false);
-        },
-        (errMsg) => {
-          console.error("CC auth error:", errMsg);
-          setAuthLoading(false);
-        },
-      );
-    } catch {
-      setAuthLoading(false);
-    }
+    await ccStartXLogin(
+      CC_CALLBACK_URL,
+      (user) => {
+        setCcUser(user);
+        setAuthLoading(false);
+        setShowAuthPrompt(false);
+      },
+      (_errMsg) => {
+        // Same-tab redirect failed — nothing to show here since page will reload or error is surfaced upstream
+        setAuthLoading(false);
+      },
+    );
   }, []);
 
   const handleLogout = useCallback(() => {

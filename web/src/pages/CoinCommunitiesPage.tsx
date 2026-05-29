@@ -219,13 +219,15 @@ export const CoinCommunitiesPage = () => {
   const [selectedToken, setSelectedToken] = useState<{ address: string; symbol: string } | null>(null);
   const [ccUser, setCcUser] = useState<CCUser | null>(() => ccGetStoredUser());
   const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const handleXLogin = useCallback(async () => {
     setAuthLoading(true);
+    setAuthError(null);
     await ccStartXLogin(
       CC_CALLBACK_URL,
       (user) => { setCcUser(user); setAuthLoading(false); },
-      () => setAuthLoading(false),
+      (msg) => { setAuthLoading(false); setAuthError(msg); },
     );
   }, []);
 
@@ -312,6 +314,19 @@ export const CoinCommunitiesPage = () => {
             </button>
           )}
         </div>
+
+        {/* Auth error banner */}
+        {authError && (
+          <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-mono flex items-start gap-2">
+            <span className="shrink-0 mt-0.5">⚠</span>
+            <span className="leading-snug">
+              {authError.toLowerCase().includes("whitelist")
+                ? "Login unavailable — callback URL not yet whitelisted in CoinCommunities dashboard."
+                : authError}
+            </span>
+            <button onClick={() => setAuthError(null)} className="ml-auto shrink-0 opacity-60 hover:opacity-100 text-base leading-none">×</button>
+          </div>
+        )}
 
         {/* Tab bar */}
         {!selectedToken && (
