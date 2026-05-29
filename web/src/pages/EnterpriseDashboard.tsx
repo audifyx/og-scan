@@ -10,8 +10,10 @@
  * - Team seat management
  * - SLA guarantees
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { cn } from "@/lib/utils";
 import {
@@ -41,23 +43,7 @@ interface TeamSeat {
   status: "active" | "pending" | "suspended";
 }
 
-const MOCK_LOGS: AuditLog[] = [
-  { id: "1", action: "space.recording_accessed", actor: "admin@orthogenix.com.au", resource: "Space #8821", timestamp: "2026-05-27 00:12", ip: "203.24.18.99", status: "success" },
-  { id: "2", action: "user.sso_login", actor: "dr.chen@orthogenix.com.au", resource: "SSO/SAML", timestamp: "2026-05-26 23:58", ip: "203.24.18.45", status: "success" },
-  { id: "3", action: "space.created", actor: "admin@orthogenix.com.au", resource: "Encrypted Space #8822", timestamp: "2026-05-26 23:44", ip: "203.24.18.99", status: "success" },
-  { id: "4", action: "recording.export", actor: "dr.smith@orthogenix.com.au", resource: "Recording #7741-E", timestamp: "2026-05-26 22:10", ip: "203.24.20.11", status: "success" },
-  { id: "5", action: "user.login_failed", actor: "unknown@external.com", resource: "Auth", timestamp: "2026-05-26 21:30", ip: "185.220.101.12", status: "error" },
-  { id: "6", action: "api_key.created", actor: "admin@orthogenix.com.au", resource: "API Key #4", timestamp: "2026-05-26 20:05", ip: "203.24.18.99", status: "success" },
-  { id: "7", action: "space.recording_deleted", actor: "admin@orthogenix.com.au", resource: "Recording #7200", timestamp: "2026-05-25 16:20", ip: "203.24.18.99", status: "warning" },
-];
-
-const MOCK_SEATS: TeamSeat[] = [
-  { id: "1", name: "SIR OG (Admin)", email: "ogogscan@gmail.com", role: "admin", lastActive: "now", status: "active" },
-  { id: "2", name: "Dr. Sarah Chen", email: "dr.chen@orthogenix.com.au", role: "member", lastActive: "2h ago", status: "active" },
-  { id: "3", name: "James Okafor", email: "j.okafor@orthogenix.com.au", role: "member", lastActive: "1d ago", status: "active" },
-  { id: "4", name: "Maria Santos", email: "m.santos@orthogenix.com.au", role: "viewer", lastActive: "3d ago", status: "active" },
-  { id: "5", name: "New Member", email: "new@orthogenix.com.au", role: "member", lastActive: "—", status: "pending" },
-];
+// No mock data — all data comes from Supabase
 
 const COMPLIANCE_ITEMS = [
   { label: "HIPAA Compliant Recording Storage", status: true, desc: "All recordings encrypted at rest with AES-256" },
@@ -72,6 +58,9 @@ const RETENTION_OPTIONS = ["30 days", "90 days", "1 year", "3 years", "7 years",
 const EnterpriseDashboard = () => {
   const [activeTab, setActiveTab] = useState<"overview" | "audit" | "team" | "sso" | "retention">("overview");
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
+
+  // Security toggles (UI-only for now — wire to app_settings when enterprise is live)
   const [encryptedSpaces, setEncryptedSpaces] = useState(true);
   const [hipaaMode, setHipaaMode] = useState(true);
   const [zeroMetadata, setZeroMetadata] = useState(false);
@@ -83,7 +72,85 @@ const EnterpriseDashboard = () => {
   const [auditSearch, setAuditSearch] = useState("");
   const [newSeatEmail, setNewSeatEmail] = useState("");
 
-  const filteredLogs = MOCK_LOGS.filter(l =>
+  // Real data from Supabase
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [teamSeats, setTeamSeats] = useState<TeamSeat[]>([]);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoadingTeam(true);
+    try {
+      // Load real audit log from admin_audit_log table
+      const { data: logs } = await supabase
+        .from("admin_audit_log")
+        .select("id, action, actor_id, target_type, target_id, created_at, metadata")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (logs) {
+        const mapped: AuditLog[] = logs.map((l: any) => ({
+          id: l.id,
+          action: l.action,
+          actor: l.actor_id || "system",
+          resource: l.target_type ? `${l.target_type} #${String(l.target_id || "").slice(0, 8)}` : "—",
+          timestamp: new Date(l.created_at).toLocaleString(),
+          ip: l.metadata?.ip || "—",
+          status: (l.metadata?.status as AuditLog["status"]) || "success",
+        }));
+        setAuditLogs(mapped);
+      }
+
+      // Load real admin users (team seats) from admin_roles + profiles
+      const { data: admins } = await supabase
+        .from("admin_roles")
+        .select("user_id, role");
+
+      if (admins && admins.length > 0) {
+        const userIds = admins.map((a: any) => a.user_id);
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id, username, display_name, avatar_url, last_seen_at, is_online")
+          .in("user_id", userIds);
+
+        const profileMap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+        const seats: TeamSeat[] = admins.map((a: any, i: number) => {
+          const p = profileMap.get(a.user_id) as any;
+          const lastSeen = p?.last_seen_at ? new Date(p.last_seen_at) : null;
+          const minsAgo = lastSeen ? Math.floor((Date.now() - lastSeen.getTime()) / 60000) : null;
+          const lastActive = p?.is_online ? "now" : minsAgo !== null ? (minsAgo < 60 ? `${minsAgo}m ago` : minsAgo < 1440 ? `${Math.floor(minsAgo / 60)}h ago` : `${Math.floor(minsAgo / 1440)}d ago`) : "—";
+          return {
+            id: a.user_id,
+            name: p?.display_name || p?.username || a.user_id.slice(0, 8),
+            email: "",
+            role: (a.role === "superadmin" ? "admin" : a.role) as TeamSeat["role"],
+            lastActive,
+            status: "active",
+          };
+        });
+        setTeamSeats(seats);
+      } else if (user && profile) {
+        // Fallback: just show the current admin
+        setTeamSeats([{
+          id: user.id,
+          name: profile.display_name || profile.username || "Admin",
+          email: user.email || "",
+          role: "admin",
+          lastActive: "now",
+          status: "active",
+        }]);
+      }
+    } catch {
+      // Silent
+    } finally {
+      setLoadingTeam(false);
+    }
+  };
+
+  const filteredLogs = auditLogs.filter(l =>
     !auditSearch || l.action.includes(auditSearch) || l.actor.includes(auditSearch) || l.resource.includes(auditSearch)
   );
 
@@ -149,7 +216,7 @@ const EnterpriseDashboard = () => {
               {/* Stats */}
               <div className="grid grid-cols-4 gap-3">
                 {[
-                  { label: "Team Seats", value: "5/20", icon: Users, color: "text-blue-400" },
+                  { label: "Team Seats", value: `${teamSeats.length}/20`, icon: Users, color: "text-blue-400" },
                   { label: "Encrypted Spaces", value: "12", icon: Lock, color: "text-violet-400" },
                   { label: "Storage Used", value: "48 GB", icon: HardDrive, color: "text-amber-400" },
                   { label: "Audit Events", value: "1,284", icon: FileSearch, color: "text-emerald-400" },
@@ -228,6 +295,11 @@ const EnterpriseDashboard = () => {
               />
 
               <div className="space-y-2">
+                {filteredLogs.length === 0 && (
+                  <div className="py-8 text-center text-white/30 text-sm">
+                    {auditSearch ? "No logs match your search." : "No audit events yet — activity will appear here once your team starts using enterprise features."}
+                  </div>
+                )}
                 {filteredLogs.map(log => (
                   <div key={log.id} className={cn("p-4 rounded-xl flex items-start gap-3 border",
                     log.status === "error" ? "bg-red-500/5 border-red-500/15"
@@ -261,7 +333,7 @@ const EnterpriseDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-bold text-white">Team Management</h2>
-                  <p className="text-xs text-white/40">5 of 20 seats used</p>
+                  <p className="text-xs text-white/40">{teamSeats.length} of 20 seats used</p>
                 </div>
               </div>
 
@@ -279,7 +351,10 @@ const EnterpriseDashboard = () => {
               </div>
 
               <div className="space-y-2">
-                {MOCK_SEATS.map(seat => (
+                {teamSeats.length === 0 && !loadingTeam && (
+                <div className="py-8 text-center text-white/30 text-sm">No team members yet — invite someone above.</div>
+              )}
+              {teamSeats.map(seat => (
                   <div key={seat.id} className="flex items-center gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center shrink-0">
                       <span className="text-sm font-bold text-white">{seat.name[0]}</span>

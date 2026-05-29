@@ -3,9 +3,11 @@
  * Updates `is_online = true` + `last_seen_at = now()` every 15s.
  * Sets `is_online = false` on page hide/unload.
  * Also recalculates `current_level` from `xp` on each heartbeat.
+ * Logs one session_start activity event per mount.
  */
 import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { trackActivity } from "@/lib/trackActivity";
 import { useAuth } from "./useAuth";
 
 const HEARTBEAT_MS = 15_000; // 15 seconds
@@ -61,6 +63,15 @@ export function usePresence() {
         .eq("user_id", user.id)
         .then(() => {});
     };
+
+    // Log session start once per mount (fire-and-forget)
+    trackActivity({
+      user_id: user.id,
+      activity_type: "session.start",
+      title: "Session started",
+      data: { path: window.location.pathname },
+      is_public: false,
+    });
 
     // Initial heartbeat
     heartbeat();

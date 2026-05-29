@@ -13,6 +13,7 @@ import { shortAddr, fmtUsd } from "@/lib/og";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { trackActivity } from "@/lib/trackActivity";
 
 interface ScanEntry {
   id: string;
@@ -84,6 +85,21 @@ export function addToScanHistory(entry: Omit<ScanEntry, "id" | "scannedAt" | "ta
         priceAtScan: entry.priceAtScan,
       },
     }).then(() => {});
+    // Track scan activity
+    trackActivity({
+      user_id: data.user.id,
+      activity_type: "scanner.scan",
+      title: `Scanned ${entry.symbol || entry.name || "token"}`,
+      description: entry.mint,
+      data: {
+        mint: entry.mint,
+        symbol: entry.symbol,
+        name: entry.name,
+        rugScore: entry.rugScore,
+        marketCap: entry.marketCap,
+      },
+      is_public: false,
+    });
   });
 }
 
