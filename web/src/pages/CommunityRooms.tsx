@@ -159,8 +159,28 @@ const ROOM_TYPES: { value: RoomType; label: string; Icon: React.ComponentType<{ 
 ];
 
 const DEFAULT_CHANNELS = ["general", "announcements", "research", "questions", "memes", "support", "events", "spaces-discussion"];
-const QUICK_EMOJIS = ["🔥", "💎", "🚀", "👀", "✅", "💯", "🧠", "🛡️"];
+const QUICK_EMOJIS = ["🔥", "💎", "🚀", "👀", "✅", "💯", "🧠", "🛡️", "💰", "🐋", "📈", "⚡", "🎯", "🤝"];
 const MESSAGE_ACTION_REACTIONS = ["👀", "🚀", "💎", "🔥"];
+
+/* ─── OGS-style Reaction Picker Emojis (50+ crypto/meme culture emojis) ─── */
+const OGS_REACTION_CATEGORIES: { label: string; emojis: string[] }[] = [
+  {
+    label: "🔥 Hype",
+    emojis: ["🔥", "🚀", "💎", "👀", "⚡", "💯", "🏆", "👑", "✨", "🎯", "🫡", "🤯", "😤", "💪", "🙌"],
+  },
+  {
+    label: "💰 Crypto",
+    emojis: ["💰", "🐋", "📈", "📉", "🪙", "💸", "🤑", "🏦", "⛏️", "🧾", "📊", "🐂", "🐻", "🦈", "🧲"],
+  },
+  {
+    label: "🧠 Vibes",
+    emojis: ["🧠", "🛡️", "🤝", "🫶", "❤️", "👍", "👎", "😂", "💀", "🤡", "😈", "👻", "🎩", "🍀", "🌙"],
+  },
+  {
+    label: "⚠️ Alerts",
+    emojis: ["⚠️", "🚨", "🔴", "🟢", "🟡", "🏴‍☠️", "🔒", "🔓", "📌", "🧐", "🕵️", "🔍", "💡", "📢", "🗳️"],
+  },
+];
 const MOD_ROLES: RoomRole[] = ["owner", "admin", "moderator"];
 const SAVED_MESSAGES_STORAGE_PREFIX = "ogscan-community-saved-messages:";
 
@@ -317,6 +337,7 @@ function MessageRow({
   const hasAttachment = !!attachmentUrl;
   const attachmentIsImage = !!msg.media_url || (!!attachmentUrl && isImageUrl(attachmentUrl));
   const [menuOpen, setMenuOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
   if (msg.is_deleted || msg.deleted_at) return null;
 
@@ -413,7 +434,7 @@ function MessageRow({
           </div>
 
           <div className={cn("relative flex flex-wrap items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100", isOwn && "justify-end")}>
-            <button onClick={() => setMenuOpen(prev => !prev)} className="rounded-full bg-white/[0.04] px-2 py-1.5 text-white/32 hover:bg-white/[0.08] hover:text-white/70" title="More">
+            <button onClick={() => { setMenuOpen(prev => !prev); setEmojiPickerOpen(false); }} className="rounded-full bg-white/[0.04] px-2 py-1.5 text-white/32 hover:bg-white/[0.08] hover:text-white/70" title="More">
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
             <button onClick={() => onReply(msg)} className="rounded-full bg-white/[0.04] px-2 py-1.5 text-white/32 hover:bg-white/[0.08] hover:text-white/70" title="Reply">
@@ -435,6 +456,34 @@ function MessageRow({
                 </button>
               );
             })}
+            <button onClick={() => { setEmojiPickerOpen(prev => !prev); setMenuOpen(false); }} className="rounded-full bg-white/[0.04] px-2 py-1.5 text-white/32 hover:bg-white/[0.08] hover:text-white/70" title="Add reaction">
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+            {emojiPickerOpen && (
+              <div className={cn("absolute z-40 w-[280px] rounded-2xl border border-white/10 bg-[#11111a] p-2 shadow-2xl", isOwn ? "right-0 top-10" : "left-0 top-10")}>
+                <div className="mb-1 flex items-center justify-between px-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Reactions</span>
+                  <button onClick={() => setEmojiPickerOpen(false)} className="rounded p-0.5 text-white/30 hover:text-white"><X className="h-3 w-3" /></button>
+                </div>
+                <div className="max-h-[240px] overflow-y-auto">
+                  {OGS_REACTION_CATEGORIES.map(category => (
+                    <div key={category.label} className="mb-1">
+                      <p className="px-1 py-1 text-[9px] font-bold uppercase tracking-wider text-white/20">{category.label}</p>
+                      <div className="flex flex-wrap gap-0.5">
+                        {category.emojis.map(emoji => {
+                          const isActive = msg.reactions?.find(r => r.emoji === emoji)?.reacted;
+                          return (
+                            <button key={emoji} onClick={() => { onReact(msg, emoji); setEmojiPickerOpen(false); }} className={cn("rounded-lg px-2 py-1 text-base transition-colors hover:bg-white/[0.08]", isActive && "bg-white/[0.12] ring-1 ring-white/10")} title={emoji}>
+                              {emoji}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {menuOpen && (
               <div className={cn("absolute z-30 min-w-[190px] rounded-2xl border border-white/10 bg-[#11111a] p-1.5 shadow-2xl", isOwn ? "right-0 top-10" : "left-0 top-10")}>
                 <button onClick={() => { onToggleSave(msg); setMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs text-white/60 hover:bg-white/[0.05] hover:text-white">
@@ -615,7 +664,7 @@ const CommunityRooms: React.FC = () => {
 
       const [reactionRowsResult, missingRepliesResult] = await Promise.all([
         messageIds.length > 0
-          ? supabase.from("message_reactions").select("message_id, user_id, emoji, created_at").in("message_id", messageIds)
+          ? supabase.from("community_room_reactions").select("message_id, user_id, emoji, created_at").in("message_id", messageIds)
           : Promise.resolve({ data: [], error: null }),
         missingReplyIds.length > 0
           ? supabase.from("community_room_messages").select("*").in("id", missingReplyIds)
@@ -738,7 +787,7 @@ const CommunityRooms: React.FC = () => {
         }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "community_room_members", filter: `room_id=eq.${activeRoom.id}` }, () => loadMembers(activeRoom.id))
-      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, payload => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_room_reactions" }, payload => {
         const changedMessageId = (payload.new as { message_id?: string } | null)?.message_id || (payload.old as { message_id?: string } | null)?.message_id;
         if (changedMessageId && activeMessageIdsRef.current.includes(changedMessageId)) {
           loadMessages(activeRoom.id);
@@ -954,17 +1003,33 @@ const CommunityRooms: React.FC = () => {
     if (!user || !activeRoom) return;
     const alreadyReacted = !!message.reactions?.find(reaction => reaction.emoji === emoji && reaction.reacted);
 
-    const query = supabase.from("message_reactions");
+    // Optimistic update — instant feedback
+    setMessages(prev => prev.map(m => {
+      if (m.id !== message.id) return m;
+      const existing = (m.reactions || []).slice();
+      const idx = existing.findIndex(r => r.emoji === emoji);
+      if (alreadyReacted) {
+        if (idx !== -1) {
+          if (existing[idx].count <= 1) existing.splice(idx, 1);
+          else existing[idx] = { ...existing[idx], count: existing[idx].count - 1, reacted: false };
+        }
+      } else {
+        if (idx !== -1) existing[idx] = { ...existing[idx], count: existing[idx].count + 1, reacted: true };
+        else existing.push({ emoji, count: 1, reacted: true });
+      }
+      return { ...m, reactions: existing };
+    }));
+
+    const query = supabase.from("community_room_reactions");
     const { error } = alreadyReacted
       ? await query.delete().eq("message_id", message.id).eq("user_id", user.id).eq("emoji", emoji)
       : await query.upsert({ message_id: message.id, user_id: user.id, emoji }, { onConflict: "message_id,user_id,emoji" });
 
     if (error) {
       toast.error("Could not update reaction");
-      return;
+      // Revert on error
+      loadMessages(activeRoom.id);
     }
-
-    loadMessages(activeRoom.id);
   };
 
   const toggleSavedMessage = (message: Message) => {
