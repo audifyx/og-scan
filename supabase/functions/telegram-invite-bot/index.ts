@@ -23,12 +23,10 @@ const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
 const CHAT_ID   = Deno.env.get("TELEGRAM_CHAT_ID")!;
 const API       = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
-// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are auto-injected by Supabase runtime
 const SUPABASE_URL    = Deno.env.get("SB_URL") ?? Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SR_KEY = Deno.env.get("SB_SERVICE_ROLE") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SR_KEY);
 
-// Bot user IDs to ignore (GroupAnonymousBot, etc.)
 const IGNORED_BOT_IDS = new Set([1087968824, 136817688, 93372553]);
 
 /* ──────────────────── Telegram helpers ────────────── */
@@ -39,10 +37,14 @@ async function tgPost(method: string, body: object) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return res.json();
+  const json = await res.json();
+  if (!json.ok) {
+    console.error(`[tgPost] ${method} failed:`, JSON.stringify(json));
+  }
+  return json;
 }
 
-function sendMsg(chatId: number | string, text: string, extra?: object) {
+async function sendMsg(chatId: number | string, text: string, extra?: object) {
   return tgPost("sendMessage", { chat_id: chatId, text, parse_mode: "HTML", ...extra });
 }
 
@@ -66,8 +68,9 @@ async function handleInvite(
   username: string | null,
   firstName: string | null,
   chatId: number | string,
+  messageId?: number,
+  isGroup?: boolean,
 ) {
-  // Skip bots
   if (IGNORED_BOT_IDS.has(userId)) return;
 
   // Check if this user already has an invite link
@@ -81,7 +84,6 @@ async function handleInvite(
   if (existing?.invite_link) {
     link = existing.invite_link;
   } else {
-    // Create a new invite link via Telegram API
     const res = await tgPost("createChatInviteLink", {
       chat_id: CHAT_ID,
       name: `invite_${userId}_${username ?? "user"}`,
@@ -89,14 +91,14 @@ async function handleInvite(
     });
 
     if (!res.ok) {
-      console.error("[invite] createChatInviteLink failed:", res);
-      await sendMsg(chatId, "⚠️ Couldn't create invite link. Make sure I'm an admin with invite permissions.");
+      console.error("[invite] createChatInviteLink failed:", JSON.stringify(res));
+      await sendMsg(chatId, "⚠️ Couldn't create invite link. Please try again later.", 
+        messageId ? { reply_to_message_id: messageId } : {});
       return;
     }
 
     link = res.result.invite_link;
 
-    // Save to DB
     await supabase.from("telegram_invites").insert({
       invite_link: link,
       creator_telegram_id: userId,
@@ -105,27 +107,50 @@ async function handleInvite(
     });
   }
 
-  // Count how many people joined via this link
   const { count: joinCount } = await supabase
     .from("telegram_invite_joins")
     .select("id", { count: "exact", head: true })
     .eq("invite_link", link);
 
-  await sendMsg(chatId,
+  const inviteMsg =
     `🔗 <b>Your personal OG SCAN invite link</b>\n\n` +
     `${link}\n\n` +
     `Share this link to invite people to the community.\n` +
     `When they join, you get the credit! 👑\n\n` +
     `📊 Invites so far: <b>${joinCount ?? 0}</b>\n` +
-    `Type /leaderboardd to see the invite rankings.`
-  );
+    `Type /leaderboard to see the invite rankings.`;
+
+  // If command sent in group → try to DM the user privately, 
+  // then post a brief reply in the group
+  if (isGroup) {
+    const dmResult = await sendMsg(userId, inviteMsg);
+    if (dmResult.ok) {
+      // Successfully DMed — post brief confirmation in group
+      const name = escHtml(displayName(firstName, username));
+      await sendMsg(chatId,
+        `📩 ${name}, your invite link has been sent to your DMs! 🔗`,
+        messageId ? { reply_to_message_id: messageId } : {}
+      );
+    } else {
+      // Can't DM (user hasn't started bot) — post in group as reply
+      console.log(`[invite] Can't DM user ${userId}, posting in group instead. Error:`, dmResult);
+      await sendMsg(chatId,
+        `🔗 <b>${escHtml(displayName(firstName, username))}, here's your personal OG SCAN invite link:</b>\n\n` +
+        `${link}\n\n` +
+        `📊 Invites so far: <b>${joinCount ?? 0}</b>\n\n` +
+        `💡 Tip: Start a chat with me directly to get your link privately next time!`,
+        messageId ? { reply_to_message_id: messageId } : {}
+      );
+    }
+  } else {
+    // DM context — reply directly
+    await sendMsg(chatId, inviteMsg);
+  }
 }
 
 /* ─────────────────── /leaderboard handler ─────────────── */
 
-async function handleLeaderboard(chatId: number | string) {
-  // Build leaderboard from telegram_invites joined with join counts
-  // This way users with 0 invites still appear once they've used /invite
+async function handleLeaderboard(chatId: number | string, messageId?: number) {
   const { data: inviteRows } = await supabase
     .from("telegram_invites")
     .select("creator_telegram_id, creator_username, creator_first_name")
@@ -133,12 +158,12 @@ async function handleLeaderboard(chatId: number | string) {
 
   if (!inviteRows || inviteRows.length === 0) {
     await sendMsg(chatId,
-      `📊 No one has created an invite link yet.\n\nBe the first! Use /invite to get your link. 🔥`
+      `📊 No one has created an invite link yet.\n\nBe the first! Use /invite to get your link. 🔥`,
+      messageId ? { reply_to_message_id: messageId } : {}
     );
     return;
   }
 
-  // Count joins per inviter
   const { data: joinRows } = await supabase
     .from("telegram_invite_joins")
     .select("inviter_telegram_id")
@@ -149,7 +174,6 @@ async function handleLeaderboard(chatId: number | string) {
     joinCounts[r.inviter_telegram_id] = (joinCounts[r.inviter_telegram_id] ?? 0) + 1;
   }
 
-  // Merge and sort
   const ranked = inviteRows
     .map(r => ({
       id: r.creator_telegram_id,
@@ -168,7 +192,8 @@ async function handleLeaderboard(chatId: number | string) {
   await sendMsg(chatId,
     `🏆 <b>OG SCAN Invite Leaderboard</b>\n\n` +
     lines.join("\n") +
-    `\n\n👑 Get your invite link with /invite`
+    `\n\n👑 Get your invite link with /invite`,
+    messageId ? { reply_to_message_id: messageId } : {}
   );
 }
 
@@ -179,10 +204,11 @@ async function handleMyInvites(
   username: string | null,
   firstName: string | null,
   chatId: number | string,
+  messageId?: number,
+  isGroup?: boolean,
 ) {
   if (IGNORED_BOT_IDS.has(userId)) return;
 
-  // Check they have a link at all
   const { data: myInvite } = await supabase
     .from("telegram_invites")
     .select("invite_link")
@@ -191,7 +217,8 @@ async function handleMyInvites(
 
   if (!myInvite) {
     await sendMsg(chatId,
-      `You don't have an invite link yet!\nUse /invite to get your personal link. 🔗`
+      `You don't have an invite link yet!\nUse /invite to get your personal link. 🔗`,
+      messageId ? { reply_to_message_id: messageId } : {}
     );
     return;
   }
@@ -201,7 +228,6 @@ async function handleMyInvites(
     .select("id", { count: "exact", head: true })
     .eq("invite_link", myInvite.invite_link);
 
-  // Calculate rank: count how many invite creators have more joins than this user
   const { data: allJoins } = await supabase
     .from("telegram_invite_joins")
     .select("inviter_telegram_id")
@@ -215,14 +241,25 @@ async function handleMyInvites(
   const rank = Object.values(allCounts).filter(c => c > myCount).length + 1;
 
   const name = escHtml(displayName(firstName, username));
-  await sendMsg(chatId,
+  const statsMsg =
     `📊 <b>${name}'s Invite Stats</b>\n\n` +
     `Invites: <b>${myCount}</b>\n` +
     `Rank: <b>#${rank}</b>\n\n` +
     (myCount === 0
       ? `Share your link and start climbing the leaderboard! 🔥\n\n${myInvite.invite_link}`
-      : `Keep going! Use /leaderboardd to see the full rankings.`)
-  );
+      : `Keep going! Use /leaderboard to see the full rankings.`);
+
+  if (isGroup) {
+    const dmResult = await sendMsg(userId, statsMsg);
+    if (dmResult.ok) {
+      await sendMsg(chatId, `📩 ${name}, your invite stats have been sent to your DMs!`,
+        messageId ? { reply_to_message_id: messageId } : {});
+    } else {
+      await sendMsg(chatId, statsMsg, messageId ? { reply_to_message_id: messageId } : {});
+    }
+  } else {
+    await sendMsg(chatId, statsMsg);
+  }
 }
 
 /* ──────────── chat_member join handler ──────────── */
@@ -234,7 +271,6 @@ async function handleChatMember(update: any) {
   const newStatus = member.new_chat_member?.status;
   const oldStatus = member.old_chat_member?.status;
 
-  // Only fire when someone actually joins (wasn't a member, now is)
   const justJoined =
     (newStatus === "member" || newStatus === "restricted") &&
     (oldStatus === "left" || oldStatus === "kicked" || oldStatus === "banned");
@@ -265,7 +301,6 @@ async function handleChatMember(update: any) {
     }
   }
 
-  // Upsert — UNIQUE on joiner_telegram_id prevents double counting
   const { error } = await supabase
     .from("telegram_invite_joins")
     .upsert(
@@ -282,9 +317,8 @@ async function handleChatMember(update: any) {
       { onConflict: "joiner_telegram_id" }
     );
 
-  if (error) console.error("[chat_member] upsert error:", error);
+  if (error) console.error("[chat_member] upsert error:", JSON.stringify(error));
 
-  // Welcome message in channel
   const joinerName = escHtml(displayName(joiner.first_name, joiner.username));
   if (inviterTgId) {
     const inviterName = escHtml(displayName(inviterFirstName, inviterUsername));
@@ -309,40 +343,43 @@ Deno.serve(async (req) => {
   try { update = await req.json(); } catch { return new Response("Bad JSON", { status: 400 }); }
 
   try {
-    // chat_member join event
     if (update.chat_member) {
       await handleChatMember(update);
       return new Response("OK");
     }
 
-    // Message commands
     const msg = update.message ?? update.edited_message;
     if (!msg?.text) return new Response("OK");
 
     const rawCmd  = msg.text.trim().split(" ")[0].toLowerCase();
-    const cmd     = rawCmd.replace(/@\w+$/, ""); // strip @botname suffix
+    const cmd     = rawCmd.replace(/@\w+$/, "");
     const userId: number        = msg.from?.id;
     const username: string | null = msg.from?.username ?? null;
     const firstName: string | null = msg.from?.first_name ?? null;
     const chatId: number        = msg.chat.id;
+    const messageId: number     = msg.message_id;
+    const isGroup: boolean      = msg.chat.type === "group" || msg.chat.type === "supergroup";
+
+    console.log(`[cmd] ${cmd} from userId=${userId} in chatId=${chatId} isGroup=${isGroup}`);
 
     if (cmd === "/invite") {
-      await handleInvite(userId, username, firstName, chatId);
-    } else if (cmd === "/leaderboardd" || cmd === "/leaderboard") {
-      await handleLeaderboard(chatId);
+      await handleInvite(userId, username, firstName, chatId, messageId, isGroup);
+    } else if (cmd === "/leaderboard" || cmd === "/leaderboardd") {
+      await handleLeaderboard(chatId, messageId);
     } else if (cmd === "/invites") {
-      await handleMyInvites(userId, username, firstName, chatId);
+      await handleMyInvites(userId, username, firstName, chatId, messageId, isGroup);
     } else if (cmd === "/start" || cmd === "/help") {
       await sendMsg(chatId,
         `🤖 <b>OG SCAN Invite Bot</b>\n\n` +
         `/invite — Get your personal invite link 🔗\n` +
-        `/leaderboardd — View the invite rankings 🏆\n` +
+        `/leaderboard — View the invite rankings 🏆\n` +
         `/invites — See your invite count & rank 📊\n\n` +
-        `Invite people and earn your spot at the top! 👑`
+        `Invite people and earn your spot at the top! 👑`,
+        messageId ? { reply_to_message_id: messageId } : {}
       );
     }
   } catch (e) {
-    console.error("[telegram-invite-bot] Error:", e);
+    console.error("[telegram-invite-bot] Unhandled error:", e);
   }
 
   return new Response("OK");
