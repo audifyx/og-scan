@@ -69,6 +69,10 @@ interface UserProfile {
   page_accent?: string | null;
   is_official_account?: boolean;
   affiliate_org_id?: string | null;
+  og_score?: number | null;
+  og_rank?: string | null;
+  accurate_calls?: number | null;
+  total_likes_received?: number | null;
 }
 
 interface UserActivity {
@@ -631,6 +635,17 @@ const Profile = () => {
 
           {/* Pill badges row — level, streak, private */}
           <div className="flex items-center gap-1.5 flex-wrap mt-3">
+            {/* OG Reputation Score */}
+            {profile.og_rank && profile.og_rank !== "Newcomer" && (
+              <span className={`flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-bold border ${
+                profile.og_rank === "Legend" ? "bg-amber-500/10 border-amber-500/25 text-amber-400" :
+                profile.og_rank === "OG" ? "bg-purple-500/10 border-purple-500/25 text-purple-400" :
+                profile.og_rank === "Alpha" ? "bg-cyan-500/10 border-cyan-500/25 text-cyan-400" :
+                "bg-green-500/10 border-green-500/25 text-green-400"
+              }`}>
+                ⭐ {profile.og_rank} · {(profile.og_score || 0).toLocaleString()} OG
+              </span>
+            )}
             <span className="flex items-center gap-1 text-[11px] bg-white/[0.06] px-2.5 py-1 rounded-full text-white/60 font-medium">
               <Zap className="h-3 w-3 text-yellow-400" /> Lv {level} · {getLevelTitle(level)}
             </span>

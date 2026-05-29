@@ -11,7 +11,9 @@ import {
   Edit, Shield, LogOut, Crown, ImagePlus, Upload, Video,
   Settings, TrendingUp, ExternalLink, Copy, Play, BadgeCheck,
   Medal, Star, CalendarDays, BookOpen, ClipboardCheck, BarChart3,
-  Flame, Award, Gauge, Layers, Hash, Megaphone, Sparkles
+  Flame, Award, Gauge, Layers, Hash, Megaphone, Sparkles,
+  Zap, Bell, Swords, AlertTriangle, TrendingDown, Wallet, Target,
+  Activity, CheckCircle2, Clock, ArrowRight, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -287,6 +289,16 @@ interface Post {
   token_liquidity_usd?: number | null;
   token_volume_24h_usd?: number | null;
   token_pair_address?: string | null;
+  // Alpha call track record
+  token_price_at_post?: number | null;
+  token_24h_return?: number | null;
+  token_7d_return?: number | null;
+  // X cross-post
+  tweet_id?: string | null;
+  tweet_url?: string | null;
+  // Author OG reputation
+  og_score?: number | null;
+  og_rank?: string | null;
   // Client state
   liked?: boolean;
   reposted?: boolean;
@@ -309,7 +321,7 @@ interface PostReply {
    Main View Router
    ═══════════════════════════════════════════════════════════════ */
 
-type MainView = "home" | "explore" | "news" | "community";
+type MainView = "home" | "explore" | "news" | "community" | "smart_money" | "alerts" | "raids" | "dms";
 type FeedSort = "latest" | "top" | "trending";
 
 /* ─── Standard Forensic Constants ─── */
@@ -469,21 +481,25 @@ function QualityScorePill({ community }: { community: Community }) {
   );
 }
 
-/* ── Enrich posts with missing username/avatar from profiles table ── */
+/* ── Enrich posts with username/avatar/og_rank from profiles table ── */
 async function enrichPostProfiles(posts: Post[]): Promise<Post[]> {
-  const missing = posts.filter(p => !p.username || p.username === "Anonymous" || p.username === "anon");
-  if (missing.length === 0) return posts;
-  const userIds = [...new Set(missing.map(p => p.user_id))];
+  if (posts.length === 0) return posts;
+  const userIds = [...new Set(posts.map(p => p.user_id))];
   const { data: profiles } = await supabase.from("profiles")
-    .select("user_id, username, avatar_url")
+    .select("user_id, username, avatar_url, og_score, og_rank")
     .in("user_id", userIds);
   if (!profiles || profiles.length === 0) return posts;
   const profileMap = new Map(profiles.map(p => [p.user_id, p]));
   return posts.map(p => {
-    if (p.username && p.username !== "Anonymous" && p.username !== "anon") return p;
     const prof = profileMap.get(p.user_id);
     if (!prof) return p;
-    return { ...p, username: prof.username || p.username, avatar_url: prof.avatar_url || p.avatar_url };
+    return {
+      ...p,
+      username: (!p.username || p.username === "Anonymous" || p.username === "anon") ? (prof.username || p.username) : p.username,
+      avatar_url: p.avatar_url || prof.avatar_url,
+      og_score: prof.og_score,
+      og_rank: prof.og_rank,
+    };
   });
 }
 
@@ -626,6 +642,14 @@ const Communities = () => {
           onSelect={openCommunity}
           onCreateNew={() => setShowCreateCommunity(true)}
         />
+      ) : mainView === "smart_money" ? (
+        <SmartMoneyFeed user={user} />
+      ) : mainView === "alerts" ? (
+        <AlertsHub user={user} />
+      ) : mainView === "raids" ? (
+        <RaidsHub user={user} />
+      ) : mainView === "dms" ? (
+        <DMsHub user={user} />
       ) : (
         <HomeFeed
           user={user}
@@ -719,7 +743,9 @@ function TopNav({
           {([
             { id: "home" as MainView, label: "Home", icon: <Home className="h-4 w-4" /> },
             { id: "explore" as MainView, label: "Explore", icon: <Search className="h-4 w-4" /> },
-            { id: "news" as MainView, label: "News", icon: <Newspaper className="h-4 w-4" /> },
+            { id: "smart_money" as MainView, label: "Smart $", icon: <Zap className="h-4 w-4" /> },
+            { id: "alerts" as MainView, label: "Alerts", icon: <Bell className="h-4 w-4" /> },
+            { id: "raids" as MainView, label: "Raids", icon: <Swords className="h-4 w-4" /> },
           ]).map(tab => (
             <button
               key={tab.id}
@@ -2113,6 +2139,178 @@ function CommunityFeed({
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   Token Safety Panel — on-demand CA analysis popup
+   ═══════════════════════════════════════════════════════════════ */
+
+interface SafetyData {
+  symbol: string;
+  name: string;
+  priceUsd: number | null;
+  change24h: number | null;
+  marketCapUsd: number | null;
+  liquidityUsd: number | null;
+  volume24hUsd: number | null;
+  chartUrl: string | null;
+  score: number;
+  flags: string[];
+}
+
+async function fetchSafetyData(ca: string): Promise<SafetyData | null> {
+  try {
+    const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${ca}`);
+    if (!r.ok) return null;
+    const pairs = await r.json();
+    if (!Array.isArray(pairs) || pairs.length === 0) return null;
+    const pair = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+    const liq = pair.liquidity?.usd ?? 0;
+    const vol = pair.volume?.h24 ?? 0;
+    const mc = pair.marketCap ?? pair.fdv ?? 0;
+    const flags: string[] = [];
+    let score = 100;
+    if (liq < 10000) { flags.push("⚠️ Very low liquidity"); score -= 35; }
+    else if (liq < 50000) { flags.push("⚠️ Low liquidity"); score -= 15; }
+    if (mc > 0 && liq / mc < 0.02) { flags.push("⚠️ Liq/MC ratio < 2%"); score -= 20; }
+    if (vol < 1000) { flags.push("⚠️ Almost no volume"); score -= 20; }
+    if (pairs.length === 1) { flags.push("ℹ️ Single trading pair"); score -= 5; }
+    if (score >= 80) flags.unshift("✅ Passes basic checks");
+    return {
+      symbol: pair.baseToken?.symbol || "???",
+      name: pair.baseToken?.name || "Unknown",
+      priceUsd: pair.priceUsd ? parseFloat(pair.priceUsd) : null,
+      change24h: pair.priceChange?.h24 ?? null,
+      marketCapUsd: mc || null,
+      liquidityUsd: liq || null,
+      volume24hUsd: vol || null,
+      chartUrl: pair.url || `https://dexscreener.com/solana/${ca}`,
+      score: Math.max(0, score),
+      flags,
+    };
+  } catch { return null; }
+}
+
+function TokenSafetyPanel({ ca, onClose }: { ca: string; onClose: () => void }) {
+  const [data, setData] = useState<SafetyData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSafetyData(ca).then(d => { setData(d); setLoading(false); });
+  }, [ca]);
+
+  const scoreColor = !data ? "text-white/30"
+    : data.score >= 75 ? "text-green-400"
+    : data.score >= 45 ? "text-yellow-400"
+    : "text-red-400";
+
+  const scoreBg = !data ? "bg-white/[0.04]"
+    : data.score >= 75 ? "bg-green-500/10 border-green-500/20"
+    : data.score >= 45 ? "bg-yellow-500/10 border-yellow-500/20"
+    : "bg-red-500/10 border-red-500/20";
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-end justify-center sm:items-center px-4 pb-4 sm:pb-0"
+      onClick={onClose}>
+      <div className="bg-[#0a0a10] border border-white/[0.08] rounded-2xl w-full max-w-sm shadow-2xl p-4 space-y-3"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-white/30 font-mono truncate max-w-[200px]">{ca.slice(0, 8)}...{ca.slice(-6)}</p>
+          </div>
+          <button onClick={onClose} className="text-white/25 hover:text-white"><XIcon className="h-4 w-4" /></button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-white/20" />
+          </div>
+        ) : !data ? (
+          <p className="text-xs text-white/30 text-center py-6">Token not found on DexScreener</p>
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-base font-black text-white">{data.symbol}</p>
+                <p className="text-xs text-white/30">{data.name}</p>
+              </div>
+              <div className={cn("px-3 py-1.5 rounded-xl border text-center", scoreBg)}>
+                <p className={cn("text-xl font-black leading-none", scoreColor)}>{data.score}</p>
+                <p className="text-[9px] text-white/30 mt-0.5">Safety</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: "Price", value: data.priceUsd != null ? (data.priceUsd < 0.0001 ? `$${data.priceUsd.toExponential(2)}` : `$${data.priceUsd.toPrecision(4)}`) : "—" },
+                { label: "24h", value: data.change24h != null ? `${data.change24h > 0 ? "+" : ""}${data.change24h.toFixed(1)}%` : "—", color: data.change24h != null ? (data.change24h >= 0 ? "text-green-400" : "text-red-400") : "" },
+                { label: "Market Cap", value: data.marketCapUsd ? (data.marketCapUsd >= 1e6 ? `$${(data.marketCapUsd / 1e6).toFixed(2)}M` : `$${(data.marketCapUsd / 1e3).toFixed(0)}K`) : "—" },
+                { label: "Liquidity", value: data.liquidityUsd ? (data.liquidityUsd >= 1e6 ? `$${(data.liquidityUsd / 1e6).toFixed(2)}M` : `$${(data.liquidityUsd / 1e3).toFixed(0)}K`) : "—" },
+              ].map(({ label, value, color }) => (
+                <div key={label} className="bg-white/[0.03] rounded-xl p-2.5">
+                  <p className="text-[10px] text-white/25">{label}</p>
+                  <p className={cn("text-sm font-bold text-white mt-0.5", color)}>{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-1">
+              {data.flags.map((f, i) => <p key={i} className="text-[11px] text-white/50">{f}</p>)}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <a href={data.chartUrl || "#"} target="_blank" rel="noopener noreferrer"
+                className="flex-1 py-2 rounded-xl bg-og-cyan/10 border border-og-cyan/20 text-og-cyan text-xs font-bold text-center hover:bg-og-cyan/20 transition-colors">
+                📊 View Chart
+              </a>
+              <button onClick={() => { navigator.clipboard.writeText(ca); toast.success("CA copied"); }}
+                className="flex-1 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white/40 text-xs font-bold hover:bg-white/[0.08] transition-colors">
+                📋 Copy CA
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Solana CA regex ── */
+const SOL_CA_REGEX = /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/g;
+
+function PostContentRenderer({ content }: { content: string }) {
+  const [activeCa, setActiveCa] = useState<string | null>(null);
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  const regex = new RegExp(SOL_CA_REGEX.source, "g");
+
+  while ((match = regex.exec(content)) !== null) {
+    const ca = match[0];
+    if (match.index > lastIndex) {
+      parts.push(content.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <button
+        key={match.index}
+        onClick={e => { e.stopPropagation(); setActiveCa(ca); }}
+        className="inline font-mono text-og-cyan/80 hover:text-og-cyan hover:underline underline-offset-2 transition-colors text-[12px] bg-og-cyan/5 px-1 rounded"
+        title="Click to analyze token"
+      >
+        {ca.slice(0, 6)}…{ca.slice(-4)}
+      </button>
+    );
+    lastIndex = match.index + ca.length;
+  }
+  if (lastIndex < content.length) parts.push(content.slice(lastIndex));
+
+  return (
+    <>
+      <span className="whitespace-pre-wrap">{parts}</span>
+      {activeCa && <TokenSafetyPanel ca={activeCa} onClose={() => setActiveCa(null)} />}
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Post Card — X/Twitter style
    ═══════════════════════════════════════════════════════════════ */
 
@@ -2221,6 +2419,34 @@ function PostCard({
             <span className="text-xs text-white/15 shrink-0">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
             {isThread && <Badge className="text-[7px] bg-blue-500/10 text-blue-400 border-blue-500/20 ml-1">Thread</Badge>}
             {isArticle && <Badge className="text-[7px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20 ml-1">Article</Badge>}
+            {/* X cross-post badge */}
+            {post.tweet_id && (
+              <a href={post.tweet_url || `https://x.com/i/web/status/${post.tweet_id}`} target="_blank" rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/[0.08] hover:bg-white/[0.15] transition-colors"
+                title="View on X">
+                <span className="text-[9px] font-black text-white/50">𝕏</span>
+              </a>
+            )}
+            {/* Alpha call return badge */}
+            {post.token_24h_return != null && (
+              <span className={cn("ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border",
+                post.token_24h_return >= 0
+                  ? "bg-green-500/10 border-green-500/20 text-green-400"
+                  : "bg-red-500/10 border-red-500/20 text-red-400"
+              )}>
+                {post.token_24h_return >= 0 ? "+" : ""}{post.token_24h_return.toFixed(0)}%
+              </span>
+            )}
+            {/* OG Rank badge */}
+            {post.og_rank && post.og_rank !== "Newcomer" && (
+              <span className={cn("ml-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded-full border uppercase tracking-wide",
+                post.og_rank === "Legend" ? "bg-og-gold/10 border-og-gold/25 text-og-gold" :
+                post.og_rank === "OG" ? "bg-purple-500/10 border-purple-500/25 text-purple-400" :
+                post.og_rank === "Alpha" ? "bg-og-cyan/10 border-og-cyan/25 text-og-cyan" :
+                "bg-og-lime/10 border-og-lime/25 text-og-lime"
+              )}>{post.og_rank}</span>
+            )}
             <div className="ml-auto relative">
               <button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
                 className="p-1 rounded-full text-white/15 hover:text-white/40 hover:bg-white/[0.04] transition-colors">
@@ -2273,8 +2499,8 @@ function PostCard({
               </div>
             </div>
           ) : (
-            <div className={cn("mt-1 text-sm text-white/70 leading-relaxed whitespace-pre-wrap break-words", compact ? "line-clamp-3" : "line-clamp-6")}>
-              {post.content}
+            <div className={cn("mt-1 text-sm text-white/70 leading-relaxed break-words", compact ? "line-clamp-3" : "line-clamp-6")}>
+              <PostContentRenderer content={post.content} />
             </div>
           )}
           {isArticle && post.article_cover_url && (
@@ -3096,6 +3322,764 @@ function ComposeModal({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Smart Money Feed
+   ═══════════════════════════════════════════════════════════════ */
+
+interface SmartWallet {
+  id: string;
+  address: string;
+  label: string;
+  tier: string;
+  description: string | null;
+  twitter_handle: string | null;
+  avatar_url: string | null;
+  win_rate: number | null;
+  avg_return: number | null;
+}
+
+interface SmartActivity {
+  id: string;
+  wallet_address: string;
+  tx_type: string | null;
+  token_ca: string | null;
+  token_symbol: string | null;
+  token_name: string | null;
+  amount_sol: number | null;
+  amount_usd: number | null;
+  return_pct: number | null;
+  created_at: string;
+}
+
+function SmartMoneyFeed({ user }: { user: any }) {
+  const [wallets, setWallets] = useState<SmartWallet[]>([]);
+  const [activity, setActivity] = useState<SmartActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeWallet, setActiveWallet] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: ws }, { data: acts }] = await Promise.all([
+        supabase.from("og_smart_wallets").select("*").eq("is_active", true).order("created_at"),
+        supabase.from("smart_wallet_activity").select("*").order("created_at", { ascending: false }).limit(50),
+      ]);
+      setWallets(ws || []);
+      setActivity(acts || []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const filteredActivity = activeWallet
+    ? activity.filter(a => a.wallet_address === activeWallet)
+    : activity;
+
+  const tierColor = (tier: string) => ({
+    whale: "text-og-gold border-og-gold/30 bg-og-gold/10",
+    kol: "text-purple-400 border-purple-400/30 bg-purple-400/10",
+    alpha: "text-og-cyan border-og-cyan/30 bg-og-cyan/10",
+    insider: "text-red-400 border-red-400/30 bg-red-400/10",
+    dev: "text-og-lime border-og-lime/30 bg-og-lime/10",
+  }[tier] || "text-white/40 border-white/10 bg-white/5");
+
+  return (
+    <div className="divide-y divide-white/[0.04]">
+      {/* Header */}
+      <div className="px-4 py-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Zap className="h-4 w-4 text-og-lime" />
+          <h2 className="text-sm font-black text-white uppercase tracking-wide">Smart Money Tracker</h2>
+        </div>
+        <p className="text-[11px] text-white/30">Track alpha wallets and whale activity in real time</p>
+      </div>
+
+      {/* Wallet pills */}
+      <div className="px-4 py-3">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <button
+            onClick={() => setActiveWallet(null)}
+            className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium whitespace-nowrap transition-all shrink-0",
+              !activeWallet ? "border-og-lime/60 bg-og-lime/10 text-og-lime" : "border-white/[0.06] text-white/30 hover:text-white/50"
+            )}>
+            All Wallets
+          </button>
+          {wallets.map(w => (
+            <button key={w.address} onClick={() => setActiveWallet(w.address === activeWallet ? null : w.address)}
+              className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium whitespace-nowrap transition-all shrink-0",
+                activeWallet === w.address ? "border-og-cyan/60 bg-og-cyan/10 text-og-cyan" : "border-white/[0.06] text-white/30 hover:text-white/50"
+              )}>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full border font-bold uppercase"
+                style={{ color: "inherit", borderColor: "inherit" }}>{w.tier}</span>
+              {w.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Wallet cards */}
+      {wallets.length > 0 && (
+        <div className="px-4 py-3 grid grid-cols-2 gap-2">
+          {wallets.map(w => (
+            <button key={w.address} onClick={() => setActiveWallet(w.address === activeWallet ? null : w.address)}
+              className={cn("text-left p-3 rounded-xl border transition-all",
+                activeWallet === w.address ? "border-og-cyan/30 bg-og-cyan/5" : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.10]"
+              )}>
+              <div className="flex items-center justify-between mb-1">
+                <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full border font-bold uppercase", tierColor(w.tier))}>{w.tier}</span>
+                {w.win_rate != null && <span className="text-[10px] text-og-lime font-bold">{w.win_rate.toFixed(0)}% W</span>}
+              </div>
+              <p className="text-xs font-bold text-white truncate">{w.label}</p>
+              <p className="text-[10px] font-mono text-white/20 mt-0.5">{w.address.slice(0, 6)}…{w.address.slice(-4)}</p>
+              {w.avg_return != null && (
+                <p className="text-[10px] text-og-cyan mt-1">avg {w.avg_return >= 0 ? "+" : ""}{w.avg_return.toFixed(0)}%</p>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Activity feed */}
+      <div>
+        <div className="px-4 py-2.5 flex items-center justify-between">
+          <p className="text-[10px] text-white/25 uppercase tracking-wider font-semibold">
+            {activeWallet ? "Wallet Activity" : "Recent Activity"} · {filteredActivity.length}
+          </p>
+          <Activity className="h-3.5 w-3.5 text-white/15" />
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-white/20" /></div>
+        ) : filteredActivity.length === 0 ? (
+          <div className="py-12 text-center">
+            <Activity className="h-8 w-8 text-white/10 mx-auto mb-2" />
+            <p className="text-sm text-white/20">No activity yet</p>
+            <p className="text-[11px] text-white/10 mt-1">Activity will appear as wallets transact</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.03]">
+            {filteredActivity.map(act => {
+              const wallet = wallets.find(w => w.address === act.wallet_address);
+              const isBuy = act.tx_type === "buy";
+              const isSell = act.tx_type === "sell";
+              return (
+                <div key={act.id} className="px-4 py-3 flex items-start gap-3">
+                  <div className={cn("w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0",
+                    isBuy ? "bg-green-500/10" : isSell ? "bg-red-500/10" : "bg-white/[0.05]"
+                  )}>
+                    {isBuy ? "📈" : isSell ? "📉" : "💫"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-bold text-white">{wallet?.label || act.wallet_address.slice(0, 8)}</span>
+                      <span className={cn("text-[10px] font-bold uppercase",
+                        isBuy ? "text-green-400" : isSell ? "text-red-400" : "text-white/40"
+                      )}>{act.tx_type || "swap"}</span>
+                      {act.token_symbol && <span className="text-[10px] text-og-cyan font-mono">${act.token_symbol}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {act.amount_usd != null && (
+                        <span className="text-[10px] text-white/40">
+                          ${act.amount_usd >= 1000 ? `${(act.amount_usd / 1000).toFixed(1)}K` : act.amount_usd.toFixed(0)}
+                        </span>
+                      )}
+                      {act.return_pct != null && (
+                        <span className={cn("text-[10px] font-bold", act.return_pct >= 0 ? "text-green-400" : "text-red-400")}>
+                          {act.return_pct >= 0 ? "+" : ""}{act.return_pct.toFixed(1)}%
+                        </span>
+                      )}
+                      <span className="text-[10px] text-white/20 ml-auto">
+                        {formatDistanceToNow(new Date(act.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                    {act.token_ca && (
+                      <p className="text-[10px] font-mono text-white/15 mt-0.5">{act.token_ca.slice(0, 8)}…{act.token_ca.slice(-4)}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Alerts Hub — Price Alerts + Wallet Alerts + Notifications
+   ═══════════════════════════════════════════════════════════════ */
+
+interface PriceAlertRow {
+  id: string;
+  token_ca?: string;
+  token_address?: string;
+  token_symbol?: string;
+  symbol?: string;
+  target_price: number;
+  direction?: string;
+  condition?: string;
+  is_active: boolean;
+  fired_at?: string | null;
+  triggered_at?: string | null;
+  created_at: string;
+}
+
+interface WalletAlertRow {
+  id: string;
+  wallet_address: string | null;
+  label: string | null;
+  is_active: boolean;
+  last_activity: string | null;
+  created_at: string;
+}
+
+interface NotificationRow {
+  id: string;
+  type: string;
+  title: string;
+  body?: string;
+  message?: string;
+  is_read?: boolean;
+  read_at?: string | null;
+  created_at: string;
+}
+
+function AlertsHub({ user }: { user: any }) {
+  const [tab, setTab] = useState<"notifications" | "price" | "wallet">("notifications");
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [priceAlerts, setPriceAlerts] = useState<PriceAlertRow[]>([]);
+  const [walletAlerts, setWalletAlerts] = useState<WalletAlertRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Add price alert form
+  const [showAddPrice, setShowAddPrice] = useState(false);
+  const [pCA, setPCA] = useState("");
+  const [pSymbol, setPSymbol] = useState("");
+  const [pPrice, setPPrice] = useState("");
+  const [pDir, setPDir] = useState<"above" | "below">("above");
+  const [savingP, setSavingP] = useState(false);
+
+  // Add wallet alert form
+  const [showAddWallet, setShowAddWallet] = useState(false);
+  const [wAddr, setWAddr] = useState("");
+  const [wLabel, setWLabel] = useState("");
+  const [savingW, setSavingW] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    async function load() {
+      const [{ data: notifs }, { data: pa }, { data: wa }] = await Promise.all([
+        supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
+        supabase.from("price_alerts").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("wallet_alerts").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      ]);
+      setNotifications(notifs || []);
+      setPriceAlerts(pa || []);
+      setWalletAlerts(wa || []);
+      setLoading(false);
+    }
+    load();
+  }, [user]);
+
+  const unreadCount = notifications.filter(n => !n.is_read && !n.read_at).length;
+
+  const markAllRead = async () => {
+    if (!user) return;
+    await supabase.from("notifications").update({ is_read: true, read_at: new Date().toISOString() })
+      .eq("user_id", user.id).is("read_at", null);
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() })));
+  };
+
+  const addPriceAlert = async () => {
+    if (!user) { toast.error("Sign in first"); return; }
+    if (!pCA.trim() || !pPrice) { toast.error("Fill all fields"); return; }
+    setSavingP(true);
+    try {
+      const { data, error } = await supabase.from("price_alerts").insert({
+        user_id: user.id,
+        token_address: pCA.trim(),
+        symbol: pSymbol || null,
+        target_price: parseFloat(pPrice),
+        condition: pDir === "above" ? "above" : "below",
+        direction: pDir,
+        is_active: true,
+      }).select().single();
+      if (error) throw error;
+      setPriceAlerts(prev => [data, ...prev]);
+      setPCA(""); setPSymbol(""); setPPrice(""); setShowAddPrice(false);
+      toast.success("Price alert set! 🔔");
+    } catch (e: any) { toast.error(e.message || "Failed"); }
+    setSavingP(false);
+  };
+
+  const deletePriceAlert = async (id: string) => {
+    await supabase.from("price_alerts").delete().eq("id", id);
+    setPriceAlerts(prev => prev.filter(a => a.id !== id));
+    toast.success("Alert removed");
+  };
+
+  const addWalletAlert = async () => {
+    if (!user) { toast.error("Sign in first"); return; }
+    if (!wAddr.trim()) { toast.error("Wallet address required"); return; }
+    setSavingW(true);
+    try {
+      const { data, error } = await supabase.from("wallet_alerts").insert({
+        user_id: user.id,
+        wallet_address: wAddr.trim(),
+        label: wLabel || null,
+        is_active: true,
+      }).select().single();
+      if (error) throw error;
+      setWalletAlerts(prev => [data, ...prev]);
+      setWAddr(""); setWLabel(""); setShowAddWallet(false);
+      toast.success("Wallet alert added! 👁️");
+    } catch (e: any) { toast.error(e.message || "Failed"); }
+    setSavingW(false);
+  };
+
+  const deleteWalletAlert = async (id: string) => {
+    await supabase.from("wallet_alerts").delete().eq("id", id);
+    setWalletAlerts(prev => prev.filter(a => a.id !== id));
+    toast.success("Wallet alert removed");
+  };
+
+  const notifIcon = (type: string) => ({
+    price_alert: "💰", wallet_alert: "👁️", like: "❤️",
+    reply: "💬", mention: "@", dm: "✉️",
+  }[type] || "🔔");
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="px-4 py-4 flex items-center justify-between border-b border-white/[0.04]">
+        <div>
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-og-cyan" />
+            <h2 className="text-sm font-black text-white uppercase tracking-wide">Alerts & Notifications</h2>
+          </div>
+          <p className="text-[11px] text-white/30 mt-0.5">Price alerts, wallet watchers, activity feed</p>
+        </div>
+        {unreadCount > 0 && (
+          <button onClick={markAllRead} className="text-[10px] text-og-cyan hover:underline">Mark all read</button>
+        )}
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex border-b border-white/[0.04]">
+        {([
+          { id: "notifications" as const, label: "Feed", badge: unreadCount },
+          { id: "price" as const, label: "Price", badge: priceAlerts.filter(a => a.is_active).length },
+          { id: "wallet" as const, label: "Wallets", badge: walletAlerts.length },
+        ]).map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={cn("flex-1 py-2.5 text-xs font-medium transition-colors relative flex items-center justify-center gap-1.5",
+              tab === t.id ? "text-white" : "text-white/30 hover:text-white/50"
+            )}>
+            {t.label}
+            {t.badge > 0 && (
+              <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-bold",
+                tab === t.id ? "bg-og-cyan/20 text-og-cyan" : "bg-white/[0.06] text-white/30"
+              )}>{t.badge}</span>
+            )}
+            {tab === t.id && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-og-cyan" />}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-white/20" /></div>
+      ) : tab === "notifications" ? (
+        <div className="divide-y divide-white/[0.03]">
+          {notifications.length === 0 ? (
+            <div className="py-12 text-center">
+              <Bell className="h-8 w-8 text-white/10 mx-auto mb-2" />
+              <p className="text-sm text-white/20">No notifications yet</p>
+            </div>
+          ) : notifications.map(n => (
+            <div key={n.id} className={cn("px-4 py-3 flex items-start gap-3 transition-colors",
+              !n.is_read && !n.read_at ? "bg-og-cyan/[0.02]" : ""
+            )}>
+              <div className="w-8 h-8 rounded-full bg-white/[0.05] flex items-center justify-center text-sm shrink-0">
+                {notifIcon(n.type)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-white">{n.title}</p>
+                {(n.body || n.message) && <p className="text-[11px] text-white/40 mt-0.5 line-clamp-2">{n.body || n.message}</p>}
+                <p className="text-[10px] text-white/20 mt-1">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
+              </div>
+              {!n.is_read && !n.read_at && (
+                <div className="w-2 h-2 rounded-full bg-og-cyan shrink-0 mt-1" />
+              )}
+            </div>
+          ))}
+        </div>
+      ) : tab === "price" ? (
+        <div>
+          {showAddPrice ? (
+            <div className="p-4 space-y-3 border-b border-white/[0.06] bg-white/[0.02]">
+              <p className="text-xs font-bold text-white">New Price Alert</p>
+              <input value={pCA} onChange={e => setPCA(e.target.value)} placeholder="Token contract address (CA)..."
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-white/20 outline-none focus:border-og-cyan/40" />
+              <div className="flex gap-2">
+                <input value={pSymbol} onChange={e => setPSymbol(e.target.value)} placeholder="Symbol (optional)"
+                  className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 outline-none focus:border-og-cyan/40" />
+                <input type="number" value={pPrice} onChange={e => setPPrice(e.target.value)} placeholder="Target $"
+                  className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 outline-none focus:border-og-cyan/40" />
+              </div>
+              <div className="flex gap-2">
+                {(["above", "below"] as const).map(d => (
+                  <button key={d} onClick={() => setPDir(d)}
+                    className={cn("flex-1 py-2 rounded-xl border text-xs font-medium capitalize transition-colors",
+                      pDir === d ? "border-og-lime/40 bg-og-lime/10 text-og-lime" : "border-white/[0.06] text-white/30"
+                    )}>
+                    {d === "above" ? "📈 Above" : "📉 Below"} ${pPrice || "..."}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={addPriceAlert} disabled={savingP} className="flex-1 h-8 text-xs">
+                  {savingP ? <Loader2 className="h-3 w-3 animate-spin" /> : "Set Alert"}
+                </Button>
+                <button onClick={() => setShowAddPrice(false)} className="px-4 py-2 rounded-xl text-white/30 text-xs hover:text-white/60">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setShowAddPrice(true)}
+              className="w-full px-4 py-3 flex items-center gap-2 text-xs text-og-cyan hover:bg-og-cyan/5 transition-colors border-b border-white/[0.04]">
+              <Plus className="h-4 w-4" /> Add Price Alert
+            </button>
+          )}
+          <div className="divide-y divide-white/[0.03]">
+            {priceAlerts.length === 0 ? (
+              <div className="py-10 text-center">
+                <AlertTriangle className="h-8 w-8 text-white/10 mx-auto mb-2" />
+                <p className="text-sm text-white/20">No price alerts yet</p>
+              </div>
+            ) : priceAlerts.map(a => (
+              <div key={a.id} className="px-4 py-3 flex items-center gap-3">
+                <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-sm",
+                  (a.direction || a.condition) === "above" ? "bg-green-500/10" : "bg-red-500/10"
+                )}>
+                  {(a.direction || a.condition) === "above" ? "📈" : "📉"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-white">{a.token_symbol || a.symbol || "Token"}</span>
+                    <span className="text-[10px] text-white/30">{a.direction || a.condition} ${a.target_price}</span>
+                  </div>
+                  <p className="text-[10px] font-mono text-white/20 mt-0.5">
+                    {(a.token_ca || a.token_address || "").slice(0, 8)}…{(a.token_ca || a.token_address || "").slice(-4)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {a.is_active ? (
+                    <span className="text-[9px] text-og-lime bg-og-lime/10 px-2 py-0.5 rounded-full">Active</span>
+                  ) : (
+                    <span className="text-[9px] text-white/25 bg-white/[0.04] px-2 py-0.5 rounded-full">Fired</span>
+                  )}
+                  <button onClick={() => deletePriceAlert(a.id)}
+                    className="text-white/20 hover:text-red-400 transition-colors">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div>
+          {showAddWallet ? (
+            <div className="p-4 space-y-3 border-b border-white/[0.06] bg-white/[0.02]">
+              <p className="text-xs font-bold text-white">Watch a Wallet</p>
+              <input value={wAddr} onChange={e => setWAddr(e.target.value)} placeholder="Solana wallet address..."
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-white/20 outline-none focus:border-og-cyan/40" />
+              <input value={wLabel} onChange={e => setWLabel(e.target.value)} placeholder="Label (e.g. 'Ansem's wallet')"
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 outline-none focus:border-og-cyan/40" />
+              <div className="flex gap-2">
+                <Button onClick={addWalletAlert} disabled={savingW} className="flex-1 h-8 text-xs">
+                  {savingW ? <Loader2 className="h-3 w-3 animate-spin" /> : "Start Watching"}
+                </Button>
+                <button onClick={() => setShowAddWallet(false)} className="px-4 py-2 rounded-xl text-white/30 text-xs hover:text-white/60">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setShowAddWallet(true)}
+              className="w-full px-4 py-3 flex items-center gap-2 text-xs text-og-cyan hover:bg-og-cyan/5 transition-colors border-b border-white/[0.04]">
+              <Plus className="h-4 w-4" /> Watch a Wallet
+            </button>
+          )}
+          <div className="divide-y divide-white/[0.03]">
+            {walletAlerts.length === 0 ? (
+              <div className="py-10 text-center">
+                <Wallet className="h-8 w-8 text-white/10 mx-auto mb-2" />
+                <p className="text-sm text-white/20">No wallets tracked yet</p>
+                <p className="text-[11px] text-white/15 mt-1">Add a wallet to get notified on activity</p>
+              </div>
+            ) : walletAlerts.map(a => (
+              <div key={a.id} className="px-4 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-og-cyan/10 flex items-center justify-center text-sm shrink-0">👁️</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-white">{a.label || "Unnamed wallet"}</p>
+                  <p className="text-[10px] font-mono text-white/25 mt-0.5">
+                    {(a.wallet_address || "").slice(0, 8)}…{(a.wallet_address || "").slice(-4)}
+                  </p>
+                  {a.last_activity && (
+                    <p className="text-[10px] text-white/20 mt-0.5">
+                      Last: {formatDistanceToNow(new Date(a.last_activity), { addSuffix: true })}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={cn("text-[9px] px-2 py-0.5 rounded-full", a.is_active ? "bg-og-lime/10 text-og-lime" : "bg-white/[0.04] text-white/25")}>
+                    {a.is_active ? "Watching" : "Paused"}
+                  </span>
+                  <button onClick={() => deleteWalletAlert(a.id)} className="text-white/20 hover:text-red-400 transition-colors">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Raids Hub — Community Raids 2.0
+   ═══════════════════════════════════════════════════════════════ */
+
+interface Raid {
+  id: string;
+  title: string | null;
+  target_url: string | null;
+  goal_likes: number;
+  goal_reposts: number;
+  goal_replies: number;
+  current_likes: number;
+  current_reposts: number;
+  current_replies: number;
+  participants: number;
+  status: string;
+  ends_at: string | null;
+  tweet_id: string | null;
+  created_at: string;
+  community_id: string | null;
+  created_by: string | null;
+}
+
+function RaidsHub({ user }: { user: any }) {
+  const [raids, setRaids] = useState<Raid[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+
+  // Form
+  const [rTitle, setRTitle] = useState("");
+  const [rUrl, setRUrl] = useState("");
+  const [rGoalLikes, setRGoalLikes] = useState("100");
+  const [rGoalReposts, setRGoalReposts] = useState("50");
+  const [rEndsIn, setREndsIn] = useState("24");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    supabase.from("community_raids").select("*").order("created_at", { ascending: false }).limit(20)
+      .then(({ data }) => { setRaids(data || []); setLoading(false); });
+  }, []);
+
+  const createRaid = async () => {
+    if (!user) { toast.error("Sign in first"); return; }
+    if (!rTitle.trim() || !rUrl.trim()) { toast.error("Title and URL required"); return; }
+    setSaving(true);
+    try {
+      const endsAt = new Date(Date.now() + parseInt(rEndsIn) * 3600 * 1000).toISOString();
+      // Extract tweet ID from URL
+      const tweetMatch = rUrl.match(/status\/(\d+)/);
+      const tweetId = tweetMatch?.[1] || null;
+      const { data, error } = await supabase.from("community_raids").insert({
+        created_by: user.id,
+        title: rTitle.trim(),
+        target_url: rUrl.trim(),
+        goal_likes: parseInt(rGoalLikes) || 100,
+        goal_reposts: parseInt(rGoalReposts) || 50,
+        goal_replies: 20,
+        current_likes: 0, current_reposts: 0, current_replies: 0,
+        participants: 0,
+        status: "active",
+        ends_at: endsAt,
+        tweet_id: tweetId,
+      }).select().single();
+      if (error) throw error;
+      setRaids(prev => [data, ...prev]);
+      setRTitle(""); setRUrl(""); setShowCreate(false);
+      toast.success("Raid launched! ⚔️");
+    } catch (e: any) { toast.error(e.message || "Failed"); }
+    setSaving(false);
+  };
+
+  const joinRaid = async (raid: Raid) => {
+    if (!user) { toast.error("Sign in first"); return; }
+    try {
+      await supabase.from("raid_participants").insert({ raid_id: raid.id, user_id: user.id });
+      await supabase.from("community_raids").update({ participants: (raid.participants || 0) + 1 }).eq("id", raid.id);
+      setRaids(prev => prev.map(r => r.id === raid.id ? { ...r, participants: (r.participants || 0) + 1 } : r));
+      // Open tweet in new tab
+      if (raid.target_url) window.open(raid.target_url, "_blank");
+      toast.success("Joined raid! Go engage! 🚀");
+    } catch (e: any) {
+      if ((e as any).code === "23505") { 
+        if (raid.target_url) window.open(raid.target_url, "_blank");
+      } else {
+        toast.error("Failed to join");
+      }
+    }
+  };
+
+  const progress = (current: number, goal: number) => goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
+
+  return (
+    <div>
+      <div className="px-4 py-4 flex items-center justify-between border-b border-white/[0.04]">
+        <div>
+          <div className="flex items-center gap-2">
+            <Swords className="h-4 w-4 text-red-400" />
+            <h2 className="text-sm font-black text-white uppercase tracking-wide">Community Raids</h2>
+          </div>
+          <p className="text-[11px] text-white/30 mt-0.5">Coordinate engagement raids on target posts</p>
+        </div>
+        <button onClick={() => setShowCreate(!showCreate)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/15 transition-colors">
+          <Plus className="h-3.5 w-3.5" /> New Raid
+        </button>
+      </div>
+
+      {showCreate && (
+        <div className="p-4 space-y-3 border-b border-white/[0.06] bg-red-500/[0.02]">
+          <p className="text-xs font-bold text-white">🎯 Launch a Raid</p>
+          <input value={rTitle} onChange={e => setRTitle(e.target.value)} placeholder="Raid name..."
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-red-400/40" />
+          <input value={rUrl} onChange={e => setRUrl(e.target.value)} placeholder="Target tweet URL..."
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-red-400/40" />
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: "Like goal", value: rGoalLikes, set: setRGoalLikes },
+              { label: "Repost goal", value: rGoalReposts, set: setRGoalReposts },
+              { label: "Duration (h)", value: rEndsIn, set: setREndsIn },
+            ].map(({ label, value, set }) => (
+              <div key={label}>
+                <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1">{label}</label>
+                <input type="number" value={value} onChange={e => set(e.target.value)}
+                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-2.5 py-2 text-xs text-white outline-none focus:border-red-400/40" />
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={createRaid} disabled={saving} className="flex-1 h-8 text-xs bg-red-500/80 hover:bg-red-500 text-white">
+              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : "⚔️ Launch Raid"}
+            </Button>
+            <button onClick={() => setShowCreate(false)} className="px-4 text-white/30 text-xs hover:text-white/60">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-white/20" /></div>
+      ) : raids.length === 0 ? (
+        <div className="py-12 text-center">
+          <Swords className="h-8 w-8 text-white/10 mx-auto mb-2" />
+          <p className="text-sm text-white/20">No active raids</p>
+          <p className="text-[11px] text-white/10 mt-1">Launch a raid to coordinate community engagement</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-white/[0.04]">
+          {raids.map(raid => {
+            const likePct = progress(raid.current_likes, raid.goal_likes);
+            const repostPct = progress(raid.current_reposts, raid.goal_reposts);
+            const isActive = raid.status === "active";
+            const endsIn = raid.ends_at ? new Date(raid.ends_at).getTime() - Date.now() : null;
+            const expired = endsIn != null && endsIn < 0;
+            return (
+              <div key={raid.id} className="p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-base shrink-0",
+                    isActive && !expired ? "bg-red-500/15" : "bg-white/[0.04]"
+                  )}>
+                    {isActive && !expired ? "⚔️" : "✅"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-bold text-white truncate">{raid.title || "Unnamed Raid"}</p>
+                      {isActive && !expired && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-full">LIVE</span>}
+                    </div>
+                    {raid.ends_at && (
+                      <p className="text-[10px] text-white/25 mt-0.5 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {expired ? "Ended" : `Ends ${formatDistanceToNow(new Date(raid.ends_at), { addSuffix: true })}`}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-white/20">{raid.participants || 0} raiders</p>
+                  </div>
+                  <button onClick={() => joinRaid(raid)}
+                    disabled={expired || !isActive}
+                    className={cn("px-3 py-1.5 rounded-xl text-xs font-bold transition-colors",
+                      isActive && !expired
+                        ? "bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25"
+                        : "bg-white/[0.04] border border-white/[0.06] text-white/20"
+                    )}>
+                    {isActive && !expired ? "🚀 Join" : "Done"}
+                  </button>
+                </div>
+
+                {/* Progress bars */}
+                <div className="space-y-1.5">
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-[10px] text-white/30">❤️ Likes</span>
+                      <span className="text-[10px] text-white/30">{raid.current_likes || 0} / {raid.goal_likes}</span>
+                    </div>
+                    <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                      <div className="h-full bg-red-400 rounded-full transition-all" style={{ width: `${likePct}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-[10px] text-white/30">🔁 Reposts</span>
+                      <span className="text-[10px] text-white/30">{raid.current_reposts || 0} / {raid.goal_reposts}</span>
+                    </div>
+                    <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                      <div className="h-full bg-og-lime rounded-full transition-all" style={{ width: `${repostPct}%` }} />
+                    </div>
+                  </div>
+                </div>
+
+                {raid.target_url && (
+                  <a href={raid.target_url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-[10px] text-og-cyan/60 hover:text-og-cyan transition-colors">
+                    <ExternalLink className="h-3 w-3" /> View target post
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DMs Hub — stub (DirectMessages.tsx handles the full UI)
+   ═══════════════════════════════════════════════════════════════ */
+
+function DMsHub({ user }: { user: any }) {
+  return (
+    <div className="px-4 py-12 text-center">
+      <MessageSquare className="h-8 w-8 text-og-cyan/30 mx-auto mb-3" />
+      <p className="text-sm text-white/30">Direct Messages are available via the DMs section in the main nav.</p>
     </div>
   );
 }
