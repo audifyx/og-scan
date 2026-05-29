@@ -1,9 +1,9 @@
 /**
  * CommunityReputation — User reputation system with XP, levels, and badges.
- * Earn XP from participation: posting, scanning, hosting spaces, accurate calls.
+ * Earn XP from non-monetary participation: helpful posts, replies, likes, consistency, and events.
  */
 import { useState, useMemo } from "react";
-import { Star, Trophy, Shield, Flame, Target, Zap, Award, Crown, TrendingUp, MessageSquare, Search, Mic, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, Shield, Flame, Target, Zap, Crown, MessageSquare, Mic, ChevronDown, ChevronUp, Heart, BadgeCheck, CalendarDays, BookOpen, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -22,12 +22,12 @@ interface UserReputation {
   title: string;
   badges: Array<{ id: string; name: string; emoji: string; description: string; earnedAt: string }>;
   stats: {
-    scansPerformed: number;
-    spacesHosted: number;
+    helpfulPosts: number;
+    commentsReceived: number;
     messagesPosted: number;
-    callAccuracy: number;
+    likesReceived: number;
     daysActive: number;
-    tokensDiscovered: number;
+    eventsJoined: number;
   };
   rank: number;
   streak: number;
@@ -44,8 +44,8 @@ const LEVELS: Array<{ level: number; title: string; minXp: number; color: string
   { level: 3, title: "Scout", minXp: 300, color: "text-blue-400" },
   { level: 4, title: "Analyst", minXp: 700, color: "text-cyan-400" },
   { level: 5, title: "Researcher", minXp: 1500, color: "text-emerald-400" },
-  { level: 6, title: "Alpha Hunter", minXp: 3000, color: "text-lime-400" },
-  { level: 7, title: "Whale Whisperer", minXp: 6000, color: "text-amber-400" },
+  { level: 6, title: "Community Voice", minXp: 3000, color: "text-lime-400" },
+  { level: 7, title: "Trusted Expert", minXp: 6000, color: "text-amber-400" },
   { level: 8, title: "OG Veteran", minXp: 12000, color: "text-orange-400" },
   { level: 9, title: "Diamond Brain", minXp: 25000, color: "text-purple-400" },
   { level: 10, title: "Legendary OG", minXp: 50000, color: "text-primary" },
@@ -67,14 +67,14 @@ function getLevelInfo(xp: number) {
 }
 
 const XP_ACTIONS: ReputationAction[] = [
-  { type: "scan", label: "Token Scan", xp: 5, icon: <Search className="h-3 w-3" /> },
-  { type: "post", label: "Discussion Post", xp: 3, icon: <MessageSquare className="h-3 w-3" /> },
-  { type: "space_host", label: "Host a Space", xp: 25, icon: <Mic className="h-3 w-3" /> },
-  { type: "space_join", label: "Join a Space", xp: 5, icon: <Mic className="h-3 w-3" /> },
-  { type: "accurate_call", label: "Accurate Call", xp: 50, icon: <Target className="h-3 w-3" /> },
-  { type: "daily_login", label: "Daily Login", xp: 10, icon: <Flame className="h-3 w-3" /> },
-  { type: "first_scan", label: "First Scan of Day", xp: 15, icon: <Star className="h-3 w-3" /> },
-  { type: "discovery", label: "Token Discovery", xp: 20, icon: <Zap className="h-3 w-3" /> },
+  { type: "post", label: "Quality Post", xp: 8, icon: <MessageSquare className="h-3 w-3" /> },
+  { type: "reply", label: "Constructive Reply", xp: 4, icon: <Users className="h-3 w-3" /> },
+  { type: "liked", label: "Received Like", xp: 2, icon: <Heart className="h-3 w-3" /> },
+  { type: "expert", label: "Helpful Answer", xp: 20, icon: <BadgeCheck className="h-3 w-3" /> },
+  { type: "event_host", label: "Host an Event", xp: 25, icon: <Mic className="h-3 w-3" /> },
+  { type: "event_join", label: "Join an Event", xp: 5, icon: <CalendarDays className="h-3 w-3" /> },
+  { type: "daily_checkin", label: "Daily Check-in", xp: 10, icon: <Flame className="h-3 w-3" /> },
+  { type: "resource", label: "Add Resource", xp: 15, icon: <BookOpen className="h-3 w-3" /> },
 ];
 
 export const CommunityReputation: React.FC<Props> = ({ reputation, compact = false }) => {
@@ -170,19 +170,19 @@ export const CommunityReputation: React.FC<Props> = ({ reputation, compact = fal
           {/* Stats grid */}
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-lg bg-black/20 p-2 text-center">
-              <Search className="h-3 w-3 text-white/15 mx-auto mb-0.5" />
-              <p className="text-xs font-bold text-white">{reputation.stats.scansPerformed}</p>
-              <p className="text-[8px] text-white/15">Scans</p>
+              <BadgeCheck className="h-3 w-3 text-white/15 mx-auto mb-0.5" />
+              <p className="text-xs font-bold text-white">{reputation.stats.helpfulPosts}</p>
+              <p className="text-[8px] text-white/15">Helpful</p>
             </div>
             <div className="rounded-lg bg-black/20 p-2 text-center">
               <Mic className="h-3 w-3 text-white/15 mx-auto mb-0.5" />
-              <p className="text-xs font-bold text-white">{reputation.stats.spacesHosted}</p>
-              <p className="text-[8px] text-white/15">Spaces</p>
+              <p className="text-xs font-bold text-white">{reputation.stats.eventsJoined}</p>
+              <p className="text-[8px] text-white/15">Events</p>
             </div>
             <div className="rounded-lg bg-black/20 p-2 text-center">
-              <Target className="h-3 w-3 text-white/15 mx-auto mb-0.5" />
-              <p className="text-xs font-bold text-white">{reputation.stats.callAccuracy}%</p>
-              <p className="text-[8px] text-white/15">Accuracy</p>
+              <Heart className="h-3 w-3 text-white/15 mx-auto mb-0.5" />
+              <p className="text-xs font-bold text-white">{reputation.stats.likesReceived}</p>
+              <p className="text-[8px] text-white/15">Likes</p>
             </div>
             <div className="rounded-lg bg-black/20 p-2 text-center">
               <MessageSquare className="h-3 w-3 text-white/15 mx-auto mb-0.5" />
@@ -195,9 +195,9 @@ export const CommunityReputation: React.FC<Props> = ({ reputation, compact = fal
               <p className="text-[8px] text-white/15">Active Days</p>
             </div>
             <div className="rounded-lg bg-black/20 p-2 text-center">
-              <Zap className="h-3 w-3 text-white/15 mx-auto mb-0.5" />
-              <p className="text-xs font-bold text-white">{reputation.stats.tokensDiscovered}</p>
-              <p className="text-[8px] text-white/15">Discovered</p>
+              <Users className="h-3 w-3 text-white/15 mx-auto mb-0.5" />
+              <p className="text-xs font-bold text-white">{reputation.stats.commentsReceived}</p>
+              <p className="text-[8px] text-white/15">Replies</p>
             </div>
           </div>
 
@@ -239,3 +239,4 @@ export const CommunityReputation: React.FC<Props> = ({ reputation, compact = fal
 };
 
 export default CommunityReputation;
+
