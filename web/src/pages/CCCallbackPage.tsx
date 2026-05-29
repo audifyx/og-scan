@@ -21,6 +21,7 @@ export const CCCallbackPage = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
+  const [debugUrl, setDebugUrl] = useState("");
   const ran = useRef(false);
 
   useEffect(() => {
@@ -42,6 +43,9 @@ export const CCCallbackPage = () => {
         setTimeout(() => navigate(returnTo, { replace: true }), 800);
       }
     };
+
+    // Capture the full URL for debugging
+    setDebugUrl(window.location.href);
 
     const fail = (msg: string) => {
       setErrorMsg(msg);
@@ -87,6 +91,9 @@ export const CCCallbackPage = () => {
             </div>
             <p className="text-white font-bold text-base">Connection failed</p>
             <p className="text-white/40 text-sm mt-2 leading-relaxed">{errorMsg}</p>
+            {debugUrl && (
+              <p className="text-white/20 text-[10px] mt-3 break-all leading-snug font-mono">{debugUrl}</p>
+            )}
             <button
               onClick={() => window.opener ? window.close() : navigate("/app")}
               className="mt-4 px-5 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-white/60 font-mono text-[11px] uppercase tracking-widest hover:border-white/20 transition-colors"
