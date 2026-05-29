@@ -35,12 +35,17 @@ interface Community {
   creator_name: string | null;
   member_count: number;
   post_count?: number;
+  posts_count?: number;
   created_at: string;
   icon: string | null;
   avatar_url?: string | null;
   banner_url?: string | null;
   category?: string | null;
   rules?: string | null;
+  tags?: string[] | null;
+  weekly_ama_schedule?: string | null;
+  research_hub_summary?: string | null;
+  quality_focus?: string | null;
   is_active?: boolean;
   invite_code?: string | null;
 }
@@ -318,17 +323,35 @@ const DISCOVERY_RAILS = [
 ];
 
 const COMMUNITY_PLAYBOOK = [
-  { label: "Weekly AMA", Icon: CalendarDays, detail: "Friday 8 PM" },
-  { label: "Research Hub", Icon: BookOpen, detail: "Guides and FAQs" },
-  { label: "Quality Score", Icon: ClipboardCheck, detail: "Helpful posts rise" },
-  { label: "Topic Channels", Icon: Hash, detail: "Research, news, memes" },
-];
+  { key: "ama", label: "Weekly AMA", Icon: CalendarDays },
+  { key: "research", label: "Research Hub", Icon: BookOpen },
+  { key: "quality", label: "Quality Score", Icon: ClipboardCheck },
+  { key: "topics", label: "Topic Channels", Icon: Hash },
+] as const;
+
+type CommunityActionKey = typeof COMMUNITY_PLAYBOOK[number]["key"];
+
+function getCommunityPostCount(c: Community) {
+  return c.posts_count ?? c.post_count ?? 0;
+}
+
+function parseTopicChannels(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\\n,]/)
+        .map(item => item.trim().replace(/^#/, ""))
+        .filter(Boolean)
+    )
+  ).slice(0, 8);
+}
 
 function getCommunityScore(c: Community) {
   const memberWeight = Math.min(38, Math.floor((c.member_count || 0) / 12));
-  const postWeight = Math.min(22, (c.post_count || 0) * 2);
+  const postWeight = Math.min(22, getCommunityPostCount(c) * 2);
   const profileWeight = (c.avatar_url ? 8 : 0) + (c.banner_url ? 8 : 0) + (c.description ? 8 : 0) + (c.rules ? 6 : 0);
-  return Math.min(98, 42 + memberWeight + postWeight + profileWeight);
+  const experienceWeight = (c.tags?.length ? Math.min(8, c.tags.length * 2) : 0) + (c.weekly_ama_schedule ? 6 : 0) + (c.research_hub_summary ? 6 : 0) + (c.quality_focus ? 4 : 0);
+  return Math.min(98, 34 + memberWeight + postWeight + profileWeight + experienceWeight);
 }
 
 function getCommunityLevel(c: Community) {
@@ -1181,17 +1204,40 @@ function CommunityFeed({
   onJoin: () => void;
   onLeave: () => void;
 }) {
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "posts" | "articles" | "threads" | "members" | "settings">("all");
+  const [feedSort, setFeedSort] = useState<FeedSort>("latest");
+  const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [members, setMembers] = useState<CommunityMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
+  const [communityState, setCommunityState] = useState<Community>(community);
   const [editRules, setEditRules] = useState(community.rules || "");
   const [editDesc, setEditDesc] = useState(community.description || "");
+  const [editAma, setEditAma] = useState(community.weekly_ama_schedule || "");
+  const [editResearchHub, setEditResearchHub] = useState(community.research_hub_summary || "");
+  const [editTopicChannels, setEditTopicChannels] = useState((community.tags || []).join(", "));
+  const [editQualityFocus, setEditQualityFocus] = useState(community.quality_focus || "");
+  const [activeActionCard, setActiveActionCard] = useState<CommunityActionKey | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [savingActionCard, setSavingActionCard] = useState<CommunityActionKey | null>(null);
   const canModerate = myRole === "creator" || myRole === "moderator" || isGlobalAdmin;
   const isCreator = myRole === "creator";
+
+  useEffect(() => {
+    setCommunityState(community);
+    setEditRules(community.rules || "");
+    setEditDesc(community.description || "");
+    setEditAma(community.weekly_ama_schedule || "");
+    setEditResearchHub(community.research_hub_summary || "");
+    setEditTopicChannels((community.tags || []).join(", "));
+    setEditQualityFocus(community.quality_focus || "");
+    setActiveActionCard(null);
+    setActiveTopic(null);
+    setFeedSort("latest");
+  }, [community]);
 
   // Check if user is a global platform admin
   useEffect(() => {
@@ -1244,14 +1290,62 @@ function CommunityFeed({
     fetchPosts();
   };
 
+  const saveCommunityUpdate = async (updates: Partial<Community>, successMessage: string, actionKey?: CommunityActionKey) => {
+    if (actionKey) setSavingActionCard(actionKey);
+    const { data, error } = await supabase.from("communities")
+      .update(updates)
+      .eq("id", community.id)
+      .select("*")
+      .single();
+
+    if (actionKey) setSavingActionCard(null);
+
+    if (error) {
+      console.error("Failed to update community:", error);
+      toast.error(error.message || "Failed to save changes");
+      return null;
+    }
+
+    const nextCommunity = { ...communityState, ...(data as Community), ...updates };
+    setCommunityState(nextCommunity);
+    setEditDesc(nextCommunity.description || "");
+    setEditRules(nextCommunity.rules || "");
+    setEditAma(nextCommunity.weekly_ama_schedule || "");
+    setEditResearchHub(nextCommunity.research_hub_summary || "");
+    setEditTopicChannels((nextCommunity.tags || []).join(", "));
+    setEditQualityFocus(nextCommunity.quality_focus || "");
+    toast.success(successMessage);
+    return nextCommunity;
+  };
+
   const saveSettings = async () => {
     setSavingSettings(true);
-    await supabase.from("communities").update({
+    await saveCommunityUpdate({
       description: editDesc.trim() || null,
       rules: editRules.trim() || null,
-    }).eq("id", community.id);
-    toast.success("Settings saved ✨");
+    }, "Settings saved ✨");
     setSavingSettings(false);
+  };
+
+  const saveActionCard = async (key: CommunityActionKey) => {
+    if (!canModerate) return;
+    if (key === "ama") {
+      await saveCommunityUpdate({ weekly_ama_schedule: editAma.trim() || null }, "Weekly AMA updated", key);
+      return;
+    }
+    if (key === "research") {
+      await saveCommunityUpdate({ research_hub_summary: editResearchHub.trim() || null }, "Research hub updated", key);
+      return;
+    }
+    if (key === "topics") {
+      const tags = parseTopicChannels(editTopicChannels);
+      await saveCommunityUpdate({ tags }, "Topic channels updated", key);
+      setActiveTopic(tags[0] || null);
+      return;
+    }
+    if (key === "quality") {
+      await saveCommunityUpdate({ quality_focus: editQualityFocus.trim() || null }, "Quality score guidance updated", key);
+    }
   };
 
   const kickMember = async (member: CommunityMember) => {
@@ -1298,9 +1392,27 @@ function CommunityFeed({
       }));
     }
 
+    if (activeTopic) {
+      items = items.filter(post => (post.tags || []).some(tag => tag.toLowerCase() === activeTopic.toLowerCase()));
+    }
+
+    if (feedSort === "top") {
+      items = [...items].sort((a, b) => {
+        const aScore = (a.is_pinned ? 5000 : 0) + (a.likes_count || 0) * 3 + (a.replies_count || 0) * 5 + (a.views_count || 0);
+        const bScore = (b.is_pinned ? 5000 : 0) + (b.likes_count || 0) * 3 + (b.replies_count || 0) * 5 + (b.views_count || 0);
+        return bScore - aScore;
+      });
+    } else if (feedSort === "trending") {
+      items = [...items].sort((a, b) => {
+        const aScore = (a.is_pinned ? 5000 : 0) + (a.views_count || 0) * 3 + (a.likes_count || 0) * 4 + (a.replies_count || 0) * 6;
+        const bScore = (b.is_pinned ? 5000 : 0) + (b.views_count || 0) * 3 + (b.likes_count || 0) * 4 + (b.replies_count || 0) * 6;
+        return bScore - aScore;
+      });
+    }
+
     setPosts(items);
     setLoading(false);
-  }, [community.id, user, filter]);
+  }, [community.id, user, filter, activeTopic, feedSort]);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
@@ -1312,6 +1424,15 @@ function CommunityFeed({
     return () => { supabase.removeChannel(ch); };
   }, [community.id, fetchPosts]);
 
+  const currentCommunity = communityState;
+  const level = getCommunityLevel(currentCommunity);
+  const articleCount = posts.filter(post => post.is_article || post.post_type === "article").length;
+  const topicCollections = (currentCommunity.tags && currentCommunity.tags.length > 0)
+    ? currentCommunity.tags.slice(0, 6)
+    : Array.from(new Set(posts.flatMap(post => post.tags || []))).slice(0, 6);
+  const qualitySummary = currentCommunity.quality_focus?.trim() || "Helpful posts rise";
+  const qualityScore = getCommunityScore(currentCommunity);
+
   return (
     <div>
       {/* Community header — X-style with banner */}
@@ -1321,8 +1442,7 @@ function CommunityFeed({
           "from-og-gold/20 via-og-gold/10 to-transparent",
           "from-og-lime/20 via-og-lime/10 to-transparent",
         ];
-        const gIdx = community.name.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % gradients.length;
-        const level = getCommunityLevel(community);
+        const gIdx = currentCommunity.name.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % gradients.length;
         return (
           <div className="border-b border-white/[0.06]">
             {/* Banner */}
@@ -1332,23 +1452,23 @@ function CommunityFeed({
                   onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
               )}
               <div className="absolute bottom-3 right-3 flex gap-1.5">
-                <QualityScorePill community={community} />
+                <QualityScorePill community={currentCommunity} />
                 <span className="inline-flex items-center gap-1 rounded-full border border-black/20 bg-black/45 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white/75 backdrop-blur">
                   <Flame className="h-3 w-3 text-og-lime" />
                   {level.label}
                 </span>
               </div>
               <div className="absolute -bottom-7 left-4">
-                <CommunityAvatar community={community} size="lg" className="border-[3px] border-background shadow-xl" />
+                <CommunityAvatar community={currentCommunity} size="lg" className="border-[3px] border-background shadow-xl" />
               </div>
             </div>
             {/* Info */}
             <div className="pt-9 px-4 pb-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-black uppercase tracking-widest text-white">{community.name}</h2>
-                  {community.description && (
-                    <p className="text-[11px] text-white/30 mt-1 leading-relaxed">{community.description}</p>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-white">{currentCommunity.name}</h2>
+                  {currentCommunity.description && (
+                    <p className="text-[11px] text-white/30 mt-1 leading-relaxed">{currentCommunity.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-3">
@@ -1380,10 +1500,10 @@ function CommunityFeed({
               </div>
               <div className="flex items-center gap-4 mt-3">
                 <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest flex items-center gap-1.5">
-                  <Users className="h-3 w-3" /> <span className="text-white/40">{community.member_count || 0} MEMBERS</span>
+                  <Users className="h-3 w-3" /> <span className="text-white/40">{currentCommunity.member_count || 0} MEMBERS</span>
                 </span>
-                {community.category && (
-                  <span className="text-[9px] font-black text-og-cyan/40 bg-og-cyan/5 px-2 py-0.5 rounded-full border border-og-cyan/10 uppercase">{community.category}</span>
+                {currentCommunity.category && (
+                  <span className="text-[9px] font-black text-og-cyan/40 bg-og-cyan/5 px-2 py-0.5 rounded-full border border-og-cyan/10 uppercase">{currentCommunity.category}</span>
                 )}
               </div>
               <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
@@ -1399,14 +1519,190 @@ function CommunityFeed({
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                {COMMUNITY_PLAYBOOK.map(item => (
-                  <div key={item.label} className="rounded-xl border border-white/[0.05] bg-black/20 p-2">
-                    <item.Icon className="mb-1 h-3.5 w-3.5 text-white/35" />
-                    <p className="text-[10px] font-black uppercase tracking-wider text-white/70">{item.label}</p>
-                    <p className="text-[9px] text-white/20">{item.detail}</p>
-                  </div>
-                ))}
+                {COMMUNITY_PLAYBOOK.map(item => {
+                  const detail = item.key === "ama"
+                    ? (currentCommunity.weekly_ama_schedule?.trim() || "Set the AMA cadence")
+                    : item.key === "research"
+                      ? (currentCommunity.research_hub_summary?.trim() || (articleCount > 0 ? `${articleCount} articles ready` : "Guides and FAQs"))
+                      : item.key === "quality"
+                        ? qualitySummary
+                        : topicCollections.length > 0
+                          ? topicCollections.slice(0, 3).join(" • ")
+                          : "Research • news • memes";
+
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => {
+                        setActiveActionCard(activeActionCard === item.key ? null : item.key);
+                        if (item.key === "research") setFilter("articles");
+                        if (item.key === "quality") {
+                          setFilter("all");
+                          setFeedSort("top");
+                        }
+                        if (item.key === "topics" && topicCollections.length > 0) {
+                          setActiveTopic(topicCollections[0]);
+                          setFilter("all");
+                        }
+                      }}
+                      className={cn(
+                        "rounded-xl border bg-black/20 p-2 text-left transition-all",
+                        activeActionCard === item.key ? "border-og-cyan/40 shadow-[0_0_20px_rgba(34,211,238,0.12)]" : "border-white/[0.05] hover:border-og-cyan/20"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <item.Icon className="h-3.5 w-3.5 text-white/35" />
+                        <ChevronRight className={cn("h-3.5 w-3.5 text-white/25 transition-transform", activeActionCard === item.key && "rotate-90 text-og-cyan")} />
+                      </div>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-white/70">{item.label}</p>
+                      <p className="mt-1 text-[9px] text-white/20 line-clamp-2">{detail}</p>
+                    </button>
+                  );
+                })}
               </div>
+              {activeActionCard && (
+                <div className="mt-3 rounded-2xl border border-og-cyan/20 bg-black/25 p-3 space-y-3">
+                  {activeActionCard === "ama" && (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-og-cyan/70">Weekly AMA</p>
+                          <p className="mt-1 text-sm text-white/55">Set the live AMA schedule and jump straight into Spaces.</p>
+                        </div>
+                        <button type="button" onClick={() => navigate("/spaces")} className="text-[10px] font-black uppercase tracking-widest text-og-cyan hover:text-white transition-colors">Open Spaces</button>
+                      </div>
+                      <input
+                        value={editAma}
+                        onChange={e => setEditAma(e.target.value)}
+                        readOnly={!canModerate}
+                        placeholder="Every Thursday, 7PM EST · Host: Audifyx"
+                        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder:text-white/20 outline-none focus:border-og-cyan/30 read-only:cursor-default read-only:text-white/45"
+                      />
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] text-white/30">This updates the card immediately.</p>
+                        {canModerate && (
+                          <button type="button" onClick={() => saveActionCard("ama")} disabled={savingActionCard === "ama"} className="px-3 py-2 rounded-xl bg-og-cyan text-background text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50">
+                            {savingActionCard === "ama" ? "Saving..." : "Save AMA"}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {activeActionCard === "research" && (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-og-cyan/70">Research hub</p>
+                          <p className="mt-1 text-sm text-white/55">Define what members should find here, then jump into article mode.</p>
+                        </div>
+                        <button type="button" onClick={() => setFilter("articles")} className="text-[10px] font-black uppercase tracking-widest text-og-cyan hover:text-white transition-colors">View articles</button>
+                      </div>
+                      <textarea
+                        value={editResearchHub}
+                        onChange={e => setEditResearchHub(e.target.value)}
+                        readOnly={!canModerate}
+                        placeholder="What should members find in this research hub?"
+                        className="h-24 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder:text-white/20 outline-none resize-none focus:border-og-cyan/30 read-only:cursor-default read-only:text-white/45"
+                      />
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] text-white/30">Current article count: {articleCount}</p>
+                        {canModerate && (
+                          <button type="button" onClick={() => saveActionCard("research")} disabled={savingActionCard === "research"} className="px-3 py-2 rounded-xl bg-og-cyan text-background text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50">
+                            {savingActionCard === "research" ? "Saving..." : "Save hub"}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {activeActionCard === "quality" && (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-og-cyan/70">Quality score</p>
+                          <p className="mt-1 text-sm text-white/55">Define the signal this community values and sort the feed live.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(["latest", "top", "trending"] as FeedSort[]).map(option => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => setFeedSort(option)}
+                              className={cn("rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest transition-colors", feedSort === option ? "border-og-cyan/40 bg-og-cyan/10 text-og-cyan" : "border-white/[0.08] text-white/35 hover:text-white")}
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <textarea
+                        value={editQualityFocus}
+                        onChange={e => setEditQualityFocus(e.target.value)}
+                        readOnly={!canModerate}
+                        placeholder="Helpful posts rise, low-effort shills sink, signal beats noise."
+                        className="h-24 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder:text-white/20 outline-none resize-none focus:border-og-cyan/30 read-only:cursor-default read-only:text-white/45"
+                      />
+                      <div className="grid grid-cols-3 gap-2 text-center text-[10px] uppercase tracking-widest">
+                        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-2 py-3 text-white/55"><p className="text-white text-sm font-black">{qualityScore}%</p>Quality</div>
+                        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-2 py-3 text-white/55"><p className="text-white text-sm font-black">{level.label}</p>Level</div>
+                        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-2 py-3 text-white/55"><p className="text-white text-sm font-black">{posts.length}</p>Visible posts</div>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] text-white/30">Switching sort updates the feed below immediately.</p>
+                        {canModerate && (
+                          <button type="button" onClick={() => saveActionCard("quality")} disabled={savingActionCard === "quality"} className="px-3 py-2 rounded-xl bg-og-cyan text-background text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50">
+                            {savingActionCard === "quality" ? "Saving..." : "Save focus"}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {activeActionCard === "topics" && (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-og-cyan/70">Topic channels</p>
+                          <p className="mt-1 text-sm text-white/55">Set the main channels, then tap one to filter the feed instantly.</p>
+                        </div>
+                        <button type="button" onClick={() => setActiveTopic(null)} className="text-[10px] font-black uppercase tracking-widest text-og-cyan hover:text-white transition-colors">Clear filter</button>
+                      </div>
+                      <textarea
+                        value={editTopicChannels}
+                        onChange={e => setEditTopicChannels(e.target.value)}
+                        readOnly={!canModerate}
+                        placeholder="research, alpha, news, memes"
+                        className="h-20 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-sm text-white placeholder:text-white/20 outline-none resize-none focus:border-og-cyan/30 read-only:cursor-default read-only:text-white/45"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        {topicCollections.map(topic => (
+                          <button
+                            key={topic}
+                            type="button"
+                            onClick={() => {
+                              setActiveTopic(topic);
+                              setFilter("all");
+                            }}
+                            className={cn("rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors", activeTopic?.toLowerCase() === topic.toLowerCase() ? "border-og-cyan/40 bg-og-cyan/10 text-og-cyan" : "border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white")}
+                          >
+                            #{topic}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] text-white/30">Filtering by topic narrows the feed below.</p>
+                        {canModerate && (
+                          <button type="button" onClick={() => saveActionCard("topics")} disabled={savingActionCard === "topics"} className="px-3 py-2 rounded-xl bg-og-cyan text-background text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all disabled:opacity-50">
+                            {savingActionCard === "topics" ? "Saving..." : "Save topics"}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -1429,6 +1725,34 @@ function CommunityFeed({
           </button>
         ))}
       </div>
+
+      {filter !== "members" && filter !== "settings" && (
+        <div className="flex items-center justify-between gap-3 border-b border-white/[0.04] px-4 py-2 flex-wrap">
+          <div className="flex items-center gap-1">
+            {(["latest", "top", "trending"] as FeedSort[]).map(option => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setFeedSort(option)}
+                className={cn("rounded-lg border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors", feedSort === option ? "border-og-cyan/40 bg-og-cyan/10 text-og-cyan" : "border-transparent text-white/30 hover:text-white/60")}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+          {activeTopic ? (
+            <button
+              type="button"
+              onClick={() => setActiveTopic(null)}
+              className="text-[10px] font-black uppercase tracking-widest text-og-cyan hover:text-white transition-colors"
+            >
+              Clear #{activeTopic}
+            </button>
+          ) : (
+            <span className="text-[10px] uppercase tracking-widest text-white/20">Sorted for signal</span>
+          )}
+        </div>
+      )}
 
       {filter === "settings" && (isCreator || canModerate) ? (
         <div className="p-4 space-y-6">
