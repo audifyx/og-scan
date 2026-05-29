@@ -9,6 +9,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { isValidSolanaAddress } from "@/lib/solana-api";
+import {
+  canUseReservedUsername,
+  getReservedUsernameMessage,
+  isReservedUsername,
+  normalizeUsernameForPolicy,
+} from "@/lib/usernamePolicy";
 
 const Setup = () => {
   const navigate = useNavigate();
@@ -39,11 +45,18 @@ const Setup = () => {
         return;
       }
 
+      const cleanUsername = normalizeUsernameForPolicy(username);
+      if (isReservedUsername(cleanUsername) && !canUseReservedUsername(user?.email)) {
+        setIsChecking(false);
+        setIsAvailable(false);
+        return;
+      }
+
       setIsChecking(true);
       const { data, error } = await supabase
         .from("profiles")
         .select("username")
-        .eq("username", username.toLowerCase())
+        .eq("username", cleanUsername)
         .maybeSingle();
 
       setIsChecking(false);
@@ -52,7 +65,7 @@ const Setup = () => {
 
     const debounce = setTimeout(checkUsername, 300);
     return () => clearTimeout(debounce);
-  }, [username]);
+  }, [username, user?.email]);
 
   // Validate wallet address
   useEffect(() => {
@@ -70,9 +83,15 @@ const Setup = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (username.length < 3) {
       toast({ title: "Username must be at least 3 characters", variant: "destructive" });
+      return;
+    }
+
+    const cleanUsername = normalizeUsernameForPolicy(username);
+    if (isReservedUsername(cleanUsername) && !canUseReservedUsername(user?.email)) {
+      toast({ title: getReservedUsernameMessage(), variant: "destructive" });
       return;
     }
 
@@ -88,10 +107,10 @@ const Setup = () => {
 
     setIsSubmitting(true);
 
-    const updateData: { username: string; wallet_address?: string } = { 
-      username: username.toLowerCase() 
+    const updateData: { username: string; wallet_address?: string } = {
+      username: cleanUsername,
     };
-    
+
     if (walletAddress) {
       updateData.wallet_address = walletAddress;
     }
@@ -178,7 +197,9 @@ const Setup = () => {
                   <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
                 )}
                 {!isChecking && isAvailable === false && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-destructive">Taken</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-destructive">
+                    {isReservedUsername(username) && !canUseReservedUsername(user?.email) ? "Reserved" : "Taken"}
+                  </span>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">

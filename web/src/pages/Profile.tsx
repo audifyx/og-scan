@@ -23,6 +23,12 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import {
+  canUseReservedUsername,
+  getReservedUsernameMessage,
+  isReservedUsername,
+  normalizeUsernameForPolicy,
+} from "@/lib/usernamePolicy";
 import { formatDistanceToNow, format } from "date-fns";
 import { useFriends } from "@/hooks/useFriends";
 
@@ -393,9 +399,16 @@ const Profile = () => {
 
   const saveProfile = async () => {
     if (!user) return;
+
+    const cleanUsername = normalizeUsernameForPolicy(editedProfile.username || "");
+    if (cleanUsername && isReservedUsername(cleanUsername) && !canUseReservedUsername(user.email)) {
+      toast.error(getReservedUsernameMessage());
+      return;
+    }
+
     try {
       const { error } = await supabase.from("profiles").update({
-        username: editedProfile.username, bio: editedProfile.bio,
+        username: cleanUsername || null, bio: editedProfile.bio,
         twitter_handle: editedProfile.twitter_handle, discord_handle: editedProfile.discord_handle,
         website: editedProfile.website, is_public: editedProfile.is_public,
         wallet_address: editedProfile.wallet_address,
@@ -534,8 +547,7 @@ const Profile = () => {
               </button>
               {isOwnProfile ? (
                 <button onClick={() => setEditing(!editing)}
-                  className="h-9 px-4 rounded-full border border-white/25 bg-transparent hover:bg-white/[0.06] text-sm font-bold text-white transition-all">
-                  {editing ? "Cancel" : "Edit profile"}
+                  className="h-9 px-4 rounded-full border border-white/25 bg-transparl" : "Edit profile"}
                 </button>
               ) : (
                 <button onClick={handleFollow}
@@ -919,7 +931,391 @@ const Profile = () => {
                     {tokenHoldings.map((token, i) => {
                       const bal = token.token_info?.balance ? token.token_info.balance / Math.pow(10, token.token_info.decimals || 0) : 0;
                       const val = token.token_info?.price_info?.total_price || 0;
-                      const pct = walletStats?.totalUsdValue ? (val / walletStats.totalUsdValue * 100) : 0;
+                      const pct = walletStats?.totalUsdent hover:bg-white/[0.06] text-sm font-bold text-white transition-all">
+                  {editing ? "Cancel" : "Edit profile"}
+                </button>
+              ) : (
+                <button onClick={handleFollow}
+                  className={`h-9 px-5 rounded-full text-sm font-bold transition-all ${
+                    isFollowing
+                      ? "border border-white/25 bg-transparent text-white hover:border-red-500/50 hover:text-red-400"
+                      : "bg-white text-black hover:bg-white/90"
+                  }`}>
+                  {isFollowing ? "Following" : "Follow"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── IDENTITY ─────────────────────────────────────────────────────── */}
+        <div className="px-4 pb-4 border-b border-white/[0.06]">
+          {/* Name + verification + badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-[22px] font-extrabold leading-tight tracking-tight">
+              {profile.display_name || profile.username || "Anonymous"}
+            </h1>
+            {profile.verified && (
+              <svg className="h-5 w-5 text-[#1d9bf0] shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.66-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91c-1.31.67-2.2 1.91-2.2 3.34s.89 2.67 2.2 3.34c-.46 1.39-.21 2.9.8 3.91s2.52 1.26 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.68-.88 3.34-2.19c1.39.45 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2L6.8 12.46l1.41-1.42 2.26 2.26 4.8-5.23 1.47 1.36-6.2 6.77z"/>
+              </svg>
+            )}
+            {profile.is_pioneer && <span className="text-base" title="OG Pioneer">⭐</span>}
+            {profile.badge && (
+              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-gradient-to-r ${getBadgeGradient(profile.badge)} text-white uppercase tracking-wide`}>
+                {profile.badge}
+              </span>
+            )}
+            {profile.is_official_account && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-black shrink-0">
+                ✦ OFFICIAL
+              </span>
+            )}
+            {profile.affiliate_org_id && !profile.is_official_account && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-violet-600 to-indigo-500 text-white shrink-0">
+                🏷 OG SCAN AFFILIATE
+              </span>
+            )}
+          </div>
+
+          {/* @username */}
+          <p className="text-[15px] text-white/40 mt-0.5">
+            @{profile.username || "anonymous"}
+          </p>
+
+          {/* Bio */}
+          {profile.bio && (
+            <p className="text-[15px] text-white/85 leading-relaxed mt-3">{profile.bio}</p>
+          )}
+
+          {/* Meta info row — location, website, twitter, join date */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3">
+            {profile.location && (
+              <span className="flex items-center gap-1 text-[14px] text-white/45">
+                <MapPin className="h-3.5 w-3.5" /> {profile.location}
+              </span>
+            )}
+            {website && (
+              <a href={website} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[14px] text-primary hover:underline transition-colors">
+                <LinkIcon className="h-3.5 w-3.5" /> {website.replace(/^https?:\/\//, "").split("/")[0]}
+              </a>
+            )}
+            {profile.twitter_handle && (
+              <a href={`https://twitter.com/${profile.twitter_handle}`} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[14px] text-white/45 hover:text-sky-400 transition-colors">
+                <Twitter className="h-3.5 w-3.5" /> @{profile.twitter_handle}
+              </a>
+            )}
+            {profile.created_at && (
+              <span className="flex items-center gap-1 text-[14px] text-white/35">
+                <Calendar className="h-3.5 w-3.5" /> Joined {format(new Date(profile.created_at), "MMMM yyyy")}
+              </span>
+            )}
+          </div>
+
+          {/* Pill badges row — level, streak, private */}
+          <div className="flex items-center gap-1.5 flex-wrap mt-3">
+            <span className="flex items-center gap-1 text-[11px] bg-white/[0.06] px-2.5 py-1 rounded-full text-white/60 font-medium">
+              <Zap className="h-3 w-3 text-yellow-400" /> Lv {level} · {getLevelTitle(level)}
+            </span>
+            {(profile.daily_streak || 0) > 0 && (
+              <span className="flex items-center gap-1 text-[11px] bg-orange-500/10 px-2.5 py-1 rounded-full text-orange-400 font-medium">
+                <Flame className="h-3 w-3" /> {profile.daily_streak}d streak
+              </span>
+            )}
+            {(profile.holder_streak || 0) > 0 && (
+              <span className="flex items-center gap-1 text-[11px] bg-emerald-500/10 px-2.5 py-1 rounded-full text-emerald-400 font-medium">
+                💎 {profile.holder_streak}d holder
+              </span>
+            )}
+            {!profile.is_public && (
+              <span className="flex items-center gap-1 text-[11px] bg-white/[0.05] px-2.5 py-1 rounded-full text-white/35 font-medium">
+                <Lock className="h-3 w-3" /> Private
+              </span>
+            )}
+          </div>
+
+          {/* XP progress bar */}
+          {rep > 0 && (
+            <div className="mt-3.5">
+              <div className="flex justify-between text-[11px] text-white/30 mb-1.5">
+                <span className="font-medium">Level {level} XP</span>
+                <span>{rep.toLocaleString()} / {(Math.ceil(rep / 1000) * 1000).toLocaleString()}</span>
+              </div>
+              <div className="h-1 rounded-full bg-white/[0.08] overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500" style={{ width: `${levelPct}%` }} />
+              </div>
+            </div>
+          )}
+
+          {/* Stats row — X-style: number bold, label muted, hover underline */}
+          <div className="flex items-center gap-5 mt-4">
+            <button className="text-left group hover:underline decoration-white/20">
+              <span className="text-[15px] font-bold text-white">{shortNum(profile.following_count || 0)}</span>
+              <span className="text-[15px] text-white/45 ml-1">Following</span>
+            </button>
+            <button className="text-left group hover:underline decoration-white/20">
+              <span className="text-[15px] font-bold text-white">{shortNum(profile.followers_count || 0)}</span>
+              <span className="text-[15px] text-white/45 ml-1">Followers</span>
+            </button>
+            <span className="text-left">
+              <span className="text-[15px] font-bold text-white">{communities.length}</span>
+              <span className="text-[15px] text-white/45 ml-1">Communities</span>
+            </span>
+            {walletStats && (
+              <span className="text-left ml-auto">
+                <span className="text-[15px] font-bold text-primary">{shortUsd(walletStats.totalUsdValue || 0)}</span>
+                <span className="text-[13px] text-white/35 ml-1">Portfolio</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ── EDIT PANEL — slide-down drawer style ─────────────────────────── */}
+        {editing && (
+          <div className="border-b border-white/[0.06] bg-white/[0.015] backdrop-blur-sm">
+            <div className="px-4 py-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base">Edit profile</h3>
+                <button onClick={() => setEditing(false)} className="h-8 w-8 rounded-full hover:bg-white/[0.07] flex items-center justify-center text-white/50 hover:text-white transition-all">
+                  <XIcon className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 space-y-1.5">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Username</Label>
+                  <Input value={editedProfile.username || ""} onChange={e => setEditedProfile({ ...editedProfile, username: e.target.value })} className="h-10 rounded-xl text-sm" placeholder="your_username" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Twitter / X</Label>
+                  <Input value={editedProfile.twitter_handle || ""} onChange={e => setEditedProfile({ ...editedProfile, twitter_handle: e.target.value })} className="h-10 rounded-xl text-sm" placeholder="handle (no @)" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Website</Label>
+                  <Input value={editedProfile.website || ""} onChange={e => setEditedProfile({ ...editedProfile, website: e.target.value })} className="h-10 rounded-xl text-sm" placeholder="https://" />
+                </div>
+                <div className="col-span-2 space-y-1.5">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Bio</Label>
+                  <Textarea value={editedProfile.bio || ""} onChange={e => setEditedProfile({ ...editedProfile, bio: e.target.value })} className="rounded-xl text-[15px] resize-none" rows={3} placeholder="Tell the world who you are…" maxLength={160} />
+                  <p className="text-[11px] text-white/25 text-right">{(editedProfile.bio || "").length}/160</p>
+                </div>
+                <div className="col-span-2 space-y-1.5">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                    <Wallet className="h-3 w-3" /> Solana Wallet
+                  </Label>
+                  <Input value={editedProfile.wallet_address || ""} onChange={e => setEditedProfile({ ...editedProfile, wallet_address: e.target.value })} className="h-10 rounded-xl text-sm font-mono" placeholder="Wallet address for live stats" />
+                </div>
+
+                {/* ── Accent Color ── */}
+                <div className="col-span-2 space-y-2">
+                  <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Accent color</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { key: "violet",  hex: "#7c3aed" },
+                      { key: "sky",     hex: "#0284c7" },
+                      { key: "emerald", hex: "#059669" },
+                      { key: "amber",   hex: "#d97706" },
+                      { key: "rose",    hex: "#e11d48" },
+                      { key: "cyan",    hex: "#0891b2" },
+                      { key: "pink",    hex: "#db2777" },
+                      { key: "indigo",  hex: "#4f46e5" },
+                    ].map(({ key, hex }) => (
+                      <button
+                        key={key}
+                        onClick={() => setEditedProfile({ ...editedProfile, page_accent: key })}
+                        className={`h-7 w-7 rounded-full border-2 transition-all ${(editedProfile.page_accent || "violet") === key ? "border-white scale-110 shadow-lg" : "border-white/15 hover:border-white/40"}`}
+                        style={{ backgroundColor: hex }}
+                        title={key}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Public page URL ── */}
+                {editedProfile.username && (
+                  <div className="col-span-2 space-y-1.5">
+                    <Label className="text-[12px] text-white/40 font-semibold uppercase tracking-wider">Your public page</Label>
+                    <div className="flex items-center gap-2 h-10 px-3 rounded-xl bg-white/[0.04] border border-white/[0.07]">
+                      <code className="text-xs text-white/40 flex-1 truncate">ogscan.fun/u/{editedProfile.username}</code>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(`https://ogscan.fun/u/${editedProfile.username}`); toast.success("Copied!"); }}
+                        className="text-white/30 hover:text-white/60 transition-colors"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center gap-2">
+                  <Switch checked={editedProfile.is_public ?? true} onCheckedChange={c => setEditedProfile({ ...editedProfile, is_public: c })} />
+                  <Label className="text-sm text-white/55">Public profile</Label>
+                </div>
+                <button onClick={saveProfile} className="h-9 px-6 rounded-full bg-white text-black text-sm font-bold hover:bg-white/90 transition-all">
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TABS — X-style sticky underline tabs ─────────────────────────── */}
+        <Tabs defaultValue="activity">
+          <TabsList className="w-full flex overflow-x-auto bg-transparent border-b border-white/[0.06] rounded-none p-0 gap-0 h-auto sticky top-0 z-20 backdrop-blur-xl bg-background/80">
+            {[
+              { value: "activity",  label: "Activity" },
+              { value: "portfolio", label: "Portfolio" },
+              { value: "social",    label: "Social" },
+              ...(isOwnProfile ? [{ value: "saved", label: "Saved" }] : []),
+              { value: "stats",     label: "Stats" },
+            ].map(t => (
+              <TabsTrigger key={t.value} value={t.value}
+                className="flex-1 min-w-[4rem] flex items-center justify-center py-4 px-1 text-[15px] font-medium rounded-none border-b-[3px] border-transparent text-white/40 data-[state=active]:text-white data-[state=active]:border-white bg-transparent data-[state=active]:bg-transparent hover:bg-white/[0.04] hover:text-white/70 transition-all">
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          {/* ── ACTIVITY ──────────────────────────────────────────────────── */}
+          <TabsContent value="activity" className="m-0">
+            <div className="divide-y divide-white/[0.04]">
+              {/* Wallet refresh strip */}
+              {profile.wallet_address && (
+                <div className="px-4 py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-[11px] text-white/40">Live from wallet</span>
+                  </div>
+                  <button onClick={handleRefresh} disabled={refreshing}
+                    className="text-[11px] text-white/40 hover:text-white flex items-center gap-1 transition-colors">
+                    <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} /> Refresh
+                  </button>
+                </div>
+              )}
+
+              {/* Wallet transactions */}
+              {profile.wallet_address && walletTransactions.length > 0 ? (
+                walletTransactions.map((tx, i) => {
+                  const isSwap     = tx.type === "SWAP";
+                  const isIncoming = tx.nativeTransfers?.[0]?.toUserAccount === profile.wallet_address;
+                  const isNft      = ["NFT_SALE","NFT_MINT","NFT_LISTING"].includes(tx.type);
+                  const ts         = tx.timestamp ? new Date(tx.timestamp * 1000) : new Date();
+                  const amt        = (tx.nativeTransfers?.[0]?.amount || 0) / 1e9;
+                  return (
+                    <div key={tx.signature || i}
+                      className="px-4 py-3 flex items-center gap-3 hover:bg-white/[0.02] transition-colors cursor-pointer group"
+                      onClick={() => window.open(`https://solscan.io/tx/${tx.signature}`, "_blank")}>
+                      <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${isSwap ? "bg-violet-500/15 text-violet-400" : isIncoming ? "bg-green-500/15 text-green-400" : isNft ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
+                        {isSwap ? <RefreshCw className="h-4 w-4" /> : isIncoming ? <ArrowDownRight className="h-4 w-4" /> : isNft ? <Trophy className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">{isSwap ? "Swap" : isNft ? tx.type.replace(/_/g," ") : isIncoming ? "Received" : "Sent"}</p>
+                          <p className={`text-sm font-semibold ${isIncoming ? "text-green-400" : "text-white/60"}`}>
+                            {amt > 0 ? `${isIncoming ? "+" : "-"}${amt.toFixed(4)} SOL` : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <p className="text-[11px] font-mono text-white/30">{tx.signature?.slice(0,8)}…{tx.signature?.slice(-4)}</p>
+                          <p className="text-[11px] text-white/30">{formatDistanceToNow(ts, { addSuffix: true })}</p>
+                        </div>
+                      </div>
+                      <ExternalLink className="h-3.5 w-3.5 text-white/20 opacity-0 group-hover:opacity-100 shrink-0" />
+                    </div>
+                  );
+                })
+              ) : activities.length > 0 ? (
+                activities.map(a => (
+                  <div key={a.id} className="px-4 py-3 flex items-center gap-3 hover:bg-white/[0.02] transition-colors">
+                    <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${a.activity_type === "trade" ? "bg-primary/15 text-primary" : a.activity_type === "achievement" ? "bg-amber-500/15 text-amber-400" : "bg-white/[0.07] text-white/40"}`}>
+                      {a.activity_type === "trade" ? <TrendingUp className="h-4 w-4" /> : a.activity_type === "achievement" ? <Trophy className="h-4 w-4" /> : <Activity className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium truncate">{a.title}</p>
+                        <p className="text-[11px] text-white/30 shrink-0">{formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}</p>
+                      </div>
+                      {a.description && <p className="text-[12px] text-white/40 mt-0.5 line-clamp-1">{a.description}</p>}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-16 text-center">
+                  <Activity className="h-10 w-10 mx-auto mb-3 text-white/15" />
+                  <p className="text-sm text-white/40">No activity yet</p>
+                  {isOwnProfile && !profile.wallet_address && (
+                    <Button size="sm" variant="outline" className="mt-4 rounded-full text-xs" onClick={() => setEditing(true)}>
+                      <Wallet className="h-3.5 w-3.5 mr-1.5" /> Connect wallet
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ── PORTFOLIO ─────────────────────────────────────────────────── */}
+          <TabsContent value="portfolio" className="m-0">
+            {profile.wallet_address ? (
+              <div>
+                {/* Stats strip */}
+                <div className="px-4 py-3 flex items-center justify-between border-b border-white/[0.04]">
+                  <div>
+                    <p className="text-[11px] text-white/40">Total Portfolio</p>
+                    {loadingStats ? (
+                      <div className="h-6 w-24 bg-white/[0.07] rounded animate-pulse mt-0.5" />
+                    ) : (
+                      <p className="text-xl font-bold text-primary">{shortUsd(walletStats?.totalUsdValue || 0)}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-right">
+                    <div>
+                      <p className="text-[11px] text-white/40">SOL</p>
+                      <p className="text-sm font-semibold">{walletStats?.balance?.toFixed(3) || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-white/40">24h</p>
+                      <p className={`text-sm font-semibold ${(walletStats?.priceChange24h || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {(walletStats?.priceChange24h || 0) >= 0 ? "+" : ""}{walletStats?.priceChange24h?.toFixed(1) || "0"}%
+                      </p>
+                    </div>
+                    <button onClick={handleRefresh} disabled={refreshing}
+                      className="h-8 w-8 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center transition-colors">
+                      <RefreshCw className={`h-3.5 w-3.5 text-white/60 ${refreshing ? "animate-spin" : ""}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Wallet address */}
+                <div className="px-4 py-2.5 border-b border-white/[0.04]">
+                  <a href={`https://solscan.io/account/${profile.wallet_address}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-[11px] font-mono text-white/30 hover:text-white/60 transition-colors">
+                    <Wallet className="h-3 w-3" />
+                    {profile.wallet_address.slice(0,14)}…{profile.wallet_address.slice(-8)}
+                    <ExternalLink className="h-3 w-3 ml-auto" />
+                  </a>
+                </div>
+
+                {/* Token list */}
+                {loadingStats ? (
+                  <div className="divide-y divide-white/[0.04]">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="px-4 py-3 flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-full bg-white/[0.07] animate-pulse shrink-0" />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="h-3 w-24 bg-white/[0.07] rounded animate-pulse" />
+                          <div className="h-2.5 w-16 bg-white/[0.05] rounded animate-pulse" />
+                        </div>
+                        <div className="h-3 w-14 bg-white/[0.07] rounded animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                ) : tokenHoldings.length > 0 ? (
+                  <div className="divide-y divide-white/[0.04]">
+                    {tokenHoldings.map((token, i) => {
+                      const bal = token.token_info?.balance ? token.token_info.balance / Math.pow(10, token.token_info.decimals || 0) : 0;
+                      const vaValue ? (val / walletStats.totalUsdValue * 100) : 0;
                       return (
                         <div key={token.id || i} className="px-4 py-3 flex items-center gap-3 hover:bg-white/[0.02] transition-colors">
                           <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center overflow-hidden shrink-0">
