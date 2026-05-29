@@ -83,8 +83,8 @@ export const CoinCommunityPanel = ({ tokenAddress, tokenSymbol }: Props) => {
   } = useQuery({
     queryKey: ["cc-messages", tokenAddress],
     queryFn: () => ccGetMessages(tokenAddress, 20),
-    staleTime: 30_000,
-    refetchInterval: 30_000,
+    staleTime: 60_000,
+    refetchInterval: 90_000,
   });
 
   const communityUrl = `https://coincommunities.org/community/${tokenAddress}`;
