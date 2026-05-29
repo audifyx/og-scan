@@ -95,7 +95,9 @@ interface CalEvent {
 const CAL_STORAGE_KEY = "ogscan_intel_calendar_v2";
 const NEWS_CACHE_KEY = "ogscan_intel_news_v2";
 const NEWS_CACHE_TTL = 15 * 60 * 1000;
-const MAX_PER_CATEGORY = 25;
+const MAX_PER_CATEGORY = 40;
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmamlwbmtoY2VianZ0dGxpcHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1Mjc5NDgsImV4cCI6MjA5MzEwMzk0OH0.***REMOVED_ANON_SIG***";
+const EDGE_NEWS_URL = "https://ffjipnkhcebjvttliptb.supabase.co/functions/v1/news-fetcher";
 
 const RSS_FEEDS = [
   { name: "CoinTelegraph", url: "https://cointelegraph.com/rss" },
@@ -395,7 +397,27 @@ export function CryptoCalendar() {
         return;
       }
 
-      // 2. Fall back to RSS with cache
+      // 2. DB is empty — trigger edge function to populate it
+      try {
+        await fetch(EDGE_NEWS_URL, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${SUPABASE_ANON_KEY}`, "Content-Type": "application/json" },
+          body: "{}",
+        });
+        // Re-fetch from DB after edge function runs
+        const { data: freshNews } = await supabase
+          .from("crypto_news")
+          .select("id, title, description, source, category, sentiment, published_at, source_url, image_url, is_featured, engagement_score")
+          .order("published_at", { ascending: false })
+          .limit(MAX_PER_CATEGORY);
+        if (freshNews && freshNews.length > 0) {
+          if (mounted.current) setNews(freshNews as NewsItem[]);
+          setNewsLoading(false);
+          return;
+        }
+      } catch (_) { /* noop — fall through to RSS */ }
+
+      // 3. Fall back to RSS with cache
       const cached = getCachedNews();
       if (!force && cached && Date.now() - cached.ts < NEWS_CACHE_TTL) {
         if (mounted.current) { setNews(cached.items); setNewsLoading(false); }
