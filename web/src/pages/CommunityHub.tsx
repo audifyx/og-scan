@@ -34,6 +34,9 @@ const DISCOVER_SUBS: { id: DiscoverSub; label: string; Icon: React.ComponentType
 const STORAGE_KEY = "og_community_sub_tab";
 const DISCOVER_STORAGE_KEY = "og_discover_sub";
 
+const isSubTab = (value: string | null): value is SubTab =>
+  SUB_TABS.some((tab) => tab.id === value);
+
 const Spinner = () => (
   <div className="flex items-center justify-center py-20">
     <div className="h-6 w-6 border-2 border-og-lime border-t-transparent rounded-full animate-spin" />
@@ -42,7 +45,10 @@ const Spinner = () => (
 
 const CommunityHub: React.FC = () => {
   const [sub, setSub] = useState<SubTab>(() => {
-    try { return (localStorage.getItem(STORAGE_KEY) as SubTab) || "social"; } catch { return "social"; }
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return isSubTab(saved) ? saved : "social";
+    } catch { return "social"; }
   });
   const [discoverSub, setDiscoverSub] = useState<DiscoverSub>(() => {
     try { return (localStorage.getItem(DISCOVER_STORAGE_KEY) as DiscoverSub) || "launchpad"; } catch { return "launchpad"; }
@@ -53,27 +59,50 @@ const CommunityHub: React.FC = () => {
   }, [sub]);
 
   useEffect(() => {
+    const syncSavedTab = () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (isSubTab(saved)) setSub(saved);
+      } catch {}
+    };
+
+    window.addEventListener("storage", syncSavedTab);
+    window.addEventListener("og:community-sub-tab", syncSavedTab);
+    return () => {
+      window.removeEventListener("storage", syncSavedTab);
+      window.removeEventListener("og:community-sub-tab", syncSavedTab);
+    };
+  }, []);
+
+  useEffect(() => {
     try { localStorage.setItem(DISCOVER_STORAGE_KEY, discoverSub); } catch {}
   }, [discoverSub]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Sub-tab bar */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.07] bg-card/80 px-2 py-1.5 backdrop-blur-lg">
+      <div
+        className="ios-scroll flex shrink-0 snap-x items-center gap-2 overflow-x-auto border-b border-white/[0.07] bg-card/80 px-3 py-2 backdrop-blur-lg"
+        role="tablist"
+        aria-label="Community sections"
+      >
         {SUB_TABS.map((t) => {
           const active = sub === t.id;
           return (
             <button
               key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
               onClick={() => setSub(t.id)}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold transition-all",
+                "flex shrink-0 snap-start items-center gap-2 rounded-xl px-4 py-2.5 text-[12px] font-bold transition-all active:scale-[0.98]",
                 active
                   ? "bg-og-lime/10 text-og-lime border border-og-lime/20"
                   : "text-white/35 hover:text-white/55 hover:bg-white/[0.04] border border-transparent",
               )}
             >
-              <t.Icon className="h-3.5 w-3.5" />
+              <t.Icon className="h-4 w-4" />
               {t.label}
             </button>
           );
@@ -101,15 +130,22 @@ const CommunityHub: React.FC = () => {
         {sub === "discover" && (
           <div className="flex h-full flex-col overflow-hidden">
             {/* Discover sub-nav */}
-            <div className="flex shrink-0 items-center gap-1 px-3 py-1.5 border-b border-white/[0.05] bg-white/[0.01]" style={{ scrollbarWidth: "none" }}>
+            <div
+              className="ios-scroll flex shrink-0 snap-x items-center gap-1.5 overflow-x-auto border-b border-white/[0.05] bg-white/[0.01] px-3 py-2"
+              role="tablist"
+              aria-label="Discover sections"
+            >
               {DISCOVER_SUBS.map((ds) => {
                 const active = discoverSub === ds.id;
                 return (
                   <button
                     key={ds.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
                     onClick={() => setDiscoverSub(ds.id)}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all whitespace-nowrap",
+                      "flex shrink-0 snap-start items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all whitespace-nowrap active:scale-[0.98]",
                       active
                         ? "bg-og-cyan/10 text-og-cyan border border-og-cyan/20"
                         : "text-white/25 hover:text-white/45 border border-transparent",
