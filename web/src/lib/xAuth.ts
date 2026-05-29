@@ -14,9 +14,8 @@ const TOKEN_URL = "https://api.twitter.com/2/oauth2/token";
 const LS_VERIFIER = "x_pkce_verifier";
 const LS_STATE = "x_pkce_state";
 
-// These are injected from Supabase secrets via the edge function.
-// The client only needs the public client_id for the PKCE redirect.
-export const X_CLIENT_ID = import.meta.env.VITE_TWITTER_CLIENT_ID || "";
+// Public OAuth 2.0 Client ID (safe to expose — only used for PKCE redirect, not secret operations)
+export const X_CLIENT_ID = import.meta.env.VITE_TWITTER_CLIENT_ID || "VEttdDM5YUtpMGJsbURCSmhBMEg6MTpjaQ";
 export const X_CALLBACK_URL = `${window.location.origin}/x-callback`;
 export const X_SCOPES = "tweet.write tweet.read like.read users.read offline.access";
 
