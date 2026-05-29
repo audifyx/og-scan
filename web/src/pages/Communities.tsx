@@ -389,6 +389,51 @@ function parseTopicChannels(value: string) {
   ).slice(0, 8);
 }
 
+function createCommunityLink(): CommunityExternalLink {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title: "",
+    url: "",
+    badge: DEFAULT_COMMUNITY_LINK_BADGE,
+  };
+}
+
+function normalizeCommunityUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^[a-z]+:/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function getCommunityLinks(c: Community): CommunityExternalLink[] {
+  if (!Array.isArray(c.community_links)) return [];
+  return c.community_links
+    .filter((item): item is CommunityExternalLink => Boolean(item && typeof item === "object"))
+    .map(item => ({
+      id: item.id || `${item.title || "link"}-${Math.random().toString(36).slice(2, 7)}`,
+      title: item.title || "",
+      url: item.url || "",
+      badge: item.badge || DEFAULT_COMMUNITY_LINK_BADGE,
+    }))
+    .filter(item => item.title.trim() && item.url.trim());
+}
+
+function sanitizeCommunityLinks(links: CommunityExternalLink[]): CommunityExternalLink[] {
+  return links
+    .map(link => ({
+      id: link.id || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      title: link.title.trim(),
+      url: normalizeCommunityUrl(link.url),
+      badge: COMMUNITY_LINK_BADGES.some(badge => badge.key === link.badge) ? link.badge : DEFAULT_COMMUNITY_LINK_BADGE,
+    }))
+    .filter(link => link.title && link.url)
+    .slice(0, 8);
+}
+
+function getCommunityLinkBadge(badgeKey?: string | null) {
+  return COMMUNITY_LINK_BADGES.find(badge => badge.key === badgeKey) || COMMUNITY_LINK_BADGES[0];
+}
+
 function getCommunityScore(c: Community) {
   const memberWeight = Math.min(38, Math.floor((c.member_count || 0) / 12));
   const postWeight = Math.min(22, getCommunityPostCount(c) * 2);
@@ -1267,7 +1312,11 @@ function CommunityFeed({
   const [activeActionCard, setActiveActionCard] = useState<CommunityActionKey | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingActionCard, setSavingActionCard] = useState<CommunityActionKey | null>(null);
-  const canModerate = myRole === "creator" || myRole === "moderator" || isGlobalAdmin;
+  const isAppOwner = user?.email?.toLowerCase() === "audifyx@gmail.com";
+  const isAppTeam = isGlobalAdmin || isAppOwner;
+  const canEditCommunity = myRole === "creator" || myRole === "moderator" || isAppTeam;
+  const canManageModerators = myRole === "creator" || isAppTeam;
+  const canModerate = myRole === "creator" || myRole === "moderator" || isAppTeam;
   const isCreator = myRole === "creator";
 
   useEffect(() => {
@@ -1316,7 +1365,7 @@ function CommunityFeed({
   }, [filter, community.id]);
 
   const toggleMod = async (member: CommunityMember) => {
-    if (myRole !== "creator" && !isGlobalAdmin) return;
+    if (!canManageModerators) return;
     const newRole = member.role === "moderator" ? "member" : "moderator";
     const { error } = await supabase.from("community_members").update({ role: newRole }).eq("id", member.id);
     if (error) {
@@ -1336,6 +1385,7 @@ function CommunityFeed({
   };
 
   const saveCommunityUpdate = async (updates: Partial<Community>, successMessage: string, actionKey?: CommunityActionKey) => {
+    if (!canEditCommunity) return null;
     if (actionKey) setSavingActionCard(actionKey);
     const { data, error } = await supabase.from("communities")
       .update(updates)
@@ -1365,6 +1415,7 @@ function CommunityFeed({
   };
 
   const saveSettings = async () => {
+    if (!canEditCommunity) return;
     setSavingSettings(true);
     await saveCommunityUpdate({
       description: editDesc.trim() || null,
@@ -1777,7 +1828,7 @@ function CommunityFeed({
 
       {/* Filter tabs */}
       <div className="flex border-b border-white/[0.04]">
-        {(["all", "posts", "threads", "articles", "members", ...(canModerate || isCreator ? ["settings" as const] : [])] as const).map(f => (
+        {(["all", "posts", "threads", "articles", "members", ...(canEditCommunity ? ["settings" as const] : [])] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f as any)}
@@ -1821,7 +1872,7 @@ function CommunityFeed({
         </div>
       )}
 
-      {filter === "settings" && (isCreator || canModerate) ? (
+      {filter === "settings" && canEditCommunity ? (
         <div className="p-4 space-y-6">
           {/* Description */}
           <div>
@@ -1944,7 +1995,7 @@ function CommunityFeed({
                         m.role === "creator" ? "text-og-gold bg-og-gold/10 border-og-gold/20" : "text-og-cyan bg-og-cyan/10 border-og-cyan/20"
                       )}>{m.role === "creator" ? "OWNER" : "MOD"}</span>
                     </div>
-                    {(isCreator || isGlobalAdmin) && m.role === "moderator" && (
+                    {canManageModerators && m.role === "moderator" && (
                       <button onClick={() => toggleMod(m)}
                         className="text-[10px] text-red-400/60 hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-400/10 transition-colors">
                         Remove
@@ -1959,7 +2010,7 @@ function CommunityFeed({
                     <div key={m.id} className="flex items-center gap-3 px-3 py-2 hover:bg-white/[0.02] rounded-lg">
                       <Avatar url={m.avatar_url} name={m.username} size="sm" onClick={() => onOpenProfile(m.user_id)} />
                       <button type="button" onClick={() => onOpenProfile(m.user_id)} className="text-sm text-white/60 flex-1 text-left hover:text-white transition-colors">{m.username || "User"}</button>
-                      {(isCreator || isGlobalAdmin) && (
+                      {canManageModerators && (
                         <button onClick={() => toggleMod(m)}
                           className="p-1.5 rounded-lg text-white/15 hover:text-og-cyan hover:bg-og-cyan/10 transition-colors" title="Make moderator">
                           <Shield className="h-3.5 w-3.5" />
@@ -1998,7 +2049,7 @@ function CommunityFeed({
                   </div>
                   <p className="text-[10px] text-white/20">Joined {formatDistanceToNow(new Date(m.joined_at), { addSuffix: true })}</p>
                 </div>
-                {(myRole === "creator" || isGlobalAdmin) && m.role !== "creator" && (
+                {canManageModerators && m.role !== "creator" && (
                   <div className="flex items-center gap-1">
                     <button onClick={() => toggleMod(m)} title={m.role === "moderator" ? "Remove mod" : "Make mod"}
                       className={cn("p-1.5 rounded-lg transition-colors", m.role === "moderator" ? "text-og-cyan hover:bg-og-cyan/10" : "text-white/15 hover:text-og-cyan hover:bg-og-cyan/10")}>
@@ -2120,6 +2171,19 @@ function PostCard({
     setSaving(false);
   };
 
+  const handleCopyPostLink = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(`${window.location.origin}?post=${post.id}`);
+    setShowMenu(false);
+    toast.success("Post link copied");
+  };
+
+  const handleOpenPost = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    onClick?.();
+  };
+
   return (
     <article data-post-id={post.id} className={cn("px-4 py-3 hover:bg-white/[0.015] transition-colors relative", post.is_pinned && "bg-og-cyan/[0.03]")}>
       {post.is_pinned && (
@@ -2146,37 +2210,43 @@ function PostCard({
             <span className="text-xs text-white/15 shrink-0">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
             {isThread && <Badge className="text-[7px] bg-blue-500/10 text-blue-400 border-blue-500/20 ml-1">Thread</Badge>}
             {isArticle && <Badge className="text-[7px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20 ml-1">Article</Badge>}
-            {(canDelete || canPin) && (
-              <div className="ml-auto relative">
-                <button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-                  className="p-1 rounded-full text-white/15 hover:text-white/40 hover:bg-white/[0.04] transition-colors">
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-                {showMenu && (
-                  <div className="absolute right-0 top-7 z-50 bg-[#111] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[140px]"
-                    onClick={e => e.stopPropagation()}>
-                    {isOwner && (
-                      <button onClick={(e) => { e.stopPropagation(); setEditing(true); setEditContent(post.content); setShowMenu(false); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.04] hover:text-white transition-colors">
-                        <Edit className="h-3.5 w-3.5" /> Edit
-                      </button>
-                    )}
-                    {canPin && onPin && (
-                      <button onClick={(e) => { e.stopPropagation(); onPin(post.id, !!post.is_pinned); setShowMenu(false); }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.04] hover:text-white transition-colors">
-                        <Pin className="h-3.5 w-3.5" /> {post.is_pinned ? "Unpin" : "Pin"}
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button onClick={handleDelete}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400/70 hover:bg-red-400/10 hover:text-red-400 transition-colors">
-                        <Trash2 className="h-3.5 w-3.5" /> Delete
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="ml-auto relative">
+              <button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                className="p-1 rounded-full text-white/15 hover:text-white/40 hover:bg-white/[0.04] transition-colors">
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+              {showMenu && (
+                <div className="absolute right-0 top-7 z-50 bg-[#111] border border-white/[0.1] rounded-xl shadow-2xl py-1 min-w-[160px]"
+                  onClick={e => e.stopPropagation()}>
+                  <button onClick={handleOpenPost}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.04] hover:text-white transition-colors">
+                    <ExternalLink className="h-3.5 w-3.5" /> Open post
+                  </button>
+                  <button onClick={handleCopyPostLink}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.04] hover:text-white transition-colors">
+                    <Copy className="h-3.5 w-3.5" /> Copy link
+                  </button>
+                  {isOwner && (
+                    <button onClick={(e) => { e.stopPropagation(); setEditing(true); setEditContent(post.content); setShowMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.04] hover:text-white transition-colors">
+                      <Edit className="h-3.5 w-3.5" /> Edit
+                    </button>
+                  )}
+                  {canPin && onPin && (
+                    <button onClick={(e) => { e.stopPropagation(); onPin(post.id, !!post.is_pinned); setShowMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/60 hover:bg-white/[0.04] hover:text-white transition-colors">
+                      <Pin className="h-3.5 w-3.5" /> {post.is_pinned ? "Unpin" : "Pin"}
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button onClick={handleDelete}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400/70 hover:bg-red-400/10 hover:text-red-400 transition-colors">
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           {isArticle && post.article_title && <p className="text-base font-bold text-white mt-1 leading-tight">{post.article_title}</p>}
           {editing ? (
@@ -2363,7 +2433,7 @@ function ActionBtn({
       )}
     >
       {icon}
-      {count > 0 && <span className="text-[11px]">{count}</span>}
+      <span className="text-[11px]">{count}</span>
     </button>
   );
 }
