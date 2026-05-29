@@ -171,6 +171,7 @@ const App = () => (
             <Route path="/callouts" element={<ProtectedRoute><Callouts /></ProtectedRoute>} />
 
             {/* ── Protected: Community ── */}
+            <Route path="/coin-communities" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/trading-lobbies" element={<ProtectedRoute><TradingLobbies /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
             <Route path="/messages" element={<ProtectedRoute><DirectMessagesPage /></ProtectedRoute>} />

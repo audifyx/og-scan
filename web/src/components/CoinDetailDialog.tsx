@@ -62,6 +62,7 @@ import {
 } from "@/lib/og";
 import { explorerAddressUrl, getChain } from "@/lib/chains";
 import { fetchEvmTokenSecurity, type EvmTokenSecurity } from "@/lib/evm-intel";
+import { CoinCommunityPanel } from "@/components/CoinCommunityPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -552,6 +553,25 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
           {/* LEFT COLUMN */}
           <div className="grid gap-5">
 
+            {/* Live Chart — FIRST (pump.fun style: chart at top) */}
+            <Section title="Live Chart" icon={<BarChart3 className="h-3.5 w-3.5" />} accent="cyan"
+              badge={
+                <a href={chartUrl} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-white/50 transition hover:border-og-cyan/40 hover:text-og-cyan">
+                  Full chart <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              }>
+              <div className="relative h-[340px] overflow-hidden rounded-xl border border-white/[0.07] bg-[#030b18] sm:h-[420px]">
+                <iframe
+                  src={chartEmbedUrl}
+                  title={`${detailToken.symbol} chart`}
+                  className="h-full w-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+            </Section>
+
             {/* OG Classification */}
             <Section title="OG Classification" icon={<Sparkles className="h-3.5 w-3.5" />} accent="cyan" badge={
               isFetchingClassification
@@ -579,25 +599,6 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
               {forensicScore?.classification.reasoning_summary && (
                 <p className="mt-3 text-xs leading-relaxed text-white/40">{forensicScore.classification.reasoning_summary}</p>
               )}
-            </Section>
-
-            {/* Live Chart */}
-            <Section title="Live Chart" icon={<BarChart3 className="h-3.5 w-3.5" />} accent="cyan"
-              badge={
-                <a href={chartUrl} target="_blank" rel="noreferrer"
-                  className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-white/50 transition hover:border-og-cyan/40 hover:text-og-cyan">
-                  Open full <ExternalLink className="h-2.5 w-2.5" />
-                </a>
-              }>
-              <div className="relative h-[340px] overflow-hidden rounded-xl border border-white/[0.07] bg-[#030b18] sm:h-[400px]">
-                <iframe
-                  src={chartEmbedUrl}
-                  title={`${detailToken.symbol} chart`}
-                  className="h-full w-full border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
             </Section>
 
             {/* Trade Activity */}
@@ -666,6 +667,42 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
 
           {/* RIGHT SIDEBAR */}
           <aside className="grid content-start gap-4">
+
+            {/* Trade quick-links (pump.fun style: trade actions at top of sidebar) */}
+            <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-4">
+              <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-og-gold mb-3 flex items-center gap-2">
+                <CandlestickChart className="h-3.5 w-3.5" /> Trade
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <a
+                  href={isSolana ? `https://jup.ag/swap/SOL-${detailToken.id}` : (pair?.url ?? chartUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-og-lime/15 border border-og-lime/30 px-3 py-2.5 font-mono text-[10px] font-bold uppercase tracking-widest text-og-lime transition hover:bg-og-lime/25"
+                >
+                  Buy ↑
+                </a>
+                <a
+                  href={isSolana ? `https://jup.ag/swap/${detailToken.id}-SOL` : (pair?.url ?? chartUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/25 px-3 py-2.5 font-mono text-[10px] font-bold uppercase tracking-widest text-red-400 transition hover:bg-red-500/20"
+                >
+                  Sell ↓
+                </a>
+              </div>
+              <a
+                href={chartUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-1.5 w-full rounded-lg border border-white/10 bg-white/[0.04] py-2 font-mono text-[10px] uppercase tracking-widest text-white/50 transition hover:border-og-cyan/40 hover:text-og-cyan"
+              >
+                <BarChart3 className="h-3 w-3" /> Full chart on DexScreener
+              </a>
+            </div>
+
+            {/* CoinCommunities chat panel (pump.fun style community section) */}
+            <CoinCommunityPanel tokenAddress={detailToken.id} tokenSymbol={detailToken.symbol ?? "—"} />
 
             {/* Market data */}
             <SidePanel title="Market Data" icon={<CandlestickChart className="h-3.5 w-3.5" />} accent="gold">

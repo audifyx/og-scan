@@ -81,6 +81,7 @@ const TokenIntel = lazy(() => importTokenIntel().then(m => ({ default: m.TokenIn
 
 /* ─── Page imports ─── */
 const importCommunitiesPage = () => import("./Communities");
+const importCoinCommunitiesPage = () => import("./CoinCommunitiesPage");
 const importDiscoverPage = () => import("./Discover");
 const importArtFeedPage = () => import("./ArtFeed");
 const importSpacesPage = () => import("./Spaces");
@@ -91,6 +92,7 @@ const importChartsPage = () => import("./Charts");
 const importLiveTradingPage = () => import("./LiveTrading");
 const importLiveFeedPage = () => import("./LiveFeed");
 const CommunitiesPage = lazy(importCommunitiesPage);
+const CoinCommunitiesPageLazy = lazy(() => importCoinCommunitiesPage().then(m => ({ default: m.CoinCommunitiesPage })));
 const DiscoverPage = lazy(importDiscoverPage);
 const ArtFeed = lazy(importArtFeedPage);
 const SpacesPage = lazy(importSpacesPage);
@@ -185,6 +187,7 @@ type TabId =
   | "spaces"
   | "social"
   | "community"
+  | "coin-communities"
   | "tools"
   | "profile"
   | "charts"
@@ -505,6 +508,17 @@ const TABS: TabConfig[] = [
     group: "Main",
   },
   {
+    id: "coin-communities",
+    label: "CC Feed",
+    slug: "coin-communities",
+    pageNumber: 28,
+    eyebrow: "Cross-Coin Feed",
+    description: "Live feed and top communities powered by CoinCommunities — real posts from real traders.",
+    Icon: Globe,
+    accent: "lime",
+    group: "Main",
+  },
+  {
     id: "tools",
     label: "Tools",
     slug: "tools",
@@ -655,6 +669,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
 
   /* ─── Social / community pages ─── */
   if (tab === "communities") return <CommunitiesInline />;
+  if (tab === "coin-communities") return <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}><CoinCommunitiesPageLazy /></Suspense>;
   if (tab === "discover") return <DiscoverInline />;
   if (tab === "memes") return <ArtFeed inline />;
   if (tab === "spaces") return <SpacesPage />;
@@ -685,6 +700,9 @@ const preloadTab = (tab: TabId): void => {
       return;
     case "communities":
       void importCommunitiesPage();
+      return;
+    case "coin-communities":
+      void importCoinCommunitiesPage();
       return;
     case "discover":
       void importDiscoverPage();
