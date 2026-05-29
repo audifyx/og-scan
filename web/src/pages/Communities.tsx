@@ -23,6 +23,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { CoinCommunityFull } from "@/components/CoinCommunityFull";
+import { HELIUS_API_KEY, OGSCAN_TOKEN_MINT } from "@/lib/og";
 
 /* ═══════════════════════════════════════════════════════════════
    Types
@@ -58,6 +60,23 @@ interface Community {
   community_links?: CommunityExternalLink[] | null;
   is_active?: boolean;
   invite_code?: string | null;
+  // Token gating
+  holder_only?: boolean;
+  gate_token_mint?: string | null;
+  gate_minimum_balance?: number | null;
+  gate_usd_minimum?: number | null;
+  holder_token_mint?: string | null;
+  holder_min_amount?: number | null;
+  holder_token_symbol?: string | null;
+  holder_token_name?: string | null;
+  // CC integration
+  cc_enabled?: boolean;
+  cc_token_address?: string | null;
+  // Verified / trending
+  verified?: boolean;
+  trending?: boolean;
+  trending_score?: number | null;
+  active_members_24h?: number | null;
 }
 
 interface CommunityMember {
@@ -79,6 +98,60 @@ async function uploadImage(file: File, folder: string): Promise<string> {
   if (error) throw error;
   const { data } = supabase.storage.from(UPLOAD_BUCKET).getPublicUrl(path);
   return data.publicUrl;
+}
+
+/* ── Token gate check: verify wallet holds ≥ $8 worth via Helius + DexScreener ── */
+async function checkTokenGate(
+  walletAddress: string,
+  tokenMint: string,
+  minUsd: number,
+): Promise<{ passes: boolean; balance: number; valueUsd: number; priceUsd: number }> {
+  try {
+    // 1. Get token accounts via Helius DAS
+    const heliusRes = await fetch(
+      `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", id: 1,
+          method: "getTokenAccountsByOwner",
+          params: [
+            walletAddress,
+            { mint: tokenMint },
+            { encoding: "jsonParsed" },
+          ],
+        }),
+      }
+    );
+    const heliusData = await heliusRes.json();
+    const accounts = heliusData?.result?.value ?? [];
+    let rawBalance = 0;
+    let decimals = 6;
+    for (const acc of accounts) {
+      const parsed = acc?.account?.data?.parsed?.info?.tokenAmount;
+      if (parsed) {
+        rawBalance += parseFloat(parsed.uiAmountString || "0");
+        decimals = parsed.decimals ?? decimals;
+      }
+    }
+
+    // 2. Get token price from DexScreener
+    let priceUsd = 0;
+    try {
+      const dexRes = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${tokenMint}`);
+      const dexData = await dexRes.json();
+      const pairs: any[] = dexData?.pairs ?? dexData ?? [];
+      const bestPair = [...pairs].sort((a: any, b: any) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
+      priceUsd = parseFloat(bestPair?.priceUsd ?? "0");
+    } catch { /* price fetch failed, use 0 */ }
+
+    const valueUsd = rawBalance * priceUsd;
+    return { passes: valueUsd >= minUsd, balance: rawBalance, valueUsd, priceUsd };
+  } catch {
+    // If check fails, allow join (fail open to avoid blocking users with API errors)
+    return { passes: true, balance: 0, valueUsd: 0, priceUsd: 0 };
+  }
 }
 
 /* ── Image upload button component ── */
@@ -540,6 +613,39 @@ const Communities = () => {
   const joinCommunity = async (cid: string) => {
     if (!user) { toast.error("Sign in first"); return; }
     try {
+      // ── Token gate enforcement ──────────────────────────────────────────────
+      const { data: comm } = await supabase.from("communities")
+        .select("holder_only, gate_token_mint, gate_usd_minimum, holder_token_mint, holder_min_amount, holder_token_symbol, name")
+        .eq("id", cid).single();
+
+      if (comm?.holder_only && (comm.gate_token_mint || comm.holder_token_mint)) {
+        const tokenMint = comm.gate_token_mint || comm.holder_token_mint;
+        const minUsd = comm.gate_usd_minimum || comm.holder_min_amount || 8;
+        const symbol = comm.holder_token_symbol || "token";
+
+        // Get user wallet from profile
+        const { data: profile } = await supabase.from("profiles")
+          .select("wallet_address, sol_wallet").eq("user_id", user.id).single();
+        const wallet = profile?.wallet_address || profile?.sol_wallet;
+
+        if (!wallet) {
+          toast.error(`This community requires holding $${minUsd} worth of $${symbol.toUpperCase()}. Link your wallet in Settings → Profile first.`);
+          return;
+        }
+
+        toast.message("Checking wallet balance…");
+        const gateResult = await checkTokenGate(wallet, tokenMint, minUsd);
+
+        if (!gateResult.passes) {
+          const held = gateResult.valueUsd < 0.01 ? "0" : `$${gateResult.valueUsd.toFixed(2)}`;
+          toast.error(`You need ≥ $${minUsd} worth of $${symbol.toUpperCase()} to join. Your balance: ${held}. Buy on DexScreener to qualify.`);
+          return;
+        }
+
+        toast.success(`✅ Balance verified — $${gateResult.valueUsd.toFixed(2)} of $${symbol.toUpperCase()} found!`);
+      }
+      // ───────────────────────────────────────────────────────────────────────
+
       await supabase.from("community_members").insert({ community_id: cid, user_id: user.id, role: "member" });
       // increment member_count
       const { data: c } = await supabase.from("communities").select("member_count").eq("id", cid).single();
@@ -1146,84 +1252,135 @@ function CommunityAvatar({ community: c, size = "md", className = "" }: { commun
 
 function CommunityCard({ community: c, onClick, variant = "list" }: { community: Community; onClick: () => void; variant?: "list" | "grid" | "compact" }) {
   const gradients = [
-    "from-og-cyan/20 to-og-cyan/5 border-og-cyan/20 text-og-cyan",
-    "from-og-gold/20 to-og-gold/5 border-og-gold/20 text-og-gold",
-    "from-og-lime/20 to-og-lime/5 border-og-lime/20 text-og-lime",
-    "from-blue-500/20 to-blue-500/5 border-blue-500/20 text-blue-400",
-    "from-purple-500/20 to-purple-500/5 border-purple-500/20 text-purple-400",
+    "from-og-cyan/25 via-og-cyan/10 to-transparent border-og-cyan/20",
+    "from-og-gold/25 via-og-gold/10 to-transparent border-og-gold/20",
+    "from-og-lime/25 via-og-lime/10 to-transparent border-og-lime/20",
+    "from-blue-500/25 via-blue-500/10 to-transparent border-blue-500/20",
+    "from-purple-500/25 via-purple-500/10 to-transparent border-purple-500/20",
+    "from-pink-500/25 via-pink-500/10 to-transparent border-pink-500/20",
   ];
   const gradIdx = c.name.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % gradients.length;
+  const isGated = c.holder_only && (c.gate_token_mint || c.holder_token_mint);
+  const gateSymbol = c.holder_token_symbol || "OG";
+  const minUsd = c.gate_usd_minimum || c.holder_min_amount || 0;
+  const isCcEnabled = c.cc_enabled && c.cc_token_address;
 
   if (variant === "compact") {
     return (
       <button onClick={onClick} className="flex flex-col items-center gap-1.5 shrink-0 w-[72px] group">
-        <CommunityAvatar community={c} size="lg" className="group-hover:scale-105 group-active:scale-95 transition-all shadow-lg" />
+        <div className="relative">
+          <CommunityAvatar community={c} size="lg" className="group-hover:scale-105 group-active:scale-95 transition-all shadow-lg" />
+          {isGated && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-og-gold border border-background flex items-center justify-center text-[8px]">🔒</span>
+          )}
+          {isCcEnabled && (
+            <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-og-cyan border border-background flex items-center justify-center text-[8px]">⚡</span>
+          )}
+        </div>
         <span className="text-[10px] text-white/40 font-black uppercase tracking-tighter truncate w-full text-center">{c.name}</span>
       </button>
     );
   }
 
   if (variant === "grid") {
-    const level = getCommunityLevel(c);
     return (
-      <button onClick={onClick} className="group rounded-2xl overflow-hidden border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-all hover:border-white/[0.12] w-full text-left">
+      <button onClick={onClick} className="group rounded-2xl overflow-hidden border border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04] transition-all hover:border-white/[0.14] hover:shadow-lg hover:shadow-black/30 w-full text-left">
         {/* Banner */}
-        <div className={cn("h-20 w-full bg-gradient-to-br relative border-b", gradients[gradIdx])}>
+        <div className={cn("h-24 w-full bg-gradient-to-br relative", gradients[gradIdx])}>
           {c.banner_url && (
             <img src={c.banner_url} className="w-full h-full object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
           )}
-          <div className="absolute right-3 top-3">
-            <QualityScorePill community={c} />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          {/* Badges top right */}
+          <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+            {c.trending && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/20 border border-orange-500/30 px-2 py-0.5 text-[8px] font-black text-orange-400 uppercase tracking-widest backdrop-blur">
+                <TrendingUp className="h-2.5 w-2.5" /> Hot
+              </span>
+            )}
+            {isGated && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-og-gold/20 border border-og-gold/30 px-2 py-0.5 text-[8px] font-black text-og-gold uppercase tracking-widest backdrop-blur">
+                🔒 ${minUsd}
+              </span>
+            )}
+            {isCcEnabled && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-og-cyan/20 border border-og-cyan/30 px-2 py-0.5 text-[8px] font-black text-og-cyan uppercase tracking-widest backdrop-blur">
+                <Zap className="h-2.5 w-2.5" /> Live
+              </span>
+            )}
           </div>
+          {/* Avatar overlapping */}
           <div className="absolute -bottom-5 left-3">
-            <CommunityAvatar community={c} size="sm" className="border-2 border-background shadow-lg" />
+            <CommunityAvatar community={c} size="sm" className="border-2 border-background shadow-xl" />
           </div>
         </div>
         <div className="pt-7 px-3 pb-3">
           <div className="flex items-center gap-1.5">
             <p className="text-xs font-black uppercase tracking-wider text-white truncate">{c.name}</p>
-            {c.privacy === "private" && <span className="text-[9px] text-white/30">🔒</span>}
+            {c.verified && <BadgeCheck className="h-3.5 w-3.5 text-og-cyan shrink-0" />}
           </div>
           {c.description && (
-            <p className="text-[11px] text-white/30 line-clamp-2 mt-1 leading-relaxed">{c.description}</p>
+            <p className="text-[11px] text-white/35 line-clamp-2 mt-1 leading-relaxed">{c.description}</p>
           )}
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest flex items-center gap-1">
-              <Users className="h-3 w-3" /> {c.member_count || 0} MEMBERS
+          <div className="flex items-center gap-3 mt-2.5">
+            <span className="text-[9px] font-bold text-white/25 uppercase tracking-widest flex items-center gap-1">
+              <Users className="h-3 w-3" /> {c.member_count || 0}
             </span>
-            <span className="text-[9px] font-bold text-og-lime/50 uppercase tracking-widest flex items-center gap-1">
-              <Flame className="h-3 w-3" /> {level.label}
-            </span>
+            {c.active_members_24h != null && c.active_members_24h > 0 && (
+              <span className="text-[9px] font-bold text-og-lime/60 uppercase tracking-widest flex items-center gap-1">
+                <Activity className="h-3 w-3" /> {c.active_members_24h} active
+              </span>
+            )}
+            {c.category && (
+              <span className="text-[9px] font-black text-og-cyan/50 uppercase tracking-wider">{c.category}</span>
+            )}
           </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {QUALITY_BADGES.slice(0, 3).map(badge => (
-              <ReputationBadge key={badge.label} {...badge} />
-            ))}
-          </div>
+          {isGated && (
+            <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-og-gold/20 bg-og-gold/5 px-2 py-1.5">
+              <span className="text-[8px] text-og-gold font-black uppercase tracking-widest">🔒 Requires ${minUsd} of ${gateSymbol}</span>
+            </div>
+          )}
         </div>
       </button>
     );
   }
 
-  // Default: list variant
+  // Default: list variant — much more visual
   return (
-    <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors text-left group">
-      <CommunityAvatar community={c} size="md" />
+    <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.025] active:bg-white/[0.04] transition-colors text-left group">
+      <div className="relative shrink-0">
+        <CommunityAvatar community={c} size="md" />
+        {isGated && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-og-gold border border-background flex items-center justify-center text-[8px]">🔒</span>
+        )}
+      </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-black uppercase tracking-wider text-white truncate group-hover:text-og-cyan transition-colors">{c.name}</p>
-        <div className="flex items-center gap-3 mt-0.5">
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-black uppercase tracking-wider text-white truncate group-hover:text-og-cyan transition-colors">{c.name}</p>
+          {c.verified && <BadgeCheck className="h-3.5 w-3.5 text-og-cyan shrink-0" />}
+          {c.trending && <TrendingUp className="h-3.5 w-3.5 text-orange-400 shrink-0" />}
+          {isCcEnabled && <Zap className="h-3.5 w-3.5 text-og-cyan/60 shrink-0" />}
+        </div>
+        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
           <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest flex items-center gap-1">
-            <Users className="h-3 w-3" /> {c.member_count || 0}
+            <Users className="h-3 w-3" /> {(c.member_count || 0).toLocaleString()}
           </span>
-          <span className="text-[10px] font-bold text-emerald-300/50 uppercase tracking-widest flex items-center gap-1">
-            <Gauge className="h-3 w-3" /> {getCommunityScore(c)}%
-          </span>
+          {c.active_members_24h != null && c.active_members_24h > 0 && (
+            <span className="text-[10px] font-bold text-og-lime/50 uppercase tracking-widest flex items-center gap-1">
+              <Activity className="h-3 w-3" /> {c.active_members_24h}
+            </span>
+          )}
           {c.category && (
-            <span className="text-[9px] font-black uppercase text-og-cyan/60">{c.category}</span>
+            <span className="text-[9px] font-black uppercase text-og-cyan/50">{c.category}</span>
+          )}
+          {isGated && (
+            <span className="text-[9px] font-black uppercase text-og-gold/60 flex items-center gap-0.5">
+              🔒 ${minUsd} ${gateSymbol}
+            </span>
           )}
         </div>
       </div>
-      <ChevronRight className="h-4 w-4 text-white/10 group-hover:text-white transition-all" />
+      <ChevronRight className="h-4 w-4 text-white/10 group-hover:text-og-cyan group-hover:translate-x-0.5 transition-all" />
     </button>
   );
 }
@@ -1332,7 +1489,7 @@ function CommunityFeed({
   const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "posts" | "articles" | "threads" | "members" | "settings">("all");
+  const [filter, setFilter] = useState<"all" | "posts" | "articles" | "threads" | "members" | "settings" | "cc">("all");
   const [feedSort, setFeedSort] = useState<FeedSort>("latest");
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [members, setMembers] = useState<CommunityMember[]>([]);
@@ -1642,21 +1799,59 @@ function CommunityFeed({
                     </>
                   ) : (
                     <button onClick={onJoin}
-                      className="px-4 py-1.5 rounded-xl bg-og-cyan text-background text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all">
-                      Join
+                      className={cn("px-4 py-1.5 rounded-xl text-background text-[10px] font-black uppercase tracking-widest transition-all",
+                        currentCommunity.holder_only
+                          ? "bg-og-gold hover:bg-og-gold/80 shadow-[0_0_15px_rgba(251,191,36,0.2)]"
+                          : "bg-og-cyan hover:bg-white shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+                      )}>
+                      {currentCommunity.holder_only ? "🔒 Join" : "Join"}
                     </button>
                   )}
                 </div>
               </div>
+
+              {/* Token gate info banner */}
+              {currentCommunity.holder_only && (currentCommunity.gate_token_mint || currentCommunity.holder_token_mint) && !isMember && (
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-og-gold/25 bg-og-gold/[0.06] px-3 py-2.5">
+                  <span className="text-og-gold text-sm">🔒</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-black text-og-gold uppercase tracking-wide">Token Gated Community</p>
+                    <p className="text-[10px] text-white/35 mt-0.5">
+                      Hold ${currentCommunity.gate_usd_minimum || currentCommunity.holder_min_amount || 8} worth of ${currentCommunity.holder_token_symbol || "OG"} to join
+                    </p>
+                  </div>
+                  <a
+                    href={`https://dexscreener.com/solana/${currentCommunity.gate_token_mint || currentCommunity.holder_token_mint || OGSCAN_TOKEN_MINT}`}
+                    target="_blank" rel="noreferrer"
+                    className="shrink-0 text-[9px] font-black uppercase tracking-widest text-og-gold border border-og-gold/30 rounded-lg px-2.5 py-1 hover:bg-og-gold/10 transition-colors"
+                  >
+                    Buy →
+                  </a>
+                </div>
+              )}
+
+              {/* CC Communities badge */}
+              {currentCommunity.cc_enabled && (
+                <div className="mt-2 flex items-center gap-2 rounded-xl border border-og-cyan/20 bg-og-cyan/[0.05] px-3 py-2">
+                  <Zap className="h-3.5 w-3.5 text-og-cyan shrink-0" />
+                  <p className="text-[10px] text-og-cyan/80 font-bold">Live CC Chat enabled — tap the ⚡ tab to chat</p>
+                </div>
+              )}
+
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {QUALITY_BADGES.map(badge => (
                   <ReputationBadge key={badge.label} {...badge} />
                 ))}
               </div>
-              <div className="flex items-center gap-4 mt-3">
+              <div className="flex items-center gap-4 mt-3 flex-wrap">
                 <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest flex items-center gap-1.5">
-                  <Users className="h-3 w-3" /> <span className="text-white/40">{currentCommunity.member_count || 0} MEMBERS</span>
+                  <Users className="h-3 w-3" /> <span className="text-white/40">{(currentCommunity.member_count || 0).toLocaleString()} MEMBERS</span>
                 </span>
+                {currentCommunity.active_members_24h != null && currentCommunity.active_members_24h > 0 && (
+                  <span className="text-[9px] font-bold text-og-lime/50 uppercase tracking-widest flex items-center gap-1.5">
+                    <Activity className="h-3 w-3" /> <span className="text-og-lime/60">{currentCommunity.active_members_24h} ACTIVE TODAY</span>
+                  </span>
+                )}
                 {currentCommunity.category && (
                   <span className="text-[9px] font-black text-og-cyan/40 bg-og-cyan/5 px-2 py-0.5 rounded-full border border-og-cyan/10 uppercase">{currentCommunity.category}</span>
                 )}
@@ -1864,16 +2059,27 @@ function CommunityFeed({
       })()}
 
       {/* Filter tabs */}
-      <div className="flex border-b border-white/[0.04]">
-        {(["all", "posts", "threads", "articles", "members", ...(canEditCommunity ? ["settings" as const] : [])] as const).map(f => (
+      <div className="flex border-b border-white/[0.04] overflow-x-auto scrollbar-hide">
+        {([
+          "all",
+          "posts",
+          "threads",
+          "articles",
+          ...(currentCommunity.cc_enabled ? ["cc" as const] : []),
+          "members",
+          ...(canEditCommunity ? ["settings" as const] : []),
+        ] as const).map(f => (
           <button
             key={f}
             onClick={() => setFilter(f as any)}
-            className={cn("flex-1 py-2.5 text-xs font-medium transition-colors relative capitalize",
+            className={cn("shrink-0 flex-1 py-2.5 text-xs font-medium transition-colors relative capitalize min-w-[2.5rem]",
               filter === f ? "text-white" : "text-white/25"
             )}
           >
-            {f === "members" ? <Users className="h-3.5 w-3.5 mx-auto" /> : f === "settings" ? <Settings className="h-3.5 w-3.5 mx-auto" /> : f}
+            {f === "members" ? <Users className="h-3.5 w-3.5 mx-auto" /> :
+             f === "settings" ? <Settings className="h-3.5 w-3.5 mx-auto" /> :
+             f === "cc" ? <span className="flex items-center justify-center gap-0.5"><Zap className="h-3 w-3" /><span className="text-[10px]">CC</span></span> :
+             f}
             {filter === f && (
               <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-[2px] rounded-full bg-og-cyan" />
             )}
@@ -1881,7 +2087,18 @@ function CommunityFeed({
         ))}
       </div>
 
-      {filter !== "members" && filter !== "settings" && (
+      {/* CC Communities panel — full embedded chat */}
+      {filter === "cc" && currentCommunity.cc_enabled && currentCommunity.cc_token_address && (
+        <div className="p-4">
+          <CoinCommunityFull
+            tokenAddress={currentCommunity.cc_token_address}
+            tokenSymbol={currentCommunity.holder_token_symbol || "OG"}
+            embedded={true}
+          />
+        </div>
+      )}
+
+      {filter !== "members" && filter !== "settings" && filter !== "cc" && (
         <div className="flex items-center justify-between gap-3 border-b border-white/[0.04] px-4 py-2 flex-wrap">
           <div className="flex items-center gap-1">
             {(["latest", "top", "trending"] as FeedSort[]).map(option => (
@@ -3465,39 +3682,61 @@ function SmartMoneyFeed({ user }: { user: any }) {
               const wallet = wallets.find(w => w.address === act.wallet_address);
               const isBuy = act.tx_type === "buy";
               const isSell = act.tx_type === "sell";
+              const tokenCA = act.token_ca || act.token_address;
+              const dexUrl = tokenCA ? `https://dexscreener.com/solana/${tokenCA}` : null;
               return (
-                <div key={act.id} className="px-4 py-3 flex items-start gap-3">
-                  <div className={cn("w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0",
-                    isBuy ? "bg-green-500/10" : isSell ? "bg-red-500/10" : "bg-white/[0.05]"
+                <div key={act.id} className="px-4 py-3.5 flex items-start gap-3 hover:bg-white/[0.015] transition-colors group">
+                  {/* Tx icon */}
+                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 border",
+                    isBuy ? "bg-green-500/10 border-green-500/20" : isSell ? "bg-red-500/10 border-red-500/20" : "bg-white/[0.04] border-white/[0.06]"
                   )}>
                     {isBuy ? "📈" : isSell ? "📉" : "💫"}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-bold text-white">{wallet?.label || act.wallet_address.slice(0, 8)}</span>
-                      <span className={cn("text-[10px] font-bold uppercase",
-                        isBuy ? "text-green-400" : isSell ? "text-red-400" : "text-white/40"
+                      <span className="text-xs font-black text-white">{wallet?.label || `${act.wallet_address.slice(0, 6)}…${act.wallet_address.slice(-4)}`}</span>
+                      <span className={cn("text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border",
+                        isBuy ? "text-green-400 border-green-500/20 bg-green-500/10" : isSell ? "text-red-400 border-red-500/20 bg-red-500/10" : "text-white/30 border-white/10 bg-white/5"
                       )}>{act.tx_type || "swap"}</span>
-                      {act.token_symbol && <span className="text-[10px] text-og-cyan font-mono">${act.token_symbol}</span>}
+                      {act.token_symbol && (
+                        <span className="text-[10px] text-og-cyan font-mono font-bold">${act.token_symbol}</span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-3 mt-1">
                       {act.amount_usd != null && (
-                        <span className="text-[10px] text-white/40">
+                        <span className="text-[11px] text-white/50 font-bold">
                           ${act.amount_usd >= 1000 ? `${(act.amount_usd / 1000).toFixed(1)}K` : act.amount_usd.toFixed(0)}
                         </span>
                       )}
                       {act.return_pct != null && (
-                        <span className={cn("text-[10px] font-bold", act.return_pct >= 0 ? "text-green-400" : "text-red-400")}>
+                        <span className={cn("text-[11px] font-black", act.return_pct >= 0 ? "text-green-400" : "text-red-400")}>
                           {act.return_pct >= 0 ? "+" : ""}{act.return_pct.toFixed(1)}%
                         </span>
                       )}
-                      <span className="text-[10px] text-white/20 ml-auto">
+                      {tokenCA && (
+                        <div className="flex items-center gap-1.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(tokenCA); toast.success("CA copied!"); }}
+                            className="text-white/20 hover:text-og-cyan p-1 rounded-md hover:bg-og-cyan/10 transition-colors"
+                            title="Copy CA"
+                          ><Copy className="h-3 w-3" /></button>
+                          {dexUrl && (
+                            <a href={dexUrl} target="_blank" rel="noreferrer"
+                              className="text-white/20 hover:text-og-lime p-1 rounded-md hover:bg-og-lime/10 transition-colors"
+                              title="View on DexScreener"
+                            ><ExternalLink className="h-3 w-3" /></a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {tokenCA && (
+                        <span className="text-[9px] font-mono text-white/15">{tokenCA.slice(0, 8)}…{tokenCA.slice(-4)}</span>
+                      )}
+                      <span className="text-[9px] text-white/20 ml-auto">
                         {formatDistanceToNow(new Date(act.created_at), { addSuffix: true })}
                       </span>
                     </div>
-                    {act.token_ca && (
-                      <p className="text-[10px] font-mono text-white/15 mt-0.5">{act.token_ca.slice(0, 8)}…{act.token_ca.slice(-4)}</p>
-                    )}
                   </div>
                 </div>
               );
@@ -3573,7 +3812,7 @@ function AlertsHub({ user }: { user: any }) {
     if (!user) return;
     async function load() {
       const [{ data: notifs }, { data: pa }, { data: wa }] = await Promise.all([
-        supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
+        supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
         supabase.from("price_alerts").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
         supabase.from("wallet_alerts").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
       ]);
@@ -3583,6 +3822,22 @@ function AlertsHub({ user }: { user: any }) {
       setLoading(false);
     }
     load();
+  }, [user]);
+
+  // Realtime subscription for new notifications
+  useEffect(() => {
+    if (!user) return;
+    const ch = supabase.channel(`alerts-notifs-${user.id}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "notifications",
+        filter: `user_id=eq.${user.id}`,
+      }, payload => {
+        setNotifications(prev => [payload.new as NotificationRow, ...prev]);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, [user]);
 
   const unreadCount = notifications.filter(n => !n.is_read && !n.read_at).length;
@@ -3700,19 +3955,22 @@ function AlertsHub({ user }: { user: any }) {
               <p className="text-sm text-white/20">No notifications yet</p>
             </div>
           ) : notifications.map(n => (
-            <div key={n.id} className={cn("px-4 py-3 flex items-start gap-3 transition-colors",
-              !n.is_read && !n.read_at ? "bg-og-cyan/[0.02]" : ""
+            <div key={n.id} className={cn(
+              "px-4 py-3.5 flex items-start gap-3 transition-colors hover:bg-white/[0.015] cursor-default",
+              !n.is_read && !n.read_at ? "bg-og-cyan/[0.03] border-l-2 border-og-cyan/40" : ""
             )}>
-              <div className="w-8 h-8 rounded-full bg-white/[0.05] flex items-center justify-center text-sm shrink-0">
+              <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center text-sm shrink-0 border",
+                !n.is_read && !n.read_at ? "bg-og-cyan/10 border-og-cyan/20" : "bg-white/[0.04] border-white/[0.06]"
+              )}>
                 {notifIcon(n.type)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-white">{n.title}</p>
-                {(n.body || n.message) && <p className="text-[11px] text-white/40 mt-0.5 line-clamp-2">{n.body || n.message}</p>}
-                <p className="text-[10px] text-white/20 mt-1">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
+                <p className={cn("text-xs font-bold", !n.is_read && !n.read_at ? "text-white" : "text-white/70")}>{n.title}</p>
+                {(n.body || n.message) && <p className="text-[11px] text-white/35 mt-0.5 leading-relaxed line-clamp-2">{n.body || n.message}</p>}
+                <p className="text-[10px] text-white/20 mt-1.5">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
               </div>
               {!n.is_read && !n.read_at && (
-                <div className="w-2 h-2 rounded-full bg-og-cyan shrink-0 mt-1" />
+                <div className="w-2.5 h-2.5 rounded-full bg-og-cyan shadow-[0_0_6px_rgba(34,211,238,0.6)] shrink-0 mt-1" />
               )}
             </div>
           ))}
@@ -3995,71 +4253,100 @@ function RaidsHub({ user }: { user: any }) {
           <p className="text-[11px] text-white/10 mt-1">Launch a raid to coordinate community engagement</p>
         </div>
       ) : (
-        <div className="divide-y divide-white/[0.04]">
+        <div className="space-y-3 p-4">
           {raids.map(raid => {
             const likePct = progress(raid.current_likes, raid.goal_likes);
             const repostPct = progress(raid.current_reposts, raid.goal_reposts);
             const isActive = raid.status === "active";
             const endsIn = raid.ends_at ? new Date(raid.ends_at).getTime() - Date.now() : null;
             const expired = endsIn != null && endsIn < 0;
+            const totalProgress = Math.round((likePct + repostPct) / 2);
+
+            // Format countdown
+            let countdown = "";
+            if (!expired && endsIn != null) {
+              const h = Math.floor(endsIn / 3600000);
+              const m = Math.floor((endsIn % 3600000) / 60000);
+              countdown = h > 0 ? `${h}h ${m}m` : `${m}m`;
+            }
+
             return (
-              <div key={raid.id} className="p-4 space-y-3">
+              <div key={raid.id} className={cn("rounded-2xl border p-4 space-y-3 transition-all",
+                isActive && !expired
+                  ? "border-red-500/20 bg-red-500/[0.03] hover:border-red-500/30"
+                  : "border-white/[0.06] bg-white/[0.02]"
+              )}>
+                {/* Header */}
                 <div className="flex items-start gap-3">
-                  <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-base shrink-0",
-                    isActive && !expired ? "bg-red-500/15" : "bg-white/[0.04]"
+                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border",
+                    isActive && !expired ? "bg-red-500/15 border-red-500/25" : "bg-white/[0.04] border-white/[0.06]"
                   )}>
-                    {isActive && !expired ? "⚔️" : "✅"}
+                    {isActive && !expired ? "⚔️" : "🏁"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-bold text-white truncate">{raid.title || "Unnamed Raid"}</p>
-                      {isActive && !expired && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-full">LIVE</span>}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-black text-white">{raid.title || "Unnamed Raid"}</p>
+                      {isActive && !expired && (
+                        <span className="text-[8px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full font-black uppercase tracking-widest animate-pulse">
+                          LIVE
+                        </span>
+                      )}
+                      {expired && (
+                        <span className="text-[8px] bg-white/[0.06] text-white/30 px-1.5 py-0.5 rounded-full font-black uppercase">ENDED</span>
+                      )}
                     </div>
-                    {raid.ends_at && (
-                      <p className="text-[10px] text-white/25 mt-0.5 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {expired ? "Ended" : `Ends ${formatDistanceToNow(new Date(raid.ends_at), { addSuffix: true })}`}
-                      </p>
-                    )}
-                    <p className="text-[10px] text-white/20">{raid.participants || 0} raiders</p>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <span className="text-[10px] text-white/25 flex items-center gap-1">
+                        <Users className="h-3 w-3" /> {raid.participants || 0} raiders
+                      </span>
+                      {countdown && (
+                        <span className="text-[10px] text-orange-400/70 flex items-center gap-1 font-bold">
+                          <Clock className="h-3 w-3" /> {countdown} left
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <button onClick={() => joinRaid(raid)}
-                    disabled={expired || !isActive}
-                    className={cn("px-3 py-1.5 rounded-xl text-xs font-bold transition-colors",
-                      isActive && !expired
-                        ? "bg-red-500/15 border border-red-500/30 text-red-400 hover:bg-red-500/25"
-                        : "bg-white/[0.04] border border-white/[0.06] text-white/20"
-                    )}>
-                    {isActive && !expired ? "🚀 Join" : "Done"}
-                  </button>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    {/* Total progress ring */}
+                    <span className={cn("text-[11px] font-black px-2 py-1 rounded-lg",
+                      totalProgress >= 75 ? "text-og-lime bg-og-lime/10" : totalProgress >= 50 ? "text-og-gold bg-og-gold/10" : "text-white/40 bg-white/[0.04]"
+                    )}>{totalProgress}%</span>
+                    <button onClick={() => joinRaid(raid)}
+                      disabled={expired || !isActive}
+                      className={cn("px-3 py-1.5 rounded-xl text-xs font-black transition-all",
+                        isActive && !expired
+                          ? "bg-red-500/20 border border-red-500/35 text-red-400 hover:bg-red-500/30 hover:scale-105 active:scale-95"
+                          : "bg-white/[0.04] border border-white/[0.06] text-white/20 cursor-not-allowed"
+                      )}>
+                      {isActive && !expired ? "🚀 Raid" : "✓"}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Progress bars */}
-                <div className="space-y-1.5">
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-[10px] text-white/30">❤️ Likes</span>
-                      <span className="text-[10px] text-white/30">{raid.current_likes || 0} / {raid.goal_likes}</span>
+                <div className="space-y-2">
+                  {[
+                    { label: "❤️ Likes", current: raid.current_likes || 0, goal: raid.goal_likes, pct: likePct, color: "bg-red-400" },
+                    { label: "🔁 Reposts", current: raid.current_reposts || 0, goal: raid.goal_reposts, pct: repostPct, color: "bg-og-lime" },
+                    ...(raid.goal_replies ? [{ label: "💬 Replies", current: raid.current_replies || 0, goal: raid.goal_replies, pct: progress(raid.current_replies || 0, raid.goal_replies), color: "bg-og-cyan" }] : []),
+                  ].map(bar => (
+                    <div key={bar.label}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] text-white/30">{bar.label}</span>
+                        <span className="text-[10px] font-bold text-white/40">{bar.current.toLocaleString()} / {bar.goal.toLocaleString()}</span>
+                      </div>
+                      <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                        <div className={cn("h-full rounded-full transition-all duration-700", bar.color)} style={{ width: `${bar.pct}%` }} />
+                      </div>
                     </div>
-                    <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                      <div className="h-full bg-red-400 rounded-full transition-all" style={{ width: `${likePct}%` }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-[10px] text-white/30">🔁 Reposts</span>
-                      <span className="text-[10px] text-white/30">{raid.current_reposts || 0} / {raid.goal_reposts}</span>
-                    </div>
-                    <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                      <div className="h-full bg-og-lime rounded-full transition-all" style={{ width: `${repostPct}%` }} />
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
                 {raid.target_url && (
                   <a href={raid.target_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-[10px] text-og-cyan/60 hover:text-og-cyan transition-colors">
+                    className="flex items-center gap-1.5 w-full rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[10px] text-og-cyan/60 hover:text-og-cyan hover:border-og-cyan/20 transition-colors">
                     <ExternalLink className="h-3 w-3" /> View target post
+                    <ArrowRight className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100" />
                   </a>
                 )}
               </div>
