@@ -12,10 +12,8 @@ import {
   AccessToken,
 } from "https://esm.sh/@livekit/server-sdk@1.2.7";
 
-const LIVEKIT_API_KEY = Deno.env.get("LIVEKIT_API_KEY") ?? "APIXohxufzLVrjn";
-const LIVEKIT_API_SECRET =
-  Deno.env.get("LIVEKIT_API_SECRET") ??
-  "0Z0w71dJEh6zTcvNdQaBZkpo12wvvJED5X678nT4tpO";
+const LIVEKIT_API_KEY = Deno.env.get("LIVEKIT_API_KEY") ?? "";
+const LIVEKIT_API_SECRET = Deno.env.get("LIVEKIT_API_SECRET") ?? "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,6 +27,13 @@ serve(async (req: Request) => {
   }
 
   try {
+    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+      return new Response(JSON.stringify({ error: "LiveKit is not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { spaceId, guestName } = await req.json();
     if (!spaceId) {
       return new Response(JSON.stringify({ error: "spaceId required" }), {

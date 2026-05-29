@@ -999,6 +999,12 @@ const OverviewPage = ({
 
   const [popupMint, setPopupMint] = useState<string | null>(null);
   const popupToken: JupTokenInfo | null = popupMint ? { id: popupMint, name: "", symbol: "", decimals: 9 } : null;
+  const appHomeCards = [
+    { label: "Truth Scan", value: "Ready", sub: "Token forensic mode", Icon: Search, accent: "lime" as TabAccent, tab: "scanner" as TabId },
+    { label: "Launch Radar", value: "Live", sub: "Fresh mint stream", Icon: Target, accent: "cyan" as TabAccent, tab: "snipe-feed" as TabId },
+    { label: "Market Pulse", value: "Hot", sub: "Narratives and whales", Icon: Flame, accent: "gold" as TabAccent, tab: "feed" as TabId },
+    { label: "Spaces", value: "Open", sub: "Voice rooms and alpha", Icon: Radio, accent: "cyan" as TabAccent, tab: "community" as TabId },
+  ];
 
   const toolSections = [
     {
@@ -1028,6 +1034,67 @@ const OverviewPage = ({
 
   return (
     <div className="space-y-5">
+      <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0b1423] p-4 shadow-[0_24px_80px_-58px_hsl(var(--og-cyan)/0.95)] sm:p-5">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_0%,hsl(var(--og-cyan)/0.16),transparent_30%),radial-gradient(circle_at_90%_16%,hsl(var(--og-lime)/0.12),transparent_30%),radial-gradient(circle_at_50%_100%,rgba(244,114,182,0.1),transparent_34%)]" />
+        <div className="relative flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/15 bg-white/10">
+              <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-og-cyan">Command home</p>
+              <h1 className="truncate text-2xl font-black tracking-normal text-white sm:text-3xl">OGScan</h1>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onChangeMint}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.07] text-white/55 transition hover:text-white"
+            aria-label="Change active mint"
+          >
+            <Wallet className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="relative mt-4 rounded-[1.35rem] border border-white/10 bg-black/20 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-bold text-white/45">Active mint</p>
+              <p className="mt-1 font-mono text-sm font-black text-white">{shortAddr(mint, 6)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onScanClick}
+              className="flex min-h-11 items-center gap-2 rounded-2xl bg-og-lime px-4 text-sm font-black text-og-ink transition active:scale-95"
+            >
+              <Search className="h-4 w-4" />
+              Scan
+            </button>
+          </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full w-[78%] rounded-full bg-gradient-to-r from-og-lime via-og-cyan to-[#f472b6]" />
+          </div>
+        </div>
+
+        <div className="relative mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {appHomeCards.map((card) => (
+            <button
+              key={card.label}
+              type="button"
+              onClick={() => onSwitchTab(card.tab)}
+              className="group rounded-[1.15rem] border border-white/10 bg-white/[0.055] p-3 text-left transition hover:bg-white/[0.08] active:scale-[0.98]"
+            >
+              <div className={cn("mb-3 grid h-10 w-10 place-items-center rounded-2xl border", accentIcon(card.accent))}>
+                <card.Icon className="h-5 w-5" />
+              </div>
+              <p className="text-xl font-black text-white">{card.value}</p>
+              <p className="mt-0.5 text-[12px] font-bold text-white/70">{card.label}</p>
+              <p className="text-[10px] text-white/36">{card.sub}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ─── Hero ─── */}
       <div className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-br from-og-lime/[0.04] via-white/[0.03] to-og-cyan/[0.03]">
         <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-og-lime/[0.06] blur-[80px]" />

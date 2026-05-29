@@ -1,10 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
+  process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const SUPABASE_ANON_KEY =
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmamlwbmtoY2VianZ0dGxpcHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1Mjc5NDgsImV4cCI6MjA5MzEwMzk0OH0.aXu8bbpVVwc8KOJf1-lHqO3cz_0GZD10_TE0GlKQ1BI";
+  process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
 
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const HUMAN_CODE = "OGSCAN";
@@ -72,6 +71,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      res.status(500).json({
+        allowed: false,
+        code: "signup_guard_not_configured",
+        message: "Signup security is not configured. Please contact support.",
+      });
+      return;
+    }
+
     const { email, username, fingerprint, honeypot, humanCode, elapsedMs } = req.body ?? {};
 
     if (!email || !username || !fingerprint) {
