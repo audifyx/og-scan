@@ -738,6 +738,32 @@ const CommunityRooms: React.FC = () => {
 
   useEffect(() => { loadRooms(); }, [loadRooms]);
 
+  // Real-time: community_rooms list updates (new rooms, renames, deletions)
+  useEffect(() => {
+    if (!user) return;
+    const ch = supabase
+      .channel(`community-rooms-list-${Date.now()}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_rooms" }, (payload) => {
+        const newRoom = payload.new as Room;
+        setRooms(prev => {
+          if (prev.some(r => r.id === newRoom.id)) return prev;
+          return [newRoom, ...prev];
+        });
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "community_rooms" }, (payload) => {
+        const updated = payload.new as Room;
+        setRooms(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
+        setActiveRoom(prev => prev?.id === updated.id ? { ...prev, ...updated } : prev);
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "community_rooms" }, (payload) => {
+        const deleted = payload.old as Room;
+        setRooms(prev => prev.filter(r => r.id !== deleted.id));
+        setActiveRoom(prev => prev?.id === deleted.id ? null : prev);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user]);
+
   useEffect(() => {
     if (!activeRoom) return;
     loadMessages(activeRoom.id);
