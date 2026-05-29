@@ -449,7 +449,7 @@ const CommunityRooms: React.FC = () => {
       toast.error("Could not load messages");
       setMessages([]);
     } else {
-      const rows = (data || []) as Message[];
+      const rows = ((data || []) as Message[]).filter(message => !message.is_deleted && !message.deleted_at);
       const profilesMap = await fetchProfilesMap(rows.map(message => message.sender_id));
       setMessages(rows.reverse().map(message => ({ ...message, profiles: profilesMap[message.sender_id] || null })));
     }
@@ -586,10 +586,29 @@ const CommunityRooms: React.FC = () => {
 
   const deleteMessage = async (message: Message) => {
     if (!activeRoom || (!canModerate && message.sender_id !== user?.id)) return;
-    await supabase.from("community_room_messages").update({ is_deleted: true, deleted_at: new Date().toISOString(), content: "[deleted]" }).eq("id", message.id);
     if (canModerate) {
       await supabase.from("community_room_moderation_actions").insert({ room_id: activeRoom.id, moderator_id: user?.id, target_user_id: message.sender_id, message_id: message.id, action_type: "message_deleted" });
     }
+    const { error } = await supabase.from("community_room_messages").delete().eq("id", message.id);
+    if (error) {
+      toast.error(error.message || "Could not delete message");
+      return;
+    }
+
+    setMessages(prev => prev.filter(item => item.id !== message.id));
+    const { data: latest } = await supabase
+      .from("community_room_messages")
+      .select("content, created_at")
+      .eq("room_id", activeRoom.id)
+      .or("is_deleted.is.null,is_deleted.eq.false")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    await supabase
+      .from("community_rooms")
+      .update({ last_message: latest?.content?.slice(0, 180) || null, last_message_at: latest?.created_at || null })
+      .eq("id", activeRoom.id);
     loadMessages(activeRoom.id);
   };
 

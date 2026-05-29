@@ -16,6 +16,7 @@ import {
   Flame,
   Gauge,
   Globe,
+  Hash,
   Home,
   Layers3,
   LayoutGrid,
@@ -158,6 +159,7 @@ const ProDashboard = lazy(() => import("@/components/premium-20x/ProDashboard").
 
 const LEGACY_DEFAULT_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
 const STORAGE_TAB = "og_scanner.active_site_tab";
+const COMMUNITY_SUB_STORAGE_KEY = "og_community_sub_tab";
 
 type TabId =
   | "overview"
@@ -191,6 +193,7 @@ type TabId =
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
+type CommunitySubTab = "social" | "rooms" | "spaces" | "communities" | "discover";
 
 type TabConfig = {
   id: TabId;
@@ -999,11 +1002,18 @@ const OverviewPage = ({
 
   const [popupMint, setPopupMint] = useState<string | null>(null);
   const popupToken: JupTokenInfo | null = popupMint ? { id: popupMint, name: "", symbol: "", decimals: 9 } : null;
+  const openCommunitySub = (sub: CommunitySubTab) => {
+    try {
+      localStorage.setItem(COMMUNITY_SUB_STORAGE_KEY, sub);
+      window.dispatchEvent(new Event("og:community-sub-tab"));
+    } catch { /* noop */ }
+    onSwitchTab("community");
+  };
   const appHomeCards = [
     { label: "Truth Scan", value: "Ready", sub: "Token forensic mode", Icon: Search, accent: "lime" as TabAccent, tab: "scanner" as TabId },
     { label: "Launch Radar", value: "Live", sub: "Fresh mint stream", Icon: Target, accent: "cyan" as TabAccent, tab: "snipe-feed" as TabId },
     { label: "Market Pulse", value: "Hot", sub: "Narratives and whales", Icon: Flame, accent: "gold" as TabAccent, tab: "feed" as TabId },
-    { label: "Spaces", value: "Open", sub: "Voice rooms and alpha", Icon: Radio, accent: "cyan" as TabAccent, tab: "community" as TabId },
+    { label: "Spaces", value: "Open", sub: "Voice rooms and alpha", Icon: Radio, accent: "cyan" as TabAccent, tab: "community" as TabId, communitySub: "spaces" as CommunitySubTab },
   ];
 
   const toolSections = [
@@ -1081,7 +1091,7 @@ const OverviewPage = ({
             <button
               key={card.label}
               type="button"
-              onClick={() => onSwitchTab(card.tab)}
+              onClick={() => card.communitySub ? openCommunitySub(card.communitySub) : onSwitchTab(card.tab)}
               className="group rounded-[1.15rem] border border-white/10 bg-white/[0.055] p-3 text-left transition hover:bg-white/[0.08] active:scale-[0.98]"
             >
               <div className={cn("mb-3 grid h-10 w-10 place-items-center rounded-2xl border", accentIcon(card.accent))}>
@@ -1180,14 +1190,16 @@ const OverviewPage = ({
         <h2 className="text-[15px] font-black text-white">Community & Activity</h2>
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
           {[
-            { label: "Chat", Icon: MessageSquare, accent: "lime" as TabAccent, tab: "community" as TabId },
-            { label: "Spaces", Icon: Radio, accent: "cyan" as TabAccent, tab: "community" as TabId },
-            { label: "Alpha", Icon: TrendingUp, accent: "gold" as TabAccent, tab: "community" as TabId },
+            { label: "Chat", Icon: MessageSquare, accent: "lime" as TabAccent, communitySub: "social" as CommunitySubTab },
+            { label: "Rooms", Icon: Hash, accent: "white" as TabAccent, communitySub: "rooms" as CommunitySubTab },
+            { label: "Spaces", Icon: Radio, accent: "cyan" as TabAccent, communitySub: "spaces" as CommunitySubTab },
+            { label: "Groups", Icon: Users, accent: "gold" as TabAccent, communitySub: "communities" as CommunitySubTab },
+            { label: "Discover", Icon: Compass, accent: "cyan" as TabAccent, communitySub: "discover" as CommunitySubTab },
           ].map((item) => (
             <button
               key={item.label}
               type="button"
-              onClick={() => onSwitchTab(item.tab)}
+              onClick={() => openCommunitySub(item.communitySub)}
               className="group flex flex-col items-center gap-2 py-3 px-1 rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-all hover:bg-white/[0.06] hover:border-white/[0.12] hover:scale-[1.04] active:scale-95"
             >
               <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl border", accentIcon(item.accent))}>
