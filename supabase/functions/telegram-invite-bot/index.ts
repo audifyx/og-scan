@@ -120,32 +120,8 @@ async function handleInvite(
     `📊 Invites so far: <b>${joinCount ?? 0}</b>\n` +
     `Type /leaderboard to see the invite rankings.`;
 
-  // If command sent in group → try to DM the user privately, 
-  // then post a brief reply in the group
-  if (isGroup) {
-    const dmResult = await sendMsg(userId, inviteMsg);
-    if (dmResult.ok) {
-      // Successfully DMed — post brief confirmation in group
-      const name = escHtml(displayName(firstName, username));
-      await sendMsg(chatId,
-        `📩 ${name}, your invite link has been sent to your DMs! 🔗`,
-        messageId ? { reply_to_message_id: messageId } : {}
-      );
-    } else {
-      // Can't DM (user hasn't started bot) — post in group as reply
-      console.log(`[invite] Can't DM user ${userId}, posting in group instead. Error:`, dmResult);
-      await sendMsg(chatId,
-        `🔗 <b>${escHtml(displayName(firstName, username))}, here's your personal OG SCAN invite link:</b>\n\n` +
-        `${link}\n\n` +
-        `📊 Invites so far: <b>${joinCount ?? 0}</b>\n\n` +
-        `💡 Tip: Start a chat with me directly to get your link privately next time!`,
-        messageId ? { reply_to_message_id: messageId } : {}
-      );
-    }
-  } else {
-    // DM context — reply directly
-    await sendMsg(chatId, inviteMsg);
-  }
+  // Always post the invite link directly in the chat (group or DM)
+  await sendMsg(chatId, inviteMsg, messageId ? { reply_to_message_id: messageId } : {});
 }
 
 /* ─────────────────── /leaderboard handler ─────────────── */
@@ -249,17 +225,8 @@ async function handleMyInvites(
       ? `Share your link and start climbing the leaderboard! 🔥\n\n${myInvite.invite_link}`
       : `Keep going! Use /leaderboard to see the full rankings.`);
 
-  if (isGroup) {
-    const dmResult = await sendMsg(userId, statsMsg);
-    if (dmResult.ok) {
-      await sendMsg(chatId, `📩 ${name}, your invite stats have been sent to your DMs!`,
-        messageId ? { reply_to_message_id: messageId } : {});
-    } else {
-      await sendMsg(chatId, statsMsg, messageId ? { reply_to_message_id: messageId } : {});
-    }
-  } else {
-    await sendMsg(chatId, statsMsg);
-  }
+  // Always reply directly in the chat (group or DM)
+  await sendMsg(chatId, statsMsg, messageId ? { reply_to_message_id: messageId } : {});
 }
 
 /* ──────────── chat_member join handler ──────────── */
