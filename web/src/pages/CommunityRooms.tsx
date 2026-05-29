@@ -506,10 +506,13 @@ const CommunityRooms: React.FC = () => {
   const [attachmentDraft, setAttachmentDraft] = useState<AttachmentDraft>({ url: "", caption: "" });
   const [savedMessageIds, setSavedMessageIds] = useState<string[]>([]);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Map<string, { username: string; avatar_url: string | null }>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const realtimeRef = useRef<any>(null);
   const presenceRef = useRef<any>(null);
+  const typingChannelRef = useRef<any>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeMessageIdsRef = useRef<string[]>([]);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const handledRequestedMessageRef = useRef<string | null>(null);
@@ -612,7 +615,7 @@ const CommunityRooms: React.FC = () => {
 
       const [reactionRowsResult, missingRepliesResult] = await Promise.all([
         messageIds.length > 0
-          ? supabase.from("community_room_reactions").select("message_id, user_id, emoji, created_at").in("message_id", messageIds)
+          ? supabase.from("message_reactions").select("message_id, user_id, emoji, created_at").in("message_id", messageIds)
           : Promise.resolve({ data: [], error: null }),
         missingReplyIds.length > 0
           ? supabase.from("community_room_messages").select("*").in("id", missingReplyIds)
@@ -700,9 +703,42 @@ const CommunityRooms: React.FC = () => {
     realtimeRef.current?.unsubscribe();
     realtimeRef.current = supabase
       .channel(`community-room-messages-${activeRoom.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_room_messages", filter: `room_id=eq.${activeRoom.id}` }, () => loadMessages(activeRoom.id))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_room_messages", filter: `room_id=eq.${activeRoom.id}` }, async (payload) => {
+        const newMsg = payload.new as Message;
+        // Fetch profile for the new message sender
+        const profilesMap = await fetchProfilesMap([newMsg.sender_id]);
+        const hydratedMsg = { ...newMsg, profiles: profilesMap[newMsg.sender_id] || null, reactions: [], replyCount: 0, replyPreview: null };
+        setMessages(prev => {
+          // Replace optimistic temp message
+          const tempIdx = prev.findIndex(m => m.id.startsWith("temp-") && m.sender_id === newMsg.sender_id && m.content === newMsg.content);
+          if (tempIdx !== -1) {
+            const updated = [...prev];
+            updated[tempIdx] = hydratedMsg;
+            return updated;
+          }
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, hydratedMsg];
+        });
+        activeMessageIdsRef.current = [...activeMessageIdsRef.current, newMsg.id];
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "community_room_messages", filter: `room_id=eq.${activeRoom.id}` }, (payload) => {
+        const deletedId = (payload.old as { id?: string })?.id;
+        if (deletedId) {
+          setMessages(prev => prev.filter(m => m.id !== deletedId));
+          activeMessageIdsRef.current = activeMessageIdsRef.current.filter(id => id !== deletedId);
+        }
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "community_room_messages", filter: `room_id=eq.${activeRoom.id}` }, (payload) => {
+        const updated = payload.new as Message;
+        if (updated.is_deleted) {
+          setMessages(prev => prev.filter(m => m.id !== updated.id));
+        } else {
+          setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m));
+        }
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "community_room_members", filter: `room_id=eq.${activeRoom.id}` }, () => loadMembers(activeRoom.id))
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_room_reactions" }, payload => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, payload => {
         const changedMessageId = (payload.new as { message_id?: string } | null)?.message_id || (payload.old as { message_id?: string } | null)?.message_id;
         if (changedMessageId && activeMessageIdsRef.current.includes(changedMessageId)) {
           loadMessages(activeRoom.id);
@@ -725,6 +761,43 @@ const CommunityRooms: React.FC = () => {
     presenceRef.current = channel;
     return () => { channel.unsubscribe(); };
   }, [activeRoom, profile?.username, user]);
+
+  /* ─── Typing indicator channel ─── */
+  useEffect(() => {
+    if (!activeRoom || !user) {
+      if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
+      if (typingChannelRef.current) { typingChannelRef.current.untrack?.(); supabase.removeChannel(typingChannelRef.current); typingChannelRef.current = null; }
+      setTypingUsers(new Map());
+      return;
+    }
+    const ch = supabase.channel(`community-typing-${activeRoom.id}`, { config: { presence: { key: user.id } } });
+    ch.on("presence", { event: "sync" }, () => {
+      const state = ch.presenceState();
+      const typing = new Map<string, { username: string; avatar_url: string | null }>();
+      Object.entries(state).forEach(([uid, data]) => {
+        if (uid !== user.id && Array.isArray(data) && data.some((d: any) => d.typing)) {
+          const info = data[0] as any;
+          typing.set(uid, { username: info.username || "Someone", avatar_url: info.avatar_url || null });
+        }
+      });
+      setTypingUsers(typing);
+    });
+    ch.subscribe(async (status: string) => { if (status === "SUBSCRIBED") await ch.track({ typing: false, username: profile?.username || "Member", avatar_url: profile?.avatar_url || null }); });
+    typingChannelRef.current = ch;
+    return () => {
+      if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
+      ch.untrack?.(); supabase.removeChannel(ch);
+      if (typingChannelRef.current === ch) typingChannelRef.current = null;
+      setTypingUsers(new Map());
+    };
+  }, [activeRoom, user, profile?.username, profile?.avatar_url]);
+
+  const broadcastTyping = useCallback(() => {
+    if (!activeRoom || !user || !typingChannelRef.current) return;
+    void typingChannelRef.current.track({ typing: true, username: profile?.username || "Member", avatar_url: profile?.avatar_url || null });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => { void typingChannelRef.current?.track({ typing: false, username: profile?.username || "Member", avatar_url: profile?.avatar_url || null }); }, 3000);
+  }, [activeRoom, user, profile?.username, profile?.avatar_url]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -802,6 +875,20 @@ const CommunityRooms: React.FC = () => {
     setSending(true);
     const content = input.trim();
     setInput("");
+    // Stop typing indicator
+    if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
+    void typingChannelRef.current?.track({ typing: false, username: profile?.username || "Member", avatar_url: profile?.avatar_url || null });
+    // Optimistic insert — show message instantly
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: Message = {
+      id: tempId, room_id: activeRoom.id, sender_id: user.id, content, created_at: new Date().toISOString(),
+      is_pinned: false, is_deleted: false, deleted_at: null, reply_to_id: replyTo?.id || null,
+      attachment_url: null, attachment_type: null, edited_at: null,
+      profiles: profile ? { user_id: user.id, username: profile.username, avatar_url: profile.avatar_url, verified: (profile as any).verified ?? false } : null,
+      reactions: [], replyCount: 0, replyPreview: replyTo ? { id: replyTo.id, sender_id: replyTo.sender_id, content: replyTo.content, is_deleted: false, profiles: replyTo.profiles || null } : null,
+    } as Message;
+    setMessages(prev => [...prev, optimisticMsg]);
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 30);
     const { error } = await supabase.from("community_room_messages").insert({
       room_id: activeRoom.id,
       sender_id: user.id,
@@ -811,6 +898,7 @@ const CommunityRooms: React.FC = () => {
     if (error) {
       toast.error(error.message || "Message failed");
       setInput(content);
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     } else {
       setReplyTo(null);
       await supabase.from("community_rooms").update({ last_message: content.slice(0, 180), last_message_at: new Date().toISOString() }).eq("id", activeRoom.id);
@@ -866,7 +954,7 @@ const CommunityRooms: React.FC = () => {
     if (!user || !activeRoom) return;
     const alreadyReacted = !!message.reactions?.find(reaction => reaction.emoji === emoji && reaction.reacted);
 
-    const query = supabase.from("community_room_reactions");
+    const query = supabase.from("message_reactions");
     const { error } = alreadyReacted
       ? await query.delete().eq("message_id", message.id).eq("user_id", user.id).eq("emoji", emoji)
       : await query.upsert({ message_id: message.id, user_id: user.id, emoji }, { onConflict: "message_id,user_id,emoji" });
@@ -1304,6 +1392,27 @@ const CommunityRooms: React.FC = () => {
                   )}
                 </div>
 
+                {/* Typing indicator */}
+                {typingUsers.size > 0 && (
+                  <div className="flex items-center gap-2 border-t border-white/[0.04] px-4 py-1.5">
+                    <div className="flex -space-x-1.5">
+                      {[...typingUsers.entries()].slice(0, 3).map(([uid, info]) => (
+                        info.avatar_url
+                          ? <img key={uid} src={info.avatar_url} alt="" className="h-5 w-5 rounded-full border border-[#0d0f15] object-cover" />
+                          : <div key={uid} className="flex h-5 w-5 items-center justify-center rounded-full border border-[#0d0f15] bg-white/10 text-[8px] font-bold text-white/50">{(info.username || "?")[0].toUpperCase()}</div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-white/30">
+                      <span>{[...typingUsers.values()].slice(0, 2).map(u => u.username).join(", ")}{typingUsers.size > 2 ? ` +${typingUsers.size - 2}` : ""} is typing</span>
+                      <span className="flex gap-0.5">
+                        <span className="h-1 w-1 animate-bounce rounded-full bg-white/25" style={{ animationDelay: "0ms" }} />
+                        <span className="h-1 w-1 animate-bounce rounded-full bg-white/25" style={{ animationDelay: "150ms" }} />
+                        <span className="h-1 w-1 animate-bounce rounded-full bg-white/25" style={{ animationDelay: "300ms" }} />
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="border-t border-white/[0.06] p-3">
                   {replyTo && (
                     <div className="mb-2 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
@@ -1331,7 +1440,7 @@ const CommunityRooms: React.FC = () => {
                     <input
                       ref={inputRef}
                       value={input}
-                      onChange={event => setInput(event.target.value)}
+                      onChange={event => { setInput(event.target.value); broadcastTyping(); }}
                       onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(); } }}
                       disabled={isMuted || isBanned || !!activeRoom.is_locked || (!!activeRoom.is_read_only && !canModerate)}
                       placeholder={isMuted ? "Muted members cannot send messages" : activeRoom.is_read_only && !canModerate ? "Announcements channel is read-only" : `Message #${activeRoom.name}`}
