@@ -2854,11 +2854,20 @@ function ComposeModal({
           const { data: xResult, error: xError } = await supabase.functions.invoke("post-to-x", {
             body: { text: tweetText, imageUrl: imageUrl || null },
           });
-          if (!xError && xResult?.tweetId) {
+          if (xError) {
+            console.error("X cross-post error:", xError);
+            toast.error("OG post saved ✓ but X post failed: " + (xError.message || "Unknown error"));
+          } else if (xResult?.error) {
+            console.error("X cross-post error:", xResult.error);
+            toast.error("OG post saved ✓ but X post failed: " + xResult.error);
+          } else if (xResult?.tweetId) {
             toast.success("Also posted to X 🐦");
+          } else {
+            toast.error("OG post saved ✓ but X post returned no tweet ID — check Settings → Connections");
           }
-        } catch {
-          toast.error("OG post saved, but X cross-post failed. Check your X connection in Settings.");
+        } catch (xErr: any) {
+          console.error("X cross-post exception:", xErr);
+          toast.error("OG post saved ✓ but X cross-post failed. Check your X connection in Settings.");
         }
       }
 
