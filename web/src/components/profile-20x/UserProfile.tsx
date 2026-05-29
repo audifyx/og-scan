@@ -1,5 +1,5 @@
 Exit code: 0
-Wall time: 2.9 seconds
+Wall time: 1.1 seconds
 Total output lines: 2136
 Output:
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -619,7 +619,7 @@ function IdentityBadgeChip({ badge }: { badge: IdentityBadge }) {
         <button
           type="button"
           className={cn(
-            "inline-flex h-6 w-6 items-center justify-center rounded-full border trans…16716 tokens truncated…"bg-black">
+            "inline-flex h-6 w-6 item…16737 tokens truncated…"bg-black">
                           {post.image_url ? <img src={post.image_url} alt="" className="aspect-square w-full object-cover" /> : post.article_cover_url ? <img src={post.article_cover_url} alt="" className="aspect-square w-full object-cover" /> : <div className="flex aspect-square items-center justify-center text-white/35"><Activity className="h-6 w-6" /></div>}
                         </article>
                       ))}
