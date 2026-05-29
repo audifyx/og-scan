@@ -74,7 +74,7 @@ export async function xStartLogin(): Promise<void> {
  * Call this from XCallbackPage after Twitter redirects back.
  * Returns { access_token, refresh_token, expires_in } or throws on error.
  */
-export async function xExchangeCode(code: string, returnedState: string): Promise<{
+export async function xExchangeCode(code: string, returnedState: string, authToken?: string): Promise<{
   access_token: string;
   refresh_token: string;
   expires_in: number;
@@ -90,9 +90,13 @@ export async function xExchangeCode(code: string, returnedState: string): Promis
   if (returnedState !== savedState) throw new Error("State mismatch — possible CSRF. Please try again.");
 
   // Token exchange happens via Supabase edge function (server-side, hides client_secret)
+  // Must include user's JWT so the function can save tokens to the right profile row
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
   const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/x-oauth-callback`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ code, verifier, redirectUri: X_CALLBACK_URL }),
   });
 

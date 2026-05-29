@@ -35,7 +35,9 @@ export function XCallbackPage() {
       }
 
       try {
-        const data = await xExchangeCode(code, state);
+        // Get JWT so the edge function can save tokens to the user's profile
+        const { data: { session } } = await supabase.auth.getSession();
+        const data = await xExchangeCode(code, state, session?.access_token);
 
         // Store X user info locally
         xSetStoredUser({
