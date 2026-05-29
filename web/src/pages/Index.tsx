@@ -944,6 +944,12 @@ const Index = () => {
           <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
             <CommunityHub />
           </main>
+        ) : tab === "coin-communities" ? (
+          <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0 flex flex-col">
+            <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}>
+              <CoinCommunitiesPageLazy />
+            </Suspense>
+          </main>
         ) : (
           <main className={cn(
             "min-h-0 flex-1 overflow-x-hidden pb-28 lg:pb-8",
