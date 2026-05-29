@@ -722,6 +722,133 @@ const CommunityRooms: React.FC = () => {
     loadRooms();
   };
 
+  const sidePanelContent = sidePanel === "info" ? (
+    <div className="space-y-4">
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-white/25">Room Rules</p>
+        <p className="mt-2 whitespace-pre-wrap rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs leading-relaxed text-white/55">{activeRoom?.rules || "No rules posted yet. Keep it helpful, respectful, and crypto-focused."}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          { label: "Members", value: activeRoom?.member_count || members.length, Icon: Users },
+          { label: "Online", value: localOnline || activeRoom?.online_count || 0, Icon: Bell },
+          { label: "Pinned", value: pinnedMessages.length, Icon: Pin },
+          { label: "Reports", value: reports.length, Icon: Flag },
+        ].map(item => (
+          <div key={item.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3">
+            <item.Icon className="mb-2 h-4 w-4 text-white/35" />
+            <p className="text-lg font-black text-white">{item.value}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-white/25">{item.label}</p>
+          </div>
+        ))}
+      </div>
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-white/25">Connected Features</p>
+        <div className="mt-2 space-y-2">
+          {[
+            { label: "Spaces discussion", Icon: Mic, action: () => navigate("/spaces") },
+            { label: "Scheduled events", Icon: CalendarDays, action: () => navigate("/spaces") },
+            { label: "Shared links", Icon: Link2, action: copyRoomLink },
+            { label: "Moderation logs", Icon: ShieldCheck, action: () => setSidePanel("moderation") },
+          ].map(item => (
+            <button key={item.label} onClick={item.action} className="flex w-full items-center gap-2 rounded-xl border border-white/[0.05] bg-black/20 px-3 py-2 text-left text-xs text-white/50 transition hover:border-white/[0.08] hover:bg-black/30 hover:text-white/80">
+              <item.Icon className="h-3.5 w-3.5 text-og-cyan/65" />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {canModerate && activeRoom && (
+        <div>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/25">Channel Controls</p>
+          {[
+            { field: "is_locked" as const, label: "Lock channel", value: !!activeRoom.is_locked, Icon: Lock },
+            { field: "is_read_only" as const, label: "Read-only", value: !!activeRoom.is_read_only, Icon: Megaphone },
+            { field: "is_hidden" as const, label: "Hidden", value: !!activeRoom.is_hidden, Icon: EyeOff },
+            { field: "is_archived" as const, label: "Archived", value: !!activeRoom.is_archived, Icon: Archive },
+          ].map(control => (
+            <button key={control.field} onClick={() => toggleRoomFlag(control.field, !control.value)} className="mb-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs text-white/50 hover:bg-white/[0.04]">
+              <control.Icon className="h-3.5 w-3.5" />
+              <span className="flex-1">{control.label}</span>
+              {control.value && <CheckCircle2 className="h-3.5 w-3.5 text-og-lime" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  ) : sidePanel === "members" ? (
+    <div>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase tracking-widest text-white/25">Members ({members.length})</p>
+        <button onClick={copyRoomLink} className="rounded-lg p-1.5 text-white/25 hover:bg-white/[0.05] hover:text-white" title="Copy room invite link">
+          <UserPlus className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="space-y-1">
+        {members.map(member => (
+          <div key={member.user_id} className="rounded-2xl border border-white/[0.05] bg-white/[0.02] p-2.5">
+            <div className="flex items-center gap-2">
+              <Avatar url={member.profiles?.avatar_url} username={member.profiles?.username} size="sm" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold text-white/70">{member.profiles?.username || "Member"}</p>
+                <p className="text-[9px] text-white/25">Joined {formatShortDate(member.joined_at)}</p>
+              </div>
+              <RoleBadge role={member.role} />
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-1 text-center">
+              <span className="rounded-lg bg-black/20 px-1 py-1 text-[9px] text-white/28">Rep {member.reputation_score || 0}</span>
+              <span className="rounded-lg bg-black/20 px-1 py-1 text-[9px] text-white/28">Act {member.activity_score || 0}</span>
+              <span className="rounded-lg bg-black/20 px-1 py-1 text-[9px] text-white/28">Warn {member.warning_count || 0}</span>
+            </div>
+            {canModerate && member.user_id !== user?.id && member.role !== "owner" && (
+              <div className="mt-2 flex gap-1">
+                <button onClick={() => setModTarget(member)} className="flex-1 rounded-lg bg-white/[0.04] px-2 py-1 text-[10px] font-bold text-white/45 hover:text-white">Manage</button>
+                <select value={member.role} onChange={event => updateMemberRole(member, event.target.value as RoomRole)} className="rounded-lg border border-white/[0.06] bg-[#10131a] px-2 py-1 text-[10px] text-white/50">
+                  {(["admin", "moderator", "helper", "verified", "member"] as RoomRole[]).map(role => <option key={role} value={role}>{role}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : sidePanel === "moderation" ? (
+    <div className="space-y-4">
+      {!canModerate ? (
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 text-center">
+          <Shield className="mx-auto h-8 w-8 text-white/12" />
+          <p className="mt-2 text-sm font-bold text-white/30">Moderator access required</p>
+        </div>
+      ) : (
+        <>
+          <div>
+            <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/25">Open Reports</p>
+            <div className="space-y-2">
+              {reports.length === 0 ? <p className="rounded-xl bg-white/[0.025] p-3 text-xs text-white/25">No reports.</p> : reports.map(report => (
+                <div key={report.id} className="rounded-xl border border-red-400/10 bg-red-400/[0.04] p-3">
+                  <p className="text-xs font-bold text-white/70">{report.reason}</p>
+                  <p className="mt-1 text-[9px] uppercase tracking-widest text-white/25">{report.status} · {formatShortDate(report.created_at)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/25">Audit Log</p>
+            <div className="space-y-2">
+              {modActions.length === 0 ? <p className="rounded-xl bg-white/[0.025] p-3 text-xs text-white/25">No actions logged.</p> : modActions.map(action => (
+                <div key={action.id} className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
+                  <p className="text-xs font-bold text-white/65">{action.action_type.replace(/_/g, " ")}</p>
+                  {action.reason && <p className="mt-1 text-[10px] text-white/30">{action.reason}</p>}
+                  <p className="mt-1 text-[9px] uppercase tracking-widest text-white/18">{formatShortDate(action.created_at)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#08090d] text-white">
       <aside className="flex w-[310px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0d0f15] max-md:w-[92px]">
@@ -893,139 +1020,23 @@ const CommunityRooms: React.FC = () => {
                 </div>
               </section>
 
-              {sidePanel && (
-                <aside className="w-[320px] shrink-0 overflow-y-auto border-l border-white/[0.06] bg-[#0d0f15] p-4 max-lg:hidden">
-                  {sidePanel === "info" && (
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-white/25">Room Rules</p>
-                        <p className="mt-2 whitespace-pre-wrap rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs leading-relaxed text-white/55">{activeRoom.rules || "No rules posted yet. Keep it helpful, respectful, and crypto-focused."}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { label: "Members", value: activeRoom.member_count || members.length, Icon: Users },
-                          { label: "Online", value: localOnline || activeRoom.online_count || 0, Icon: Bell },
-                          { label: "Pinned", value: pinnedMessages.length, Icon: Pin },
-                          { label: "Reports", value: reports.length, Icon: Flag },
-                        ].map(item => (
-                          <div key={item.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3">
-                            <item.Icon className="mb-2 h-4 w-4 text-white/35" />
-                            <p className="text-lg font-black text-white">{item.value}</p>
-                            <p className="text-[9px] font-black uppercase tracking-widest text-white/25">{item.label}</p>
-                          </div>
-                        ))}
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-white/25">Connected Features</p>
-                        <div className="mt-2 space-y-2">
-                          {[
-                            { label: "Spaces discussion", Icon: Mic, action: () => navigate("/spaces") },
-                            { label: "Scheduled events", Icon: CalendarDays, action: () => navigate("/spaces") },
-                            { label: "Shared links", Icon: Link2, action: copyRoomLink },
-                            { label: "Moderation logs", Icon: ShieldCheck, action: () => setSidePanel("moderation") },
-                          ].map(item => (
-                            <button key={item.label} onClick={item.action} className="flex w-full items-center gap-2 rounded-xl border border-white/[0.05] bg-black/20 px-3 py-2 text-left text-xs text-white/50 transition hover:border-white/[0.08] hover:bg-black/30 hover:text-white/80">
-                              <item.Icon className="h-3.5 w-3.5 text-og-cyan/65" />
-                              {item.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      {canModerate && (
-                        <div>
-                          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/25">Channel Controls</p>
-                          {[
-                            { field: "is_locked" as const, label: "Lock channel", value: !!activeRoom.is_locked, Icon: Lock },
-                            { field: "is_read_only" as const, label: "Read-only", value: !!activeRoom.is_read_only, Icon: Megaphone },
-                            { field: "is_hidden" as const, label: "Hidden", value: !!activeRoom.is_hidden, Icon: EyeOff },
-                            { field: "is_archived" as const, label: "Archived", value: !!activeRoom.is_archived, Icon: Archive },
-                          ].map(control => (
-                            <button key={control.field} onClick={() => toggleRoomFlag(control.field, !control.value)} className="mb-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs text-white/50 hover:bg-white/[0.04]">
-                              <control.Icon className="h-3.5 w-3.5" />
-                              <span className="flex-1">{control.label}</span>
-                              {control.value && <CheckCircle2 className="h-3.5 w-3.5 text-og-lime" />}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {sidePanel === "members" && (
-                    <div>
-                      <div className="mb-3 flex items-center justify-between gap-2">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-white/25">Members ({members.length})</p>
-                        <button onClick={copyRoomLink} className="rounded-lg p-1.5 text-white/25 hover:bg-white/[0.05] hover:text-white" title="Copy room invite link">
-                          <UserPlus className="h-4 w-4" />
+              {sidePanel && sidePanelContent && (
+                <>
+                  <aside className="hidden w-[320px] shrink-0 overflow-y-auto border-l border-white/[0.06] bg-[#0d0f15] p-4 lg:block">
+                    {sidePanelContent}
+                  </aside>
+                  <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden" onClick={() => setSidePanel(null)}>
+                    <div className="absolute inset-x-0 bottom-0 max-h-[78vh] overflow-y-auto rounded-t-3xl border-t border-white/[0.08] bg-[#0d0f15] p-4 shadow-2xl" onClick={event => event.stopPropagation()}>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/28">{sidePanel}</p>
+                        <button onClick={() => setSidePanel(null)} className="rounded-lg p-1.5 text-white/35 hover:bg-white/[0.05] hover:text-white">
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
-                      <div className="space-y-1">
-                        {members.map(member => (
-                          <div key={member.user_id} className="rounded-2xl border border-white/[0.05] bg-white/[0.02] p-2.5">
-                            <div className="flex items-center gap-2">
-                              <Avatar url={member.profiles?.avatar_url} username={member.profiles?.username} size="sm" />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-xs font-bold text-white/70">{member.profiles?.username || "Member"}</p>
-                                <p className="text-[9px] text-white/25">Joined {formatShortDate(member.joined_at)}</p>
-                              </div>
-                              <RoleBadge role={member.role} />
-                            </div>
-                            <div className="mt-2 grid grid-cols-3 gap-1 text-center">
-                              <span className="rounded-lg bg-black/20 px-1 py-1 text-[9px] text-white/28">Rep {member.reputation_score || 0}</span>
-                              <span className="rounded-lg bg-black/20 px-1 py-1 text-[9px] text-white/28">Act {member.activity_score || 0}</span>
-                              <span className="rounded-lg bg-black/20 px-1 py-1 text-[9px] text-white/28">Warn {member.warning_count || 0}</span>
-                            </div>
-                            {canModerate && member.user_id !== user?.id && member.role !== "owner" && (
-                              <div className="mt-2 flex gap-1">
-                                <button onClick={() => setModTarget(member)} className="flex-1 rounded-lg bg-white/[0.04] px-2 py-1 text-[10px] font-bold text-white/45 hover:text-white">Manage</button>
-                                <select value={member.role} onChange={event => updateMemberRole(member, event.target.value as RoomRole)} className="rounded-lg border border-white/[0.06] bg-[#10131a] px-2 py-1 text-[10px] text-white/50">
-                                  {(["admin", "moderator", "helper", "verified", "member"] as RoomRole[]).map(role => <option key={role} value={role}>{role}</option>)}
-                                </select>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                      {sidePanelContent}
                     </div>
-                  )}
-
-                  {sidePanel === "moderation" && (
-                    <div className="space-y-4">
-                      {!canModerate ? (
-                        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 text-center">
-                          <Shield className="mx-auto h-8 w-8 text-white/12" />
-                          <p className="mt-2 text-sm font-bold text-white/30">Moderator access required</p>
-                        </div>
-                      ) : (
-                        <>
-                          <div>
-                            <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/25">Open Reports</p>
-                            <div className="space-y-2">
-                              {reports.length === 0 ? <p className="rounded-xl bg-white/[0.025] p-3 text-xs text-white/25">No reports.</p> : reports.map(report => (
-                                <div key={report.id} className="rounded-xl border border-red-400/10 bg-red-400/[0.04] p-3">
-                                  <p className="text-xs font-bold text-white/70">{report.reason}</p>
-                                  <p className="mt-1 text-[9px] uppercase tracking-widest text-white/25">{report.status} · {formatShortDate(report.created_at)}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-white/25">Audit Log</p>
-                            <div className="space-y-2">
-                              {modActions.length === 0 ? <p className="rounded-xl bg-white/[0.025] p-3 text-xs text-white/25">No actions logged.</p> : modActions.map(action => (
-                                <div key={action.id} className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-                                  <p className="text-xs font-bold text-white/65">{action.action_type.replace(/_/g, " ")}</p>
-                                  {action.reason && <p className="mt-1 text-[10px] text-white/30">{action.reason}</p>}
-                                  <p className="mt-1 text-[9px] uppercase tracking-widest text-white/18">{formatShortDate(action.created_at)}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </aside>
+                  </div>
+                </>
               )}
             </div>
           </>
