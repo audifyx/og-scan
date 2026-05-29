@@ -7,7 +7,6 @@ import {
   Copy,
   Fingerprint,
   Flame,
-  Gauge,
   LockKeyhole,
   Radar,
   Search,
@@ -36,9 +35,8 @@ const homeTiles = [
 ];
 
 const dockActions = [
-  { label: "Scanner", href: "/scanner", Icon: Search, color: "bg-og-lime text-og-ink" },
-  { label: "App", href: "/app", Icon: Gauge, color: "bg-white text-[#08111f]" },
-  { label: "Sign up", href: "/auth?mode=signup", Icon: Fingerprint, color: "bg-og-cyan text-[#06121d]" },
+  { label: "Log in", href: "/auth", Icon: LockKeyhole, color: "border border-white/10 bg-white/[0.08] text-white" },
+  { label: "Sign up", href: "/auth?mode=signup", Icon: Fingerprint, color: "bg-og-lime text-og-ink" },
 ];
 
 const MobilePreview = memo(() => (
@@ -236,9 +234,9 @@ const BetaHome = memo(() => {
       </section>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#07101d]/95 px-4 pb-[calc(0.9rem+env(safe-area-inset-bottom,0px))] pt-3 backdrop-blur-2xl sm:hidden">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {dockActions.map((action) => (
-            <Link key={action.href} to={action.href} className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl text-[10px] font-black", action.color)}>
+            <Link key={action.href} to={action.href} className={cn("flex min-h-12 items-center justify-center gap-2 rounded-2xl text-sm font-black", action.color)}>
               <action.Icon className="h-4 w-4" />
               {action.label}
             </Link>
