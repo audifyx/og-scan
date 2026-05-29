@@ -41,6 +41,7 @@ import {
   ccGetCommunityMembers,
   type CCUser,
 } from "@/lib/ccAuth";
+import { supabase } from "@/lib/supabase";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -147,6 +148,24 @@ const ComposeModal = ({ tokenAddress, tokenSymbol, user, onClose, onPosted }: Co
 
   useEffect(() => { textareaRef.current?.focus(); }, []);
 
+  // Auto-read wallet address from the user's OG Scan profile
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user: authUser } }) => {
+      if (!authUser) return;
+      supabase
+        .from("profiles")
+        .select("wallet_address, sol_wallet")
+        .eq("user_id", authUser.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            const addr = data.wallet_address || data.sol_wallet || "";
+            if (addr) setWalletAddress(addr);
+          }
+        });
+    });
+  }, []);
+
   const { mutate: submit, isPending } = useMutation({
     mutationFn: () => ccPostMessage(tokenAddress, text.trim(), walletAddress),
     onSuccess: () => { onPosted(); onClose(); },
@@ -219,15 +238,24 @@ const ComposeModal = ({ tokenAddress, tokenSymbol, user, onClose, onPosted }: Co
               <span className="text-[12px] font-semibold">Wallet required to post</span>
             </div>
             <p className="text-white/50 text-[12px] mb-4 leading-relaxed">
-              You must hold <span className="text-og-lime font-bold">${tokenSymbol}</span> tokens to post in this community. Enter your Solana wallet address to verify your balance.
+              You must hold <span className="text-og-lime font-bold">${tokenSymbol}</span> tokens to post in this community.
+              {walletAddress ? " We detected your linked wallet below." : " Enter your Solana wallet address to verify your balance."}
             </p>
-            <input
-              type="text"
-              value={walletAddress}
-              onChange={(e) => setWalletAddress(e.target.value.trim())}
-              placeholder="Your Solana wallet address"
-              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-white/90 text-[12px] font-mono placeholder:text-white/20 outline-none focus:border-og-lime/40 transition-colors mb-3"
-            />
+            <div className="relative mb-3">
+              <input
+                type="text"
+                value={walletAddress}
+                onChange={(e) => setWalletAddress(e.target.value.trim())}
+                placeholder="Your Solana wallet address"
+                className={cn(
+                  "w-full rounded-xl border bg-white/[0.04] px-3 py-2.5 text-white/90 text-[12px] font-mono placeholder:text-white/20 outline-none transition-colors",
+                  walletAddress ? "border-og-lime/40 focus:border-og-lime/60" : "border-white/10 focus:border-og-lime/40",
+                )}
+              />
+              {walletAddress && (
+                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-og-lime" />
+              )}
+            </div>
             {error && (
               <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-red-400 text-[11px] mb-3">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />{error}
@@ -439,8 +467,8 @@ export const CoinCommunityFull = ({
         </div>
       )}
 
-      {/* ── Tab bar ── */}
-      <div className="flex border-b border-white/[0.07] shrink-0">
+      {/* ── Tab bar + Post button ── */}
+      <div className="flex items-center border-b border-white/[0.07] shrink-0">
         {SORT_TABS.map(({ id, label }) => (
           <button
             key={id}
@@ -455,6 +483,14 @@ export const CoinCommunityFull = ({
             {label}
           </button>
         ))}
+        {/* Post button — top right of tab bar */}
+        <button
+          onClick={handleFabClick}
+          className="shrink-0 flex items-center gap-1.5 mx-3 px-3 py-1.5 rounded-xl bg-og-lime text-black font-bold text-[11px] uppercase tracking-wider hover:bg-og-lime/90 active:scale-95 transition-all shadow-lg shadow-og-lime/20"
+        >
+          <Plus className="h-3.5 w-3.5" strokeWidth={3} />
+          Post
+        </button>
       </div>
 
       {/* ── Content ── */}
@@ -483,17 +519,8 @@ export const CoinCommunityFull = ({
             displayMessages.map((msg) => <PostCard key={msg.id} msg={msg} />)
           )
         )}
-        {/* Bottom padding for FAB */}
-        <div className="h-20" />
+        <div className="h-6" />
       </div>
-
-      {/* ── Green FAB ── */}
-      <button
-        onClick={handleFabClick}
-        className="absolute bottom-5 right-5 w-12 h-12 rounded-full bg-og-lime flex items-center justify-center shadow-lg shadow-og-lime/20 hover:bg-og-lime/90 active:scale-95 transition-all z-10"
-      >
-        <Plus className="h-5 w-5 text-black" strokeWidth={3} />
-      </button>
 
       {/* ── Auth Prompt modal ── */}
       {showAuthPrompt && (

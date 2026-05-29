@@ -271,31 +271,49 @@ export const CoinCommunitiesPage = () => {
   const isFetching = fetchingFeed || fetchingTop;
 
   return (
-    <div className="flex flex-col min-h-full bg-background text-foreground">
+    <div className="flex flex-col h-full bg-background text-foreground overflow-hidden">
       {/* ── Header ── */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-xl border-b border-white/[0.07]">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Globe className="h-4 w-4 text-og-lime" />
-            <span className="font-display font-black text-white text-base uppercase tracking-tight">Coin Communities</span>
-          </div>
-          <span className="ml-1 rounded-full bg-og-lime/10 border border-og-lime/20 px-2 py-0.5 font-mono text-[8px] uppercase tracking-widest text-og-lime">
-            Live
-          </span>
+      <div className="shrink-0 bg-background/95 backdrop-blur-xl border-b border-white/[0.07]">
+        <div className="flex items-center gap-2 px-4 py-3">
+          {/* Back button when viewing a token */}
+          {selectedToken ? (
+            <button
+              onClick={handleBack}
+              className="text-white/40 hover:text-white/80 font-mono text-[10px] uppercase tracking-widest transition-colors shrink-0"
+            >
+              ← Back
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <Globe className="h-4 w-4 text-og-lime shrink-0" />
+              <span className="font-display font-black text-white text-sm uppercase tracking-tight">CC Feed</span>
+              <span className="rounded-full bg-og-lime/10 border border-og-lime/20 px-1.5 py-0.5 font-mono text-[7px] uppercase tracking-widest text-og-lime">Live</span>
+            </div>
+          )}
+
+          {selectedToken && (
+            <span className="font-bold text-white text-sm truncate">${selectedToken.symbol}</span>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Refresh */}
           <button
             onClick={() => { refetchFeed(); refetchTop(); }}
-            className={cn("ml-auto text-white/30 hover:text-white/70 transition-colors p-1", isFetching && "animate-spin")}
+            className={cn("text-white/30 hover:text-white/70 transition-colors p-1 shrink-0", isFetching && "animate-spin")}
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
-          {/* X auth — logged-in user pill or sign-in button */}
+
+          {/* X auth */}
           {ccUser ? (
-            <div className="flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/10 pl-1 pr-2.5 py-1">
+            <div className="flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/10 pl-1 pr-2 py-1 shrink-0">
               {ccUser.profileImageUrl && (
                 <img src={ccUser.profileImageUrl} alt={ccUser.displayName} className="w-5 h-5 rounded-full" />
               )}
-              <span className="font-mono text-[9px] text-white/60 max-w-[80px] truncate">@{ccUser.username}</span>
-              <button onClick={handleLogout} title="Disconnect X" className="text-white/25 hover:text-red-400 transition-colors ml-0.5">
+              <span className="font-mono text-[9px] text-white/60 max-w-[70px] truncate">@{ccUser.username}</span>
+              <button onClick={handleLogout} title="Disconnect X" className="text-white/25 hover:text-red-400 transition-colors">
                 <LogOut className="h-3 w-3" />
               </button>
             </div>
@@ -303,14 +321,10 @@ export const CoinCommunitiesPage = () => {
             <button
               onClick={handleXLogin}
               disabled={authLoading}
-              className="flex items-center gap-1.5 rounded-full bg-white text-black font-bold text-[10px] px-3 py-1.5 hover:bg-white/90 active:scale-95 transition-all disabled:opacity-60 shrink-0"
+              className="flex items-center gap-1.5 rounded-full bg-white text-black font-bold text-[10px] px-2.5 py-1.5 hover:bg-white/90 active:scale-95 transition-all disabled:opacity-60 shrink-0"
             >
-              {authLoading ? (
-                <RefreshCw className="h-3 w-3 animate-spin" />
-              ) : (
-                <svg viewBox="0 0 24 24" className="w-3 h-3 fill-black shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
-              )}
-              {authLoading ? "Opening…" : "Sign in with X"}
+              {authLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <svg viewBox="0 0 24 24" className="w-3 h-3 fill-black shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>}
+              {authLoading ? "…" : "Sign in"}
             </button>
           )}
         </div>
@@ -319,16 +333,12 @@ export const CoinCommunitiesPage = () => {
         {authError && (
           <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-mono flex items-start gap-2">
             <span className="shrink-0 mt-0.5">⚠</span>
-            <span className="leading-snug">
-              {authError.toLowerCase().includes("whitelist")
-                ? "Login unavailable — callback URL not yet whitelisted in CoinCommunities dashboard."
-                : authError}
-            </span>
+            <span className="leading-snug">{authError}</span>
             <button onClick={() => setAuthError(null)} className="ml-auto shrink-0 opacity-60 hover:opacity-100 text-base leading-none">×</button>
           </div>
         )}
 
-        {/* Tab bar */}
+        {/* Tab bar — only on main feed/top views */}
         {!selectedToken && (
           <div className="flex px-4 gap-1 pb-2">
             {TABS.map(({ id, label, icon: Icon }) => (
@@ -350,45 +360,30 @@ export const CoinCommunitiesPage = () => {
         )}
       </div>
 
-      {/* ── Content ── */}
-      <div className="flex-1">
-        {/* Token-specific community — full pump.fun-style page with X login + posting */}
+      {/* ── Scrollable content ── */}
+      <div className="flex-1 overflow-y-auto overscroll-contain">
+        {/* Token-specific community */}
         {selectedToken && (
-          <div className="flex flex-col h-full">
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] shrink-0">
-              <button
-                onClick={handleBack}
-                className="text-white/40 hover:text-white/80 font-mono text-[10px] uppercase tracking-widest transition-colors"
-              >
-                ← Back
-              </button>
-              <span className="font-bold text-white text-sm">${selectedToken.symbol} Community</span>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}>
-                <CoinCommunityFull
-                  tokenAddress={selectedToken.address}
-                  tokenSymbol={selectedToken.symbol}
-                />
-              </Suspense>
-            </div>
-          </div>
+          <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}>
+            <CoinCommunityFull
+              tokenAddress={selectedToken.address}
+              tokenSymbol={selectedToken.symbol}
+            />
+          </Suspense>
         )}
 
         {/* Live cross-community feed */}
         {!selectedToken && activeView === "feed" && (
-          <div>
-            {fetchingFeed && feed.length === 0 ? (
-              <div className="flex items-center justify-center py-16 text-white/30 text-sm">
-                Loading live feed...
-              </div>
-            ) : feed.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 gap-2">
-                <Globe className="h-8 w-8 text-white/15" />
-                <p className="text-white/30 text-sm">No feed posts yet</p>
-              </div>
-            ) : (
-              feed.map((item) => (
+          fetchingFeed && feed.length === 0 ? (
+            <div className="flex items-center justify-center py-16 text-white/30 text-sm">Loading live feed...</div>
+          ) : feed.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-2">
+              <Globe className="h-8 w-8 text-white/15" />
+              <p className="text-white/30 text-sm">No feed posts yet</p>
+            </div>
+          ) : (
+            <>
+              {feed.map((item) => (
                 <div
                   key={item.id}
                   onClick={() => item.tokenAddress && handleSelectToken(item.tokenAddress, item.tokenSymbol)}
@@ -396,35 +391,34 @@ export const CoinCommunitiesPage = () => {
                 >
                   <FeedCard item={item} />
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+              <div className="h-6" />
+            </>
+          )
         )}
 
         {/* Top communities grid */}
         {!selectedToken && activeView === "top" && (
           <div className="p-4">
             {fetchingTop && top.length === 0 ? (
-              <div className="flex items-center justify-center py-16 text-white/30 text-sm">
-                Loading communities...
-              </div>
+              <div className="flex items-center justify-center py-16 text-white/30 text-sm">Loading communities...</div>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {top.map((community) => (
-                  <CommunityCard
-                    key={community.tokenAddress}
-                    community={community}
-                    onClick={(ca) => handleSelectToken(ca, community.tokenSymbol)}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {top.map((community) => (
+                    <CommunityCard
+                      key={community.tokenAddress}
+                      community={community}
+                      onClick={(ca) => handleSelectToken(ca, community.tokenSymbol)}
+                    />
+                  ))}
+                </div>
+                <div className="h-6" />
+              </>
             )}
           </div>
         )}
       </div>
-
-      {/* Bottom padding for mobile nav */}
-      <div className="h-20 lg:h-4" />
     </div>
   );
 };
