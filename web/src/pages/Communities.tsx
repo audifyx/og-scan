@@ -2774,6 +2774,11 @@ function ComposeModal({
   const [tokenAddress, setTokenAddress] = useState("");
   const [tokenData, setTokenData] = useState<DexTokenData | null>(null);
   const [fetchingToken, setFetchingToken] = useState(false);
+  // X cross-post
+  const [crossPostToX, setCrossPostToX] = useState(false);
+  const [xConnected] = React.useState(() => {
+    try { return !!localStorage.getItem("x_user"); } catch { return false; }
+  });
 
   useEffect(() => {
     (async () => {
@@ -2838,6 +2843,25 @@ function ComposeModal({
           ...tokenFields,
         });
       }
+      // Cross-post to X if toggle is on and user has X connected
+      if (crossPostToX && xConnected) {
+        const tweetText = postType === "thread"
+          ? threadParts.filter(Boolean).join("\n\n").slice(0, 280)
+          : postType === "article"
+          ? `${articleTitle}\n\nhttps://ogscan.fun`
+          : content.trim().slice(0, 280);
+        try {
+          const { data: xResult, error: xError } = await supabase.functions.invoke("post-to-x", {
+            body: { text: tweetText, imageUrl: imageUrl || null },
+          });
+          if (!xError && xResult?.tweetId) {
+            toast.success("Also posted to X 🐦");
+          }
+        } catch {
+          toast.error("OG post saved, but X cross-post failed. Check your X connection in Settings.");
+        }
+      }
+
       toast.success(postType === "article" ? "Article published! 📝" : postType === "thread" ? "Thread posted! 🧵" : "Posted! ✨");
       onClose();
     } catch (e: any) {
@@ -2856,6 +2880,32 @@ function ComposeModal({
         <div className="flex items-center gap-3 p-4 border-b border-white/[0.06]">
           <button onClick={onClose} className="text-white/40 hover:text-white"><XIcon className="h-5 w-5" /></button>
           <div className="flex-1" />
+          {/* X cross-post toggle */}
+          {xConnected && postType !== "article" && (
+            <button
+              onClick={() => setCrossPostToX(v => !v)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest transition-all mr-1",
+                crossPostToX
+                  ? "bg-white/10 border-white/30 text-white"
+                  : "border-white/[0.08] text-white/25 hover:text-white/50"
+              )}
+              title="Also post to X"
+            >
+              <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+              {crossPostToX ? "Posting to X" : "Also post to X"}
+            </button>
+          )}
+          {!xConnected && (
+            <a
+              href="/settings?tab=connections"
+              className="flex items-center gap-1 mr-1 text-white/20 hover:text-white/50 transition-colors text-[10px] font-mono"
+              title="Connect X to cross-post"
+            >
+              <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+              Connect X
+            </a>
+          )}
           <Button onClick={handlePost} disabled={posting || currentLen === 0} className="px-4 h-8 rounded-full text-xs font-bold">
             {posting ? <Loader2 className="h-3 w-3 animate-spin" /> : postType === "article" ? "Publish" : "Post"}
           </Button>
