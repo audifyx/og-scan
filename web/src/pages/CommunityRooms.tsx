@@ -489,7 +489,7 @@ const CommunityRooms: React.FC = () => {
   const [modActions, setModActions] = useState<ModAction[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roomFilter, setRoomFilter] = useState<"active" | "discover" | "archived">("active");
-  const [sidePanel, setSidePanel] = useState<"members" | "moderation" | "info" | null>("info");
+  const [sidePanel, setSidePanel] = useState<"members" | "moderation" | "info" | null>(null);
   const [input, setInput] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [loadingRooms, setLoadingRooms] = useState(true);
