@@ -81,6 +81,11 @@ interface Message {
   profiles?: ProfileLite | null;
 }
 
+interface AttachmentDraft {
+  url: string;
+  caption: string;
+}
+
 interface Member {
   room_id: string;
   user_id: string;
@@ -140,6 +145,9 @@ const durationToExpiry = (duration: ModerationDuration) => {
 
 const formatTime = (value: string) => new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const formatShortDate = (value: string) => new Date(value).toLocaleDateString([], { month: "short", day: "numeric" });
+const IMAGE_URL_RE = /\.(png|jpe?g|gif|webp|svg|avif)(\?.*)?$/i;
+
+const isImageUrl = (value: string) => IMAGE_URL_RE.test(value) || value.includes("images") || value.includes("img") || value.includes("photo");
 
 const slugifyRoomName = (value: string) => {
   const slug = value
@@ -259,6 +267,9 @@ function MessageRow({
   onReact: (message: Message, emoji: string) => void;
   onReply: (message: Message) => void;
 }) {
+  const attachmentUrl = msg.media_url || msg.file_url;
+  const hasAttachment = !!attachmentUrl;
+  const attachmentIsImage = !!msg.media_url || (!!attachmentUrl && isImageUrl(attachmentUrl));
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -279,7 +290,25 @@ function MessageRow({
           )}
         >
           {msg.is_pinned && <Pin className="mr-1 inline h-3 w-3 text-og-gold" />}
-          {msg.is_deleted ? <span className="italic text-white/30">Message deleted</span> : msg.content}
+          {msg.is_deleted ? (
+            <span className="italic text-white/30">Message deleted</span>
+          ) : (
+            <div className="space-y-2">
+              {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+              {hasAttachment && (
+                attachmentIsImage ? (
+                  <a href={attachmentUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                    <img src={attachmentUrl || undefined} alt="Attachment" className="max-h-72 w-full object-cover" />
+                  </a>
+                ) : (
+                  <a href={attachmentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs font-bold text-white/80 hover:bg-black/30">
+                    <Link2 className="h-3.5 w-3.5 text-og-cyan" />
+                    Open attachment
+                  </a>
+                )
+              )}
+            </div>
+          )}
         </div>
         <div className={cn("flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100", isOwn && "flex-row-reverse")}>
           {QUICK_EMOJIS.slice(0, 4).map(emoji => (
@@ -340,6 +369,9 @@ const CommunityRooms: React.FC = () => {
   const [modReason, setModReason] = useState("");
   const [modDuration, setModDuration] = useState<ModerationDuration>("1h");
   const [localOnline, setLocalOnline] = useState(0);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showAttachModal, setShowAttachModal] = useState(false);
+  const [attachmentDraft, setAttachmentDraft] = useState<AttachmentDraft>({ url: "", caption: "" });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const realtimeRef = useRef<any>(null);
@@ -350,6 +382,7 @@ const CommunityRooms: React.FC = () => {
   const isMuted = !!currentMember?.muted_until && new Date(currentMember.muted_until).getTime() > Date.now();
   const isBanned = !!currentMember?.is_banned || (!!currentMember?.banned_until && new Date(currentMember.banned_until).getTime() > Date.now());
   const pinnedMessages = messages.filter(message => message.is_pinned && !message.is_deleted);
+  const requestedRoomId = useMemo(() => new URLSearchParams(window.location.search).get("room"), []);
 
   const filteredRooms = useMemo(() => {
     return rooms.filter(room => {
@@ -375,10 +408,15 @@ const CommunityRooms: React.FC = () => {
     } else {
       const rows = (data || []) as Room[];
       setRooms(rows);
-      if (!activeRoom && rows.length > 0) setActiveRoom(rows[0]);
+      const requestedRoom = requestedRoomId ? rows.find(room => room.id === requestedRoomId) : null;
+      if (requestedRoom) {
+        setActiveRoom(requestedRoom);
+      } else if (!activeRoom && rows.length > 0) {
+        setActiveRoom(rows[0]);
+      }
     }
     setLoadingRooms(false);
-  }, [activeRoom]);
+  }, [activeRoom, requestedRoomId]);
 
   const loadMembers = useCallback(async (roomId: string) => {
     const { data, error } = await supabase
@@ -587,6 +625,58 @@ const CommunityRooms: React.FC = () => {
     loadModeration(activeRoom.id);
   };
 
+  const addEmojiToComposer = (emoji: string) => {
+    setInput(prev => `${prev}${prev && !prev.endsWith(" ") ? " " : ""}${emoji}`.trimStart());
+    setShowEmojiPicker(false);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const copyRoomLink = async () => {
+    if (!activeRoom) return;
+    const roomPath = `${window.location.origin}${window.location.pathname}?room=${activeRoom.id}`;
+    try {
+      await navigator.clipboard.writeText(roomPath);
+      toast.success("Room link copied");
+    } catch {
+      toast.error("Could not copy room link");
+    }
+  };
+
+  const sendAttachment = async () => {
+    if (!user || !activeRoom) return;
+    const url = attachmentDraft.url.trim();
+    const caption = attachmentDraft.caption.trim();
+
+    if (!url) {
+      toast.error("Add a media or file URL");
+      return;
+    }
+
+    const payload = {
+      room_id: activeRoom.id,
+      sender_id: user.id,
+      content: caption || url,
+      media_url: isImageUrl(url) ? url : null,
+      file_url: isImageUrl(url) ? null : url,
+      message_type: isImageUrl(url) ? "image" : "attachment",
+    };
+
+    const { error } = await supabase.from("community_room_messages").insert(payload);
+    if (error) {
+      toast.error(error.message || "Attachment failed");
+      return;
+    }
+
+    await supabase
+      .from("community_rooms")
+      .update({ last_message: caption || "Shared an attachment", last_message_at: new Date().toISOString() })
+      .eq("id", activeRoom.id);
+
+    setAttachmentDraft({ url: "", caption: "" });
+    setShowAttachModal(false);
+    toast.success("Attachment sent");
+  };
+
   const warnMember = async () => {
     if (!activeRoom || !user || !modTarget || !modReason.trim()) return;
     await supabase.from("community_room_warnings").insert({ room_id: activeRoom.id, user_id: modTarget.user_id, moderator_id: user.id, reason: modReason.trim() });
@@ -771,11 +861,20 @@ const CommunityRooms: React.FC = () => {
                       <button onClick={() => setReplyTo(null)}><X className="h-3.5 w-3.5 text-white/30" /></button>
                     </div>
                   )}
+                  {showEmojiPicker && (
+                    <div className="mb-2 flex flex-wrap gap-1 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2">
+                      {QUICK_EMOJIS.map(emoji => (
+                        <button key={emoji} onClick={() => addEmojiToComposer(emoji)} className="rounded-lg px-2 py-1 text-sm hover:bg-white/[0.06]">
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className={cn("flex items-center gap-2 rounded-2xl border border-white/[0.06] bg-white/[0.035] px-3 py-2", (isMuted || isBanned || activeRoom.is_locked) && "opacity-55")}>
-                    <button className="rounded-lg p-1 text-white/30 hover:bg-white/[0.06]" title="Emoji">
+                    <button onClick={() => setShowEmojiPicker(prev => !prev)} className="rounded-lg p-1 text-white/30 hover:bg-white/[0.06]" title="Emoji">
                       <Smile className="h-4 w-4" />
                     </button>
-                    <button className="rounded-lg p-1 text-white/30 hover:bg-white/[0.06]" title="Attach media">
+                    <button onClick={() => setShowAttachModal(true)} className="rounded-lg p-1 text-white/30 hover:bg-white/[0.06]" title="Attach media">
                       <ImageIcon className="h-4 w-4" />
                     </button>
                     <input
@@ -820,15 +919,15 @@ const CommunityRooms: React.FC = () => {
                         <p className="text-[10px] font-black uppercase tracking-widest text-white/25">Connected Features</p>
                         <div className="mt-2 space-y-2">
                           {[
-                            { label: "Spaces discussion", Icon: Mic },
-                            { label: "Scheduled events", Icon: CalendarDays },
-                            { label: "Shared links", Icon: Link2 },
-                            { label: "Moderation logs", Icon: ShieldCheck },
+                            { label: "Spaces discussion", Icon: Mic, action: () => navigate("/spaces") },
+                            { label: "Scheduled events", Icon: CalendarDays, action: () => navigate("/spaces") },
+                            { label: "Shared links", Icon: Link2, action: copyRoomLink },
+                            { label: "Moderation logs", Icon: ShieldCheck, action: () => setSidePanel("moderation") },
                           ].map(item => (
-                            <div key={item.label} className="flex items-center gap-2 rounded-xl border border-white/[0.05] bg-black/20 px-3 py-2 text-xs text-white/50">
+                            <button key={item.label} onClick={item.action} className="flex w-full items-center gap-2 rounded-xl border border-white/[0.05] bg-black/20 px-3 py-2 text-left text-xs text-white/50 transition hover:border-white/[0.08] hover:bg-black/30 hover:text-white/80">
                               <item.Icon className="h-3.5 w-3.5 text-og-cyan/65" />
                               {item.label}
-                            </div>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -854,9 +953,11 @@ const CommunityRooms: React.FC = () => {
 
                   {sidePanel === "members" && (
                     <div>
-                      <div className="mb-3 flex items-center justify-between">
+                      <div className="mb-3 flex items-center justify-between gap-2">
                         <p className="text-[10px] font-black uppercase tracking-widest text-white/25">Members ({members.length})</p>
-                        <UserPlus className="h-4 w-4 text-white/25" />
+                        <button onClick={copyRoomLink} className="rounded-lg p-1.5 text-white/25 hover:bg-white/[0.05] hover:text-white" title="Copy room invite link">
+                          <UserPlus className="h-4 w-4" />
+                        </button>
                       </div>
                       <div className="space-y-1">
                         {members.map(member => (
@@ -972,6 +1073,37 @@ const CommunityRooms: React.FC = () => {
               </div>
               <button onClick={createRoom} disabled={!newRoom.name.trim()} className="w-full rounded-xl bg-og-cyan px-4 py-2.5 text-sm font-black text-background transition-colors hover:bg-white disabled:opacity-40">
                 Create Chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAttachModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-[#11131b] p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-black text-white">Attach Media or File</h3>
+                <p className="text-xs text-white/30">Paste an image URL, media URL, or file link to send it into this room.</p>
+              </div>
+              <button onClick={() => setShowAttachModal(false)} className="rounded-lg p-1.5 text-white/35 hover:bg-white/[0.05]"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="space-y-3">
+              <input
+                value={attachmentDraft.url}
+                onChange={event => setAttachmentDraft(prev => ({ ...prev, url: event.target.value }))}
+                placeholder="https://..."
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/20"
+              />
+              <textarea
+                value={attachmentDraft.caption}
+                onChange={event => setAttachmentDraft(prev => ({ ...prev, caption: event.target.value }))}
+                placeholder="Optional caption"
+                className="h-24 w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/20"
+              />
+              <button onClick={sendAttachment} className="w-full rounded-xl bg-og-cyan px-4 py-2.5 text-sm font-black text-background transition-colors hover:bg-white">
+                Send attachment
               </button>
             </div>
           </div>
