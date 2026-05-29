@@ -25,6 +25,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { CoinCommunityFull } from "@/components/CoinCommunityFull";
 import { HELIUS_API_KEY, OGSCAN_TOKEN_MINT } from "@/lib/og";
+import { trackActivity } from "@/lib/trackActivity";
 
 /* ═══════════════════════════════════════════════════════════════
    Types
@@ -648,11 +649,19 @@ const Communities = () => {
 
       await supabase.from("community_members").insert({ community_id: cid, user_id: user.id, role: "member" });
       // increment member_count
-      const { data: c } = await supabase.from("communities").select("member_count").eq("id", cid).single();
+      const { data: c } = await supabase.from("communities").select("member_count, name").eq("id", cid).single();
       await supabase.from("communities").update({ member_count: (c?.member_count || 0) + 1 }).eq("id", cid);
       const newMap = new Map(myMemberships);
       newMap.set(cid, { id: "", community_id: cid, user_id: user.id, role: "member", joined_at: new Date().toISOString() });
       setMyMemberships(newMap);
+      // Track join activity
+      trackActivity({
+        user_id: user.id,
+        activity_type: "community.joined",
+        title: `Joined ${c?.name || "community"}`,
+        data: { community_id: cid, community_name: c?.name },
+        is_public: true,
+      });
       toast.success("Joined! 🎉");
     } catch (e: any) {
       if (e.message?.includes("duplicate") || e.code === "23505") toast.error("Already a member");

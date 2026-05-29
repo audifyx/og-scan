@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext, type ReactNode } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { trackActivity } from "@/lib/trackActivity";
 import {
   canUseReservedUsername,
   getReservedUsernameMessage,
@@ -142,17 +143,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           body: { inviteeId: data.user.id, inviteCode: refCode },
         }).catch(() => {}); // fire-and-forget
       }
+      // Track sign-up event
+      trackActivity({
+        user_id: data.user.id,
+        activity_type: "auth.signup",
+        title: "Signed up",
+        description: `New account created with username ${cleanUsername}`,
+        data: { username: cleanUsername },
+        is_public: false,
+      });
     }
 
     return { error: error as Error | null, userId: data?.user?.id ?? null };
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data?.user) {
+      trackActivity({
+        user_id: data.user.id,
+        activity_type: "auth.signin",
+        title: "Signed in",
+        data: { method: "email" },
+        is_public: false,
+      });
+    }
     return { error: error as Error | null };
   };
 
   const signOut = async () => {
+    // Track sign-out before clearing state
+    if (user) {
+      await trackActivity({
+        user_id: user.id,
+        activity_type: "auth.signout",
+        title: "Signed out",
+        is_public: false,
+      });
+    }
     await supabase.auth.signOut();
     setProfile(null);
   };
