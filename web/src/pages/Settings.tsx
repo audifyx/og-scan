@@ -15,6 +15,12 @@ import { ThemePicker } from "@/components/settings/ThemePicker";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import {
+  canUseReservedUsername,
+  getReservedUsernameMessage,
+  isReservedUsername,
+  normalizeUsernameForPolicy,
+} from "@/lib/usernamePolicy";
 import { DEFAULT_NOTIFICATION_PREFERENCES, normalizeNotificationPreferences } from "@/lib/notificationSettings";
 import {
   DollarSign, Bell, User, Shield, Webhook, Palette, LogOut, Eye, EyeOff,
@@ -140,10 +146,17 @@ const Settings = () => {
 
   const saveProfile = async () => {
     if (!user) return;
+
+    const cleanUsername = normalizeUsernameForPolicy(profile.username || "");
+    if (cleanUsername && isReservedUsername(cleanUsername) && !canUseReservedUsername(user.email)) {
+      toast.error(getReservedUsernameMessage());
+      return;
+    }
+
     setSavingProfile(true);
     try {
       const { error } = await supabase.from("profiles").update({
-        username: profile.username,
+        username: cleanUsername || null,
         display_name: profile.display_name,
         bio: profile.bio,
         twitter_handle: profile.twitter_handle,

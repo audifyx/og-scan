@@ -8,6 +8,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import { toast } from "sonner";
 import { z } from "zod";
+import {
+  canUseReservedUsername,
+  getReservedUsernameMessage,
+  isReservedUsername,
+} from "@/lib/usernamePolicy";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -79,6 +84,9 @@ const Auth = () => {
     if (mode === "signup") {
       const clean = username.replace(/^@/, "");
       try { usernameSchema.parse(clean); } catch (e) { if (e instanceof z.ZodError) newErrors.username = e.errors[0].message; }
+      if (!newErrors.username && isReservedUsername(clean) && !canUseReservedUsername(email)) {
+        newErrors.username = getReservedUsernameMessage();
+      }
     }
     if (mode !== "reset") {
       try { passwordSchema.parse(password); } catch (e) { if (e instanceof z.ZodError) newErrors.password = e.errors[0].message; }

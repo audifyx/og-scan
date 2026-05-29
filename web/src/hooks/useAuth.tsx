@@ -1,6 +1,12 @@
 import { useState, useEffect, createContext, useContext, type ReactNode } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import {
+  canUseReservedUsername,
+  getReservedUsernameMessage,
+  isReservedUsername,
+  normalizeUsernameForPolicy,
+} from "@/lib/usernamePolicy";
 
 export interface Profile {
   id: string;
@@ -56,10 +62,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
       }
     } else if (error && error.code === "PGRST116") {
-      const displayName = (userMeta?.username as string) || userEmail || userId;
+      const requestedUsername = typeof userMeta?.username === "string" ? normalizeUsernameForPolicy(userMeta.username) : null;
+      const username = requestedUsername && (!isReservedUsername(requestedUsername) || canUseReservedUsername(userEmail))
+        ? requestedUsername
+        : null;
       const { data: newProfile } = await supabase
         .from("profiles")
-        .insert({ user_id: userId, username: displayName })
+        .insert({ user_id: userId, username })
         .select()
         .single();
       if (newProfile) setProfile(newProfile as Profile);
@@ -110,12 +119,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, username: string) => {
+    const cleanUsername = normalizeUsernameForPolicy(username);
+    if (isReservedUsername(cleanUsername) && !canUseReservedUsername(email)) {
+      return { error: new Error(getReservedUsernameMessage()), userId: null };
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: { username: username.replace(/^@/, "") },
+        data: { username: cleanUsername },
       },
     });
 
@@ -152,6 +166,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error("Not authenticated") };
+
+    if (typeof updates.username === "string") {
+      const cleanUsername = normalizeUsernameForPolicy(updates.username);
+      if (isReservedUsername(cleanUsername) && !canUseReservedUsername(user.email)) {
+        return { error: new Error(getReservedUsernameMessage()) };
+      }
+      updates = { ...updates, username: cleanUsername };
+    }
+
     const { error } = await supabase.from("profiles").update(updates).eq("user_id", user.id);
     if (!error) await fetchProfile(user.id);
     return { error: error as Error | null };

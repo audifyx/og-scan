@@ -1,4 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import {
+  canUseReservedUsername,
+  getReservedUsernameMessage,
+  isReservedUsername,
+  normalizeUsernameForPolicy,
+} from "../src/lib/usernamePolicy";
 
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
@@ -81,8 +87,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const { email, username, fingerprint, honeypot, humanCode, elapsedMs } = req.body ?? {};
+    const cleanUsername = typeof username === "string" ? normalizeUsernameForPolicy(username) : "";
+    const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!email || !username || !fingerprint) {
+    if (!cleanEmail || !cleanUsername || !fingerprint) {
       res.status(400).json({ allowed: false, code: "missing_fields", message: "Missing signup guard fields" });
       return;
     }
@@ -102,12 +110,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
+    if (isReservedUsername(cleanUsername) && !canUseReservedUsername(cleanEmail)) {
+      res.status(200).json({
+        allowed: false,
+        code: "username_reserved",
+        message: getReservedUsernameMessage(),
+      });
+      return;
+    }
+
     const sinceIso = new Date(Date.now() - YEAR_MS).toISOString();
     const clientIp = getClientIp(req);
 
     const [deviceMatch, usernameMatch, lastIpMatch, firstIpMatch] = await Promise.all([
       fetchFirstProfileMatch("last_fingerprint", fingerprint, sinceIso),
-      fetchFirstProfileMatch("username", username, "1970-01-01T00:00:00.000Z"),
+      fetchFirstProfileMatch("username", cleanUsername, "1970-01-01T00:00:00.000Z"),
       clientIp !== "unknown" ? fetchFirstProfileMatch("last_ip", clientIp, sinceIso) : Promise.resolve(null),
       clientIp !== "unknown" ? fetchFirstProfileMatch("first_seen_ip", clientIp, sinceIso) : Promise.resolve(null),
     ]);
