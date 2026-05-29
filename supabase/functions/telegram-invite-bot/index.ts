@@ -117,7 +117,7 @@ async function handleInvite(
     `Share this link to invite people to the community.\n` +
     `When they join, you get the credit! 👑\n\n` +
     `📊 Invites so far: <b>${joinCount ?? 0}</b>\n` +
-    `Type /leaderboard to see the invite rankings.`
+    `Type /leaderboardd to see the invite rankings.`
   );
 }
 
@@ -221,7 +221,7 @@ async function handleMyInvites(
     `Rank: <b>#${rank}</b>\n\n` +
     (myCount === 0
       ? `Share your link and start climbing the leaderboard! 🔥\n\n${myInvite.invite_link}`
-      : `Keep going! Use /leaderboard to see the full rankings.`)
+      : `Keep going! Use /leaderboardd to see the full rankings.`)
   );
 }
 
@@ -328,7 +328,7 @@ Deno.serve(async (req) => {
 
     if (cmd === "/invite") {
       await handleInvite(userId, username, firstName, chatId);
-    } else if (cmd === "/leaderboard") {
+    } else if (cmd === "/leaderboardd" || cmd === "/leaderboard") {
       await handleLeaderboard(chatId);
     } else if (cmd === "/invites") {
       await handleMyInvites(userId, username, firstName, chatId);
@@ -336,7 +336,7 @@ Deno.serve(async (req) => {
       await sendMsg(chatId,
         `🤖 <b>OG SCAN Invite Bot</b>\n\n` +
         `/invite — Get your personal invite link 🔗\n` +
-        `/leaderboard — View the invite rankings 🏆\n` +
+        `/leaderboardd — View the invite rankings 🏆\n` +
         `/invites — See your invite count & rank 📊\n\n` +
         `Invite people and earn your spot at the top! 👑`
       );
