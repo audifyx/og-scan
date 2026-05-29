@@ -96,14 +96,25 @@ export async function ccStartXLogin(
   localStorage.setItem(LS_VERIFIER, verifier);
   sessionStorage.setItem("cc_return_to", window.location.pathname + window.location.search);
 
-  const result = await api.twitterAuthUrl({ query: { redirectUrl } });
-  if (result.error) {
-    const msg = (result.error as { message?: string }).message ?? "Failed to get auth URL";
-    onError?.(msg);
+  // Use direct fetch — the SDK doesn't correctly forward the X-Api-Key header
+  // for this endpoint (configureApi stores apiKey but the client reads options.auth).
+  let authUrl: string;
+  try {
+    const resp = await fetch(
+      `${BASE_URL}/api/v1/users/twitter/auth-url?redirectUrl=${encodeURIComponent(redirectUrl)}`,
+      { headers: { "X-Api-Key": CC_API_KEY } },
+    );
+    const json = await resp.json() as { authUrl?: string; message?: string };
+    if (!resp.ok || !json.authUrl) {
+      onError?.(json.message ?? `Failed to get auth URL (${resp.status})`);
+      return;
+    }
+    authUrl = json.authUrl;
+  } catch (e) {
+    onError?.("Network error — could not reach CoinCommunities API.");
     return;
   }
 
-  const authUrl = (result.data as { authUrl: string }).authUrl;
   // Full-page redirect — no popup, no browser block
   window.location.href = authUrl;
 }
