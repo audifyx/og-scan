@@ -46,8 +46,8 @@ const PRIZE_TIERS = [
 ];
 
 /** Contest 1 dates — 2 weeks */
-const CONTEST_START = new Date("2026-06-02T00:00:00Z");
-const CONTEST_END = new Date("2026-06-16T00:00:00Z");
+const CONTEST_START = new Date("2026-05-30T00:00:00Z");
+const CONTEST_END = new Date("2026-06-17T12:00:00Z");
 const CONTEST_NAME = "OG Scan Referral Sprint #1";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -150,6 +150,7 @@ const Invite = () => {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft(CONTEST_END));
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loadingBoard, setLoadingBoard] = useState(true);
+  const [myInvites, setMyInvites] = useState<{ username: string; qualified: boolean; createdAt: string }[]>([]);
   const [myStats, setMyStats] = useState<{ invited: number; qualified: number; rank: number | null }>({
     invited: 0, qualified: 0, rank: null,
   });
@@ -306,6 +307,25 @@ const Invite = () => {
             qualified: myQualifiedRefs,
             rank: myEntry?.rank || null,
           });
+
+          // Build individual invite list for current user
+          const myRefs = contestRefs.filter((p) => p.referred_by === user.id);
+          const inviteeIds = myRefs.map((r) => r.user_id);
+          let inviteeNames = new Map<string, string>();
+          if (inviteeIds.length > 0) {
+            const { data: invProfs } = await supabase
+              .from("profiles")
+              .select("user_id, username")
+              .in("user_id", inviteeIds);
+            inviteeNames = new Map((invProfs || []).map((p: any) => [p.user_id, p.username || "Anonymous"]));
+          }
+          const inviteList = myRefs.map((r) => ({
+            username: inviteeNames.get(r.user_id) || "Anonymous",
+            qualified: qualifiedInvitees.has(r.user_id),
+            createdAt: r.created_at,
+          }));
+          inviteList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          setMyInvites(inviteList);
         }
       } catch (err) {
         console.error("Failed to load leaderboard", err);
@@ -617,6 +637,47 @@ const Invite = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Your Invites list */}
+                {myInvites.length > 0 && (
+                  <div className="p-5 pt-0">
+                    <h3 className="font-bold text-sm flex items-center gap-2 mb-3">
+                      <Users className="h-4 w-4 text-white/40" />
+                      Your Invites
+                    </h3>
+                    <div className="space-y-2">
+                      {myInvites.map((inv, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-[10px] font-bold text-white/50">
+                              {inv.username.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-white/80">{inv.username}</p>
+                              <p className="text-[10px] text-white/25">
+                                {new Date(inv.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                              </p>
+                            </div>
+                          </div>
+                          {inv.qualified ? (
+                            <div className="flex items-center gap-1 text-green-400">
+                              <Check className="h-4 w-4" />
+                              <span className="text-[10px] font-bold uppercase">Qualified</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-white/20">
+                              <X className="h-4 w-4" />
+                              <span className="text-[10px] font-bold uppercase">Not qualified</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </Card>
             </div>
 
