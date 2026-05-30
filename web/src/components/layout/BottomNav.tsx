@@ -1,4 +1,4 @@
-import { Home, Users, Wrench, User, Globe } from "lucide-react";
+import { Home, Users, Wrench, User, Globe, Gift } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/app", icon: Home, label: "Home" },
+  { to: "/invite", icon: Gift, label: "Invite" },
   { to: "/community", icon: Users, label: "Community" },
-  { to: "/coin-communities", icon: Globe, label: "CC Feed" },
   { to: "/tools", icon: Wrench, label: "Tools" },
   { to: "/profile", icon: User, label: "Profile" },
 ];
@@ -83,6 +83,9 @@ const routeToNav: Record<string, string> = {
 
   /* Coin Communities */
   "/coin-communities": "/coin-communities",
+
+  /* Invite */
+  "/invite": "/invite",
 
   /* Profile — account, settings, premium */
   "/profile": "/profile",

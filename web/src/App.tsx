@@ -24,6 +24,7 @@ import AlphaChat from "./pages/AlphaChat";
 // Webhooks removed
 import TradingLobbies from "./pages/TradingLobbies";
 import Leaderboard from "./pages/Leaderboard";
+import Invite from "./pages/Invite";
 import DirectMessages from "./pages/DirectMessages";
 import Notifications from "./pages/Notifications";
 // Premium removed
@@ -180,6 +181,7 @@ const App = () => (
             <Route path="/coin-communities" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/trading-lobbies" element={<ProtectedRoute><TradingLobbies /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+            <Route path="/invite" element={<ProtectedRoute><Invite /></ProtectedRoute>} />
             <Route path="/messages" element={<ProtectedRoute><DirectMessagesPage /></ProtectedRoute>} />
 
             {/* Premium removed */}
