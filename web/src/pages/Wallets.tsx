@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Plus, Eye, Trash2, RefreshCw, Send, Copy, ExternalLink, Zap, Clock, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Coins, Globe, Twitter, MessageCircle, Link as LinkIcon, Play, Pause, BarChart3, Droplets, Users, Shield, Check, Wallet } from "lucide-react";
+import { Plus, Eye, Trash2, RefreshCw, Send, Copy, ExternalLink, Zap, Clock, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Coins, Globe, Twitter, MessageCircle, Link as LinkIcon, Play, Pause, BarChart3, Droplets, Users, Shield, Check, Wallet, ChevronDown, ChevronUp, Activity, DollarSign } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConnectedWalletTab } from "@/components/wallet/ConnectedWalletTab";
@@ -76,6 +76,7 @@ const Wallets = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [selectedToken, setSelectedToken] = useState<{ address: string; name: string; symbol: string } | null>(null);
+  const [expandedWatchToken, setExpandedWatchToken] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeWalletRef = useRef<string | null>(null);
@@ -410,7 +411,129 @@ const Wallets = () => {
               </div>
               
               <div className="mt-4">
-                <TabsContent value="tokens"><TokenList tokens={assets} /></TabsContent>
+                <TabsContent value="tokens">
+                  {tokensWithLinks.length === 0 ? (
+                    <TokenList tokens={assets} />
+                  ) : (
+                    <div className="space-y-2">
+                      {tokensWithLinks.map((token) => {
+                        const isExpanded = expandedWatchToken === token.address;
+                        return (
+                          <Card key={token.address} className={`og-glass-card overflow-hidden transition-all ${isExpanded ? "border-primary/30" : ""}`}>
+                            <CardContent className="p-0">
+                              {/* Token row */}
+                              <div className="flex items-center gap-3 px-3.5 py-3">
+                                {token.image ? (
+                                  <img src={token.image} alt={token.symbol} className="h-10 w-10 rounded-xl object-cover shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                                ) : (
+                                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#22d3ee] to-[#eab308] flex items-center justify-center text-xs font-bold text-[hsl(var(--og-ink))] shrink-0">{token.symbol.slice(0, 2)}</div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="font-bold text-sm">{token.symbol}</p>
+                                    <Badge className={token.priceChange24h >= 0 ? "bg-green-500/10 text-green-400 border-green-500/20 text-[9px]" : "bg-red-500/10 text-red-400 border-red-500/20 text-[9px]"}>
+                                      {token.priceChange24h >= 0 ? "+" : ""}{token.priceChange24h.toFixed(1)}%
+                                    </Badge>
+                                  </div>
+                                  <p className="text-[11px] text-white/35 truncate">{token.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} {token.symbol}</p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="font-mono text-sm font-semibold text-primary">${token.value.toFixed(2)}</p>
+                                  <p className="text-[11px] text-white/30">${token.price < 0.01 ? token.price.toExponential(2) : token.price.toFixed(5)}</p>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0 ml-1">
+                                  <Button variant="outline" size="sm" onClick={() => setSelectedToken({ address: token.address, name: token.name, symbol: token.symbol })}
+                                    className="h-6 px-2 text-[10px]">Analyze</Button>
+                                  <Button variant="ghost" size="sm"
+                                    className={`h-6 w-6 p-0 transition-colors ${isExpanded ? "text-primary" : "text-white/30 hover:text-white/60"}`}
+                                    onClick={() => setExpandedWatchToken(isExpanded ? null : token.address)}>
+                                    {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Expanded detail panel */}
+                              {isExpanded && (
+                                <div className="border-t border-white/[0.07] bg-black/20">
+                                  {/* Live stats strip */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.05]">
+                                    {[
+                                      { label: "Price", value: `$${token.price < 0.0001 ? token.price.toExponential(3) : token.price.toFixed(6)}` },
+                                      { label: "24h Change", value: `${token.priceChange24h >= 0 ? "+" : ""}${token.priceChange24h.toFixed(2)}%` },
+                                      { label: "Balance", value: `${token.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${token.symbol}` },
+                                      { label: "Value", value: `$${token.value.toFixed(2)}` },
+                                    ].map((stat, i) => (
+                                      <div key={i} className="bg-black/30 p-3 text-center">
+                                        <p className="text-[10px] text-white/30 mb-0.5">{stat.label}</p>
+                                        <p className="text-xs font-bold text-white">{stat.value}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="p-3 space-y-3">
+                                    {/* Social links */}
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-[10px] text-white/30">Links:</span>
+                                      {token.links?.website && (
+                                        <a href={token.links.website} target="_blank" rel="noopener noreferrer"
+                                          className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.12] text-white/60 transition-colors">
+                                          <Globe className="h-2.5 w-2.5" />Website
+                                        </a>
+                                      )}
+                                      {token.links?.twitter && (
+                                        <a href={token.links.twitter} target="_blank" rel="noopener noreferrer"
+                                          className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.12] text-white/60 transition-colors">
+                                          <Twitter className="h-2.5 w-2.5" />Twitter
+                                        </a>
+                                      )}
+                                      {token.links?.telegram && (
+                                        <a href={token.links.telegram} target="_blank" rel="noopener noreferrer"
+                                          className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.12] text-white/60 transition-colors">
+                                          <MessageCircle className="h-2.5 w-2.5" />Telegram
+                                        </a>
+                                      )}
+                                      <a href={token.links?.dex || `https://dexscreener.com/solana/${token.address}`} target="_blank" rel="noopener noreferrer"
+                                        className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.12] text-primary transition-colors">
+                                        <TrendingUp className="h-2.5 w-2.5" />DexScreener
+                                      </a>
+                                      <a href={token.links?.explorer || `https://solscan.io/token/${token.address}`} target="_blank" rel="noopener noreferrer"
+                                        className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.12] text-white/60 transition-colors">
+                                        <ExternalLink className="h-2.5 w-2.5" />Solscan
+                                      </a>
+                                    </div>
+                                    {/* Inline DexScreener chart */}
+                                    <div>
+                                      <p className="text-[10px] text-white/30 mb-2 flex items-center gap-1.5">
+                                        <BarChart3 className="h-3 w-3" />Live Chart & Trade Feed
+                                      </p>
+                                      <iframe
+                                        src={`https://dexscreener.com/solana/${token.address}?embed=1&theme=dark&trades=1&info=1`}
+                                        className="w-full rounded-xl border border-white/[0.07]"
+                                        style={{ height: "480px" }}
+                                        title={`${token.symbol} live chart`}
+                                      />
+                                    </div>
+                                    {/* Quick action buttons */}
+                                    <div className="flex gap-2">
+                                      <Button variant="outline" size="sm" onClick={() => setSelectedToken({ address: token.address, name: token.name, symbol: token.symbol })}
+                                        className="flex-1 gap-1.5 border-primary/30 text-primary hover:bg-primary/10">
+                                        <Activity className="h-3.5 w-3.5" />Full Analysis
+                                      </Button>
+                                      <Button variant="outline" size="sm" onClick={() => copyToClipboard(token.address, "Address")}
+                                        className="gap-1.5">
+                                        {copied === token.address ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                                        Copy CA
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
 
                 <TabsContent value="links">
                   <Card className="og-glass-card">

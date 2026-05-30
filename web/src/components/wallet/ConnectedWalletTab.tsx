@@ -1,6 +1,7 @@
 /**
  * ConnectedWalletTab — Full on-chain wallet terminal powered by Phantom.
- * Features: connect, portfolio, buy/sell via Jupiter, charts, tx history.
+ * Features: connect, portfolio, inline charts, live data feed per token,
+ * buys/sells, PnL dashboard, volume tracker, tx history.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -9,7 +10,9 @@ import {
   Copy, ExternalLink, RefreshCw, TrendingUp, TrendingDown,
   ArrowUpRight, ArrowDownLeft, Coins, Clock, Zap, ChevronDown,
   BarChart3, Wallet, Check, X, AlertTriangle, Search, ArrowLeftRight,
-  Shield
+  Shield, DollarSign, Activity, Target, Trophy, Skull, Flame, ChevronUp,
+  Globe, Twitter, MessageCircle, Filter, Eye, Layers, PieChart, Volume2,
+  Plus, Minus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +26,7 @@ import {
   getWalletOverview, getAssets, getTransactions,
   WalletOverview, TokenAsset, Transaction, formatAddress, formatUsd
 } from "@/lib/solana-api";
-import { HELIUS_RPC, HELIUS_API_KEY, jupPrice, SOL_MINT, JUPITER_BASE, JUPITER_API_KEY } from "@/lib/og";
+import { HELIUS_RPC, HELIUS_API_KEY, jupPrice, SOL_MINT, JUPITER_BASE, JUPITER_API_KEY, BIRDEYE_BASE, BIRDEYE_API_KEY } from "@/lib/og";
 import { formatDistanceToNow } from "date-fns";
 import { VersionedTransaction } from "@solana/web3.js";
 
@@ -37,8 +40,22 @@ interface RichToken {
   price: number;
   value: number;
   change24h: number;
+  volume24h?: number;
+  liquidity?: number;
+  mcap?: number;
   image?: string;
   verified?: boolean;
+  website?: string;
+  twitter?: string;
+  telegram?: string;
+  pairAddress?: string;
+  // PnL fields (computed from tx history)
+  totalBought?: number;      // USD spent buying
+  totalSold?: number;        // USD received selling
+  avgBuyPrice?: number;
+  realizedPnl?: number;
+  unrealizedPnl?: number;
+  totalVolume?: number;
 }
 
 interface EnrichedTx {
@@ -50,55 +67,59 @@ interface EnrichedTx {
   tokenName?: string;
   tokenSymbol?: string;
   tokenImage?: string;
+  tokenMint?: string;
   amount?: string;
   amountUsd?: string;
   isIncoming?: boolean;
   isOutgoing?: boolean;
+  solAmount?: number;
+  tokenAmount?: number;
+  isBuy?: boolean;
+  isSell?: boolean;
+}
+
+interface TokenTrade {
+  signature: string;
+  timestamp?: number;
+  side: "buy" | "sell";
+  tokenAmount: number;
+  solAmount: number;
+  usdValue: number;
+  pricePerToken: number;
+}
+
+interface WalletPnL {
+  totalPortfolioValue: number;
+  totalInvested: number;
+  totalRealized: number;
+  totalUnrealized: number;
+  totalPnl: number;
+  totalVolume: number;
+  totalBuyVolume: number;
+  totalSellVolume: number;
+  winCount: number;
+  lossCount: number;
+  biggestWin: { symbol: string; pnl: number } | null;
+  biggestLoss: { symbol: string; pnl: number } | null;
+  tokens: Array<{
+    mint: string;
+    symbol: string;
+    name: string;
+    image?: string;
+    currentValue: number;
+    currentPrice: number;
+    balance: number;
+    totalBought: number;
+    totalSold: number;
+    realizedPnl: number;
+    unrealizedPnl: number;
+    totalPnl: number;
+    roi: number;
+    trades: TokenTrade[];
+  }>;
 }
 
 /* ─── Phantom native swap ────────────────────────────────────────── */
-/**
- * Execute swap via Phantom's native swap API — zero platform fees, just network cost.
- * Uses window.phantom.solana.swap() which opens Phantom's own swap UI in-wallet.
- * Falls back to Jupiter quote API for getting the swap transaction if needed.
- */
-async function phantomSwap(
-  fromMint: string,
-  toMint: string,
-  amountLamports: number,
-  slippageBps: number,
-  userPublicKey: string
-): Promise<string> {
-  const phantom = (window as any).phantom?.solana;
-  if (!phantom?.isPhantom) throw new Error("Phantom wallet not detected");
-
-  // 1. Get quote from Jupiter
-  const quoteRes = await fetch(
-    `${JUPITER_BASE}/swap/v1/quote?inputMint=${fromMint}&outputMint=${toMint}&amount=${amountLamports}&slippageBps=${slippageBps}&restrictIntermediateTokens=true`,
-    { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
-  );
-  if (!quoteRes.ok) throw new Error("Failed to get swap quote");
-  const quote = await quoteRes.json();
-
-  // 2. Build swap transaction via Jupiter (no platform fee)
-  const swapRes = await fetch(`${JUPITER_BASE}/swap/v1/swap`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${JUPITER_API_KEY}` },
-    body: JSON.stringify({
-      quoteResponse: quote,
-      userPublicKey,
-      wrapAndUnwrapSol: true,
-      dynamicComputeUnitLimit: true,
-      prioritizationFeeLamports: "auto",
-      // No feeAccount = zero platform fees
-    }),
-  });
-  if (!swapRes.ok) throw new Error("Failed to build swap transaction");
-  const { swapTransaction } = await swapRes.json();
-  return swapTransaction; // base64 versioned tx
-}
-
-/** Decode base64 to Uint8Array without relying on Node Buffer */
 function base64ToUint8Array(b64: string): Uint8Array {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
@@ -106,8 +127,32 @@ function base64ToUint8Array(b64: string): Uint8Array {
   return bytes;
 }
 
+async function phantomSwap(
+  fromMint: string, toMint: string, amountLamports: number,
+  slippageBps: number, userPublicKey: string
+): Promise<string> {
+  const phantom = (window as any).phantom?.solana;
+  if (!phantom?.isPhantom) throw new Error("Phantom wallet not detected");
+  const quoteRes = await fetch(
+    `${JUPITER_BASE}/swap/v1/quote?inputMint=${fromMint}&outputMint=${toMint}&amount=${amountLamports}&slippageBps=${slippageBps}&restrictIntermediateTokens=true`,
+    { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
+  );
+  if (!quoteRes.ok) throw new Error("Failed to get swap quote");
+  const quote = await quoteRes.json();
+  const swapRes = await fetch(`${JUPITER_BASE}/swap/v1/swap`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${JUPITER_API_KEY}` },
+    body: JSON.stringify({ quoteResponse: quote, userPublicKey, wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: "auto" }),
+  });
+  if (!swapRes.ok) throw new Error("Failed to build swap transaction");
+  const { swapTransaction } = await swapRes.json();
+  return swapTransaction;
+}
+
 /* ─── Helpers ───────────────────────────────────────────────────── */
 function getTypeIcon(tx: EnrichedTx) {
+  if (tx.isBuy) return <ArrowDownLeft className="h-4 w-4 text-green-400" />;
+  if (tx.isSell) return <ArrowUpRight className="h-4 w-4 text-red-400" />;
   if (tx.isIncoming) return <ArrowDownLeft className="h-4 w-4 text-green-400" />;
   if (tx.isOutgoing) return <ArrowUpRight className="h-4 w-4 text-red-400" />;
   if (tx.type === "SWAP") return <ArrowLeftRight className="h-4 w-4 text-[#22d3ee]" />;
@@ -115,23 +160,36 @@ function getTypeIcon(tx: EnrichedTx) {
 }
 
 function getTypeBg(tx: EnrichedTx) {
-  if (tx.isIncoming) return "bg-green-500/10 border border-green-500/20";
-  if (tx.isOutgoing) return "bg-red-500/10 border border-red-500/20";
+  if (tx.isBuy || tx.isIncoming) return "bg-green-500/10 border border-green-500/20";
+  if (tx.isSell || tx.isOutgoing) return "bg-red-500/10 border border-red-500/20";
   if (tx.type === "SWAP") return "bg-[#22d3ee]/10 border border-[#22d3ee]/20";
   return "bg-white/[0.06] border border-white/[0.08]";
+}
+
+function formatPnl(val: number) {
+  const sign = val >= 0 ? "+" : "";
+  return `${sign}${formatUsd(val)}`;
+}
+
+function fmtNum(n: number) {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
+  return formatUsd(n);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
    Main Component
    ═══════════════════════════════════════════════════════════════════ */
 export function ConnectedWalletTab() {
-  const { publicKey, connect, disconnect, connected, wallet, signTransaction, wallets, select } = useWallet();
+  const { publicKey, connect, disconnect, connected, wallet, wallets, select } = useWallet();
   const { connection } = useConnection();
 
   const [overview, setOverview] = useState<WalletOverview | null>(null);
   const [tokens, setTokens] = useState<RichToken[]>([]);
   const [txs, setTxs] = useState<EnrichedTx[]>([]);
+  const [walletPnl, setWalletPnl] = useState<WalletPnL | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pnlLoading, setPnlLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState("portfolio");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -143,16 +201,48 @@ export function ConnectedWalletTab() {
   const [swapAmount, setSwapAmount] = useState("");
   const [swapLoading, setSwapLoading] = useState(false);
   const [swapQuote, setSwapQuote] = useState<{ outAmount: number; outSymbol: string; priceImpact: number } | null>(null);
-  const [slippage, setSlippage] = useState(100); // 1%
+  const [slippage, setSlippage] = useState(100);
 
-  // Chart state
-  const [chartToken, setChartToken] = useState<RichToken | null>(null);
-  const [chartOpen, setChartOpen] = useState(false);
+  // Chart / expanded token state
+  const [expandedToken, setExpandedToken] = useState<string | null>(null);
+  const [tokenTradesMap, setTokenTradesMap] = useState<Record<string, TokenTrade[]>>({});
+  const [tokenTradesLoading, setTokenTradesLoading] = useState<string | null>(null);
 
-  // Token search
+  // Token search & sort
   const [tokenSearch, setTokenSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"value" | "change" | "volume" | "pnl">("value");
 
   const address = publicKey?.toBase58() ?? "";
+
+  /* ── Fetch token market data from Birdeye ── */
+  const enrichTokensWithMarketData = useCallback(async (richTokens: RichToken[]): Promise<RichToken[]> => {
+    const topTokens = richTokens.slice(0, 20); // Batch top 20
+    const enriched = await Promise.all(topTokens.map(async (t) => {
+      try {
+        // DexScreener for social links + pair info
+        const dexRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${t.mint}`);
+        const dexData = await dexRes.json();
+        const pair = dexData.pairs?.[0];
+        if (pair) {
+          const socials = pair.info?.socials || [];
+          const twitter = socials.find((s: any) => s.type === "twitter")?.url;
+          const telegram = socials.find((s: any) => s.type === "telegram")?.url;
+          const website = pair.info?.websites?.[0]?.url;
+          return {
+            ...t,
+            change24h: pair.priceChange?.h24 || t.change24h,
+            volume24h: pair.volume?.h24 || 0,
+            liquidity: pair.liquidity?.usd || 0,
+            mcap: pair.marketCap || 0,
+            twitter, telegram, website,
+            pairAddress: pair.pairAddress,
+          };
+        }
+      } catch { /* skip */ }
+      return t;
+    }));
+    return [...enriched, ...richTokens.slice(20)];
+  }, []);
 
   /* ── Load wallet data ── */
   const loadData = useCallback(async (addr: string, silent = false) => {
@@ -162,80 +252,221 @@ export function ConnectedWalletTab() {
       const [ov, assetData, rawTxs] = await Promise.all([
         getWalletOverview(addr),
         getAssets(addr, 1, 100),
-        getTransactions(addr, 30),
+        getTransactions(addr, 50),
       ]);
       setOverview(ov);
 
       // Build rich token list
-      const rich: RichToken[] = assetData.items.map((a: TokenAsset) => {
-        const meta = a.content?.metadata ?? {};
-        const info = a.token_info ?? {};
-        const decimals = info.decimals ?? 0;
-        const raw = info.balance ?? 0;
-        const balance = raw / Math.pow(10, decimals);
-        const price = info.price_info?.price_per_token ?? 0;
-        const value = info.price_info?.total_price ?? 0;
-        return {
-          mint: a.id,
-          symbol: meta.symbol ?? "?",
-          name: meta.name ?? "Unknown",
-          balance,
-          decimals,
-          price,
-          value,
-          change24h: 0,
-          image: a.content?.links?.image,
-          verified: false,
-        };
-      }).filter(t => t.balance > 0).sort((a, b) => b.value - a.value);
+      const rich: RichToken[] = assetData.items
+        .map((a: TokenAsset) => {
+          const meta = a.content?.metadata ?? {};
+          const info = a.token_info ?? {};
+          const decimals = info.decimals ?? 0;
+          const raw = info.balance ?? 0;
+          const balance = raw / Math.pow(10, decimals);
+          const price = info.price_info?.price_per_token ?? 0;
+          const value = info.price_info?.total_price ?? 0;
+          return {
+            mint: a.id, symbol: meta.symbol ?? "?", name: meta.name ?? "Unknown",
+            balance, decimals, price, value, change24h: 0, image: a.content?.links?.image,
+          };
+        })
+        .filter((t: RichToken) => t.balance > 0)
+        .sort((a: RichToken, b: RichToken) => b.value - a.value);
 
       setTokens(rich);
 
       // Enrich transactions
-      const enriched: EnrichedTx[] = rawTxs.map((tx: Transaction) => {
+      const enrichedTxs: EnrichedTx[] = rawTxs.map((tx: Transaction) => {
         const nativeTx = tx.nativeTransfers?.[0];
         const tokenTx = tx.tokenTransfers?.[0];
-        let isIncoming = false, isOutgoing = false;
-        let amount = "";
-        if (nativeTx) {
+        let isIncoming = false, isOutgoing = false, isBuy = false, isSell = false;
+        let amount = "", solAmount = 0, tokenAmount = 0;
+        const txType = tx.type?.toUpperCase() ?? "";
+
+        if (txType === "SWAP") {
+          // For swaps, determine buy vs sell direction
+          const outToken = tx.tokenTransfers?.find((tt: any) => tt.toUserAccount === addr);
+          const inToken = tx.tokenTransfers?.find((tt: any) => tt.fromUserAccount === addr);
+          if (outToken) { isBuy = true; tokenAmount = outToken.tokenAmount || 0; }
+          if (inToken) { isSell = true; tokenAmount = inToken.tokenAmount || 0; }
+          if (nativeTx) solAmount = Math.abs(nativeTx.amount / 1e9);
+          amount = solAmount > 0 ? `${solAmount.toFixed(4)} SOL` : `${tokenAmount.toFixed(2)} tokens`;
+        } else if (nativeTx) {
           isIncoming = nativeTx.toUserAccount === addr;
           isOutgoing = nativeTx.fromUserAccount === addr;
           const sol = Math.abs(nativeTx.amount / 1e9);
+          solAmount = sol;
           amount = `${sol.toFixed(4)} SOL`;
         } else if (tokenTx) {
           isIncoming = tokenTx.toUserAccount === addr;
           isOutgoing = tokenTx.fromUserAccount === addr;
-          amount = `${tokenTx.tokenAmount.toFixed(2)} tokens`;
+          tokenAmount = tokenTx.tokenAmount || 0;
+          amount = `${tokenAmount.toFixed(2)} tokens`;
         }
+
         return {
-          signature: tx.signature,
-          type: tx.type ?? "UNKNOWN",
-          timestamp: tx.timestamp,
-          description: tx.description,
-          fee: tx.fee,
-          amount,
-          isIncoming,
-          isOutgoing,
+          signature: tx.signature, type: tx.type ?? "UNKNOWN",
+          timestamp: tx.timestamp, description: tx.description,
+          fee: tx.fee, amount, isIncoming, isOutgoing, isBuy, isSell,
+          solAmount, tokenAmount,
+          tokenMint: tx.tokenTransfers?.[0]?.mint,
         };
       });
-      setTxs(enriched);
+      setTxs(enrichedTxs);
       setLastRefresh(new Date());
+
+      // Enrich with market data (async, non-blocking)
+      enrichTokensWithMarketData(rich).then(setTokens);
+
     } catch (e) {
       if (!silent) toast({ title: "Failed to load wallet", description: String(e), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enrichTokensWithMarketData]);
+
+  /* ── Compute PnL from on-chain transaction history ── */
+  const computePnL = useCallback(async (addr: string) => {
+    setPnlLoading(true);
+    try {
+      // Fetch more transactions for PnL accuracy
+      const rawTxs = await getTransactions(addr, 100);
+      const solPriceRes = await fetch("https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112");
+      const solPriceData = await solPriceRes.json();
+      const solPrice = parseFloat(solPriceData?.pairs?.[0]?.priceUsd || "170");
+
+      // Group trades by token mint
+      const tokenTradeGroups: Record<string, TokenTrade[]> = {};
+
+      for (const tx of rawTxs) {
+        const tokenTx = tx.tokenTransfers?.[0];
+        const nativeTx = tx.nativeTransfers?.[0];
+        const txType = tx.type?.toUpperCase() ?? "";
+
+        if (txType === "SWAP" && tokenTx && nativeTx) {
+          const mint = tokenTx.mint;
+          const tokenAmt = tokenTx.tokenAmount || 0;
+          const solAmt = Math.abs(nativeTx.amount / 1e9);
+          const usdVal = solAmt * solPrice;
+          const side: "buy" | "sell" = tokenTx.toUserAccount === addr ? "buy" : "sell";
+
+          if (!tokenTradeGroups[mint]) tokenTradeGroups[mint] = [];
+          tokenTradeGroups[mint].push({
+            signature: tx.signature,
+            timestamp: tx.timestamp,
+            side,
+            tokenAmount: tokenAmt,
+            solAmount: solAmt,
+            usdValue: usdVal,
+            pricePerToken: tokenAmt > 0 ? usdVal / tokenAmt : 0,
+          });
+        }
+      }
+
+      setTokenTradesMap(tokenTradeGroups);
+
+      // Build PnL per token
+      const tokenPnlList = await Promise.all(
+        Object.entries(tokenTradeGroups).map(async ([mint, trades]) => {
+          // Get current token info
+          const currentToken = tokens.find(t => t.mint === mint);
+          const currentPrice = currentToken?.price || 0;
+          const currentBalance = currentToken?.balance || 0;
+          const currentValue = currentToken?.value || 0;
+
+          const buys = trades.filter(t => t.side === "buy");
+          const sells = trades.filter(t => t.side === "sell");
+          const totalBought = buys.reduce((s, t) => s + t.usdValue, 0);
+          const totalSold = sells.reduce((s, t) => s + t.usdValue, 0);
+
+          // Avg buy price
+          const totalBuyTokens = buys.reduce((s, t) => s + t.tokenAmount, 0);
+          const avgBuyPrice = totalBuyTokens > 0 ? totalBought / totalBuyTokens : 0;
+
+          // Unrealized = current value of remaining holdings vs avg cost
+          const unrealizedPnl = avgBuyPrice > 0 ? (currentPrice - avgBuyPrice) * currentBalance : currentValue;
+          // Realized = what we sold minus what it cost
+          const avgCostBasis = totalBuyTokens > 0 ? totalBought / totalBuyTokens : 0;
+          const totalSellTokens = sells.reduce((s, t) => s + t.tokenAmount, 0);
+          const realizedPnl = totalSold - (avgCostBasis * totalSellTokens);
+          const totalPnl = realizedPnl + unrealizedPnl;
+          const roi = totalBought > 0 ? (totalPnl / totalBought) * 100 : 0;
+
+          // Try to get symbol from current tokens or DexScreener
+          let symbol = currentToken?.symbol || "???";
+          let name = currentToken?.name || "Unknown";
+          let image = currentToken?.image;
+
+          if (!currentToken) {
+            try {
+              const dexRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`);
+              const dexData = await dexRes.json();
+              const pair = dexData.pairs?.[0];
+              if (pair) {
+                symbol = pair.baseToken?.symbol || symbol;
+                name = pair.baseToken?.name || name;
+                image = pair.info?.imageUrl;
+              }
+            } catch { /* skip */ }
+          }
+
+          return {
+            mint, symbol, name, image,
+            currentValue, currentPrice, balance: currentBalance,
+            totalBought, totalSold, realizedPnl, unrealizedPnl, totalPnl, roi,
+            trades,
+          };
+        })
+      );
+
+      const validTokens = tokenPnlList.filter(t => t.totalBought > 0 || t.currentValue > 0);
+      const totalPortfolioValue = tokens.reduce((s, t) => s + t.value, 0);
+      const totalInvested = validTokens.reduce((s, t) => s + t.totalBought, 0);
+      const totalRealized = validTokens.reduce((s, t) => s + t.realizedPnl, 0);
+      const totalUnrealized = validTokens.reduce((s, t) => s + t.unrealizedPnl, 0);
+      const totalBuyVolume = Object.values(tokenTradeGroups).flat().filter(t => t.side === "buy").reduce((s, t) => s + t.usdValue, 0);
+      const totalSellVolume = Object.values(tokenTradeGroups).flat().filter(t => t.side === "sell").reduce((s, t) => s + t.usdValue, 0);
+
+      const sorted = [...validTokens].sort((a, b) => b.totalPnl - a.totalPnl);
+      const biggestWin = sorted.find(t => t.totalPnl > 0) ? { symbol: sorted.find(t => t.totalPnl > 0)!.symbol, pnl: sorted.find(t => t.totalPnl > 0)!.totalPnl } : null;
+      const biggestLoss = [...sorted].reverse().find(t => t.totalPnl < 0) ? { symbol: [...sorted].reverse().find(t => t.totalPnl < 0)!.symbol, pnl: [...sorted].reverse().find(t => t.totalPnl < 0)!.totalPnl } : null;
+
+      setWalletPnl({
+        totalPortfolioValue,
+        totalInvested,
+        totalRealized,
+        totalUnrealized,
+        totalPnl: totalRealized + totalUnrealized,
+        totalVolume: totalBuyVolume + totalSellVolume,
+        totalBuyVolume,
+        totalSellVolume,
+        winCount: validTokens.filter(t => t.totalPnl > 0).length,
+        lossCount: validTokens.filter(t => t.totalPnl < 0).length,
+        biggestWin,
+        biggestLoss,
+        tokens: sorted,
+      });
+    } catch (e) {
+      console.error("PnL computation failed:", e);
+    } finally {
+      setPnlLoading(false);
+    }
+  }, [tokens]);
 
   useEffect(() => {
     if (connected && address) {
       loadData(address);
     } else {
-      setOverview(null);
-      setTokens([]);
-      setTxs([]);
+      setOverview(null); setTokens([]); setTxs([]); setWalletPnl(null);
     }
   }, [connected, address, loadData]);
+
+  useEffect(() => {
+    if (connected && address && activeTab === "pnl" && !walletPnl && !pnlLoading) {
+      computePnL(address);
+    }
+  }, [activeTab, connected, address, walletPnl, pnlLoading, computePnL]);
 
   // Auto-refresh every 15s
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -248,10 +479,7 @@ export function ConnectedWalletTab() {
 
   /* ── Swap quote fetch ── */
   useEffect(() => {
-    if (!swapOpen || !swapToken || !swapAmount || isNaN(Number(swapAmount))) {
-      setSwapQuote(null);
-      return;
-    }
+    if (!swapOpen || !swapToken || !swapAmount || isNaN(Number(swapAmount))) { setSwapQuote(null); return; }
     const timeout = setTimeout(async () => {
       try {
         const inputMint = swapMode === "buy" ? SOL_MINT : swapToken.mint;
@@ -259,7 +487,6 @@ export function ConnectedWalletTab() {
         const decimals = swapMode === "buy" ? 9 : swapToken.decimals;
         const amountLamports = Math.floor(Number(swapAmount) * Math.pow(10, decimals));
         if (amountLamports <= 0) return;
-
         const res = await fetch(
           `${JUPITER_BASE}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountLamports}&slippageBps=${slippage}`,
           { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
@@ -268,46 +495,30 @@ export function ConnectedWalletTab() {
         if (q.outAmount) {
           const outDecimals = swapMode === "buy" ? swapToken.decimals : 9;
           const outSymbol = swapMode === "buy" ? swapToken.symbol : "SOL";
-          setSwapQuote({
-            outAmount: Number(q.outAmount) / Math.pow(10, outDecimals),
-            outSymbol,
-            priceImpact: parseFloat(q.priceImpactPct ?? "0") * 100,
-          });
+          setSwapQuote({ outAmount: Number(q.outAmount) / Math.pow(10, outDecimals), outSymbol, priceImpact: parseFloat(q.priceImpactPct ?? "0") * 100 });
         }
       } catch { /* ignore */ }
     }, 600);
     return () => clearTimeout(timeout);
   }, [swapOpen, swapToken, swapAmount, swapMode, slippage]);
 
-  /* ── Execute swap via Phantom native (zero platform fees) ── */
+  /* ── Execute swap ── */
   const executeSwap = async () => {
     if (!swapToken || !swapAmount || !publicKey) return;
     setSwapLoading(true);
     try {
       const phantom = (window as any).phantom?.solana;
       if (!phantom?.isPhantom) throw new Error("Phantom wallet not found. Please install Phantom.");
-
       const inputMint = swapMode === "buy" ? SOL_MINT : swapToken.mint;
       const outputMint = swapMode === "buy" ? swapToken.mint : SOL_MINT;
       const decimals = swapMode === "buy" ? 9 : swapToken.decimals;
       const amountLamports = Math.floor(Number(swapAmount) * Math.pow(10, decimals));
-
-      // Build swap tx via Jupiter (no platform fee account = zero fees)
       const swapTxBase64 = await phantomSwap(inputMint, outputMint, amountLamports, slippage, publicKey.toBase58());
-
-      // Deserialize using browser-native atob (no Buffer needed)
       const txBytes = base64ToUint8Array(swapTxBase64);
       const tx = VersionedTransaction.deserialize(txBytes);
-
-      // Sign & send via Phantom directly
       const { signature: sig } = await phantom.signAndSendTransaction(tx);
-
-      toast({
-        title: `${swapMode === "buy" ? "Buy" : "Sell"} submitted! ✅`,
-        description: `TX: ${formatAddress(sig, 6)}`,
-      });
-      setSwapOpen(false);
-      setSwapAmount("");
+      toast({ title: `${swapMode === "buy" ? "Buy" : "Sell"} submitted! ✅`, description: `TX: ${formatAddress(sig, 6)}` });
+      setSwapOpen(false); setSwapAmount("");
       setTimeout(() => loadData(address, true), 3000);
     } catch (e: any) {
       toast({ title: "Swap failed", description: e?.message ?? String(e), variant: "destructive" });
@@ -316,17 +527,20 @@ export function ConnectedWalletTab() {
     }
   };
 
-  /* ── Copy address ── */
   const copyAddress = () => {
     navigator.clipboard.writeText(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
-  /* ── Filtered tokens ── */
-  const filteredTokens = tokens.filter(t =>
-    !tokenSearch || t.symbol.toLowerCase().includes(tokenSearch.toLowerCase()) || t.name.toLowerCase().includes(tokenSearch.toLowerCase())
-  );
+  // Sorted + filtered tokens
+  const sortedTokens = [...tokens]
+    .filter(t => !tokenSearch || t.symbol.toLowerCase().includes(tokenSearch.toLowerCase()) || t.name.toLowerCase().includes(tokenSearch.toLowerCase()))
+    .sort((a, b) => {
+      if (sortBy === "value") return b.value - a.value;
+      if (sortBy === "change") return (b.change24h || 0) - (a.change24h || 0);
+      if (sortBy === "volume") return (b.volume24h || 0) - (a.volume24h || 0);
+      return b.value - a.value;
+    });
 
   /* ════════════════════════════════════════════════════════════════
      NOT CONNECTED VIEW
@@ -334,7 +548,6 @@ export function ConnectedWalletTab() {
   if (!connected) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-8 px-4">
-        {/* Hero card */}
         <div className="og-glass-card rounded-3xl p-8 max-w-md w-full text-center space-y-6">
           <div className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-[hsl(var(--og-lime))] to-[#22d3ee] flex items-center justify-center shadow-lg shadow-[hsl(var(--og-lime))/0.3]">
             <Wallet className="h-10 w-10 text-[hsl(var(--og-ink))]" />
@@ -342,26 +555,18 @@ export function ConnectedWalletTab() {
           <div>
             <h2 className="text-2xl font-bold mb-2">Connect Your Wallet</h2>
             <p className="text-white/50 text-sm leading-relaxed">
-              Connect Phantom or Solflare to view your portfolio, trade tokens, track transactions — all inside OG Scan.
+              Connect Phantom or Solflare to view your portfolio, trade tokens, track PnL, volume, and full live data feeds — all inside OG Scan.
             </p>
           </div>
-
-          {/* Wallet buttons */}
           <div className="flex flex-col gap-3">
             {wallets.filter(w => ["Phantom", "Solflare"].includes(w.adapter.name)).map(w => (
-              <button
-                key={w.adapter.name}
-                onClick={() => { select(w.adapter.name as any); setTimeout(() => connect().catch(() => {}), 100); }}
-                className="flex items-center gap-3 w-full px-5 py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-[hsl(var(--og-lime))/0.4] transition-all group"
-              >
-                {w.adapter.icon && (
-                  <img src={w.adapter.icon} alt={w.adapter.name} className="w-7 h-7 rounded-lg" />
-                )}
+              <button key={w.adapter.name} onClick={() => { select(w.adapter.name as any); setTimeout(() => connect().catch(() => {}), 100); }}
+                className="flex items-center gap-3 w-full px-5 py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-[hsl(var(--og-lime))/0.4] transition-all group">
+                {w.adapter.icon && <img src={w.adapter.icon} alt={w.adapter.name} className="w-7 h-7 rounded-lg" />}
                 <span className="font-semibold text-sm">{w.adapter.name}</span>
                 <span className="ml-auto text-[10px] text-white/30 group-hover:text-[hsl(var(--og-lime))] transition-colors">Connect →</span>
               </button>
             ))}
-            {/* Fallback if no wallets detected */}
             {wallets.filter(w => ["Phantom", "Solflare"].includes(w.adapter.name)).length === 0 && (
               <div className="text-center text-sm text-white/40 py-4">
                 <AlertTriangle className="h-5 w-5 mx-auto mb-2 text-yellow-500" />
@@ -369,13 +574,10 @@ export function ConnectedWalletTab() {
               </div>
             )}
           </div>
-
           <p className="text-[11px] text-white/25">Your keys never leave your wallet. OG Scan only reads on-chain data.</p>
         </div>
-
-        {/* Feature pills */}
         <div className="flex flex-wrap justify-center gap-2 max-w-sm">
-          {["Portfolio overview", "Buy & sell tokens", "Transaction history", "Price charts", "SOL balance"].map(f => (
+          {["Portfolio overview", "Buy & sell tokens", "Per-token live feeds", "PnL tracker", "Volume analytics", "Trade history"].map(f => (
             <span key={f} className="text-xs px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.08] text-white/50">{f}</span>
           ))}
         </div>
@@ -386,7 +588,7 @@ export function ConnectedWalletTab() {
   /* ════════════════════════════════════════════════════════════════
      CONNECTED VIEW
      ════════════════════════════════════════════════════════════════ */
-  const totalValue = (overview?.totalUsdValue ?? 0);
+  const totalValue = overview?.totalUsdValue ?? 0;
   const solValue = (overview?.balance ?? 0) * (overview?.solPrice ?? 0);
 
   return (
@@ -395,7 +597,6 @@ export function ConnectedWalletTab() {
       {/* ── Header bar ── */}
       <div className="og-glass-card rounded-2xl p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          {/* Address + wallet icon */}
           <div className="flex items-center gap-3 min-w-0">
             {wallet?.adapter.icon ? (
               <img src={wallet.adapter.icon} alt="" className="w-9 h-9 rounded-xl border border-white/10" />
@@ -417,25 +618,12 @@ export function ConnectedWalletTab() {
               <div className="text-[11px] text-white/35">{wallet?.adapter.name ?? "Wallet"} • Solana Mainnet</div>
             </div>
           </div>
-
-          {/* Actions */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost" size="sm"
-              onClick={() => loadData(address)}
-              disabled={loading}
-              className="gap-1.5 text-white/50 hover:text-white h-8"
-            >
+            <Button variant="ghost" size="sm" onClick={() => loadData(address)} disabled={loading} className="gap-1.5 text-white/50 hover:text-white h-8">
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               {lastRefresh ? formatDistanceToNow(lastRefresh, { addSuffix: true }) : ""}
             </Button>
-            <Button
-              variant="outline" size="sm"
-              onClick={() => disconnect()}
-              className="h-8 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10"
-            >
-              Disconnect
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => disconnect()} className="h-8 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10">Disconnect</Button>
           </div>
         </div>
       </div>
@@ -444,27 +632,10 @@ export function ConnectedWalletTab() {
       {overview && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            {
-              icon: BarChart3, label: "Total Value", color: "text-[hsl(var(--og-lime))]",
-              value: formatUsd(totalValue),
-              sub: `${tokens.length} tokens`,
-            },
-            {
-              icon: Coins, label: "SOL Balance", color: "text-[#22d3ee]",
-              value: `${(overview.balance ?? 0).toFixed(4)} SOL`,
-              sub: formatUsd(solValue),
-            },
-            {
-              icon: overview.priceChange24h >= 0 ? TrendingUp : TrendingDown,
-              label: "SOL 24h", color: overview.priceChange24h >= 0 ? "text-green-400" : "text-red-400",
-              value: `${overview.priceChange24h >= 0 ? "+" : ""}${(overview.priceChange24h ?? 0).toFixed(2)}%`,
-              sub: `$${(overview.solPrice ?? 0).toFixed(2)}/SOL`,
-            },
-            {
-              icon: Shield, label: "NFTs", color: "text-purple-400",
-              value: String(overview.nftCount ?? 0),
-              sub: `${overview.totalAssets ?? 0} total assets`,
-            },
+            { icon: BarChart3, label: "Total Value", color: "text-[hsl(var(--og-lime))]", value: formatUsd(totalValue), sub: `${tokens.length} tokens` },
+            { icon: Coins, label: "SOL Balance", color: "text-[#22d3ee]", value: `${(overview.balance ?? 0).toFixed(4)} SOL`, sub: formatUsd(solValue) },
+            { icon: overview.priceChange24h >= 0 ? TrendingUp : TrendingDown, label: "SOL 24h", color: overview.priceChange24h >= 0 ? "text-green-400" : "text-red-400", value: `${overview.priceChange24h >= 0 ? "+" : ""}${(overview.priceChange24h ?? 0).toFixed(2)}%`, sub: `$${(overview.solPrice ?? 0).toFixed(2)}/SOL` },
+            { icon: Shield, label: "NFTs", color: "text-purple-400", value: String(overview.nftCount ?? 0), sub: `${overview.totalAssets ?? 0} total assets` },
           ].map((s, i) => (
             <Card key={i} className="og-glass-card">
               <CardContent className="p-3.5">
@@ -484,30 +655,39 @@ export function ConnectedWalletTab() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="overflow-x-auto">
           <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 bg-white/[0.04] border border-white/[0.07] rounded-2xl">
-            <TabsTrigger value="portfolio" className="gap-1.5"><Coins className="h-3.5 w-3.5" />Portfolio</TabsTrigger>
+            <TabsTrigger value="portfolio" className="gap-1.5"><Coins className="h-3.5 w-3.5" />Holdings</TabsTrigger>
+            <TabsTrigger value="pnl" className="gap-1.5"><DollarSign className="h-3.5 w-3.5" />P&L</TabsTrigger>
+            <TabsTrigger value="volume" className="gap-1.5"><Activity className="h-3.5 w-3.5" />Volume</TabsTrigger>
             <TabsTrigger value="trade" className="gap-1.5"><ArrowLeftRight className="h-3.5 w-3.5" />Trade</TabsTrigger>
             <TabsTrigger value="history" className="gap-1.5"><Clock className="h-3.5 w-3.5" />History</TabsTrigger>
-            <TabsTrigger value="charts" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" />Charts</TabsTrigger>
           </TabsList>
         </div>
 
-        {/* ══ PORTFOLIO TAB ══ */}
+        {/* ══════════════════════════════════════════════════════
+            HOLDINGS TAB — full per-token expanded panels
+            ══════════════════════════════════════════════════════ */}
         <TabsContent value="portfolio" className="mt-4 space-y-3">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-            <Input
-              placeholder="Search tokens..."
-              value={tokenSearch}
-              onChange={e => setTokenSearch(e.target.value)}
-              className="pl-9 bg-white/[0.04] border-white/[0.08] rounded-xl h-9 text-sm"
-            />
+          {/* Controls row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[160px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
+              <Input placeholder="Search tokens..." value={tokenSearch} onChange={e => setTokenSearch(e.target.value)}
+                className="pl-9 bg-white/[0.04] border-white/[0.08] rounded-xl h-9 text-sm" />
+            </div>
+            <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.07] rounded-xl p-0.5">
+              {(["value", "change", "volume"] as const).map(s => (
+                <button key={s} onClick={() => setSortBy(s)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${sortBy === s ? "bg-white/[0.1] text-white" : "text-white/35 hover:text-white/60"}`}>
+                  {s === "value" ? "Value" : s === "change" ? "24h%" : "Volume"}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* SOL row */}
           <Card className="og-glass-card">
             <CardContent className="p-0">
-              <div className="flex items-center gap-3 p-3.5 hover:bg-white/[0.04] transition-colors rounded-2xl">
+              <div className="flex items-center gap-3 p-3.5">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#9945FF] to-[#14F195] flex items-center justify-center shrink-0">
                   <span className="text-xs font-black text-white">SOL</span>
                 </div>
@@ -524,86 +704,472 @@ export function ConnectedWalletTab() {
                     {(overview?.priceChange24h ?? 0) >= 0 ? "+" : ""}{(overview?.priceChange24h ?? 0).toFixed(2)}%
                   </p>
                 </div>
-                <Button
-                  size="sm" variant="outline"
+                <Button size="sm" variant="outline"
                   className="h-7 text-[11px] ml-1 border-[hsl(var(--og-lime))/0.3] text-[hsl(var(--og-lime))] hover:bg-[hsl(var(--og-lime))/0.1]"
-                  onClick={() => {
-                    setSwapToken({ mint: SOL_MINT, symbol: "SOL", name: "Solana", balance: overview?.balance ?? 0, decimals: 9, price: overview?.solPrice ?? 0, value: solValue, change24h: overview?.priceChange24h ?? 0 });
-                    setSwapMode("sell"); setSwapOpen(true);
-                  }}
-                >
+                  onClick={() => { setSwapToken({ mint: SOL_MINT, symbol: "SOL", name: "Solana", balance: overview?.balance ?? 0, decimals: 9, price: overview?.solPrice ?? 0, value: solValue, change24h: overview?.priceChange24h ?? 0 }); setSwapMode("sell"); setSwapOpen(true); }}>
                   Sell
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Token list */}
+          {/* Token list with expandable detail panels */}
           {loading && tokens.length === 0 ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-16 rounded-2xl bg-white/[0.04] animate-pulse" />
-              ))}
-            </div>
-          ) : filteredTokens.length === 0 ? (
-            <div className="text-center py-12 text-white/30 text-sm">
-              {tokenSearch ? "No tokens match your search" : "No tokens found"}
-            </div>
+            <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-20 rounded-2xl bg-white/[0.04] animate-pulse" />)}</div>
+          ) : sortedTokens.length === 0 ? (
+            <div className="text-center py-12 text-white/30 text-sm">{tokenSearch ? "No tokens match" : "No tokens found"}</div>
           ) : (
-            <Card className="og-glass-card overflow-hidden">
-              <CardContent className="p-0">
-                {filteredTokens.map((token, idx) => (
-                  <div
-                    key={token.mint}
-                    className={`flex items-center gap-3 px-3.5 py-3 hover:bg-white/[0.04] transition-colors ${idx < filteredTokens.length - 1 ? "border-b border-white/[0.05]" : ""}`}
-                  >
-                    {/* Token image */}
-                    {token.image ? (
-                      <img
-                        src={token.image} alt={token.symbol}
-                        className="w-9 h-9 rounded-xl object-cover shrink-0"
-                        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[hsl(var(--og-lime))/0.3] to-[#22d3ee]/0.3 border border-white/[0.08] flex items-center justify-center shrink-0">
-                        <span className="text-[10px] font-black text-white/70">{token.symbol.slice(0, 3)}</span>
+            <div className="space-y-2">
+              {sortedTokens.map((token) => {
+                const isExpanded = expandedToken === token.mint;
+                const tokenTrades = tokenTradesMap[token.mint] || [];
+                const recentBuys = tokenTrades.filter(t => t.side === "buy").slice(0, 5);
+                const recentSells = tokenTrades.filter(t => t.side === "sell").slice(0, 5);
+
+                return (
+                  <Card key={token.mint} className={`og-glass-card overflow-hidden transition-all ${isExpanded ? "border-[hsl(var(--og-lime))/0.3]" : ""}`}>
+                    {/* Token row — always visible */}
+                    <CardContent className="p-0">
+                      <div className="flex items-center gap-3 px-3.5 py-3">
+                        {/* Token image */}
+                        {token.image ? (
+                          <img src={token.image} alt={token.symbol} className="w-10 h-10 rounded-xl object-cover shrink-0"
+                            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[hsl(var(--og-lime))/0.3] to-[#22d3ee]/0.3 border border-white/[0.08] flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-black text-white/70">{token.symbol.slice(0, 3)}</span>
+                          </div>
+                        )}
+
+                        {/* Name + balance */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-semibold text-sm">{token.symbol}</p>
+                            {token.change24h !== 0 && (
+                              <Badge className={`text-[9px] px-1.5 py-0 h-4 ${token.change24h >= 0 ? "bg-green-500/15 text-green-400 border-green-500/25" : "bg-red-500/15 text-red-400 border-red-500/25"}`}>
+                                {token.change24h >= 0 ? "+" : ""}{token.change24h.toFixed(1)}%
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-white/35 truncate">
+                            {token.balance < 0.01 ? token.balance.toExponential(2) : token.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} {token.symbol}
+                          </p>
+                        </div>
+
+                        {/* Value + price */}
+                        <div className="text-right shrink-0">
+                          <p className="font-mono text-sm font-semibold">{token.value > 0 ? formatUsd(token.value) : "—"}</p>
+                          <p className="text-[11px] text-white/30">${token.price < 0.001 ? token.price.toExponential(2) : token.price.toFixed(5)}</p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 shrink-0 ml-1">
+                          <Button size="sm" variant="outline"
+                            className="h-6 px-2 text-[10px] border-green-500/30 text-green-400 hover:bg-green-500/10"
+                            onClick={() => { setSwapToken(token); setSwapMode("buy"); setSwapOpen(true); }}>
+                            <Plus className="h-2.5 w-2.5 mr-0.5" />Buy
+                          </Button>
+                          <Button size="sm" variant="outline"
+                            className="h-6 px-2 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10"
+                            onClick={() => { setSwapToken(token); setSwapMode("sell"); setSwapOpen(true); }}>
+                            <Minus className="h-2.5 w-2.5 mr-0.5" />Sell
+                          </Button>
+                          <Button size="sm" variant="ghost"
+                            className={`h-6 w-6 p-0 transition-colors ${isExpanded ? "text-[hsl(var(--og-lime))]" : "text-white/30 hover:text-white/60"}`}
+                            onClick={() => setExpandedToken(isExpanded ? null : token.mint)}>
+                            {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                          </Button>
+                        </div>
                       </div>
-                    )}
 
-                    {/* Name + balance */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">{token.symbol}</p>
-                      <p className="text-[11px] text-white/35 truncate">{token.balance < 0.01 ? token.balance.toExponential(2) : token.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} {token.symbol}</p>
-                    </div>
+                      {/* ── Expanded Detail Panel ── */}
+                      {isExpanded && (
+                        <div className="border-t border-white/[0.07] bg-black/20">
+                          {/* Live stats strip */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.05]">
+                            {[
+                              { label: "Price", value: `$${token.price < 0.0001 ? token.price.toExponential(3) : token.price.toFixed(6)}` },
+                              { label: "24h Volume", value: token.volume24h ? fmtNum(token.volume24h) : "N/A" },
+                              { label: "Liquidity", value: token.liquidity ? fmtNum(token.liquidity) : "N/A" },
+                              { label: "Market Cap", value: token.mcap ? fmtNum(token.mcap) : "N/A" },
+                            ].map((stat, i) => (
+                              <div key={i} className="bg-black/30 p-3 text-center">
+                                <p className="text-[10px] text-white/30 mb-0.5">{stat.label}</p>
+                                <p className="text-xs font-bold text-white">{stat.value}</p>
+                              </div>
+                            ))}
+                          </div>
 
-                    {/* Value */}
-                    <div className="text-right shrink-0">
-                      <p className="font-mono text-sm font-semibold">{token.value > 0 ? formatUsd(token.value) : "—"}</p>
-                      <p className="text-[11px] text-white/30">${token.price < 0.001 ? token.price.toExponential(2) : token.price.toFixed(5)}</p>
-                    </div>
+                          {/* Chart + tabs */}
+                          <div className="p-3 space-y-3">
+                            {/* Social links */}
+                            {(token.website || token.twitter || token.telegram) && (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] text-white/30">Links:</span>
+                                {token.website && (
+                                  <a href={token.website} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.12] text-white/60 transition-colors">
+                                    <Globe className="h-2.5 w-2.5" />Website
+                                  </a>
+                                )}
+                                {token.twitter && (
+                                  <a href={token.twitter} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.12] text-white/60 transition-colors">
+                                    <Twitter className="h-2.5 w-2.5" />Twitter
+                                  </a>
+                                )}
+                                {token.telegram && (
+                                  <a href={token.telegram} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.12] text-white/60 transition-colors">
+                                    <MessageCircle className="h-2.5 w-2.5" />Telegram
+                                  </a>
+                                )}
+                                <a href={`https://dexscreener.com/solana/${token.mint}`} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.12] text-[hsl(var(--og-lime))] transition-colors">
+                                  <TrendingUp className="h-2.5 w-2.5" />DexScreener
+                                </a>
+                                <a href={`https://solscan.io/token/${token.mint}`} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.12] text-white/60 transition-colors">
+                                  <ExternalLink className="h-2.5 w-2.5" />Solscan
+                                </a>
+                              </div>
+                            )}
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 shrink-0 ml-1">
-                      <Button
-                        size="sm" variant="outline"
-                        className="h-6 px-2 text-[10px] border-[hsl(var(--og-lime))/0.3] text-[hsl(var(--og-lime))] hover:bg-[hsl(var(--og-lime))/0.1]"
-                        onClick={() => { setSwapToken(token); setSwapMode("buy"); setSwapOpen(true); }}
-                      >Buy</Button>
-                      <Button
-                        size="sm" variant="outline"
-                        className="h-6 px-2 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10"
-                        onClick={() => { setSwapToken(token); setSwapMode("sell"); setSwapOpen(true); }}
-                      >Sell</Button>
-                      <Button
-                        size="sm" variant="ghost"
-                        className="h-6 w-6 p-0 text-white/30 hover:text-[#22d3ee]"
-                        onClick={() => { setChartToken(token); setChartOpen(true); }}
-                      ><BarChart3 className="h-3 w-3" /></Button>
-                    </div>
-                  </div>
-                ))}
+                            {/* Inline DexScreener chart */}
+                            <div>
+                              <p className="text-[10px] text-white/30 mb-2 flex items-center gap-1.5">
+                                <BarChart3 className="h-3 w-3" />Live Chart
+                              </p>
+                              <iframe
+                                src={`https://dexscreener.com/solana/${token.mint}?embed=1&theme=dark&trades=1&info=0`}
+                                className="w-full rounded-xl border border-white/[0.07]"
+                                style={{ height: "400px" }}
+                                title={`${token.symbol} live chart`}
+                              />
+                            </div>
+
+                            {/* Live Trade Feed — buys and sells */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* Recent Buys */}
+                              <div>
+                                <p className="text-[10px] text-white/30 mb-2 flex items-center gap-1.5">
+                                  <ArrowDownLeft className="h-3 w-3 text-green-400" />Your Recent Buys
+                                </p>
+                                {recentBuys.length === 0 ? (
+                                  <p className="text-[10px] text-white/20 italic">No buy trades in history</p>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {recentBuys.map(trade => (
+                                      <div key={trade.signature} className="flex items-center gap-2 p-2 rounded-lg bg-green-500/5 border border-green-500/10">
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[10px] font-semibold text-green-400">+{trade.tokenAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {token.symbol}</p>
+                                          <p className="text-[9px] text-white/30">{trade.solAmount.toFixed(4)} SOL · {trade.timestamp ? formatDistanceToNow(new Date(trade.timestamp * 1000), { addSuffix: true }) : "—"}</p>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-[10px] text-white/60">{formatUsd(trade.usdValue)}</p>
+                                          {trade.pricePerToken > 0 && <p className="text-[9px] text-white/25">${trade.pricePerToken.toExponential(2)}/token</p>}
+                                        </div>
+                                        <a href={`https://solscan.io/tx/${trade.signature}`} target="_blank" rel="noopener noreferrer">
+                                          <ExternalLink className="h-2.5 w-2.5 text-white/20 hover:text-white/60" />
+                                        </a>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Recent Sells */}
+                              <div>
+                                <p className="text-[10px] text-white/30 mb-2 flex items-center gap-1.5">
+                                  <ArrowUpRight className="h-3 w-3 text-red-400" />Your Recent Sells
+                                </p>
+                                {recentSells.length === 0 ? (
+                                  <p className="text-[10px] text-white/20 italic">No sell trades in history</p>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {recentSells.map(trade => (
+                                      <div key={trade.signature} className="flex items-center gap-2 p-2 rounded-lg bg-red-500/5 border border-red-500/10">
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[10px] font-semibold text-red-400">-{trade.tokenAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {token.symbol}</p>
+                                          <p className="text-[9px] text-white/30">{trade.solAmount.toFixed(4)} SOL · {trade.timestamp ? formatDistanceToNow(new Date(trade.timestamp * 1000), { addSuffix: true }) : "—"}</p>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-[10px] text-white/60">{formatUsd(trade.usdValue)}</p>
+                                          {trade.pricePerToken > 0 && <p className="text-[9px] text-white/25">${trade.pricePerToken.toExponential(2)}/token</p>}
+                                        </div>
+                                        <a href={`https://solscan.io/tx/${trade.signature}`} target="_blank" rel="noopener noreferrer">
+                                          <ExternalLink className="h-2.5 w-2.5 text-white/20 hover:text-white/60" />
+                                        </a>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Note about loading trade history */}
+                            {tokenTrades.length === 0 && (
+                              <div className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                                <Activity className="h-3.5 w-3.5 text-white/20 shrink-0" />
+                                <p className="text-[10px] text-white/30">Switch to the <strong className="text-white/50">P&L tab</strong> and click "Calculate" to load full trade history for this token.</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════
+            P&L TAB
+            ══════════════════════════════════════════════════════ */}
+        <TabsContent value="pnl" className="mt-4 space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-base">Profit & Loss</h3>
+              <p className="text-[11px] text-white/35">Based on your last 100 transactions</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => computePnL(address)} disabled={pnlLoading}
+              className="h-8 gap-1.5 border-[hsl(var(--og-lime))/0.3] text-[hsl(var(--og-lime))] hover:bg-[hsl(var(--og-lime))/0.1]">
+              <RefreshCw className={`h-3.5 w-3.5 ${pnlLoading ? "animate-spin" : ""}`} />
+              {pnlLoading ? "Calculating..." : "Recalculate"}
+            </Button>
+          </div>
+
+          {pnlLoading && (
+            <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-20 rounded-2xl bg-white/[0.04] animate-pulse" />)}</div>
+          )}
+
+          {!pnlLoading && !walletPnl && (
+            <Card className="og-glass-card">
+              <CardContent className="p-12 text-center">
+                <DollarSign className="h-12 w-12 text-white/15 mx-auto mb-4" />
+                <p className="text-white/40 text-sm">Click "Recalculate" to compute your P&L from on-chain history</p>
               </CardContent>
             </Card>
+          )}
+
+          {walletPnl && !pnlLoading && (
+            <>
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: "Total P&L", value: formatPnl(walletPnl.totalPnl), color: walletPnl.totalPnl >= 0 ? "text-green-400" : "text-red-400", icon: walletPnl.totalPnl >= 0 ? TrendingUp : TrendingDown },
+                  { label: "Realized", value: formatPnl(walletPnl.totalRealized), color: walletPnl.totalRealized >= 0 ? "text-green-400" : "text-red-400", icon: Target },
+                  { label: "Unrealized", value: formatPnl(walletPnl.totalUnrealized), color: walletPnl.totalUnrealized >= 0 ? "text-[hsl(var(--og-lime))]" : "text-orange-400", icon: PieChart },
+                  { label: "Win Rate", value: `${walletPnl.winCount + walletPnl.lossCount > 0 ? Math.round(walletPnl.winCount / (walletPnl.winCount + walletPnl.lossCount) * 100) : 0}%`, color: "text-[#22d3ee]", icon: Trophy },
+                ].map((s, i) => (
+                  <Card key={i} className="og-glass-card">
+                    <CardContent className="p-3.5">
+                      <div className="flex items-center gap-2 mb-1">
+                        <s.icon className={`h-3.5 w-3.5 ${s.color}`} />
+                        <span className="text-[11px] text-white/40">{s.label}</span>
+                      </div>
+                      <p className={`text-base font-bold ${s.color}`}>{s.value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Win / loss tally */}
+              <div className="grid grid-cols-2 gap-3">
+                {walletPnl.biggestWin && (
+                  <Card className="og-glass-card border-green-500/20">
+                    <CardContent className="p-3.5 flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-green-500/10"><Trophy className="h-4 w-4 text-green-400" /></div>
+                      <div>
+                        <p className="text-[10px] text-white/35">Best Win</p>
+                        <p className="font-bold text-sm text-green-400">{walletPnl.biggestWin.symbol}</p>
+                        <p className="text-[10px] text-green-400/70">{formatPnl(walletPnl.biggestWin.pnl)}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {walletPnl.biggestLoss && (
+                  <Card className="og-glass-card border-red-500/20">
+                    <CardContent className="p-3.5 flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-red-500/10"><Skull className="h-4 w-4 text-red-400" /></div>
+                      <div>
+                        <p className="text-[10px] text-white/35">Biggest Loss</p>
+                        <p className="font-bold text-sm text-red-400">{walletPnl.biggestLoss.symbol}</p>
+                        <p className="text-[10px] text-red-400/70">{formatPnl(walletPnl.biggestLoss.pnl)}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* Per-token PnL breakdown */}
+              <Card className="og-glass-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-[hsl(var(--og-lime))]" />
+                    Token P&L Breakdown
+                    <Badge variant="outline" className="text-[10px] ml-auto">{walletPnl.tokens.length} tokens</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[480px]">
+                    <div className="divide-y divide-white/[0.04]">
+                      {walletPnl.tokens.map(t => (
+                        <div key={t.mint} className="px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                          <div className="flex items-center gap-3">
+                            {t.image ? (
+                              <img src={t.image} className="w-9 h-9 rounded-xl object-cover shrink-0" alt="" onError={e => (e.target as HTMLImageElement).style.display = "none"} />
+                            ) : (
+                              <div className="w-9 h-9 rounded-xl bg-white/[0.06] flex items-center justify-center shrink-0 text-[10px] font-bold text-white/40">{t.symbol.slice(0, 2)}</div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-semibold text-sm">{t.symbol}</p>
+                                <Badge className={`text-[9px] px-1.5 h-4 ${t.totalPnl >= 0 ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}>
+                                  {t.roi.toFixed(0)}% ROI
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-3 mt-0.5">
+                                <span className="text-[10px] text-white/30">Bought: {formatUsd(t.totalBought)}</span>
+                                <span className="text-[10px] text-white/30">Sold: {formatUsd(t.totalSold)}</span>
+                                <span className="text-[10px] text-white/30">Held: {formatUsd(t.currentValue)}</span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className={`font-mono font-bold text-sm ${t.totalPnl >= 0 ? "text-green-400" : "text-red-400"}`}>{formatPnl(t.totalPnl)}</p>
+                              <p className="text-[10px] text-white/30">{t.trades.length} trades</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════
+            VOLUME TAB
+            ══════════════════════════════════════════════════════ */}
+        <TabsContent value="volume" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-base">Volume Analytics</h3>
+              <p className="text-[11px] text-white/35">All your buys, sells and total activity</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => computePnL(address)} disabled={pnlLoading}
+              className="h-8 gap-1.5 border-[hsl(var(--og-lime))/0.3] text-[hsl(var(--og-lime))] hover:bg-[hsl(var(--og-lime))/0.1]">
+              <RefreshCw className={`h-3.5 w-3.5 ${pnlLoading ? "animate-spin" : ""}`} />
+              {pnlLoading ? "Loading..." : "Load"}
+            </Button>
+          </div>
+
+          {!walletPnl && !pnlLoading && (
+            <Card className="og-glass-card">
+              <CardContent className="p-12 text-center">
+                <Volume2 className="h-12 w-12 text-white/15 mx-auto mb-4" />
+                <p className="text-white/40 text-sm">Click "Load" to analyze your trading volume</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {pnlLoading && <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-20 rounded-2xl bg-white/[0.04] animate-pulse" />)}</div>}
+
+          {walletPnl && !pnlLoading && (
+            <>
+              {/* Volume summary */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: "Total Volume", value: fmtNum(walletPnl.totalVolume), icon: Activity, color: "text-[hsl(var(--og-lime))]" },
+                  { label: "Buy Volume", value: fmtNum(walletPnl.totalBuyVolume), icon: ArrowDownLeft, color: "text-green-400" },
+                  { label: "Sell Volume", value: fmtNum(walletPnl.totalSellVolume), icon: ArrowUpRight, color: "text-red-400" },
+                ].map((s, i) => (
+                  <Card key={i} className="og-glass-card">
+                    <CardContent className="p-3.5">
+                      <div className="flex items-center gap-2 mb-1">
+                        <s.icon className={`h-3.5 w-3.5 ${s.color}`} />
+                        <span className="text-[11px] text-white/40">{s.label}</span>
+                      </div>
+                      <p className={`text-base font-bold ${s.color}`}>{s.value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Buy/Sell ratio bar */}
+              {walletPnl.totalVolume > 0 && (
+                <Card className="og-glass-card">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-white/40">Buy / Sell Ratio</span>
+                      <span className="text-xs text-white/40">{Math.round(walletPnl.totalBuyVolume / walletPnl.totalVolume * 100)}% buys</span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-red-500/30 overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-green-500 to-[hsl(var(--og-lime))] rounded-full"
+                        style={{ width: `${Math.round(walletPnl.totalBuyVolume / walletPnl.totalVolume * 100)}%` }} />
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-[10px] text-green-400">Buys {fmtNum(walletPnl.totalBuyVolume)}</span>
+                      <span className="text-[10px] text-red-400">Sells {fmtNum(walletPnl.totalSellVolume)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Per-token volume table */}
+              <Card className="og-glass-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Flame className="h-4 w-4 text-orange-400" />
+                    Most Traded Tokens
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[420px]">
+                    <div className="divide-y divide-white/[0.04]">
+                      {[...walletPnl.tokens]
+                        .sort((a, b) => (b.totalBought + b.totalSold) - (a.totalBought + a.totalSold))
+                        .map((t, idx) => {
+                          const totalVol = t.totalBought + t.totalSold;
+                          const pct = walletPnl.totalVolume > 0 ? (totalVol / walletPnl.totalVolume * 100) : 0;
+                          return (
+                            <div key={t.mint} className="px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                              <div className="flex items-center gap-3">
+                                <span className="text-[11px] text-white/20 w-5 text-center">{idx + 1}</span>
+                                {t.image ? (
+                                  <img src={t.image} className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" onError={e => (e.target as HTMLImageElement).style.display = "none"} />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0 text-[9px] font-bold text-white/40">{t.symbol.slice(0, 2)}</div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <p className="font-semibold text-sm">{t.symbol}</p>
+                                    <p className="text-xs font-mono text-white/70">{fmtNum(totalVol)}</p>
+                                  </div>
+                                  <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                    <div className="h-full bg-gradient-to-r from-[hsl(var(--og-lime))/0.7] to-[hsl(var(--og-lime))] rounded-full"
+                                      style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <div className="flex gap-3 mt-1">
+                                    <span className="text-[9px] text-green-400">B: {fmtNum(t.totalBought)}</span>
+                                    <span className="text-[9px] text-red-400">S: {fmtNum(t.totalSold)}</span>
+                                    <span className="text-[9px] text-white/25">{t.trades.length} trades</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 
@@ -612,93 +1178,58 @@ export function ConnectedWalletTab() {
           <Card className="og-glass-card max-w-md mx-auto">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <ArrowLeftRight className="h-4 w-4 text-[hsl(var(--og-lime))]" />
-                Swap Tokens
+                <ArrowLeftRight className="h-4 w-4 text-[hsl(var(--og-lime))]" />Swap Tokens
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* From/To selector */}
               <div className="space-y-2">
                 <div className="og-glass-card rounded-xl p-3 space-y-2">
                   <p className="text-[11px] text-white/40 uppercase tracking-wide">You Pay</p>
                   <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={swapAmount}
-                      onChange={e => setSwapAmount(e.target.value)}
-                      className="bg-transparent border-none text-2xl font-bold p-0 h-auto focus-visible:ring-0 text-white"
-                    />
-                    <button
-                      className="flex items-center gap-2 bg-white/[0.08] border border-white/[0.1] rounded-xl px-3 py-2 hover:bg-white/[0.12] transition-colors shrink-0"
-                      onClick={() => {
-                        if (swapMode === "buy") {
-                          setSwapToken({ mint: SOL_MINT, symbol: "SOL", name: "Solana", balance: overview?.balance ?? 0, decimals: 9, price: overview?.solPrice ?? 0, value: solValue, change24h: 0 });
-                        }
-                      }}
-                    >
+                    <Input type="number" placeholder="0.00" value={swapAmount} onChange={e => setSwapAmount(e.target.value)}
+                      className="bg-transparent border-none text-2xl font-bold p-0 h-auto focus-visible:ring-0 text-white" />
+                    <button className="flex items-center gap-2 bg-white/[0.08] border border-white/[0.1] rounded-xl px-3 py-2 hover:bg-white/[0.12] transition-colors shrink-0">
                       <span className="text-sm font-semibold">{swapMode === "buy" ? "SOL" : (swapToken?.symbol ?? "Token")}</span>
                       <ChevronDown className="h-3 w-3 text-white/50" />
                     </button>
                   </div>
-                  {swapMode === "buy" && overview && (
-                    <p className="text-[11px] text-white/30">Balance: {(overview.balance ?? 0).toFixed(4)} SOL</p>
-                  )}
-                  {swapMode === "sell" && swapToken && (
-                    <p className="text-[11px] text-white/30">Balance: {swapToken.balance.toFixed(4)} {swapToken.symbol}</p>
-                  )}
+                  {swapMode === "buy" && overview && <p className="text-[11px] text-white/30">Balance: {(overview.balance ?? 0).toFixed(4)} SOL</p>}
+                  {swapMode === "sell" && swapToken && <p className="text-[11px] text-white/30">Balance: {swapToken.balance.toFixed(4)} {swapToken.symbol}</p>}
                 </div>
-
-                {/* Swap direction toggle */}
                 <div className="flex justify-center">
-                  <button
-                    onClick={() => setSwapMode(m => m === "buy" ? "sell" : "buy")}
-                    className="p-2 rounded-xl bg-white/[0.06] border border-white/[0.08] hover:bg-[hsl(var(--og-lime))/0.1] hover:border-[hsl(var(--og-lime))/0.3] transition-all"
-                  >
+                  <button onClick={() => setSwapMode(m => m === "buy" ? "sell" : "buy")}
+                    className="p-2 rounded-xl bg-white/[0.06] border border-white/[0.08] hover:bg-[hsl(var(--og-lime))/0.1] hover:border-[hsl(var(--og-lime))/0.3] transition-all">
                     <ArrowLeftRight className="h-4 w-4 text-white/50" />
                   </button>
                 </div>
-
                 <div className="og-glass-card rounded-xl p-3 space-y-2">
                   <p className="text-[11px] text-white/40 uppercase tracking-wide">You Receive</p>
                   <div className="flex items-center gap-2">
-                    <div className="text-2xl font-bold text-white/60 flex-1">
-                      {swapQuote ? swapQuote.outAmount.toFixed(4) : "—"}
-                    </div>
+                    <div className="text-2xl font-bold text-white/60 flex-1">{swapQuote ? swapQuote.outAmount.toFixed(4) : "—"}</div>
                     <div className="flex items-center gap-2 bg-white/[0.08] border border-white/[0.1] rounded-xl px-3 py-2 shrink-0">
                       <span className="text-sm font-semibold">{swapMode === "buy" ? (swapToken?.symbol ?? "Token") : "SOL"}</span>
                     </div>
                   </div>
                   {swapQuote && (
                     <p className={`text-[11px] ${Math.abs(swapQuote.priceImpact) > 3 ? "text-red-400" : "text-white/30"}`}>
-                      Price impact: {swapQuote.priceImpact.toFixed(2)}%
-                      {Math.abs(swapQuote.priceImpact) > 3 && " ⚠️ High"}
+                      Price impact: {swapQuote.priceImpact.toFixed(2)}%{Math.abs(swapQuote.priceImpact) > 3 && " ⚠️ High"}
                     </p>
                   )}
                 </div>
               </div>
-
-              {/* Token picker for buy */}
               {swapMode === "buy" && (
                 <div className="space-y-2">
                   <p className="text-[11px] text-white/40 uppercase tracking-wide">Select token to buy</p>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
-                    <Input
-                      placeholder="Search your tokens..."
-                      value={tokenSearch}
-                      onChange={e => setTokenSearch(e.target.value)}
-                      className="pl-8 bg-white/[0.04] border-white/[0.08] rounded-xl h-8 text-xs"
-                    />
+                    <Input placeholder="Search your tokens..." value={tokenSearch} onChange={e => setTokenSearch(e.target.value)}
+                      className="pl-8 bg-white/[0.04] border-white/[0.08] rounded-xl h-8 text-xs" />
                   </div>
                   <ScrollArea className="h-32">
                     <div className="space-y-1">
-                      {filteredTokens.slice(0, 20).map(t => (
-                        <button
-                          key={t.mint}
-                          onClick={() => setSwapToken(t)}
-                          className={`flex items-center gap-2 w-full px-3 py-2 rounded-xl text-left hover:bg-white/[0.06] transition-colors ${swapToken?.mint === t.mint ? "bg-[hsl(var(--og-lime))/0.1] border border-[hsl(var(--og-lime))/0.3]" : ""}`}
-                        >
+                      {sortedTokens.slice(0, 20).map(t => (
+                        <button key={t.mint} onClick={() => setSwapToken(t)}
+                          className={`flex items-center gap-2 w-full px-3 py-2 rounded-xl text-left hover:bg-white/[0.06] transition-colors ${swapToken?.mint === t.mint ? "bg-[hsl(var(--og-lime))/0.1] border border-[hsl(var(--og-lime))/0.3]" : ""}`}>
                           {t.image && <img src={t.image} className="w-5 h-5 rounded-md" alt="" />}
                           <span className="text-xs font-semibold">{t.symbol}</span>
                           <span className="text-[10px] text-white/30 truncate flex-1">{t.name}</span>
@@ -709,38 +1240,24 @@ export function ConnectedWalletTab() {
                   </ScrollArea>
                 </div>
               )}
-
-              {/* Slippage */}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-white/40">Slippage</span>
                 <div className="flex items-center gap-1">
                   {[50, 100, 300].map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setSlippage(s)}
-                      className={`text-[11px] px-2 py-0.5 rounded-lg transition-colors ${slippage === s ? "bg-[hsl(var(--og-lime))] text-[hsl(var(--og-ink))] font-semibold" : "bg-white/[0.06] text-white/40 hover:bg-white/[0.1]"}`}
-                    >
+                    <button key={s} onClick={() => setSlippage(s)}
+                      className={`text-[11px] px-2 py-0.5 rounded-lg transition-colors ${slippage === s ? "bg-[hsl(var(--og-lime))] text-[hsl(var(--og-ink))] font-semibold" : "bg-white/[0.06] text-white/40 hover:bg-white/[0.1]"}`}>
                       {s / 100}%
                     </button>
                   ))}
                 </div>
               </div>
-
-              {/* Execute */}
               <Button
                 className="w-full h-12 text-sm font-bold bg-gradient-to-r from-[hsl(var(--og-lime))] to-[#22d3ee] text-[hsl(var(--og-ink))] hover:opacity-90 rounded-2xl"
                 disabled={!swapToken || !swapAmount || swapLoading || !swapQuote}
-                onClick={executeSwap}
-              >
-                {swapLoading ? (
-                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Zap className="h-4 w-4 mr-2" />
-                )}
-                {swapLoading ? "Signing & sending..." : swapMode === "buy" ? `Buy ${swapToken?.symbol ?? "Token"}` : `Sell ${swapToken?.symbol ?? "Token"}`}
+                onClick={executeSwap}>
+                {swapLoading ? <><RefreshCw className="h-4 w-4 animate-spin mr-2" />Signing...</> : <><Zap className="h-4 w-4 mr-2" />{swapMode === "buy" ? `Buy ${swapToken?.symbol ?? "Token"}` : `Sell ${swapToken?.symbol ?? "Token"}`}</>}
               </Button>
-
-              <p className="text-center text-[10px] text-white/25">Powered by Jupiter · Transaction signed by your wallet</p>
+              <p className="text-center text-[10px] text-white/25">Powered by Jupiter · Signed by your wallet</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -761,16 +1278,16 @@ export function ConnectedWalletTab() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[520px]">
+              <ScrollArea className="h-[560px]">
                 {txs.length === 0 ? (
                   <div className="text-center py-16 text-white/30 text-sm">
-                    <Clock className="h-8 w-8 mx-auto mb-3 text-white/20" />
-                    No transactions found
+                    <Clock className="h-8 w-8 mx-auto mb-3 text-white/20" />No transactions found
                   </div>
                 ) : (
                   <div className="divide-y divide-white/[0.04]">
                     {txs.map(tx => {
                       const ts = tx.timestamp ? formatDistanceToNow(new Date(tx.timestamp * 1000), { addSuffix: true }) : "Unknown";
+                      const label = tx.isBuy ? "Bought" : tx.isSell ? "Sold" : tx.isIncoming ? "Received" : tx.isOutgoing ? "Sent" : tx.type.replace(/_/g, " ").toLowerCase();
                       return (
                         <div key={tx.signature} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors">
                           <div className={`p-2 rounded-xl shrink-0 ${getTypeBg(tx)}`}>
@@ -778,16 +1295,21 @@ export function ConnectedWalletTab() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-sm font-semibold capitalize">{tx.type.replace(/_/g, " ").toLowerCase()}</span>
-                              {tx.tokenSymbol && <Badge variant="outline" className="text-[9px] px-1.5 h-4">{tx.tokenSymbol}</Badge>}
+                              <span className="text-sm font-semibold capitalize">{label}</span>
+                              {tx.tokenMint && <Badge variant="outline" className="text-[9px] px-1.5 h-4 font-mono">{tx.tokenMint.slice(0, 6)}…</Badge>}
+                              <Badge variant="secondary" className={`text-[9px] px-1 h-4 ${tx.isBuy ? "bg-green-500/10 text-green-400" : tx.isSell ? "bg-red-500/10 text-red-400" : ""}`}>
+                                {tx.type}
+                              </Badge>
                             </div>
                             <p className="text-[11px] text-white/35 mt-0.5" title={tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleString() : ""}>{ts}</p>
                             {tx.description && <p className="text-[10px] text-white/25 truncate mt-0.5">{tx.description}</p>}
                           </div>
                           <div className="text-right shrink-0">
-                            {tx.amount && <p className={`font-mono text-sm font-semibold ${tx.isIncoming ? "text-green-400" : tx.isOutgoing ? "text-red-400" : "text-white/70"}`}>
-                              {tx.isIncoming ? "+" : tx.isOutgoing ? "-" : ""}{tx.amount}
-                            </p>}
+                            {tx.amount && (
+                              <p className={`font-mono text-sm font-semibold ${tx.isBuy || tx.isIncoming ? "text-green-400" : tx.isSell || tx.isOutgoing ? "text-red-400" : "text-white/70"}`}>
+                                {tx.isBuy || tx.isIncoming ? "+" : tx.isSell || tx.isOutgoing ? "-" : ""}{tx.amount}
+                              </p>
+                            )}
                             {tx.fee && <p className="text-[10px] text-white/25">{(tx.fee / 1e9).toFixed(5)} SOL fee</p>}
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
@@ -806,50 +1328,6 @@ export function ConnectedWalletTab() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/* ══ CHARTS TAB ══ */}
-        <TabsContent value="charts" className="mt-4 space-y-3">
-          <p className="text-sm text-white/40">Select a token from your portfolio to view its chart</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {tokens.slice(0, 20).map(token => (
-              <button
-                key={token.mint}
-                onClick={() => { setChartToken(token); setChartOpen(true); }}
-                className={`flex flex-col items-start gap-1 p-3 rounded-xl border transition-all hover:border-[hsl(var(--og-lime))/0.4] hover:bg-[hsl(var(--og-lime))/0.05] text-left ${chartToken?.mint === token.mint ? "border-[hsl(var(--og-lime))/0.5] bg-[hsl(var(--og-lime))/0.08]" : "border-white/[0.08] bg-white/[0.03]"}`}
-              >
-                <div className="flex items-center gap-2 w-full">
-                  {token.image && <img src={token.image} className="w-7 h-7 rounded-lg object-cover" alt="" onError={e => (e.target as HTMLImageElement).style.display = "none"} />}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold truncate">{token.symbol}</p>
-                    <p className="text-[10px] text-white/30 truncate">{token.name}</p>
-                  </div>
-                </div>
-                <p className="text-[11px] font-mono text-white/60">{token.price > 0 ? `$${token.price < 0.001 ? token.price.toExponential(2) : token.price.toFixed(4)}` : "—"}</p>
-              </button>
-            ))}
-          </div>
-
-          {/* Inline chart if selected */}
-          {chartToken && (
-            <Card className="og-glass-card">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-[hsl(var(--og-lime))]" />
-                  {chartToken.symbol} / USD
-                  <Button variant="ghost" size="sm" className="ml-auto h-6 text-[10px]" onClick={() => setChartToken(null)}><X className="h-3 w-3" /></Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-2">
-                <iframe
-                  src={`https://dexscreener.com/solana/${chartToken.mint}?embed=1&theme=dark&trades=0&info=0`}
-                  className="w-full rounded-xl border border-white/[0.07]"
-                  style={{ height: "480px" }}
-                  title={`${chartToken.symbol} chart`}
-                />
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
       </Tabs>
 
       {/* ══ SWAP DIALOG ══ */}
@@ -857,17 +1335,11 @@ export function ConnectedWalletTab() {
         <DialogContent className="bg-[hsl(var(--background))] border border-white/[0.1] rounded-2xl max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
-              {swapMode === "buy" ? (
-                <ArrowDownLeft className="h-4 w-4 text-green-400" />
-              ) : (
-                <ArrowUpRight className="h-4 w-4 text-red-400" />
-              )}
+              {swapMode === "buy" ? <ArrowDownLeft className="h-4 w-4 text-green-400" /> : <ArrowUpRight className="h-4 w-4 text-red-400" />}
               {swapMode === "buy" ? "Buy" : "Sell"} {swapToken?.symbol ?? "Token"}
             </DialogTitle>
           </DialogHeader>
-
           <div className="space-y-4 pt-1">
-            {/* Token info */}
             {swapToken && (
               <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
                 {swapToken.image && <img src={swapToken.image} className="w-10 h-10 rounded-xl object-cover" alt="" />}
@@ -875,24 +1347,13 @@ export function ConnectedWalletTab() {
                   <p className="font-semibold">{swapToken.name}</p>
                   <p className="text-[11px] text-white/40">Balance: {swapToken.balance.toFixed(4)} {swapToken.symbol}</p>
                 </div>
-                <div className="text-right">
-                  <p className="font-mono text-sm">{formatUsd(swapToken.value)}</p>
-                </div>
+                <div className="text-right"><p className="font-mono text-sm">{formatUsd(swapToken.value)}</p></div>
               </div>
             )}
-
-            {/* Amount input */}
             <div className="space-y-1">
               <p className="text-xs text-white/40">{swapMode === "buy" ? "Amount in SOL" : `Amount in ${swapToken?.symbol ?? "tokens"}`}</p>
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={swapAmount}
-                onChange={e => setSwapAmount(e.target.value)}
-                className="bg-white/[0.04] border-white/[0.1] rounded-xl text-lg font-bold h-12"
-                autoFocus
-              />
-              {/* Quick amounts */}
+              <Input type="number" placeholder="0.00" value={swapAmount} onChange={e => setSwapAmount(e.target.value)}
+                className="bg-white/[0.04] border-white/[0.1] rounded-xl text-lg font-bold h-12" autoFocus />
               <div className="flex gap-2 mt-1">
                 {swapMode === "buy"
                   ? ["0.1", "0.5", "1", "All"].map(v => (
@@ -906,8 +1367,6 @@ export function ConnectedWalletTab() {
                 }
               </div>
             </div>
-
-            {/* Quote */}
             {swapQuote && (
               <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-1.5">
                 <div className="flex justify-between text-xs">
@@ -917,71 +1376,32 @@ export function ConnectedWalletTab() {
                 <div className="flex justify-between text-xs">
                   <span className="text-white/40">Price impact</span>
                   <span className={Math.abs(swapQuote.priceImpact) > 3 ? "text-red-400 font-semibold" : "text-white/60"}>
-                    {swapQuote.priceImpact.toFixed(2)}%
-                    {Math.abs(swapQuote.priceImpact) > 3 && " ⚠️"}
+                    {swapQuote.priceImpact.toFixed(2)}%{Math.abs(swapQuote.priceImpact) > 3 && " ⚠️"}
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-white/40">Slippage</span>
-                  <span className="text-white/60">{slippage / 100}%</span>
+                  <span className="text-white/40">Slippage</span><span className="text-white/60">{slippage / 100}%</span>
                 </div>
               </div>
             )}
-
-            {/* Slippage control */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-white/40">Max slippage</span>
               <div className="flex gap-1">
                 {[50, 100, 300].map(s => (
                   <button key={s} onClick={() => setSlippage(s)}
-                    className={`text-[11px] px-2.5 py-1 rounded-lg transition-colors ${slippage === s ? "bg-[hsl(var(--og-lime))] text-[hsl(var(--og-ink))] font-bold" : "bg-white/[0.06] text-white/40"}`}
-                  >{s / 100}%</button>
+                    className={`text-[11px] px-2.5 py-1 rounded-lg transition-colors ${slippage === s ? "bg-[hsl(var(--og-lime))] text-[hsl(var(--og-ink))] font-bold" : "bg-white/[0.06] text-white/40"}`}>
+                    {s / 100}%
+                  </button>
                 ))}
               </div>
             </div>
-
-            {/* CTA */}
             <Button
-              className={`w-full h-12 font-bold text-sm rounded-2xl ${swapMode === "buy"
-                ? "bg-gradient-to-r from-green-500 to-[hsl(var(--og-lime))] text-[hsl(var(--og-ink))]"
-                : "bg-gradient-to-r from-red-500 to-orange-500 text-white"} hover:opacity-90`}
-              disabled={!swapAmount || swapLoading || !swapQuote}
-              onClick={executeSwap}
-            >
-              {swapLoading
-                ? <><RefreshCw className="h-4 w-4 animate-spin mr-2" />Sending to wallet...</>
-                : <><Zap className="h-4 w-4 mr-2" />{swapMode === "buy" ? `Buy ${swapToken?.symbol}` : `Sell ${swapToken?.symbol}`}</>
-              }
+              className={`w-full h-12 font-bold text-sm rounded-2xl ${swapMode === "buy" ? "bg-gradient-to-r from-green-500 to-[hsl(var(--og-lime))] text-[hsl(var(--og-ink))]" : "bg-gradient-to-r from-red-500 to-orange-500 text-white"} hover:opacity-90`}
+              disabled={!swapAmount || swapLoading || !swapQuote} onClick={executeSwap}>
+              {swapLoading ? <><RefreshCw className="h-4 w-4 animate-spin mr-2" />Sending to wallet...</> : <><Zap className="h-4 w-4 mr-2" />{swapMode === "buy" ? `Buy ${swapToken?.symbol}` : `Sell ${swapToken?.symbol}`}</>}
             </Button>
             <p className="text-center text-[10px] text-white/20">Powered by Jupiter · Signed by your wallet extension</p>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ══ CHART DIALOG (from portfolio) ══ */}
-      <Dialog open={chartOpen} onOpenChange={setChartOpen}>
-        <DialogContent className="bg-[hsl(var(--background))] border border-white/[0.1] rounded-2xl max-w-3xl w-full">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <BarChart3 className="h-4 w-4 text-[hsl(var(--og-lime))]" />
-              {chartToken?.symbol} / USD
-              {chartToken && (
-                <Button variant="outline" size="sm" className="ml-auto h-7 text-[11px]"
-                  onClick={() => { setSwapToken(chartToken); setChartOpen(false); setSwapMode("buy"); setSwapOpen(true); }}
-                >
-                  <Zap className="h-3 w-3 mr-1" />Trade
-                </Button>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          {chartToken && (
-            <iframe
-              src={`https://dexscreener.com/solana/${chartToken.mint}?embed=1&theme=dark&trades=1&info=1`}
-              className="w-full rounded-xl border border-white/[0.07]"
-              style={{ height: "520px" }}
-              title={`${chartToken.symbol} chart`}
-            />
-          )}
         </DialogContent>
       </Dialog>
     </div>
