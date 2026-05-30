@@ -30,6 +30,7 @@ import Notifications from "./pages/Notifications";
 // Premium removed
 import OfficialToken from "./pages/OfficialToken";
 import PumpV5 from "./pages/PumpV5";
+import Launch from "./pages/Launch";
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
@@ -191,6 +192,7 @@ const App = () => (
             <Route path="/charts" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/live-feed-page" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/pumpv5" element={<ProtectedRoute><PumpV5 /></ProtectedRoute>} />
+            <Route path="/launch" element={<ProtectedRoute><Launch /></ProtectedRoute>} />
 
             {/* ── Protected: Admin ── */}
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />

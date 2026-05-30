@@ -1,6 +1,6 @@
 import {
   Bell, Gift, Headset, LineChart, LogOut, Mail,
-  MessageSquare, Settings, Trophy,
+  MessageSquare, Settings, Trophy, Rocket,
   User, Wallet, X, Shield, Menu, Users, Wrench, Home,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
@@ -24,6 +24,7 @@ const mainItems: NavItem[] = [
 ];
 
 const tradingItems: NavItem[] = [
+  { to: "/launch",          icon: Rocket,        label: "Launch",          eyebrow: "Create tokens" },
   { to: "/wallets",         icon: Wallet,        label: "Wallets",         eyebrow: "Tracked wallets" },
   { to: "/charts",          icon: LineChart,     label: "Charts",          eyebrow: "Live charts" },
   { to: "/callouts",        icon: Bell,          label: "Callouts",        eyebrow: "Trade alerts" },
