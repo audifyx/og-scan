@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Plus, Eye, Trash2, RefreshCw, Send, Copy, ExternalLink, Zap, Clock, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Coins, Globe, Twitter, MessageCircle, Link as LinkIcon, Play, Pause, BarChart3, Droplets, Users, Shield, Check } from "lucide-react";
+import { Plus, Eye, Trash2, RefreshCw, Send, Copy, ExternalLink, Zap, Clock, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Coins, Globe, Twitter, MessageCircle, Link as LinkIcon, Play, Pause, BarChart3, Droplets, Users, Shield, Check, Wallet } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ConnectedWalletTab } from "@/components/wallet/ConnectedWalletTab";
 import { WalletSearch } from "@/components/WalletSearch";
 import { PortfolioOverview } from "@/components/PortfolioOverview";
 import { TokenList } from "@/components/TokenList";
@@ -292,9 +293,8 @@ const Wallets = () => {
 
   return (
     <AppLayout>
-      <PageHeader title="Wallet Tracker" description="Track any Solana wallet in real-time">
+      <PageHeader title="Wallet" description="Connect your wallet or track any Solana address">
         <div className="flex items-center gap-2">
-          {/* credits removed */}
           {activeWallet && (
             <Badge className={`gap-1.5 ${autoRefresh ? "bg-primary/15 text-primary border-primary/25" : "bg-white/[0.05]"}`}>
               <div className={`w-2 h-2 rounded-full ${autoRefresh ? "bg-primary animate-pulse" : "bg-white/30"}`} />
@@ -304,7 +304,25 @@ const Wallets = () => {
         </div>
       </PageHeader>
 
-      <div className="p-4 lg:p-6 space-y-6">
+      <div className="p-4 lg:p-6 space-y-4">
+        {/* Top-level tab: My Wallet vs Watch Mode */}
+        <Tabs defaultValue="my-wallet" className="w-full">
+          <TabsList className="inline-flex bg-white/[0.04] border border-white/[0.07] rounded-2xl mb-4">
+            <TabsTrigger value="my-wallet" className="gap-2 data-[state=active]:bg-[hsl(var(--og-lime))/0.12] data-[state=active]:text-[hsl(var(--og-lime))]">
+              <Wallet className="h-4 w-4" />My Wallet
+            </TabsTrigger>
+            <TabsTrigger value="watch" className="gap-2">
+              <Eye className="h-4 w-4" />Watch Mode
+            </TabsTrigger>
+          </TabsList>
+
+          {/* MY WALLET TAB */}
+          <TabsContent value="my-wallet">
+            <ConnectedWalletTab />
+          </TabsContent>
+
+          {/* WATCH MODE TAB */}
+          <TabsContent value="watch">
         <WalletSearch onSearch={handleSearch} isLoading={isLoading} />
 
         {trackedWallets.length > 0 && (
@@ -544,6 +562,9 @@ const Wallets = () => {
             <p className="text-sm text-muted-foreground max-w-sm">Search for a Solana wallet address above to start tracking holdings and transactions.</p>
           </div>
         )}
+          </TabsContent>
+          {/* end Watch Mode */}
+        </Tabs>
       </div>
 
       {selectedToken && (
