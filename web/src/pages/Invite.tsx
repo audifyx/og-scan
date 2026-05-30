@@ -213,39 +213,33 @@ const Invite = () => {
     return () => { cancelled = true; };
   }, [publicKey]);
 
-  /* Load leaderboard */
+  /* Load leaderboard — uses profiles.referred_by as source of truth */
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
       setLoadingBoard(true);
       try {
-        // Get all referrals in contest period
-        const { data: refs } = await supabase
-          .from("referrals")
-          .select("inviter_id, invitee_id, created_at")
-          .gte("created_at", CONTEST_START.toISOString())
-          .lte("created_at", CONTEST_END.toISOString())
-          .order("created_at", { ascending: false });
-
-        if (!refs || cancelled) { setLoadingBoard(false); return; }
-
-        // Get all unique invitee IDs to check their holdings
-        const allInviteeIds = [...new Set(refs.map((r) => r.invitee_id))];
-
-        // Fetch invitee profiles to get wallet addresses
-        const { data: inviteeProfiles } = await supabase
+        // Get all profiles that were referred by someone (referred_by is set)
+        const { data: referredProfiles } = await supabase
           .from("profiles")
-          .select("user_id, sol_wallet, wallet_address")
-          .in("user_id", allInviteeIds.length > 0 ? allInviteeIds : ["__none__"]);
+          .select("user_id, referred_by, sol_wallet, wallet_address, created_at")
+          .not("referred_by", "is", null);
+
+        if (!referredProfiles || cancelled) { setLoadingBoard(false); return; }
+
+        // Filter to contest period
+        const contestRefs = referredProfiles.filter((p) => {
+          const created = new Date(p.created_at);
+          return created >= CONTEST_START && created <= CONTEST_END;
+        });
 
         // Check which invitees hold ≥ $10 OGS (batch check wallets)
         const qualifiedInvitees = new Set<string>();
         const currentOgsPrice = ogsPrice > 0 ? ogsPrice : await getOgsPrice();
 
-        if (inviteeProfiles && currentOgsPrice > 0) {
-          // Check wallets in parallel (max 10 at a time to avoid rate limits)
-          const walletsToCheck = inviteeProfiles
+        if (currentOgsPrice > 0) {
+          const walletsToCheck = contestRefs
             .filter((p) => p.sol_wallet || p.wallet_address)
             .map((p) => ({ userId: p.user_id, wallet: (p.sol_wallet || p.wallet_address) as string }));
 
@@ -253,7 +247,7 @@ const Invite = () => {
           for (let i = 0; i < walletsToCheck.length; i += batchSize) {
             if (cancelled) return;
             const batch = walletsToCheck.slice(i, i + batchSize);
-            const results = await Promise.allSettled(
+            await Promise.allSettled(
               batch.map(async ({ userId, wallet }) => {
                 const balance = await getOgsBalance(wallet);
                 if (balance * currentOgsPrice >= MIN_HOLDING_USD) {
@@ -267,14 +261,15 @@ const Invite = () => {
         // Count referrals per inviter — total and qualified
         const totalCounts = new Map<string, number>();
         const qualifiedCounts = new Map<string, number>();
-        for (const r of refs) {
-          totalCounts.set(r.inviter_id, (totalCounts.get(r.inviter_id) || 0) + 1);
-          if (qualifiedInvitees.has(r.invitee_id)) {
-            qualifiedCounts.set(r.inviter_id, (qualifiedCounts.get(r.inviter_id) || 0) + 1);
+        for (const r of contestRefs) {
+          const inviterId = r.referred_by as string;
+          totalCounts.set(inviterId, (totalCounts.get(inviterId) || 0) + 1);
+          if (qualifiedInvitees.has(r.user_id)) {
+            qualifiedCounts.set(inviterId, (qualifiedCounts.get(inviterId) || 0) + 1);
           }
         }
 
-        // Sort by QUALIFIED count desc (only qualified count for leaderboard ranking)
+        // Sort by QUALIFIED count desc, then total as tiebreaker
         const sorted = Array.from(totalCounts.entries())
           .map(([userId, total]) => ({ userId, total, qualified: qualifiedCounts.get(userId) || 0 }))
           .sort((a, b) => b.qualified - a.qualified || b.total - a.total)
