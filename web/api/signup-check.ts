@@ -63,12 +63,6 @@ const SUPABASE_ANON_KEY =
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const MIN_FORM_TIME_MS = 4_000;
 
-// Cloudflare Turnstile secret key (test key — always passes)
-// For production, replace with your real secret from:
-// https://dash.cloudflare.com → Turnstile → Your widget → Secret Key
-const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET || "1x0000000000000000000000000000000AA";
-const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-
 const baseHeaders = {
   apikey: SUPABASE_ANON_KEY,
   Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
@@ -140,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    const { email, username, fingerprint, honeypot, captchaToken, elapsedMs } = req.body ?? {};
+    const { email, username, fingerprint, honeypot, humanCode, captchaToken, elapsedMs } = req.body ?? {};
     const cleanUsername = typeof username === "string" ? normalizeUsernameForPolicy(username) : "";
     const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
@@ -154,29 +148,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    // Verify Cloudflare Turnstile CAPTCHA
-    if (!captchaToken) {
-      res.status(200).json({ allowed: false, code: "captcha_missing", message: "Please complete the human verification." });
+    // Verify "Type OGSCAN" human check
+    if (typeof humanCode !== "string" || humanCode.trim().toUpperCase() !== "OGSCAN") {
+      res.status(200).json({ allowed: false, code: "human_check", message: "Type OGSCAN in the verification box to continue." });
+      return;
+    }
+
+    // Verify slider CAPTCHA token
+    if (!captchaToken || typeof captchaToken !== "string") {
+      res.status(200).json({ allowed: false, code: "captcha_missing", message: "Please complete the slider verification." });
       return;
     }
 
     try {
-      const turnstileRes = await fetch(TURNSTILE_VERIFY_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          secret: TURNSTILE_SECRET,
-          response: captchaToken,
-          remoteip: getClientIp(req),
-        }),
-      });
-      const turnstileData = await turnstileRes.json() as { success: boolean };
-      if (!turnstileData.success) {
-        res.status(200).json({ allowed: false, code: "captcha_failed", message: "Human verification failed. Please try again." });
+      const decoded = Buffer.from(captchaToken, "base64").toString("utf-8");
+      if (!decoded.startsWith("ogcap_")) {
+        res.status(200).json({ allowed: false, code: "captcha_invalid", message: "Slider verification failed. Please try again." });
+        return;
+      }
+      const parts = decoded.split("_");
+      const captchaElapsed = parseInt(parts[2], 10);
+      // Bot would solve instantly — require at least 500ms interaction
+      if (captchaElapsed < 500) {
+        res.status(200).json({ allowed: false, code: "captcha_too_fast", message: "Verification failed. Please try again." });
         return;
       }
     } catch {
-      res.status(200).json({ allowed: false, code: "captcha_error", message: "Verification service unavailable. Please try again." });
+      res.status(200).json({ allowed: false, code: "captcha_error", message: "Slider verification failed. Please try again." });
       return;
     }
 

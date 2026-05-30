@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
-import { Turnstile } from "@/components/Turnstile";
+import { SliderCaptcha } from "@/components/SliderCaptcha";
 import { toast } from "sonner";
 import { z } from "zod";
 import {
@@ -57,11 +57,12 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [humanCode, setHumanCode] = useState("");
   const [honeypot, setHoneypot] = useState("");
   const [formStartedAt] = useState(() => Date.now());
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; username?: string; password?: string; confirm?: string; humanCode?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; username?: string; password?: string; confirm?: string; humanCode?: string; captcha?: string }>({});
 
   useEffect(() => {
     const ref = searchParams.get("ref");
@@ -93,7 +94,8 @@ const Auth = () => {
       try { passwordSchema.parse(password); } catch (e) { if (e instanceof z.ZodError) newErrors.password = e.errors[0].message; }
     }
     if (mode === "signup" && password !== confirmPassword) newErrors.confirm = "Passwords do not match";
-    if (mode === "signup" && !captchaToken) newErrors.humanCode = "Please complete the human verification";
+    if (mode === "signup" && humanCode.trim().toUpperCase() !== "OGSCAN") newErrors.humanCode = "Type OGSCAN exactly to verify you are human";
+    if (mode === "signup" && !captchaToken) newErrors.captcha = "Please complete the CAPTCHA verification";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -120,6 +122,7 @@ const Auth = () => {
             username: clean,
             fingerprint: getDeviceFingerprint(),
             honeypot,
+            humanCode,
             captchaToken,
             elapsedMs: Date.now() - formStartedAt,
           }),
@@ -298,19 +301,21 @@ const Auth = () => {
                         {errors.confirm && <p className="text-xs font-semibold text-og-blood">{errors.confirm}</p>}
                       </div>
 
-                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <Label className="mb-3 block text-[11px] font-black uppercase tracking-[0.16em] text-white/42">
-                          Human Verification
-                        </Label>
-                        <Turnstile
-                          onVerify={(token) => setCaptchaToken(token)}
-                          onExpire={() => setCaptchaToken(null)}
-                          onError={() => setCaptchaToken(null)}
-                        />
-                        {captchaToken && (
-                          <p className="mt-2 text-center text-[10px] font-bold text-green-400/80">✓ Verified</p>
-                        )}
-                        {errors.humanCode && <p className="mt-2 text-center text-xs font-semibold text-og-blood">{errors.humanCode}</p>}
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-4">
+                        <div>
+                          <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Type OGSCAN</Label>
+                          <Input value={humanCode} onChange={(e) => setHumanCode(e.target.value.toUpperCase())} className="mt-2 min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] text-base uppercase tracking-[0.18em] text-white focus:border-og-lime" placeholder="OGSCAN" />
+                          {errors.humanCode && <p className="mt-1 text-xs font-semibold text-og-blood">{errors.humanCode}</p>}
+                        </div>
+
+                        <div>
+                          <Label className="mb-3 block text-[11px] font-black uppercase tracking-[0.16em] text-white/42">
+                            Slide to Verify
+                          </Label>
+                          <SliderCaptcha onVerify={(token) => setCaptchaToken(token)} />
+                          {errors.captcha && <p className="mt-2 text-center text-xs font-semibold text-og-blood">{errors.captcha}</p>}
+                        </div>
+
                         <div className="hidden" aria-hidden="true">
                           <Label>Leave this field empty</Label>
                           <Input tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
