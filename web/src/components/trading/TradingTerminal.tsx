@@ -7,29 +7,25 @@
  *   Right  (320 px)  5m stats → Buy/Sell swap → Token Info
  *
  * All data is fetched natively — no embeds. Chart uses lightweight-charts.
+ * Chart + Trades use GeckoTerminal (CORS-friendly) with DexScreener pool address.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
 import {
-  Search, Copy, ExternalLink, RefreshCw, TrendingUp, TrendingDown,
-  ArrowUpRight, ArrowDownLeft, ChevronDown, BarChart3, Check,
-  Wallet, Activity, Star, Flame, Clock, Eye, X, Loader2,
-  LayoutGrid, Users,
+  Search, Copy, ExternalLink, RefreshCw,
+  ArrowUpRight, ArrowDownLeft, ChevronDown, Check,
+  Wallet, Activity, Star, X, Loader2, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import {
-  birdeyeOhlcv,
   jupSearchToken,
   JUPITER_BASE,
   JUPITER_API_KEY,
-  BIRDEYE_API_KEY,
-  BIRDEYE_BASE,
   HELIUS_RPC,
   SOL_MINT,
   shortAddr,
@@ -37,8 +33,6 @@ import {
 } from "@/lib/og";
 import {
   getAssets,
-  getWalletOverview,
-  formatUsd,
   type TokenAsset,
 } from "@/lib/solana-api";
 import { CandlestickChart, type CandleDataPoint } from "./CandlestickChart";
@@ -71,7 +65,6 @@ interface TradeEntry {
   time: number;
   side: "buy" | "sell";
   priceUsd: number;
-  mcap: number;
   amount: number;
   symbol: string;
   value: number;
@@ -93,12 +86,12 @@ interface TokenSecurity {
 
 type Timeframe = "15m" | "1H" | "4H" | "1D";
 
-const TIMEFRAMES: { label: string; value: Timeframe; lookbackSec: number }[] = [
-  { label: "15m", value: "15m", lookbackSec: 86_400 },
-  { label: "1H",  value: "1H",  lookbackSec: 7 * 86_400 },
-  { label: "4H",  value: "4H",  lookbackSec: 30 * 86_400 },
-  { label: "1D",  value: "1D",  lookbackSec: 90 * 86_400 },
-];
+const TIMEFRAME_CONFIG: Record<Timeframe, { geckoBase: string; aggregate: number; limit: number; label: string }> = {
+  "15m": { geckoBase: "minute", aggregate: 15, limit: 96,  label: "15m" },
+  "1H":  { geckoBase: "hour",   aggregate: 1,  limit: 168, label: "1H" },
+  "4H":  { geckoBase: "hour",   aggregate: 4,  limit: 180, label: "4H" },
+  "1D":  { geckoBase: "day",    aggregate: 1,  limit: 90,  label: "1D" },
+};
 
 const DEFAULT_MINTS: { mint: string; symbol: string; name: string }[] = [
   { mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", symbol: "BONK", name: "Bonk" },
@@ -121,10 +114,13 @@ type SidebarTab = (typeof SIDEBAR_TABS)[number];
 const BOTTOM_TABS = ["Trades", "My Trades", "Positions", "Top Traders"] as const;
 type BottomTab = (typeof BOTTOM_TABS)[number];
 
+const GECKO_BASE = "https://api.geckoterminal.com/api/v2";
+
 /* ═══════════════════════════════════════════════════════════════════
    API Helpers
    ═══════════════════════════════════════════════════════════════════ */
 
+/** Fetch token pair info from DexScreener (CORS-friendly) */
 async function fetchDexPair(mint: string): Promise<TokenListItem | null> {
   try {
     const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`);
@@ -134,6 +130,8 @@ async function fetchDexPair(mint: string): Promise<TokenListItem | null> {
       .filter((p: any) => p.chainId === "solana")
       .sort((a: any, b: any) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))[0];
     if (!pair) return null;
+    const txns5m = pair.txns?.m5 || {};
+    const totalTxns5m = (txns5m.buys || 0) + (txns5m.sells || 0);
     return {
       mint,
       symbol: pair.baseToken?.symbol || "???",
@@ -146,41 +144,66 @@ async function fetchDexPair(mint: string): Promise<TokenListItem | null> {
       liquidity: pair.liquidity?.usd || 0,
       pairAddress: pair.pairAddress,
       volume5m: pair.volume?.m5 || 0,
-      buys5m: pair.txns?.m5?.buys || 0,
-      sells5m: pair.txns?.m5?.sells || 0,
-      buyVol5m: pair.volume?.m5 ? (pair.volume.m5 * (pair.txns?.m5?.buys || 0)) / Math.max(1, (pair.txns?.m5?.buys || 0) + (pair.txns?.m5?.sells || 0)) : 0,
-      sellVol5m: pair.volume?.m5 ? (pair.volume.m5 * (pair.txns?.m5?.sells || 0)) / Math.max(1, (pair.txns?.m5?.buys || 0) + (pair.txns?.m5?.sells || 0)) : 0,
+      buys5m: txns5m.buys || 0,
+      sells5m: txns5m.sells || 0,
+      buyVol5m: totalTxns5m > 0 ? ((pair.volume?.m5 || 0) * (txns5m.buys || 0)) / totalTxns5m : 0,
+      sellVol5m: totalTxns5m > 0 ? ((pair.volume?.m5 || 0) * (txns5m.sells || 0)) / totalTxns5m : 0,
     };
   } catch { return null; }
 }
 
-async function fetchTrades(mint: string): Promise<TradeEntry[]> {
+/** Fetch OHLCV candle data from GeckoTerminal (CORS-friendly) */
+async function fetchGeckoOhlcv(
+  poolAddress: string,
+  tokenMint: string,
+  timeframe: Timeframe,
+): Promise<CandleDataPoint[]> {
+  const cfg = TIMEFRAME_CONFIG[timeframe];
+  const url = `${GECKO_BASE}/networks/solana/pools/${poolAddress}/ohlcv/${cfg.geckoBase}?aggregate=${cfg.aggregate}&limit=${cfg.limit}&currency=usd&token=${tokenMint}`;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const d = await r.json();
+    const items: number[][] = d?.data?.attributes?.ohlcv_list ?? [];
+    return items
+      .map(([ts, o, h, l, c, v]) => ({
+        time: ts,
+        open: o,
+        high: h,
+        low: l,
+        close: c,
+        volume: v,
+      }))
+      .sort((a, b) => a.time - b.time);
+  } catch { return []; }
+}
+
+/** Fetch recent trades from GeckoTerminal (CORS-friendly) */
+async function fetchGeckoTrades(poolAddress: string, tokenSymbol: string): Promise<TradeEntry[]> {
   try {
     const r = await fetch(
-      `${BIRDEYE_BASE}/defi/txs/token?address=${mint}&tx_type=swap&sort_type=desc&limit=40`,
-      { headers: { "X-API-KEY": BIRDEYE_API_KEY, "x-chain": "solana" } }
+      `${GECKO_BASE}/networks/solana/pools/${poolAddress}/trades`
     );
     if (!r.ok) return [];
     const d = await r.json();
-    return (d?.data?.items || []).map((tx: any) => {
-      const isBuy = tx.side === "buy";
-      const tokenSide = isBuy ? tx.to : tx.from;
-      const solSide = isBuy ? tx.from : tx.to;
+    return (d?.data ?? []).slice(0, 50).map((t: any) => {
+      const a = t.attributes || {};
+      const isBuy = a.kind === "buy";
       return {
-        txHash: tx.txHash || "",
-        time: tx.blockUnixTime || 0,
-        side: tx.side || "buy",
-        priceUsd: tokenSide?.nearestPrice || tokenSide?.price || 0,
-        mcap: 0,
-        amount: Math.abs(tokenSide?.uiAmount || tokenSide?.amount || 0),
-        symbol: tokenSide?.symbol || "???",
-        value: Math.abs(solSide?.uiAmount || solSide?.amount || 0),
-        wallet: tx.owner || "",
+        txHash: a.tx_hash || "",
+        time: a.block_timestamp ? Math.floor(new Date(a.block_timestamp).getTime() / 1000) : 0,
+        side: isBuy ? "buy" : "sell",
+        priceUsd: parseFloat(a.price_to_in_usd || a.price_from_in_usd || "0"),
+        amount: parseFloat(isBuy ? a.to_token_amount || "0" : a.from_token_amount || "0"),
+        symbol: tokenSymbol,
+        value: parseFloat(a.volume_in_usd || "0"),
+        wallet: a.tx_from_address || "",
       } as TradeEntry;
     });
   } catch { return []; }
 }
 
+/** Fetch mint/freeze/holder security info from Helius RPC */
 async function fetchSecurity(mint: string): Promise<TokenSecurity> {
   const def: TokenSecurity = {
     top10HoldersPercent: null,
@@ -191,25 +214,17 @@ async function fetchSecurity(mint: string): Promise<TokenSecurity> {
     mutable: null,
   };
   try {
-    // Mint info (authority checks)
-    const mintRes = await fetch(HELIUS_RPC, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0", id: "mint-info",
-        method: "getAccountInfo",
-        params: [mint, { encoding: "jsonParsed" }],
+    const [mintRes, holderRes] = await Promise.all([
+      fetch(HELIUS_RPC, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", id: "mint-info",
+          method: "getAccountInfo",
+          params: [mint, { encoding: "jsonParsed" }],
+        }),
       }),
-    });
-    const mintData = await mintRes.json();
-    const info = mintData?.result?.value?.data?.parsed?.info;
-    if (info) {
-      def.mintable = !!info.mintAuthority;
-      def.freezable = !!info.freezeAuthority;
-      const supply = parseFloat(info.supply || "0") / Math.pow(10, info.decimals || 0);
-
-      // Top 10 holders
-      const holderRes = await fetch(HELIUS_RPC, {
+      fetch(HELIUS_RPC, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -217,7 +232,14 @@ async function fetchSecurity(mint: string): Promise<TokenSecurity> {
           method: "getTokenLargestAccounts",
           params: [mint, { commitment: "confirmed" }],
         }),
-      });
+      }),
+    ]);
+    const mintData = await mintRes.json();
+    const info = mintData?.result?.value?.data?.parsed?.info;
+    if (info) {
+      def.mintable = !!info.mintAuthority;
+      def.freezable = !!info.freezeAuthority;
+      const supply = parseFloat(info.supply || "0") / Math.pow(10, info.decimals || 0);
       const holderData = await holderRes.json();
       const accounts = holderData?.result?.value || [];
       const top10Sum = accounts
@@ -232,7 +254,7 @@ async function fetchSecurity(mint: string): Promise<TokenSecurity> {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Swap Helper (Phantom native — zero platform fees)
+   Swap Helper (Jupiter — zero platform fees)
    ═══════════════════════════════════════════════════════════════════ */
 
 function b64ToU8(b64: string): Uint8Array {
@@ -315,7 +337,7 @@ function fmtNum(n: number): string {
    ═══════════════════════════════════════════════════════════════════ */
 
 export const TradingTerminal = () => {
-  const { publicKey, signTransaction, connected } = useWallet();
+  const { publicKey, signTransaction, connected, wallets, select, connect, disconnect } = useWallet();
   const { connection } = useConnection();
 
   /* ── State ──────────────────────────────────────────────── */
@@ -339,6 +361,7 @@ export const TradingTerminal = () => {
   const [loadingTokens, setLoadingTokens] = useState(true);
   const [copied, setCopied] = useState(false);
   const [positions, setPositions] = useState<TokenAsset[]>([]);
+  const [showWalletPicker, setShowWalletPicker] = useState(false);
 
   // Chart height from container
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -367,70 +390,67 @@ export const TradingTerminal = () => {
       valid.sort((a, b) => b.volume24h - a.volume24h);
       setTokens(valid);
       setLoadingTokens(false);
-      // Auto-select first
-      if (valid.length > 0 && !selectedToken) {
+      if (valid.length > 0) {
         setSelectedMint(valid[0].mint);
       }
     })();
     return () => { cancelled = true; };
   }, []);
 
-  /* ── Load selected token data ───────────────────────────── */
+  /* ── Load selected token data (DexScreener pair + security) ─── */
   useEffect(() => {
     if (!selectedMint) return;
     let cancelled = false;
     (async () => {
-      // Pair data
       const pair = await fetchDexPair(selectedMint);
       if (cancelled) return;
       if (pair) setSelectedToken(pair);
 
-      // Security info
+      // Security info (Helius RPC — supports CORS)
       fetchSecurity(selectedMint).then((s) => { if (!cancelled) setSecurity(s); });
-
-      // Trades
-      fetchTrades(selectedMint).then((t) => { if (!cancelled) setTrades(t); });
     })();
     return () => { cancelled = true; };
   }, [selectedMint]);
 
-  /* ── Load chart data ────────────────────────────────────── */
+  /* ── Load chart data from GeckoTerminal ─────────────────── */
   useEffect(() => {
-    if (!selectedMint) return;
+    if (!selectedToken?.pairAddress) return;
     let cancelled = false;
     (async () => {
       setLoadingChart(true);
-      const tf = TIMEFRAMES.find((t) => t.value === timeframe)!;
-      const now = Math.floor(Date.now() / 1000);
       try {
-        const candles = await birdeyeOhlcv(selectedMint, tf.value, now - tf.lookbackSec, now);
-        if (cancelled) return;
-        setChartData(
-          candles.map((c) => ({
-            time: c.unixTime,
-            open: c.o,
-            high: c.h,
-            low: c.l,
-            close: c.c,
-            volume: c.v,
-          }))
+        const candles = await fetchGeckoOhlcv(
+          selectedToken.pairAddress!,
+          selectedMint,
+          timeframe,
         );
+        if (!cancelled) setChartData(candles);
       } catch {
         if (!cancelled) setChartData([]);
       }
-      setLoadingChart(false);
+      if (!cancelled) setLoadingChart(false);
     })();
     return () => { cancelled = true; };
-  }, [selectedMint, timeframe]);
+  }, [selectedToken?.pairAddress, selectedMint, timeframe]);
+
+  /* ── Load trades from GeckoTerminal ─────────────────────── */
+  useEffect(() => {
+    if (!selectedToken?.pairAddress) return;
+    let cancelled = false;
+    fetchGeckoTrades(selectedToken.pairAddress, selectedToken.symbol).then((t) => {
+      if (!cancelled) setTrades(t);
+    });
+    return () => { cancelled = true; };
+  }, [selectedToken?.pairAddress, selectedToken?.symbol]);
 
   /* ── Auto-refresh trades every 8s ───────────────────────── */
   useEffect(() => {
-    if (!selectedMint) return;
+    if (!selectedToken?.pairAddress) return;
     const iv = setInterval(() => {
-      fetchTrades(selectedMint).then(setTrades);
+      fetchGeckoTrades(selectedToken.pairAddress!, selectedToken.symbol).then(setTrades);
     }, 8000);
     return () => clearInterval(iv);
-  }, [selectedMint]);
+  }, [selectedToken?.pairAddress, selectedToken?.symbol]);
 
   /* ── Auto-refresh pair data every 15s ───────────────────── */
   useEffect(() => {
@@ -478,6 +498,7 @@ export const TradingTerminal = () => {
     setTrades([]);
     setChartData([]);
     setSecurity(null);
+    setSelectedToken(null);
   }, []);
 
   const copyMint = useCallback(() => {
@@ -486,6 +507,26 @@ export const TradingTerminal = () => {
     setTimeout(() => setCopied(false), 2000);
     toast({ title: "Address copied" });
   }, [selectedMint]);
+
+  /** Connect wallet using the adapter's select + connect */
+  const connectWallet = useCallback(async () => {
+    if (connected) return;
+    // If Phantom is available, use it directly
+    const phantomAdapter = wallets.find((w) => w.adapter.name === "Phantom");
+    const solflareAdapter = wallets.find((w) => w.adapter.name === "Solflare");
+    const target = phantomAdapter || solflareAdapter || wallets[0];
+    if (target) {
+      try {
+        select(target.adapter.name as any);
+        // Wait for the adapter to be ready, then connect
+        setTimeout(async () => {
+          try { await connect(); } catch { /* user cancelled or not installed */ }
+        }, 200);
+      } catch { /* ignore */ }
+    } else {
+      toast({ title: "No wallet detected", description: "Install Phantom or Solflare", variant: "destructive" });
+    }
+  }, [connected, wallets, select, connect]);
 
   const handleSwap = useCallback(async () => {
     if (!publicKey || !signTransaction || !selectedMint) return;
@@ -511,9 +552,8 @@ export const TradingTerminal = () => {
   }, [publicKey, signTransaction, selectedMint, swapMode, swapAmount, connection]);
 
   const selectSearchResult = useCallback(
-    async (token: JupTokenInfo) => {
+    (token: JupTokenInfo) => {
       const mint = (token as any).address || token.id;
-      // Add to list if not there
       setTokens((prev) => {
         if (prev.some((t) => t.mint === mint)) return prev;
         return [
@@ -533,6 +573,14 @@ export const TradingTerminal = () => {
     [selectToken]
   );
 
+  const refreshChart = useCallback(() => {
+    if (!selectedToken?.pairAddress) return;
+    setLoadingChart(true);
+    fetchGeckoOhlcv(selectedToken.pairAddress, selectedMint, timeframe)
+      .then(setChartData)
+      .finally(() => setLoadingChart(false));
+  }, [selectedToken?.pairAddress, selectedMint, timeframe]);
+
   /* ── Derived ────────────────────────────────────────────── */
   const t = selectedToken; // shorthand
 
@@ -541,7 +589,7 @@ export const TradingTerminal = () => {
      ═══════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="flex h-[calc(100vh-68px)] lg:h-[calc(100vh-0px)] overflow-hidden bg-[#0a0a14]">
+    <div className="flex flex-col lg:flex-row min-h-[calc(100vh-68px)] lg:h-[calc(100vh-0px)] overflow-y-auto lg:overflow-hidden bg-[#0a0a14]">
 
       {/* ═══════════════ LEFT SIDEBAR ═══════════════ */}
       <aside className="hidden lg:flex flex-col w-[280px] min-w-[280px] border-r border-white/[0.07] bg-[#0d0d1a]">
@@ -610,7 +658,7 @@ export const TradingTerminal = () => {
               <Loader2 className="h-5 w-5 animate-spin text-white/30" />
             </div>
           ) : sidebarTab === "Trending" ? (
-            tokens.map((token, i) => (
+            tokens.map((token) => (
               <button
                 key={token.mint}
                 onClick={() => selectToken(token.mint)}
@@ -685,7 +733,7 @@ export const TradingTerminal = () => {
       </aside>
 
       {/* ═══════════════ CENTER PANEL ═══════════════ */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden lg:overflow-hidden">
 
         {/* Mobile token selector */}
         <div className="lg:hidden border-b border-white/[0.07] bg-[#0d0d1a]">
@@ -699,6 +747,24 @@ export const TradingTerminal = () => {
                 className="pl-8 h-8 text-xs bg-white/[0.04] border-white/[0.07] rounded-lg"
               />
             </div>
+            {/* Mobile search results */}
+            {searchResults.length > 0 && (
+              <div className="mt-1 bg-[#111128] rounded-lg border border-white/[0.07] max-h-[200px] overflow-y-auto">
+                {searchResults.map((sr) => (
+                  <button
+                    key={(sr as any).address || sr.id}
+                    onClick={() => selectSearchResult(sr)}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/[0.06] text-left"
+                  >
+                    {((sr as any).logoURI || sr.icon) && (
+                      <img src={(sr as any).logoURI || sr.icon} alt="" className="w-5 h-5 rounded-full" />
+                    )}
+                    <span className="text-xs font-semibold">{sr.symbol}</span>
+                    <span className="text-[10px] text-white/30 truncate">{sr.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex gap-1.5 px-2 pb-2 overflow-x-auto no-scrollbar">
             {tokens.slice(0, 10).map((tk) => (
@@ -763,17 +829,17 @@ export const TradingTerminal = () => {
 
         {/* Chart controls */}
         <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/[0.07] bg-[#0a0a14]">
-          {TIMEFRAMES.map((tf) => (
+          {(Object.keys(TIMEFRAME_CONFIG) as Timeframe[]).map((tf) => (
             <button
-              key={tf.value}
-              onClick={() => setTimeframe(tf.value)}
+              key={tf}
+              onClick={() => setTimeframe(tf)}
               className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
-                timeframe === tf.value
+                timeframe === tf
                   ? "bg-[#ab9ff2]/20 text-[#ab9ff2]"
                   : "text-white/35 hover:text-white/60 hover:bg-white/[0.04]"
               }`}
             >
-              {tf.label}
+              {TIMEFRAME_CONFIG[tf].label}
             </button>
           ))}
           <div className="w-px h-4 bg-white/[0.07] mx-1" />
@@ -795,30 +861,23 @@ export const TradingTerminal = () => {
             MCap
           </button>
           <div className="flex-1" />
-          <button
-            onClick={() => {
-              setLoadingChart(true);
-              const tf = TIMEFRAMES.find((t) => t.value === timeframe)!;
-              const now = Math.floor(Date.now() / 1000);
-              birdeyeOhlcv(selectedMint, tf.value, now - tf.lookbackSec, now)
-                .then((c) => setChartData(c.map((x) => ({ time: x.unixTime, open: x.o, high: x.h, low: x.l, close: x.c, volume: x.v }))))
-                .finally(() => setLoadingChart(false));
-            }}
-            className="text-white/25 hover:text-white/50 transition-colors p-1"
-          >
+          <button onClick={refreshChart} className="text-white/25 hover:text-white/50 transition-colors p-1">
             <RefreshCw className={`h-3.5 w-3.5 ${loadingChart ? "animate-spin" : ""}`} />
           </button>
         </div>
 
         {/* Chart area */}
-        <div ref={chartContainerRef} className="flex-1 min-h-[200px] relative">
+        <div ref={chartContainerRef} className="flex-1 min-h-[300px] h-[350px] lg:h-auto relative">
           {loadingChart && chartData.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-[#ab9ff2]/40" />
             </div>
           ) : chartData.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center text-white/20 text-sm">
-              No chart data available
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <Loader2 className="h-6 w-6 animate-spin text-white/20 mx-auto mb-2" />
+                <p className="text-white/20 text-sm">Loading chart…</p>
+              </div>
             </div>
           ) : (
             <CandlestickChart data={chartData} height={chartHeight} />
@@ -826,7 +885,7 @@ export const TradingTerminal = () => {
         </div>
 
         {/* Bottom tabs: Trades / My Trades / Positions / Top Traders */}
-        <div className="border-t border-white/[0.07] bg-[#0d0d1a] flex flex-col min-h-[200px] max-h-[280px]">
+        <div className="border-t border-white/[0.07] bg-[#0d0d1a] flex flex-col min-h-[250px] lg:min-h-[200px] lg:max-h-[280px]">
           <div className="flex border-b border-white/[0.07]">
             {BOTTOM_TABS.map((tab) => (
               <button
@@ -846,7 +905,6 @@ export const TradingTerminal = () => {
           <ScrollArea className="flex-1">
             {bottomTab === "Trades" && (
               <>
-                {/* Trades header */}
                 <div className="grid grid-cols-6 gap-2 px-3 py-1.5 text-[10px] text-white/25 font-medium border-b border-white/[0.05] sticky top-0 bg-[#0d0d1a]">
                   <span>Time</span>
                   <span>Type</span>
@@ -857,7 +915,8 @@ export const TradingTerminal = () => {
                 </div>
                 {trades.length === 0 ? (
                   <div className="flex items-center justify-center py-8 text-white/20 text-xs">
-                    {loadingChart ? "Loading trades…" : "No trades found"}
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Loading trades…
                   </div>
                 ) : (
                   trades.map((trade, i) => (
@@ -871,7 +930,7 @@ export const TradingTerminal = () => {
                       </span>
                       <span className="text-white/60 font-mono">{fmtPrice(trade.priceUsd)}</span>
                       <span className="text-white/50 font-mono">{fmtNum(trade.amount)}</span>
-                      <span className="text-white/50 font-mono">{fmtNum(trade.value)}</span>
+                      <span className="text-white/50 font-mono">${fmtNum(trade.value)}</span>
                       <a
                         href={`https://solscan.io/account/${trade.wallet}`}
                         target="_blank"
@@ -1039,11 +1098,7 @@ export const TradingTerminal = () => {
             </Button>
           ) : (
             <Button
-              onClick={() => {
-                // Trigger wallet adapter modal
-                const btn = document.querySelector(".wallet-adapter-button") as HTMLButtonElement;
-                btn?.click();
-              }}
+              onClick={connectWallet}
               className="w-full h-11 rounded-xl font-semibold text-sm bg-[#ab9ff2] hover:bg-[#9b8fe2] text-black"
             >
               <Wallet className="h-4 w-4 mr-2" />
@@ -1102,50 +1157,143 @@ export const TradingTerminal = () => {
             </div>
           )}
         </div>
-
-        {/* Mobile swap button */}
       </aside>
 
-      {/* ═══════════════ MOBILE BOTTOM BAR ═══════════════ */}
-      <div className="lg:hidden fixed bottom-[68px] left-0 right-0 z-30 bg-[#0d0d1a] border-t border-white/[0.07] p-2 flex gap-2">
-        {connected ? (
-          <>
-            <Input
-              type="number"
-              placeholder="SOL amount"
-              value={swapAmount}
-              onChange={(e) => setSwapAmount(e.target.value)}
-              className="flex-1 h-9 text-sm bg-white/[0.04] border-white/[0.07] rounded-lg font-mono"
-            />
-            <Button
-              size="sm"
-              onClick={() => { setSwapMode("buy"); handleSwap(); }}
-              disabled={swapping}
-              className="bg-green-500 text-black font-semibold rounded-lg px-4"
+      {/* ═══════════════ MOBILE SWAP & INFO SECTION ═══════════════ */}
+      <div className="lg:hidden bg-[#0d0d1a] border-t border-white/[0.07]">
+        {/* 5m stats */}
+        {t && (
+          <div className="grid grid-cols-3 border-b border-white/[0.07]">
+            <div className="p-3 text-center border-r border-white/[0.05]">
+              <p className="text-[10px] text-white/30">5m Vol</p>
+              <p className="text-xs font-bold font-mono text-white/80">{fmtMcap(t.volume5m)}</p>
+            </div>
+            <div className="p-3 text-center border-r border-white/[0.05]">
+              <p className="text-[10px] text-white/30">Buys</p>
+              <p className="text-xs font-bold font-mono text-green-400">{t.buys5m}</p>
+            </div>
+            <div className="p-3 text-center">
+              <p className="text-[10px] text-white/30">Sells</p>
+              <p className="text-xs font-bold font-mono text-red-400">{t.sells5m}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Swap panel */}
+        <div className="p-4 space-y-3 border-b border-white/[0.07]">
+          <div className="flex rounded-lg overflow-hidden border border-white/[0.07]">
+            <button
+              onClick={() => setSwapMode("buy")}
+              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+                swapMode === "buy"
+                  ? "bg-green-500/20 text-green-400 border-b-2 border-green-400"
+                  : "text-white/40 hover:text-white/60"
+              }`}
             >
               Buy
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => { setSwapMode("sell"); handleSwap(); }}
-              disabled={swapping}
-              className="bg-red-500 text-white font-semibold rounded-lg px-4"
+            </button>
+            <button
+              onClick={() => setSwapMode("sell")}
+              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+                swapMode === "sell"
+                  ? "bg-red-500/20 text-red-400 border-b-2 border-red-400"
+                  : "text-white/40 hover:text-white/60"
+              }`}
             >
               Sell
+            </button>
+          </div>
+
+          <div className="relative">
+            <Input
+              type="number"
+              placeholder="0"
+              value={swapAmount}
+              onChange={(e) => setSwapAmount(e.target.value)}
+              className="h-12 text-lg font-mono bg-white/[0.04] border-white/[0.07] rounded-xl pr-16"
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-white/50">
+              <span className="text-xs font-medium">SOL</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5">
+            {[0.1, 0.25, 0.5, 1, 5, 10].map((amt) => (
+              <button
+                key={amt}
+                onClick={() => setSwapAmount(String(amt))}
+                className="py-1.5 rounded-lg text-[11px] font-medium bg-white/[0.04] border border-white/[0.07] text-white/50 hover:bg-white/[0.08] transition-colors"
+              >
+                {amt} ◎
+              </button>
+            ))}
+          </div>
+
+          {connected ? (
+            <Button
+              onClick={handleSwap}
+              disabled={swapping || !swapAmount}
+              className={`w-full h-11 rounded-xl font-semibold text-sm ${
+                swapMode === "buy"
+                  ? "bg-green-500 hover:bg-green-600 text-black"
+                  : "bg-red-500 hover:bg-red-600 text-white"
+              }`}
+            >
+              {swapping ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : swapMode === "buy" ? (
+                <ArrowDownLeft className="h-4 w-4 mr-2" />
+              ) : (
+                <ArrowUpRight className="h-4 w-4 mr-2" />
+              )}
+              {swapping ? "Swapping…" : swapMode === "buy" ? `Buy ${t?.symbol || ""}` : `Sell ${t?.symbol || ""}`}
             </Button>
-          </>
-        ) : (
-          <Button
-            onClick={() => {
-              const btn = document.querySelector(".wallet-adapter-button") as HTMLButtonElement;
-              btn?.click();
-            }}
-            className="flex-1 h-9 bg-[#ab9ff2] text-black font-semibold rounded-lg"
-          >
-            <Wallet className="h-4 w-4 mr-2" />
-            Connect Wallet
-          </Button>
+          ) : (
+            <Button
+              onClick={connectWallet}
+              className="w-full h-11 rounded-xl font-semibold text-sm bg-[#ab9ff2] hover:bg-[#9b8fe2] text-black"
+            >
+              <Wallet className="h-4 w-4 mr-2" />
+              Connect Wallet
+            </Button>
+          )}
+          <p className="text-[10px] text-white/25 text-center">$0 fee · Powered by Jupiter</p>
+        </div>
+
+        {/* Token Info on mobile */}
+        {security && (
+          <div className="p-4">
+            <h3 className="text-xs font-semibold text-white/60 mb-3 flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5" />
+              Token Info
+            </h3>
+            <div className="grid grid-cols-4 gap-3">
+              <InfoCell
+                label="Top 10 H"
+                value={security.top10HoldersPercent != null ? `${security.top10HoldersPercent.toFixed(1)}%` : "—"}
+                color={
+                  security.top10HoldersPercent == null ? "neutral" :
+                  security.top10HoldersPercent < 30 ? "good" :
+                  security.top10HoldersPercent < 60 ? "warn" : "bad"
+                }
+              />
+              <InfoCell label="Dev H" value={security.devHoldersPercent != null ? `${security.devHoldersPercent.toFixed(1)}%` : "—"} color="neutral" />
+              <InfoCell
+                label="Mintable"
+                value={security.mintable == null ? "—" : security.mintable ? "Yes" : "No"}
+                color={security.mintable == null ? "neutral" : security.mintable ? "bad" : "good"}
+              />
+              <InfoCell
+                label="Freezable"
+                value={security.freezable == null ? "—" : security.freezable ? "Yes" : "No"}
+                color={security.freezable == null ? "neutral" : security.freezable ? "bad" : "good"}
+              />
+            </div>
+          </div>
         )}
+
+        {/* Bottom padding for app nav bar */}
+        <div className="h-20" />
       </div>
     </div>
   );
