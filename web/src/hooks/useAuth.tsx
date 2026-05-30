@@ -139,9 +139,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const refCode = localStorage.getItem("og_ref_code");
       if (refCode) {
         localStorage.removeItem("og_ref_code");
-        supabase.functions.invoke("process-referral", {
-          body: { inviteeId: data.user.id, inviteCode: refCode },
-        }).catch(() => {}); // fire-and-forget
+        // Try edge function first, fall back to direct insert
+        (async () => {
+          try {
+            const { error: fnErr } = await supabase.functions.invoke("process-referral", {
+              body: { inviteeId: data.user.id, inviteCode: refCode },
+            });
+            if (fnErr) throw fnErr;
+          } catch (edgeFnErr) {
+            console.warn("Edge function failed, using direct referral insert:", edgeFnErr);
+            try {
+              // Look up inviter by referral_code
+              const { data: inviter } = await supabase
+                .from("profiles")
+                .select("user_id")
+                .eq("referral_code", refCode)
+                .maybeSingle();
+              if (inviter && inviter.user_id !== data.user!.id) {
+                // Insert referral directly
+                await supabase.from("referrals").insert({
+                  inviter_id: inviter.user_id,
+                  invitee_id: data.user!.id,
+                  code: refCode,
+                  reward_credits: 100,
+                });
+                // Set referred_by on invitee profile
+                await supabase
+                  .from("profiles")
+                  .update({ referred_by: inviter.user_id })
+                  .eq("user_id", data.user!.id);
+              }
+            } catch (directErr) {
+              console.error("Direct referral insert also failed:", directErr);
+            }
+          }
+        })();
       }
       // Track sign-up event
       trackActivity({

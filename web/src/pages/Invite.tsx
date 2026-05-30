@@ -29,7 +29,9 @@ import { OGSCAN_TOKEN_MINT, HELIUS_RPC, shortAddr } from "@/lib/og";
    ═══════════════════════════════════════════════════════════════════ */
 
 const OGS_MINT = OGSCAN_TOKEN_MINT;
+const SOL_MINT = "So11111111111111111111111111111111111111112";
 const MIN_HOLDING_USD = 10;
+const BUY_AMOUNT_USD = 15;
 
 /** Prize tiers for the top 8 */
 const PRIZE_TIERS = [
@@ -57,6 +59,7 @@ interface LeaderboardEntry {
   username: string;
   userId: string;
   qualifiedReferrals: number;
+  totalReferrals: number;
   prize: number;
 }
 
@@ -151,6 +154,7 @@ const Invite = () => {
     invited: 0, qualified: 0, rank: null,
   });
   const [showWalletPicker, setShowWalletPicker] = useState(false);
+  const [solPrice, setSolPrice] = useState(0);
 
   const contestStatus = useMemo(() => getContestStatus(), []);
   const referralCode = (profile as any)?.referral_code;
@@ -160,6 +164,18 @@ const Invite = () => {
   useEffect(() => {
     const iv = setInterval(() => setTimeLeft(getTimeLeft(CONTEST_END)), 1000);
     return () => clearInterval(iv);
+  }, []);
+
+  /* Fetch SOL price for buy button */
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${SOL_MINT}`);
+        const d = await r.json();
+        const pair = (d.pairs || []).find((p: any) => p.chainId === "solana" && parseFloat(p.liquidity?.usd || "0") > 100000);
+        if (pair) setSolPrice(parseFloat(pair.priceUsd || "0"));
+      } catch { /* fallback stays 0 */ }
+    })();
   }, []);
 
   /* Load profile */
@@ -212,19 +228,60 @@ const Invite = () => {
           .lte("created_at", CONTEST_END.toISOString())
           .order("created_at", { ascending: false });
 
-        // Count referrals per inviter
-        const counts = new Map<string, number>();
-        for (const r of refs || []) {
-          counts.set(r.inviter_id, (counts.get(r.inviter_id) || 0) + 1);
+        if (!refs || cancelled) { setLoadingBoard(false); return; }
+
+        // Get all unique invitee IDs to check their holdings
+        const allInviteeIds = [...new Set(refs.map((r) => r.invitee_id))];
+
+        // Fetch invitee profiles to get wallet addresses
+        const { data: inviteeProfiles } = await supabase
+          .from("profiles")
+          .select("user_id, sol_wallet, wallet_address")
+          .in("user_id", allInviteeIds.length > 0 ? allInviteeIds : ["__none__"]);
+
+        // Check which invitees hold ≥ $10 OGS (batch check wallets)
+        const qualifiedInvitees = new Set<string>();
+        const currentOgsPrice = ogsPrice > 0 ? ogsPrice : await getOgsPrice();
+
+        if (inviteeProfiles && currentOgsPrice > 0) {
+          // Check wallets in parallel (max 10 at a time to avoid rate limits)
+          const walletsToCheck = inviteeProfiles
+            .filter((p) => p.sol_wallet || p.wallet_address)
+            .map((p) => ({ userId: p.user_id, wallet: (p.sol_wallet || p.wallet_address) as string }));
+
+          const batchSize = 10;
+          for (let i = 0; i < walletsToCheck.length; i += batchSize) {
+            if (cancelled) return;
+            const batch = walletsToCheck.slice(i, i + batchSize);
+            const results = await Promise.allSettled(
+              batch.map(async ({ userId, wallet }) => {
+                const balance = await getOgsBalance(wallet);
+                if (balance * currentOgsPrice >= MIN_HOLDING_USD) {
+                  qualifiedInvitees.add(userId);
+                }
+              })
+            );
+          }
         }
 
-        // Sort by count desc
-        const sorted = Array.from(counts.entries())
-          .sort((a, b) => b[1] - a[1])
+        // Count referrals per inviter — total and qualified
+        const totalCounts = new Map<string, number>();
+        const qualifiedCounts = new Map<string, number>();
+        for (const r of refs) {
+          totalCounts.set(r.inviter_id, (totalCounts.get(r.inviter_id) || 0) + 1);
+          if (qualifiedInvitees.has(r.invitee_id)) {
+            qualifiedCounts.set(r.inviter_id, (qualifiedCounts.get(r.inviter_id) || 0) + 1);
+          }
+        }
+
+        // Sort by QUALIFIED count desc (only qualified count for leaderboard ranking)
+        const sorted = Array.from(totalCounts.entries())
+          .map(([userId, total]) => ({ userId, total, qualified: qualifiedCounts.get(userId) || 0 }))
+          .sort((a, b) => b.qualified - a.qualified || b.total - a.total)
           .slice(0, 20);
 
-        // Fetch usernames
-        const ids = sorted.map(([id]) => id);
+        // Fetch usernames for leaderboard
+        const ids = sorted.map((e) => e.userId);
         const { data: profs } = await supabase
           .from("profiles")
           .select("user_id, username")
@@ -232,23 +289,25 @@ const Invite = () => {
 
         const nameMap = new Map((profs || []).map((p: any) => [p.user_id, p.username || "Anonymous"]));
 
-        const board: LeaderboardEntry[] = sorted.map(([userId, count], i) => ({
+        const board: LeaderboardEntry[] = sorted.map((entry, i) => ({
           rank: i + 1,
-          username: nameMap.get(userId) || "Anonymous",
-          userId,
-          qualifiedReferrals: count,
+          username: nameMap.get(entry.userId) || "Anonymous",
+          userId: entry.userId,
+          qualifiedReferrals: entry.qualified,
+          totalReferrals: entry.total,
           prize: i < PRIZE_TIERS.length ? PRIZE_TIERS[i].prize : 0,
         }));
 
         if (!cancelled) {
           setLeaderboard(board);
 
-          // Find user's rank
+          // Find user's stats
           const myEntry = board.find((e) => e.userId === user.id);
-          const allRefs = (refs || []).filter((r) => r.inviter_id === user.id);
+          const myTotalRefs = totalCounts.get(user.id) || 0;
+          const myQualifiedRefs = qualifiedCounts.get(user.id) || 0;
           setMyStats({
-            invited: allRefs.length,
-            qualified: allRefs.length, // For now count all, can add holder check later
+            invited: myTotalRefs,
+            qualified: myQualifiedRefs,
             rank: myEntry?.rank || null,
           });
         }
@@ -285,10 +344,17 @@ const Invite = () => {
     }
   }, [inviteLink, copyLink]);
 
-  /* Open Phantom to buy OGS */
+  /* Open Phantom to buy $15 of OGS — pre-filled amount */
   const buyOgs = useCallback(() => {
-    window.open(`https://phantom.app/ul/swap/So11111111111111111111111111111111111111112/${OGS_MINT}?ref=ogscan`, "_blank");
-  }, []);
+    let url = `https://phantom.app/ul/swap/${SOL_MINT}/${OGS_MINT}`;
+    if (solPrice > 0) {
+      // Calculate $15 worth of SOL in lamports (SOL has 9 decimals)
+      const solAmount = BUY_AMOUNT_USD / solPrice;
+      const lamports = Math.ceil(solAmount * 1e9);
+      url += `?amount=${lamports}`;
+    }
+    window.open(url, "_blank");
+  }, [solPrice]);
 
   /* ── Wallet Picker Overlay ── */
   const WalletPickerOverlay = () => {
@@ -475,7 +541,7 @@ const Invite = () => {
                           <Button onClick={buyOgs} variant="outline"
                             className="w-full border-[#ab9ff2]/30 text-[#ab9ff2] hover:bg-[#ab9ff2]/10 text-xs">
                             <ArrowUpRight className="h-3.5 w-3.5 mr-1.5" />
-                            Buy OGS on Phantom
+                            Buy $15 of OGS on Phantom
                           </Button>
                         </div>
                       )}
@@ -589,9 +655,10 @@ const Invite = () => {
                       {/* Header */}
                       <div className="grid grid-cols-12 gap-2 px-3 py-1.5 text-[10px] text-white/25 uppercase tracking-widest font-bold">
                         <span className="col-span-1">#</span>
-                        <span className="col-span-5">User</span>
-                        <span className="col-span-3 text-center">Referrals</span>
-                        <span className="col-span-3 text-right">Prize</span>
+                        <span className="col-span-4">User</span>
+                        <span className="col-span-2 text-center">Invited</span>
+                        <span className="col-span-3 text-center">Qualified</span>
+                        <span className="col-span-2 text-right">Prize</span>
                       </div>
 
                       {/* Prize tiers (always show 8 rows) */}
@@ -617,7 +684,7 @@ const Invite = () => {
                             </div>
 
                             {/* Username */}
-                            <div className="col-span-5">
+                            <div className="col-span-4">
                               {entry ? (
                                 <div className="flex items-center gap-2">
                                   <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-[10px] font-bold text-white/50">
@@ -635,15 +702,22 @@ const Invite = () => {
                               )}
                             </div>
 
-                            {/* Referral count */}
+                            {/* Total invited */}
+                            <div className="col-span-2 text-center">
+                              <span className="text-sm font-bold font-mono text-white/40">
+                                {entry ? entry.totalReferrals : "—"}
+                              </span>
+                            </div>
+
+                            {/* Qualified (holds $10+ OGS) */}
                             <div className="col-span-3 text-center">
-                              <span className="text-sm font-bold font-mono">
+                              <span className="text-sm font-bold font-mono text-green-400">
                                 {entry ? entry.qualifiedReferrals : "—"}
                               </span>
                             </div>
 
                             {/* Prize */}
-                            <div className="col-span-3 text-right">
+                            <div className="col-span-2 text-right">
                               <span className={`text-sm font-black ${tier.rank <= 3 ? tier.color : "text-white/40"}`}>
                                 ${tier.prize}
                               </span>
@@ -662,7 +736,7 @@ const Invite = () => {
                             <div className="col-span-1">
                               <span className="text-xs font-bold text-white/30">{myStats.rank}</span>
                             </div>
-                            <div className="col-span-5">
+                            <div className="col-span-4">
                               <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-lg bg-[#ab9ff2]/20 flex items-center justify-center text-[10px] font-bold text-[#ab9ff2]">
                                   {profile?.username?.charAt(0).toUpperCase() || "Y"}
@@ -672,10 +746,13 @@ const Invite = () => {
                                 </p>
                               </div>
                             </div>
-                            <div className="col-span-3 text-center">
-                              <span className="text-sm font-bold font-mono">{myStats.qualified}</span>
+                            <div className="col-span-2 text-center">
+                              <span className="text-sm font-bold font-mono text-white/40">{myStats.invited}</span>
                             </div>
-                            <div className="col-span-3 text-right">
+                            <div className="col-span-3 text-center">
+                              <span className="text-sm font-bold font-mono text-green-400">{myStats.qualified}</span>
+                            </div>
+                            <div className="col-span-2 text-right">
                               <span className="text-xs text-white/25">Outside top 8</span>
                             </div>
                           </div>
