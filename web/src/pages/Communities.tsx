@@ -3964,11 +3964,18 @@ function ComposeModal({
 
       if (willCrossPost) {
         const tweetText = postType === "thread"
-          ? threadParts.filter(Boolean).join("\n\n").slice(0, 280)
-          : content.trim().slice(0, 280);
+          ? threadParts.filter(Boolean).join("\n\n")
+          : content.trim();
         try {
           const { data: xResult, error: xError } = await supabase.functions.invoke("post-to-x", {
-            body: { text: tweetText, imageUrl: imageUrl || null },
+            body: {
+              text: tweetText,
+              imageUrl: imageUrl || null,
+              videoUrl: videoUrl || null,
+              linkUrl: linkUrl || null,
+              youtubeUrl: youtubeUrl || null,
+              chartUrl: (postType === "call" && tokenData?.chartUrl) ? tokenData.chartUrl : null,
+            },
           });
           if (!xError && xResult?.tweetId) toast.success("Also posted to X 🐦");
           else if (xError) toast.error("OG post saved ✓ but X post failed");
