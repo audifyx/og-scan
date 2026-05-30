@@ -1,49 +1,151 @@
 /**
- * Wallets page — Embedded Phantom swap terminal for OGS token.
+ * Wallets page — Browser-style wrapper for Phantom Trade.
+ * Custom mini-browser chrome around trade.phantom.com.
  */
 
-import { useRef } from "react";
+import { useState, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { OGSCAN_TOKEN_MINT } from "@/lib/og";
+import {
+  RefreshCw,
+  ExternalLink,
+  Lock,
+  ArrowLeft,
+  ArrowRight,
+  Globe,
+} from "lucide-react";
+
+const PHANTOM_URL = "https://trade.phantom.com";
 
 const Wallets = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [iframeError, setIframeError] = useState(false);
 
-  // Phantom Trade terminal
-  const phantomSwapUrl = `https://trade.phantom.com/`;
+  const handleReload = () => {
+    setLoading(true);
+    setIframeError(false);
+    if (iframeRef.current) {
+      iframeRef.current.src = PHANTOM_URL;
+    }
+  };
 
   return (
     <AppLayout>
       <div className="flex flex-col h-[calc(100vh-4rem)] lg:h-screen w-full bg-[#0a0a0f]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-[#0d0d14]/80 backdrop-blur-sm shrink-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-black text-white tracking-tight">Trade OGS</h1>
-            <span className="text-[10px] text-white/30 bg-white/[0.04] px-2 py-0.5 rounded-full border border-white/[0.06]">
-              Powered by Phantom
-            </span>
+        {/* ── Browser chrome ── */}
+        <div className="shrink-0 bg-[#141420] border-b border-white/[0.06]">
+          {/* Tab bar */}
+          <div className="flex items-center gap-1 px-3 pt-2">
+            <div className="flex items-center gap-2 bg-[#1c1c2e] rounded-t-lg px-4 py-2 border border-white/[0.08] border-b-0 max-w-[240px]">
+              <img
+                src="https://phantom.com/favicon.ico"
+                alt=""
+                className="w-4 h-4 rounded-sm"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+              <span className="text-[11px] text-white/70 font-medium truncate">
+                Phantom Trade
+              </span>
+            </div>
           </div>
-          <a
-            href={phantomSwapUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[11px] text-[#ab9ff2] hover:text-[#c4bbff] transition-colors font-semibold"
-          >
-            Open in Phantom ↗
-          </a>
+
+          {/* Navigation + Address bar */}
+          <div className="flex items-center gap-2 px-3 py-2">
+            {/* Nav buttons */}
+            <div className="flex items-center gap-0.5">
+              <button
+                className="p-1.5 rounded-md text-white/20 hover:text-white/40 hover:bg-white/[0.05] transition"
+                disabled
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                className="p-1.5 rounded-md text-white/20 hover:text-white/40 hover:bg-white/[0.05] transition"
+                disabled
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={handleReload}
+                className="p-1.5 rounded-md text-white/30 hover:text-white/60 hover:bg-white/[0.05] transition"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+
+            {/* Address bar */}
+            <div className="flex-1 flex items-center gap-2 bg-[#0d0d18] rounded-lg px-3 py-1.5 border border-white/[0.06]">
+              <Lock className="h-3 w-3 text-green-400/60 shrink-0" />
+              <span className="text-[12px] text-white/50 font-mono truncate select-all">
+                trade.phantom.com
+              </span>
+            </div>
+
+            {/* Open in new tab */}
+            <a
+              href={PHANTOM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-md text-white/30 hover:text-white/60 hover:bg-white/[0.05] transition"
+              title="Open in new tab"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
 
-        {/* Embedded Phantom swap */}
-        <div className="flex-1 w-full relative">
+        {/* ── Page content (iframe or fallback) ── */}
+        <div className="flex-1 relative bg-[#0d0d14]">
+          {/* Loading bar */}
+          {loading && (
+            <div className="absolute top-0 left-0 right-0 h-[2px] z-10">
+              <div className="h-full bg-[#ab9ff2] rounded-full animate-pulse w-2/3" />
+            </div>
+          )}
+
           <iframe
             ref={iframeRef}
-            src={phantomSwapUrl}
-            title="Phantom Swap — OGS Token"
+            src={PHANTOM_URL}
+            title="Phantom Trade"
             className="w-full h-full border-0"
-            allow="clipboard-write; clipboard-read; wallet-standard"
+            allow="clipboard-write; clipboard-read"
             sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"
             style={{ colorScheme: "dark" }}
+            onLoad={() => setLoading(false)}
+            onError={() => {
+              setLoading(false);
+              setIframeError(true);
+            }}
           />
+
+          {/* Fallback overlay if iframe can't load */}
+          {iframeError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0d0d14] gap-6 px-6">
+              <div className="w-16 h-16 rounded-2xl bg-[#ab9ff2]/10 border border-[#ab9ff2]/20 flex items-center justify-center">
+                <Globe className="h-8 w-8 text-[#ab9ff2]" />
+              </div>
+              <div className="text-center">
+                <h2 className="text-lg font-black text-white mb-2">
+                  Open Phantom Trade
+                </h2>
+                <p className="text-sm text-white/40 max-w-sm">
+                  Phantom Trade needs to open in a new window for full
+                  functionality.
+                </p>
+              </div>
+              <a
+                href={PHANTOM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-[#ab9ff2] text-[#0a0a0f] px-6 py-3 rounded-xl font-black text-sm hover:bg-[#c4bbff] transition active:scale-[0.98]"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open Phantom Trade
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>
