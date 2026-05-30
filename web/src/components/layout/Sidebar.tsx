@@ -1,5 +1,5 @@
 import {
-  Bell, Headset, LineChart, LogOut, Mail,
+  Bell, Gift, Headset, LineChart, LogOut, Mail,
   MessageSquare, Settings, Trophy,
   User, Wallet, X, Shield, Menu, Users, Wrench, Home,
 } from "lucide-react";
@@ -17,6 +17,7 @@ type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; 
 
 const mainItems: NavItem[] = [
   { to: "/app",        icon: Home,          label: "Home",      eyebrow: "Command hub" },
+  { to: "/invite",     icon: Gift,          label: "Invite",    eyebrow: "Referral contest" },
   { to: "/community",  icon: Users,         label: "Community", eyebrow: "Social & voice" },
   { to: "/tools",      icon: Wrench,        label: "Tools",     eyebrow: "Scanners & feeds" },
   { to: "/profile",    icon: User,          label: "Profile",   eyebrow: "Your account" },
