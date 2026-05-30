@@ -1293,6 +1293,25 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
 
   const totalInRoom = voiceParticipants.length || ((cur.listener_count || 0) + (cur.speaker_count || 0));
 
+  // Always ensure current user appears in the participant list even before LiveKit connects
+  const displayParticipants: VoiceParticipant[] = useMemo(() => {
+    if (!user) return voiceParticipants;
+    const alreadyIn = voiceParticipants.some(p => p.user_id === user.id);
+    if (alreadyIn) return voiceParticipants;
+    // Inject the current user as a local-only entry so they see themselves immediately
+    const selfEntry: VoiceParticipant = {
+      id: `local-${user.id}`,
+      user_id: user.id,
+      username: profile?.username || "You",
+      avatar_url: profile?.avatar_url ?? null,
+      is_speaking: false,
+      is_muted: true,
+      role: myRole,
+      joined_at: new Date().toISOString(),
+    };
+    return [selfEntry, ...voiceParticipants];
+  }, [voiceParticipants, user, profile, myRole]);
+
   // Green Room pre-show
   if (inGreenRoom) {
     return (
@@ -1406,9 +1425,9 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
             <button onClick={() => setShowHostPanel(false)} className="p-1 rounded hover:bg-white/10"><XIcon className="h-3 w-3 text-white/25" /></button>
           </div>
           <div>
-            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">Speakers ({voiceParticipants.filter(p => p.role === "speaker").length}/{MAX_SPEAKERS})</p>
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">Speakers ({displayParticipants.filter(p => p.role === "speaker").length}/{MAX_SPEAKERS})</p>
             <div className="space-y-1.5">
-              {voiceParticipants.filter(p => p.role === "speaker").map(p => (
+              {displayParticipants.filter(p => p.role === "speaker").map(p => (
                 <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
                   <div className="w-7 h-7 rounded-full bg-white/[0.05] border border-white/[0.08] overflow-hidden flex items-center justify-center">
                     {safAvatar(p.avatar_url) ? <img src={safAvatar(p.avatar_url)} alt="" className="w-full h-full object-cover" /> : <span className="text-[9px] font-bold text-white/30">{p.username?.[0]?.toUpperCase() || "?"}</span>}
@@ -1424,17 +1443,17 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
               ))}
             </div>
           </div>
-          {voiceParticipants.filter(p => p.role === "listener").length > 0 && (
+          {displayParticipants.filter(p => p.role === "listener").length > 0 && (
             <div>
-              <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">Listeners ({voiceParticipants.filter(p => p.role === "listener").length})</p>
+              <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">Listeners ({displayParticipants.filter(p => p.role === "listener").length})</p>
               <div className="space-y-1.5 max-h-32 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-                {voiceParticipants.filter(p => p.role === "listener").map(p => (
+                {displayParticipants.filter(p => p.role === "listener").map(p => (
                   <div key={p.id} className="flex items-center gap-2 p-2 rounded-xl bg-white/[0.02] border border-white/[0.05]">
                     <div className="w-6 h-6 rounded-full bg-white/[0.05] border border-white/[0.06] overflow-hidden flex items-center justify-center">
                       {safAvatar(p.avatar_url) ? <img src={safAvatar(p.avatar_url)} alt="" className="w-full h-full object-cover" /> : <span className="text-[8px] font-bold text-white/20">{p.username?.[0]?.toUpperCase() || "?"}</span>}
                     </div>
                     <span className="text-[10px] text-white/40 font-medium flex-1 truncate">{p.username || "User"}</span>
-                    {voiceParticipants.filter(pp => pp.role === "speaker").length < MAX_SPEAKERS && (
+                    {displayParticipants.filter(pp => pp.role === "speaker").length < MAX_SPEAKERS && (
                       <button onClick={() => voicePanelRef.current?.promoteToSpeaker(p.user_id)} className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/15"><UserPlus className="h-3 w-3 inline mr-0.5" />Promote</button>
                     )}
                   </div>
@@ -1534,11 +1553,11 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
             <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/[0.06]">
               <Mic className="h-4 w-4 text-emerald-400/60" />
               <span className="text-[11px] font-black text-emerald-400/50 uppercase tracking-widest">
-                Speakers ({voiceParticipants.filter(p => p.role === "speaker").length})
+                Speakers ({displayParticipants.filter(p => p.role === "speaker").length})
               </span>
             </div>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-              {voiceParticipants.filter(p => p.role === "speaker").map(p => (
+              {displayParticipants.filter(p => p.role === "speaker").map(p => (
                 <PersonCard
                   key={p.id}
                   username={p.username}
@@ -1548,7 +1567,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
                   isHost={p.user_id === space.host_id}
                 />
               ))}
-              {voiceParticipants.filter(p => p.role === "speaker").length === 0 && (
+              {displayParticipants.filter(p => p.role === "speaker").length === 0 && (
                 <div className="col-span-full text-center py-6">
                   <Mic className="h-6 w-6 mx-auto text-white/[0.06] mb-1.5" />
                   <p className="text-[10px] text-white/15">No speakers yet</p>
@@ -1562,11 +1581,11 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
             <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/[0.06]">
               <Headphones className="h-4 w-4 text-blue-400/50" />
               <span className="text-[11px] font-black text-blue-400/40 uppercase tracking-widest">
-                Listeners ({voiceParticipants.filter(p => p.role === "listener").length})
+                Listeners ({displayParticipants.filter(p => p.role === "listener").length})
               </span>
             </div>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
-              {voiceParticipants.filter(p => p.role === "listener").map(p => (
+              {displayParticipants.filter(p => p.role === "listener").map(p => (
                 <div key={p.id} className="relative group">
                   <PersonCard
                     username={p.username}
@@ -1574,7 +1593,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
                     isYou={p.user_id === user?.id}
                     isSpeaking={false}
                   />
-                  {isHost && voiceParticipants.filter(pp => pp.role === "speaker").length < MAX_SPEAKERS && (
+                  {isHost && displayParticipants.filter(pp => pp.role === "speaker").length < MAX_SPEAKERS && (
                     <button
                       onClick={() => voicePanelRef.current?.promoteToSpeaker(p.user_id)}
                       className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500/40"
@@ -1585,7 +1604,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
                   )}
                 </div>
               ))}
-              {voiceParticipants.filter(p => p.role === "listener").length === 0 && (
+              {displayParticipants.filter(p => p.role === "listener").length === 0 && (
                 <div className="col-span-full text-center py-6">
                   <Headphones className="h-6 w-6 mx-auto text-white/[0.06] mb-1.5" />
                   <p className="text-[10px] text-white/15">No listeners yet — share the link!</p>
@@ -1627,7 +1646,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
           <div className="mt-4">
             <SpeakerTimerWidget
               isHost={isHost}
-              speakers={voiceParticipants.filter(p => p.role === "speaker").map(p => ({ id: p.user_id, name: p.username || "User" }))}
+              speakers={displayParticipants.filter(p => p.role === "speaker").map(p => ({ id: p.user_id, name: p.username || "User" }))}
               onTimeUp={handleSpeakerTimeUp}
               autoTimerMinutes={cur.max_speaker_time_minutes}
             />
@@ -1657,7 +1676,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
             <CoHostManager
               isHost={isHost}
               coHosts={coHosts}
-              participants={voiceParticipants.map(p => ({ userId: p.user_id, username: p.username || "User", avatarUrl: p.avatar_url }))}
+              participants={displayParticipants.map(p => ({ userId: p.user_id, username: p.username || "User", avatarUrl: p.avatar_url }))}
               onAddCoHost={(userId, perms) => {
                 const p = voiceParticipants.find(pp => pp.user_id === userId);
                 const updated = [...coHosts, { userId, username: p?.username || "User", avatarUrl: p?.avatar_url ?? null, permissions: perms }];
