@@ -228,10 +228,11 @@ const Invite = () => {
 
         if (!referredProfiles || cancelled) { setLoadingBoard(false); return; }
 
-        // Filter to contest period
+        // For active/upcoming contests, count all referrals (people invited before kickoff still count)
+        // For ended contests, only count referrals created before contest end
         const contestRefs = referredProfiles.filter((p) => {
           const created = new Date(p.created_at);
-          return created >= CONTEST_START && created <= CONTEST_END;
+          return created <= CONTEST_END;
         });
 
         // Check which invitees hold ≥ $10 OGS (batch check wallets)
