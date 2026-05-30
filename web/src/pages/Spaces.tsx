@@ -2541,7 +2541,20 @@ const Spaces = () => {
       // Filter private spaces: show only if user is host or co-host
       const uid = user?.id;
       const filterPrivate = (list: Space[]) => list.filter(s => !s.is_private || s.host_id === uid || (s.co_hosts && uid && s.co_hosts.includes(uid)));
-      setSpaces(filterPrivate((lr.data as Space[] | null) ?? []));
+      const activeSpaces = filterPrivate((lr.data as Space[] | null) ?? []);
+
+      // Auto-start overdue scheduled spaces (scheduled_for in the past, not yet live)
+      const now = new Date();
+      const overdue = activeSpaces.filter(s => !s.is_live && s.scheduled_for && new Date(s.scheduled_for) <= now);
+      if (overdue.length > 0) {
+        await Promise.all(
+          overdue.map(s => supabase.from("spaces").update({ is_live: true, scheduled_for: null }).eq("id", s.id))
+        );
+        // Mark them live in local state immediately
+        overdue.forEach(s => { s.is_live = true; s.scheduled_for = null; });
+      }
+
+      setSpaces(activeSpaces);
       setPastSpaces(filterPrivate((pr.data as Space[] | null) ?? []));
     } catch (e) { console.warn("Spaces fetch exception:", e); setSpaces([]); setPastSpaces([]); }
     setLoading(false);
@@ -2609,7 +2622,14 @@ const Spaces = () => {
 
   // Derived lists
   const liveRooms = useMemo(() => spaces.filter(s => s.is_live), [spaces]);
-  const scheduledRooms = useMemo(() => spaces.filter(s => !s.is_live && !s.ended_at), [spaces]);
+  const scheduledRooms = useMemo(() => spaces.filter(s => !s.is_live && s.scheduled_for && !s.ended_at), [spaces]);
+
+  // Smart tab: if Live tab is empty but Upcoming has spaces, switch to Upcoming
+  useEffect(() => {
+    if (!loading && tab === "live" && liveRooms.length === 0 && scheduledRooms.length > 0) {
+      setTab("upcoming");
+    }
+  }, [loading, liveRooms.length, scheduledRooms.length]);
   const endedRooms = useMemo(() => pastSpaces, [pastSpaces]);
 
   // Filter by topic
