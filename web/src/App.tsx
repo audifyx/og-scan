@@ -37,6 +37,7 @@ import SupportCenter from "./pages/SupportCenter";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
+import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
 import { XCallbackPage } from "./pages/XCallbackPage";
 import Admin from "./pages/Admin";
 import SpaceReplay from "./pages/SpaceReplay";
@@ -89,6 +90,7 @@ const App = () => (
   <MaintenanceLock>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <SolanaWalletProvider>
       <ThemeProvider>
       <TooltipProvider>
         <Toaster />
@@ -278,6 +280,7 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
       </ThemeProvider>
+      </SolanaWalletProvider>
     </AuthProvider>
   </QueryClientProvider>
   </MaintenanceLock>
