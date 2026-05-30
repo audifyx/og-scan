@@ -13,7 +13,9 @@ import {
   Medal, Star, CalendarDays, BookOpen, ClipboardCheck, BarChart3,
   Flame, Award, Gauge, Layers, Hash, Megaphone, Sparkles,
   Zap, Bell, Swords, AlertTriangle, TrendingDown, Wallet, Target,
-  Activity, CheckCircle2, Clock, ArrowRight, RefreshCw, Radio
+  Activity, CheckCircle2, Clock, ArrowRight, RefreshCw, Radio,
+  Headphones, Globe, Link2, Youtube, Mic2, ChevronDown, ChevronUp,
+  ImageIcon, FilePlus2, FileVideo, MousePointerClick
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -278,6 +280,129 @@ function fmtPrice(n: number | null | undefined): string {
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
+/* ── Post Badge Chip ── */
+const POST_BADGES: Record<string, { emoji: string; label: string; className: string }> = {
+  alpha:    { emoji: "⚡", label: "Alpha",    className: "border-og-cyan/30 bg-og-cyan/10 text-og-cyan" },
+  signal:   { emoji: "🚨", label: "Signal",   className: "border-red-400/30 bg-red-400/10 text-red-300" },
+  research: { emoji: "🧠", label: "Research", className: "border-violet-400/30 bg-violet-400/10 text-violet-300" },
+  analysis: { emoji: "📊", label: "Analysis", className: "border-sky-400/30 bg-sky-400/10 text-sky-300" },
+  news:     { emoji: "📰", label: "News",     className: "border-orange-400/30 bg-orange-400/10 text-orange-300" },
+  call:     { emoji: "🎯", label: "Call",     className: "border-og-lime/30 bg-og-lime/10 text-og-lime" },
+  idea:     { emoji: "💡", label: "Idea",     className: "border-yellow-400/30 bg-yellow-400/10 text-yellow-300" },
+  gm:       { emoji: "☀️", label: "GM",       className: "border-og-gold/30 bg-og-gold/10 text-og-gold" },
+  degen:    { emoji: "🎲", label: "Degen",    className: "border-pink-400/30 bg-pink-400/10 text-pink-300" },
+  wen:      { emoji: "⏳", label: "Wen",      className: "border-white/20 bg-white/5 text-white/50" },
+};
+
+function PostBadgeChip({ badge }: { badge: string }) {
+  const meta = POST_BADGES[badge] || { emoji: "🏷️", label: badge, className: "border-white/15 bg-white/[0.04] text-white/40" };
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest", meta.className)}>
+      <span>{meta.emoji}</span>
+      {meta.label}
+    </span>
+  );
+}
+
+/* ── YouTube Card ── */
+function YouTubeCard({ youtubeId, title }: { youtubeId: string; title?: string | null }) {
+  const [playing, setPlaying] = useState(false);
+  const thumbUrl = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+  if (playing) {
+    return (
+      <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.06] bg-black" style={{ paddingBottom: "56.25%" }}>
+        <iframe
+          src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1`}
+          className="absolute inset-0 w-full h-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          title={title || "YouTube video"}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.06] cursor-pointer group" onClick={() => setPlaying(true)}>
+      <img src={thumbUrl} alt={title || "YouTube"} className="w-full aspect-video object-cover" />
+      <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-2 group-hover:bg-black/50 transition-colors">
+        <div className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+          <Play className="h-6 w-6 text-white fill-white ml-1" />
+        </div>
+        {title && <p className="text-white font-semibold text-sm text-center px-4 line-clamp-2 drop-shadow">{title}</p>}
+      </div>
+      <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded-full bg-red-600/90 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-white">
+        <Play className="h-2.5 w-2.5 fill-white" /> YouTube
+      </div>
+    </div>
+  );
+}
+
+/* ── X Space Card ── */
+function XSpaceCard({ url, title, isLive }: { url: string; title?: string | null; isLive?: boolean }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-white/[0.01] px-4 py-3.5 hover:border-white/20 transition-colors group"
+    >
+      <div className="shrink-0 w-10 h-10 rounded-full bg-black border border-white/10 flex items-center justify-center">
+        <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          {isLive ? (
+            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-red-400">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />LIVE
+            </span>
+          ) : (
+            <span className="text-[9px] font-bold uppercase tracking-widest text-white/30">X Space</span>
+          )}
+        </div>
+        <p className="text-sm font-semibold text-white truncate">{title || "Join X Space"}</p>
+        <p className="text-[10px] text-white/30 mt-0.5 truncate">{url.replace("https://", "")}</p>
+      </div>
+      <div className="shrink-0 flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white/50 group-hover:text-white group-hover:border-white/30 transition-colors">
+        <Headphones className="h-3 w-3" /> Join
+      </div>
+    </a>
+  );
+}
+
+/* ── Link Preview Card ── */
+function LinkPreviewCard({ url, title, description, imageUrl, faviconUrl, domain }: {
+  url: string; title?: string | null; description?: string | null;
+  imageUrl?: string | null; faviconUrl?: string | null; domain?: string | null;
+}) {
+  const displayDomain = domain || (() => { try { return new URL(url).hostname.replace("www.", ""); } catch { return url; } })();
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex gap-0 rounded-xl overflow-hidden border border-white/[0.08] hover:border-white/20 transition-colors group"
+    >
+      {imageUrl && (
+        <div className="shrink-0 w-20 sm:w-24">
+          <img src={imageUrl} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).parentElement!.remove(); }} />
+        </div>
+      )}
+      <div className="flex-1 min-w-0 px-3 py-2.5 bg-white/[0.02] group-hover:bg-white/[0.04] transition-colors">
+        <div className="flex items-center gap-1.5 mb-1">
+          {faviconUrl ? (
+            <img src={faviconUrl} alt="" className="w-3.5 h-3.5 rounded-sm object-contain" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          ) : (
+            <Globe className="h-3 w-3 text-white/30" />
+          )}
+          <span className="text-[9px] font-mono text-white/30 uppercase tracking-wide truncate">{displayDomain}</span>
+        </div>
+        {title && <p className="text-[13px] font-semibold text-white leading-tight line-clamp-2">{title}</p>}
+        {description && <p className="text-[11px] text-white/40 mt-0.5 line-clamp-2 leading-snug">{description}</p>}
+      </div>
+    </a>
+  );
+}
+
 /* ── Live Chart Card component for posts ── */
 function TokenChartCard({ post, className = "" }: { post: Post; className?: string }) {
   if (!post.token_address) return null;
@@ -375,6 +500,22 @@ interface Post {
   // Author OG reputation
   og_score?: number | null;
   og_rank?: string | null;
+  // Rich media v2
+  link_url?: string | null;
+  link_title?: string | null;
+  link_description?: string | null;
+  link_image_url?: string | null;
+  link_favicon_url?: string | null;
+  link_domain?: string | null;
+  youtube_url?: string | null;
+  youtube_id?: string | null;
+  youtube_title?: string | null;
+  x_space_url?: string | null;
+  x_space_title?: string | null;
+  x_space_live?: boolean | null;
+  embed_space_id?: string | null;
+  post_badge?: string | null;
+  is_x_post?: boolean | null;
   // Client state
   liked?: boolean;
   reposted?: boolean;
@@ -397,7 +538,7 @@ interface PostReply {
    Main View Router
    ═══════════════════════════════════════════════════════════════ */
 
-type MainView = "home" | "explore" | "news" | "community" | "smart_money" | "alerts" | "raids" | "dms";
+type MainView = "home" | "explore" | "news" | "community" | "smart_money" | "alerts" | "raids" | "dms" | "x_posts" | "x_spaces";
 type FeedSort = "latest" | "top" | "trending";
 
 /* ─── Standard Forensic Constants ─── */
@@ -759,6 +900,10 @@ const Communities = () => {
           onSelect={openCommunity}
           onCreateNew={() => setShowCreateCommunity(true)}
         />
+      ) : mainView === "x_posts" ? (
+        <XPostsFeed user={user} onSelectPost={openPost} onOpenProfile={openUserProfile} />
+      ) : mainView === "x_spaces" ? (
+        <XSpacesCommunityFeed user={user} />
       ) : mainView === "smart_money" ? (
         <SmartMoneyFeed user={user} />
       ) : mainView === "alerts" ? (
@@ -860,8 +1005,9 @@ function TopNav({
           {([
             { id: "home" as MainView, label: "Home", icon: <Home className="h-4 w-4" /> },
             { id: "explore" as MainView, label: "Explore", icon: <Search className="h-4 w-4" /> },
+            { id: "x_posts" as MainView, label: "𝕏 Feed", icon: <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> },
+            { id: "x_spaces" as MainView, label: "Spaces", icon: <Radio className="h-4 w-4" /> },
             { id: "smart_money" as MainView, label: "Smart $", icon: <Zap className="h-4 w-4" /> },
-            { id: "alerts" as MainView, label: "Alerts", icon: <Bell className="h-4 w-4" /> },
             { id: "raids" as MainView, label: "Raids", icon: <Swords className="h-4 w-4" /> },
           ]).map(tab => (
             <button
@@ -3129,6 +3275,12 @@ function PostCard({
               <img src={post.article_cover_url} className="w-full aspect-[2/1] object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
           )}
+          {/* Post badge */}
+          {post.post_badge && (
+            <div className="mt-1.5">
+              <PostBadgeChip badge={post.post_badge} />
+            </div>
+          )}
           {!isArticle && post.image_url && (
             <div className="mt-2 rounded-xl overflow-hidden border border-white/[0.06]">
               <img src={post.image_url} className="w-full max-h-96 object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
@@ -3139,6 +3291,31 @@ function PostCard({
             <div className="mt-2 rounded-xl overflow-hidden border border-white/[0.06] bg-black" onClick={e => e.stopPropagation()}>
               <video src={post.video_url} controls preload="metadata" playsInline
                 className="w-full max-h-96 object-contain" />
+            </div>
+          )}
+          {/* YouTube embed */}
+          {post.youtube_id && (
+            <div className="mt-2 rounded-xl overflow-hidden border border-white/[0.06]" onClick={e => e.stopPropagation()}>
+              <YouTubeCard youtubeId={post.youtube_id} title={post.youtube_title} />
+            </div>
+          )}
+          {/* X Space card */}
+          {post.x_space_url && (
+            <div className="mt-2" onClick={e => e.stopPropagation()}>
+              <XSpaceCard url={post.x_space_url} title={post.x_space_title} isLive={!!post.x_space_live} />
+            </div>
+          )}
+          {/* Link preview card */}
+          {post.link_url && !post.youtube_id && !post.x_space_url && (
+            <div className="mt-2" onClick={e => e.stopPropagation()}>
+              <LinkPreviewCard
+                url={post.link_url}
+                title={post.link_title}
+                description={post.link_description}
+                imageUrl={post.link_image_url}
+                faviconUrl={post.link_favicon_url}
+                domain={post.link_domain}
+              />
             </div>
           )}
           {/* Live Chart Card for token/call posts */}
@@ -3608,8 +3785,48 @@ function PostDetail({ post, user, onBack, onOpenProfile, isGlobalAdmin = false, 
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Compose Modal — Create Post / Thread / Article
+   Compose Modal v2 — Rich Post Creation
    ═══════════════════════════════════════════════════════════════ */
+
+/* ── YouTube URL parser ── */
+function parseYouTubeId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname === "youtu.be") return u.pathname.slice(1).split("?")[0];
+    if (u.hostname.includes("youtube.com")) return u.searchParams.get("v");
+  } catch {}
+  return null;
+}
+
+/* ── Link metadata fetcher (via allorigins proxy) ── */
+async function fetchLinkMeta(url: string): Promise<{
+  title: string | null; description: string | null;
+  image: string | null; favicon: string | null; domain: string;
+}> {
+  const domain = (() => { try { return new URL(url).hostname.replace("www.", ""); } catch { return url; } })();
+  const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  try {
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(5000) });
+    const json = await resp.json() as { contents?: string };
+    const html = json.contents || "";
+    const getMeta = (prop: string, attr: string = "content") => {
+      const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+${attr}=["']([^"']+)["']`, "i"))
+                || html.match(new RegExp(`<meta[^>]+${attr}=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`, "i"));
+      return m ? m[1] : null;
+    };
+    const titleM = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    return {
+      title: getMeta("og:title") || getMeta("twitter:title") || (titleM ? titleM[1].trim() : null),
+      description: getMeta("og:description") || getMeta("twitter:description") || getMeta("description"),
+      image: getMeta("og:image") || getMeta("twitter:image"),
+      favicon,
+      domain,
+    };
+  } catch {
+    return { title: null, description: null, image: null, favicon, domain };
+  }
+}
 
 function ComposeModal({
   user, community, onClose
@@ -3632,6 +3849,20 @@ function ComposeModal({
   const [tokenAddress, setTokenAddress] = useState("");
   const [tokenData, setTokenData] = useState<DexTokenData | null>(null);
   const [fetchingToken, setFetchingToken] = useState(false);
+  // Rich media v2
+  const [postBadge, setPostBadge] = useState("");
+  const [showBadges, setShowBadges] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkMeta, setLinkMeta] = useState<{ title: string | null; description: string | null; image: string | null; favicon: string | null; domain: string } | null>(null);
+  const [fetchingLink, setFetchingLink] = useState(false);
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [youtubeId, setYoutubeId] = useState<string | null>(null);
+  const [xSpaceUrl, setXSpaceUrl] = useState("");
+  const [xSpaceTitle, setXSpaceTitle] = useState("");
+  const [xSpaceLive, setXSpaceLive] = useState(false);
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [showYouTubeInput, setShowYouTubeInput] = useState(false);
+  const [showXSpaceInput, setShowXSpaceInput] = useState(false);
   // X cross-post
   const [crossPostToX, setCrossPostToX] = useState(false);
   const [xConnected] = React.useState(() => {
@@ -3646,6 +3877,20 @@ function ComposeModal({
     })();
   }, []);
 
+  const handleFetchLink = async () => {
+    if (!linkUrl.trim()) return;
+    setFetchingLink(true);
+    const meta = await fetchLinkMeta(linkUrl.trim());
+    setLinkMeta(meta);
+    setFetchingLink(false);
+  };
+
+  const handleYouTubeUrl = (url: string) => {
+    setYoutubeUrl(url);
+    const id = parseYouTubeId(url);
+    setYoutubeId(id);
+  };
+
   const handlePost = async () => {
     if (!user) { toast.error("Sign in first"); return; }
     if (!selectedCommunityId) { toast.error("Select a community"); return; }
@@ -3659,25 +3904,34 @@ function ComposeModal({
       const avatar = profile?.avatar_url || null;
       const tagArr = tags.split(",").map(t => t.trim()).filter(Boolean);
 
-      // Token data for "call" posts
       const tokenFields = postType === "call" && tokenData ? {
-        token_address: tokenData.address,
-        token_symbol: tokenData.symbol,
-        token_name: tokenData.name,
-        token_logo_url: tokenData.logoUrl,
-        token_price_usd: tokenData.priceUsd,
-        token_change_24h: tokenData.change24h,
-        token_market_cap_usd: tokenData.marketCapUsd,
-        token_liquidity_usd: tokenData.liquidityUsd,
-        token_volume_24h_usd: tokenData.volume24hUsd,
+        token_address: tokenData.address, token_symbol: tokenData.symbol, token_name: tokenData.name,
+        token_logo_url: tokenData.logoUrl, token_price_usd: tokenData.priceUsd,
+        token_change_24h: tokenData.change24h, token_market_cap_usd: tokenData.marketCapUsd,
+        token_liquidity_usd: tokenData.liquidityUsd, token_volume_24h_usd: tokenData.volume24hUsd,
         token_pair_address: tokenData.pairAddress,
       } : {};
+
+      const richFields = {
+        post_badge: postBadge || null,
+        link_url: linkUrl || null,
+        link_title: linkMeta?.title || null,
+        link_description: linkMeta?.description || null,
+        link_image_url: linkMeta?.image || null,
+        link_favicon_url: linkMeta?.favicon || null,
+        link_domain: linkMeta?.domain || null,
+        youtube_url: youtubeUrl || null,
+        youtube_id: youtubeId || null,
+        x_space_url: xSpaceUrl || null,
+        x_space_title: xSpaceTitle || null,
+        x_space_live: xSpaceLive,
+      };
 
       if (postType === "thread") {
         const { data: parent } = await supabase.from("community_posts").insert({
           community_id: selectedCommunityId, user_id: user.id, username, avatar_url: avatar,
           content: threadParts[0].trim(), post_type: "thread", tags: tagArr,
-          image_url: imageUrl || null, video_url: videoUrl || null,
+          image_url: imageUrl || null, video_url: videoUrl || null, ...richFields,
         }).select().single();
         if (parent) {
           for (let i = 1; i < threadParts.length; i++) {
@@ -3697,36 +3951,22 @@ function ComposeModal({
           is_article: postType === "article",
           article_title: postType === "article" ? articleTitle : null,
           article_cover_url: postType === "article" ? (bannerUrl || imageUrl || null) : null,
-          tags: tagArr,
-          ...tokenFields,
+          tags: tagArr, ...tokenFields, ...richFields,
         });
       }
-      // Cross-post to X if toggle is on and user has X connected
+
       if (crossPostToX && xConnected) {
         const tweetText = postType === "thread"
           ? threadParts.filter(Boolean).join("\n\n").slice(0, 280)
-          : postType === "article"
-          ? `${articleTitle}\n\nhttps://ogscan.fun`
+          : postType === "article" ? `${articleTitle}\n\nhttps://ogscan.fun`
           : content.trim().slice(0, 280);
         try {
           const { data: xResult, error: xError } = await supabase.functions.invoke("post-to-x", {
             body: { text: tweetText, imageUrl: imageUrl || null },
           });
-          if (xError) {
-            console.error("X cross-post error:", xError);
-            toast.error("OG post saved ✓ but X post failed: " + (xError.message || "Unknown error"));
-          } else if (xResult?.error) {
-            console.error("X cross-post error:", xResult.error);
-            toast.error("OG post saved ✓ but X post failed: " + xResult.error);
-          } else if (xResult?.tweetId) {
-            toast.success("Also posted to X 🐦");
-          } else {
-            toast.error("OG post saved ✓ but X post returned no tweet ID — check Settings → Connections");
-          }
-        } catch (xErr: any) {
-          console.error("X cross-post exception:", xErr);
-          toast.error("OG post saved ✓ but X cross-post failed. Check your X connection in Settings.");
-        }
+          if (!xError && xResult?.tweetId) toast.success("Also posted to X 🐦");
+          else if (xError) toast.error("OG post saved ✓ but X post failed");
+        } catch {}
       }
 
       toast.success(postType === "article" ? "Article published! 📝" : postType === "thread" ? "Thread posted! 🧵" : "Posted! ✨");
@@ -3741,88 +3981,76 @@ function ComposeModal({
   const currentLen = postType === "thread" ? threadParts.reduce((s, p) => s + p.length, 0) : content.length;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-start justify-center pt-12 px-4">
-      <div className="bg-[#0a0a0f] border border-white/[0.08] rounded-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-white/[0.06]">
-          <button onClick={onClose} className="text-white/40 hover:text-white"><XIcon className="h-5 w-5" /></button>
+    <div className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm flex items-start justify-center pt-6 px-3 pb-6" onClick={onClose}>
+      <div
+        className="bg-[#080810] border border-white/[0.1] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl shadow-black"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ── Header ── */}
+        <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3 border-b border-white/[0.07] bg-[#080810]/95 backdrop-blur">
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/[0.06] transition-all">
+            <XIcon className="h-4 w-4" />
+          </button>
           <div className="flex-1" />
-          {/* X cross-post toggle */}
           {xConnected && postType !== "article" && (
-            <button
-              onClick={() => setCrossPostToX(v => !v)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest transition-all mr-1",
-                crossPostToX
-                  ? "bg-white/10 border-white/30 text-white"
-                  : "border-white/[0.08] text-white/25 hover:text-white/50"
-              )}
-              title="Also post to X"
-            >
+            <button onClick={() => setCrossPostToX(v => !v)}
+              className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest transition-all mr-1",
+                crossPostToX ? "bg-white/10 border-white/30 text-white" : "border-white/[0.08] text-white/25 hover:text-white/50")}>
               <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
               {crossPostToX ? "Posting to X" : "Also post to X"}
             </button>
           )}
-          {!xConnected && (
-            <a
-              href="/settings?tab=connections"
-              className="flex items-center gap-1 mr-1 text-white/20 hover:text-white/50 transition-colors text-[10px] font-mono"
-              title="Connect X to cross-post"
-            >
-              <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
-              Connect X
-            </a>
-          )}
-          <Button onClick={handlePost} disabled={posting || currentLen === 0} className="px-4 h-8 rounded-full text-xs font-bold">
-            {posting ? <Loader2 className="h-3 w-3 animate-spin" /> : postType === "article" ? "Publish" : "Post"}
+          <Button onClick={handlePost} disabled={posting || currentLen === 0}
+            className="px-5 h-9 rounded-full text-xs font-black bg-og-cyan text-black hover:bg-og-cyan/90">
+            {posting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : postType === "article" ? "Publish" : "Post"}
           </Button>
         </div>
 
-        {/* Post type selector */}
-        <div className="flex gap-1 px-4 pt-3">
-          {(["post", "thread", "article", "call"] as const).map(t => (
-            <button key={t} onClick={() => setPostType(t)}
-              className={cn("px-3 py-1.5 rounded-full text-xs font-medium transition-colors capitalize",
-                postType === t ? "bg-og-cyan/10 text-og-cyan" : "text-white/20"
-              )}>
-              {t === "post" ? "📝 Post" : t === "thread" ? "🧵 Thread" : t === "article" ? "📰 Article" : "📈 Call"}
+        {/* ── Post type selector ── */}
+        <div className="flex gap-1.5 px-4 pt-4 pb-2 overflow-x-auto scrollbar-hide">
+          {([
+            { id: "post" as const, icon: "📝", label: "Post" },
+            { id: "thread" as const, icon: "🧵", label: "Thread" },
+            { id: "article" as const, icon: "📰", label: "Article" },
+            { id: "call" as const, icon: "📈", label: "Call" },
+          ]).map(t => (
+            <button key={t.id} onClick={() => setPostType(t.id)}
+              className={cn("flex items-center gap-1.5 shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all",
+                postType === t.id ? "bg-og-cyan/10 border-og-cyan/40 text-og-cyan" : "border-white/[0.07] text-white/25 hover:text-white/60 hover:border-white/20")}>
+              <span>{t.icon}</span>{t.label}
             </button>
           ))}
         </div>
 
-        {/* Community selector */}
-        <div className="px-4 pt-3">
+        {/* ── Community selector ── */}
+        <div className="px-4 pb-3">
           <select value={selectedCommunityId} onChange={e => setSelectedCommunityId(e.target.value)}
-            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white appearance-none">
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white/70 appearance-none outline-none focus:border-og-cyan/30">
             <option value="">Select community...</option>
             {communities.map(c => <option key={c.id} value={c.id}>{c.icon || ""} {c.name}</option>)}
           </select>
         </div>
 
-        {/* Compose area */}
-        <div className="p-4 space-y-3">
-          {/* Article: Banner upload + title */}
+        {/* ── Compose area ── */}
+        <div className="px-4 pb-4 space-y-3">
+
+          {/* Article header */}
           {postType === "article" && (
-            <>
-              {/* Banner */}
-              <div>
-                <label className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 block">Article Banner</label>
-                {bannerUrl ? (
-                  <div className="relative rounded-xl overflow-hidden border border-white/[0.08] mb-2">
-                    <img src={bannerUrl} alt="" className="w-full aspect-[2.5/1] object-cover" />
-                    <button onClick={() => setBannerUrl("")}
-                      className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white">
-                      <XIcon className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <ImageUploadBtn onUploaded={setBannerUrl} label="Upload banner" className="w-full justify-center py-6 border-dashed" />
-                )}
-              </div>
-              {/* Title */}
+            <div className="space-y-2">
+              {bannerUrl ? (
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.08]">
+                  <img src={bannerUrl} alt="" className="w-full aspect-[2.5/1] object-cover" />
+                  <button onClick={() => setBannerUrl("")}
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white">
+                    <XIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <ImageUploadBtn onUploaded={setBannerUrl} label="Upload banner" className="w-full justify-center py-5 border-dashed" />
+              )}
               <input type="text" placeholder="Article title..." value={articleTitle} onChange={e => setArticleTitle(e.target.value)}
-                className="w-full bg-transparent text-xl font-bold text-white placeholder-white/20 outline-none" />
-            </>
+                className="w-full bg-transparent text-xl font-bold text-white placeholder-white/20 outline-none border-b border-white/[0.06] pb-2" />
+            </div>
           )}
 
           {/* Thread compose */}
@@ -3830,33 +4058,33 @@ function ComposeModal({
             <div className="space-y-2">
               {threadParts.map((part, i) => (
                 <div key={i} className="flex gap-2">
-                  <div className="flex flex-col items-center pt-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-og-cyan" />
-                    {i < threadParts.length - 1 && <div className="w-0.5 flex-1 bg-white/[0.06] mt-1" />}
+                  <div className="flex flex-col items-center pt-2.5">
+                    <div className="w-2 h-2 rounded-full bg-og-cyan/70" />
+                    {i < threadParts.length - 1 && <div className="w-px flex-1 bg-og-cyan/10 mt-1" />}
                   </div>
                   <textarea value={part} onChange={e => { const next = [...threadParts]; next[i] = e.target.value; setThreadParts(next); }}
                     placeholder={i === 0 ? "Start your thread..." : `Part ${i + 1}...`} maxLength={2000}
-                    className="flex-1 bg-white/[0.02] border border-white/[0.06] rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 resize-none outline-none min-h-[80px] focus:border-og-cyan/30" />
+                    className="flex-1 bg-white/[0.02] border border-white/[0.06] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/20 resize-none outline-none min-h-[80px] focus:border-og-cyan/30 transition-colors" />
                 </div>
               ))}
-              <button onClick={addThreadPart} className="ml-5 text-xs text-og-cyan/60 hover:text-og-cyan flex items-center gap-1">
+              <button onClick={addThreadPart} className="ml-5 text-xs text-og-cyan/50 hover:text-og-cyan flex items-center gap-1 transition-colors">
                 <Plus className="h-3 w-3" /> Add part ({threadParts.length}/20)
               </button>
             </div>
           ) : (
             <textarea value={content} onChange={e => setContent(e.target.value)}
-              placeholder={postType === "article" ? "Write your article... (up to 15,000 characters)" : "What's happening?"}
-              maxLength={maxChars}
-              className="w-full bg-transparent text-sm text-white placeholder-white/20 resize-none outline-none min-h-[120px]" />
+              placeholder={postType === "article" ? "Write your article..." : "What's on your mind?"}
+              maxLength={maxChars} rows={4}
+              className="w-full bg-transparent text-sm text-white placeholder-white/25 resize-none outline-none min-h-[100px]" />
           )}
 
-          {/* Token address input for Call posts */}
+          {/* Token call input */}
           {postType === "call" && (
             <div>
               <label className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 block">Contract Address (CA)</label>
               <div className="flex gap-2">
                 <input type="text" value={tokenAddress} onChange={e => setTokenAddress(e.target.value)}
-                  placeholder="Paste Solana token address..."
+                  placeholder="Solana token address..."
                   className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 outline-none focus:border-og-cyan/30 font-mono" />
                 <button onClick={async () => {
                   if (!tokenAddress.trim()) return;
@@ -3872,56 +4100,72 @@ function ComposeModal({
               </div>
               {tokenData && (
                 <div className="mt-2 rounded-xl border border-og-cyan/20 bg-og-cyan/[0.03] p-3">
-                  <div className="flex items-center gap-2 mb-1.5">
+                  <div className="flex items-center gap-2 mb-1">
                     {tokenData.logoUrl && <img src={tokenData.logoUrl} className="w-6 h-6 rounded-full" alt="" />}
-                    <span className="text-sm font-black text-white">{tokenData.symbol}</span>
+                    <span className="font-black text-white text-sm">{tokenData.symbol}</span>
                     <span className="text-[10px] text-white/30">{tokenData.name}</span>
                   </div>
                   <div className="flex gap-3 text-[10px] text-white/40">
-                    <span>Price: <span className="text-white/60 font-mono">{fmtPrice(tokenData.priceUsd)}</span></span>
-                    <span>MCap: <span className="text-white/60 font-mono">{fmtCompact(tokenData.marketCapUsd)}</span></span>
-                    <span>Vol: <span className="text-white/60 font-mono">{fmtCompact(tokenData.volume24hUsd)}</span></span>
+                    <span>Price: <span className="text-og-cyan font-mono">{fmtPrice(tokenData.priceUsd)}</span></span>
+                    <span>MCap: <span className="text-og-cyan font-mono">{fmtCompact(tokenData.marketCapUsd)}</span></span>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Media upload — image or video */}
+          {/* ── Image & Video ── */}
           {postType !== "article" && (
-            <div className="flex gap-2">
+            <div className="space-y-2">
               {imageUrl ? (
-                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] flex-1">
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.08]">
                   <img src={imageUrl} alt="Preview" className="w-full max-h-48 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   <button onClick={() => setImageUrl("")}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white">
-                    <XIcon className="h-3.5 w-3.5" />
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white/70 hover:text-white">
+                    <XIcon className="h-3 w-3" />
                   </button>
                 </div>
               ) : videoUrl ? (
-                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] flex-1 bg-black">
-                  <video src={videoUrl} controls preload="metadata" className="w-full max-h-48 object-contain" />
+                <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-black">
+                  <video src={videoUrl} controls preload="metadata" className="w-full max-h-40 object-contain" />
                   <button onClick={() => setVideoUrl("")}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white">
-                    <XIcon className="h-3.5 w-3.5" />
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center text-white/70 hover:text-white">
+                    <XIcon className="h-3 w-3" />
                   </button>
                 </div>
-              ) : (
-                <div className="flex gap-2">
-                  <ImageUploadBtn onUploaded={setImageUrl} label="Image" />
-                  <MediaUploadBtn accept="video/*" label="Video" onUploaded={(url, type) => { if (type === "video") setVideoUrl(url); else setImageUrl(url); }} />
+              ) : null}
+
+              {/* Image & video attachment buttons */}
+              {!imageUrl && !videoUrl && (
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Image column */}
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] text-white/20 uppercase tracking-widest font-bold">Image</p>
+                    <input type="url" placeholder="Paste image URL..."
+                      onBlur={e => { if (e.target.value.trim()) { setImageUrl(e.target.value.trim()); e.target.value = ""; } }}
+                      className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-2.5 py-2 text-[11px] text-white/60 placeholder-white/15 outline-none focus:border-white/20" />
+                    <ImageUploadBtn onUploaded={setImageUrl} label="📎 Upload image" className="w-full justify-center" />
+                  </div>
+                  {/* Video column */}
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] text-white/20 uppercase tracking-widest font-bold">Video</p>
+                    <input type="url" placeholder="Paste video URL..."
+                      onBlur={e => { if (e.target.value.trim()) { setVideoUrl(e.target.value.trim()); e.target.value = ""; } }}
+                      className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-2.5 py-2 text-[11px] text-white/60 placeholder-white/15 outline-none focus:border-white/20" />
+                    <MediaUploadBtn accept="video/*" label="📎 Upload video" onUploaded={(url, type) => { if (type === "video") setVideoUrl(url); else setImageUrl(url); }} />
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Article image upload */}
+          {/* ── Article image ── */}
           {postType === "article" && (
             <div>
-              <label className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 block">Article Icon / Image</label>
+              <label className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 block">Article image</label>
               {imageUrl ? (
                 <div className="relative rounded-xl overflow-hidden border border-white/[0.08]">
-                  <img src={imageUrl} alt="Preview" className="w-full max-h-48 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  <img src={imageUrl} alt="" className="w-full max-h-48 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   <button onClick={() => setImageUrl("")}
                     className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center text-white/70 hover:text-white">
                     <XIcon className="h-3.5 w-3.5" />
@@ -3933,17 +4177,395 @@ function ComposeModal({
             </div>
           )}
 
+          {/* ── YouTube embed ── */}
+          {postType !== "article" && (
+            <div>
+              <button onClick={() => setShowYouTubeInput(v => !v)}
+                className={cn("flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold transition-all w-full",
+                  youtubeId ? "border-red-500/30 bg-red-500/10 text-red-400" : showYouTubeInput ? "border-white/20 bg-white/[0.04] text-white/60" : "border-white/[0.07] text-white/25 hover:text-white/60 hover:border-white/20")}>
+                <Play className="h-3.5 w-3.5" />
+                {youtubeId ? "✓ YouTube attached" : "Embed YouTube video"}
+                {showYouTubeInput && !youtubeId ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
+              </button>
+              {(showYouTubeInput || youtubeUrl) && (
+                <div className="mt-2 flex gap-2">
+                  <input type="url" value={youtubeUrl} onChange={e => handleYouTubeUrl(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                    className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white/60 placeholder-white/15 outline-none focus:border-red-500/30" />
+                  {youtubeUrl && <button onClick={() => { setYoutubeUrl(""); setYoutubeId(null); setShowYouTubeInput(false); }} className="text-white/30 hover:text-white/60"><XIcon className="h-4 w-4" /></button>}
+                </div>
+              )}
+              {youtubeId && (
+                <div className="mt-2 rounded-xl overflow-hidden border border-white/[0.06]">
+                  <YouTubeCard youtubeId={youtubeId} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── X Space embed ── */}
+          {postType !== "article" && (
+            <div>
+              <button onClick={() => setShowXSpaceInput(v => !v)}
+                className={cn("flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold transition-all w-full",
+                  xSpaceUrl ? "border-white/30 bg-white/[0.06] text-white" : showXSpaceInput ? "border-white/20 bg-white/[0.04] text-white/60" : "border-white/[0.07] text-white/25 hover:text-white/60 hover:border-white/20")}>
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                {xSpaceUrl ? "✓ X Space attached" : "Share X Space"}
+                {showXSpaceInput ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
+              </button>
+              {(showXSpaceInput || xSpaceUrl) && (
+                <div className="mt-2 space-y-2">
+                  <input type="url" value={xSpaceUrl} onChange={e => setXSpaceUrl(e.target.value)}
+                    placeholder="https://x.com/i/spaces/..."
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white/60 placeholder-white/15 outline-none focus:border-white/30" />
+                  <input type="text" value={xSpaceTitle} onChange={e => setXSpaceTitle(e.target.value)}
+                    placeholder="Space title (optional)..."
+                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white/60 placeholder-white/15 outline-none" />
+                  <label className="flex items-center gap-2 cursor-pointer" onClick={() => setXSpaceLive(v => !v)}>
+                    <div className={cn("w-8 h-4 rounded-full transition-colors relative", xSpaceLive ? "bg-red-500" : "bg-white/10")}>
+                      <div className={cn("absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform", xSpaceLive ? "translate-x-4" : "translate-x-0.5")} />
+                    </div>
+                    <span className="text-[10px] text-white/40">Mark as LIVE</span>
+                  </label>
+                  {xSpaceUrl && <XSpaceCard url={xSpaceUrl} title={xSpaceTitle || null} isLive={xSpaceLive} />}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Link preview ── */}
+          {postType !== "article" && !youtubeId && !xSpaceUrl && (
+            <div>
+              <button onClick={() => setShowLinkInput(v => !v)}
+                className={cn("flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold transition-all w-full",
+                  linkUrl ? "border-og-cyan/30 bg-og-cyan/10 text-og-cyan" : showLinkInput ? "border-white/20 bg-white/[0.04] text-white/60" : "border-white/[0.07] text-white/25 hover:text-white/60 hover:border-white/20")}>
+                <Link2 className="h-3.5 w-3.5" />
+                {linkUrl ? "✓ Link preview attached" : "Attach link (auto-preview title)"}
+                {showLinkInput ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
+              </button>
+              {(showLinkInput || linkUrl) && (
+                <div className="mt-2 space-y-2">
+                  <div className="flex gap-2">
+                    <input type="url" value={linkUrl}
+                      onChange={e => { setLinkUrl(e.target.value); setLinkMeta(null); }}
+                      onKeyDown={e => { if (e.key === "Enter") handleFetchLink(); }}
+                      placeholder="https://example.com/article..."
+                      className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white/60 placeholder-white/15 outline-none focus:border-og-cyan/30" />
+                    <button onClick={handleFetchLink} disabled={fetchingLink || !linkUrl}
+                      className="px-3 py-2 rounded-xl bg-og-cyan/10 text-og-cyan text-xs font-bold hover:bg-og-cyan/20 disabled:opacity-40 transition-colors whitespace-nowrap">
+                      {fetchingLink ? <Loader2 className="h-3 w-3 animate-spin" /> : "Preview"}
+                    </button>
+                    {linkUrl && <button onClick={() => { setLinkUrl(""); setLinkMeta(null); setShowLinkInput(false); }} className="text-white/30 hover:text-white/60"><XIcon className="h-4 w-4" /></button>}
+                  </div>
+                  {linkMeta && (
+                    <LinkPreviewCard url={linkUrl} title={linkMeta.title} description={linkMeta.description}
+                      imageUrl={linkMeta.image} faviconUrl={linkMeta.favicon} domain={linkMeta.domain} />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Post Badge ── */}
+          <div>
+            <button onClick={() => setShowBadges(v => !v)}
+              className={cn("flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-bold transition-all w-full",
+                postBadge ? "border-og-lime/30 bg-og-lime/10 text-og-lime" : showBadges ? "border-white/20 bg-white/[0.04] text-white/60" : "border-white/[0.07] text-white/25 hover:text-white/60 hover:border-white/20")}>
+              <span>{postBadge ? POST_BADGES[postBadge]?.emoji || "🏷️" : "🏷️"}</span>
+              {postBadge ? `Badge: ${POST_BADGES[postBadge]?.label || postBadge}` : "Add post badge"}
+              {showBadges ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
+            </button>
+            {showBadges && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {postBadge && (
+                  <button onClick={() => setPostBadge("")}
+                    className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[9px] font-bold text-white/30 hover:text-white/60 transition-colors">
+                    <XIcon className="h-2.5 w-2.5" /> Remove
+                  </button>
+                )}
+                {Object.entries(POST_BADGES).map(([key, badge]) => (
+                  <button key={key} onClick={() => { setPostBadge(key); setShowBadges(false); }}
+                    className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest transition-all",
+                      postBadge === key ? badge.className : "border-white/[0.08] text-white/35 hover:text-white/70 bg-white/[0.02]")}>
+                    <span>{badge.emoji}</span>{badge.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Tags */}
           <input type="text" placeholder="Tags (comma-separated)..." value={tags} onChange={e => setTags(e.target.value)}
             className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white/50 placeholder-white/15 outline-none" />
 
           <div className="flex items-center justify-between text-[10px] text-white/15">
-            <span>{currentLen.toLocaleString()} / {maxChars.toLocaleString()}</span>
+            <span>{currentLen.toLocaleString()} / {maxChars.toLocaleString()} chars</span>
             {postType === "thread" && <span>{threadParts.length} parts</span>}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   𝕏 Posts Feed — posts cross-posted from X
+   ═══════════════════════════════════════════════════════════════ */
+
+function XPostsFeed({ user, onSelectPost, onOpenProfile }: {
+  user: any;
+  onSelectPost?: (post: Post) => void;
+  onOpenProfile?: (username: string) => void;
+}) {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("community_posts")
+      .select("*")
+      .eq("is_x_post", true)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(40);
+    setPosts((data || []) as Post[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div className="flex-1 overflow-y-auto scrollbar-hide">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b border-white/[0.06] px-4 py-3 flex items-center gap-3">
+        <div className="w-7 h-7 rounded-full bg-black border border-white/15 flex items-center justify-center">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </div>
+        <div>
+          <h2 className="text-sm font-black text-white">𝕏 Cross-Posts</h2>
+          <p className="text-[9px] text-white/25">Posts also shared to X</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-white/20" />
+        </div>
+      ) : posts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center px-6">
+          <div className="w-12 h-12 rounded-2xl border border-white/[0.08] flex items-center justify-center mb-3">
+            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white/20"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </div>
+          <p className="text-white/30 text-sm font-semibold">No X cross-posts yet</p>
+          <p className="text-white/15 text-xs mt-1">When community members cross-post to X, they appear here</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-white/[0.04]">
+          {posts.map(p => (
+            <PostCard key={p.id} post={p} user={user} onClick={() => onSelectPost?.(p)} onOpenProfile={onOpenProfile} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   𝕏 Spaces Community Feed
+   ═══════════════════════════════════════════════════════════════ */
+
+interface CommunityXSpace {
+  id: string;
+  space_url: string;
+  space_title: string | null;
+  host_username: string | null;
+  host_avatar_url: string | null;
+  is_live: boolean;
+  scheduled_at: string | null;
+  listener_count: number | null;
+  created_at: string;
+  user_id: string;
+}
+
+function XSpacesCommunityFeed({ user }: { user: any }) {
+  const [spaces, setSpaces] = useState<CommunityXSpace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [spaceUrl, setSpaceUrl] = useState("");
+  const [spaceTitle, setSpaceTitle] = useState("");
+  const [isLive, setIsLive] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const xUser = React.useMemo(() => {
+    try { const s = localStorage.getItem("x_user"); return s ? JSON.parse(s) : null; } catch { return null; }
+  }, []);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("community_x_spaces")
+      .select("*")
+      .order("is_live", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setSpaces((data || []) as CommunityXSpace[]);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleSubmit = async () => {
+    if (!user) { toast.error("Sign in to share a Space"); return; }
+    if (!spaceUrl.trim()) { toast.error("Paste a Space URL"); return; }
+    setSubmitting(true);
+    try {
+      await supabase.from("community_x_spaces").insert({
+        space_url: spaceUrl.trim(),
+        space_title: spaceTitle.trim() || null,
+        is_live: isLive,
+        user_id: user.id,
+        host_username: xUser?.username || null,
+        host_avatar_url: xUser?.profile_image_url || null,
+      });
+      toast.success("Space shared!");
+      setSpaceUrl(""); setSpaceTitle(""); setIsLive(false); setShowForm(false);
+      load();
+    } catch (e: any) {
+      toast.error("Failed: " + (e.message || "Unknown error"));
+    } finally { setSubmitting(false); }
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto scrollbar-hide">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b border-white/[0.06] px-4 py-3 flex items-center gap-3">
+        <div className="w-7 h-7 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+          <Radio className="h-3.5 w-3.5 text-violet-400" />
+        </div>
+        <div className="flex-1">
+          <h2 className="text-sm font-black text-white">X Spaces</h2>
+          <p className="text-[9px] text-white/25">Live & scheduled community spaces</p>
+        </div>
+        <button onClick={() => setShowForm(v => !v)}
+          className="flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-violet-400 hover:bg-violet-500/20 transition-colors">
+          <Plus className="h-3 w-3" /> Share Space
+        </button>
+      </div>
+
+      {/* Submit form */}
+      {showForm && (
+        <div className="px-4 py-4 border-b border-white/[0.06] bg-white/[0.01] space-y-2">
+          {!xUser && (
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5 text-xs text-white/40 text-center">
+              Connect your X account in Settings to host spaces
+            </div>
+          )}
+          <input type="url" value={spaceUrl} onChange={e => setSpaceUrl(e.target.value)}
+            placeholder="https://x.com/i/spaces/..."
+            className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white/70 placeholder-white/15 outline-none focus:border-violet-500/30" />
+          <input type="text" value={spaceTitle} onChange={e => setSpaceTitle(e.target.value)}
+            placeholder="Space title (e.g. Alpha calls this Friday at 8pm)..."
+            className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white/70 placeholder-white/15 outline-none" />
+          <label className="flex items-center gap-2 cursor-pointer" onClick={() => setIsLive(v => !v)}>
+            <div className={cn("w-8 h-4 rounded-full transition-colors relative", isLive ? "bg-red-500" : "bg-white/10")}>
+              <div className={cn("absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform", isLive ? "translate-x-4" : "translate-x-0.5")} />
+            </div>
+            <span className="text-[11px] text-white/40">Currently LIVE</span>
+          </label>
+          <div className="flex gap-2">
+            <button onClick={handleSubmit} disabled={submitting || !spaceUrl}
+              className="flex-1 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 py-2 text-xs font-black disabled:opacity-50 hover:bg-violet-500/30 transition-colors">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Share Space"}
+            </button>
+            <button onClick={() => setShowForm(false)}
+              className="px-4 rounded-xl border border-white/[0.08] text-white/30 text-xs hover:text-white/60 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-white/20" />
+        </div>
+      ) : spaces.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center px-6">
+          <div className="w-12 h-12 rounded-2xl border border-white/[0.08] flex items-center justify-center mb-3">
+            <Radio className="h-5 w-5 text-white/15" />
+          </div>
+          <p className="text-white/30 text-sm font-semibold">No spaces yet</p>
+          <p className="text-white/15 text-xs mt-1">Share an X Space link for the community to join</p>
+        </div>
+      ) : (
+        <div className="px-4 py-4 space-y-3">
+          {/* Live spaces first */}
+          {spaces.filter(s => s.is_live).length > 0 && (
+            <div>
+              <p className="text-[9px] text-red-400 uppercase tracking-widest font-black mb-2 flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />Live Now
+              </p>
+              <div className="space-y-2">
+                {spaces.filter(s => s.is_live).map(space => (
+                  <SpaceCard key={space.id} space={space} />
+                ))}
+              </div>
+            </div>
+          )}
+          {spaces.filter(s => !s.is_live).length > 0 && (
+            <div>
+              <p className="text-[9px] text-white/25 uppercase tracking-widest font-black mb-2">Scheduled / Past</p>
+              <div className="space-y-2">
+                {spaces.filter(s => !s.is_live).map(space => (
+                  <SpaceCard key={space.id} space={space} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpaceCard({ space }: { space: CommunityXSpace }) {
+  const timeAgo = (() => {
+    const diff = Date.now() - new Date(space.created_at).getTime();
+    const h = Math.floor(diff / 3600000);
+    if (h < 1) return "just now";
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  })();
+
+  return (
+    <a href={space.space_url} target="_blank" rel="noopener noreferrer"
+      className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-gradient-to-br from-violet-500/[0.05] to-transparent px-4 py-3.5 hover:border-violet-500/25 hover:bg-violet-500/[0.08] transition-all group">
+      <div className="shrink-0 w-10 h-10 rounded-full bg-black border border-white/10 flex items-center justify-center overflow-hidden">
+        {space.host_avatar_url
+          ? <img src={space.host_avatar_url} className="w-full h-full object-cover" alt="" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          : <Radio className="h-4 w-4 text-violet-400" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          {space.is_live ? (
+            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-red-400">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />LIVE
+            </span>
+          ) : (
+            <span className="text-[9px] font-bold uppercase tracking-widest text-white/25">X Space</span>
+          )}
+          {space.host_username && (
+            <span className="text-[9px] text-white/25">@{space.host_username}</span>
+          )}
+          <span className="text-[9px] text-white/15 ml-auto">{timeAgo}</span>
+        </div>
+        <p className="text-sm font-semibold text-white truncate">{space.space_title || "Unnamed Space"}</p>
+        <p className="text-[10px] text-white/25 mt-0.5 truncate">{space.space_url.replace("https://", "")}</p>
+      </div>
+      <div className="shrink-0 flex items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/[0.06] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-violet-400 group-hover:border-violet-500/40 group-hover:bg-violet-500/15 transition-colors">
+        <Headphones className="h-3 w-3" /> Join
+      </div>
+    </a>
   );
 }
 
