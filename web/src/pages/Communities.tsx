@@ -3927,11 +3927,16 @@ function ComposeModal({
         x_space_live: xSpaceLive,
       };
 
+      // Determine X cross-post flag upfront
+      const willCrossPost = crossPostToX && xConnected && postType !== "article";
+
       if (postType === "thread") {
         const { data: parent } = await supabase.from("community_posts").insert({
           community_id: selectedCommunityId, user_id: user.id, username, avatar_url: avatar,
           content: threadParts[0].trim(), post_type: "thread", tags: tagArr,
-          image_url: imageUrl || null, video_url: videoUrl || null, ...richFields,
+          image_url: imageUrl || null, video_url: videoUrl || null,
+          is_x_post: willCrossPost || null,
+          ...richFields,
         }).select().single();
         if (parent) {
           for (let i = 1; i < threadParts.length; i++) {
@@ -3951,14 +3956,15 @@ function ComposeModal({
           is_article: postType === "article",
           article_title: postType === "article" ? articleTitle : null,
           article_cover_url: postType === "article" ? (bannerUrl || imageUrl || null) : null,
-          tags: tagArr, ...tokenFields, ...richFields,
+          tags: tagArr, ...tokenFields,
+          is_x_post: willCrossPost || null,
+          ...richFields,
         });
       }
 
-      if (crossPostToX && xConnected) {
+      if (willCrossPost) {
         const tweetText = postType === "thread"
           ? threadParts.filter(Boolean).join("\n\n").slice(0, 280)
-          : postType === "article" ? `${articleTitle}\n\nhttps://ogscan.fun`
           : content.trim().slice(0, 280);
         try {
           const { data: xResult, error: xError } = await supabase.functions.invoke("post-to-x", {
