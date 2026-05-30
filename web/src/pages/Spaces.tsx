@@ -46,6 +46,7 @@ import InviteLink from "@/components/spaces/InviteLink";
 import SpaceNotifications from "@/components/spaces/SpaceNotifications";
 import GreenRoom from "@/components/spaces/GreenRoom";
 import { notifyUsers } from "@/lib/notifications";
+import { xGetStoredUser, xStartLogin } from "@/lib/xAuth";
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    TYPES
@@ -2263,6 +2264,246 @@ const OnlineUsersBanner = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════════
+   X SPACES FEED — Live & Upcoming spaces from accounts the user follows on X
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+interface XSpace {
+  id: string;
+  title: string;
+  state: "live" | "scheduled";
+  creator_id: string;
+  creator_username: string;
+  creator_name: string;
+  creator_avatar: string | null;
+  participant_count: number;
+  lang: string;
+  is_ticketed: boolean;
+  started_at: string | null;
+  scheduled_start: string | null;
+  created_at: string;
+  join_url: string;
+  x_url: string;
+}
+
+const XSpaceCard = ({ space }: { space: XSpace }) => {
+  const isLive = space.state === "live";
+  const avatar = safeAvatarUrl(space.creator_avatar);
+
+  const openSpace = () => {
+    window.open(space.x_url, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <div
+      onClick={openSpace}
+      className="group relative flex items-start gap-3 p-3.5 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.10] cursor-pointer transition-all"
+    >
+      {/* Live pulse */}
+      {isLive && (
+        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-400" />
+          </span>
+          <span className="text-[9px] font-black text-red-400 uppercase tracking-wide">Live</span>
+        </div>
+      )}
+
+      {/* Avatar */}
+      <div className="shrink-0 w-10 h-10 rounded-full overflow-hidden border border-white/[0.08] bg-white/[0.04] flex items-center justify-center">
+        {avatar
+          ? <img src={avatar} alt={space.creator_name} className="w-full h-full object-cover" />
+          : <span className="text-[13px] font-bold text-white/40">{(space.creator_name[0] || "?").toUpperCase()}</span>
+        }
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0 pr-12">
+        <p className="text-[12px] font-black text-white leading-tight line-clamp-2">{space.title}</p>
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <span className="text-[10px] text-white/40 font-medium">@{space.creator_username}</span>
+          {space.participant_count > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] text-white/25">
+              <Headphones className="h-2.5 w-2.5" />
+              {space.participant_count.toLocaleString()}
+            </span>
+          )}
+          {!isLive && space.scheduled_start && (
+            <span className="text-[10px] text-sky-400/60 font-medium">
+              {format(new Date(space.scheduled_start), "MMM d · h:mm a")}
+            </span>
+          )}
+          {space.is_ticketed && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/20">
+              Ticketed
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Join button */}
+      <button
+        onClick={(e) => { e.stopPropagation(); openSpace(); }}
+        className={cn(
+          "absolute right-3 bottom-3 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black transition-all border",
+          isLive
+            ? "bg-sky-500/15 border-sky-500/30 text-sky-400 hover:bg-sky-500/25"
+            : "bg-white/[0.04] border-white/[0.08] text-white/40 hover:bg-white/[0.08] hover:text-white/60"
+        )}
+      >
+        <ExternalLink className="h-3 w-3" />
+        {isLive ? "Join" : "Remind"}
+      </button>
+    </div>
+  );
+};
+
+const XSpacesFeed = ({ session }: { session: string | null }) => {
+  const [spaces, setSpaces] = useState<XSpace[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [requiresAuth, setRequiresAuth] = useState(false);
+  const [requiresReauth, setRequiresReauth] = useState(false);
+  const xUser = xGetStoredUser();
+
+  const fetch = useCallback(async () => {
+    if (!session) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await window.fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/x-spaces-feed`,
+        { headers: { Authorization: `Bearer ${session}`, "Content-Type": "application/json" } },
+      );
+      const data = await res.json();
+      if (data.requiresAuth) { setRequiresAuth(true); setLoading(false); return; }
+      if (data.requiresReauth) { setRequiresReauth(true); setLoading(false); return; }
+      if (data.error) { setError(data.error); setLoading(false); return; }
+      setSpaces(data.spaces ?? []);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load X Spaces");
+    }
+    setLoading(false);
+  }, [session]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  if (!xUser || requiresAuth) {
+    return (
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] py-10 px-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-sky-400/10 border border-sky-400/20 flex items-center justify-center mx-auto mb-4">
+          <Twitter className="h-6 w-6 text-sky-400" />
+        </div>
+        <h3 className="text-base font-black text-white mb-1">Connect your X account</h3>
+        <p className="text-sm text-white/30 mb-4 max-w-xs mx-auto">See live X Spaces from people you follow and join them right here.</p>
+        <button
+          onClick={() => xStartLogin()}
+          className="px-5 py-2.5 rounded-xl bg-sky-500/15 border border-sky-500/25 text-sky-400 text-sm font-bold hover:bg-sky-500/25 transition-all flex items-center gap-2 mx-auto"
+        >
+          <Twitter className="h-4 w-4" /> Connect X
+        </button>
+      </div>
+    );
+  }
+
+  if (requiresReauth) {
+    return (
+      <div className="rounded-2xl border border-amber-400/15 bg-amber-400/[0.03] py-8 px-6 text-center">
+        <h3 className="text-sm font-black text-white mb-1">Permission upgrade needed</h3>
+        <p className="text-xs text-white/40 mb-4">Re-connect your X account to grant the <span className="text-amber-400">follows.read</span> permission for this feature.</p>
+        <button
+          onClick={() => xStartLogin()}
+          className="px-4 py-2 rounded-xl bg-amber-400/15 border border-amber-400/25 text-amber-400 text-xs font-bold hover:bg-amber-400/25 transition-all flex items-center gap-2 mx-auto"
+        >
+          <Twitter className="h-3.5 w-3.5" /> Re-connect X
+        </button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map(i => <div key={i} className="h-20 rounded-2xl bg-white/[0.02] animate-pulse" />)}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-red-500/15 bg-red-500/[0.03] p-4 flex items-center gap-3">
+        <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+        <p className="text-xs text-red-400/80">{error}</p>
+        <button onClick={fetch} className="ml-auto text-[10px] font-bold text-white/40 hover:text-white/70 transition whitespace-nowrap">Retry</button>
+      </div>
+    );
+  }
+
+  const liveSpaces = spaces.filter(s => s.state === "live");
+  const scheduledSpaces = spaces.filter(s => s.state === "scheduled");
+
+  if (!spaces.length) {
+    return (
+      <div className="rounded-2xl border border-white/[0.05] bg-white/[0.015] py-10 px-6 text-center">
+        <div className="w-10 h-10 rounded-full bg-sky-400/10 flex items-center justify-center mx-auto mb-3">
+          <Radio className="h-5 w-5 text-sky-400/50" />
+        </div>
+        <h3 className="text-sm font-bold text-white/60">No X Spaces right now</h3>
+        <p className="text-xs text-white/25 mt-1">Check back later — live spaces from people you follow will show up here.</p>
+        <button onClick={fetch} className="mt-4 text-[10px] font-bold text-sky-400/50 hover:text-sky-400 transition flex items-center gap-1.5 mx-auto">
+          <Repeat2 className="h-3 w-3" /> Refresh
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Connected as */}
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-white/25 font-medium">
+          Following feed for <span className="text-white/50">@{xUser.username}</span>
+        </span>
+        <button onClick={fetch} className="text-[10px] font-bold text-sky-400/50 hover:text-sky-400 transition flex items-center gap-1">
+          <Repeat2 className="h-3 w-3" /> Refresh
+        </button>
+      </div>
+
+      {/* Live now */}
+      {liveSpaces.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[11px] font-black text-red-400 uppercase tracking-wide">🔴 Live Now</span>
+            <span className="text-[10px] text-white/25">{liveSpaces.length}</span>
+          </div>
+          <div className="space-y-2">
+            {liveSpaces.map(s => <XSpaceCard key={s.id} space={s} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming */}
+      {scheduledSpaces.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[11px] font-black text-sky-400/70 uppercase tracking-wide">🗓 Scheduled</span>
+            <span className="text-[10px] text-white/25">{scheduledSpaces.length}</span>
+          </div>
+          <div className="space-y-2">
+            {scheduledSpaces.map(s => <XSpaceCard key={s.id} space={s} />)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const XSpacesTabWrapper = () => {
+  const { session } = useAuth();
+  return <XSpacesFeed session={session?.access_token ?? null} />;
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════════
    MAIN SPACES PAGE
    ═══════════════════════════════════════════════════════════════════════════════ */
 
@@ -2273,7 +2514,7 @@ const Spaces = () => {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [activeSpace, setActiveSpace] = useState<Space | null>(null);
-  const [tab, setTab] = useState<"live" | "upcoming" | "replay">("live");
+  const [tab, setTab] = useState<"live" | "upcoming" | "replay" | "x-spaces">("live");
   const [topicFilter, setTopicFilter] = useState<string>("All");
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -2476,16 +2717,21 @@ const Spaces = () => {
         {/* Row 1: Tabs */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: "none" }}>
-            {(["live", "upcoming", "replay"] as const).map(t => {
+            {(["live", "upcoming", "replay", "x-spaces"] as const).map(t => {
               const isActive = tab === t;
-              const label = t === "live" ? "Live" : t === "upcoming" ? "Upcoming" : "Replay";
+              const isX = t === "x-spaces";
+              const label = t === "live" ? "Live" : t === "upcoming" ? "Upcoming" : t === "replay" ? "Replay" : "𝕏 Spaces";
               const count = t === "replay" ? endedRooms.length : undefined;
               return (
                 <button key={t} onClick={() => setTab(t)}
                   className={cn(
                     "px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap shrink-0",
-                    isActive
+                    isActive && isX
+                      ? "bg-sky-500/15 text-sky-400 border border-sky-500/25"
+                      : isActive
                       ? "bg-blue-500/15 text-blue-400 border border-blue-500/25"
+                      : isX
+                      ? "text-sky-400/50 hover:text-sky-400/80 hover:bg-sky-500/[0.05] border border-transparent"
                       : "text-white/35 hover:text-white/60 hover:bg-white/[0.03] border border-transparent"
                   )}>
                   {label}
@@ -2528,31 +2774,33 @@ const Spaces = () => {
           </div>
         )}
 
-        {/* ═══ TOPIC FILTER PILLS ═══ */}
-        <div className="relative">
-          <div ref={topicScrollRef} className="flex gap-2 overflow-x-auto scrollbar-none pb-1" style={{ scrollbarWidth: "none" }}>
-            {displayTopics.map(t => {
-              const isActive = topicFilter === t;
-              const meta = TOPIC_META[t];
-              return (
-                <button key={t} onClick={() => setTopicFilter(t)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-bold whitespace-nowrap transition-all shrink-0",
-                    isActive
-                      ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
-                      : "bg-white/[0.03] text-white/35 border border-white/[0.06] hover:bg-white/[0.06] hover:text-white/50"
-                  )}>
-                  {meta && <span className="text-sm">{meta.icon}</span>}
-                  {t}
-                </button>
-              );
-            })}
+        {/* ═══ TOPIC FILTER PILLS (hidden on X Spaces tab) ═══ */}
+        {tab !== "x-spaces" && (
+          <div className="relative">
+            <div ref={topicScrollRef} className="flex gap-2 overflow-x-auto scrollbar-none pb-1" style={{ scrollbarWidth: "none" }}>
+              {displayTopics.map(t => {
+                const isActive = topicFilter === t;
+                const meta = TOPIC_META[t];
+                return (
+                  <button key={t} onClick={() => setTopicFilter(t)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-bold whitespace-nowrap transition-all shrink-0",
+                      isActive
+                        ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                        : "bg-white/[0.03] text-white/35 border border-white/[0.06] hover:bg-white/[0.06] hover:text-white/50"
+                    )}>
+                    {meta && <span className="text-sm">{meta.icon}</span>}
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Scroll fade indicator */}
+            <div className="absolute right-0 top-0 bottom-1 w-10 bg-gradient-to-l from-background to-transparent pointer-events-none flex items-center justify-end pr-1">
+              <ChevronRight className="h-3.5 w-3.5 text-white/20" />
+            </div>
           </div>
-          {/* Scroll fade indicator */}
-          <div className="absolute right-0 top-0 bottom-1 w-10 bg-gradient-to-l from-background to-transparent pointer-events-none flex items-center justify-end pr-1">
-            <ChevronRight className="h-3.5 w-3.5 text-white/20" />
-          </div>
-        </div>
+        )}
 
         {/* ═══ CONTENT AREA ═══ */}
         <div className="pt-1">
@@ -2628,6 +2876,11 @@ const Spaces = () => {
                     ))}
                   </div>
                 )
+              )}
+
+              {/* X SPACES TAB */}
+              {tab === "x-spaces" && (
+                <XSpacesTabWrapper />
               )}
             </>
           )}

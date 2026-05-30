@@ -17,7 +17,7 @@ const LS_STATE = "x_pkce_state";
 // Public OAuth 2.0 Client ID (safe to expose — only used for PKCE redirect, not secret operations)
 export const X_CLIENT_ID = import.meta.env.VITE_TWITTER_CLIENT_ID || "VEttdDM5YUtpMGJsbURCSmhBMEg6MTpjaQ";
 export const X_CALLBACK_URL = `${window.location.origin}/x-callback`;
-export const X_SCOPES = "tweet.write tweet.read like.read users.read offline.access";
+export const X_SCOPES = "tweet.write tweet.read like.read users.read follows.read space.read offline.access";
 
 // ── PKCE helpers ─────────────────────────────────────────────────────────────
 
