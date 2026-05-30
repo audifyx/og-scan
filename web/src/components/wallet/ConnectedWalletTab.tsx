@@ -25,8 +25,7 @@ import {
 } from "@/lib/solana-api";
 import { HELIUS_RPC, HELIUS_API_KEY, jupPrice, SOL_MINT, JUPITER_BASE, JUPITER_API_KEY } from "@/lib/og";
 import { formatDistanceToNow } from "date-fns";
-import { PublicKey, VersionedTransaction } from "@solana/web3.js";
-import { Buffer } from "buffer";
+import { VersionedTransaction } from "@solana/web3.js";
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 interface RichToken {
@@ -280,39 +279,31 @@ export function ConnectedWalletTab() {
     return () => clearTimeout(timeout);
   }, [swapOpen, swapToken, swapAmount, swapMode, slippage]);
 
-  /* ── Execute swap ── */
+  /* ── Execute swap via Phantom native (zero platform fees) ── */
   const executeSwap = async () => {
-    if (!swapToken || !swapAmount || !publicKey || !signTransaction) return;
+    if (!swapToken || !swapAmount || !publicKey) return;
     setSwapLoading(true);
     try {
+      const phantom = (window as any).phantom?.solana;
+      if (!phantom?.isPhantom) throw new Error("Phantom wallet not found. Please install Phantom.");
+
       const inputMint = swapMode === "buy" ? SOL_MINT : swapToken.mint;
       const outputMint = swapMode === "buy" ? swapToken.mint : SOL_MINT;
       const decimals = swapMode === "buy" ? 9 : swapToken.decimals;
       const amountLamports = Math.floor(Number(swapAmount) * Math.pow(10, decimals));
 
-      const swapTxBase64 = await jupiterSwap(inputMint, outputMint, amountLamports, slippage, publicKey.toBase58());
+      // Build swap tx via Jupiter (no platform fee account = zero fees)
+      const swapTxBase64 = await phantomSwap(inputMint, outputMint, amountLamports, slippage, publicKey.toBase58());
 
-      // Deserialize
-      const buf = Buffer.from(swapTxBase64, "base64");
-      const tx = VersionedTransaction.deserialize(buf);
+      // Deserialize using browser-native atob (no Buffer needed)
+      const txBytes = base64ToUint8Array(swapTxBase64);
+      const tx = VersionedTransaction.deserialize(txBytes);
 
-      // Sign
-      const signed = await signTransaction(tx);
+      // Sign & send via Phantom directly
+      const { signature: sig } = await phantom.signAndSendTransaction(tx);
 
-      // Send
-      const raw = signed.serialize();
-      const res = await fetch(HELIUS_RPC, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0", id: 1,
-          method: "sendTransaction",
-          params: [Buffer.from(raw).toString("base64"), { encoding: "base64", skipPreflight: true }],
-        }),
-      });
-      const { result: sig } = await res.json();
       toast({
-        title: `${swapMode === "buy" ? "Buy" : "Sell"} submitted!`,
+        title: `${swapMode === "buy" ? "Buy" : "Sell"} submitted! ✅`,
         description: `TX: ${formatAddress(sig, 6)}`,
       });
       setSwapOpen(false);
