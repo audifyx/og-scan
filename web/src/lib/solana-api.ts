@@ -154,22 +154,14 @@ export interface ParsedTransaction {
 
 /* ═══════════════════════════════════════════════════════════════
    Jupiter Price API (v3) — fast, reliable, covers pump.fun tokens
+   Response format: { [mint]: { usdPrice: number, priceChange24h: number, ... } }
    ═══════════════════════════════════════════════════════════════ */
 
 interface JupPriceEntry {
-  id: string;
-  type: string;
-  price: string;
-  extraInfo?: {
-    quotedPrice?: {
-      buyPrice: string;
-      buyAt: number;
-      sellPrice: string;
-      sellAt: number;
-    };
-    lastSwappedPrice?: { lastJupiterSellAt: number; lastJupiterSellPrice: string; lastJupiterBuyAt: number; lastJupiterBuyPrice: string };
-    confidenceLevel?: string;
-  };
+  usdPrice?: number;
+  priceChange24h?: number;
+  liquidity?: number;
+  decimals?: number;
 }
 
 const _jupPriceCache: Record<string, { price: number; ts: number }> = {};
@@ -182,6 +174,7 @@ export async function fetchJupiterPrices(mints: string[]): Promise<Record<string
   if (toFetch.length > 0) {
     try {
       // Jupiter price v3 — batched, authenticated
+      // Response: { [mint]: { usdPrice: number, priceChange24h: number, ... } }
       const chunks = [];
       for (let i = 0; i < toFetch.length; i += 100) {
         chunks.push(toFetch.slice(i, i + 100));
@@ -192,9 +185,9 @@ export async function fetchJupiterPrices(mints: string[]): Promise<Record<string
           headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` },
         });
         if (!res.ok) return;
-        const data = await res.json() as { data: Record<string, JupPriceEntry> };
-        for (const [mint, entry] of Object.entries(data.data ?? {})) {
-          const price = parseFloat(entry.price ?? "0");
+        const data = await res.json() as Record<string, JupPriceEntry>;
+        for (const [mint, entry] of Object.entries(data)) {
+          const price = typeof entry?.usdPrice === "number" ? entry.usdPrice : 0;
           if (price > 0) _jupPriceCache[mint] = { price, ts: now };
         }
       }));
@@ -222,24 +215,18 @@ export async function fetchSolPrice(): Promise<{ price: number; change24h: numbe
   }
 
   try {
-    // Try Jupiter price API first (most reliable)
+    // Jupiter price v3 — response: { [mint]: { usdPrice: number, priceChange24h: number } }
     const res = await fetch(
-      `${JUPITER_BASE}/price/v3?ids=${SOL_MINT},${USDC_MINT}`,
+      `${JUPITER_BASE}/price/v3?ids=${SOL_MINT}`,
       { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
     );
     if (res.ok) {
-      const data = await res.json() as { data: Record<string, JupPriceEntry> };
-      const solEntry = data.data?.[SOL_MINT];
+      const data = await res.json() as Record<string, JupPriceEntry>;
+      const solEntry = data[SOL_MINT];
       if (solEntry) {
-        const price = parseFloat(solEntry.price ?? "0");
+        const price = typeof solEntry.usdPrice === "number" ? solEntry.usdPrice : 0;
         if (price > 0) {
-          // 24h change — compute from quotedPrice buy vs sell as proxy, or default 0
-          let change24h = 0;
-          const buyAt = solEntry.extraInfo?.quotedPrice?.buyAt ?? 0;
-          const buyPrice = parseFloat(solEntry.extraInfo?.quotedPrice?.buyPrice ?? "0");
-          if (buyAt > 0 && buyPrice > 0 && now / 1000 - buyAt < 120) {
-            change24h = ((price - buyPrice) / buyPrice) * 100;
-          }
+          const change24h = typeof solEntry.priceChange24h === "number" ? solEntry.priceChange24h : 0;
           _solPriceCache = { price, change24h, ts: now };
           return { price, change24h };
         }
@@ -254,7 +241,7 @@ export async function fetchSolPrice(): Promise<{ price: number; change24h: numbe
     const pair = Array.isArray(pairs) ? pairs[0] : null;
     if (pair) {
       const price = parseFloat(pair.priceUsd ?? "0");
-      const change24h = parseFloat(pair.priceChange?.h24 ?? "0");
+      const change24h = parseFloat(String(pair.priceChange?.h24 ?? "0"));
       if (price > 0) {
         _solPriceCache = { price, change24h, ts: now };
         return { price, change24h };
