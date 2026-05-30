@@ -271,20 +271,44 @@ const Invite = () => {
           }
         }
 
-        // Sort by QUALIFIED count desc, then total as tiebreaker
+        // Get all unique inviter IDs to check if THEY also hold ≥$10 OGS
+        const allInviterIds = [...new Set(contestRefs.map((r) => r.referred_by as string))];
+        const { data: inviterProfiles } = await supabase
+          .from("profiles")
+          .select("user_id, username, sol_wallet, wallet_address")
+          .in("user_id", allInviterIds.length > 0 ? allInviterIds : ["__none__"]);
+
+        // Check which inviters are themselves holders
+        const qualifiedInviters = new Set<string>();
+        if (inviterProfiles && currentOgsPrice > 0) {
+          const inviterWallets = inviterProfiles
+            .filter((p) => p.sol_wallet || p.wallet_address)
+            .map((p) => ({ userId: p.user_id, wallet: (p.sol_wallet || p.wallet_address) as string }));
+          const batchSize2 = 10;
+          for (let i = 0; i < inviterWallets.length; i += batchSize2) {
+            if (cancelled) return;
+            const batch = inviterWallets.slice(i, i + batchSize2);
+            await Promise.allSettled(
+              batch.map(async ({ userId, wallet }) => {
+                const balance = await getOgsBalance(wallet);
+                if (balance * currentOgsPrice >= MIN_HOLDING_USD) {
+                  qualifiedInviters.add(userId);
+                }
+              })
+            );
+          }
+        }
+
+        // Build name map from inviter profiles
+        const nameMap = new Map((inviterProfiles || []).map((p: any) => [p.user_id, p.username || "Anonymous"]));
+
+        // Leaderboard: only users who have ≥1 qualified invite AND are holders themselves
+        // Sort by qualified count desc, tiebreak by total
         const sorted = Array.from(totalCounts.entries())
           .map(([userId, total]) => ({ userId, total, qualified: qualifiedCounts.get(userId) || 0 }))
+          .filter((e) => e.qualified > 0 && qualifiedInviters.has(e.userId))
           .sort((a, b) => b.qualified - a.qualified || b.total - a.total)
           .slice(0, 20);
-
-        // Fetch usernames for leaderboard
-        const ids = sorted.map((e) => e.userId);
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("user_id, username")
-          .in("user_id", ids.length > 0 ? ids : ["__none__"]);
-
-        const nameMap = new Map((profs || []).map((p: any) => [p.user_id, p.username || "Anonymous"]));
 
         const board: LeaderboardEntry[] = sorted.map((entry, i) => ({
           rank: i + 1,
@@ -638,14 +662,26 @@ const Invite = () => {
                   </div>
                 </div>
 
-                {/* Your Invites list */}
-                {myInvites.length > 0 && (
-                  <div className="p-5 pt-0">
-                    <h3 className="font-bold text-sm flex items-center gap-2 mb-3">
-                      <Users className="h-4 w-4 text-white/40" />
-                      Your Invites
-                    </h3>
-                    <div className="space-y-2">
+              </Card>
+            </div>
+
+            {/* ── Right column: Your Invites + Leaderboard + How it works ── */}
+            <div className="lg:col-span-3 space-y-4">
+
+              {/* Your Invites — scrollable list */}
+              {myInvites.length > 0 && (
+                <Card className="glass-card border border-white/[0.07] overflow-hidden">
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold text-sm flex items-center gap-2">
+                        <Users className="h-4 w-4 text-[#ab9ff2]" />
+                        Your Invites
+                      </h3>
+                      <Badge className="bg-white/[0.05] text-white/40 border-white/[0.08] text-[10px]">
+                        {myInvites.filter((i) => i.qualified).length}/{myInvites.length} qualified
+                      </Badge>
+                    </div>
+                    <div className="max-h-[240px] overflow-y-auto space-y-2 pr-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                       {myInvites.map((inv, i) => (
                         <div
                           key={i}
@@ -668,7 +704,7 @@ const Invite = () => {
                               <span className="text-[10px] font-bold uppercase">Qualified</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1 text-white/20">
+                            <div className="flex items-center gap-1 text-red-400/60">
                               <X className="h-4 w-4" />
                               <span className="text-[10px] font-bold uppercase">Not qualified</span>
                             </div>
@@ -677,12 +713,8 @@ const Invite = () => {
                       ))}
                     </div>
                   </div>
-                )}
-              </Card>
-            </div>
-
-            {/* ── Right column: Leaderboard + How it works ── */}
-            <div className="lg:col-span-3 space-y-4">
+                </Card>
+              )}
 
               {/* Leaderboard */}
               <Card className="glass-card border border-white/[0.07] overflow-hidden">
@@ -712,10 +744,9 @@ const Invite = () => {
                       {/* Header */}
                       <div className="grid grid-cols-12 gap-2 px-3 py-1.5 text-[10px] text-white/25 uppercase tracking-widest font-bold">
                         <span className="col-span-1">#</span>
-                        <span className="col-span-4">User</span>
-                        <span className="col-span-2 text-center">Invited</span>
+                        <span className="col-span-5">User</span>
                         <span className="col-span-3 text-center">Qualified</span>
-                        <span className="col-span-2 text-right">Prize</span>
+                        <span className="col-span-3 text-right">Prize</span>
                       </div>
 
                       {/* Prize tiers (always show 8 rows) */}
@@ -741,7 +772,7 @@ const Invite = () => {
                             </div>
 
                             {/* Username */}
-                            <div className="col-span-4">
+                            <div className="col-span-5">
                               {entry ? (
                                 <div className="flex items-center gap-2">
                                   <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center text-[10px] font-bold text-white/50">
@@ -759,14 +790,7 @@ const Invite = () => {
                               )}
                             </div>
 
-                            {/* Total invited */}
-                            <div className="col-span-2 text-center">
-                              <span className="text-sm font-bold font-mono text-white/40">
-                                {entry ? entry.totalReferrals : "—"}
-                              </span>
-                            </div>
-
-                            {/* Qualified (holds $10+ OGS) */}
+                            {/* Qualified count */}
                             <div className="col-span-3 text-center">
                               <span className="text-sm font-bold font-mono text-green-400">
                                 {entry ? entry.qualifiedReferrals : "—"}
@@ -774,7 +798,7 @@ const Invite = () => {
                             </div>
 
                             {/* Prize */}
-                            <div className="col-span-2 text-right">
+                            <div className="col-span-3 text-right">
                               <span className={`text-sm font-black ${tier.rank <= 3 ? tier.color : "text-white/40"}`}>
                                 ${tier.prize}
                               </span>
@@ -793,7 +817,7 @@ const Invite = () => {
                             <div className="col-span-1">
                               <span className="text-xs font-bold text-white/30">{myStats.rank}</span>
                             </div>
-                            <div className="col-span-4">
+                            <div className="col-span-5">
                               <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-lg bg-[#ab9ff2]/20 flex items-center justify-center text-[10px] font-bold text-[#ab9ff2]">
                                   {profile?.username?.charAt(0).toUpperCase() || "Y"}
@@ -803,13 +827,10 @@ const Invite = () => {
                                 </p>
                               </div>
                             </div>
-                            <div className="col-span-2 text-center">
-                              <span className="text-sm font-bold font-mono text-white/40">{myStats.invited}</span>
-                            </div>
                             <div className="col-span-3 text-center">
                               <span className="text-sm font-bold font-mono text-green-400">{myStats.qualified}</span>
                             </div>
-                            <div className="col-span-2 text-right">
+                            <div className="col-span-3 text-right">
                               <span className="text-xs text-white/25">Outside top 8</span>
                             </div>
                           </div>
