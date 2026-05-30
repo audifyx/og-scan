@@ -895,7 +895,7 @@ const Index = () => {
   };
 
   return (
-    <div className="st-workspace flex min-h-screen bg-background text-foreground relative">
+    <div className="st-workspace flex h-screen overflow-hidden bg-background text-foreground relative">
       {/* Wallpaper layer — very subtle, pushed far back */}
       {customWallpaper && (
         <div className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-15" style={{ backgroundImage: `url(${customWallpaper})` }}>
@@ -922,7 +922,7 @@ const Index = () => {
       )}
 
       {/* Main content */}
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col lg:ml-[260px]">
+      <div className="relative z-10 flex min-w-0 flex-1 min-h-0 flex-col lg:ml-[260px]">
         {/* Top bar + horizontal tab strip */}
         <AppTopBar
           tab={activeTab}
@@ -947,7 +947,9 @@ const Index = () => {
         ) : tab === "coin-communities" ? (
           <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0 flex flex-col">
             <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}>
-              <CoinCommunitiesPageLazy />
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                <CoinCommunitiesPageLazy />
+              </div>
             </Suspense>
           </main>
         ) : (
