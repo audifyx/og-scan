@@ -9,8 +9,8 @@ import { OGSCAN_TOKEN_MINT } from "@/lib/og";
 const Wallets = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Phantom's swap page pre-filled with SOL → OGS
-  const phantomSwapUrl = `https://phantom.app/swap/SolanaMainnet/SOL/${OGSCAN_TOKEN_MINT}`;
+  // Phantom Trade terminal
+  const phantomSwapUrl = `https://trade.phantom.com/`;
 
   return (
     <AppLayout>
