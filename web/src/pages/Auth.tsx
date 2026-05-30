@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, AtSign, Eye, EyeOff, Fingerprint, Loader2, Lock, Mail, Radar, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
+import { Turnstile } from "@/components/Turnstile";
 import { toast } from "sonner";
 import { z } from "zod";
 import {
@@ -55,7 +56,7 @@ const Auth = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [humanCode, setHumanCode] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [honeypot, setHoneypot] = useState("");
   const [formStartedAt] = useState(() => Date.now());
   const [showPassword, setShowPassword] = useState(false);
@@ -92,7 +93,7 @@ const Auth = () => {
       try { passwordSchema.parse(password); } catch (e) { if (e instanceof z.ZodError) newErrors.password = e.errors[0].message; }
     }
     if (mode === "signup" && password !== confirmPassword) newErrors.confirm = "Passwords do not match";
-    if (mode === "signup" && humanCode.trim().toUpperCase() !== "OGSCAN") newErrors.humanCode = "Type OGSCAN exactly to verify you are human";
+    if (mode === "signup" && !captchaToken) newErrors.humanCode = "Please complete the human verification";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -119,7 +120,7 @@ const Auth = () => {
             username: clean,
             fingerprint: getDeviceFingerprint(),
             honeypot,
-            humanCode,
+            captchaToken,
             elapsedMs: Date.now() - formStartedAt,
           }),
         });
@@ -298,9 +299,18 @@ const Auth = () => {
                       </div>
 
                       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                        <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Type OGSCAN</Label>
-                        <Input value={humanCode} onChange={(e) => setHumanCode(e.target.value.toUpperCase())} className="mt-2 min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] text-base uppercase tracking-[0.18em] text-white focus:border-og-lime" placeholder="OGSCAN" />
-                        {errors.humanCode && <p className="mt-1 text-xs font-semibold text-og-blood">{errors.humanCode}</p>}
+                        <Label className="mb-3 block text-[11px] font-black uppercase tracking-[0.16em] text-white/42">
+                          Human Verification
+                        </Label>
+                        <Turnstile
+                          onVerify={(token) => setCaptchaToken(token)}
+                          onExpire={() => setCaptchaToken(null)}
+                          onError={() => setCaptchaToken(null)}
+                        />
+                        {captchaToken && (
+                          <p className="mt-2 text-center text-[10px] font-bold text-green-400/80">✓ Verified</p>
+                        )}
+                        {errors.humanCode && <p className="mt-2 text-center text-xs font-semibold text-og-blood">{errors.humanCode}</p>}
                         <div className="hidden" aria-hidden="true">
                           <Label>Leave this field empty</Label>
                           <Input tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
