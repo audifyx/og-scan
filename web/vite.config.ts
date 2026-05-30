@@ -15,6 +15,15 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Polyfill Node.js Buffer for browser
+      buffer: "buffer",
     },
+  },
+  define: {
+    // Make Buffer available globally in browser
+    global: "globalThis",
+  },
+  optimizeDeps: {
+    include: ["buffer"],
   },
 }));

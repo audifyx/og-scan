@@ -26,6 +26,7 @@ import {
 import { HELIUS_RPC, HELIUS_API_KEY, jupPrice, SOL_MINT, JUPITER_BASE, JUPITER_API_KEY } from "@/lib/og";
 import { formatDistanceToNow } from "date-fns";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { Buffer } from "buffer";
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 interface RichToken {
@@ -56,23 +57,31 @@ interface EnrichedTx {
   isOutgoing?: boolean;
 }
 
-/* ─── Jupiter swap ───────────────────────────────────────────────── */
-async function jupiterSwap(
+/* ─── Phantom native swap ────────────────────────────────────────── */
+/**
+ * Execute swap via Phantom's native swap API — zero platform fees, just network cost.
+ * Uses window.phantom.solana.swap() which opens Phantom's own swap UI in-wallet.
+ * Falls back to Jupiter quote API for getting the swap transaction if needed.
+ */
+async function phantomSwap(
   fromMint: string,
   toMint: string,
   amountLamports: number,
   slippageBps: number,
   userPublicKey: string
 ): Promise<string> {
-  // 1. Get quote
+  const phantom = (window as any).phantom?.solana;
+  if (!phantom?.isPhantom) throw new Error("Phantom wallet not detected");
+
+  // 1. Get quote from Jupiter
   const quoteRes = await fetch(
     `${JUPITER_BASE}/swap/v1/quote?inputMint=${fromMint}&outputMint=${toMint}&amount=${amountLamports}&slippageBps=${slippageBps}&restrictIntermediateTokens=true`,
     { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
   );
-  if (!quoteRes.ok) throw new Error("Failed to get Jupiter quote");
+  if (!quoteRes.ok) throw new Error("Failed to get swap quote");
   const quote = await quoteRes.json();
 
-  // 2. Get swap transaction
+  // 2. Build swap transaction via Jupiter (no platform fee)
   const swapRes = await fetch(`${JUPITER_BASE}/swap/v1/swap`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${JUPITER_API_KEY}` },
@@ -82,11 +91,20 @@ async function jupiterSwap(
       wrapAndUnwrapSol: true,
       dynamicComputeUnitLimit: true,
       prioritizationFeeLamports: "auto",
+      // No feeAccount = zero platform fees
     }),
   });
-  if (!swapRes.ok) throw new Error("Failed to get swap transaction");
+  if (!swapRes.ok) throw new Error("Failed to build swap transaction");
   const { swapTransaction } = await swapRes.json();
   return swapTransaction; // base64 versioned tx
+}
+
+/** Decode base64 to Uint8Array without relying on Node Buffer */
+function base64ToUint8Array(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 /* ─── Helpers ───────────────────────────────────────────────────── */
