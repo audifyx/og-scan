@@ -12,7 +12,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection, type WalletContextState } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { supabase } from "@/lib/supabase";
 import {
@@ -110,8 +110,11 @@ async function fetchTokensByAuthority(
 
 /* ─── Main Component ─── */
 export default function TokenManager() {
-  const { publicKey, signTransaction, connected } = useWallet();
+  const { publicKey, signTransaction, connected, wallets, select, connect } = useWallet();
   const { connection } = useConnection();
+  const availableWallets = wallets.filter(
+    (w) => w.readyState === "Installed" || w.readyState === "Loadable",
+  );
 
   /* ─── State ─── */
   const [step, setStep] = useState<Step>("connect");
@@ -526,9 +529,37 @@ export default function TokenManager() {
               Connect the wallet that deployed your token to verify update authority.
             </p>
           </div>
-          <p className="text-xs text-white/20">
-            Use the wallet button in the app header to connect Phantom or Solflare.
-          </p>
+          <div className="w-full max-w-xs space-y-2">
+            {availableWallets.map((w) => (
+              <button
+                key={w.adapter.name}
+                onClick={() => {
+                  select(w.adapter.name as any);
+                  setTimeout(() => { connect().catch(() => {}); }, 150);
+                }}
+                className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 transition-all hover:border-[#ab9ff2]/40 hover:bg-white/[0.1] group"
+              >
+                {w.adapter.icon && (
+                  <img src={w.adapter.icon} alt={w.adapter.name} className="h-8 w-8 rounded-lg" />
+                )}
+                <span className="text-sm font-semibold text-white">{w.adapter.name}</span>
+                <span className="ml-auto text-[10px] text-white/30 group-hover:text-[#ab9ff2]">Connect →</span>
+              </button>
+            ))}
+            {availableWallets.length === 0 && (
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-4 text-center">
+                <p className="text-xs text-white/30">No wallet detected.</p>
+                <a
+                  href="https://phantom.app/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[#ab9ff2] hover:underline"
+                >
+                  Install Phantom <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
