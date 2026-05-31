@@ -188,11 +188,33 @@ export default function TokenManager() {
   const handleConnectWallet = useCallback(async (walletName: string) => {
     setError(null);
     try {
+      // If already the right wallet adapter selected, just call connect() directly
+      if (wallet?.adapter.name === walletName) {
+        await connect();
+        return;
+      }
+      // Otherwise select the wallet — the useEffect below will call connect()
       select(walletName as any);
     } catch (err: any) {
-      console.error("select failed:", err);
+      // "already connected" is fine, anything else show error
+      if (!String(err?.message || "").toLowerCase().includes("connect")) {
+        setError("Failed to connect. Please try again.");
+      }
+      console.error("connect/select error:", err);
     }
-  }, [select]);
+  }, [select, connect, wallet]);
+
+  /* After select() changes the wallet adapter, explicitly call connect().
+     autoConnect only works silently on mount — for user-initiated clicks
+     we need to call connect() to trigger the Phantom popup. */
+  useEffect(() => {
+    if (wallet && !connected && !connecting) {
+      connect().catch((err) => {
+        // Silently handle — autoConnect errors, user can click again
+        console.log("Auto-connect attempt:", err?.message);
+      });
+    }
+  }, [wallet, connected, connecting, connect]);
 
   /* ─── Load metadata for a selected mint ─── */
   const loadMetadata = useCallback(
