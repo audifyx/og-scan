@@ -118,8 +118,10 @@ export default function TokenManager() {
     (w) => w.adapter.name === "Phantom",
   );
 
-  /* Usable wallet = connected AND publicKey present (needed for signing/fetching). */
-  const walletReady = !!(connected && publicKey);
+  /* Match ConnectedWalletTab: gate on `connected` only.
+   * publicKey always arrives in the same render cycle as connected=true,
+   * but using && publicKey can cause a 1-frame flash of the connect screen. */
+  const walletReady = connected;
 
   /* (wallet connection is handled inline on the Connect buttons below,
    *  same pattern as ConnectedWalletTab: select → setTimeout → connect) */
