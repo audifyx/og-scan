@@ -468,12 +468,8 @@ const Invite = () => {
                 <Trophy className="h-3 w-3 mr-1" />
                 Referral Contest
               </Badge>
-              <Badge className={`text-[10px] font-bold uppercase tracking-widest ${
-                contestStatus === "active" ? "bg-green-500/15 text-green-400 border-green-400/20" :
-                contestStatus === "upcoming" ? "bg-amber-500/15 text-amber-400 border-amber-400/20" :
-                "bg-red-500/15 text-red-400 border-red-400/20"
-              }`}>
-                {contestStatus === "active" ? "🟢 Live" : contestStatus === "upcoming" ? "⏳ Upcoming" : "🏁 Ended"}
+              <Badge className="text-[10px] font-bold uppercase tracking-widest bg-amber-500/15 text-amber-400 border-amber-400/20">
+                ⏳ Coming Soon
               </Badge>
             </div>
             <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-2">
