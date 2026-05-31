@@ -16,7 +16,6 @@ import {
   Activity,
   Search,
   Rocket,
-  Mail,
   Mic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,7 +27,7 @@ const CommunitiesPage  = lazy(() => import("./Communities"));
 const DiscoverPage     = lazy(() => import("./Discover"));
 const LiveFeedPage     = lazy(() => import("./LiveFeed"));
 const CommunityRoomsPage = lazy(() => import("./CommunityRooms"));
-const DirectMessages   = lazy(() => import("./DirectMessages"));
+// DirectMessages removed from CommunityHub — accessible via dedicated DM tab
 const TokenExplorer    = lazy(
   () => import("@/components/discover-20x/TokenExplorer").then((m) => ({ default: m.TokenExplorer })),
 );
@@ -38,7 +37,7 @@ const TokenExplorer    = lazy(
    ═══════════════════════════════════════════════════════════════ */
 
 type MainTab      = "chat" | "live" | "community";
-type ChatSub      = "channels" | "rooms" | "dms";
+type ChatSub      = "channels" | "rooms";
 type LiveSub      = "spaces" | "streams";
 type CommunitySub = "groups" | "discover";
 type DiscoverSub  = "launchpad" | "live-feed" | "explore";
@@ -52,7 +51,6 @@ const MAIN_TABS: TabDef<MainTab>[] = [
 const CHAT_SUBS: TabDef<ChatSub>[] = [
   { id: "channels", label: "Channels", Icon: Hash },
   { id: "rooms",    label: "Rooms",    Icon: MessageSquare },
-  { id: "dms",      label: "DMs",      Icon: Mail },
 ];
 
 const LIVE_SUBS: TabDef<LiveSub>[] = [
@@ -236,9 +234,7 @@ const CommunityHub: React.FC = () => {
               {chatSub === "rooms" && (
                 <Suspense fallback={<Spinner />}><CommunityRoomsPage /></Suspense>
               )}
-              {chatSub === "dms" && (
-                <Suspense fallback={<Spinner />}><DirectMessages /></Suspense>
-              )}
+
             </div>
           </>
         )}

@@ -679,7 +679,7 @@ const DirectMessages: React.FC = () => {
 
                         {/* Action toolbar */}
                         <div className={cn(
-                          "absolute -top-8 flex items-center gap-0.5 rounded-xl border border-white/[0.08] bg-[#0d1117]/95 px-1 py-0.5 shadow-xl backdrop-blur opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100",
+                          "absolute -top-8 flex items-center gap-0.5 rounded-xl border border-white/[0.08] bg-[#0d1117]/95 px-1 py-0.5 shadow-xl backdrop-blur opacity-0 transition-opacity group-hover:opacity-100",
                           isMe ? "right-0" : "left-0",
                         )}>
                           <button onClick={() => setMenuOpenId(menuOpenId === msg.id ? null : msg.id)} className="rounded-full bg-white/[0.04] px-1.5 py-1 text-white/32 hover:bg-white/[0.08] hover:text-white/70" title="More">

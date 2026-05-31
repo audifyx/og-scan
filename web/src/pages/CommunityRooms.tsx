@@ -434,7 +434,7 @@ function MessageRow({
             {hasAttachment ? <span>Attachment</span> : null}
           </div>
 
-          <div className={cn("relative flex flex-wrap items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100", isOwn && "justify-end")}>
+          <div className={cn("relative flex flex-wrap items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100", isOwn && "justify-end")}>
             <button onClick={() => { setMenuOpen(prev => !prev); setEmojiPickerOpen(false); }} className="rounded-full bg-white/[0.04] px-2 py-1.5 text-white/32 hover:bg-white/[0.08] hover:text-white/70" title="More">
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
@@ -1348,7 +1348,7 @@ const CommunityRooms: React.FC = () => {
   ) : null;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#08090d] text-white">
+    <div className="flex h-full overflow-hidden bg-[#08090d] text-white">
       <aside className="flex w-[310px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0d0f15] max-md:w-[92px]">
         <div className="flex items-center gap-2 border-b border-white/[0.06] p-3">
           <button onClick={() => navigate(-1)} className="rounded-lg p-2 text-white/35 hover:bg-white/[0.05] hover:text-white">
