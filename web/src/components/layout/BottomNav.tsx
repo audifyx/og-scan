@@ -1,4 +1,4 @@
-import { Home, Users, Wrench, User, Globe, Gift, Rocket } from "lucide-react";
+import { Home, Users, Wrench, User, Globe, Rocket } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { to: "/app", icon: Home, label: "Home" },
   { to: "/launch", icon: Rocket, label: "Launch" },
-  { to: "/invite", icon: Gift, label: "Invite" },
   { to: "/community", icon: Users, label: "Community" },
   { to: "/tools", icon: Wrench, label: "Tools" },
   { to: "/profile", icon: User, label: "Profile" },
@@ -88,8 +87,8 @@ const routeToNav: Record<string, string> = {
   /* Launch */
   "/launch": "/launch",
 
-  /* Invite */
-  "/invite": "/invite",
+  /* Invite (sidebar only — no bottom nav highlight) */
+  "/invite": "/app",
 
   /* Profile — account, settings, premium */
   "/profile": "/profile",
