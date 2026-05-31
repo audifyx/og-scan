@@ -118,8 +118,8 @@ export default function TokenManager() {
     (w) => w.adapter.name === "Phantom",
   );
 
-  /* Whether we consider the wallet usable (connected + has publicKey) */
-  const walletReady = !!(connected && publicKey);
+  /* Whether we consider the wallet usable — match ConnectedWalletTab: just `connected` */
+  const walletReady = connected;
 
   /* (wallet connection is handled inline on the Connect buttons below,
    *  same pattern as ConnectedWalletTab: select → setTimeout → connect) */
