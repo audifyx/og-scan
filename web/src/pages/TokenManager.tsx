@@ -114,7 +114,7 @@ export default function TokenManager() {
   const { publicKey, signTransaction, connected, wallets, select, connect, disconnect, wallet, connecting } = useWallet();
   const { connection } = useConnection();
   const availableWallets = wallets.filter(
-    (w) => w.readyState === "Installed" || w.readyState === "Loadable",
+    (w) => w.adapter.name === "Phantom",
   );
 
   /* Whether we consider the wallet usable (connected + has publicKey) */
@@ -229,22 +229,6 @@ export default function TokenManager() {
       const ref = encodeURIComponent(window.location.origin);
       window.location.href = `https://phantom.app/ul/browse/${url}?ref=${ref}`;
       return;
-    }
-
-    /* ── Solflare ── */
-    if (walletName === "Solflare") {
-      const provider = (window as any).solflare;
-      if (provider?.isSolflare) {
-        try {
-          await provider.connect();
-          select("Solflare" as any);
-          setWantConnect(true);
-          return;
-        } catch (err: any) {
-          setError("Solflare connection failed: " + (err?.message || "Try again."));
-          return;
-        }
-      }
     }
 
     /* ── Fallback: standard adapter flow ── */
