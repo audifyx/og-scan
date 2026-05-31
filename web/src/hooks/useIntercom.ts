@@ -8,7 +8,7 @@ declare global {
   }
 }
 
-const APP_ID = "b8625356-848a-4885-96d1-8c883d3985c0";
+const APP_ID = "wlc3xyxr";
 
 /**
  * Keeps the Intercom / Fin messenger in sync with the current auth state.
