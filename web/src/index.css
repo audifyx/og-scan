@@ -989,3 +989,86 @@ button, a, input, select, textarea {
 .bg-solana-gradient {
   background: linear-gradient(135deg, hsl(var(--og-lime)/0.5), hsl(var(--og-cyan)/0.5));
 }
+
+/* ===== Auth / Landing / Splash animation kit (added) ===== */
+@keyframes og-fade-up {
+  0%   { opacity: 0; transform: translateY(18px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.og-fade-up { opacity: 0; animation: og-fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+@keyframes og-fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.og-fade-in { opacity: 0; animation: og-fade-in 0.9s ease forwards; }
+
+@keyframes og-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+.og-float { animation: og-float 6s ease-in-out infinite; }
+
+@keyframes og-aurora-1 {
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  50%  { transform: translate3d(6%, 8%, 0) scale(1.15); }
+  100% { transform: translate3d(0,0,0) scale(1); }
+}
+@keyframes og-aurora-2 {
+  0%   { transform: translate3d(0,0,0) scale(1.1); }
+  50%  { transform: translate3d(-8%, -6%, 0) scale(1); }
+  100% { transform: translate3d(0,0,0) scale(1.1); }
+}
+.og-aurora-1 { animation: og-aurora-1 16s ease-in-out infinite; }
+.og-aurora-2 { animation: og-aurora-2 20s ease-in-out infinite; }
+
+@keyframes og-radar-sweep { to { transform: rotate(360deg); } }
+.og-radar-sweep { animation: og-radar-sweep 3.2s linear infinite; }
+
+@keyframes og-ping-ring {
+  0%   { transform: scale(0.6); opacity: 0.65; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.og-ping-ring { animation: og-ping-ring 2.6s ease-out infinite; }
+
+@keyframes og-bar-grow {
+  0%   { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
+.og-bar-grow { transform-origin: left; animation: og-bar-grow 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+@keyframes og-gradient-pan {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.og-gradient-text {
+  background: linear-gradient(90deg, hsl(var(--og-lime)), hsl(var(--og-cyan)), hsl(var(--og-gold)), hsl(var(--og-lime)));
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: og-gradient-pan 6s ease infinite;
+}
+
+@keyframes og-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.82); }
+}
+.og-pulse-dot { animation: og-pulse-dot 1.6s ease-in-out infinite; }
+
+.og-anim-delay-1 { animation-delay: 0.08s; }
+.og-anim-delay-2 { animation-delay: 0.16s; }
+.og-anim-delay-3 { animation-delay: 0.24s; }
+.og-anim-delay-4 { animation-delay: 0.32s; }
+.og-anim-delay-5 { animation-delay: 0.40s; }
+.og-anim-delay-6 { animation-delay: 0.48s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .og-fade-up, .og-fade-in, .og-float, .og-aurora-1, .og-aurora-2,
+  .og-radar-sweep, .og-ping-ring, .og-bar-grow, .og-gradient-text, .og-pulse-dot {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

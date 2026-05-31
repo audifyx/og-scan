@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Zap } from "lucide-react";
+import { Radar, ShieldCheck } from "lucide-react";
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -9,37 +9,74 @@ export const SplashScreen = ({ onComplete }: SplashScreenProps) => {
   const [phase, setPhase] = useState<"logo" | "text" | "fade">("logo");
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase("text"), 800);
-    const t2 = setTimeout(() => setPhase("fade"), 2200);
-    const t3 = setTimeout(onComplete, 2800);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    const t1 = setTimeout(() => setPhase("text"), 750);
+    const t2 = setTimeout(() => setPhase("fade"), 2300);
+    const t3 = setTimeout(onComplete, 2850);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
   }, [onComplete]);
 
   return (
-    <div className={`fixed inset-0 z-[200] bg-background flex flex-col items-center justify-center transition-opacity duration-500 ${phase === "fade" ? "opacity-0" : "opacity-100"}`}>
-      {/* Ambient gold glow */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full bg-primary/15 blur-[100px] animate-pulse" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full bg-accent/10 blur-[80px] animate-pulse" style={{ animationDelay: "0.5s" }} />
+    <div
+      className={`fixed inset-0 z-[200] flex flex-col items-center justify-center overflow-hidden bg-[#050914] transition-opacity duration-500 ${
+        phase === "fade" ? "opacity-0" : "opacity-100"
+      }`}
+    >
+      <div className="pointer-events-none absolute inset-0">
+        <div className="og-aurora-1 absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-og-cyan/20 blur-[120px]" />
+        <div className="og-aurora-2 absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full bg-og-lime/15 blur-[100px]" />
       </div>
+      <div className="grid-bg pointer-events-none absolute inset-0 opacity-[0.10]" />
 
-      {/* Logo */}
-      <div className={`relative transition-all duration-700 ease-out ${phase === "logo" ? "scale-100 opacity-100" : "scale-110 opacity-100"}`}>
-        <div className="w-24 h-24 rounded-[28px] bg-gradient-to-br from-primary via-accent to-gold-dark flex items-center justify-center shadow-2xl shadow-primary/30">
-          <Zap className="h-12 w-12 text-primary-foreground" strokeWidth={2.5} />
+      <div
+        className={`relative transition-all duration-700 ease-out ${
+          phase === "logo" ? "scale-95 opacity-100" : "scale-100 opacity-100"
+        }`}
+      >
+        <span className="og-ping-ring absolute inset-0 rounded-[30px] border border-og-lime/50" />
+        <span
+          className="og-ping-ring absolute inset-0 rounded-[30px] border border-og-cyan/40"
+          style={{ animationDelay: "0.9s" }}
+        />
+        <div className="relative grid h-28 w-28 place-items-center overflow-hidden rounded-[30px] border border-white/15 bg-gradient-to-br from-og-lime/25 via-[#0b1423] to-og-cyan/20 shadow-[0_24px_80px_-30px_hsl(var(--og-cyan))]">
+          <div
+            className="absolute inset-0 opacity-60"
+            style={{
+              background:
+                "conic-gradient(from 0deg, transparent 0deg, hsl(var(--og-lime) / 0.55) 60deg, transparent 130deg)",
+              maskImage: "radial-gradient(circle, transparent 30%, black 31%)",
+              WebkitMaskImage: "radial-gradient(circle, transparent 30%, black 31%)",
+            }}
+          >
+            <div className="og-radar-sweep h-full w-full" />
+          </div>
+          <Radar className="relative h-12 w-12 text-og-lime" strokeWidth={2.2} />
         </div>
-        <div className="absolute inset-0 rounded-[28px] border-2 border-primary/30 animate-ping" style={{ animationDuration: "1.5s" }} />
       </div>
 
-      {/* Text */}
-      <div className={`mt-8 text-center transition-all duration-500 ${phase !== "logo" ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-        <h1 className="font-display text-2xl font-bold tracking-wide text-foreground">SOL TOOLS</h1>
-        <p className="text-xs text-primary/70 mt-2 font-mono tracking-widest">PRO TRADING SUITE</p>
+      <div
+        className={`mt-9 text-center transition-all duration-500 ${
+          phase !== "logo" ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+        }`}
+      >
+        <h1 className="text-4xl font-black tracking-tight">
+          <span className="og-gradient-text">OGScan</span>
+        </h1>
+        <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.32em] text-white/45">
+          <ShieldCheck className="h-3.5 w-3.5 text-og-cyan" />
+          Solana intel suite
+        </p>
       </div>
 
-      {/* Loading bar */}
-      <div className={`mt-10 w-32 h-0.5 rounded-full bg-muted overflow-hidden transition-opacity duration-300 ${phase !== "logo" ? "opacity-100" : "opacity-0"}`}>
-        <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full animate-[loading_1.5s_ease-in-out_forwards]" />
+      <div
+        className={`mt-10 h-1 w-40 overflow-hidden rounded-full bg-white/10 transition-opacity duration-300 ${
+          phase !== "logo" ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <div className="og-bar-grow h-full rounded-full bg-gradient-to-r from-og-lime via-og-cyan to-og-gold" />
       </div>
     </div>
   );
