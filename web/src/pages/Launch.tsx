@@ -3,15 +3,16 @@
  *
  * Flow:
  *  1. User fills form (name, ticker, description, logo, socials)
- *  2. Uploads image + metadata to IPFS via /api/pump-create?step=ipfs
- *  3. Generates mint keypair client-side
- *  4. Gets unsigned tx from PumpPortal via /api/pump-create?step=create
- *  5. Signs with Phantom (both user wallet + mint keypair)
- *  6. Sends to Solana
- *  7. Success screen with pump.fun link
+ *  2. User pays $3 SOL fee to OG Scan wallet
+ *  3. Uploads image + metadata to IPFS via /api/pump-create?step=ipfs
+ *  4. Generates mint keypair client-side
+ *  5. Gets unsigned tx from PumpPortal via /api/pump-create?step=create
+ *  6. Signs with Phantom (both user wallet + mint keypair)
+ *  7. Sends to Solana
+ *  8. Success screen with pump.fun link
  */
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,18 +21,27 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Keypair, VersionedTransaction } from "@solana/web3.js";
+import {
+  Keypair, VersionedTransaction, Transaction,
+  SystemProgram, PublicKey, LAMPORTS_PER_SOL,
+} from "@solana/web3.js";
 import { toast } from "sonner";
 import {
-  Rocket, Upload, Image as ImageIcon, Globe, Twitter, Send,
+  Rocket, Upload, Globe, Twitter, Send,
   Loader2, CheckCircle, Copy, ExternalLink, Wallet, AlertTriangle,
-  Sparkles, Zap, ArrowRight, X, Info
+  Sparkles, Zap, ArrowRight, X, Info, DollarSign,
 } from "lucide-react";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 
 const MAX_IMG_SIZE = 5 * 1024 * 1024; // 5 MB
 const ACCEPTED_IMG = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+
+/** OG Scan revenue wallet — receives the $3 launch fee */
+const FEE_WALLET = new PublicKey("o3mh85BefXsTWwQhyYdm9VXWaNGxct1jXPe2tRX4MYi");
+
+/** Launch fee in USD */
+const LAUNCH_FEE_USD = 3;
 
 interface FormData {
   name: string;
@@ -43,12 +53,14 @@ interface FormData {
   devBuySol: string;
 }
 
-type LaunchStep = "form" | "uploading" | "signing" | "sending" | "success" | "error";
+type LaunchStep = "form" | "paying" | "uploading" | "signing" | "sending" | "success" | "error";
+
+const STEP_LABELS = ["Pay", "IPFS", "Sign", "Send"];
 
 /* ─── Component ──────────────────────────────────────────────────────── */
 
 export default function Launch() {
-  const { publicKey, signTransaction, connected, connect, wallets, select } = useWallet();
+  const { publicKey, signTransaction, sendTransaction, connected, connect, wallets, select } = useWallet();
   const { connection } = useConnection();
 
   const [form, setForm] = useState<FormData>({
@@ -69,7 +81,35 @@ export default function Launch() {
   const [mintAddress, setMintAddress] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [showWalletPicker, setShowWalletPicker] = useState(false);
+  const [solPrice, setSolPrice] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /* ─── Fetch SOL price ──────────────────────────────────────────────── */
+
+  useEffect(() => {
+    const fetchPrice = async () => {
+      try {
+        const res = await fetch("https://api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112");
+        const data = await res.json();
+        const price = parseFloat(data?.data?.["So11111111111111111111111111111111111111112"]?.price);
+        if (price && price > 0) setSolPrice(price);
+      } catch {
+        // Fallback: try CoinGecko
+        try {
+          const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+          const data = await res.json();
+          if (data?.solana?.usd) setSolPrice(data.solana.usd);
+        } catch {
+          // Will show "calculating..." in UI
+        }
+      }
+    };
+    fetchPrice();
+    const interval = setInterval(fetchPrice, 60_000); // Refresh every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  const feeSol = solPrice ? LAUNCH_FEE_USD / solPrice : null;
 
   /* ─── Image handling ───────────────────────────────────────────────── */
 
@@ -105,16 +145,45 @@ export default function Launch() {
     connected &&
     publicKey &&
     signTransaction &&
+    sendTransaction &&
     form.name.trim().length > 0 &&
     form.symbol.trim().length > 0 &&
-    imageFile;
+    imageFile &&
+    solPrice !== null;
 
   /* ─── Launch flow ──────────────────────────────────────────────────── */
 
   const handleLaunch = async () => {
-    if (!canLaunch || !publicKey || !signTransaction || !imageFile) return;
+    if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile || !solPrice) return;
 
     try {
+      /* Step 0 — Pay $3 SOL fee */
+      setStep("paying");
+      setStatusMsg("Preparing payment…");
+
+      const feeLamports = Math.ceil((LAUNCH_FEE_USD / solPrice) * LAMPORTS_PER_SOL);
+
+      const feeTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: FEE_WALLET,
+          lamports: feeLamports,
+        })
+      );
+      feeTx.feePayer = publicKey;
+      feeTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+      setStatusMsg(`Pay $${LAUNCH_FEE_USD} launch fee (${(feeLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL)…`);
+
+      const feeSig = await sendTransaction(feeTx, connection);
+
+      setStatusMsg("Confirming payment…");
+      const feeConf = await connection.confirmTransaction(feeSig, "confirmed");
+      if (feeConf.value.err) {
+        throw new Error("Fee payment failed on-chain");
+      }
+      toast.success("Payment confirmed ✓");
+
       /* Step 1 — Upload to IPFS */
       setStep("uploading");
       setStatusMsg("Uploading image & metadata to IPFS…");
@@ -177,7 +246,7 @@ export default function Launch() {
 
       /* Step 4 — Deserialize + sign */
       setStep("signing");
-      setStatusMsg("Waiting for wallet signature…");
+      setStatusMsg("Sign the token creation transaction…");
 
       const txBytes = Uint8Array.from(atob(txBase64), (c) => c.charCodeAt(0));
       const tx = VersionedTransaction.deserialize(txBytes);
@@ -197,7 +266,6 @@ export default function Launch() {
         maxRetries: 3,
       });
 
-      // Wait for confirmation
       setStatusMsg("Confirming…");
       const confirmation = await connection.confirmTransaction(sig, "confirmed");
 
@@ -250,6 +318,18 @@ export default function Launch() {
     }
   };
 
+  /* ─── Step index helper ────────────────────────────────────────────── */
+
+  const getStepIndex = (): number => {
+    switch (step) {
+      case "paying": return 0;
+      case "uploading": return 1;
+      case "signing": return 2;
+      case "sending": return 3;
+      default: return -1;
+    }
+  };
+
   /* ─── Render ───────────────────────────────────────────────────────── */
 
   return (
@@ -267,7 +347,7 @@ export default function Launch() {
               Launch on Pump.fun
             </h1>
             <p className="text-sm text-white/40 max-w-md mx-auto">
-              Create and deploy your token in seconds. Free to launch — just sign with your wallet.
+              Create and deploy your token in seconds. Fill in the details, pay the launch fee, and you're live.
             </p>
           </div>
 
@@ -349,23 +429,26 @@ export default function Launch() {
           )}
 
           {/* ─── Loading / In-Progress ─────────────────────────── */}
-          {(step === "uploading" || step === "signing" || step === "sending") && (
+          {(step === "paying" || step === "uploading" || step === "signing" || step === "sending") && (
             <Card className="border-[#ab9ff2]/20 bg-[#ab9ff2]/[0.02] backdrop-blur-sm">
               <CardContent className="p-12 text-center">
                 <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#ab9ff2]/10 border border-[#ab9ff2]/20 animate-pulse">
                   <Loader2 className="h-10 w-10 text-[#ab9ff2] animate-spin" />
                 </div>
                 <h2 className="text-xl font-black text-white mb-2">
-                  {step === "uploading" ? "Uploading…" : step === "signing" ? "Sign Transaction" : "Broadcasting…"}
+                  {step === "paying" ? "Pay Launch Fee" :
+                   step === "uploading" ? "Uploading…" :
+                   step === "signing" ? "Sign Transaction" :
+                   "Broadcasting…"}
                 </h2>
                 <p className="text-sm text-white/50">{statusMsg}</p>
 
                 {/* Progress steps */}
                 <div className="mt-8 flex items-center justify-center gap-2">
-                  {["IPFS", "Sign", "Send"].map((label, i) => {
-                    const stepIndex = step === "uploading" ? 0 : step === "signing" ? 1 : 2;
-                    const isActive = i === stepIndex;
-                    const isDone = i < stepIndex;
+                  {STEP_LABELS.map((label, i) => {
+                    const currentIdx = getStepIndex();
+                    const isActive = i === currentIdx;
+                    const isDone = i < currentIdx;
                     return (
                       <div key={label} className="flex items-center gap-2">
                         <div className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ${
@@ -378,7 +461,9 @@ export default function Launch() {
                         <span className={`text-[10px] uppercase tracking-widest ${isDone ? "text-green-400/60" : isActive ? "text-[#ab9ff2]/80" : "text-white/20"}`}>
                           {label}
                         </span>
-                        {i < 2 && <ArrowRight className={`h-3 w-3 ${i < stepIndex ? "text-green-500/30" : "text-white/10"}`} />}
+                        {i < STEP_LABELS.length - 1 && (
+                          <ArrowRight className={`h-3 w-3 ${i < currentIdx ? "text-green-500/30" : "text-white/10"}`} />
+                        )}
                       </div>
                     );
                   })}
@@ -547,24 +632,33 @@ export default function Launch() {
               </Card>
 
               {/* Cost breakdown */}
-              <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-4">
-                <div className="flex justify-between text-xs text-white/40 mb-1">
-                  <span>Launch fee</span>
-                  <span className="text-green-400">Free</span>
+              <div className="rounded-lg border border-[#ab9ff2]/10 bg-[#ab9ff2]/[0.02] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign className="h-4 w-4 text-[#ab9ff2]" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">Cost Breakdown</span>
                 </div>
-                <div className="flex justify-between text-xs text-white/40 mb-1">
+                <div className="flex justify-between text-xs text-white/40 mb-1.5">
+                  <span>Launch fee</span>
+                  <span className="text-[#ab9ff2] font-bold">
+                    ${LAUNCH_FEE_USD}.00{feeSol ? ` (${feeSol.toFixed(4)} SOL)` : ""}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs text-white/40 mb-1.5">
                   <span>Network fee</span>
                   <span>~0.02 SOL</span>
                 </div>
                 {parseFloat(form.devBuySol) > 0 && (
-                  <div className="flex justify-between text-xs text-white/40 mb-1">
+                  <div className="flex justify-between text-xs text-white/40 mb-1.5">
                     <span>Dev buy</span>
                     <span>{form.devBuySol} SOL</span>
                   </div>
                 )}
                 <div className="mt-2 pt-2 border-t border-white/[0.06] flex justify-between text-xs text-white/60 font-bold">
                   <span>Total</span>
-                  <span>~{(0.02 + (parseFloat(form.devBuySol) || 0)).toFixed(2)} SOL</span>
+                  <span>
+                    ~{((feeSol || 0) + 0.02 + (parseFloat(form.devBuySol) || 0)).toFixed(4)} SOL
+                    {solPrice ? ` (~$${((feeSol || 0) * solPrice + 0.02 * solPrice + (parseFloat(form.devBuySol) || 0) * solPrice).toFixed(2)})` : ""}
+                  </span>
                 </div>
               </div>
 
@@ -621,14 +715,16 @@ export default function Launch() {
                     ? "Fill in token details"
                     : !imageFile
                     ? "Upload a logo"
-                    : `Launch ${form.symbol.trim() || "Token"} on Pump.fun`}
+                    : !solPrice
+                    ? "Loading SOL price…"
+                    : `Pay $${LAUNCH_FEE_USD} & Launch ${form.symbol.trim()}`}
                 </button>
               )}
 
               {/* Disclaimer */}
               <p className="text-center text-[10px] text-white/15 leading-relaxed">
                 By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet.
-                <br />OG Scan does not charge any fees for token creation.
+                <br />A ${LAUNCH_FEE_USD} SOL launch fee is charged per token creation.
               </p>
             </div>
           )}
