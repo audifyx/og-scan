@@ -110,14 +110,14 @@ async function fetchTokensByAuthority(
 
 /* ─── Main Component ─── */
 export default function TokenManager() {
-  const { publicKey, signTransaction, connected, wallets, select, connect } = useWallet();
+  const { publicKey, signTransaction, connected, wallets, select, connect, wallet } = useWallet();
   const { connection } = useConnection();
   const availableWallets = wallets.filter(
     (w) => w.readyState === "Installed" || w.readyState === "Loadable",
   );
 
   /* ─── State ─── */
-  const [step, setStep] = useState<Step>("connect");
+  const [step, setStep] = useState<Step>(connected && publicKey ? "select" : "connect");
   const [mintInput, setMintInput] = useState("");
   const [myTokens, setMyTokens] = useState<
     { mint: string; name: string; symbol: string; image: string }[]
@@ -127,6 +127,7 @@ export default function TokenManager() {
   const [metadata, setMetadata] = useState<TokenMetadataFull | null>(null);
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectingWallet, setConnectingWallet] = useState(false);
 
   // Edit form
   const [editName, setEditName] = useState("");
@@ -145,24 +146,14 @@ export default function TokenManager() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  /* ─── Auto-advance to select when wallet connects ─── */
-  useEffect(() => {
-    if (connected && publicKey && step === "connect") {
-      setStep("select");
-      loadMyTokens();
-    }
-    if (!connected && step !== "connect") {
-      setStep("connect");
-    }
-  }, [connected, publicKey]);
-
   /* ─── Load tokens with update authority ─── */
-  const loadMyTokens = useCallback(async () => {
-    if (!publicKey) return;
+  const loadMyTokens = useCallback(async (walletAddr?: string) => {
+    const addr = walletAddr || publicKey?.toBase58();
+    if (!addr) return;
     setLoadingTokens(true);
     setError(null);
     try {
-      const tokens = await fetchTokensByAuthority(publicKey.toBase58());
+      const tokens = await fetchTokensByAuthority(addr);
       setMyTokens(tokens);
     } catch (err) {
       setError("Failed to load your tokens. Try again.");
@@ -170,6 +161,38 @@ export default function TokenManager() {
       setLoadingTokens(false);
     }
   }, [publicKey]);
+
+  /* ─── Handle wallet connect button click ─── */
+  const handleConnectWallet = useCallback(async (walletName: string) => {
+    setConnectingWallet(true);
+    setError(null);
+    try {
+      select(walletName as any);
+      // Small delay to let wallet adapter register the selection
+      await new Promise((r) => setTimeout(r, 300));
+      await connect();
+    } catch (err: any) {
+      if (!err?.message?.includes("User rejected")) {
+        setError("Wallet connection failed. Please try again.");
+      }
+    } finally {
+      setConnectingWallet(false);
+    }
+  }, [select, connect]);
+
+  /* ─── Auto-advance to select when wallet connects ─── */
+  useEffect(() => {
+    if (connected && publicKey) {
+      if (step === "connect") {
+        setStep("select");
+        loadMyTokens(publicKey.toBase58());
+      }
+    } else {
+      if (step !== "connect") {
+        setStep("connect");
+      }
+    }
+  }, [connected, publicKey, step, loadMyTokens]);
 
   /* ─── Load metadata for a selected mint ─── */
   const loadMetadata = useCallback(
@@ -533,17 +556,17 @@ export default function TokenManager() {
             {availableWallets.map((w) => (
               <button
                 key={w.adapter.name}
-                onClick={() => {
-                  select(w.adapter.name as any);
-                  setTimeout(() => { connect().catch(() => {}); }, 150);
-                }}
-                className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 transition-all hover:border-[#ab9ff2]/40 hover:bg-white/[0.1] group"
+                onClick={() => handleConnectWallet(w.adapter.name)}
+                disabled={connectingWallet}
+                className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 transition-all hover:border-[#ab9ff2]/40 hover:bg-white/[0.1] group disabled:opacity-50"
               >
                 {w.adapter.icon && (
                   <img src={w.adapter.icon} alt={w.adapter.name} className="h-8 w-8 rounded-lg" />
                 )}
                 <span className="text-sm font-semibold text-white">{w.adapter.name}</span>
-                <span className="ml-auto text-[10px] text-white/30 group-hover:text-[#ab9ff2]">Connect →</span>
+                <span className="ml-auto text-[10px] text-white/30 group-hover:text-[#ab9ff2]">
+                  {connectingWallet ? <Loader2 className="h-3 w-3 animate-spin" /> : "Connect →"}
+                </span>
               </button>
             ))}
             {availableWallets.length === 0 && (
