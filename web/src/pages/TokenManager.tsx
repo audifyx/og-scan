@@ -184,37 +184,58 @@ export default function TokenManager() {
     }
   }, [walletReady]);
 
-  /* ─── Wallet connect handler ─── */
-  const handleConnectWallet = useCallback(async (walletName: string) => {
-    setError(null);
-    try {
-      // If already the right wallet adapter selected, just call connect() directly
-      if (wallet?.adapter.name === walletName) {
-        await connect();
-        return;
-      }
-      // Otherwise select the wallet — the useEffect below will call connect()
-      select(walletName as any);
-    } catch (err: any) {
-      // "already connected" is fine, anything else show error
-      if (!String(err?.message || "").toLowerCase().includes("connect")) {
-        setError("Failed to connect. Please try again.");
-      }
-      console.error("connect/select error:", err);
-    }
-  }, [select, connect, wallet]);
+  /* ─── Wallet connect handler ───
+   * NOTE: select() alone is NOT enough. The provider's autoConnect only
+   * reconnects dapps the wallet already trusts (a silent connect); a
+   * first-time user never sees the approval prompt, so clicking "Connect"
+   * appears to do nothing. We must explicitly call connect() — but only
+   * AFTER the adapter is actually selected, otherwise wallet-adapter throws
+   * WalletNotSelectedError. So: connect now if already selected, else record
+   * the intent and let the effect below connect once selection settles. */
+  const [pendingConnect, setPendingConnect] = useState<string | null>(null);
 
-  /* After select() changes the wallet adapter, explicitly call connect().
-     autoConnect only works silently on mount — for user-initiated clicks
-     we need to call connect() to trigger the Phantom popup. */
-  useEffect(() => {
-    if (wallet && !connected && !connecting) {
-      connect().catch((err) => {
-        // Silently handle — autoConnect errors, user can click again
-        console.log("Auto-connect attempt:", err?.message);
-      });
+  const safeConnectError = useCallback((err: any) => {
+    const msg = err?.message || String(err);
+    if (!/already pending|user rejected|user denied|wallet not selected/i.test(msg)) {
+      setError(msg);
     }
-  }, [wallet, connected, connecting, connect]);
+    console.error("wallet connect failed:", err);
+  }, []);
+
+  const handleConnectWallet = useCallback(
+    async (walletName: string) => {
+      setError(null);
+      try {
+        if (wallet?.adapter.name === walletName) {
+          await connect();
+          return;
+        }
+        setPendingConnect(walletName);
+        select(walletName as any);
+      } catch (err: any) {
+        safeConnectError(err);
+      }
+    },
+    [wallet, select, connect, safeConnectError],
+  );
+
+  /* Fire the explicit connect() once the selected wallet matches our intent. */
+  useEffect(() => {
+    if (
+      pendingConnect &&
+      wallet?.adapter.name === pendingConnect &&
+      !connected &&
+      !connecting
+    ) {
+      setPendingConnect(null);
+      connect().catch(safeConnectError);
+    }
+  }, [pendingConnect, wallet, connected, connecting, connect, safeConnectError]);
+
+  /* Clear any stale pending intent once connected. */
+  useEffect(() => {
+    if (connected && pendingConnect) setPendingConnect(null);
+  }, [connected, pendingConnect]);
 
   /* ─── Load metadata for a selected mint ─── */
   const loadMetadata = useCallback(
