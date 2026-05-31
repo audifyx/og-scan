@@ -163,36 +163,41 @@ export default function TokenManager() {
   }, [publicKey]);
 
   /* ─── Handle wallet connect button click ─── */
-  const handleConnectWallet = useCallback(async (walletName: string) => {
+  const handleConnectWallet = useCallback((walletName: string) => {
     setConnectingWallet(true);
     setError(null);
-    try {
-      select(walletName as any);
-      // Small delay to let wallet adapter register the selection
-      await new Promise((r) => setTimeout(r, 300));
-      await connect();
-    } catch (err: any) {
-      if (!err?.message?.includes("User rejected")) {
-        setError("Wallet connection failed. Please try again.");
-      }
-    } finally {
-      setConnectingWallet(false);
-    }
-  }, [select, connect]);
+    // select() triggers autoConnect from the WalletProvider (autoConnect is enabled)
+    select(walletName as any);
+  }, [select]);
 
   /* ─── Auto-advance to select when wallet connects ─── */
   useEffect(() => {
     if (connected && publicKey) {
+      setConnectingWallet(false);
       if (step === "connect") {
         setStep("select");
         loadMyTokens(publicKey.toBase58());
       }
-    } else {
-      if (step !== "connect") {
-        setStep("connect");
-      }
+    } else if (!connected && step !== "connect") {
+      setStep("connect");
     }
   }, [connected, publicKey, step, loadMyTokens]);
+
+  /* ─── Fallback: if select() doesn't auto-connect after 3s, try manual connect ─── */
+  useEffect(() => {
+    if (!connectingWallet || connected) return;
+    const timer = setTimeout(() => {
+      if (!connected && wallet) {
+        connect().catch(() => {
+          setError("Could not connect. Please try clicking Connect in your wallet extension.");
+          setConnectingWallet(false);
+        });
+      } else {
+        setConnectingWallet(false);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [connectingWallet, connected, wallet, connect]);
 
   /* ─── Load metadata for a selected mint ─── */
   const loadMetadata = useCallback(
