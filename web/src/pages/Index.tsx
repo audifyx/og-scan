@@ -1094,11 +1094,11 @@ const OverviewPage = ({
 
   // Community quick links — compact horizontal strip
   const communityLinks = [
-    { label: "Social Feed", Icon: MessageSquare, sub: "social" as CommunitySubTab, accent: "lime" as TabAccent },
-    { label: "Rooms", Icon: Hash, sub: "rooms" as CommunitySubTab, accent: "white" as TabAccent },
-    { label: "Spaces", Icon: Radio, sub: "spaces" as CommunitySubTab, accent: "cyan" as TabAccent },
-    { label: "Groups", Icon: Users, sub: "communities" as CommunitySubTab, accent: "gold" as TabAccent },
-    { label: "Discover", Icon: Compass, sub: "discover" as CommunitySubTab, accent: "cyan" as TabAccent },
+    { label: "Chat", Icon: MessageSquare, sub: "social" as CommunitySubTab, accent: "cyan" as TabAccent },
+    { label: "Rooms", Icon: Hash, sub: "rooms" as CommunitySubTab, accent: "cyan" as TabAccent },
+    { label: "Spaces", Icon: Radio, sub: "spaces" as CommunitySubTab, accent: "gold" as TabAccent },
+    { label: "Groups", Icon: Users, sub: "communities" as CommunitySubTab, accent: "lime" as TabAccent },
+    { label: "Discover", Icon: Compass, sub: "discover" as CommunitySubTab, accent: "lime" as TabAccent },
   ];
 
   // Forensic tools — compact list
