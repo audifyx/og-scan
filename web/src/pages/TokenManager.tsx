@@ -214,22 +214,29 @@ export default function TokenManager() {
     }
 
     try {
-      // Connect directly via the injected provider — always shows the popup
+      // Step 1: connect via injected provider — shows the approval popup
       const resp = await provider.connect({ onlyIfTrusted: false });
-      // resp.publicKey is set immediately after approval
-      // The WalletProvider will detect the provider is now connected
-      // and update React state automatically via its internal listeners.
-      // We just need to call select() to tell it which adapter to use.
+      console.log("Phantom connected, pubkey:", resp?.publicKey?.toString());
+
+      // Step 2: select the adapter so wallet-adapter React state picks it up
       select("Phantom" as any);
+
+      // Step 3: force connect() on the adapter so connected+publicKey update
+      // Give select() one tick to register before calling connect()
+      setTimeout(() => {
+        connect().catch((e) => console.log("adapter sync:", e?.message));
+      }, 100);
+
     } catch (err: any) {
+      console.error("Phantom connect error full:", err);
+      const msg = err?.message || JSON.stringify(err) || "Unknown error";
       if (err?.code === 4001) {
         setError("Cancelled — please approve the connection in Phantom.");
       } else {
-        setError("Could not connect to Phantom. Please try again.");
-        console.error("Phantom connect error:", err);
+        setError("Phantom error: " + msg);
       }
     }
-  }, [select]);
+  }, [select, connect]);
 
   /* ─── Load metadata for a selected mint ─── */
   const loadMetadata = useCallback(
