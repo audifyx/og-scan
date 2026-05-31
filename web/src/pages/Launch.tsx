@@ -39,7 +39,7 @@ const MAX_IMG_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMG = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 /** OG Scan revenue wallet — receives the $3 launch fee */
-const FEE_WALLET = new PublicKey("4UExBp5jxvS5YzV7tS5pvWhmtFnZeDcyEany8oKuVbU67CRipakS15LDLHbPjv49sBeZ1DUaMcTbRzktTgV6VQP4");
+const FEE_WALLET = new PublicKey("4jSxy7gni9ndwzPfNisfKnmCSUeVYrpNACmDxYADfi4i");
 const LAUNCH_FEE_USD = 3;
 
 const STORAGE_KEY = "ogscan_launched_tokens";
