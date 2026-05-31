@@ -331,9 +331,9 @@ export function createToken2022UpdateFieldInstruction(
   // Precomputed: sha256("spl_token_metadata_interface:update_field")[0..8]
   const discriminator = Buffer.from([130, 68, 42, 109, 52, 18, 206, 255]);
 
-  // Field enum: u32 discriminant, then for custom keys a borsh string follows
-  const fieldBuf = Buffer.alloc(4);
-  fieldBuf.writeUInt32LE(fieldVariant, 0);
+  // Field enum is Borsh-serialized as a single-byte (u8) variant discriminant
+  // (0=Name, 1=Symbol, 2=Uri). Writing it as u32 corrupts the instruction.
+  const fieldBuf = Buffer.from([fieldVariant]);
 
   // Value: borsh string (u32 length + bytes)
   const valBytes = Buffer.from(value, "utf8");

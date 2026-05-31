@@ -13,7 +13,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { supabase } from "@/lib/supabase";
 import {
   getMetadataPDA,
@@ -545,7 +545,31 @@ export default function TokenManager() {
       const tx = new Transaction();
 
       if (metadata.tokenStandard === "token2022") {
-        /* ── Token-2022: one UpdateField instruction per changed field ── */
+        /* ── Token-2022: top up rent first if the mint account must grow ──
+         * UpdateField reallocs the mint in place, so it must stay rent-exempt
+         * at the new (larger) size or the whole tx fails. Over-estimate the
+         * new size and transfer only the shortfall; extra lamports remain in
+         * the account. */
+        const mintInfo = await connection.getAccountInfo(mintPk);
+        if (mintInfo) {
+          const extraBytes =
+            Buffer.byteLength(editName, "utf8") +
+            Buffer.byteLength(editSymbol, "utf8") +
+            Buffer.byteLength(newUri, "utf8");
+          const estNewLen = mintInfo.data.length + extraBytes;
+          const needed = await connection.getMinimumBalanceForRentExemption(estNewLen);
+          if (needed > mintInfo.lamports) {
+            tx.add(
+              SystemProgram.transfer({
+                fromPubkey: publicKey,
+                toPubkey: mintPk,
+                lamports: needed - mintInfo.lamports,
+              }),
+            );
+          }
+        }
+
+        /* ── one UpdateField instruction per changed field ── */
         if (editName !== metadata.onChain.name) {
           tx.add(createToken2022UpdateFieldInstruction(mintPk, publicKey, "name", editName));
         }
