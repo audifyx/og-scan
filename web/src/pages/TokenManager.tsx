@@ -2,7 +2,7 @@
  * Token Manager — Update on-chain token metadata for FREE.
  *
  * Flow:
- *   1. Connect wallet
+ *   1. Connect wallet  (derived from wallet adapter state — no step management)
  *   2. Paste token mint OR auto-detect tokens with update authority
  *   3. View current on-chain metadata (name, symbol, image, description, links)
  *   4. Edit fields → upload new image to Supabase Storage → build new metadata JSON
@@ -12,7 +12,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useWallet, useConnection, type WalletContextState } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { supabase } from "@/lib/supabase";
 import {
@@ -55,7 +55,8 @@ interface TokenMetadataFull {
   imageUrl: string | null;
 }
 
-type Step = "connect" | "select" | "edit" | "preview" | "signing" | "success";
+/* The only "steps" we manage are post-connect: select → edit → signing → success */
+type PostConnectStep = "select" | "edit" | "signing" | "success";
 
 /* ─── Helpers ─── */
 const HELIUS_KEY = "6fb9660c-e27c-4309-a027-251e32fb7b6e";
@@ -110,24 +111,27 @@ async function fetchTokensByAuthority(
 
 /* ─── Main Component ─── */
 export default function TokenManager() {
-  const { publicKey, signTransaction, connected, wallets, select, connect, wallet } = useWallet();
+  const { publicKey, signTransaction, connected, wallets, select, connect, disconnect, wallet, connecting } = useWallet();
   const { connection } = useConnection();
   const availableWallets = wallets.filter(
     (w) => w.readyState === "Installed" || w.readyState === "Loadable",
   );
 
+  /* Whether we consider the wallet usable (connected + has publicKey) */
+  const walletReady = !!(connected && publicKey);
+
   /* ─── State ─── */
-  const [step, setStep] = useState<Step>(connected && publicKey ? "select" : "connect");
+  const [postStep, setPostStep] = useState<PostConnectStep>("select");
   const [mintInput, setMintInput] = useState("");
   const [myTokens, setMyTokens] = useState<
     { mint: string; name: string; symbol: string; image: string }[]
   >([]);
   const [loadingTokens, setLoadingTokens] = useState(false);
+  const [tokensLoaded, setTokensLoaded] = useState(false);
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<TokenMetadataFull | null>(null);
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [connectingWallet, setConnectingWallet] = useState(false);
 
   // Edit form
   const [editName, setEditName] = useState("");
@@ -146,15 +150,15 @@ export default function TokenManager() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  /* ─── Load tokens with update authority ─── */
-  const loadMyTokens = useCallback(async (walletAddr?: string) => {
-    const addr = walletAddr || publicKey?.toBase58();
-    if (!addr) return;
+  /* ─── Load tokens when wallet becomes ready ─── */
+  const loadMyTokens = useCallback(async () => {
+    if (!publicKey) return;
     setLoadingTokens(true);
     setError(null);
     try {
-      const tokens = await fetchTokensByAuthority(addr);
+      const tokens = await fetchTokensByAuthority(publicKey.toBase58());
       setMyTokens(tokens);
+      setTokensLoaded(true);
     } catch (err) {
       setError("Failed to load your tokens. Try again.");
     } finally {
@@ -162,42 +166,33 @@ export default function TokenManager() {
     }
   }, [publicKey]);
 
-  /* ─── Handle wallet connect button click ─── */
-  const handleConnectWallet = useCallback((walletName: string) => {
-    setConnectingWallet(true);
-    setError(null);
-    // select() triggers autoConnect from the WalletProvider (autoConnect is enabled)
-    select(walletName as any);
-  }, [select]);
-
-  /* ─── Auto-advance to select when wallet connects ─── */
+  /* Auto-load tokens whenever wallet becomes ready */
   useEffect(() => {
-    if (connected && publicKey) {
-      setConnectingWallet(false);
-      if (step === "connect") {
-        setStep("select");
-        loadMyTokens(publicKey.toBase58());
-      }
-    } else if (!connected && step !== "connect") {
-      setStep("connect");
+    if (walletReady && !tokensLoaded && !loadingTokens) {
+      loadMyTokens();
     }
-  }, [connected, publicKey, step, loadMyTokens]);
+  }, [walletReady, tokensLoaded, loadingTokens, loadMyTokens]);
 
-  /* ─── Fallback: if select() doesn't auto-connect after 3s, try manual connect ─── */
+  /* Reset if wallet disconnects */
   useEffect(() => {
-    if (!connectingWallet || connected) return;
-    const timer = setTimeout(() => {
-      if (!connected && wallet) {
-        connect().catch(() => {
-          setError("Could not connect. Please try clicking Connect in your wallet extension.");
-          setConnectingWallet(false);
-        });
-      } else {
-        setConnectingWallet(false);
-      }
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [connectingWallet, connected, wallet, connect]);
+    if (!walletReady) {
+      setPostStep("select");
+      setTokensLoaded(false);
+      setMyTokens([]);
+      setMetadata(null);
+      setSelectedMint(null);
+    }
+  }, [walletReady]);
+
+  /* ─── Wallet connect handler ─── */
+  const handleConnectWallet = useCallback(async (walletName: string) => {
+    setError(null);
+    try {
+      select(walletName as any);
+    } catch (err: any) {
+      console.error("select failed:", err);
+    }
+  }, [select]);
 
   /* ─── Load metadata for a selected mint ─── */
   const loadMetadata = useCallback(
@@ -276,7 +271,7 @@ export default function TokenManager() {
         );
         setEditBannerFile(null);
 
-        setStep("edit");
+        setPostStep("edit");
       } catch (err: any) {
         setError(err?.message || "Failed to load token metadata.");
       } finally {
@@ -341,7 +336,7 @@ export default function TokenManager() {
 
     setUploading(true);
     setError(null);
-    setStep("signing");
+    setPostStep("signing");
 
     try {
       let imageUrl = metadata.imageUrl || "";
@@ -461,15 +456,15 @@ export default function TokenManager() {
       await connection.confirmTransaction(sig, "confirmed");
 
       setTxSig(sig);
-      setStep("success");
+      setPostStep("success");
     } catch (err: any) {
       console.error("Update failed:", err);
       if (err?.message?.includes("User rejected")) {
         setError("Transaction cancelled by user.");
-        setStep("edit");
+        setPostStep("edit");
       } else {
         setError(err?.message || "Update failed. Please try again.");
-        setStep("edit");
+        setPostStep("edit");
       }
     } finally {
       setUploading(false);
@@ -512,6 +507,11 @@ export default function TokenManager() {
   /* ─── RENDER ─── */
   /* ────────────────────────────────────────────────────────────── */
 
+  /* Derive what to show purely from state — no step gating for connect/select */
+  const showConnect = !walletReady && !connecting;
+  const showConnecting = connecting;
+  const showPostConnect = walletReady;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-6">
       {/* ── Header ── */}
@@ -527,6 +527,12 @@ export default function TokenManager() {
           <span className="text-white/60">every platform</span> (DexScreener,
           Jupiter, Birdeye, wallets).
         </p>
+        {walletReady && (
+          <p className="mt-1 text-[10px] text-white/20">
+            Connected: <span className="font-mono text-og-cyan/60">{shortAddr(publicKey!.toBase58())}</span>
+            <button onClick={() => disconnect()} className="ml-2 text-white/15 hover:text-white/40 underline">disconnect</button>
+          </p>
+        )}
       </div>
 
       {/* ── Error banner ── */}
@@ -545,8 +551,20 @@ export default function TokenManager() {
         </div>
       )}
 
-      {/* ── Step: Connect Wallet ── */}
-      {step === "connect" && (
+      {/* ══════════════════════════════════════════════ */}
+      {/* ── VIEW: Wallet Connecting (spinner) ─── */}
+      {/* ══════════════════════════════════════════════ */}
+      {showConnecting && (
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8">
+          <Loader2 className="h-10 w-10 animate-spin text-og-cyan" />
+          <p className="text-sm text-white/40">Connecting wallet…</p>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════ */}
+      {/* ── VIEW: Connect Wallet ── */}
+      {/* ══════════════════════════════════════════════ */}
+      {showConnect && (
         <div className="flex flex-col items-center gap-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
             <Wallet className="h-8 w-8 text-white/30" />
@@ -562,15 +580,14 @@ export default function TokenManager() {
               <button
                 key={w.adapter.name}
                 onClick={() => handleConnectWallet(w.adapter.name)}
-                disabled={connectingWallet}
-                className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 transition-all hover:border-[#ab9ff2]/40 hover:bg-white/[0.1] group disabled:opacity-50"
+                className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 transition-all hover:border-[#ab9ff2]/40 hover:bg-white/[0.1] group"
               >
                 {w.adapter.icon && (
                   <img src={w.adapter.icon} alt={w.adapter.name} className="h-8 w-8 rounded-lg" />
                 )}
                 <span className="text-sm font-semibold text-white">{w.adapter.name}</span>
                 <span className="ml-auto text-[10px] text-white/30 group-hover:text-[#ab9ff2]">
-                  {connectingWallet ? <Loader2 className="h-3 w-3 animate-spin" /> : "Connect →"}
+                  Connect →
                 </span>
               </button>
             ))}
@@ -591,8 +608,10 @@ export default function TokenManager() {
         </div>
       )}
 
-      {/* ── Step: Select Token ── */}
-      {step === "select" && (
+      {/* ══════════════════════════════════════════════ */}
+      {/* ── VIEW: Post-Connect (select / edit / signing / success) ── */}
+      {/* ══════════════════════════════════════════════ */}
+      {showPostConnect && postStep === "select" && (
         <div className="space-y-4">
           {/* Manual mint input */}
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
@@ -631,7 +650,7 @@ export default function TokenManager() {
                 Your Tokens (Update Authority)
               </h3>
               <button
-                onClick={loadMyTokens}
+                onClick={() => loadMyTokens()}
                 disabled={loadingTokens}
                 className="rounded-lg p-1.5 text-white/25 hover:bg-white/[0.05] hover:text-white/50"
               >
@@ -732,13 +751,13 @@ export default function TokenManager() {
         </div>
       )}
 
-      {/* ── Step: Edit Metadata ── */}
-      {step === "edit" && metadata && (
+      {/* ── Post-Connect: Edit Metadata ── */}
+      {showPostConnect && postStep === "edit" && metadata && (
         <div className="space-y-4">
           {/* Back button */}
           <button
             onClick={() => {
-              setStep("select");
+              setPostStep("select");
               setMetadata(null);
               setSelectedMint(null);
             }}
@@ -1011,8 +1030,8 @@ export default function TokenManager() {
         </div>
       )}
 
-      {/* ── Step: Signing ── */}
-      {step === "signing" && (
+      {/* ── Post-Connect: Signing ── */}
+      {showPostConnect && postStep === "signing" && (
         <div className="flex flex-col items-center gap-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8">
           <Loader2 className="h-12 w-12 animate-spin text-og-cyan" />
           <div className="text-center">
@@ -1026,8 +1045,8 @@ export default function TokenManager() {
         </div>
       )}
 
-      {/* ── Step: Success ── */}
-      {step === "success" && (
+      {/* ── Post-Connect: Success ── */}
+      {showPostConnect && postStep === "success" && (
         <div className="flex flex-col items-center gap-6 rounded-2xl border border-og-lime/20 bg-og-lime/[0.03] p-8">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-og-lime/10">
             <CheckCircle2 className="h-8 w-8 text-og-lime" />
@@ -1058,7 +1077,7 @@ export default function TokenManager() {
           <div className="flex gap-3">
             <button
               onClick={() => {
-                setStep("select");
+                setPostStep("select");
                 setMetadata(null);
                 setSelectedMint(null);
                 setTxSig(null);
@@ -1077,8 +1096,8 @@ export default function TokenManager() {
         </div>
       )}
 
-      {/* ── Comparison callout ── */}
-      {(step === "connect" || step === "select") && (
+      {/* ── Comparison callout (shown when not editing) ── */}
+      {(showConnect || (showPostConnect && postStep === "select")) && (
         <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-white/[0.02] to-transparent">
           <div className="p-4">
             <h4 className="mb-3 text-[10px] font-black uppercase tracking-widest text-white/25">
