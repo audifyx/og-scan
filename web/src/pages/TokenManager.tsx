@@ -184,15 +184,58 @@ export default function TokenManager() {
     }
   }, [walletReady]);
 
-  /* ─── Wallet connect handler ─── */
-  const handleConnectWallet = useCallback(async (walletName: string) => {
-    setError(null);
-    try {
-      select(walletName as any);
-    } catch (err: any) {
-      console.error("select failed:", err);
+  /* ─── Wallet connect handler ───
+   * NOTE: select() alone is NOT enough. The provider's autoConnect only
+   * reconnects dapps the wallet already trusts (a silent connect); a
+   * first-time user never sees the approval prompt, so clicking "Connect"
+   * appears to do nothing. We must explicitly call connect() — but only
+   * AFTER the adapter is actually selected, otherwise wallet-adapter throws
+   * WalletNotSelectedError. So: connect now if already selected, else record
+   * the intent and let the effect below connect once selection settles. */
+  const [pendingConnect, setPendingConnect] = useState<string | null>(null);
+
+  const safeConnectError = useCallback((err: any) => {
+    const msg = err?.message || String(err);
+    if (!/already pending|user rejected|user denied|wallet not selected/i.test(msg)) {
+      setError(msg);
     }
-  }, [select]);
+    console.error("wallet connect failed:", err);
+  }, []);
+
+  const handleConnectWallet = useCallback(
+    async (walletName: string) => {
+      setError(null);
+      try {
+        if (wallet?.adapter.name === walletName) {
+          await connect();
+          return;
+        }
+        setPendingConnect(walletName);
+        select(walletName as any);
+      } catch (err: any) {
+        safeConnectError(err);
+      }
+    },
+    [wallet, select, connect, safeConnectError],
+  );
+
+  /* Fire the explicit connect() once the selected wallet matches our intent. */
+  useEffect(() => {
+    if (
+      pendingConnect &&
+      wallet?.adapter.name === pendingConnect &&
+      !connected &&
+      !connecting
+    ) {
+      setPendingConnect(null);
+      connect().catch(safeConnectError);
+    }
+  }, [pendingConnect, wallet, connected, connecting, connect, safeConnectError]);
+
+  /* Clear any stale pending intent once connected. */
+  useEffect(() => {
+    if (connected && pendingConnect) setPendingConnect(null);
+  }, [connected, pendingConnect]);
 
   /* ─── Load metadata for a selected mint ─── */
   const loadMetadata = useCallback(
