@@ -13,7 +13,7 @@ import {
   MessageSquare, ChevronRight, Headphones, Eye, PhoneOff,
   Settings, Shield, Crown, Search, Bell, BellOff,
   UserPlus, X, MoreVertical, Smile, Image as ImageIcon,
-  ArrowDown, Pin, Trash2, Copy, Reply, Heart,
+  ArrowDown, Pin, Trash2, Copy, Reply, Heart, Pencil, Check,
 } from "lucide-react";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -53,6 +53,9 @@ interface ChatMessage {
   avatar_url: string | null;
   content: string;
   created_at: string;
+  likes_count?: number;
+  liked_by?: string[];
+  edited_at?: string | null;
 }
 
 interface VoiceRoom {
@@ -534,8 +537,11 @@ const GeneralChat = () => {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" });
@@ -557,7 +563,7 @@ const GeneralChat = () => {
     fetchMessages();
   }, [scrollToBottom]);
 
-  /* Real-time subscription */
+  /* Real-time subscription — listen for INSERT, UPDATE, DELETE */
   useEffect(() => {
     const channel = supabase
       .channel("social-chat-realtime")
@@ -570,7 +576,6 @@ const GeneralChat = () => {
             if (prev.some((m) => m.id === msg.id)) return prev;
             return [...prev, msg];
           });
-          // Auto-scroll if near bottom
           if (scrollRef.current) {
             const el = scrollRef.current;
             const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
@@ -578,6 +583,22 @@ const GeneralChat = () => {
               setTimeout(() => scrollToBottom(), 50);
             }
           }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "social_messages", filter: "channel=eq.social-general" },
+        (payload) => {
+          const updated = payload.new as ChatMessage;
+          setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "social_messages", filter: "channel=eq.social-general" },
+        (payload) => {
+          const oldId = (payload.old as any)?.id;
+          if (oldId) setMessages((prev) => prev.filter((m) => m.id !== oldId));
         },
       )
       .subscribe();
@@ -596,6 +617,11 @@ const GeneralChat = () => {
     return () => el.removeEventListener("scroll", handler);
   }, []);
 
+  /* Focus edit input when editing starts */
+  useEffect(() => {
+    if (editingId) editInputRef.current?.focus();
+  }, [editingId]);
+
   /* Send message */
   const sendMessage = async () => {
     if (!input.trim() || !user || sending) return;
@@ -608,6 +634,8 @@ const GeneralChat = () => {
       username: profile?.username || "Anon",
       avatar_url: profile?.avatar_url,
       content,
+      likes_count: 0,
+      liked_by: [],
     });
     if (error) {
       toast.error("Failed to send message");
@@ -616,10 +644,88 @@ const GeneralChat = () => {
     setSending(false);
   };
 
+  /* Edit message */
+  const startEdit = (msg: ChatMessage) => {
+    setEditingId(msg.id);
+    setEditText(msg.content);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editText.trim()) return;
+    const { error } = await supabase
+      .from("social_messages")
+      .update({ content: editText.trim(), edited_at: new Date().toISOString() })
+      .eq("id", editingId)
+      .eq("user_id", user?.id);
+    if (error) {
+      toast.error("Failed to edit message");
+    } else {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === editingId ? { ...m, content: editText.trim(), edited_at: new Date().toISOString() } : m)),
+      );
+    }
+    setEditingId(null);
+    setEditText("");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditText("");
+  };
+
+  /* Delete message */
+  const deleteMessage = async (msgId: string) => {
+    const { error } = await supabase
+      .from("social_messages")
+      .delete()
+      .eq("id", msgId)
+      .eq("user_id", user?.id);
+    if (error) {
+      toast.error("Failed to delete message");
+    } else {
+      setMessages((prev) => prev.filter((m) => m.id !== msgId));
+      toast.success("Message deleted");
+    }
+  };
+
+  /* Like / unlike message */
+  const toggleLike = async (msg: ChatMessage) => {
+    if (!user) return;
+    const likedBy = msg.liked_by || [];
+    const alreadyLiked = likedBy.includes(user.id);
+    const newLikedBy = alreadyLiked ? likedBy.filter((id) => id !== user.id) : [...likedBy, user.id];
+    const newCount = newLikedBy.length;
+
+    // Optimistic update
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msg.id ? { ...m, liked_by: newLikedBy, likes_count: newCount } : m)),
+    );
+
+    const { error } = await supabase
+      .from("social_messages")
+      .update({ liked_by: newLikedBy, likes_count: newCount })
+      .eq("id", msg.id);
+    if (error) {
+      // Revert on error
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...m, liked_by: likedBy, likes_count: likedBy.length } : m)),
+      );
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
+    }
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      cancelEdit();
     }
   };
 
@@ -657,6 +763,11 @@ const GeneralChat = () => {
                 ? (new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime()) / 60000
                 : 999;
               const compact = sameSender && timeDiff < 5;
+              const isOwn = msg.user_id === user?.id;
+              const isEditing = editingId === msg.id;
+              const likedBy = msg.liked_by || [];
+              const likesCount = msg.likes_count || likedBy.length;
+              const isLiked = user ? likedBy.includes(user.id) : false;
 
               return (
                 <div
@@ -680,29 +791,94 @@ const GeneralChat = () => {
                       <div className="flex items-baseline gap-2">
                         <span className={cn(
                           "text-[11px] font-bold",
-                          msg.user_id === user?.id ? "text-og-lime" : "text-og-cyan",
+                          isOwn ? "text-og-lime" : "text-og-cyan",
                         )}>
-                          {msg.user_id === user?.id ? "You" : msg.username || "Anon"}
+                          {isOwn ? "You" : msg.username || "Anon"}
                         </span>
                         <span className="text-[9px] text-white/15">
                           {format(new Date(msg.created_at), "h:mm a")}
                         </span>
+                        {msg.edited_at && (
+                          <span className="text-[8px] text-white/10 italic">(edited)</span>
+                        )}
                       </div>
                     )}
-                    <p className="text-[12px] leading-relaxed text-white/70">{msg.content}</p>
+                    {isEditing ? (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <input
+                          ref={editInputRef}
+                          type="text"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={handleEditKeyDown}
+                          className="min-w-0 flex-1 rounded-lg border border-og-cyan/30 bg-og-cyan/5 px-2 py-1 text-[12px] text-white/80 outline-none focus:border-og-cyan/50"
+                        />
+                        <button onClick={saveEdit} className="rounded p-1 text-og-lime hover:bg-og-lime/10">
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={cancelEdit} className="rounded p-1 text-white/30 hover:bg-white/[0.06] hover:text-white/50">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-[12px] leading-relaxed text-white/70">{msg.content}</p>
+                        {/* Like count badge */}
+                        {likesCount > 0 && (
+                          <button
+                            onClick={() => toggleLike(msg)}
+                            className={cn(
+                              "mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold transition-colors",
+                              isLiked
+                                ? "border-pink-500/30 bg-pink-500/10 text-pink-400 hover:bg-pink-500/20"
+                                : "border-white/[0.08] bg-white/[0.03] text-white/30 hover:bg-white/[0.06] hover:text-white/50",
+                            )}
+                          >
+                            <Heart className={cn("h-2.5 w-2.5", isLiked && "fill-pink-400")} />
+                            {likesCount}
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                   {/* Hover actions */}
-                  <div className="flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
-                    <button className="rounded p-1 text-white/20 hover:bg-white/[0.06] hover:text-white/40">
-                      <Heart className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(msg.content); toast.success("Copied!"); }}
-                      className="rounded p-1 text-white/20 hover:bg-white/[0.06] hover:text-white/40"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </button>
-                  </div>
+                  {!isEditing && (
+                    <div className="flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+                      <button
+                        onClick={() => toggleLike(msg)}
+                        className={cn(
+                          "rounded p-1 transition",
+                          isLiked
+                            ? "text-pink-400 hover:bg-pink-500/10"
+                            : "text-white/20 hover:bg-white/[0.06] hover:text-white/40",
+                        )}
+                      >
+                        <Heart className={cn("h-3 w-3", isLiked && "fill-pink-400")} />
+                      </button>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(msg.content); toast.success("Copied!"); }}
+                        className="rounded p-1 text-white/20 hover:bg-white/[0.06] hover:text-white/40"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </button>
+                      {isOwn && (
+                        <>
+                          <button
+                            onClick={() => startEdit(msg)}
+                            className="rounded p-1 text-white/20 hover:bg-white/[0.06] hover:text-white/40"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={() => deleteMessage(msg.id)}
+                            className="rounded p-1 text-white/20 hover:bg-red-500/10 hover:text-red-400"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

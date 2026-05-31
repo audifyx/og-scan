@@ -554,9 +554,9 @@ const QUALITY_BADGES = [
 ];
 
 const DISCOVERY_RAILS = [
-  { label: "Trending", Icon: TrendingUp, tone: "text-og-cyan", getValue: (c: Community) => `${Math.max(8, (c.post_count || 0) + 18)} posts today` },
-  { label: "Fastest Growing", Icon: BarChart3, tone: "text-og-lime", getValue: (c: Community) => `+${Math.max(6, Math.round((c.member_count || 12) * 0.08))} members` },
-  { label: "Hidden Gem", Icon: Star, tone: "text-og-gold", getValue: (c: Community) => `${Math.max(71, getCommunityScore(c))}% quality` },
+  { label: "Trending", Icon: TrendingUp, tone: "text-og-cyan", getValue: (c: Community) => `${c.post_count || 0} posts`, sort: (a: Community, b: Community) => (b.post_count || 0) - (a.post_count || 0) },
+  { label: "Fastest Growing", Icon: BarChart3, tone: "text-og-lime", getValue: (c: Community) => `${c.member_count || 0} members`, sort: (a: Community, b: Community) => (b.member_count || 0) - (a.member_count || 0) },
+  { label: "Hidden Gem", Icon: Star, tone: "text-og-gold", getValue: (c: Community) => `${getCommunityScore(c)}% quality`, sort: (a: Community, b: Community) => getCommunityScore(b) - getCommunityScore(a) },
 ];
 
 const COMMUNITY_PLAYBOOK = [
@@ -1006,9 +1006,7 @@ function TopNav({
             { id: "home" as MainView, label: "Home", icon: <Home className="h-4 w-4" /> },
             { id: "explore" as MainView, label: "Explore", icon: <Search className="h-4 w-4" /> },
             { id: "x_posts" as MainView, label: "𝕏 Feed", icon: <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> },
-            { id: "x_spaces" as MainView, label: "Spaces", icon: <Radio className="h-4 w-4" /> },
             { id: "smart_money" as MainView, label: "Smart $", icon: <Zap className="h-4 w-4" /> },
-            { id: "raids" as MainView, label: "Raids", icon: <Swords className="h-4 w-4" /> },
           ]).map(tab => (
             <button
               key={tab.id}
@@ -1314,10 +1312,10 @@ function ExploreCommunities({
                 <p className="text-xs font-bold text-white/40 uppercase tracking-wider">Discovery Radar</p>
                 <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Personalized</span>
               </div>
-              {DISCOVERY_RAILS.map((rail, index) => {
+              {DISCOVERY_RAILS.map((rail) => {
                 const picks = [...communities]
-                  .sort((a, b) => ((b.member_count || 0) + (b.post_count || 0) * (index + 1)) - ((a.member_count || 0) + (a.post_count || 0) * (index + 1)))
-                  .slice(index, index + 3);
+                  .sort(rail.sort)
+                  .slice(0, 3);
                 return (
                   <div key={rail.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
                     <div className="mb-2 flex items-center gap-2">
