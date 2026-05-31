@@ -22,6 +22,8 @@ import {
   Keypair, VersionedTransaction, Transaction,
   SystemProgram, PublicKey, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
+import { useAdmin } from "@/hooks/useAdmin";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import {
   Rocket, Upload, Globe, Twitter, Send,
@@ -473,6 +475,8 @@ function TokenCard({ token, live }: { token: LaunchedToken; live?: LiveData }) {
 function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess: () => void }) {
   const { publicKey, signTransaction, sendTransaction, connected, connect, wallets, select } = useWallet();
   const { connection } = useConnection();
+  const { isAdmin } = useAdmin();
+  const { user } = useAuth();
 
   const [form, setForm] = useState<FormData>({
     name: "", symbol: "", description: "",
@@ -537,15 +541,87 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const updateField = (field: keyof FormData, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
-  const canLaunch =
-    connected && publicKey && signTransaction && sendTransaction &&
-    form.name.trim().length > 0 && form.symbol.trim().length > 0 &&
-    imageFile && solPrice !== null;
+  const canLaunch = isAdmin
+    ? (form.name.trim().length > 0 && form.symbol.trim().length > 0 && !!imageFile)
+    : (connected && publicKey && signTransaction && sendTransaction &&
+       form.name.trim().length > 0 && form.symbol.trim().length > 0 &&
+       imageFile && solPrice !== null);
 
   /* ─── Launch flow ──────────────────────────────────────────────────── */
 
-  const handleLaunch = async () => {
-    if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile || !solPrice) return;
+  /* ─── Admin launch (server-side, no fee, uses project wallet) ──── */
+  const handleAdminLaunch = async () => {
+    if (!imageFile) return;
+
+    try {
+      setStep("uploading");
+      setStatusMsg("Uploading image & metadata to IPFS…");
+
+      const base64 = await fileToBase64(imageFile);
+      const devBuy = parseFloat(form.devBuySol) || 0;
+
+      setStep("sending");
+      setStatusMsg("Creating token with project wallet (no fee)…");
+
+      const res = await fetch("/api/pump-create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: "admin-launch",
+          adminEmail: user?.email,
+          imageBase64: base64,
+          imageMimeType: imageFile.type,
+          name: form.name.trim(),
+          symbol: form.symbol.trim().toUpperCase(),
+          description: form.description.trim(),
+          twitter: form.twitter.trim(),
+          telegram: form.telegram.trim(),
+          website: form.website.trim(),
+          devBuySol: devBuy,
+          slippage: 15,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Launch failed" }));
+        throw new Error(err.error || "Launch failed");
+      }
+
+      const { mintAddress: mint, txSignature: sig, metadataUri: uri, wallet } = await res.json();
+
+      setMintAddress(mint);
+      setTxSignature(sig);
+      setMetadataUri(uri);
+
+      saveLaunch({
+        mintAddress: mint,
+        name: form.name.trim(),
+        symbol: form.symbol.trim().toUpperCase(),
+        description: form.description.trim(),
+        imageUrl: imagePreview || undefined,
+        metadataUri: uri,
+        txSignature: sig,
+        launchedAt: new Date().toISOString(),
+        twitter: form.twitter.trim() || undefined,
+        telegram: form.telegram.trim() || undefined,
+        website: form.website.trim() || undefined,
+        devBuySol: devBuy || undefined,
+        launcherWallet: wallet,
+      });
+
+      setStep("success");
+      toast.success("Token launched! 🚀 (Admin — no fee charged)");
+    } catch (err: any) {
+      console.error("Admin launch error:", err);
+      setErrorMsg(err.message || "Unknown error");
+      setStep("error");
+      toast.error("Launch failed");
+    }
+  };
+
+  /* ─── Regular launch (browser wallet, $3 fee) ──────────────────── */
+  const handleRegularLaunch = async () => {
+    if (!publicKey || !signTransaction || !sendTransaction || !imageFile || !solPrice) return;
 
     try {
       /* Step 0 — Pay $3 SOL fee */
@@ -657,6 +733,11 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       setStep("error");
       toast.error("Launch failed");
     }
+  };
+
+  const handleLaunch = () => {
+    if (isAdmin) return handleAdminLaunch();
+    return handleRegularLaunch();
   };
 
   const resetForm = () => {
@@ -919,29 +1000,66 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               <div className="flex items-center gap-2 mb-3">
                 <DollarSign className="h-4 w-4 text-[#ab9ff2]" />
                 <span className="text-xs font-bold text-white uppercase tracking-wider">Cost Breakdown</span>
+                {isAdmin && (
+                  <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-[9px] font-bold ml-auto">
+                    Admin — Free
+                  </Badge>
+                )}
               </div>
-              <div className="flex justify-between text-xs text-white/40 mb-1.5">
-                <span>Launch fee</span>
-                <span className="text-[#ab9ff2] font-bold">${LAUNCH_FEE_USD}.00{feeSol ? ` (${feeSol.toFixed(4)} SOL)` : ""}</span>
-              </div>
-              <div className="flex justify-between text-xs text-white/40 mb-1.5">
-                <span>Network fee</span><span>~0.02 SOL</span>
-              </div>
-              {parseFloat(form.devBuySol) > 0 && (
-                <div className="flex justify-between text-xs text-white/40 mb-1.5">
-                  <span>Dev buy</span><span>{form.devBuySol} SOL</span>
-                </div>
+              {isAdmin ? (
+                <>
+                  <div className="flex justify-between text-xs text-white/40 mb-1.5">
+                    <span>Launch fee</span>
+                    <span className="text-green-400 font-bold line-through decoration-green-400/40">$0 (free)</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-white/40 mb-1.5">
+                    <span>Wallet</span><span className="text-green-400/70">Project wallet (auto-sign)</span>
+                  </div>
+                  {parseFloat(form.devBuySol) > 0 && (
+                    <div className="flex justify-between text-xs text-white/40 mb-1.5">
+                      <span>Dev buy</span><span>{form.devBuySol} SOL</span>
+                    </div>
+                  )}
+                  <div className="mt-2 pt-2 border-t border-white/[0.06] flex justify-between text-xs text-white/60 font-bold">
+                    <span>Total</span>
+                    <span>~0.02 SOL (network only){parseFloat(form.devBuySol) > 0 ? ` + ${form.devBuySol} SOL dev buy` : ""}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between text-xs text-white/40 mb-1.5">
+                    <span>Launch fee</span>
+                    <span className="text-[#ab9ff2] font-bold">${LAUNCH_FEE_USD}.00{feeSol ? ` (${feeSol.toFixed(4)} SOL)` : ""}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-white/40 mb-1.5">
+                    <span>Network fee</span><span>~0.02 SOL</span>
+                  </div>
+                  {parseFloat(form.devBuySol) > 0 && (
+                    <div className="flex justify-between text-xs text-white/40 mb-1.5">
+                      <span>Dev buy</span><span>{form.devBuySol} SOL</span>
+                    </div>
+                  )}
+                  <div className="mt-2 pt-2 border-t border-white/[0.06] flex justify-between text-xs text-white/60 font-bold">
+                    <span>Total</span>
+                    <span>~{((feeSol || 0) + 0.02 + (parseFloat(form.devBuySol) || 0)).toFixed(4)} SOL
+                      {solPrice ? ` (~$${((feeSol || 0) * solPrice + 0.02 * solPrice + (parseFloat(form.devBuySol) || 0) * solPrice).toFixed(2)})` : ""}
+                    </span>
+                  </div>
+                </>
               )}
-              <div className="mt-2 pt-2 border-t border-white/[0.06] flex justify-between text-xs text-white/60 font-bold">
-                <span>Total</span>
-                <span>~{((feeSol || 0) + 0.02 + (parseFloat(form.devBuySol) || 0)).toFixed(4)} SOL
-                  {solPrice ? ` (~$${((feeSol || 0) * solPrice + 0.02 * solPrice + (parseFloat(form.devBuySol) || 0) * solPrice).toFixed(2)})` : ""}
-                </span>
-              </div>
             </div>
 
             {/* Connect wallet / Launch button */}
-            {!connected ? (
+            {isAdmin ? (
+              /* Admin: no wallet needed — launches with project wallet server-side */
+              <button onClick={handleLaunch} disabled={!canLaunch}
+                className={`w-full flex items-center justify-center gap-3 rounded-xl px-6 py-4 text-base font-black transition-all ${
+                  canLaunch ? "bg-gradient-to-r from-green-500 to-emerald-600 text-black hover:from-green-400 hover:to-emerald-500 shadow-lg shadow-green-500/20" : "bg-white/[0.04] text-white/20 cursor-not-allowed"
+                }`}>
+                <Rocket className="h-5 w-5" />
+                {!form.name.trim() || !form.symbol.trim() ? "Fill in token details" : !imageFile ? "Upload a logo" : `Launch ${form.symbol.trim()} (Admin — Free)`}
+              </button>
+            ) : !connected ? (
               <>
                 <button onClick={handleConnectWallet}
                   className="w-full flex items-center justify-center gap-3 rounded-xl border border-[#ab9ff2]/20 bg-[#ab9ff2]/5 px-6 py-4 text-[#ab9ff2] font-bold hover:bg-[#ab9ff2]/10 transition-all">
@@ -976,7 +1094,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
             <p className="text-center text-[10px] text-white/15 leading-relaxed">
               By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet.
-              <br />A ${LAUNCH_FEE_USD} SOL launch fee is charged per token creation.
+              {!isAdmin && <><br />A ${LAUNCH_FEE_USD} SOL launch fee is charged per token creation.</>}
             </p>
           </div>
         )}
