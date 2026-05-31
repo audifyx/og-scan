@@ -120,6 +120,15 @@ export default function TokenManager() {
   /* Whether we consider the wallet usable (connected + has publicKey) */
   const walletReady = !!(connected && publicKey);
 
+  /* Auto-connect if already inside Phantom's in-app browser */
+  useEffect(() => {
+    const provider = (window as any).phantom?.solana ?? (window as any).solana;
+    if (!provider?.isPhantom || connected) return;
+    provider.connect({ onlyIfTrusted: true })
+      .then(() => select("Phantom" as any))
+      .catch(() => {}); // not pre-trusted, user must tap Connect
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ─── State ─── */
   const [postStep, setPostStep] = useState<PostConnectStep>("select");
   const [mintInput, setMintInput] = useState("");
@@ -580,7 +589,30 @@ export default function TokenManager() {
               {wallets.filter(w => w.adapter.name === "Phantom").map(w => (
                 <button
                   key={w.adapter.name}
-                  onClick={() => { select(w.adapter.name as any); setTimeout(() => connect().catch((e) => setError("Connect failed: " + (e?.message || e))), 100); }}
+                  onClick={async () => {
+                    setError(null);
+                    try {
+                      // In Phantom's in-app browser, window.phantom.solana is already
+                      // connected — call connect({onlyIfTrusted:true}) to silently pick
+                      // up the session, then select() so the adapter syncs.
+                      const provider = (window as any).phantom?.solana ?? (window as any).solana;
+                      if (provider?.isPhantom) {
+                        try {
+                          await provider.connect({ onlyIfTrusted: true });
+                        } catch {
+                          // Not pre-trusted — show the prompt
+                          await provider.connect({ onlyIfTrusted: false });
+                        }
+                        select("Phantom" as any);
+                        return;
+                      }
+                      // Desktop extension fallback
+                      select(w.adapter.name as any);
+                      setTimeout(() => connect().catch((e) => setError("Connect failed: " + (e?.message || e))), 100);
+                    } catch (e: any) {
+                      if (e?.code !== 4001) setError("Connect failed: " + (e?.message || e));
+                    }
+                  }}
                   disabled={connecting}
                   className="flex items-center gap-3 w-full px-5 py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-[hsl(var(--og-lime))/0.4] transition-all group disabled:opacity-50"
                 >
