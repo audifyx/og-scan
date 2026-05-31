@@ -942,7 +942,9 @@ const Index = () => {
         {/* Page content */}
         {tab === "community" || tab === "social" ? (
           <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
-            <CommunityHub />
+            <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading Community...</div>}>
+              <CommunityHub />
+            </Suspense>
           </main>
         ) : tab === "coin-communities" ? (
           <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0 flex flex-col">

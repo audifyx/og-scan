@@ -5,11 +5,10 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import { Hash, MessageSquare, Radio, Users, Compass, Activity, Search, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
-import SocialHub from "./SocialHub";
-import SpacesPage from "./Spaces";
-import CommunitiesPage from "./Communities";
-import DiscoverPage from "./Discover";
-
+const SocialHub = lazy(() => import("./SocialHub"));
+const SpacesPage = lazy(() => import("./Spaces"));
+const CommunitiesPage = lazy(() => import("./Communities"));
+const DiscoverPage = lazy(() => import("./Discover"));
 const LiveFeedPage = lazy(() => import("./LiveFeed"));
 const CommunityRoomsPage = lazy(() => import("./CommunityRooms"));
 const TokenExplorer = lazy(() => import("@/components/discover-20x/TokenExplorer").then(m => ({ default: m.TokenExplorer })));
@@ -111,21 +110,29 @@ const CommunityHub: React.FC = () => {
 
       {/* Content */}
       <div className="min-h-0 flex-1 overflow-hidden">
-        {sub === "social" && <SocialHub />}
+        {sub === "social" && (
+          <Suspense fallback={<Spinner />}>
+            <SocialHub />
+          </Suspense>
+        )}
         {sub === "rooms" && (
           <Suspense fallback={<Spinner />}>
             <CommunityRoomsPage />
           </Suspense>
         )}
         {sub === "spaces" && (
-          <div className="h-full overflow-y-auto px-3 py-4 sm:px-5 lg:px-6 pb-4">
-            <SpacesPage />
-          </div>
+          <Suspense fallback={<Spinner />}>
+            <div className="h-full overflow-y-auto px-3 py-4 sm:px-5 lg:px-6 pb-4">
+              <SpacesPage />
+            </div>
+          </Suspense>
         )}
         {sub === "communities" && (
-          <div className="h-full overflow-y-auto px-3 py-4 sm:px-5 lg:px-6 pb-4">
-            <CommunitiesPage />
-          </div>
+          <Suspense fallback={<Spinner />}>
+            <div className="h-full overflow-y-auto px-3 py-4 sm:px-5 lg:px-6 pb-4">
+              <CommunitiesPage />
+            </div>
+          </Suspense>
         )}
         {sub === "discover" && (
           <div className="flex h-full flex-col overflow-hidden">
