@@ -41,6 +41,7 @@ import {
   Search,
   Shield,
   ShieldCheck,
+  AlertTriangle,
   Sparkles,
   Upload,
   Wallet,
@@ -120,14 +121,8 @@ export default function TokenManager() {
   /* Whether we consider the wallet usable (connected + has publicKey) */
   const walletReady = !!(connected && publicKey);
 
-  /* Auto-connect if already inside Phantom's in-app browser */
-  useEffect(() => {
-    const provider = (window as any).phantom?.solana ?? (window as any).solana;
-    if (!provider?.isPhantom || connected) return;
-    provider.connect({ onlyIfTrusted: true })
-      .then(() => select("Phantom" as any))
-      .catch(() => {}); // not pre-trusted, user must tap Connect
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  /* (wallet connection is handled inline on the Connect buttons below,
+   *  same pattern as ConnectedWalletTab: select → setTimeout → connect) */
 
   /* ─── State ─── */
   const [postStep, setPostStep] = useState<PostConnectStep>("select");
@@ -193,23 +188,7 @@ export default function TokenManager() {
     }
   }, [walletReady]);
 
-  /* ─── Wallet connect handler ───
-   *  Bypasses the wallet-adapter autoConnect machinery entirely.
-   *
-   *  Why: The adapter's autoConnect only does a *silent* reconnect for
-   *  previously-approved dapps. For first-time or mobile users the prompt
-   *  never appears. Worse, if autoConnect fails, onConnectError() calls
-   *  changeWallet(null) which silently clears the wallet, making it look
-   *  like "nothing happened" no matter how many times you retry via the
-   *  adapter's connect() function.
-   *
-   *  Fix: Connect directly through the injected provider (window.phantom.solana),
-   *  which always shows the approval prompt. Then call select() so the adapter
-   *  picks up the already-connected provider. If the provider isn't injected
-   *  (regular mobile browser), redirect to Phantom's universal link to open
-   *  the current page inside Phantom's in-app browser.
-   */
-  // connect is handled inline on the button (same pattern as ConnectedWalletTab)
+  /* ─── Wallet connect handler (same as ConnectedWalletTab) ─── */
 
     /* ─── Load metadata for a selected mint ─── */
   const loadMetadata = useCallback(
@@ -573,60 +552,27 @@ export default function TokenManager() {
         <div className="flex flex-col items-center justify-center gap-8 px-4 py-8">
           <div className="og-glass-card rounded-3xl p-8 max-w-md w-full text-center space-y-6">
             <div className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-[hsl(var(--og-lime))] to-[#22d3ee] flex items-center justify-center shadow-lg shadow-[hsl(var(--og-lime))/0.3]">
-              {connecting ? <Loader2 className="h-10 w-10 animate-spin text-[hsl(var(--og-ink))]" /> : <Wallet className="h-10 w-10 text-[hsl(var(--og-ink))]" />}
+              <Wallet className="h-10 w-10 text-[hsl(var(--og-ink))]" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold mb-2">
-                {connecting ? "Waiting for approval…" : "Connect Your Wallet"}
-              </h2>
+              <h2 className="text-2xl font-bold mb-2">Connect Your Wallet</h2>
               <p className="text-white/50 text-sm leading-relaxed">
-                {connecting
-                  ? "Check your Phantom extension and approve the connection."
-                  : "Connect the wallet that deployed your token to update its metadata."}
+                Connect the wallet that deployed your token to update its metadata.
               </p>
             </div>
             <div className="flex flex-col gap-3">
-              {wallets.filter(w => w.adapter.name === "Phantom").map(w => (
-                <button
-                  key={w.adapter.name}
-                  onClick={async () => {
-                    setError(null);
-                    try {
-                      // In Phantom's in-app browser, window.phantom.solana is already
-                      // connected — call connect({onlyIfTrusted:true}) to silently pick
-                      // up the session, then select() so the adapter syncs.
-                      const provider = (window as any).phantom?.solana ?? (window as any).solana;
-                      if (provider?.isPhantom) {
-                        try {
-                          await provider.connect({ onlyIfTrusted: true });
-                        } catch {
-                          // Not pre-trusted — show the prompt
-                          await provider.connect({ onlyIfTrusted: false });
-                        }
-                        select("Phantom" as any);
-                        return;
-                      }
-                      // Desktop extension fallback
-                      select(w.adapter.name as any);
-                      setTimeout(() => connect().catch((e) => setError("Connect failed: " + (e?.message || e))), 100);
-                    } catch (e: any) {
-                      if (e?.code !== 4001) setError("Connect failed: " + (e?.message || e));
-                    }
-                  }}
-                  disabled={connecting}
-                  className="flex items-center gap-3 w-full px-5 py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-[hsl(var(--og-lime))/0.4] transition-all group disabled:opacity-50"
-                >
+              {wallets.filter(w => ["Phantom", "Solflare"].includes(w.adapter.name)).map(w => (
+                <button key={w.adapter.name} onClick={() => { select(w.adapter.name as any); setTimeout(() => connect().catch(() => {}), 100); }}
+                  className="flex items-center gap-3 w-full px-5 py-3.5 rounded-2xl bg-white/[0.06] border border-white/[0.1] hover:bg-white/[0.1] hover:border-[hsl(var(--og-lime))/0.4] transition-all group">
                   {w.adapter.icon && <img src={w.adapter.icon} alt={w.adapter.name} className="w-7 h-7 rounded-lg" />}
                   <span className="font-semibold text-sm">{w.adapter.name}</span>
-                  <span className="ml-auto text-[10px] text-white/30 group-hover:text-[hsl(var(--og-lime))] transition-colors">
-                    {connecting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Connect →"}
-                  </span>
+                  <span className="ml-auto text-[10px] text-white/30 group-hover:text-[hsl(var(--og-lime))] transition-colors">Connect →</span>
                 </button>
               ))}
-              {wallets.filter(w => w.adapter.name === "Phantom").length === 0 && (
+              {wallets.filter(w => ["Phantom", "Solflare"].includes(w.adapter.name)).length === 0 && (
                 <div className="text-center text-sm text-white/40 py-4">
-                  <p className="mb-2">Phantom not detected.</p>
-                  <a href="https://phantom.app" target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-lime))] underline">Install Phantom →</a>
+                  <AlertTriangle className="h-5 w-5 mx-auto mb-2 text-yellow-500" />
+                  No wallets detected. Install <a href="https://phantom.app" target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-lime))] underline">Phantom</a> first.
                 </div>
               )}
             </div>
