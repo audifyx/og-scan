@@ -20,7 +20,12 @@ import {
   deserializeMetadata,
   createUpdateMetadataAccountV2Instruction,
   fetchMetadataJson,
+  parseToken2022Metadata,
+  isToken2022Mutable,
+  createToken2022UpdateFieldInstruction,
+  TOKEN_2022_PROGRAM_ID,
   type OnChainTokenMetadata,
+  type Token2022Metadata,
 } from "@/lib/metaplex-raw";
 import { cn } from "@/lib/utils";
 import {
@@ -54,6 +59,8 @@ interface TokenMetadataFull {
   onChain: OnChainTokenMetadata;
   offChain: Record<string, unknown> | null;
   imageUrl: string | null;
+  /** "metaplex" for SPL Token + Metaplex, "token2022" for Token-2022 inline */
+  tokenStandard: "metaplex" | "token2022";
 }
 
 /* The only "steps" we manage are post-connect: select → edit → signing → success */
@@ -281,84 +288,106 @@ export default function TokenManager() {
 
   /* ─── Wallet connect handler (same as ConnectedWalletTab) ─── */
 
-    /* ─── Load metadata for a selected mint ─── */
+    /* ─── Helper: fill edit form from metadata ─── */
+  const fillEditForm = useCallback((onChain: { name: string; symbol: string; uri?: string }, offChain: Record<string, unknown> | null, imageUrl: string | null) => {
+    setEditName(onChain.name);
+    setEditSymbol(onChain.symbol);
+    setEditDescription((offChain?.description as string) || "");
+    setEditWebsite((offChain?.external_url as string) || "");
+    setEditTwitter((offChain as any)?.twitter || (offChain as any)?.socials?.twitter || "");
+    setEditTelegram((offChain as any)?.telegram || (offChain as any)?.socials?.telegram || "");
+    setEditDiscord((offChain as any)?.discord || (offChain as any)?.socials?.discord || "");
+    setEditImagePreview(imageUrl);
+    setEditImageFile(null);
+    setEditBannerPreview((offChain?.banner_image as string) || (offChain?.header as string) || null);
+    setEditBannerFile(null);
+  }, []);
+
+    /* ─── Load metadata for a selected mint (supports Metaplex + Token-2022) ─── */
   const loadMetadata = useCallback(
     async (mint: string) => {
       setLoadingMeta(true);
       setError(null);
       try {
         const mintPk = new PublicKey(mint);
+
+        /* ── 1. Try Metaplex metadata PDA ── */
         const metaPDA = getMetadataPDA(mintPk);
-        const accountInfo = await connection.getAccountInfo(metaPDA);
+        const [metaAccount, mintAccount] = await Promise.all([
+          connection.getAccountInfo(metaPDA),
+          connection.getAccountInfo(mintPk),
+        ]);
 
-        if (!accountInfo) {
-          setError(
-            "No metadata account found. This token may not have Metaplex metadata.",
-          );
-          setLoadingMeta(false);
+        if (metaAccount) {
+          /* ── Metaplex path (standard SPL Token) ── */
+          const onChain = deserializeMetadata(Buffer.from(metaAccount.data));
+
+          if (publicKey && onChain.updateAuthority !== publicKey.toBase58()) {
+            setError(`You don't have update authority for this token. Authority: ${shortAddr(onChain.updateAuthority)}`);
+            setLoadingMeta(false);
+            return;
+          }
+          if (!onChain.isMutable) {
+            setError("This token's metadata is immutable and cannot be updated.");
+            setLoadingMeta(false);
+            return;
+          }
+
+          const offChain = onChain.uri ? await fetchMetadataJson(onChain.uri) : null;
+          const imageUrl = (offChain?.image as string) || null;
+          const meta: TokenMetadataFull = { onChain, offChain, imageUrl, tokenStandard: "metaplex" };
+          setMetadata(meta);
+          setSelectedMint(mint);
+          fillEditForm(onChain, offChain, imageUrl);
+          setPostStep("edit");
           return;
         }
 
-        const onChain = deserializeMetadata(
-          Buffer.from(accountInfo.data),
-        );
+        /* ── 2. Try Token-2022 inline metadata ── */
+        if (mintAccount) {
+          const ownerProgram = mintAccount.owner.toBase58();
+          const t22meta = parseToken2022Metadata(Buffer.from(mintAccount.data), ownerProgram);
 
-        // Check update authority
-        if (
-          publicKey &&
-          onChain.updateAuthority !== publicKey.toBase58()
-        ) {
-          setError(
-            `You don't have update authority for this token. Authority: ${shortAddr(onChain.updateAuthority)}`,
-          );
-          setLoadingMeta(false);
-          return;
+          if (t22meta) {
+            if (!isToken2022Mutable(t22meta)) {
+              setError("This token's metadata is immutable (update authority revoked). It cannot be updated.");
+              setLoadingMeta(false);
+              return;
+            }
+            if (publicKey && t22meta.updateAuthority !== publicKey.toBase58()) {
+              setError(`You don't have update authority for this token. Authority: ${shortAddr(t22meta.updateAuthority)}`);
+              setLoadingMeta(false);
+              return;
+            }
+
+            const offChain = t22meta.uri ? await fetchMetadataJson(t22meta.uri) : null;
+            const imageUrl = (offChain?.image as string) || null;
+
+            // Convert to OnChainTokenMetadata shape for unified UI
+            const onChain: OnChainTokenMetadata = {
+              key: 0,
+              updateAuthority: t22meta.updateAuthority,
+              mint: t22meta.mint,
+              name: t22meta.name,
+              symbol: t22meta.symbol,
+              uri: t22meta.uri,
+              sellerFeeBasisPoints: 0,
+              creators: null,
+              primarySaleHappened: false,
+              isMutable: true,
+            };
+
+            const meta: TokenMetadataFull = { onChain, offChain, imageUrl, tokenStandard: "token2022" };
+            setMetadata(meta);
+            setSelectedMint(mint);
+            fillEditForm(onChain, offChain, imageUrl);
+            setPostStep("edit");
+            return;
+          }
         }
 
-        if (!onChain.isMutable) {
-          setError(
-            "This token's metadata is immutable and cannot be updated.",
-          );
-          setLoadingMeta(false);
-          return;
-        }
-
-        // Fetch off-chain JSON
-        const offChain = onChain.uri
-          ? await fetchMetadataJson(onChain.uri)
-          : null;
-
-        const imageUrl =
-          (offChain?.image as string) || null;
-
-        const meta: TokenMetadataFull = { onChain, offChain, imageUrl };
-        setMetadata(meta);
-        setSelectedMint(mint);
-
-        // Pre-fill edit form
-        setEditName(onChain.name);
-        setEditSymbol(onChain.symbol);
-        setEditDescription(
-          (offChain?.description as string) || "",
-        );
-        setEditWebsite((offChain?.external_url as string) || "");
-        setEditTwitter(
-          (offChain as any)?.twitter || (offChain as any)?.socials?.twitter || "",
-        );
-        setEditTelegram(
-          (offChain as any)?.telegram || (offChain as any)?.socials?.telegram || "",
-        );
-        setEditDiscord(
-          (offChain as any)?.discord || (offChain as any)?.socials?.discord || "",
-        );
-        setEditImagePreview(imageUrl);
-        setEditImageFile(null);
-        setEditBannerPreview(
-          (offChain?.banner_image as string) || (offChain?.header as string) || null,
-        );
-        setEditBannerFile(null);
-
-        setPostStep("edit");
+        setError("No metadata found. This token may not have on-chain metadata.");
+        setLoadingMeta(false);
       } catch (err: any) {
         setError(err?.message || "Failed to load token metadata.");
       } finally {
@@ -513,26 +542,37 @@ export default function TokenManager() {
 
       // Build on-chain transaction
       const mintPk = new PublicKey(selectedMint);
-      const metaPDA = getMetadataPDA(mintPk);
+      const tx = new Transaction();
 
-      // Preserve existing creators
-      const existingCreators = metadata.onChain.creators?.map((c) => ({
-        address: new PublicKey(c.address),
-        verified: c.verified,
-        share: c.share,
-      })) || null;
+      if (metadata.tokenStandard === "token2022") {
+        /* ── Token-2022: one UpdateField instruction per changed field ── */
+        if (editName !== metadata.onChain.name) {
+          tx.add(createToken2022UpdateFieldInstruction(mintPk, publicKey, "name", editName));
+        }
+        if (editSymbol !== metadata.onChain.symbol) {
+          tx.add(createToken2022UpdateFieldInstruction(mintPk, publicKey, "symbol", editSymbol));
+        }
+        // Always update URI (points to new metadata JSON with image/desc/links)
+        tx.add(createToken2022UpdateFieldInstruction(mintPk, publicKey, "uri", newUri));
+      } else {
+        /* ── Metaplex: single UpdateMetadataAccountV2 instruction ── */
+        const metaPDA = getMetadataPDA(mintPk);
+        const existingCreators = metadata.onChain.creators?.map((c) => ({
+          address: new PublicKey(c.address),
+          verified: c.verified,
+          share: c.share,
+        })) || null;
 
-      const updateIx = createUpdateMetadataAccountV2Instruction({
-        metadata: metaPDA,
-        updateAuthority: publicKey,
-        newName: editName,
-        newSymbol: editSymbol,
-        newUri: newUri,
-        newSellerFeeBasisPoints: metadata.onChain.sellerFeeBasisPoints,
-        creators: existingCreators,
-      });
-
-      const tx = new Transaction().add(updateIx);
+        tx.add(createUpdateMetadataAccountV2Instruction({
+          metadata: metaPDA,
+          updateAuthority: publicKey,
+          newName: editName,
+          newSymbol: editSymbol,
+          newUri: newUri,
+          newSellerFeeBasisPoints: metadata.onChain.sellerFeeBasisPoints,
+          creators: existingCreators,
+        }));
+      }
       tx.feePayer = publicKey;
       const { blockhash } = await connection.getLatestBlockhash();
       tx.recentBlockhash = blockhash;

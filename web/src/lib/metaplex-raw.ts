@@ -245,3 +245,109 @@ export async function fetchMetadataJson(
     return null;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Token-2022 (SPL Token Extensions) Metadata Support
+   ═══════════════════════════════════════════════════════════════════ */
+
+export const TOKEN_2022_PROGRAM_ID = new PublicKey(
+  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+);
+
+const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
+
+export interface Token2022Metadata {
+  updateAuthority: string;
+  mint: string;
+  name: string;
+  symbol: string;
+  uri: string;
+}
+
+/**
+ * Parse Token-2022 inline metadata extension from mint account data.
+ * Returns null if the account is not Token-2022 or has no metadata extension.
+ */
+export function parseToken2022Metadata(
+  data: Buffer,
+  ownerProgram: string,
+): Token2022Metadata | null {
+  if (ownerProgram !== TOKEN_2022_PROGRAM_ID.toBase58()) return null;
+  if (data.length < 170) return null;
+
+  // TLV extensions start at byte 166 (after 165-byte base mint + account type)
+  let offset = 166;
+  while (offset + 4 <= data.length) {
+    const extType = data.readUInt16LE(offset);
+    const extLen = data.readUInt16LE(offset + 2);
+    if (extType === 0 && extLen === 0) break;
+
+    if (extType === 19 /* TokenMetadata */) {
+      const ext = data.slice(offset + 4, offset + 4 + extLen);
+      let pos = 0;
+
+      const updateAuthority = new PublicKey(ext.slice(pos, pos + 32)).toBase58();
+      pos += 32;
+      const mint = new PublicKey(ext.slice(pos, pos + 32)).toBase58();
+      pos += 32;
+
+      const nameLen = ext.readUInt32LE(pos); pos += 4;
+      const name = ext.slice(pos, pos + nameLen).toString("utf8").replace(/\0/g, ""); pos += nameLen;
+
+      const symLen = ext.readUInt32LE(pos); pos += 4;
+      const symbol = ext.slice(pos, pos + symLen).toString("utf8").replace(/\0/g, ""); pos += symLen;
+
+      const uriLen = ext.readUInt32LE(pos); pos += 4;
+      const uri = ext.slice(pos, pos + uriLen).toString("utf8").replace(/\0/g, ""); pos += uriLen;
+
+      return { updateAuthority, mint, name, symbol, uri };
+    }
+
+    offset += 4 + extLen;
+  }
+  return null;
+}
+
+/** Check if a Token-2022 metadata extension has a valid (non-system) update authority */
+export function isToken2022Mutable(meta: Token2022Metadata): boolean {
+  return meta.updateAuthority !== SYSTEM_PROGRAM_ID;
+}
+
+/**
+ * Build Token-2022 `UpdateField` instruction (spl_token_metadata_interface).
+ * Field variants: 0=Name, 1=Symbol, 2=Uri
+ */
+export function createToken2022UpdateFieldInstruction(
+  mint: PublicKey,
+  updateAuthority: PublicKey,
+  field: "name" | "symbol" | "uri",
+  value: string,
+): TransactionInstruction {
+  const fieldMap = { name: 0, symbol: 1, uri: 2 };
+  const fieldVariant = fieldMap[field];
+
+  // spl_token_metadata_interface discriminator for UpdateField
+  // = first 8 bytes of sha256("spl_token_metadata_interface:update_field")
+  // Precomputed: sha256("spl_token_metadata_interface:update_field")[0..8]
+  const discriminator = Buffer.from([130, 68, 42, 109, 52, 18, 206, 255]);
+
+  // Field enum: u32 discriminant, then for custom keys a borsh string follows
+  const fieldBuf = Buffer.alloc(4);
+  fieldBuf.writeUInt32LE(fieldVariant, 0);
+
+  // Value: borsh string (u32 length + bytes)
+  const valBytes = Buffer.from(value, "utf8");
+  const valLenBuf = Buffer.alloc(4);
+  valLenBuf.writeUInt32LE(valBytes.length, 0);
+
+  const data = Buffer.concat([discriminator, fieldBuf, valLenBuf, valBytes]);
+
+  return new TransactionInstruction({
+    programId: TOKEN_2022_PROGRAM_ID,
+    keys: [
+      { pubkey: mint, isSigner: false, isWritable: true },
+      { pubkey: updateAuthority, isSigner: true, isWritable: false },
+    ],
+    data,
+  });
+}
