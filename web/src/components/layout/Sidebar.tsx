@@ -17,21 +17,24 @@ type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; 
 
 const mainItems: NavItem[] = [
   { to: "/app",        icon: Home,          label: "Home",      eyebrow: "Command hub" },
-  { to: "/invite",     icon: Gift,          label: "Invite",    eyebrow: "Referral contest" },
+  { to: "/launch",     icon: Rocket,        label: "Launch",    eyebrow: "Tokens & launcher" },
   { to: "/community",  icon: Users,         label: "Community", eyebrow: "Social & voice" },
   { to: "/tools",      icon: Wrench,        label: "Tools",     eyebrow: "Scanners & feeds" },
   { to: "/profile",    icon: User,          label: "Profile",   eyebrow: "Your account" },
 ];
 
 const tradingItems: NavItem[] = [
-  { to: "/launch",          icon: Rocket,        label: "Launch",          eyebrow: "Create tokens" },
-  { to: "/wallets",         icon: Wallet,        label: "Wallets",         eyebrow: "Tracked wallets" },
+  { to: "/wallets",         icon: Wallet,        label: "Wallets",         eyebrow: "Phantom Trade" },
   { to: "/charts",          icon: LineChart,     label: "Charts",          eyebrow: "Live charts" },
   { to: "/callouts",        icon: Bell,          label: "Callouts",        eyebrow: "Trade alerts" },
   { to: "/trading-lobbies", icon: MessageSquare, label: "Trading Lobbies", eyebrow: "Voice + charts" },
   { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
+];
+
+const socialItems: NavItem[] = [
+  { to: "/invite",          icon: Gift,          label: "Invite",          eyebrow: "Referral contest" },
   { to: "/messages",        icon: Mail,          label: "Messages",        eyebrow: "Direct messages" },
-  { to: "/support",         icon: Headset,       label: "Support Chat",    eyebrow: "Tickets + live help" },
+  { to: "/support",         icon: Headset,       label: "Support",         eyebrow: "Help & tickets" },
 ];
 
 // ── NavRow ────────────────────────────────────────────────────────────────
@@ -153,6 +156,13 @@ export const Sidebar = () => {
             <SectionLabel label="Trading" />
             <div className="space-y-0.5">
               {tradingItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
+            </div>
+          </div>
+
+          <div className="mb-1 mt-4">
+            <SectionLabel label="Social" />
+            <div className="space-y-0.5">
+              {socialItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
             </div>
           </div>
 

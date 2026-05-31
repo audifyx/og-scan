@@ -19,9 +19,9 @@ type DiscoverSub = "launchpad" | "live-feed" | "explore";
 
 const SUB_TABS: { id: SubTab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "social", label: "Chat", Icon: MessageSquare },
-  { id: "rooms", label: "Rooms", Icon: Hash },
   { id: "spaces", label: "Spaces", Icon: Radio },
   { id: "communities", label: "Groups", Icon: Users },
+  { id: "rooms", label: "Rooms", Icon: Hash },
   { id: "discover", label: "Discover", Icon: Compass },
 ];
 
