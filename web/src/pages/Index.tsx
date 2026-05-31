@@ -44,6 +44,7 @@ import {
   Zap,
   Palette,
   Image as ImageIcon,
+  Pencil,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -91,6 +92,7 @@ const importToolsHubPage = () => import("./ToolsHub");
 const importChartsPage = () => import("./Charts");
 const importLiveTradingPage = () => import("./LiveTrading");
 const importLiveFeedPage = () => import("./LiveFeed");
+const importTokenManagerPage = () => import("./TokenManager");
 const CommunitiesPage = lazy(importCommunitiesPage);
 const CoinCommunitiesPageLazy = lazy(() => importCoinCommunitiesPage().then(m => ({ default: m.CoinCommunitiesPage })));
 const DiscoverPage = lazy(importDiscoverPage);
@@ -102,6 +104,7 @@ const ToolsHub = lazy(importToolsHubPage);
 const ChartsPage = lazy(importChartsPage);
 const LiveTradingPage = lazy(importLiveTradingPage);
 const LiveFeedPage = lazy(importLiveFeedPage);
+const TokenManagerPage = lazy(importTokenManagerPage);
 
 /* ─── 20x Feature imports ─── */
 const RugScore = lazy(() => import("@/components/scanner-20x/RugScore").then(m => ({ default: m.RugScore })));
@@ -193,7 +196,8 @@ type TabId =
   | "charts"
   | "live-trading"
   | "live-feed-page"
-  | "listings";
+  | "listings"
+  | "token-manager";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
@@ -497,6 +501,17 @@ const TABS: TabConfig[] = [
     group: "Main",
   },
   {
+    id: "token-manager",
+    label: "Token Manager",
+    slug: "token-manager",
+    pageNumber: 29,
+    eyebrow: "Free On-Chain Update",
+    description: "Update your token's image, description & links on-chain — changes show on every platform. Free.",
+    Icon: Pencil,
+    accent: "lime",
+    group: "Main",
+  },
+  {
     id: "community",
     label: "Community",
     slug: "community",
@@ -679,6 +694,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "profile") return <UserProfile viewUserId={profileViewUserId} />;
   if (tab === "live-trading") return <LiveTradingPage />;
   if (tab === "live-feed-page") return <LiveFeedPage />;
+  if (tab === "token-manager") return <TokenManagerPage />;
   return null;
 };
 
@@ -733,6 +749,9 @@ const preloadTab = (tab: TabId): void => {
       return;
     case "live-feed-page":
       void importLiveFeedPage();
+      return;
+    case "token-manager":
+      void importTokenManagerPage();
       return;
     case "scanner":
     case "og-finder":

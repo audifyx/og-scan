@@ -9,6 +9,7 @@ import {
   LineChart,
   Mail,
   Menu,
+  Pencil,
   MessageSquare,
   Shield,
   Trophy,
@@ -46,7 +47,8 @@ type TabId =
   | "social"
   | "community"
   | "tools"
-  | "profile";
+  | "profile"
+  | "token-manager";
 
 export type NavItem = {
   id?: TabId;
@@ -168,6 +170,7 @@ export const AppSidebar = ({
     { to: "/leaderboard", icon: Trophy, label: "Leaderboard", eyebrow: "Top traders" },
     { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
     { to: "/support", icon: Headset, label: "Support Chat", eyebrow: "Tickets + live help" },
+    { id: "token-manager" as TabId, icon: Pencil, label: "Token Manager", eyebrow: "Free metadata update" },
   ];
 
   const adminAppsItems: NavItem[] = [
