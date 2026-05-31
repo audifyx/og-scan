@@ -192,7 +192,8 @@ export default function TokenManager() {
    * AFTER the adapter is actually selected, otherwise wallet-adapter throws
    * WalletNotSelectedError. So: connect now if already selected, else record
    * the intent and let the effect below connect once selection settles. */
-  const [pendingConnect, setPendingConnect] = useState<string | null>(null);
+  const pendingWalletRef = useRef<string | null>(null);
+  const connectAttemptRef = useRef<number>(0);
 
   const safeConnectError = useCallback((err: any) => {
     const msg = err?.message || String(err);
@@ -203,39 +204,42 @@ export default function TokenManager() {
   }, []);
 
   const handleConnectWallet = useCallback(
-    async (walletName: string) => {
+    (walletName: string) => {
       setError(null);
-      try {
-        if (wallet?.adapter.name === walletName) {
-          await connect();
-          return;
-        }
-        setPendingConnect(walletName);
-        select(walletName as any);
-      } catch (err: any) {
-        safeConnectError(err);
+
+      // Already connected with this wallet — nothing to do
+      if (wallet?.adapter.name === walletName && connected) return;
+
+      // Right wallet already selected, just not connected yet
+      if (wallet?.adapter.name === walletName && !connecting) {
+        connect().catch(safeConnectError);
+        return;
       }
+
+      // Different wallet: select it, then retry connect() each rAF until the
+      // adapter has settled (WalletNotSelectedError = not settled yet, retry).
+      const attemptId = ++connectAttemptRef.current;
+      pendingWalletRef.current = walletName;
+      select(walletName as any);
+
+      const tryConnect = () => {
+        if (connectAttemptRef.current !== attemptId) return; // superseded
+        connect().catch((err: any) => {
+          const msg = err?.message || String(err);
+          if (/wallet not selected/i.test(msg)) {
+            // Adapter hasn't settled yet — retry next animation frame
+            requestAnimationFrame(tryConnect);
+          } else {
+            safeConnectError(err);
+          }
+        });
+      };
+
+      // One rAF delay lets the adapter internals settle before first attempt
+      requestAnimationFrame(tryConnect);
     },
-    [wallet, select, connect, safeConnectError],
+    [wallet, connected, connecting, select, connect, safeConnectError],
   );
-
-  /* Fire the explicit connect() once the selected wallet matches our intent. */
-  useEffect(() => {
-    if (
-      pendingConnect &&
-      wallet?.adapter.name === pendingConnect &&
-      !connected &&
-      !connecting
-    ) {
-      setPendingConnect(null);
-      connect().catch(safeConnectError);
-    }
-  }, [pendingConnect, wallet, connected, connecting, connect, safeConnectError]);
-
-  /* Clear any stale pending intent once connected. */
-  useEffect(() => {
-    if (connected && pendingConnect) setPendingConnect(null);
-  }, [connected, pendingConnect]);
 
   /* ─── Load metadata for a selected mint ─── */
   const loadMetadata = useCallback(
