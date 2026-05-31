@@ -154,6 +154,7 @@ const App = () => (
             <Route path="/social" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/listings" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/listings/:mintAddress" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/token-manager" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/social-hub" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/voice-rooms" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tech" element={<ProtectedRoute><Index /></ProtectedRoute>} />
