@@ -582,7 +582,7 @@ export default function TokenManager() {
   /* ────────────────────────────────────────────────────────────── */
 
   /* Derive what to show purely from state — no step gating for connect/select */
-  const showConnect = !walletReady && !connecting;
+  const showConnect = !walletReady; // visible the whole time until connected
   const showConnecting = connecting;
   const showPostConnect = walletReady;
 
@@ -626,45 +626,50 @@ export default function TokenManager() {
       )}
 
       {/* ══════════════════════════════════════════════ */}
-      {/* ── VIEW: Wallet Connecting (spinner) ─── */}
-      {/* ══════════════════════════════════════════════ */}
-      {showConnecting && (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8">
-          <Loader2 className="h-10 w-10 animate-spin text-og-cyan" />
-          <p className="text-sm text-white/40">Connecting wallet…</p>
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════ */}
-      {/* ── VIEW: Connect Wallet ── */}
+      {/* ── VIEW: Connect Wallet (shown until connected) ── */}
       {/* ══════════════════════════════════════════════ */}
       {showConnect && (
         <div className="flex flex-col items-center gap-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
-            <Wallet className="h-8 w-8 text-white/30" />
+            {connecting
+              ? <Loader2 className="h-8 w-8 animate-spin text-og-cyan" />
+              : <Wallet className="h-8 w-8 text-white/30" />}
           </div>
           <div className="text-center">
-            <h2 className="text-lg font-bold text-white">Connect Your Wallet</h2>
+            <h2 className="text-lg font-bold text-white">
+              {connecting ? "Waiting for approval…" : "Connect Your Wallet"}
+            </h2>
             <p className="mt-1 text-xs text-white/35">
-              Connect the wallet that deployed your token to verify update authority.
+              {connecting
+                ? "Check your Phantom extension for an approval prompt."
+                : "Connect the wallet that deployed your token to verify update authority."}
             </p>
           </div>
           <div className="w-full max-w-xs space-y-2">
-            {availableWallets.map((w) => (
+            {availableWallets.map((w) => {
+              const isActive = wallet?.adapter.name === w.adapter.name && connecting;
+              return (
               <button
                 key={w.adapter.name}
                 onClick={() => handleConnectWallet(w.adapter.name)}
-                className="flex w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 transition-all hover:border-[#ab9ff2]/40 hover:bg-white/[0.1] group"
+                disabled={connecting}
+                className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 transition-all group ${
+                  isActive
+                    ? "border-og-cyan/40 bg-og-cyan/[0.08]"
+                    : "border-white/[0.08] bg-white/[0.05] hover:border-[#ab9ff2]/40 hover:bg-white/[0.1]"
+                } disabled:opacity-60 disabled:cursor-not-allowed`}
               >
                 {w.adapter.icon && (
                   <img src={w.adapter.icon} alt={w.adapter.name} className="h-8 w-8 rounded-lg" />
                 )}
                 <span className="text-sm font-semibold text-white">{w.adapter.name}</span>
-                <span className="ml-auto text-[10px] text-white/30 group-hover:text-[#ab9ff2]">
-                  Connect →
+                <span className="ml-auto">
+                  {isActive
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin text-og-cyan" />
+                    : <span className="text-[10px] text-white/30 group-hover:text-[#ab9ff2]">Connect →</span>}
                 </span>
               </button>
-            ))}
+            );})}
             {availableWallets.length === 0 && (
               <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-4 text-center">
                 <p className="text-xs text-white/30">No wallet detected.</p>
