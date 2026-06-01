@@ -989,3 +989,12 @@ button, a, input, select, textarea {
 .bg-solana-gradient {
   background: linear-gradient(135deg, hsl(var(--og-lime)/0.5), hsl(var(--og-cyan)/0.5));
 }
+
+/* Push Intercom launcher above mobile bottom nav */
+@media (max-width: 1024px) {
+  .intercom-launcher,
+  #intercom-container .intercom-launcher,
+  iframe.intercom-launcher-frame {
+    bottom: 80px !important;
+  }
+}
