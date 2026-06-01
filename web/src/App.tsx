@@ -39,6 +39,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
+import { SupportChat } from "@/components/support/SupportChat";
 import { XCallbackPage } from "./pages/XCallbackPage";
 import Admin from "./pages/Admin";
 import SpaceReplay from "./pages/SpaceReplay";
@@ -283,6 +284,7 @@ const App = () => (
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <SupportChat />
         </BrowserRouter>
       </TooltipProvider>
       </ThemeProvider>

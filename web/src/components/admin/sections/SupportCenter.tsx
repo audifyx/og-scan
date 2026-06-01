@@ -46,6 +46,29 @@ export const SupportCenter = () => {
 
   useEffect(() => { fetch(); }, []);
 
+  // Real-time: new tickets + new messages in the open ticket
+  useEffect(() => {
+    const channel = supabase.channel("admin-support-rt")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "support_tickets" },
+        () => fetch()
+      )
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "support_tickets" },
+        () => fetch()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    const channel = supabase.channel(`admin-support-msgs-${selected.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "support_messages", filter: `ticket_id=eq.${selected.id}` },
+        (payload) => setMessages(prev => [...prev, payload.new as any])
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [selected?.id]);
+
   const openTicket = async (t: any) => {
     setSelected(t); setReplyText("");
     const { data } = await supabase.from("support_messages").select("*").eq("ticket_id", t.id).order("created_at", { ascending: true });
