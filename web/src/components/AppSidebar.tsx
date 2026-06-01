@@ -167,7 +167,6 @@ export const AppSidebar = ({
   const tradingItems: NavItem[] = [
     { to: "/wallets", icon: Wallet, label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
     { to: "/trading-hub", icon: TrendingUp, label: "Trading Hub", eyebrow: "Launch · Lobbies · Callouts" },
-    { to: "/leaderboard", icon: Trophy, label: "Leaderboard", eyebrow: "Top traders" },
     { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
     { to: "/support", icon: Headset, label: "Support Chat", eyebrow: "Tickets + live help" },
     { id: "token-manager" as TabId, icon: Pencil, label: "Token Manager", eyebrow: "Free metadata update" },

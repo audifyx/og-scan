@@ -17,7 +17,6 @@ type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; 
 
 const mainItems: NavItem[] = [
   { to: "/app",        icon: Home,          label: "Home",      eyebrow: "Command hub" },
-  { to: "/launch",     icon: Rocket,        label: "Launch",    eyebrow: "Tokens & launcher" },
   { to: "/community",  icon: Users,         label: "Community", eyebrow: "Social & voice" },
   { to: "/tools",      icon: Wrench,        label: "Tools",     eyebrow: "Scanners & feeds" },
   { to: "/profile",    icon: User,          label: "Profile",   eyebrow: "Your account" },
@@ -26,7 +25,6 @@ const mainItems: NavItem[] = [
 const tradingItems: NavItem[] = [
   { to: "/wallets",         icon: Wallet,        label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
   { to: "/trading-hub",     icon: TrendingUp,    label: "Trading Hub",     eyebrow: "Launch · Lobbies · Callouts" },
-  { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
 ];
 
 const socialItems: NavItem[] = [

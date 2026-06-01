@@ -10,6 +10,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -219,15 +220,21 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
     );
   }, [launches, searchQuery]);
 
+  const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0a0a0f] via-[#0d0d15] to-[#0a0a0f] px-4 py-6 md:py-10">
       <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#ab9ff2]/20 bg-[#ab9ff2]/5 px-4 py-1.5 mb-3">
-              <Rocket className="h-4 w-4 text-[#ab9ff2]" />
-              <span className="text-xs font-bold text-[#ab9ff2] uppercase tracking-widest">Token Launcher</span>
+            <div className="flex items-center gap-3 mb-3">
+              <button onClick={() => navigate("/trading-hub")} className="flex items-center justify-center h-8 w-8 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-white/60 hover:text-white">
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#ab9ff2]/20 bg-[#ab9ff2]/5 px-4 py-1.5">
+                <Rocket className="h-4 w-4 text-[#ab9ff2]" />
+                <span className="text-xs font-bold text-[#ab9ff2] uppercase tracking-widest">Token Launcher</span>
+              </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white">
               Launched Tokens

@@ -441,12 +441,17 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
     <Wrap>
       <div className="p-4 space-y-4 max-w-4xl mx-auto">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold font-display gradient-text flex items-center gap-2">
-              <Users className="h-5 w-5 text-[#22d3ee]" />
-              TRADING LOBBIES
-            </h1>
-            <p className="text-xs text-muted-foreground mt-1">Trade together. Watch together. Win together.</p>
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate("/trading-hub")} className="flex items-center justify-center h-8 w-8 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-white/60 hover:text-white">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold font-display gradient-text flex items-center gap-2">
+                <Users className="h-5 w-5 text-[#22d3ee]" />
+                TRADING LOBBIES
+              </h1>
+              <p className="text-xs text-muted-foreground mt-1">Trade together. Watch together. Win together.</p>
+            </div>
           </div>
           <Button onClick={() => setShowCreate(true)} className="btn-3d bg-gradient-to-r from-primary to-accent text-primary-foreground rounded-xl gap-1.5 text-xs">
             <Plus className="h-4 w-4" /> Create
