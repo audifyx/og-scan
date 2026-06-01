@@ -8,6 +8,7 @@ import {
   ArrowRight, Sparkles, Star
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,14 +38,72 @@ interface TokenAnalysis {
   links?: { website?: string; twitter?: string; telegram?: string; discord?: string; };
 }
 
+// Theme-aware accent: alternates between primary and secondary CSS vars so cards
+// automatically match whatever theme the user has selected.
 const TOOL_CARDS = [
-  { id: "rug-checker", name: "Rug Checker", description: "Comprehensive token safety analysis with on-chain data", icon: Shield, color: "text-[#22d3ee]", bg: "bg-[#22d3ee]/10 border-[#22d3ee]/20", active: true },
-  { id: "wallet-profiler", name: "Wallet Profiler", description: "Analyze any wallet's trading performance and patterns", icon: Wallet, color: "text-[#eab308]", bg: "bg-[#eab308]/10 border-[#eab308]/20", active: true },
-  { id: "holder-scanner", name: "Holder Scanner", description: "Deep dive into token holder distribution and whale concentration", icon: Users, color: "text-[#22d3ee]", bg: "bg-[#22d3ee]/10 border-[#22d3ee]/20", active: true },
-  { id: "liquidity-scanner", name: "Liquidity Scanner", description: "Check pool liquidity depth and LP token status", icon: Droplets, color: "text-[#eab308]", bg: "bg-[#eab308]/10 border-[#eab308]/20", active: true },
-  { id: "staking-calc", name: "Staking Calculator", description: "Calculate staking rewards and APY estimates", icon: Calculator, color: "text-[#22d3ee]", bg: "bg-[#22d3ee]/10 border-[#22d3ee]/20", active: true },
-  { id: "token-sniper", name: "Token Sniper", description: "Detect and snipe new token launches in real-time", icon: Crosshair, color: "text-[#eab308]", bg: "bg-[#eab308]/10 border-[#eab308]/20", active: true },
-  { id: "mev-tracker", name: "MEV Tracker", description: "Detect MEV activity and sandwich attacks", icon: Cpu, color: "text-[#22d3ee]", bg: "bg-[#22d3ee]/10 border-[#22d3ee]/20", active: true },
+  {
+    id: "rug-checker",
+    name: "Rug Checker",
+    description: "Comprehensive token safety analysis with on-chain data",
+    icon: Shield,
+    accent: "primary" as const,
+    category: "Security",
+    active: true,
+  },
+  {
+    id: "wallet-profiler",
+    name: "Wallet Profiler",
+    description: "Analyze any wallet's trading performance and patterns",
+    icon: Wallet,
+    accent: "secondary" as const,
+    category: "Analytics",
+    active: true,
+  },
+  {
+    id: "holder-scanner",
+    name: "Holder Scanner",
+    description: "Deep dive into token holder distribution and whale concentration",
+    icon: Users,
+    accent: "primary" as const,
+    category: "Analytics",
+    active: true,
+  },
+  {
+    id: "liquidity-scanner",
+    name: "Liquidity Scanner",
+    description: "Check pool liquidity depth and LP token status",
+    icon: Droplets,
+    accent: "secondary" as const,
+    category: "DeFi",
+    active: true,
+  },
+  {
+    id: "staking-calc",
+    name: "Staking Calc",
+    description: "Calculate staking rewards and APY estimates",
+    icon: Calculator,
+    accent: "primary" as const,
+    category: "Finance",
+    active: true,
+  },
+  {
+    id: "token-sniper",
+    name: "Token Sniper",
+    description: "Detect and snipe new token launches in real-time",
+    icon: Crosshair,
+    accent: "secondary" as const,
+    category: "Trading",
+    active: true,
+  },
+  {
+    id: "mev-tracker",
+    name: "MEV Tracker",
+    description: "Detect MEV activity and sandwich attacks",
+    icon: Cpu,
+    accent: "primary" as const,
+    category: "Security",
+    active: true,
+  },
 ];
 
 const Tools = () => {
@@ -177,31 +236,65 @@ const Tools = () => {
 
       <div className="p-4 lg:p-6 space-y-6">
 
-        {/* ── Tool Grid ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-          {TOOL_CARDS.map((tool) => (
-            <button
-              key={tool.id}
-              onClick={() => setActiveTool(tool.id)}
-              className={[
-                "relative group flex flex-col items-center gap-2.5 p-4 rounded-2xl border transition-all duration-200 text-left cursor-pointer hover:-translate-y-0.5",
-                activeTool === tool.id
-                  ? "border-[#22d3ee]/40 bg-[#22d3ee]/8 shadow-[0_0_24px_-8px_rgba(34,211,238,0.6)]"
-                  : "border-white/[0.07] bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]",
-              ].join(" ")}
-            >
+        {/* ── Tool Grid — iOS App Store style ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {TOOL_CARDS.map((tool) => {
+            const isActive = activeTool === tool.id;
+            const isPrimary = tool.accent === "primary";
+            return (
+              <button
+                key={tool.id}
+                onClick={() => setActiveTool(tool.id)}
+                className={cn(
+                  "group relative flex items-center gap-4 rounded-2xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98]",
+                  isActive
+                    ? "border-primary/40 bg-primary/[0.08] shadow-[0_0_28px_-10px_hsl(var(--primary)/0.7)]"
+                    : "border-white/[0.07] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.06]",
+                )}
+              >
+                {/* App icon */}
+                <div className={cn(
+                  "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border transition-all duration-200",
+                  isActive
+                    ? isPrimary
+                      ? "border-primary/40 bg-primary/20 shadow-[0_0_20px_-6px_hsl(var(--primary)/0.6)]"
+                      : "border-secondary/40 bg-secondary/20 shadow-[0_0_20px_-6px_hsl(var(--secondary)/0.6)]"
+                    : "border-white/10 bg-white/[0.05]",
+                )}>
+                  <tool.icon className={cn(
+                    "h-6 w-6 transition-colors",
+                    isActive
+                      ? isPrimary ? "text-primary" : "text-secondary"
+                      : "text-white/50 group-hover:text-white/75",
+                  )} />
+                </div>
 
-              <div className={`p-2.5 rounded-xl border ${tool.bg}`}>
-                <tool.icon className={`h-4 w-4 ${tool.color}`} />
-              </div>
-              <span className={`text-[11px] font-bold text-center leading-tight ${activeTool === tool.id ? "text-white" : "text-white/60"}`}>
-                {tool.name}
-              </span>
-              {activeTool === tool.id && (
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-full bg-[#22d3ee]" />
-              )}
-            </button>
-          ))}
+                {/* Text */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className={cn(
+                      "text-[13px] font-bold leading-tight truncate",
+                      isActive ? "text-white" : "text-white/80",
+                    )}>{tool.name}</p>
+                    <span className={cn(
+                      "shrink-0 rounded-full border px-1.5 py-px text-[9px] font-bold uppercase tracking-wider",
+                      isActive
+                        ? isPrimary
+                          ? "border-primary/40 bg-primary/15 text-primary"
+                          : "border-secondary/40 bg-secondary/15 text-secondary"
+                        : "border-white/10 bg-white/5 text-white/30",
+                    )}>{tool.category}</span>
+                  </div>
+                  <p className="text-[11px] text-white/40 leading-snug line-clamp-2">{tool.description}</p>
+                </div>
+
+                {/* Active indicator */}
+                {isActive && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* ── Rug Checker ── */}
