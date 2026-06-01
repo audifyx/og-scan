@@ -35,6 +35,8 @@ import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
 import SupportCenter from "./pages/SupportCenter";
+import SupportPage from "./pages/SupportPage";
+import { SupportNotificationBanner } from "./components/SupportNotificationBanner";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
@@ -101,6 +103,7 @@ const App = () => (
         <PresenceHeartbeat />
         <SecurityTracker />
         <IntercomSync />
+        <SupportNotificationBanner />
         <BrowserRouter>
           <Routes>
             {/* ── Public routes (no auth required) ── */}
@@ -202,7 +205,7 @@ const App = () => (
 
             {/* ── Public: Project/legal ── */}
             <Route path="/official-token" element={<OfficialToken />} />
-            <Route path="/support" element={<SupportCenter />} />
+            <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
             <Route path="/listen/:spaceId" element={<SpaceReplay />} />
             {/* ── Public: Live space listener (no auth required) ── */}
             <Route path="/space/:spaceId" element={<PublicSpaceListen />} />

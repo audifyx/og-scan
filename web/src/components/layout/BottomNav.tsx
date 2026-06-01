@@ -11,7 +11,7 @@ const navItems = [
   { to: "/app", icon: Home, label: "Home" },
   { to: "/community", icon: Users, label: "Community" },
   { to: "/tools", icon: Wrench, label: "Tools" },
-  { to: "/support", icon: MessageCircle, label: "Support", intercom: true },
+  { to: "/support", icon: MessageCircle, label: "Support" },
   { to: "/profile", icon: User, label: "Profile" },
 ];
 
@@ -93,6 +93,7 @@ const routeToNav: Record<string, string> = {
   /* Profile — account, settings, premium */
   "/profile": "/profile",
   "/settings": "/profile",
+  "/support": "/support",
 
   "/notifications": "/profile",
 
@@ -173,18 +174,6 @@ export const BottomNav = () => {
               "active:scale-[0.88] active:opacity-80",
               isActive ? "text-og-lime" : "text-white/35",
             );
-
-            if ((item as any).intercom) {
-              return (
-                <button
-                  key={item.to}
-                  onClick={() => { triggerHaptic(); (window as any).Intercom?.("show"); }}
-                  className={baseClass}
-                >
-                  {inner}
-                </button>
-              );
-            }
 
             return (
               <NavLink key={item.to} to={item.to} onClick={triggerHaptic} className={baseClass}>
