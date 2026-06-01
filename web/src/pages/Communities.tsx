@@ -5385,6 +5385,7 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
       const tweetMatch = cUrl.match(/status\/(\d+)/);
       const { data, error } = await supabase.from("community_raids").insert({
         created_by: user.id,
+        creator_id: user.id,
         title: cTitle.trim(),
         target_url: cUrl.trim(),
         goal_likes: parseInt(cLikes) || 200,
