@@ -31,7 +31,7 @@ const socialItems: NavItem[] = [
   // Invite — hidden from UI for now (route preserved at /invite)
   // { to: "/invite", icon: Gift, label: "Invite", eyebrow: "Referral contest" },
   { to: "/messages",        icon: Mail,          label: "Messages",        eyebrow: "Direct messages" },
-  { to: "/support",         icon: Headset,       label: "Support",         eyebrow: "Help & tickets" },
+  // { to: "/support", icon: Headset, label: "Support", eyebrow: "Help & tickets" }, // hidden
 ];
 
 // ── NavRow ────────────────────────────────────────────────────────────────

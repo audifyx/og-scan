@@ -187,7 +187,7 @@ export const AppSidebar = ({
     { id: "live-trading" as TabId, icon: Wallet, label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
     { id: "trading-hub" as TabId, icon: TrendingUp, label: "Trading Hub", eyebrow: "Launch · Lobbies · Callouts" },
     { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
-    { to: "/support", icon: Headset, label: "Support Chat", eyebrow: "Tickets + live help" },
+    // { to: "/support", icon: Headset, label: "Support Chat", eyebrow: "Tickets + live help" }, // hidden
     { id: "token-manager" as TabId, icon: Pencil, label: "Token Manager", eyebrow: "Free metadata update" },
   ];
 

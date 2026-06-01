@@ -11,7 +11,7 @@ const navItems = [
   { to: "/app", icon: Home, label: "Home" },
   { to: "/community", icon: Users, label: "Community" },
   { to: "/tools", icon: Wrench, label: "Tools" },
-  { to: "/support", icon: MessageCircle, label: "Support" },
+  // { to: "/support", icon: MessageCircle, label: "Support" }, // hidden
   { to: "/profile", icon: User, label: "Profile" },
 ];
 
@@ -93,7 +93,7 @@ const routeToNav: Record<string, string> = {
   /* Profile — account, settings, premium */
   "/profile": "/profile",
   "/settings": "/profile",
-  "/support": "/support",
+  // "/support": "/support", // hidden
 
   "/notifications": "/profile",
 
