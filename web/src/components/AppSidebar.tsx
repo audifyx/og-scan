@@ -55,6 +55,7 @@ type TabId =
   | "tools"
   | "profile"
   | "token-manager"
+  | "live-trading"
   | "live-feed-page"
   | "trading-hub";
 
@@ -183,7 +184,7 @@ export const AppSidebar = ({
   ];
 
   const tradingItems: NavItem[] = [
-    { to: "/wallets", icon: Wallet, label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
+    { id: "live-trading" as TabId, icon: Wallet, label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
     { id: "trading-hub" as TabId, icon: TrendingUp, label: "Trading Hub", eyebrow: "Launch · Lobbies · Callouts" },
     { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
     { to: "/support", icon: Headset, label: "Support Chat", eyebrow: "Tickets + live help" },
