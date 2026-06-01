@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Trophy, TrendingUp, Target, Crown, Medal, Award, UserCircle, Users,
   Flame, Zap, Star, Shield, ChevronUp, ChevronDown, Gift, Wallet, BarChart3,
+  Bell, Rocket, MessageSquare,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { safeAvatarUrl } from "@/lib/utils";
@@ -21,7 +22,7 @@ import { cn } from "@/lib/utils";
    Types & Constants
    ═══════════════════════════════════════════════════════════════ */
 
-type MainTab = "rankings" | "invites";
+type MainTab = "rankings" | "callers" | "invites";
 type SortKey = "xp" | "pnl" | "trades" | "volume" | "streak" | "reputation";
 
 interface TraderRow {
@@ -63,6 +64,19 @@ interface InviteLeaderRow {
   xp_earned: number;
   username?: string;
   avatar_url?: string;
+}
+
+interface CallerRow {
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+  total_calls: number;
+  token_calls: number;
+  wallet_calls: number;
+  last_call_at: string | null;
+  badge: string | null;
+  verified: boolean | null;
+  is_pioneer: boolean | null;
 }
 
 const SORT_OPTIONS: { key: SortKey; label: string; icon: typeof Trophy }[] = [
@@ -186,6 +200,61 @@ const Leaderboard = () => {
     enabled: mainTab === "invites",
   });
 
+  const { data: callerRows, isLoading: callersLoading } = useQuery<CallerRow[]>({
+    queryKey: ["callers-leaderboard"],
+    queryFn: async () => {
+      // Fetch recent callouts and aggregate by user_id
+      const { data, error } = await supabase
+        .from("callouts")
+        .select("user_id, type, created_at")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      if (!data || data.length === 0) return [];
+
+      // Aggregate
+      const map = new Map<string, { total: number; tokens: number; wallets: number; last: string }>();
+      for (const row of data) {
+        const uid: string = row.user_id;
+        if (!uid) continue;
+        const prev = map.get(uid) ?? { total: 0, tokens: 0, wallets: 0, last: row.created_at };
+        map.set(uid, {
+          total: prev.total + 1,
+          tokens: prev.tokens + (row.type === "token" ? 1 : 0),
+          wallets: prev.wallets + (row.type === "wallet" ? 1 : 0),
+          last: prev.last || row.created_at,
+        });
+      }
+
+      const ids = [...map.keys()];
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, username, avatar_url, badge, verified, is_pioneer")
+        .in("user_id", ids);
+      const profMap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+
+      return [...map.entries()]
+        .map(([uid, agg]) => {
+          const p = profMap.get(uid);
+          return {
+            user_id: uid,
+            username: p?.username || "Anonymous",
+            avatar_url: p?.avatar_url || null,
+            total_calls: agg.total,
+            token_calls: agg.tokens,
+            wallet_calls: agg.wallets,
+            last_call_at: agg.last,
+            badge: p?.badge || null,
+            verified: p?.verified ?? null,
+            is_pioneer: p?.is_pioneer ?? null,
+          };
+        })
+        .sort((a, b) => b.total_calls - a.total_calls);
+    },
+    staleTime: 30_000,
+    enabled: mainTab === "callers",
+  });
+
   const goToProfile = (userId: string) => {
     if (userId === user?.id) navigate("/profile");
     else navigate(`/profile/${userId}`);
@@ -208,9 +277,12 @@ const Leaderboard = () => {
       <div className="p-4 lg:p-6 space-y-6">
         <div className="space-y-3 rounded-3xl border border-white/[0.07] bg-white/[0.03] p-3 sm:p-4">
           <Tabs value={mainTab} onValueChange={v => setMainTab(v as MainTab)}>
-            <TabsList className="grid h-auto w-full grid-cols-2 bg-white/[0.04] p-1">
+            <TabsList className="grid h-auto w-full grid-cols-3 bg-white/[0.04] p-1">
               <TabsTrigger value="rankings" className="flex min-w-0 items-center justify-center gap-1.5 px-3 py-2 text-xs">
                 <Trophy className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Rankings</span>
+              </TabsTrigger>
+              <TabsTrigger value="callers" className="flex min-w-0 items-center justify-center gap-1.5 px-3 py-2 text-xs">
+                <Bell className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Top Callers</span>
               </TabsTrigger>
               <TabsTrigger value="invites" className="flex min-w-0 items-center justify-center gap-1.5 px-3 py-2 text-xs">
                 <Gift className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Invites</span>
@@ -234,6 +306,99 @@ const Leaderboard = () => {
             </Tabs>
           )}
         </div>
+
+        {/* ═══ TOP CALLERS LEADERBOARD ═══ */}
+        {mainTab === "callers" && (
+          <>
+            {/* Summary stats */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Total Callers", value: String(callerRows?.length ?? 0), icon: Users, color: "text-violet-400" },
+                { label: "Total Calls", value: (callerRows ?? []).reduce((s, r) => s + r.total_calls, 0).toLocaleString(), icon: Bell, color: "text-og-lime" },
+                { label: "Token Calls", value: (callerRows ?? []).reduce((s, r) => s + r.token_calls, 0).toLocaleString(), icon: Rocket, color: "text-og-cyan" },
+              ].map((s, i) => (
+                <div key={i} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <s.icon className={cn("h-4 w-4", s.color)} />
+                    <span className="text-[9px] font-black text-white/25 uppercase tracking-widest">{s.label}</span>
+                  </div>
+                  <p className={cn("text-2xl font-black font-mono", s.color)}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Top Callers table */}
+            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
+              <div className="hidden md:grid grid-cols-[3rem_1fr_5rem_5rem_5rem_7rem] gap-2 px-4 py-3 border-b border-white/[0.07] text-[9px] font-black text-white/25 uppercase tracking-widest">
+                <span>#</span><span>Caller</span><span>Total</span><span>Tokens</span><span>Wallets</span><span>Last Call</span>
+              </div>
+              <div className="divide-y divide-white/[0.04]">
+                {callersLoading ? (
+                  Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
+                ) : !callerRows || callerRows.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 px-6">
+                    <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
+                      <Bell className="h-7 w-7 text-white/20" />
+                    </div>
+                    <p className="text-sm font-bold text-white/50 mb-1">No callouts yet</p>
+                    <p className="text-xs text-white/25 text-center">Post a callout in the Trading Hub to appear here</p>
+                  </div>
+                ) : callerRows.map((row, i) => {
+                  const isMe = row.user_id === user?.id;
+                  const RIcon = i < 3 ? RANK_ICONS[i] : null;
+                  const lastCall = row.last_call_at
+                    ? new Date(row.last_call_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                    : "—";
+                  return (
+                    <div key={row.user_id}
+                      className={cn("flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] transition-all cursor-pointer", isMe && "bg-violet-500/[0.03] border-l-2 border-violet-500")}
+                      onClick={() => goToProfile(row.user_id)}>
+                      {/* Rank */}
+                      <div className="w-8 text-center shrink-0">
+                        {RIcon ? <RIcon className={cn("h-5 w-5 mx-auto", RANK_COLORS[i])} /> : <span className="text-sm font-mono font-bold text-white/30">{i + 1}</span>}
+                      </div>
+                      {/* Avatar + Name */}
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Avatar className="h-9 w-9 border border-border">
+                          <AvatarImage src={safeAvatarUrl(row.avatar_url)} />
+                          <AvatarFallback className="bg-muted text-xs font-mono">{(row.username ?? "?")[0]?.toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className={cn("font-semibold text-sm truncate", isMe && "text-violet-400")}>{row.username}</p>
+                            {row.is_pioneer && <Star className="h-3 w-3 text-[#eab308] shrink-0" />}
+                            {row.verified && <Shield className="h-3 w-3 text-blue-400 shrink-0" />}
+                          </div>
+                          {row.badge && <Badge variant="outline" className="text-[8px] border-primary/20 text-[#22d3ee] mt-0.5">{row.badge}</Badge>}
+                        </div>
+                      </div>
+                      {/* Stats — desktop */}
+                      <div className="hidden md:contents">
+                        <div className="w-12 text-center">
+                          <span className="text-sm font-black text-violet-300">{row.total_calls}</span>
+                        </div>
+                        <div className="w-12 text-center">
+                          <span className="text-xs font-mono text-og-cyan">{row.token_calls}</span>
+                        </div>
+                        <div className="w-12 text-center">
+                          <span className="text-xs font-mono text-og-lime">{row.wallet_calls}</span>
+                        </div>
+                        <div className="w-20 text-right">
+                          <span className="text-xs text-white/30">{lastCall}</span>
+                        </div>
+                      </div>
+                      {/* Stats — mobile */}
+                      <div className="md:hidden flex flex-col items-end gap-0.5">
+                        <span className="text-sm font-black text-violet-300">{row.total_calls} calls</span>
+                        <span className="text-[10px] text-white/30">{lastCall}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* ═══ INVITE LEADERBOARD ═══ */}
         {mainTab === "invites" && (
