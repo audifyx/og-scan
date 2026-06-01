@@ -35,7 +35,6 @@ async function signJwt(
   ];
   const signingInput = segments.join(".");
 
-  // Decode the base64url-encoded secret
   const padded = secret.replace(/-/g, "+").replace(/_/g, "/");
   const rawSecret = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
 
@@ -51,21 +50,22 @@ async function signJwt(
 }
 
 /**
- * Keeps the Intercom / Fin messenger in sync with the current auth state,
- * using JWT identity verification for logged-in users.
+ * Keeps Intercom / Fin in sync with auth state.
+ * index.html handles the initial boot via window.intercomSettings.
+ * This hook only updates identity when a user logs in/out.
  */
 export function useIntercom() {
   const { user, profile } = useAuth();
-  const bootedRef = useRef<string | null>(null); // tracks which user we've booted for
+  const identifiedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof window.Intercom !== "function") return;
     let cancelled = false;
 
-    async function boot() {
+    async function identify() {
       if (user) {
-        // Skip if already booted for this user
-        if (bootedRef.current === user.id) return;
+        // Already identified this user — skip
+        if (identifiedRef.current === user.id) return;
 
         const now = Math.floor(Date.now() / 1000);
         const jwt = await signJwt(
@@ -73,15 +73,15 @@ export function useIntercom() {
             user_id: user.id,
             email: user.email ?? undefined,
             iat: now,
-            exp: now + 3600, // 1 hour
+            exp: now + 3600,
           },
           API_SECRET,
         );
 
         if (cancelled) return;
 
-        window.Intercom("boot", {
-          api_base: "https://api-iam.intercom.io",
+        // Update Intercom with the logged-in user's identity
+        window.Intercom("update", {
           app_id: APP_ID,
           intercom_user_jwt: jwt,
           name:
@@ -89,37 +89,23 @@ export function useIntercom() {
             profile?.username ??
             user.email?.split("@")[0] ??
             undefined,
-          session_duration: 86400000, // 1 day
-          vertical_padding: 100,
         });
-        bootedRef.current = user.id;
+        identifiedRef.current = user.id;
       } else {
-        // Visitor mode
-        if (bootedRef.current !== null) {
+        // User logged out — reset to visitor
+        if (identifiedRef.current !== null) {
           window.Intercom("shutdown");
+          // Re-boot as visitor so launcher stays visible
+          window.Intercom("boot", {
+            api_base: "https://api-iam.intercom.io",
+            app_id: APP_ID,
+          });
+          identifiedRef.current = null;
         }
-        window.Intercom("boot", {
-          api_base: "https://api-iam.intercom.io",
-          app_id: APP_ID,
-          vertical_padding: 100,
-        });
-        bootedRef.current = null;
       }
     }
 
-    boot();
-
-    return () => {
-      cancelled = true;
-    };
+    identify();
+    return () => { cancelled = true; };
   }, [user, profile]);
-
-  // Shutdown on unmount
-  useEffect(() => {
-    return () => {
-      if (typeof window.Intercom === "function") {
-        window.Intercom("shutdown");
-      }
-    };
-  }, []);
 }
