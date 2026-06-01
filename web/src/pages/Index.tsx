@@ -105,6 +105,7 @@ const ChartsPage = lazy(importChartsPage);
 const LiveTradingPage = lazy(importLiveTradingPage);
 const LiveFeedPage = lazy(importLiveFeedPage);
 const TokenManagerPage = lazy(importTokenManagerPage);
+const TradingHubContent = lazy(() => import("./TradingHub").then(m => ({ default: m.TradingHubContent })));
 
 /* ─── 20x Feature imports ─── */
 const RugScore = lazy(() => import("@/components/scanner-20x/RugScore").then(m => ({ default: m.RugScore })));
@@ -197,7 +198,8 @@ type TabId =
   | "live-trading"
   | "live-feed-page"
   | "listings"
-  | "token-manager";
+  | "token-manager"
+  | "trading-hub";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
@@ -512,6 +514,17 @@ const TABS: TabConfig[] = [
     group: "Main",
   },
   {
+    id: "trading-hub",
+    label: "Trading Hub",
+    slug: "trading-hub",
+    pageNumber: 30,
+    eyebrow: "Pro Trading Suite",
+    description: "Token Launcher, Trading Lobbies, and Alpha Callouts — all in one place.",
+    Icon: TrendingUp,
+    accent: "lime",
+    group: "Main",
+  },
+  {
     id: "community",
     label: "Community",
     slug: "community",
@@ -636,6 +649,7 @@ const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
     "social-hub": "social",
     socialhub: "social",
     settings: "profile",
+    "trading-hub": "trading-hub",
   },
 );
 
@@ -695,6 +709,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "live-trading") return <LiveTradingPage />;
   if (tab === "live-feed-page") return <LiveFeedPage />;
   if (tab === "token-manager") return <TokenManagerPage />;
+  if (tab === "trading-hub") return <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}><TradingHubContent /></Suspense>;
   return null;
 };
 
@@ -1128,241 +1143,108 @@ const OverviewPage = ({
     { label: "Snipe Feed", Icon: Target, tab: "snipe-feed" as TabId, accent: "cyan" as TabAccent, desc: "New launches live" },
   ];
 
+  const spinnerSm = (color: string) => (
+    <div className="h-36 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center">
+      <div className={`h-4 w-4 border-2 ${color} border-t-transparent rounded-full animate-spin`} />
+    </div>
+  );
+
   return (
-    <div className="space-y-4 pb-6">
+    <div className="space-y-5 pb-6">
 
-      {/* ── HERO HEADER: Greeting + Active Mint ── */}
+      {/* ── HERO: greeting + avatar + scan bar ── */}
       <div className="relative overflow-hidden rounded-[1.75rem] border border-white/[0.09] bg-[#080e1a] p-5">
-        {/* ambient glow */}
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_0%_0%,hsl(var(--og-cyan)/0.14),transparent_50%),radial-gradient(ellipse_at_100%_100%,hsl(var(--og-lime)/0.10),transparent_50%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_0%_0%,hsl(var(--primary)/0.12),transparent_55%),radial-gradient(ellipse_at_100%_100%,hsl(var(--secondary)/0.08),transparent_55%)]" />
 
-        {/* Top row: greeting + avatar */}
-        <div className="relative flex items-start justify-between gap-3">
+        <div className="relative flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            {/* Logo or user avatar */}
             <div className="relative shrink-0">
               {profile?.avatar_url ? (
                 <img src={profile.avatar_url} alt="" className="h-12 w-12 rounded-2xl border border-white/15 object-cover" />
               ) : (
-                <div className="h-12 w-12 rounded-2xl border border-white/15 bg-white/[0.08] flex items-center justify-center text-xl font-black text-og-cyan">
+                <div className="h-12 w-12 rounded-2xl border border-white/15 bg-primary/10 flex items-center justify-center text-xl font-black text-primary">
                   {displayName[0]?.toUpperCase()}
                 </div>
               )}
-              {/* online dot */}
-              <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-og-lime border-2 border-[#080e1a]" />
+              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 border-2 border-[#080e1a]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-white/40 uppercase tracking-widest">{greeting}</p>
-              <h1 className="text-2xl font-black text-white truncate">{displayName} <span className="text-og-cyan">⚡</span></h1>
+              <p className="text-[10px] font-bold text-white/35 uppercase tracking-widest">{greeting}</p>
+              <h1 className="text-[22px] font-black text-white truncate leading-tight">{displayName}</h1>
             </div>
           </div>
-          {/* profile stats pill */}
           <div className="shrink-0 flex items-center gap-2">
             {profile?.current_level && (
-              <div className="flex items-center gap-1.5 rounded-xl border border-og-gold/25 bg-og-gold/[0.08] px-3 py-1.5">
-                <Trophy className="h-3.5 w-3.5 text-og-gold" />
-                <span className="text-[11px] font-black text-og-gold">LVL {profile.current_level}</span>
-              </div>
-            )}
-            {profile?.daily_streak && profile.daily_streak > 0 && (
-              <div className="flex items-center gap-1.5 rounded-xl border border-og-lime/25 bg-og-lime/[0.08] px-3 py-1.5">
-                <Flame className="h-3.5 w-3.5 text-og-lime" />
-                <span className="text-[11px] font-black text-og-lime">{profile.daily_streak}d</span>
+              <div className="flex items-center gap-1.5 rounded-xl border border-primary/25 bg-primary/[0.08] px-3 py-1.5">
+                <Trophy className="h-3 w-3 text-primary" />
+                <span className="text-[11px] font-black text-primary">LVL {profile.current_level}</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Active mint row */}
-        <div className="relative mt-4 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3">
+        {/* Scan bar */}
+        <div className="relative mt-4 flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-bold text-white/35 uppercase tracking-widest mb-0.5">Active Mint</p>
+            <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-0.5">Active Mint</p>
             <p className="font-mono text-sm font-black text-white truncate">{shortAddr(mint, 8)}</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onChangeMint}
-              className="h-9 px-3 rounded-xl border border-white/10 bg-white/[0.06] text-[11px] font-bold text-white/50 transition hover:bg-white/[0.1] hover:text-white"
-            >
-              Change
-            </button>
-            <button
-              type="button"
-              onClick={onScanClick}
-              className="h-9 px-4 rounded-xl bg-og-lime text-og-ink text-[12px] font-black transition hover:brightness-110 active:scale-95 flex items-center gap-1.5"
-            >
-              <Search className="h-3.5 w-3.5" />
-              Scan
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── FEATURE CARDS: 2x2 grid of main platform pillars ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[13px] font-black text-white uppercase tracking-widest">Platform</h2>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          {featureCards.map((card) => (
-            <button
-              key={card.title}
-              type="button"
-              onClick={() => card.communitySub ? openCommunitySub(card.communitySub) : onSwitchTab(card.tab)}
-              className={cn(
-                "group relative overflow-hidden rounded-[1.35rem] border border-white/[0.08] bg-gradient-to-br text-left transition hover:border-white/[0.14] active:scale-[0.97]",
-                card.gradient,
-                card.glow,
-              )}
-            >
-              <div className="p-4">
-                {/* icon + badge row */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl border", accentIcon(card.accent))}>
-                    <card.Icon className="h-5 w-5" />
-                  </div>
-                  <span className={cn(
-                    "rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border",
-                    card.accent === "gold" ? "border-og-gold/30 bg-og-gold/10 text-og-gold"
-                    : card.accent === "lime" ? "border-og-lime/30 bg-og-lime/10 text-og-lime"
-                    : "border-og-cyan/30 bg-og-cyan/10 text-og-cyan"
-                  )}>
-                    {card.badge}
-                  </span>
-                </div>
-                {/* eyebrow */}
-                <p className={cn("text-[9px] font-black uppercase tracking-[0.15em] mb-0.5", accentText(card.accent))}>{card.eyebrow}</p>
-                {/* title */}
-                <p className="text-[15px] font-black text-white leading-tight">{card.title}</p>
-                {/* desc */}
-                <p className="text-[10px] text-white/40 mt-1 leading-relaxed line-clamp-2">{card.desc}</p>
-              </div>
-              {/* arrow */}
-              <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition">
-                <ArrowUpRight className={cn("h-4 w-4", accentText(card.accent))} />
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── FORENSIC TOOLS: compact horizontal tool strip ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[13px] font-black text-white uppercase tracking-widest">Forensic Tools</h2>
           <button
             type="button"
-            onClick={() => onSwitchTab("tools")}
-            className="flex items-center gap-1 text-[11px] font-semibold text-white/35 transition hover:text-white/60"
+            onClick={onChangeMint}
+            className="h-8 px-3 rounded-xl border border-white/10 bg-white/[0.06] text-[11px] font-bold text-white/50 transition hover:bg-white/[0.1] hover:text-white"
           >
-            All tools <ChevronRight className="h-3 w-3" />
+            Change
           </button>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          {forensicTools.map((tool) => (
-            <button
-              key={tool.label}
-              type="button"
-              onClick={() => onSwitchTab(tool.tab)}
-              className="group flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3.5 text-left transition hover:bg-white/[0.05] hover:border-white/[0.12] active:scale-[0.98]"
-            >
-              <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border", accentIcon(tool.accent))}>
-                <tool.Icon className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[12px] font-black text-white truncate">{tool.label}</p>
-                <p className="text-[10px] text-white/40 truncate">{tool.desc}</p>
-              </div>
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={onScanClick}
+            className="h-8 px-4 rounded-xl bg-primary text-primary-foreground text-[12px] font-black transition hover:brightness-110 active:scale-95 flex items-center gap-1.5"
+          >
+            <Search className="h-3.5 w-3.5" />
+            Scan
+          </button>
         </div>
       </div>
 
-      {/* ── MARKET INTELLIGENCE: OGDaily + SmartWatchlist ── */}
+      {/* ── MARKET INTELLIGENCE ── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[13px] font-black text-white uppercase tracking-widest">Market Intelligence</h2>
-        </div>
+        <p className="text-[11px] font-black text-white/30 uppercase tracking-widest mb-3">Market Intelligence</p>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Suspense fallback={<div className="h-36 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}>
+          <Suspense fallback={spinnerSm("border-primary")}>
             <OGDaily onSelectMint={(m: string) => setPopupMint(m)} />
           </Suspense>
-          <Suspense fallback={<div className="h-36 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-lime border-t-transparent rounded-full animate-spin" /></div>}>
+          <Suspense fallback={spinnerSm("border-secondary")}>
             <SmartWatchlist onSelectMint={(m: string) => setPopupMint(m)} />
           </Suspense>
         </div>
       </div>
 
-      {/* ── ALPHA + LEADERBOARD ROW ── */}
+      {/* ── ALPHA + LEADERBOARD ── */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Suspense fallback={<div className="h-36 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-gold border-t-transparent rounded-full animate-spin" /></div>}>
+        <Suspense fallback={spinnerSm("border-og-gold")}>
           <AlphaCallouts onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
         </Suspense>
-        <Suspense fallback={<div className="h-36 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-lime border-t-transparent rounded-full animate-spin" /></div>}>
+        <Suspense fallback={spinnerSm("border-primary")}>
           <PlatformLeaderboard />
         </Suspense>
       </div>
 
-      {/* ── COMMUNITY QUICK ACCESS ── */}
+      {/* ── UTILITIES ── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[13px] font-black text-white uppercase tracking-widest">Community</h2>
-          <button
-            type="button"
-            onClick={() => onSwitchTab("community")}
-            className="flex items-center gap-1 text-[11px] font-semibold text-white/35 transition hover:text-white/60"
-          >
-            Open <ChevronRight className="h-3 w-3" />
-          </button>
+        <p className="text-[11px] font-black text-white/30 uppercase tracking-widest mb-3">Utilities</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Suspense fallback={spinnerSm("border-primary")}>
+            <PaperTrading onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
+          </Suspense>
+          <Suspense fallback={spinnerSm("border-secondary")}>
+            <CryptoCalendar />
+          </Suspense>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-          {communityLinks.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => openCommunitySub(item.sub)}
-              className="group shrink-0 flex flex-col items-center gap-2 rounded-[1.15rem] border border-white/[0.07] bg-white/[0.025] px-4 py-3.5 transition hover:bg-white/[0.05] hover:border-white/[0.12] hover:scale-[1.03] active:scale-95"
-            >
-              <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl border", accentIcon(item.accent))}>
-                <item.Icon className="h-5 w-5" />
-              </div>
-              <span className="text-[10px] font-bold text-white/55 group-hover:text-white transition-colors whitespace-nowrap">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── CHARTS: full-width section ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[13px] font-black text-white uppercase tracking-widest">Charts</h2>
-          <button
-            type="button"
-            onClick={() => onSwitchTab("charts")}
-            className="flex items-center gap-1 text-[11px] font-semibold text-white/35 transition hover:text-white/60"
-          >
-            Full view <ChevronRight className="h-3 w-3" />
-          </button>
-        </div>
-        <Suspense fallback={<div className="h-48 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-5 w-5 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}>
-          <MultiChartView onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
-        </Suspense>
-      </div>
-
-      {/* ── UTILITIES ROW ── */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Suspense fallback={<div className="h-32 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}>
-          <PaperTrading onSelectMint={(m: string) => { onSelectMint(m); onSwitchTab("scanner"); }} />
-        </Suspense>
-        <Suspense fallback={<div className="h-32 rounded-2xl border border-white/[0.07] bg-white/[0.02] flex items-center justify-center"><div className="h-4 w-4 border-2 border-og-cyan border-t-transparent rounded-full animate-spin" /></div>}>
-          <CryptoCalendar />
-        </Suspense>
       </div>
 
       <Suspense fallback={null}><QuickCalc /></Suspense>
 
-      {/* Token Detail Popup */}
       {popupToken && (
         <TokenDetailPopupWrapper
           token={popupToken}

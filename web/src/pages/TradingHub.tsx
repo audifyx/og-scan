@@ -1,5 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import { AppLayout } from "@/components/layout/AppLayout";
 import {
   Rocket, MessageSquare, Bell, ArrowRight, Zap, Users,
   TrendingUp, Radio, ChevronRight,
@@ -67,12 +66,11 @@ const hubs = [
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 
-export default function TradingHub() {
+// Named export for use inside the tab system (no layout wrapper)
+export function TradingHubContent() {
   const navigate = useNavigate();
-
   return (
-    <AppLayout>
-      <div className="min-h-screen px-4 py-8 lg:px-8">
+    <div className="px-4 py-8 lg:px-8">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="mb-10">
@@ -187,6 +185,8 @@ export default function TradingHub() {
         </div>
 
       </div>
-    </AppLayout>
   );
 }
+
+// Default export kept for any direct /trading-hub route
+export default TradingHubContent;
