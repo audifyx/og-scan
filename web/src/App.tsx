@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/hooks/useTheme";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { MaintenanceLock } from "@/components/MaintenanceLock";
 import { IntercomSync } from "@/components/IntercomSync";
+import { FinLauncher } from "@/components/FinLauncher";
 import BetaHome from "./pages/BetaHome";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -101,6 +102,7 @@ const App = () => (
         <PresenceHeartbeat />
         <SecurityTracker />
         <IntercomSync />
+        <FinLauncher />
         <BrowserRouter>
           <Routes>
             {/* ── Public routes (no auth required) ── */}
