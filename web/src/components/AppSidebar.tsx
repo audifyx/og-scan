@@ -157,7 +157,8 @@ export const AppSidebar = ({
   const primaryItems: NavItem[] = [
     { id: "overview", icon: Home, label: "Home", eyebrow: "Command hub" },
     { id: "our-coin", icon: Coins, label: "OUR COIN", eyebrow: "Official token room" },
-    { to: "/invite", icon: Gift, label: "Invite", eyebrow: "Referral contest" },
+    // Invite — hidden from UI for now (route preserved at /invite)
+    // { to: "/invite", icon: Gift, label: "Invite", eyebrow: "Referral contest" },
     { id: "community", icon: Users, label: "Community", eyebrow: "Social & Voice" },
     { id: "tools", icon: Wrench, label: "Tools", eyebrow: "Scanners & Feeds" },
     { id: "profile", icon: User, label: "Profile", eyebrow: "Your account" },

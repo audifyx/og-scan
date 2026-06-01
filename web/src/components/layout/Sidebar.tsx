@@ -30,7 +30,8 @@ const tradingItems: NavItem[] = [
 ];
 
 const socialItems: NavItem[] = [
-  { to: "/invite",          icon: Gift,          label: "Invite",          eyebrow: "Referral contest" },
+  // Invite — hidden from UI for now (route preserved at /invite)
+  // { to: "/invite", icon: Gift, label: "Invite", eyebrow: "Referral contest" },
   { to: "/messages",        icon: Mail,          label: "Messages",        eyebrow: "Direct messages" },
   { to: "/support",         icon: Headset,       label: "Support",         eyebrow: "Help & tickets" },
 ];
