@@ -1293,6 +1293,24 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
   const identityBadges = useMemo<IdentityBadge[]>(() => {
     const list: IdentityBadge[] = [];
+
+    // ── Universal defaults — every account gets these two ──
+    list.push({
+      key: "og",
+      label: "OG",
+      description: "Original Gangster — the founding badge given to every OG Scan member.",
+      tone: "gold",
+      icon: Star,
+    });
+    list.push({
+      key: "beta",
+      label: "Beta",
+      description: "Early beta tester badge given to all OG Scan signups.",
+      tone: "purple",
+      icon: Sparkles,
+    });
+
+    // ── Admin-assigned flags only — set via dashboard ──
     if (profileData?.verified) {
       list.push({
         key: "verified",
@@ -1306,15 +1324,15 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
       list.push({
         key: "owner",
         label: "Owner",
-        description: "Legendary owner identity treatment reserved for the platform owner account.",
+        description: "Legendary owner badge reserved for the platform owner account.",
         tone: "legendary",
         icon: Gem,
       });
     } else if (isOwnProfile && isAdmin) {
       list.push({
-        key: "admin-control",
+        key: "admin",
         label: "Admin",
-        description: "Admin control badge for accounts with elevated OG Scan access.",
+        description: "Admin badge for accounts with elevated OG Scan access.",
         tone: "gold",
         icon: ShieldCheck,
       });
@@ -1331,49 +1349,14 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
       list.push({
         key: "official-team",
         label: "Official Team",
-        description: "Gold affiliate/team status connected to an official org.",
+        description: "Gold affiliate/team badge connected to an official org.",
         tone: "gold",
         icon: BadgeCheck,
       });
     }
-    if (profileData?.is_pioneer) {
-      list.push({
-        key: "beta",
-        label: "Early Beta",
-        description: "Purple pioneer badge for early platform users.",
-        tone: "purple",
-        icon: Sparkles,
-      });
-    }
-    if (walletAddress) {
-      list.push({
-        key: "holder",
-        label: "Holder Verified",
-        description: "Green wallet-linked identity badge once a holder wallet is attached.",
-        tone: "green",
-        icon: Wallet,
-      });
-    }
-    if ((leaderboardRank != null && leaderboardRank <= 25) || (profileData?.trades_count ?? 0) >= 15) {
-      list.push({
-        key: "top-caller",
-        label: "Top Caller",
-        description: "Red performance badge derived from leaderboard placement and trade/call activity.",
-        tone: "red",
-        icon: Flame,
-      });
-    }
-    if ((profileData?.current_level ?? 0) >= 42 || userBadges.some((badge) => badge.rarity?.toLowerCase().includes("legend"))) {
-      list.push({
-        key: "legendary-og",
-        label: "Legendary OG",
-        description: "Holographic prestige badge unlocked by high progression or legendary badge rarity.",
-        tone: "legendary",
-        icon: Gem,
-      });
-    }
+
     return list;
-  }, [isAdmin, isOwnProfile, isOwner, leaderboardRank, profileData?.affiliate_org_id, profileData?.current_level, profileData?.is_official_account, profileData?.is_pioneer, profileData?.trades_count, profileData?.verified, userBadges, walletAddress]);
+  }, [isAdmin, isOwnProfile, isOwner, profileData?.affiliate_org_id, profileData?.is_official_account, profileData?.verified]);
 
   const roleTags = identityBadges.slice(0, 5);
   const goldVerified = isGoldVerifiedProfile(profileData, Boolean(isOwnProfile && isOwner));
