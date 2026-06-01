@@ -1,33 +1,30 @@
 /**
- * SupportPage — iOS Messages-style support chat.
+ * SupportPage — on-site support chat.
  *
- * Users  → see only their own ticket thread
- * Agents (role: admin or support) → see all tickets, pick any to reply
+ * Users  → open/continue a ticket, see which agents are online
+ * Agents (admin or support role) → inbox with all tickets, reply from here
+ *
+ * Layout: uses AppLayout so BottomNav and Sidebar are always visible.
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { formatDistanceToNow, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
-  ArrowLeft, CheckCheck, ChevronRight, Circle,
-  Loader2, Send, Shield, Sparkles, X,
+  ArrowLeft, CheckCheck, Loader2, Send, Shield,
 } from "lucide-react";
 
 /* ─── helpers ─── */
 const ago = (d: string) => formatDistanceToNow(new Date(d), { addSuffix: true });
 const stamp = (d: string) => format(new Date(d), "h:mm a");
-const isOnline = (p: any) => {
+const isOnline = (p: AgentProfile) => {
   if (!p) return false;
   if (p.is_online === false) return false;
   const t = p.last_active_at || p.last_seen_at;
   if (!t) return Boolean(p.is_online);
-  return Date.now() - new Date(t).getTime() < 3 * 60 * 1000; // 3 min window
-};
-const lastSeenText = (p: any) => {
-  const t = p?.last_active_at || p?.last_seen_at;
-  if (!t) return "Offline";
-  return `Last seen ${ago(t)}`;
+  return Date.now() - new Date(t).getTime() < 3 * 60 * 1000;
 };
 
 /* ─── types ─── */
@@ -65,7 +62,7 @@ interface AgentProfile {
 }
 
 /* ═══════════════════════════════════════════════════════ */
-/* USER VIEW — single thread                               */
+/* USER VIEW                                               */
 /* ═══════════════════════════════════════════════════════ */
 function UserChat({ agents }: { agents: AgentProfile[] }) {
   const { user, profile } = useAuth();
@@ -98,7 +95,6 @@ function UserChat({ agents }: { agents: AgentProfile[] }) {
         .eq("ticket_id", data.id)
         .order("created_at");
       setMessages(msgs || []);
-      // Mark user unreads as read
       await supabase.from("support_tickets").update({ unread_user: 0 }).eq("id", data.id);
     }
   }, [user]);
@@ -168,75 +164,75 @@ function UserChat({ agents }: { agents: AgentProfile[] }) {
   };
 
   if (loading) return (
-    <div className="flex items-center justify-center h-64">
+    <div className="flex items-center justify-center py-20">
       <Loader2 className="h-6 w-6 animate-spin text-white/20" />
     </div>
   );
 
-  /* New chat screen */
+  /* ── New conversation screen ── */
   if (!ticket) return (
-    <div className="flex flex-col h-full">
-      {/* Agent bar */}
-      <div className="px-4 py-3 border-b border-white/[0.06]">
-        <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Support Team</p>
-        <div className="flex gap-3">
-          {agents.slice(0, 5).map(a => (
-            <div key={a.user_id} className="flex flex-col items-center gap-1">
-              <div className="relative">
-                {a.avatar_url
-                  ? <img src={a.avatar_url} className="h-10 w-10 rounded-full border border-white/10 object-cover" />
-                  : <div className="h-10 w-10 rounded-full bg-og-lime/20 flex items-center justify-center text-og-lime font-bold text-sm">{(a.display_name || a.username || "?")[0].toUpperCase()}</div>}
-                <span className={cn("absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background", isOnline(a) ? "bg-green-400" : "bg-white/20")} />
+    <div className="px-4 pb-4">
+      {/* Agent avatars */}
+      {agents.length > 0 && (
+        <div className="mb-6">
+          <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-3">Support Team</p>
+          <div className="flex gap-4 flex-wrap">
+            {agents.slice(0, 6).map(a => (
+              <div key={a.user_id} className="flex flex-col items-center gap-1.5">
+                <div className="relative">
+                  {a.avatar_url
+                    ? <img src={a.avatar_url} className="h-12 w-12 rounded-full border border-white/10 object-cover" />
+                    : <div className="h-12 w-12 rounded-full bg-og-lime/20 flex items-center justify-center text-og-lime font-bold text-base">{(a.display_name || a.username || "?")[0].toUpperCase()}</div>}
+                  <span className={cn("absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background", isOnline(a) ? "bg-green-400" : "bg-white/20")} />
+                </div>
+                <span className="text-[10px] text-white/40 truncate max-w-[50px]">{a.display_name || a.username}</span>
               </div>
-              <span className="text-[9px] text-white/30 truncate max-w-[40px]">{a.display_name || a.username}</span>
-            </div>
-          ))}
-          {agents.length === 0 && <p className="text-xs text-white/20">No agents online</p>}
+            ))}
+          </div>
+          {onlineAgents.length > 0 && (
+            <p className="text-[11px] text-green-400/70 mt-3">● {onlineAgents.length} agent{onlineAgents.length > 1 ? "s" : ""} online — we reply fast</p>
+          )}
         </div>
-        {onlineAgents.length > 0 && (
-          <p className="text-[10px] text-green-400/70 mt-2">● {onlineAgents.length} agent{onlineAgents.length > 1 ? "s" : ""} online — we reply fast</p>
-        )}
+      )}
+
+      {/* Start message */}
+      <div className="text-center mb-5">
+        <p className="text-3xl mb-2">👋</p>
+        <h2 className="font-bold text-white text-xl">How can we help?</h2>
+        <p className="text-xs text-white/35 mt-1">Send us a message and we'll get back to you fast.</p>
       </div>
-      {/* New message */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-4">
-        <div className="text-center">
-          <p className="text-2xl mb-1">👋</p>
-          <h2 className="font-bold text-white text-lg">How can we help?</h2>
-          <p className="text-xs text-white/35 mt-1">Send us a message and we'll get back to you fast.</p>
-        </div>
-        <div className="w-full max-w-sm space-y-3">
-          <textarea
-            value={subject}
-            onChange={e => setSubject(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), createTicket())}
-            placeholder="Describe your issue…"
-            rows={3}
-            className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-white/20 resize-none focus:outline-none focus:border-og-cyan/30"
-          />
-          <button
-            onClick={createTicket}
-            disabled={!subject.trim() || sending}
-            className="w-full rounded-2xl bg-og-lime text-black font-bold text-sm py-3 disabled:opacity-40 hover:bg-og-lime/90 transition-colors"
-          >
-            {sending ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Start Conversation"}
-          </button>
-        </div>
+      <div className="space-y-3">
+        <textarea
+          value={subject}
+          onChange={e => setSubject(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), createTicket())}
+          placeholder="Describe your issue…"
+          rows={4}
+          className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-white/20 resize-none focus:outline-none focus:border-og-lime/30"
+        />
+        <button
+          onClick={createTicket}
+          disabled={!subject.trim() || sending}
+          className="w-full rounded-2xl bg-og-lime text-black font-bold text-sm py-3.5 disabled:opacity-40 hover:bg-og-lime/90 transition-colors"
+        >
+          {sending ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : "Start Conversation"}
+        </button>
       </div>
     </div>
   );
 
-  /* Thread view */
+  /* ── Active thread view ── */
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3">
+    <div className="flex flex-col">
+      {/* Thread header */}
+      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3 sticky top-0 bg-background/95 backdrop-blur-sm z-10">
         <div className="flex -space-x-2">
           {agents.slice(0, 3).map(a => (
             <div key={a.user_id} className="relative">
               {a.avatar_url
-                ? <img src={a.avatar_url} className="h-8 w-8 rounded-full border-2 border-background object-cover" />
-                : <div className="h-8 w-8 rounded-full border-2 border-background bg-og-lime/20 flex items-center justify-center text-og-lime text-xs font-bold">{(a.display_name || a.username || "?")[0].toUpperCase()}</div>}
-              <span className={cn("absolute bottom-0 right-0 h-2 w-2 rounded-full border border-background", isOnline(a) ? "bg-green-400" : "bg-white/20")} />
+                ? <img src={a.avatar_url} className="h-9 w-9 rounded-full border-2 border-background object-cover" />
+                : <div className="h-9 w-9 rounded-full border-2 border-background bg-og-lime/20 flex items-center justify-center text-og-lime text-xs font-bold">{(a.display_name || a.username || "?")[0].toUpperCase()}</div>}
+              <span className={cn("absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background", isOnline(a) ? "bg-green-400" : "bg-white/20")} />
             </div>
           ))}
         </div>
@@ -248,7 +244,7 @@ function UserChat({ agents }: { agents: AgentProfile[] }) {
               : "We'll reply soon"}
           </p>
         </div>
-        <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full",
+        <span className={cn("text-[9px] font-bold px-2.5 py-1 rounded-full",
           ticket.status === "open" ? "bg-yellow-400/10 text-yellow-400"
           : ticket.status === "in_progress" ? "bg-og-cyan/10 text-og-cyan"
           : "bg-white/5 text-white/30"
@@ -258,8 +254,8 @@ function UserChat({ agents }: { agents: AgentProfile[] }) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        <p className="text-center text-[10px] text-white/20">{ticket.subject}</p>
+      <div className="px-4 py-4 space-y-3">
+        <p className="text-center text-[10px] text-white/20 mb-4">{ticket.subject}</p>
         {messages.map((m, i) => {
           const isMe = !m.is_admin;
           const showTime = i === messages.length - 1 || new Date(messages[i + 1]?.created_at).getTime() - new Date(m.created_at).getTime() > 5 * 60 * 1000;
@@ -280,8 +276,8 @@ function UserChat({ agents }: { agents: AgentProfile[] }) {
                 )}
                 <div className={cn("px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
                   isMe
-                    ? "bg-og-lime text-black rounded-br-md"
-                    : "bg-white/[0.07] text-white rounded-bl-md"
+                    ? "bg-og-lime text-black rounded-br-sm"
+                    : "bg-white/[0.07] text-white rounded-bl-sm"
                 )}>
                   {m.content}
                 </div>
@@ -299,7 +295,7 @@ function UserChat({ agents }: { agents: AgentProfile[] }) {
       </div>
 
       {/* Input */}
-      <div className="px-3 py-3 border-t border-white/[0.06] flex items-end gap-2 pb-[env(safe-area-inset-bottom,12px)]">
+      <div className="px-3 pt-2 pb-4 border-t border-white/[0.06] flex items-end gap-2 sticky bottom-0 bg-background/95 backdrop-blur-sm">
         <div className="flex-1 relative">
           <textarea
             value={text}
@@ -324,7 +320,7 @@ function UserChat({ agents }: { agents: AgentProfile[] }) {
 }
 
 /* ═══════════════════════════════════════════════════════ */
-/* AGENT VIEW — ticket list + thread                       */
+/* AGENT VIEW — ticket list                                */
 /* ═══════════════════════════════════════════════════════ */
 function AgentTicketList({ onSelect }: { onSelect: (t: Ticket) => void }) {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -352,9 +348,8 @@ function AgentTicketList({ onSelect }: { onSelect: (t: Ticket) => void }) {
   const filters: Array<"open" | "in_progress" | "all"> = ["open", "in_progress", "all"];
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-4 pt-4 pb-2">
-        <h1 className="text-lg font-black text-white mb-3">Support Inbox</h1>
+    <div>
+      <div className="px-4 pt-2 pb-3">
         <div className="flex gap-1.5">
           {filters.map(f => (
             <button key={f} onClick={() => setFilter(f)}
@@ -367,43 +362,41 @@ function AgentTicketList({ onSelect }: { onSelect: (t: Ticket) => void }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <Loader2 className="h-5 w-5 animate-spin text-white/20" />
-          </div>
-        ) : tickets.length === 0 ? (
-          <div className="text-center py-16 text-white/20">
-            <p className="text-2xl mb-2">✨</p>
-            <p className="text-sm">No {filter === "all" ? "" : filter} tickets</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-white/[0.04]">
-            {tickets.map(t => (
-              <button key={t.id} onClick={() => onSelect(t)}
-                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.03] transition-colors text-left">
-                <div className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-br from-og-lime/20 to-og-cyan/20 flex items-center justify-center text-white font-bold text-sm border border-white/[0.06]">
-                  {(t.username || "?")[0].toUpperCase()}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-5 w-5 animate-spin text-white/20" />
+        </div>
+      ) : tickets.length === 0 ? (
+        <div className="text-center py-16 text-white/20">
+          <p className="text-3xl mb-2">✨</p>
+          <p className="text-sm">No {filter === "all" ? "" : filter} tickets</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-white/[0.04]">
+          {tickets.map(t => (
+            <button key={t.id} onClick={() => onSelect(t)}
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.03] transition-colors text-left">
+              <div className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-br from-og-lime/20 to-og-cyan/20 flex items-center justify-center text-white font-bold text-sm border border-white/[0.06]">
+                {(t.username || "?")[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-0.5">
+                  <p className="text-sm font-semibold text-white truncate">{t.username}</p>
+                  <p className="text-[10px] text-white/25 shrink-0 ml-2">
+                    {t.last_message_at ? ago(t.last_message_at) : ago(t.created_at)}
+                  </p>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <p className="text-sm font-semibold text-white truncate">{t.username}</p>
-                    <p className="text-[10px] text-white/25 shrink-0 ml-2">
-                      {t.last_message_at ? ago(t.last_message_at) : ago(t.created_at)}
-                    </p>
-                  </div>
-                  <p className="text-xs text-white/40 truncate">{t.last_message || t.subject}</p>
-                </div>
-                {(t.unread_agent ?? 0) > 0 && (
-                  <span className="shrink-0 h-5 min-w-[20px] rounded-full bg-og-lime text-black text-[10px] font-black flex items-center justify-center px-1">
-                    {t.unread_agent}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+                <p className="text-xs text-white/40 truncate">{t.last_message || t.subject}</p>
+              </div>
+              {(t.unread_agent ?? 0) > 0 && (
+                <span className="shrink-0 h-5 min-w-[20px] rounded-full bg-og-lime text-black text-[10px] font-black flex items-center justify-center px-1">
+                  {t.unread_agent}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -462,10 +455,10 @@ function AgentThread({ ticket, agents, onBack }: { ticket: Ticket; agents: Agent
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-3 py-3 border-b border-white/[0.06] flex items-center gap-3">
-        <button onClick={onBack} className="text-white/40 hover:text-white p-1">
+    <div className="flex flex-col">
+      {/* Header with back */}
+      <div className="px-3 py-3 border-b border-white/[0.06] flex items-center gap-3 sticky top-0 bg-background/95 backdrop-blur-sm z-10">
+        <button onClick={onBack} className="text-white/40 hover:text-white p-1 -ml-1">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="h-9 w-9 shrink-0 rounded-full bg-gradient-to-br from-og-lime/20 to-og-cyan/20 flex items-center justify-center text-white font-bold text-sm border border-white/[0.06]">
@@ -481,7 +474,7 @@ function AgentThread({ ticket, agents, onBack }: { ticket: Ticket; agents: Agent
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div className="px-4 py-4 space-y-3">
         {messages.map((m, i) => {
           const isAgent = m.is_admin;
           const showTime = i === messages.length - 1 || new Date(messages[i + 1]?.created_at).getTime() - new Date(m.created_at).getTime() > 5 * 60 * 1000;
@@ -505,8 +498,8 @@ function AgentThread({ ticket, agents, onBack }: { ticket: Ticket; agents: Agent
                 )}
                 <div className={cn("px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
                   isAgent
-                    ? "bg-og-lime text-black rounded-br-md"
-                    : "bg-white/[0.07] text-white rounded-bl-md"
+                    ? "bg-og-lime text-black rounded-br-sm"
+                    : "bg-white/[0.07] text-white rounded-bl-sm"
                 )}>
                   {m.content}
                 </div>
@@ -521,7 +514,7 @@ function AgentThread({ ticket, agents, onBack }: { ticket: Ticket; agents: Agent
       </div>
 
       {/* Input */}
-      <div className="px-3 py-3 border-t border-white/[0.06] flex items-end gap-2 pb-[env(safe-area-inset-bottom,12px)]">
+      <div className="px-3 pt-2 pb-4 border-t border-white/[0.06] flex items-end gap-2 sticky bottom-0 bg-background/95 backdrop-blur-sm">
         <div className="flex-1">
           <textarea
             value={text}
@@ -558,9 +551,7 @@ export default function SupportPage() {
   useEffect(() => {
     if (!user) { setChecking(false); return; }
     Promise.all([
-      // Check if current user is an agent
       supabase.from("admin_roles").select("role").eq("user_id", user.id).maybeSingle(),
-      // Load all agent profiles
       supabase.from("admin_roles").select("user_id, role").in("role", ["admin", "support"]),
     ]).then(async ([roleRes, agentsRes]) => {
       const role = roleRes.data?.role;
@@ -578,21 +569,33 @@ export default function SupportPage() {
     });
   }, [user?.id]);
 
-  if (checking) return (
-    <div className="flex items-center justify-center h-64">
-      <Loader2 className="h-6 w-6 animate-spin text-white/20" />
-    </div>
-  );
-
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] bg-background">
-      {isAgent ? (
-        selectedTicket
-          ? <AgentThread ticket={selectedTicket} agents={agents} onBack={() => setSelectedTicket(null)} />
-          : <AgentTicketList onSelect={setSelectedTicket} />
-      ) : (
-        <UserChat agents={agents} />
-      )}
-    </div>
+    <AppLayout>
+      <div className="max-w-xl mx-auto">
+        {/* Page header */}
+        <div className="px-4 pt-5 pb-4 border-b border-white/[0.06]">
+          <h1 className="text-xl font-black text-white">
+            {isAgent ? "Support Inbox" : "Support"}
+          </h1>
+          {isAgent && (
+            <p className="text-[11px] text-og-lime/60 mt-0.5 font-semibold">Agent View</p>
+          )}
+        </div>
+
+        {checking ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-6 w-6 animate-spin text-white/20" />
+          </div>
+        ) : isAgent ? (
+          selectedTicket
+            ? <AgentThread ticket={selectedTicket} agents={agents} onBack={() => setSelectedTicket(null)} />
+            : <AgentTicketList onSelect={setSelectedTicket} />
+        ) : (
+          <div className="pt-5">
+            <UserChat agents={agents} />
+          </div>
+        )}
+      </div>
+    </AppLayout>
   );
 }
