@@ -1,4 +1,4 @@
-import { Home, Users, Wrench, User, Globe, Rocket } from "lucide-react";
+import { Home, Users, Wrench, User, Globe, Rocket, MessageCircle } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ const navItems = [
   { to: "/app", icon: Home, label: "Home" },
   { to: "/community", icon: Users, label: "Community" },
   { to: "/tools", icon: Wrench, label: "Tools" },
+  { to: "/support", icon: MessageCircle, label: "Support", intercom: true },
   { to: "/profile", icon: User, label: "Profile" },
 ];
 
@@ -142,18 +143,8 @@ export const BottomNav = () => {
         <div className="flex items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom,0px)] pt-1.5">
           {navItems.map((item) => {
             const isActive = activeTo === item.to;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={triggerHaptic}
-                className={cn(
-                  "flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 transition-all duration-200",
-                  "active:scale-[0.88] active:opacity-80",
-                  isActive ? "text-og-lime" : "text-white/35",
-                )}
-              >
-                {/* Icon container */}
+            const inner = (
+              <>
                 <div className={cn(
                   "flex items-center justify-center w-11 h-8 rounded-xl transition-all duration-200",
                   isActive
@@ -168,14 +159,36 @@ export const BottomNav = () => {
                     strokeWidth={isActive ? 2.5 : 1.5}
                   />
                 </div>
-
-                {/* Label */}
                 <span className={cn(
                   "text-[9px] font-bold uppercase tracking-wider leading-none transition-all duration-200",
                   isActive ? "opacity-100" : "opacity-60",
                 )}>
                   {item.label}
                 </span>
+              </>
+            );
+
+            const baseClass = cn(
+              "flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 transition-all duration-200",
+              "active:scale-[0.88] active:opacity-80",
+              isActive ? "text-og-lime" : "text-white/35",
+            );
+
+            if ((item as any).intercom) {
+              return (
+                <button
+                  key={item.to}
+                  onClick={() => { triggerHaptic(); (window as any).Intercom?.("show"); }}
+                  className={baseClass}
+                >
+                  {inner}
+                </button>
+              );
+            }
+
+            return (
+              <NavLink key={item.to} to={item.to} onClick={triggerHaptic} className={baseClass}>
+                {inner}
               </NavLink>
             );
           })}
