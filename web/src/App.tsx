@@ -33,6 +33,7 @@ import OfficialToken from "./pages/OfficialToken";
 import PumpV5 from "./pages/PumpV5";
 import Launch from "./pages/Launch";
 import Callouts from "./pages/Callouts";
+import TradingHub from "./pages/TradingHub";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
 import LiveTrading from "./pages/LiveTrading";
@@ -179,6 +180,7 @@ const App = () => (
             <Route path="/ai-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
             <Route path="/alpha-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
             {/* Webhooks removed */}
+            <Route path="/trading-hub" element={<ProtectedRoute><TradingHub /></ProtectedRoute>} />
             <Route path="/callouts" element={<ProtectedRoute><Callouts /></ProtectedRoute>} />
 
             {/* ── Protected: Community ── */}

@@ -485,7 +485,7 @@ const Profile = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-[600px] mx-auto">
+      <div className="w-full">
 
         {/* ── BANNER + AVATAR ──────────────────────────────────────────────── */}
         <div className="relative">

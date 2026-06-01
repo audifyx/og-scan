@@ -12,6 +12,7 @@ import {
   Pencil,
   MessageSquare,
   Shield,
+  TrendingUp,
   Trophy,
   User,
   Users,
@@ -164,10 +165,7 @@ export const AppSidebar = ({
 
   const tradingItems: NavItem[] = [
     { to: "/wallets", icon: Wallet, label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
-    // Charts hidden from UI (redundant with Phantom Trading Terminal)
-    // { to: "/charts", icon: LineChart, label: "Charts", eyebrow: "Live charts" },
-    { to: "/callouts", icon: Bell, label: "Callouts", eyebrow: "Trade alerts" },
-    { to: "/trading-lobbies", icon: MessageSquare, label: "Trading Lobbies", eyebrow: "Voice + charts" },
+    { to: "/trading-hub", icon: TrendingUp, label: "Trading Hub", eyebrow: "Launch · Lobbies · Callouts" },
     { to: "/leaderboard", icon: Trophy, label: "Leaderboard", eyebrow: "Top traders" },
     { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
     { to: "/support", icon: Headset, label: "Support Chat", eyebrow: "Tickets + live help" },
