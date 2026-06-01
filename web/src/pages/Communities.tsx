@@ -858,7 +858,7 @@ const Communities = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto relative">
+    <div className="w-full relative">
       {/* ─── Top Nav ─── */}
       <TopNav
         mainView={mainView}
@@ -1003,10 +1003,14 @@ function TopNav({
       {!selectedPost && !selectedCommunity && (
         <div className="flex border-b border-white/[0.04]">
           {([
-            { id: "home" as MainView, label: "Home", icon: <Home className="h-4 w-4" /> },
-            { id: "explore" as MainView, label: "Explore", icon: <Search className="h-4 w-4" /> },
-            { id: "x_posts" as MainView, label: "𝕏 Feed", icon: <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> },
-            { id: "smart_money" as MainView, label: "Smart $", icon: <Zap className="h-4 w-4" /> },
+            { id: "home" as MainView, label: "OG Feed", icon: (
+              <span className="flex items-center justify-center w-4 h-4 rounded-md bg-og-lime/20 border border-og-lime/30 shrink-0">
+                <span className="text-[7px] font-black text-og-lime leading-none">OG</span>
+              </span>
+            )},
+            { id: "explore" as MainView, label: "Explore", icon: <Search className="h-3.5 w-3.5" /> },
+            { id: "x_posts" as MainView, label: "𝕏 Feed", icon: <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> },
+            { id: "smart_money" as MainView, label: "Smart $", icon: <Zap className="h-3.5 w-3.5 shrink-0" /> },
           ]).map(tab => (
             <button
               key={tab.id}
@@ -1016,7 +1020,10 @@ function TopNav({
                 mainView === tab.id ? "text-white" : "text-white/30 hover:text-white/50"
               )}
             >
-              {tab.label}
+              <span className="flex items-center justify-center gap-1.5">
+                {tab.icon}
+                <span className="text-xs font-semibold">{tab.label}</span>
+              </span>
               {mainView === tab.id && (
                 <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-og-cyan shadow-[0_0_8px_hsl(var(--og-cyan)/0.6)]" />
               )}
