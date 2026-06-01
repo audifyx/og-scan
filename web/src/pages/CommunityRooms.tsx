@@ -461,7 +461,7 @@ function MessageRow({
               <Plus className="h-3.5 w-3.5" />
             </button>
             {emojiPickerOpen && (
-              <div className={cn("absolute z-40 w-[280px] rounded-2xl border border-white/10 bg-[#11111a] p-2 shadow-2xl", isOwn ? "right-0 top-10" : "left-0 top-10")}>
+              <div className={cn("absolute z-40 w-[280px] rounded-2xl border border-white/10 bg-popover p-2 shadow-2xl", isOwn ? "right-0 top-10" : "left-0 top-10")}>
                 <div className="mb-1 flex items-center justify-between px-1">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Reactions</span>
                   <button onClick={() => setEmojiPickerOpen(false)} className="rounded p-0.5 text-white/30 hover:text-white"><X className="h-3 w-3" /></button>
@@ -486,7 +486,7 @@ function MessageRow({
               </div>
             )}
             {menuOpen && (
-              <div className={cn("absolute z-30 min-w-[190px] rounded-2xl border border-white/10 bg-[#11111a] p-1.5 shadow-2xl", isOwn ? "right-0 top-10" : "left-0 top-10")}>
+              <div className={cn("absolute z-30 min-w-[190px] rounded-2xl border border-white/10 bg-popover p-1.5 shadow-2xl", isOwn ? "right-0 top-10" : "left-0 top-10")}>
                 <button onClick={() => { onToggleSave(msg); setMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs text-white/60 hover:bg-white/[0.05] hover:text-white">
                   {isSaved ? <Check className="h-3.5 w-3.5 text-og-gold" /> : <Bookmark className="h-3.5 w-3.5" />} {isSaved ? "Saved" : "Save message"}
                 </button>
@@ -1301,7 +1301,7 @@ const CommunityRooms: React.FC = () => {
             {canModerate && member.user_id !== user?.id && member.role !== "owner" && (
               <div className="mt-2 flex gap-1">
                 <button onClick={() => setModTarget(member)} className="flex-1 rounded-lg bg-white/[0.04] px-2 py-1 text-[10px] font-bold text-white/45 hover:text-white">Manage</button>
-                <select value={member.role} onChange={event => updateMemberRole(member, event.target.value as RoomRole)} className="rounded-lg border border-white/[0.06] bg-[#10131a] px-2 py-1 text-[10px] text-white/50">
+                <select value={member.role} onChange={event => updateMemberRole(member, event.target.value as RoomRole)} className="rounded-lg border border-white/[0.06] bg-card px-2 py-1 text-[10px] text-white/50">
                   {(["admin", "moderator", "helper", "verified", "member"] as RoomRole[]).map(role => <option key={role} value={role}>{role}</option>)}
                 </select>
               </div>
@@ -1348,8 +1348,8 @@ const CommunityRooms: React.FC = () => {
   ) : null;
 
   return (
-    <div className="flex h-full overflow-hidden bg-[#08090d] text-white">
-      <aside className="flex w-[310px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0d0f15] max-md:w-[92px]">
+    <div className="flex h-full overflow-hidden bg-background text-white">
+      <aside className="flex w-[310px] shrink-0 flex-col border-r border-white/[0.06] bg-card max-md:w-[92px]">
         <div className="flex items-center gap-2 border-b border-white/[0.06] p-3">
           <button onClick={() => navigate(-1)} className="rounded-lg p-2 text-white/35 hover:bg-white/[0.05] hover:text-white">
             <ChevronLeft className="h-4 w-4" />
@@ -1414,7 +1414,7 @@ const CommunityRooms: React.FC = () => {
       <main className="flex min-w-0 flex-1 flex-col">
         {activeRoom ? (
           <>
-            <header className="border-b border-white/[0.06] bg-[#08090d]/92 backdrop-blur">
+            <header className="border-b border-white/[0.06] bg-background/92 backdrop-blur">
               {activeRoom.banner_url && <img src={activeRoom.banner_url} alt="" className="h-20 w-full object-cover opacity-70" />}
               <div className="flex items-center gap-3 px-4 py-3">
                 <RoomIcon room={activeRoom} />
@@ -1517,8 +1517,8 @@ const CommunityRooms: React.FC = () => {
                     <div className="flex -space-x-1.5">
                       {[...typingUsers.entries()].slice(0, 3).map(([uid, info]) => (
                         info.avatar_url
-                          ? <img key={uid} src={info.avatar_url} alt="" className="h-5 w-5 rounded-full border border-[#0d0f15] object-cover" />
-                          : <div key={uid} className="flex h-5 w-5 items-center justify-center rounded-full border border-[#0d0f15] bg-white/10 text-[8px] font-bold text-white/50">{(info.username || "?")[0].toUpperCase()}</div>
+                          ? <img key={uid} src={info.avatar_url} alt="" className="h-5 w-5 rounded-full border border-card object-cover" />
+                          : <div key={uid} className="flex h-5 w-5 items-center justify-center rounded-full border border-card bg-white/10 text-[8px] font-bold text-white/50">{(info.username || "?")[0].toUpperCase()}</div>
                       ))}
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px] text-white/30">
@@ -1574,11 +1574,11 @@ const CommunityRooms: React.FC = () => {
 
               {sidePanel && sidePanelContent && (
                 <>
-                  <aside className="hidden w-[320px] shrink-0 overflow-y-auto border-l border-white/[0.06] bg-[#0d0f15] p-4 lg:block">
+                  <aside className="hidden w-[320px] shrink-0 overflow-y-auto border-l border-white/[0.06] bg-card p-4 lg:block">
                     {sidePanelContent}
                   </aside>
                   <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/78 p-4 pb-[calc(env(safe-area-inset-bottom,0px)+88px)] pt-[max(env(safe-area-inset-top,0px),16px)] backdrop-blur-sm lg:hidden" onClick={() => setSidePanel(null)}>
-                    <div className="relative flex max-h-[min(78vh,calc(100vh-132px))] w-full max-w-[420px] flex-col overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#0d0f15] shadow-[0_30px_90px_rgba(0,0,0,0.55)]" onClick={event => event.stopPropagation()}>
+                    <div className="relative flex max-h-[min(78vh,calc(100vh-132px))] w-full max-w-[420px] flex-col overflow-hidden rounded-[30px] border border-white/[0.08] bg-card shadow-[0_30px_90px_rgba(0,0,0,0.55)]" onClick={event => event.stopPropagation()}>
                       <div className="relative border-b border-white/[0.06] px-5 pb-3 pt-5 text-center">
                         <p className="text-[10px] font-black uppercase tracking-[0.32em] text-white/28">{sidePanelLabel}</p>
                         <button onClick={() => setSidePanel(null)} className="absolute right-4 top-4 rounded-lg p-1.5 text-white/35 hover:bg-white/[0.05] hover:text-white">
@@ -1607,7 +1607,7 @@ const CommunityRooms: React.FC = () => {
 
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-white/[0.1] bg-[#11131b] p-5 shadow-2xl">
+          <div className="w-full max-w-lg rounded-2xl border border-white/[0.1] bg-popover p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-black text-white">Create Group Chat</h3>
@@ -1647,7 +1647,7 @@ const CommunityRooms: React.FC = () => {
 
       {showAttachModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-[#11131b] p-5 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-popover p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-black text-white">Attach Media or File</h3>
@@ -1678,7 +1678,7 @@ const CommunityRooms: React.FC = () => {
 
       {modTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-[#11131b] p-5 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-white/[0.1] bg-popover p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-black text-white">Manage Member</h3>

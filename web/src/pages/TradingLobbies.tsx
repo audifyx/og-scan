@@ -306,7 +306,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
                 className="w-full bg-muted/20 border border-border/30 rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30"
               />
               {chartResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d1627] border border-white/10 rounded-lg shadow-2xl z-50 max-h-48 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-white/10 rounded-lg shadow-2xl z-50 max-h-48 overflow-y-auto">
                   {chartResults.map((pair: any, i: number) => (
                     <button key={i} onClick={() => updateChart(pair)} className="w-full text-left p-2 hover:bg-primary/10 flex justify-between text-xs transition-colors">
                       <span className="font-semibold">{pair.baseToken.symbol}/{pair.quoteToken.symbol}</span>
@@ -398,7 +398,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
                       className="w-full bg-muted/20 border border-border/30 rounded-xl px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/30"
                     />
                     {chartResults.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d1627] border border-white/10 rounded-lg shadow-2xl z-50 max-h-48 overflow-y-auto">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-white/10 rounded-lg shadow-2xl z-50 max-h-48 overflow-y-auto">
                         {chartResults.map((pair: any, i: number) => (
                           <button key={i} onClick={() => updateChart(pair)} className="w-full text-left p-2 hover:bg-primary/10 flex justify-between text-xs">
                             <span className="font-semibold">{pair.baseToken.symbol}/{pair.quoteToken.symbol}</span>
@@ -447,7 +447,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
             </button>
             <div>
               <h1 className="text-xl font-bold font-display gradient-text flex items-center gap-2">
-                <Users className="h-5 w-5 text-[#22d3ee]" />
+                <Users className="h-5 w-5 text-primary" />
                 TRADING LOBBIES
               </h1>
               <p className="text-xs text-muted-foreground mt-1">Trade together. Watch together. Win together.</p>
@@ -567,7 +567,7 @@ const TradingLobbies = ({ inline = false }: { inline?: boolean }) => {
 const MembersPanel = ({ members, creatorId }: { members: LobbyMember[]; creatorId: string }) => (
   <div className="og-glass-card rounded-xl p-4 h-full overflow-auto">
     <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-      <Users className="h-4 w-4 text-[#22d3ee]" />
+      <Users className="h-4 w-4 text-primary" />
       Active Members ({members.length})
     </h3>
     <div className="space-y-2">

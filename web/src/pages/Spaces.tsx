@@ -508,7 +508,7 @@ const CreateSpaceModal = ({ onClose, onCreated, user, profile }: {
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto pt-10 pb-20 sm:pb-6 px-4">
       <div className="fixed inset-0 bg-black/80 backdrop-blur-xl" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg bg-[#0c1219] rounded-3xl border border-white/[0.08] shadow-2xl shadow-black/40 overflow-hidden flex flex-col sp-slide-up" style={{ maxHeight: "calc(100vh - 7rem)" }}>
+      <div className="relative w-full sm:max-w-lg bg-card rounded-3xl border border-white/[0.08] shadow-2xl shadow-black/40 overflow-hidden flex flex-col sp-slide-up" style={{ maxHeight: "calc(100vh - 7rem)" }}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-white/[0.06] relative shrink-0">
           <div>
@@ -713,7 +713,7 @@ const PersonCard = ({ username, avatarUrl, isYou, isSpeaking, isHost, online = t
         )}
       </div>
       {online && (
-        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0f18]" />
+        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-background" />
       )}
       {isHost && (
         <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center">
@@ -1360,7 +1360,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
               {showMore && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setShowMore(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-52 bg-[#0c1219] border border-white/[0.08] rounded-xl shadow-2xl z-30 overflow-hidden sp-slide-up">
+                  <div className="absolute right-0 top-full mt-1 w-52 bg-card border border-white/[0.08] rounded-xl shadow-2xl z-30 overflow-hidden sp-slide-up">
                     <button onClick={() => { setShowHostPanel(!showHostPanel); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-primary hover:bg-primary/5 transition"><Shield className="h-4 w-4" /> Host Controls</button>
                     <button onClick={() => { setShowPollCreate(true); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 transition"><BarChart3 className="h-4 w-4" /> Create Poll</button>
                     <button onClick={() => { setShowQA(!showQA); setShowMore(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-purple-400/80 hover:bg-purple-500/5 transition"><MessageCircleQuestion className="h-4 w-4" /> Q&A Mode</button>
@@ -1537,7 +1537,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
                 const tweet = `🎙️ I'm live on OGScan Spaces!\n\n"${space.title}"\n\nAnyone can listen — no login needed:\n${window.location.origin}/space/${space.id}\n\n#OGScan #CryptoSpaces`;
                 window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, "_blank", "width=600,height=500");
               }}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#1d9bf0]/10 border border-[#1d9bf0]/20 text-[#1d9bf0] text-[10px] font-bold hover:bg-[#1d9bf0]/20 transition w-full justify-center"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold hover:bg-primary/20 transition w-full justify-center"
             >
               <Twitter className="h-3.5 w-3.5" /> Announce on X
             </button>
@@ -1866,7 +1866,7 @@ const CreatePollInline = ({ onCreate, onCancel }: { onCreate: (p: SpacePoll) => 
   const updateOpt = (i: number, v: string) => { const c = [...opts]; c[i] = v; setOpts(c); };
   const valid = q.trim() && opts.filter(o => o.trim()).length >= 2;
   return (
-    <div className="mx-4 mt-2 rounded-2xl border border-primary/20 bg-[#0c1219] p-4 sp-slide-up">
+    <div className="mx-4 mt-2 rounded-2xl border border-primary/20 bg-card p-4 sp-slide-up">
       <p className="text-xs font-bold text-primary mb-3 flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Create Live Poll</p>
       <Input placeholder="Your question..." value={q} onChange={e => setQ(e.target.value)} className="bg-white/[0.04] border-white/[0.08] rounded-xl mb-3 text-sm" />
       <div className="space-y-2 mb-3">
@@ -2056,16 +2056,16 @@ const MicIllustration = ({ size = 160, className = "" }: { size?: number; classN
     <svg viewBox="0 0 80 100" className="relative z-10" style={{ width: size * 0.5, height: size * 0.6 }}>
       <defs>
         <linearGradient id="micGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.7" />
+          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.7" />
         </linearGradient>
         <linearGradient id="micShine" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#93c5fd" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
         </linearGradient>
       </defs>
       {/* Stand base */}
-      <ellipse cx="40" cy="92" rx="20" ry="5" fill="#1e3a5f" opacity="0.5" />
+      <ellipse cx="40" cy="92" rx="20" ry="5" fill="hsl(var(--primary) / 0.2)" opacity="0.5" />
       {/* Stand */}
       <rect x="37" y="68" width="6" height="20" rx="3" fill="#2563eb" opacity="0.4" />
       {/* Mic head */}
@@ -2110,11 +2110,11 @@ const EmptyMicIllustration = () => (
     <svg viewBox="0 0 80 100" className="relative z-10 w-20 h-24">
       <defs>
         <linearGradient id="emicGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.9" />
+          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.9" />
           <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.7" />
         </linearGradient>
       </defs>
-      <ellipse cx="40" cy="93" rx="22" ry="5" fill="#1e3a5f" opacity="0.4" />
+      <ellipse cx="40" cy="93" rx="22" ry="5" fill="hsl(var(--primary) / 0.2)" opacity="0.4" />
       <rect x="37" y="68" width="6" height="22" rx="3" fill="#4338ca" opacity="0.4" />
       <rect x="22" y="10" width="36" height="52" rx="18" fill="url(#emicGrad)" />
       {[22, 28, 34, 40, 46].map(y => (
@@ -2248,7 +2248,7 @@ const OnlineUsersBanner = () => {
                 )}
               </div>
               {/* Green online dot */}
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#0a0f18]" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-background" />
 
               {/* Tooltip on hover */}
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 rounded-lg bg-black/90 border border-white/10 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
@@ -2687,7 +2687,7 @@ const Spaces = () => {
           <svg className="absolute right-0 top-0 h-full w-2/3 opacity-30" viewBox="0 0 400 300" preserveAspectRatio="none">
             <defs>
               <linearGradient id="waveGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
+                <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.4" />
                 <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.1" />
               </linearGradient>
             </defs>

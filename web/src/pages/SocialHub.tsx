@@ -181,10 +181,10 @@ const SocialHub = () => {
      ═══════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-[#0a1018]">
+    <div className="flex h-full w-full overflow-hidden bg-background">
       {/* LEFT — Channel Sidebar */}
       <div className={cn(
-        "flex flex-col border-r border-white/[0.06] bg-[#0c1320] transition-all duration-200",
+        "flex flex-col border-r border-white/[0.06] bg-card transition-all duration-200",
         sidebarCollapsed ? "w-0 overflow-hidden md:w-14" : "w-56 min-w-[14rem]",
         "hidden md:flex",
       )}>
@@ -251,7 +251,7 @@ const SocialHub = () => {
                       alt="" className="h-6 w-6 rounded-full object-cover"
                       onError={(e) => { (e.target as HTMLImageElement).src = dicebear("fallback"); }}
                     />
-                    <span className="absolute -bottom-px -right-px h-2 w-2 rounded-full border border-[#0c1320] bg-og-lime" />
+                    <span className="absolute -bottom-px -right-px h-2 w-2 rounded-full border border-card bg-og-lime" />
                   </div>
                   <span className="truncate text-[10px] font-medium text-white/50">
                     {m.user_id === user?.id ? "You" : m.username || "Anon"}
@@ -271,7 +271,7 @@ const SocialHub = () => {
                 alt="" className="h-8 w-8 rounded-full border border-white/10 object-cover"
                 onError={(e) => { (e.target as HTMLImageElement).src = dicebear("me"); }}
               />
-              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#0c1320] bg-og-lime" />
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-card bg-og-lime" />
             </div>
             {!sidebarCollapsed && (
               <div className="min-w-0 flex-1">
@@ -286,7 +286,7 @@ const SocialHub = () => {
       {/* CENTER — Main Content (includes mobile channel bar) */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile channel bar */}
-        <div className="flex gap-1 overflow-x-auto border-b border-white/[0.07] bg-[#0c1320] px-3 py-2 scrollbar-none md:hidden">
+        <div className="flex gap-1 overflow-x-auto border-b border-white/[0.07] bg-card px-3 py-2 scrollbar-none md:hidden">
           {CHANNELS.map((ch) => {
             const isActive = activeChannel === ch.id;
             const Icon = ch.icon;
@@ -326,7 +326,7 @@ const SocialHub = () => {
       </div>
 
       {/* RIGHT — Active Members (desktop) */}
-      <div className="hidden w-56 flex-col border-l border-white/[0.06] bg-[#0c1320] lg:flex">
+      <div className="hidden w-56 flex-col border-l border-white/[0.06] bg-card lg:flex">
         <div className="border-b border-white/[0.07] px-4 py-3">
           <h3 className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/30">
             Members — {enrichedMembers.length}
@@ -347,7 +347,7 @@ const SocialHub = () => {
                       alt="" className="h-7 w-7 rounded-full object-cover"
                       onError={(e) => { (e.target as HTMLImageElement).src = dicebear("fallback"); }}
                     />
-                    <span className="absolute -bottom-px -right-px h-2 w-2 rounded-full border border-[#0c1320] bg-og-lime" />
+                    <span className="absolute -bottom-px -right-px h-2 w-2 rounded-full border border-card bg-og-lime" />
                   </div>
                   <span className="truncate text-[10px] font-semibold text-white/60">
                     {m.user_id === user?.id ? "You" : m.username || "Anon"}
@@ -428,7 +428,7 @@ const ActivityFeed = ({ members, activeMembersList, onlineCount, onSwitchChannel
                     alt="" className="h-11 w-11 rounded-full border-2 border-og-lime/30 object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).src = dicebear("fb"); }}
                   />
-                  <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#0a1018] bg-og-lime" />
+                  <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background bg-og-lime" />
                 </div>
                 <span className="max-w-[56px] truncate text-[9px] font-semibold text-white/50">
                   {m.user_id === user?.id ? "You" : m.username || "Anon"}
@@ -1296,7 +1296,7 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
                           <img src={avatarSrc(members.find(m => m.user_id === p.identity)?.avatar_url || (p.isLocal ? profile?.avatar_url : null), p.name)} alt="" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = dicebear(p.name); }} />
                         </div>
                         <span className={cn(
-                          "absolute bottom-0 right-0 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#0a1018]",
+                          "absolute bottom-0 right-0 flex h-4 w-4 items-center justify-center rounded-full border-2 border-background",
                           p.isMuted ? "bg-red-500" : p.isSpeaking ? "bg-og-lime" : "bg-white/20",
                         )}>
                           {p.isMuted ? <MicOff className="h-2 w-2 text-white" /> : <Mic className="h-2 w-2 text-white" />}
@@ -1335,7 +1335,7 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <img src={avatarSrc(m.avatar_url, m.username || m.user_id)} alt="" className={cn("h-9 w-9 rounded-full border object-cover", m.is_online ? "border-og-lime/30" : "border-white/10 grayscale-[50%]")} onError={(e) => { (e.target as HTMLImageElement).src = dicebear("fb"); }} />
-                      <span className={cn("absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#0a1018]", m.is_online ? "bg-og-lime" : "bg-white/15")} />
+                      <span className={cn("absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background", m.is_online ? "bg-og-lime" : "bg-white/15")} />
                     </div>
                     <div>
                       <span className="text-xs font-bold text-primary">@{m.username || "Anon"}</span>
