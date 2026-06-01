@@ -334,18 +334,18 @@ const getProgress = (xp: number | null | undefined, level: number | null | undef
 const getBadgeToneClasses = (tone: IdentityBadge["tone"]) => {
   switch (tone) {
     case "gold":
-      return "border-amber-300/35 bg-[linear-gradient(135deg,rgba(251,191,36,0.2),rgba(245,158,11,0.09))] text-amber-100 shadow-[0_0_28px_-14px_rgba(251,191,36,0.9)]";
+      return "border-amber-300/50 bg-[linear-gradient(135deg,rgba(251,191,36,0.28),rgba(245,158,11,0.12))] text-amber-100 shadow-[0_0_18px_-6px_rgba(251,191,36,0.85),inset_0_1px_0_rgba(251,191,36,0.15)]";
     case "purple":
-      return "border-violet-300/35 bg-[linear-gradient(135deg,rgba(167,139,250,0.2),rgba(124,58,237,0.09))] text-violet-100 shadow-[0_0_28px_-14px_rgba(167,139,250,0.9)]";
+      return "border-violet-300/50 bg-[linear-gradient(135deg,rgba(167,139,250,0.28),rgba(124,58,237,0.12))] text-violet-100 shadow-[0_0_18px_-6px_rgba(167,139,250,0.85),inset_0_1px_0_rgba(167,139,250,0.15)]";
     case "green":
-      return "border-emerald-300/35 bg-[linear-gradient(135deg,rgba(52,211,153,0.2),rgba(20,184,166,0.09))] text-emerald-100 shadow-[0_0_28px_-14px_rgba(52,211,153,0.9)]";
+      return "border-emerald-300/50 bg-[linear-gradient(135deg,rgba(52,211,153,0.28),rgba(20,184,166,0.12))] text-emerald-100 shadow-[0_0_18px_-6px_rgba(52,211,153,0.85),inset_0_1px_0_rgba(52,211,153,0.15)]";
     case "red":
-      return "border-rose-300/35 bg-[linear-gradient(135deg,rgba(251,113,133,0.2),rgba(225,29,72,0.09))] text-rose-100 shadow-[0_0_28px_-14px_rgba(251,113,133,0.9)]";
+      return "border-rose-300/50 bg-[linear-gradient(135deg,rgba(251,113,133,0.28),rgba(225,29,72,0.12))] text-rose-100 shadow-[0_0_18px_-6px_rgba(251,113,133,0.85),inset_0_1px_0_rgba(251,113,133,0.15)]";
     case "legendary":
-      return "border-fuchsia-200/45 bg-[linear-gradient(135deg,rgba(236,72,153,0.22),rgba(34,211,238,0.15),rgba(251,191,36,0.14))] text-white shadow-[0_0_38px_-15px_rgba(217,70,239,0.95)]";
+      return "border-fuchsia-200/60 bg-[linear-gradient(135deg,rgba(236,72,153,0.30),rgba(34,211,238,0.20),rgba(251,191,36,0.18))] text-white shadow-[0_0_24px_-6px_rgba(217,70,239,1),inset_0_1px_0_rgba(255,255,255,0.18)]";
     case "blue":
     default:
-      return "border-sky-300/35 bg-[linear-gradient(135deg,rgba(56,189,248,0.2),rgba(14,165,233,0.09))] text-sky-100 shadow-[0_0_28px_-14px_rgba(56,189,248,0.9)]";
+      return "border-sky-300/50 bg-[linear-gradient(135deg,rgba(56,189,248,0.28),rgba(14,165,233,0.12))] text-sky-100 shadow-[0_0_18px_-6px_rgba(56,189,248,0.85),inset_0_1px_0_rgba(56,189,248,0.15)]";
   }
 };
 
@@ -609,20 +609,24 @@ function EmptyState({
 
 function IdentityBadgeChip({ badge }: { badge: IdentityBadge }) {
   const Icon = badge.icon;
+  const isLegendary = badge.tone === "legendary";
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
           className={cn(
-            "inline-flex h-6 w-6 items-center justify-center rounded-full border transition duration-300 hover:brightness-110",
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition duration-300 hover:brightness-110 hover:scale-[1.04] active:scale-[0.97]",
+            isLegendary && "animate-pulse-subtle",
             getBadgeToneClasses(badge.tone),
           )}
         >
-          <Icon className="h-3.5 w-3.5" />
-                  </button>
+          <Icon className="h-3 w-3 shrink-0" />
+          <span className="text-[10px] font-bold tracking-wide uppercase leading-none">{badge.label}</span>
+        </button>
       </TooltipTrigger>
-      <TooltipContent className="max-w-[220px] rounded-md border-white/10 bg-[#08101b] px-3 py-2 text-xs leading-5 text-white/80">
+      <TooltipContent className="max-w-[220px] rounded-xl border-white/10 bg-[#08101b]/95 px-3 py-2 text-xs leading-5 text-white/80 backdrop-blur-sm">
+        <p className="font-semibold text-white mb-0.5">{badge.label}</p>
         {badge.description}
       </TooltipContent>
     </Tooltip>
@@ -1466,7 +1470,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
   return (
     <TooltipProvider delayDuration={120}>
-      <div className="mx-auto w-full max-w-[680px] pb-16">
+      <div className="w-full pb-16">
         <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 bg-black/85 px-4 backdrop-blur-xl">
           <button
             type="button"

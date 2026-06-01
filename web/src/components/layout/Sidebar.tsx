@@ -1,6 +1,6 @@
 import {
   Bell, Gift, Headset, LineChart, LogOut, Mail,
-  MessageSquare, Settings, Trophy, Rocket,
+  MessageSquare, Settings, Trophy, Rocket, TrendingUp,
   User, Wallet, X, Shield, Menu, Users, Wrench, Home,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
@@ -25,10 +25,7 @@ const mainItems: NavItem[] = [
 
 const tradingItems: NavItem[] = [
   { to: "/wallets",         icon: Wallet,        label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
-  // Charts hidden from UI (redundant with Phantom Trading Terminal)
-  // { to: "/charts", icon: LineChart, label: "Charts", eyebrow: "Live charts" },
-  { to: "/callouts",        icon: Bell,          label: "Callouts",        eyebrow: "Trade alerts" },
-  { to: "/trading-lobbies", icon: MessageSquare, label: "Trading Lobbies", eyebrow: "Voice + charts" },
+  { to: "/trading-hub",     icon: TrendingUp,    label: "Trading Hub",     eyebrow: "Launch · Lobbies · Callouts" },
   { to: "/leaderboard",     icon: Trophy,        label: "Leaderboard",     eyebrow: "Top traders" },
 ];
 
