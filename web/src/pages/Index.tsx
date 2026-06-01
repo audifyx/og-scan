@@ -652,6 +652,9 @@ const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
     socialhub: "social",
     settings: "profile",
     "trading-hub": "trading-hub",
+    wallets: "live-trading",
+    "phantom-trade": "live-trading",
+    "phantom-trading": "live-trading",
   },
 );
 

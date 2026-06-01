@@ -577,52 +577,99 @@ const SupportCenter = () => {
   }
 
   /* ═══ Ticket list ═══ */
-  const openCount = tickets.filter((t) => t.status === "open").length;
+  const openCount       = tickets.filter((t) => t.status === "open").length;
   const inProgressCount = tickets.filter((t) => t.status === "in_progress").length;
+  const resolvedCount   = tickets.filter((t) => t.status === "resolved").length;
 
   return (
     <AppLayout>
       <div className="mx-auto max-w-4xl px-4 py-8">
-        {/* ── Hero ── */}
-        <div className="mb-8 rounded-3xl border border-border/50 bg-gradient-to-br from-primary/8 via-card to-card p-6 sm:p-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/25 bg-primary/15 text-primary">
-                <Headset className="h-7 w-7" />
+
+        {/* ══════════════════════════════════════════════════════════════
+            AGENT / ADMIN HERO  (shown only to support agents & owner)
+        ══════════════════════════════════════════════════════════════ */}
+        {isSupportAgent ? (
+          <div className="mb-8">
+            {/* Header row */}
+            <div className="rounded-3xl border border-violet-500/20 bg-gradient-to-br from-violet-600/10 via-card to-card p-6 sm:p-8">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-500/15 text-violet-300">
+                    <Inbox className="h-7 w-7" />
+                    {openCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-[10px] font-black text-black">
+                        {openCount > 9 ? "9+" : openCount}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-2xl font-black text-foreground">Support Inbox</h1>
+                      <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-violet-300">
+                        Agent View
+                      </span>
+                    </div>
+                    <p className="text-[13px] text-muted-foreground/60 mt-0.5">
+                      Manage all user support requests
+                    </p>
+                  </div>
+                </div>
+
+                {/* Online agents badge */}
+                <div className="flex items-center gap-2 rounded-2xl border border-border/40 bg-muted/30 px-4 py-2.5">
+                  <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+                  <span className="text-[12px] font-semibold text-foreground/70">
+                    You're online
+                  </span>
+                  <Shield className="h-3.5 w-3.5 text-violet-300 ml-1" />
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-black text-foreground">Support Center</h1>
-                <p className="text-[13px] text-muted-foreground/60 mt-0.5">
-                  {onlineAgents.length > 0
-                    ? <span className="text-green-400 font-semibold">● {onlineAgents.length} agent{onlineAgents.length > 1 ? "s" : ""} online</span>
-                    : "Usually replies within 24 hours"}
-                </p>
+
+              {/* Stats row */}
+              <div className="mt-6 grid grid-cols-4 gap-3">
+                {[
+                  { label: "Open",     value: openCount,       color: "text-amber-300",  bg: "bg-amber-400/10 border-amber-400/20" },
+                  { label: "Live",     value: inProgressCount, color: "text-primary",    bg: "bg-primary/10 border-primary/20" },
+                  { label: "Resolved", value: resolvedCount,   color: "text-green-400",  bg: "bg-green-400/10 border-green-400/20" },
+                  { label: "Total",    value: tickets.length,  color: "text-foreground", bg: "bg-muted/30 border-border/40" },
+                ].map((s) => (
+                  <div key={s.label} className={cn("rounded-2xl border px-4 py-3 text-center", s.bg)}>
+                    <p className={cn("text-2xl font-black", s.color)}>{s.value}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 mt-0.5">{s.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
-            <button
-              onClick={() => setCreating(true)}
-              className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[14px] font-bold text-primary-foreground hover:bg-primary/80 transition"
-            >
-              <Plus className="h-4 w-4" /> New Ticket
-            </button>
           </div>
 
-          {/* Quick stats */}
-          {isSupportAgent && (
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              {[
-                { label: "Open", value: openCount, color: "text-amber-300" },
-                { label: "Live", value: inProgressCount, color: "text-primary" },
-                { label: "Total", value: tickets.length, color: "text-foreground" },
-              ].map((s) => (
-                <div key={s.label} className="rounded-2xl border border-border/40 bg-muted/30 px-4 py-3 text-center">
-                  <p className={cn("text-xl font-black", s.color)}>{s.value}</p>
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground/50 mt-0.5">{s.label}</p>
+        ) : (
+        /* ══════════════════════════════════════════════════════════════
+            USER HERO  (default customer-facing view)
+        ══════════════════════════════════════════════════════════════ */
+          <div className="mb-8 rounded-3xl border border-border/50 bg-gradient-to-br from-primary/8 via-card to-card p-6 sm:p-8">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/25 bg-primary/15 text-primary">
+                  <Headset className="h-7 w-7" />
                 </div>
-              ))}
+                <div>
+                  <h1 className="text-2xl font-black text-foreground">Support Center</h1>
+                  <p className="text-[13px] text-muted-foreground/60 mt-0.5">
+                    {onlineAgents.length > 0
+                      ? <span className="text-green-400 font-semibold">● {onlineAgents.length} agent{onlineAgents.length > 1 ? "s" : ""} online</span>
+                      : "Usually replies within 24 hours"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCreating(true)}
+                className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[14px] font-bold text-primary-foreground hover:bg-primary/80 transition"
+              >
+                <Plus className="h-4 w-4" /> New Ticket
+              </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* ── Filter + Search ── */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -671,13 +718,13 @@ const SupportCenter = () => {
             <Inbox className="h-10 w-10 text-muted-foreground/20" />
             <div className="text-center">
               <p className="text-[15px] font-bold text-muted-foreground/60">
-                {searchQuery ? "No matching tickets" : "No tickets yet"}
+                {searchQuery ? "No matching tickets" : isSupportAgent ? "All clear — inbox is empty" : "No tickets yet"}
               </p>
               <p className="text-[12px] text-muted-foreground/35 mt-1">
-                {!searchQuery && "Create your first support ticket to get started."}
+                {!searchQuery && (isSupportAgent ? "No pending user requests right now." : "Create your first support ticket to get started.")}
               </p>
             </div>
-            {!searchQuery && (
+            {!searchQuery && !isSupportAgent && (
               <button
                 onClick={() => setCreating(true)}
                 className="flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-[13px] font-bold text-primary-foreground hover:bg-primary/80 transition"

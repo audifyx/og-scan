@@ -169,7 +169,7 @@ const App = () => (
             <Route path="/profile" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/profile/:userId" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/wallets" element={<ProtectedRoute><Wallets /></ProtectedRoute>} />
+            <Route path="/wallets" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
             {/* Credits removed */}
 
@@ -180,7 +180,7 @@ const App = () => (
             <Route path="/ai-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
             <Route path="/alpha-chat" element={<ProtectedRoute><AlphaChat /></ProtectedRoute>} />
             {/* Webhooks removed */}
-            <Route path="/trading-hub" element={<ProtectedRoute><TradingHub /></ProtectedRoute>} />
+            <Route path="/trading-hub" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/callouts" element={<ProtectedRoute><Callouts /></ProtectedRoute>} />
 
             {/* ── Protected: Community ── */}
