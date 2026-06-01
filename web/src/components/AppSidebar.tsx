@@ -180,7 +180,10 @@ export const AppSidebar = ({
   ];
 
   const communityItems: NavItem[] = [
-    { id: "community", icon: Hash, label: "Social", eyebrow: "Channels · Rooms · Spaces · Voice" },
+    { id: "community", icon: Hash,           label: "Channels",      eyebrow: "Chat rooms",           commEntry: "channels" },
+    { id: "community", icon: MessageSquare,  label: "Rooms",         eyebrow: "Group chat & raids",   commEntry: "rooms" },
+    { id: "community", icon: Radio,          label: "Spaces",        eyebrow: "Voice rooms & alpha",  commEntry: "spaces" },
+    { id: "community", icon: Mic,            label: "Voice Lobbies", eyebrow: "Live voice hangouts",  commEntry: "voice" },
   ];
 
   const tradingItems: NavItem[] = [
