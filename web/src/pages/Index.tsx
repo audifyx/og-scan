@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useTransition, type ComponentType, type ReactNode, lazy, Suspense } from "react";
+import React, { useEffect, useMemo, useRef, useState, useTransition, type ComponentType, type ReactNode, lazy, Suspense } from "react";
 import { useTheme } from "@/hooks/useTheme";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -165,6 +165,46 @@ const MultiChainViralFeed = lazy(() => import("@/components/multi-chain/MultiCha
 const MultiChainLaunchTracker = lazy(() => import("@/components/multi-chain/MultiChainLaunchTracker").then(m => ({ default: m.MultiChainLaunchTracker })));
 const MemeGallery = lazy(() => import("@/components/memes-20x/MemeGallery").then(m => ({ default: m.MemeGallery })));
 const ProDashboard = lazy(() => import("@/components/premium-20x/ProDashboard").then(m => ({ default: m.ProDashboard })));
+
+/* ─── Tab Error Boundary — prevents black screen when a tab crashes ─── */
+class TabErrorBoundary extends React.Component<
+  { children: React.ReactNode; tabKey: string },
+  { hasError: boolean; error: string | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error: error?.message || "Something went wrong." };
+  }
+  componentDidUpdate(prevProps: any) {
+    // Reset when tab changes so switching away and back gives a fresh try
+    if (prevProps.tabKey !== this.props.tabKey) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 py-20 px-6 text-center">
+          <p className="text-2xl">⚠️</p>
+          <p className="text-sm font-bold text-white/60">This tab ran into an error.</p>
+          <p className="text-xs text-white/30 max-w-xs">{this.state.error}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="mt-2 rounded-xl border border-white/10 bg-white/[0.05] px-5 py-2 text-xs text-white/50 hover:text-white"
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+
 
 const LEGACY_DEFAULT_MINT = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
 const STORAGE_TAB = "og_scanner.active_site_tab";
@@ -702,7 +742,13 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "swap") return <SwapPanel ogMint={mint} onSelectMint={updateMint} />;
 
   /* ─── Social / community pages ─── */
-  if (tab === "communities") return <CommunitiesInline />;
+  if (tab === "communities") return (
+    <TabErrorBoundary tabKey="communities">
+      <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading…</div>}>
+        <CommunitiesInline />
+      </Suspense>
+    </TabErrorBoundary>
+  );
   if (tab === "coin-communities") return <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}><CoinCommunitiesPageLazy /></Suspense>;
   if (tab === "discover") return null; // rendered separately in JSX tree
   if (tab === "memes") return <ArtFeed inline />;
