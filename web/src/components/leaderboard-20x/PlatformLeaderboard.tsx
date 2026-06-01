@@ -1,7 +1,6 @@
 /**
- * PlatformLeaderboard — OG leaderboard powered by Supabase XP tables.
- * Ranks users by XP and Spaces hosted. Removes scans + accuracy.
- * Live refresh. Weekly / Monthly / All-time filters.
+ * PlatformLeaderboard — OG leaderboard powered by the `profiles` table.
+ * Ranks users by XP, Streak, or Spaces hosted. Weekly / Monthly / All-time.
  */
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -23,11 +22,14 @@ interface LeaderUser {
   username: string;
   avatar_url: string | null;
   total_xp: number;
-  level: number;
-  title: string | null;
-  spaces_hosted: number;
-  streak_days: number;
-  badges: string[];
+  xp: number;
+  current_level: number | null;
+  daily_streak: number;
+  longest_streak: number;
+  is_pioneer: boolean | null;
+  verified: boolean | null;
+  is_online: boolean | null;
+  last_seen_at: string | null;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -36,11 +38,11 @@ interface LeaderUser {
 
 const RANK_CONFIG: Record<number, { bg: string; border: string; text: string; icon: string }> = {
   1: { bg: "bg-amber-400/10",  border: "border-amber-400/25",  text: "text-amber-300",  icon: "👑" },
-  2: { bg: "bg-gray-400/10",  border: "border-gray-400/20",  text: "text-gray-300",  icon: "🥈" },
-  3: { bg: "bg-amber-700/10", border: "border-amber-700/20", text: "text-amber-600", icon: "🥉" },
+  2: { bg: "bg-gray-400/10",   border: "border-gray-400/20",   text: "text-gray-300",   icon: "🥈" },
+  3: { bg: "bg-amber-700/10",  border: "border-amber-700/20",  text: "text-amber-600",  icon: "🥉" },
 };
 
-function xpToLevel(xp: number): { level: number; title: string; next: number } {
+function xpToLevel(xp: number): { level: number; title: string } {
   const thresholds = [
     { xp: 0,     level: 1,  title: "Rookie" },
     { xp: 100,   level: 2,  title: "Trader" },
@@ -58,13 +60,18 @@ function xpToLevel(xp: number): { level: number; title: string; next: number } {
     if (xp >= t.xp) current = t;
     else break;
   }
-  const idx = thresholds.indexOf(current);
-  const next = thresholds[idx + 1]?.xp ?? current.xp;
-  return { level: current.level, title: current.title, next };
+  return { level: current.level, title: current.title };
 }
 
-type SortBy = "xp" | "spaces" | "streak";
+type SortBy = "xp" | "streak";
 type Timeframe = "week" | "month" | "all";
+
+function sortUsers(arr: LeaderUser[], by: SortBy) {
+  const copy = [...arr];
+  if (by === "xp")     return copy.sort((a, b) => (b.total_xp || b.xp || 0) - (a.total_xp || a.xp || 0));
+  if (by === "streak") return copy.sort((a, b) => (b.daily_streak || 0) - (a.daily_streak || 0));
+  return copy;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    Component
@@ -72,76 +79,54 @@ type Timeframe = "week" | "month" | "all";
 
 export const PlatformLeaderboard: React.FC = () => {
   const { user } = useAuth();
-  const [users, setUsers]       = useState<LeaderUser[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [users, setUsers]         = useState<LeaderUser[]>([]);
+  const [loading, setLoading]     = useState(true);
   const [timeframe, setTimeframe] = useState<Timeframe>("all");
-  const [sortBy, setSortBy]     = useState<SortBy>("xp");
-  const [searchQ, setSearchQ]   = useState("");
+  const [sortBy, setSortBy]       = useState<SortBy>("xp");
+  const [searchQ, setSearchQ]     = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchLeaders = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      // Determine time filter
-      let since: string | null = null;
-      if (timeframe === "week")  since = new Date(Date.now() - 7 * 86400_000).toISOString();
-      if (timeframe === "month") since = new Date(Date.now() - 30 * 86400_000).toISOString();
-
       let query = supabase
-        .from("og_user_xp")
-        .select("user_id, username, avatar_url, total_xp, level, title, spaces_hosted, streak_days, badges")
-        .order("total_xp", { ascending: false })
+        .from("profiles")
+        .select("user_id, username, avatar_url, total_xp, xp, current_level, daily_streak, longest_streak, is_pioneer, verified, is_online, last_seen_at")
+        .not("username", "is", null)
+        .order(sortBy === "xp" ? "total_xp" : "daily_streak", { ascending: false, nullsFirst: false })
         .limit(100);
 
-      if (since) {
-        // For weekly/monthly, filter by XP events instead
-        const { data: xpRows } = await supabase
-          .from("og_xp_events")
-          .select("user_id, xp_amount")
-          .gte("created_at", since);
-
-        if (xpRows && xpRows.length > 0) {
-          // Aggregate XP per user
-          const xpMap: Record<string, number> = {};
-          for (const row of xpRows) {
-            xpMap[row.user_id] = (xpMap[row.user_id] || 0) + (row.xp_amount || 0);
-          }
-          const userIds = Object.keys(xpMap);
-          if (userIds.length === 0) { setUsers([]); return; }
-
-          const { data: profiles } = await supabase
-            .from("og_user_xp")
-            .select("user_id, username, avatar_url, total_xp, level, title, spaces_hosted, streak_days, badges")
-            .in("user_id", userIds);
-
-          const merged = (profiles || []).map((u: any) => ({
-            ...u,
-            total_xp: xpMap[u.user_id] || 0,
-            ...xpToLevel(xpMap[u.user_id] || 0),
-          }));
-
-          const sorted = sortUsers(merged, sortBy);
-          setUsers(sorted);
-          return;
-        }
+      // For week/month, apply a recency filter on last_seen_at as a proxy
+      if (timeframe === "week") {
+        const since = new Date(Date.now() - 7 * 86400_000).toISOString();
+        query = query.gte("last_seen_at", since);
+      } else if (timeframe === "month") {
+        const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+        query = query.gte("last_seen_at", since);
       }
 
-      const { data } = await query;
-      const enriched = (data || []).map((u: any) => {
-        const lvl = xpToLevel(u.total_xp || 0);
-        return {
-          ...u,
-          level: u.level ?? lvl.level,
-          title: u.title ?? lvl.title,
-          spaces_hosted: u.spaces_hosted ?? 0,
-          streak_days: u.streak_days ?? 0,
-          badges: u.badges ?? [],
-        };
-      });
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const enriched: LeaderUser[] = (data || []).map((u: any) => ({
+        user_id:       u.user_id,
+        username:      u.username || "anon",
+        avatar_url:    u.avatar_url,
+        total_xp:      u.total_xp ?? u.xp ?? 0,
+        xp:            u.xp ?? 0,
+        current_level: u.current_level,
+        daily_streak:  u.daily_streak ?? 0,
+        longest_streak: u.longest_streak ?? 0,
+        is_pioneer:    u.is_pioneer,
+        verified:      u.verified,
+        is_online:     u.is_online,
+        last_seen_at:  u.last_seen_at,
+      }));
+
       setUsers(sortUsers(enriched, sortBy));
     } catch (e) {
-      console.error(e);
+      console.error("[PlatformLeaderboard]", e);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -149,15 +134,6 @@ export const PlatformLeaderboard: React.FC = () => {
   }, [timeframe, sortBy]);
 
   useEffect(() => { fetchLeaders(); }, [fetchLeaders]);
-
-  function sortUsers(arr: LeaderUser[], by: SortBy) {
-    const copy = [...arr];
-    switch (by) {
-      case "xp":     return copy.sort((a, b) => b.total_xp - a.total_xp);
-      case "spaces": return copy.sort((a, b) => b.spaces_hosted - a.spaces_hosted);
-      case "streak": return copy.sort((a, b) => b.streak_days - a.streak_days);
-    }
-  }
 
   const filtered = searchQ.trim()
     ? users.filter(u => u.username?.toLowerCase().includes(searchQ.toLowerCase()))
@@ -175,7 +151,7 @@ export const PlatformLeaderboard: React.FC = () => {
         <div className="flex-1">
           <h3 className="text-[13px] font-black uppercase tracking-widest text-white">OG Leaderboard</h3>
           <p className="text-[10px] text-white/35">
-            {users.length} OGs ranked{myRank > 0 ? ` · You're #${myRank}` : ""}
+            {loading ? "Loading…" : `${users.length} OGs ranked${myRank > 0 ? ` · You're #${myRank}` : ""}`}
           </p>
         </div>
         <button
@@ -207,20 +183,21 @@ export const PlatformLeaderboard: React.FC = () => {
           ))}
         </div>
         <div className="flex gap-1">
-          {(["xp", "spaces", "streak"] as SortBy[]).map(s => (
+          {([
+            { key: "xp" as SortBy, label: "XP", Icon: Star },
+            { key: "streak" as SortBy, label: "Streak", Icon: Flame },
+          ]).map(({ key, label, Icon }) => (
             <button
-              key={s}
+              key={key}
               type="button"
-              onClick={() => setSortBy(s)}
+              onClick={() => setSortBy(key)}
               className={cn(
                 "flex-1 flex items-center justify-center gap-1 py-1 rounded-lg text-[10px] font-bold transition",
-                sortBy === s ? "text-primary" : "text-white/20 hover:text-white/40",
+                sortBy === key ? "text-primary" : "text-white/20 hover:text-white/40",
               )}
             >
-              {s === "xp"     && <Star className="h-2.5 w-2.5" />}
-              {s === "spaces" && <Mic className="h-2.5 w-2.5" />}
-              {s === "streak" && <Flame className="h-2.5 w-2.5" />}
-              {s === "xp" ? "XP" : s === "spaces" ? "Spaces" : "Streak"}
+              <Icon className="h-2.5 w-2.5" />
+              {label}
             </button>
           ))}
         </div>
@@ -246,6 +223,7 @@ export const PlatformLeaderboard: React.FC = () => {
             const rank = i === 0 ? 2 : i === 1 ? 1 : 3;
             const conf = RANK_CONFIG[rank];
             const lvl = xpToLevel(u.total_xp);
+            const effectiveXp = u.total_xp || u.xp || 0;
             return (
               <div key={u.user_id} className={cn(
                 "rounded-2xl border p-3 text-center",
@@ -254,13 +232,13 @@ export const PlatformLeaderboard: React.FC = () => {
               )}>
                 <div className="text-xl mb-1">{conf.icon}</div>
                 {u.avatar_url
-                  ? <img src={u.avatar_url} className="w-8 h-8 rounded-full mx-auto" alt="" />
+                  ? <img src={u.avatar_url} className="w-8 h-8 rounded-full mx-auto object-cover" alt="" />
                   : <div className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center mx-auto text-[10px] font-black text-white/40">
                       {u.username?.[0]?.toUpperCase()}
                     </div>
                 }
                 <p className={cn("text-[11px] font-black mt-1.5 truncate", conf.text)}>{u.username}</p>
-                <p className="text-[9px] text-white/30 font-bold">{(u.total_xp || 0).toLocaleString()} XP</p>
+                <p className="text-[9px] text-white/30 font-bold">{effectiveXp.toLocaleString()} XP</p>
                 <p className="text-[8px] text-white/15">Lv.{lvl.level} {lvl.title}</p>
               </div>
             );
@@ -282,39 +260,55 @@ export const PlatformLeaderboard: React.FC = () => {
             <p className="text-[11px] text-white/10 mt-1">Earn XP to appear on the board</p>
           </div>
         ) : (
-          (searchQ ? filtered : filtered.slice(3)).map((u, i) => {
-            const rank = searchQ ? i + 1 : i + 4;
-            const lvl = xpToLevel(u.total_xp);
+          (searchQ ? filtered : filtered.slice(filtered.length >= 3 ? 3 : 0)).map((u, i) => {
+            const rank = searchQ ? i + 1 : i + (filtered.length >= 3 ? 4 : 1);
+            const lvl = xpToLevel(u.total_xp || u.xp || 0);
+            const effectiveXp = u.total_xp || u.xp || 0;
             const isMe = user?.id === u.user_id;
+            const online = u.is_online && u.last_seen_at
+              ? new Date(u.last_seen_at).getTime() > Date.now() - 3 * 60_000
+              : false;
             return (
               <div key={u.user_id} className={cn(
                 "flex items-center gap-2.5 px-4 py-2.5 transition hover:bg-white/[0.015]",
                 isMe && "bg-primary/[0.04]",
               )}>
                 <span className="text-[11px] font-bold text-white/20 w-6 text-center shrink-0">#{rank}</span>
-                {u.avatar_url
-                  ? <img src={u.avatar_url} className="w-7 h-7 rounded-full shrink-0" alt="" />
-                  : <div className="w-7 h-7 rounded-full bg-white/[0.07] flex items-center justify-center text-[9px] font-black text-white/25 shrink-0">
-                      {u.username?.[0]?.toUpperCase()}
-                    </div>
-                }
+                <div className="relative shrink-0">
+                  {u.avatar_url
+                    ? <img src={u.avatar_url} className="w-7 h-7 rounded-full object-cover" alt="" />
+                    : <div className="w-7 h-7 rounded-full bg-white/[0.07] flex items-center justify-center text-[9px] font-black text-white/25">
+                        {u.username?.[0]?.toUpperCase()}
+                      </div>
+                  }
+                  {online && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-og-lime border border-[#07101e]" />
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className={cn("text-[12px] font-black truncate", isMe ? "text-primary" : "text-white")}>
                       {u.username}
                     </span>
                     {isMe && <Badge className="bg-primary/10 text-primary border-primary/20 text-[7px] h-3.5 px-1">YOU</Badge>}
-                    {u.streak_days > 5 && (
-                      <span className="text-[9px] text-amber-400">🔥{u.streak_days}</span>
+                    {u.verified && <span className="text-[9px]">✓</span>}
+                    {u.is_pioneer && <span className="text-[9px] text-amber-400">⭐</span>}
+                    {(u.daily_streak || 0) > 5 && (
+                      <span className="text-[9px] text-amber-400">🔥{u.daily_streak}</span>
                     )}
                   </div>
                   <p className="text-[9px] text-white/20">Lv.{lvl.level} {lvl.title}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-[12px] font-black text-primary">{(u.total_xp || 0).toLocaleString()}<span className="text-[8px] font-normal text-white/30 ml-0.5">XP</span></p>
-                  {u.spaces_hosted > 0 && (
-                    <p className="text-[9px] text-white/20 flex items-center gap-0.5 justify-end">
-                      <Mic className="h-2 w-2" />{u.spaces_hosted}
+                  {sortBy === "xp" ? (
+                    <p className="text-[12px] font-black text-primary">
+                      {effectiveXp.toLocaleString()}
+                      <span className="text-[8px] font-normal text-white/30 ml-0.5">XP</span>
+                    </p>
+                  ) : (
+                    <p className="text-[12px] font-black text-amber-400">
+                      {u.daily_streak || 0}
+                      <span className="text-[8px] font-normal text-white/30 ml-0.5">🔥</span>
                     </p>
                   )}
                 </div>
