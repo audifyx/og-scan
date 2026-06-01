@@ -16,7 +16,6 @@ import Auth from "./pages/Auth";
 import Setup from "./pages/Setup";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
-import Wallets from "./pages/Wallets";
 import Tokens from "./pages/Tokens";
 import Tools from "./pages/Tools";
 // AdvancedTools removed
@@ -33,10 +32,8 @@ import OfficialToken from "./pages/OfficialToken";
 import PumpV5 from "./pages/PumpV5";
 import Launch from "./pages/Launch";
 import Callouts from "./pages/Callouts";
-import TradingHub from "./pages/TradingHub";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
-import LiveTrading from "./pages/LiveTrading";
 import SupportCenter from "./pages/SupportCenter";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
