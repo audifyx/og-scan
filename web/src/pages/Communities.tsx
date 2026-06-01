@@ -731,7 +731,7 @@ const Communities = () => {
   const [showCreateCommunity, setShowCreateCommunity] = useState(false);
   const [myMemberships, setMyMemberships] = useState<Map<string, CommunityMember>>(new Map());
   const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
-  const [raidPrefill, setRaidPrefill] = useState<{ title: string; url: string } | null>(null);
+  const [raidPrefill, setRaidPrefill] = useState<{ title: string; url?: string; postId?: string } | null>(null);
 
   // Check global admin status
   useEffect(() => {
@@ -1051,7 +1051,7 @@ function HomeFeed({
   onSelectCommunity: (c: Community) => void;
   onOpenProfile: (userId?: string | null) => void;
   joinedCommunityIds: string[];
-  onRaidPost?: (prefill: { title: string; url: string }) => void;
+  onRaidPost?: (prefill: { title: string; url?: string; postId?: string }) => void;
 }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -1653,7 +1653,7 @@ function CommunityFeed({
   onCompose: () => void;
   onJoin: () => void;
   onLeave: () => void;
-  onRaidPost?: (prefill: { title: string; url: string }) => void;
+  onRaidPost?: (prefill: { title: string; url?: string; postId?: string }) => void;
 }) {
   const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -3107,7 +3107,7 @@ function PostCard({
   communityOwnerId?: string;
   isGlobalAdmin?: boolean;
   onPin?: (postId: string, pinned: boolean) => void;
-  onRaidPost?: (prefill: { title: string; url: string }) => void;
+  onRaidPost?: (prefill: { title: string; url?: string; postId?: string }) => void;
 }) {
   const isArticle = post.is_article || post.post_type === "article";
   const isThread = post.post_type === "thread" && !post.thread_id;
@@ -3260,10 +3260,15 @@ function PostCard({
                     <button onClick={(e) => {
                       e.stopPropagation();
                       setShowMenu(false);
-                      // Use tweet_url if it's a cross-post, otherwise use the OGScan post URL
-                      const target = post.tweet_url || `${window.location.origin}?post=${post.id}`;
                       const snippet = (post.content || "").slice(0, 60).trim();
-                      onRaidPost({ title: `Raid: ${snippet}${snippet.length >= 60 ? "…" : ""}`, url: target });
+                      const title = `Raid: ${snippet}${snippet.length >= 60 ? "…" : ""}`;
+                      if (post.tweet_url) {
+                        // X/Twitter cross-post → external URL raid
+                        onRaidPost({ title, url: post.tweet_url });
+                      } else {
+                        // Native OGScan post → internal on-platform raid
+                        onRaidPost({ title, postId: post.id });
+                      }
                     }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400/60 hover:bg-red-500/10 hover:text-red-400 transition-colors">
                       <Swords className="h-3.5 w-3.5" /> Raid This Post
@@ -5190,6 +5195,7 @@ interface Raid {
   id: string;
   title: string | null;
   target_url: string | null;
+  post_id: string | null;
   goal_likes: number;
   goal_reposts: number;
   goal_replies: number;
@@ -5235,7 +5241,8 @@ function getRaidCountdown(endsAt: string | null): { label: string; urgent: boole
   return { label: h > 0 ? `${h}h ${m}m left` : `${m}m left`, urgent };
 }
 
-function detectPlatform(url: string | null): { name: string; icon: JSX.Element } {
+function detectPlatform(url: string | null, isInternalPost?: boolean): { name: string; icon: JSX.Element } {
+  if (isInternalPost) return { name: "OGScan Post", icon: <Swords className="h-3 w-3" /> };
   if (!url) return { name: "Web", icon: <Globe className="h-3 w-3" /> };
   if (url.includes("x.com") || url.includes("twitter.com")) return { name: "X / Twitter", icon: <svg viewBox="0 0 24 24" className="h-3 w-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> };
   if (url.includes("t.me") || url.includes("telegram")) return { name: "Telegram", icon: <MessageSquare className="h-3 w-3" /> };
@@ -5250,7 +5257,7 @@ const RAID_PRESETS = [
   { label: "Legendary Push", likes: 1000, reposts: 500, replies: 200, hours: 72, emoji: "👑" },
 ];
 
-function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: { title: string; url: string } | null; onPrefillConsumed?: () => void }) {
+function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: { title: string; url?: string; postId?: string } | null; onPrefillConsumed?: () => void }) {
   const [raids, setRaids] = useState<Raid[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<RaidFilter>("active");
@@ -5262,6 +5269,7 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
   // Create form
   const [cTitle, setCTitle] = useState("");
   const [cUrl, setCUrl] = useState("");
+  const [cPostId, setCPostId] = useState<string | null>(null); // internal post raid
   const [cLikes, setCLikes] = useState("200");
   const [cReposts, setCReposts] = useState("100");
   const [cReplies, setCReplies] = useState("50");
@@ -5300,7 +5308,20 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
   useEffect(() => {
     if (prefill) {
       setCTitle(prefill.title);
-      setCUrl(prefill.url);
+      if (prefill.postId) {
+        // Internal OGScan post raid — no URL needed, default 10/10/10
+        setCPostId(prefill.postId);
+        setCUrl("");
+        setCLikes("10");
+        setCReposts("10");
+        setCReplies("10");
+      } else {
+        setCPostId(null);
+        setCUrl(prefill.url || "");
+        setCLikes("200");
+        setCReposts("100");
+        setCReplies("50");
+      }
       setShowCreate(true);
       onPrefillConsumed?.();
     }
@@ -5348,6 +5369,50 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
     } finally { setXActioning(null); }
   };
 
+  // Perform an on-platform action (like / repost / comment) directly on the post
+  const doPostAction = async (raid: Raid, action: "like" | "repost" | "comment") => {
+    if (!user) { toast.error("Sign in first"); return; }
+    if (!raid.post_id) return;
+    const key = `${raid.id}-${action}`;
+    setXActioning(key);
+    try {
+      if (action === "like") {
+        await supabase.from("community_post_likes").insert({ post_id: raid.post_id, user_id: user.id });
+      } else if (action === "repost") {
+        await supabase.from("community_reposts").insert({ post_id: raid.post_id, user_id: user.id });
+      } else if (action === "comment") {
+        const { data: profile } = await supabase.from("profiles")
+          .select("username, avatar_url").eq("user_id", user.id).maybeSingle();
+        await supabase.from("community_post_replies").insert({
+          post_id: raid.post_id,
+          user_id: user.id,
+          username: profile?.username || user.email?.split("@")[0] || "anon",
+          avatar_url: profile?.avatar_url || null,
+          content: "⚔️ Raiding! Let's go! 🚀",
+        });
+      }
+      // Increment raid progress counter
+      const field = action === "like" ? "current_likes" : action === "repost" ? "current_reposts" : "current_replies";
+      const current = (raid[field as keyof Raid] as number) || 0;
+      await supabase.from("community_raids").update({ [field]: current + 1 }).eq("id", raid.id);
+      setRaids(prev => prev.map(r => r.id === raid.id ? { ...r, [field]: current + 1 } : r));
+      // Auto-join the raid
+      if (!myRaidIds.has(raid.id)) {
+        await supabase.from("raid_participants").insert({ raid_id: raid.id, user_id: user.id });
+        await supabase.from("community_raids").update({ participants: (raid.participants || 0) + 1 }).eq("id", raid.id);
+        setMyRaidIds(prev => new Set([...prev, raid.id]));
+        setRaids(prev => prev.map(r => r.id === raid.id ? { ...r, participants: (r.participants || 0) + 1 } : r));
+      }
+      toast.success(action === "like" ? "❤️ Liked!" : action === "repost" ? "🔁 Reposted!" : "💬 Commented!");
+    } catch (e: any) {
+      if (e?.code === "23505") {
+        toast.success(action === "like" ? "❤️ Already liked!" : action === "repost" ? "🔁 Already reposted!" : "💬 Already commented!");
+      } else {
+        toast.error(e.message || "Action failed");
+      }
+    } finally { setXActioning(null); }
+  };
+
   const isExpired = (r: Raid) => r.ends_at ? new Date(r.ends_at).getTime() < Date.now() : false;
   const isLive = (r: Raid) => r.status === "active" && !isExpired(r);
 
@@ -5378,7 +5443,7 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
   const launchRaid = async () => {
     if (!user) { toast.error("Sign in first"); return; }
     if (!cTitle.trim()) { toast.error("Give your raid a name"); return; }
-    if (!cUrl.trim()) { toast.error("Target URL is required"); return; }
+    if (!cPostId && !cUrl.trim()) { toast.error("Target URL is required"); return; }
     setSaving(true);
     try {
       const endsAt = new Date(Date.now() + parseInt(cHours) * 3600000).toISOString();
@@ -5387,10 +5452,11 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
         created_by: user.id,
         creator_id: user.id,
         title: cTitle.trim(),
-        target_url: cUrl.trim(),
-        goal_likes: parseInt(cLikes) || 200,
-        goal_reposts: parseInt(cReposts) || 100,
-        goal_replies: parseInt(cReplies) || 50,
+        target_url: cPostId ? null : (cUrl.trim() || null),
+        post_id: cPostId || null,
+        goal_likes: parseInt(cLikes) || 10,
+        goal_reposts: parseInt(cReposts) || 10,
+        goal_replies: parseInt(cReplies) || 10,
         current_likes: 0, current_reposts: 0, current_replies: 0,
         participants: 0,
         status: "active",
@@ -5399,7 +5465,7 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
       }).select().single();
       if (error) throw error;
       setRaids(prev => [data as Raid, ...prev]);
-      setCTitle(""); setCUrl(""); setCDesc(""); setShowCreate(false);
+      setCTitle(""); setCUrl(""); setCPostId(null); setCDesc(""); setShowCreate(false);
       toast.success("Raid launched! ⚔️ Let's go!");
     } catch (e: any) { toast.error(e.message || "Failed to launch"); }
     setSaving(false);
@@ -5519,7 +5585,8 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
             const expired = isExpired(raid);
             const { label: countdown, urgent } = getRaidCountdown(raid.ends_at);
             const joined = myRaidIds.has(raid.id);
-            const platform = detectPlatform(raid.target_url);
+            const isInternalPost = !!raid.post_id && !raid.target_url;
+            const platform = detectPlatform(raid.target_url, isInternalPost);
 
             const likePct = pct(raid.current_likes || 0, raid.goal_likes);
             const repostPct = pct(raid.current_reposts || 0, raid.goal_reposts);
@@ -5618,29 +5685,58 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
 
                 {/* Actions row */}
                 <div className="flex items-center gap-2 pt-0.5">
-                  {raid.target_url && (
+                  {raid.target_url && !isInternalPost && (
                     <a href={raid.target_url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-1.5 flex-1 justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[11px] font-bold text-white/40 hover:text-white/70 hover:border-white/15 transition-all">
                       <ExternalLink className="h-3.5 w-3.5" /> View Target
                     </a>
                   )}
-                  <button onClick={() => joinRaid(raid)}
-                    disabled={expired || !live}
-                    className={cn("flex items-center gap-1.5 flex-1 justify-center rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-wider transition-all",
-                      joined && live
-                        ? "bg-og-lime/15 border border-og-lime/30 text-og-lime hover:bg-og-lime/25"
-                        : live
-                          ? `bg-red-500/25 border ${style.border} ${style.color} hover:bg-red-500/35 hover:scale-105 active:scale-95`
-                          : "bg-white/[0.03] border border-white/[0.06] text-white/15 cursor-not-allowed"
-                    )}>
-                    {joined && live ? <><CheckCircle2 className="h-3.5 w-3.5" /> Engage Again</> :
-                     live ? <><Swords className="h-3.5 w-3.5" /> Join Raid</> :
-                     <><CheckCircle2 className="h-3.5 w-3.5" /> Finished</>}
-                  </button>
+                  {!isInternalPost && (
+                    <button onClick={() => joinRaid(raid)}
+                      disabled={expired || !live}
+                      className={cn("flex items-center gap-1.5 flex-1 justify-center rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-wider transition-all",
+                        joined && live
+                          ? "bg-og-lime/15 border border-og-lime/30 text-og-lime hover:bg-og-lime/25"
+                          : live
+                            ? `bg-red-500/25 border ${style.border} ${style.color} hover:bg-red-500/35 hover:scale-105 active:scale-95`
+                            : "bg-white/[0.03] border border-white/[0.06] text-white/15 cursor-not-allowed"
+                      )}>
+                      {joined && live ? <><CheckCircle2 className="h-3.5 w-3.5" /> Engage Again</> :
+                       live ? <><Swords className="h-3.5 w-3.5" /> Join Raid</> :
+                       <><CheckCircle2 className="h-3.5 w-3.5" /> Finished</>}
+                    </button>
+                  )}
                 </div>
 
+                {/* On-platform action buttons — for internal OGScan post raids */}
+                {live && isInternalPost && (
+                  <div className="border-t border-white/[0.05] pt-3 space-y-2">
+                    <p className="text-[9px] text-white/25 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                      <Swords className="h-3 w-3" /> Engage directly on OGScan
+                    </p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {([
+                        { action: "like" as const, label: "❤️ Like", key: `${raid.id}-like` },
+                        { action: "repost" as const, label: "🔁 Repost", key: `${raid.id}-repost` },
+                        { action: "comment" as const, label: "💬 Comment", key: `${raid.id}-comment` },
+                      ]).map(({ action, label, key }) => (
+                        <button key={action} onClick={() => doPostAction(raid, action)}
+                          disabled={!!xActioning}
+                          className="flex items-center justify-center gap-1 py-2.5 rounded-xl border border-white/[0.1] bg-white/[0.04] text-[10px] font-black text-white/50 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/25 disabled:opacity-40 active:scale-95 transition-all">
+                          {xActioning === key ? <Loader2 className="h-3 w-3 animate-spin" /> : label}
+                        </button>
+                      ))}
+                    </div>
+                    {joined && (
+                      <p className="text-[9px] text-og-lime/60 flex items-center gap-1 justify-center">
+                        <CheckCircle2 className="h-3 w-3" /> You're raiding this post
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* X native action buttons — only shown for X/Twitter targets */}
-                {live && platform.name === "X / Twitter" && (raid.tweet_id || raid.target_url?.match(/status\/\d+/)) && (
+                {live && !isInternalPost && platform.name === "X / Twitter" && (raid.tweet_id || raid.target_url?.match(/status\/\d+/)) && (
                   <div className="border-t border-white/[0.05] pt-3 space-y-2">
                     {xUser ? (
                       <>
@@ -5688,8 +5784,8 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
                 <Swords className="h-4 w-4 text-red-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-black text-white">Launch a Raid</h3>
-                <p className="text-[10px] text-white/30">Set your target and rally the community</p>
+                <h3 className="text-sm font-black text-white">{cPostId ? "Raid This Post ⚔️" : "Launch a Raid"}</h3>
+                <p className="text-[10px] text-white/30">{cPostId ? "Rally the community to engage on this post" : "Set your target and rally the community"}</p>
               </div>
               <button onClick={() => setShowCreate(false)} className="text-white/25 hover:text-white/60 transition-colors">
                 <XIcon className="h-5 w-5" />
@@ -5697,22 +5793,41 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
             </div>
 
             <div className="overflow-y-auto flex-1 p-5 space-y-4">
-              {/* Presets */}
-              <div>
-                <p className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-2">Quick Presets</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {RAID_PRESETS.map(p => (
-                    <button key={p.label} onClick={() => applyPreset(p)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.07] bg-white/[0.03] hover:border-red-500/25 hover:bg-red-500/[0.05] transition-all text-left">
-                      <span className="text-sm">{p.emoji}</span>
-                      <div>
-                        <p className="text-[10px] font-black text-white/60">{p.label}</p>
-                        <p className="text-[8px] text-white/20">{p.likes}L · {p.reposts}RT · {p.hours}h</p>
-                      </div>
-                    </button>
-                  ))}
+              {/* Internal post badge — shown when raiding an OGScan post */}
+              {cPostId && (
+                <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl border border-red-500/25 bg-red-500/[0.07]">
+                  <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0">
+                    <Swords className="h-4 w-4 text-red-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-black text-white/80">OGScan Post Raid</p>
+                    <p className="text-[9px] text-white/30 mt-0.5">Community members engage directly on this post — no external link needed</p>
+                  </div>
+                  <button onClick={() => setCPostId(null)}
+                    className="text-white/20 hover:text-white/50 transition-colors shrink-0">
+                    <XIcon className="h-4 w-4" />
+                  </button>
                 </div>
-              </div>
+              )}
+
+              {/* Presets — only for external URL raids */}
+              {!cPostId && (
+                <div>
+                  <p className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-2">Quick Presets</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {RAID_PRESETS.map(p => (
+                      <button key={p.label} onClick={() => applyPreset(p)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.07] bg-white/[0.03] hover:border-red-500/25 hover:bg-red-500/[0.05] transition-all text-left">
+                        <span className="text-sm">{p.emoji}</span>
+                        <div>
+                          <p className="text-[10px] font-black text-white/60">{p.label}</p>
+                          <p className="text-[8px] text-white/20">{p.likes}L · {p.reposts}RT · {p.hours}h</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Raid name */}
               <div>
@@ -5722,27 +5837,31 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
                   className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-red-400/40 transition-colors" />
               </div>
 
-              {/* Target URL */}
-              <div>
-                <label className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block">Target URL *</label>
-                <input value={cUrl} onChange={e => setCUrl(e.target.value)}
-                  placeholder="https://x.com/…"
-                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-red-400/40 font-mono text-xs transition-colors" />
-                {cUrl && (
-                  <p className="mt-1.5 flex items-center gap-1 text-[10px] text-og-cyan/60">
-                    {detectPlatform(cUrl).icon} Detected: {detectPlatform(cUrl).name}
-                  </p>
-                )}
-              </div>
+              {/* Target URL — hidden for internal post raids */}
+              {!cPostId && (
+                <div>
+                  <label className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block">Target URL *</label>
+                  <input value={cUrl} onChange={e => setCUrl(e.target.value)}
+                    placeholder="https://x.com/…"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-red-400/40 font-mono text-xs transition-colors" />
+                  {cUrl && (
+                    <p className="mt-1.5 flex items-center gap-1 text-[10px] text-og-cyan/60">
+                      {detectPlatform(cUrl).icon} Detected: {detectPlatform(cUrl).name}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Goals */}
               <div>
-                <label className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block">Engagement Goals</label>
+                <label className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block">
+                  Engagement Goals {cPostId && <span className="text-white/20 normal-case font-normal">(defaults to 10 each)</span>}
+                </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { label: "❤️ Likes", value: cLikes, set: setCLikes },
-                    { label: "🔁 Reposts", value: cReposts, set: setCReposts },
-                    { label: "💬 Replies", value: cReplies, set: setCReplies },
+                    { label: cPostId ? "🔁 Reposts" : "🔁 Reposts", value: cReposts, set: setCReposts },
+                    { label: cPostId ? "💬 Comments" : "💬 Replies", value: cReplies, set: setCReplies },
                   ].map(f => (
                     <div key={f.label}>
                       <label className="text-[9px] text-white/20 mb-1 block">{f.label}</label>
@@ -5787,7 +5906,7 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
             </div>
             {/* Sticky footer with Launch button */}
             <div className="px-5 py-4 border-t border-white/[0.06] shrink-0">
-              <Button onClick={launchRaid} disabled={saving || !cTitle.trim() || !cUrl.trim()}
+              <Button onClick={launchRaid} disabled={saving || !cTitle.trim() || (!cPostId && !cUrl.trim())}
                 className="w-full h-11 rounded-xl bg-red-500 hover:bg-red-400 text-white font-black uppercase tracking-wider text-sm">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Swords className="h-4 w-4 mr-2" />}
                 {saving ? "Launching…" : "⚔️ Launch Raid"}
