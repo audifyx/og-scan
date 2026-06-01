@@ -885,7 +885,7 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
         className="flex w-full items-center justify-between px-4 py-2 text-left transition hover:bg-white/[0.03]"
       >
         <div className="flex items-center gap-2">
-          <Sliders className="h-3.5 w-3.5 text-og-cyan" />
+          <Sliders className="h-3.5 w-3.5 text-primary" />
           <span className="text-[11px] font-bold text-white/50">Voice Toolkit</span>
           {activePreset !== "normal" && (
             <span className="rounded-full bg-og-lime/15 px-2 py-0.5 text-[9px] font-bold text-og-lime">
@@ -893,7 +893,7 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
             </span>
           )}
           {ambientPlaying && (
-            <span className="rounded-full bg-og-cyan/15 px-2 py-0.5 text-[9px] font-bold text-og-cyan">
+            <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[9px] font-bold text-primary">
               {AMBIENT_TRACKS.find(t => t.id === ambientPlaying)?.emoji} Ambient
             </span>
           )}
@@ -1030,7 +1030,7 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
                           step={s.step}
                           value={s.value}
                           onChange={e => { s.set(Number(e.target.value)); setActivePreset("custom"); }}
-                          className="flex-1 accent-og-cyan h-1"
+                          className="flex-1 accent-primary h-1"
                         />
                         <span className="text-[9px] text-white/25 w-8 text-right">{s.value.toFixed(2)}</span>
                       </div>
@@ -1079,15 +1079,15 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
                       className={cn(
                         "flex flex-col items-center gap-1.5 rounded-xl border p-3 transition",
                         ambientPlaying === track.id
-                          ? "border-og-cyan/40 bg-og-cyan/10"
+                          ? "border-primary/40 bg-primary/10"
                           : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]",
                       )}
                     >
                       <span className="text-xl">{track.emoji}</span>
                       <span className="text-[10px] font-semibold text-white/50">{track.name}</span>
                       {ambientPlaying === track.id && (
-                        <span className="flex items-center gap-1 text-[8px] font-bold text-og-cyan">
-                          <span className="h-1.5 w-1.5 rounded-full bg-og-cyan animate-pulse" /> Playing
+                        <span className="flex items-center gap-1 text-[8px] font-bold text-primary">
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" /> Playing
                         </span>
                       )}
                     </button>
@@ -1103,7 +1103,7 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
                     step="0.05"
                     value={ambientVolume}
                     onChange={e => setAmbientVolume(Number(e.target.value))}
-                    className="flex-1 accent-og-cyan h-1"
+                    className="flex-1 accent-primary h-1"
                   />
                   <span className="text-[9px] text-white/30 w-6 text-right">{Math.round(ambientVolume * 100)}%</span>
                 </div>
@@ -1172,7 +1172,7 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
                 {/* Noise suppression info */}
                 <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
                   <div className="flex items-center gap-2 mb-1">
-                    <Shield className="h-3.5 w-3.5 text-og-cyan/50" />
+                    <Shield className="h-3.5 w-3.5 text-primary/50" />
                     <p className="text-[11px] font-bold text-white/60">Audio Processing</p>
                   </div>
                   <div className="space-y-1 text-[9px] text-white/30">

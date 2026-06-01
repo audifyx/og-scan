@@ -3,17 +3,22 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Bell,
   Coins,
+  Compass,
   Gift,
+  Hash,
   Headset,
   Home,
   LineChart,
   Mail,
   Menu,
+  Mic,
   Pencil,
   MessageSquare,
+  Radio,
   Shield,
   TrendingUp,
   Trophy,
+  Tv,
   User,
   Users,
   Wallet,
@@ -49,7 +54,9 @@ type TabId =
   | "community"
   | "tools"
   | "profile"
-  | "token-manager";
+  | "token-manager"
+  | "live-feed-page"
+  | "trading-hub";
 
 export type NavItem = {
   id?: TabId;
@@ -57,6 +64,8 @@ export type NavItem = {
   icon: ComponentType<{ className?: string }>;
   label: string;
   eyebrow: string;
+  /** Written to localStorage before navigating — lets CommunityHub know which sub-tab to open */
+  commEntry?: string;
 };
 
 const NavRow = ({
@@ -79,6 +88,10 @@ const NavRow = ({
   const isActive = isTabActive || isPathActive;
 
   const handleClick = () => {
+    if (item.commEntry) {
+      try { localStorage.setItem("og_comm_entry", item.commEntry); } catch {}
+      window.dispatchEvent(new CustomEvent("og:comm-entry", { detail: item.commEntry }));
+    }
     onClose();
     if (item.id) onNavigate(item.id);
   };
@@ -157,11 +170,20 @@ export const AppSidebar = ({
   const primaryItems: NavItem[] = [
     { id: "overview", icon: Home, label: "Home", eyebrow: "Command hub" },
     { id: "our-coin", icon: Coins, label: "OUR COIN", eyebrow: "Official token room" },
-    // Invite — hidden from UI for now (route preserved at /invite)
-    // { to: "/invite", icon: Gift, label: "Invite", eyebrow: "Referral contest" },
-    { id: "community", icon: Users, label: "Community", eyebrow: "Social & Voice" },
     { id: "tools", icon: Wrench, label: "Tools", eyebrow: "Scanners & Feeds" },
     { id: "profile", icon: User, label: "Profile", eyebrow: "Your account" },
+  ];
+
+  const discoverItems: NavItem[] = [
+    { id: "discover", icon: Compass, label: "Discover", eyebrow: "LaunchPad · Explore · Live Feed" },
+    { id: "live-feed-page" as TabId, icon: Tv, label: "Streams", eyebrow: "Live coin feed" },
+  ];
+
+  const communityItems: NavItem[] = [
+    { id: "community", icon: Hash,        label: "Channels",     eyebrow: "Chat rooms",          commEntry: "channels" },
+    { id: "community", icon: MessageSquare, label: "Rooms",      eyebrow: "Group chat & raids",  commEntry: "rooms" },
+    { id: "community", icon: Radio,       label: "Spaces",       eyebrow: "Voice rooms & alpha", commEntry: "spaces" },
+    { id: "community", icon: Mic,         label: "Voice Lobbies",eyebrow: "Live voice hangouts", commEntry: "voice" },
   ];
 
   const tradingItems: NavItem[] = [
@@ -191,7 +213,7 @@ export const AppSidebar = ({
           </div>
           <div>
             <div className="text-sm font-black uppercase tracking-wide text-white">OGScan</div>
-            <div className="text-[10px] font-semibold tracking-widest text-og-cyan/80">PRO TRADING SUITE</div>
+            <div className="text-[10px] font-semibold tracking-widest text-primary/80">PRO TRADING SUITE</div>
           </div>
         </button>
         <button
@@ -209,7 +231,41 @@ export const AppSidebar = ({
           <div className="space-y-0.5">
             {primaryItems.map((item) => (
               <NavRow
-                key={item.id}
+                key={item.id ?? item.to}
+                item={item}
+                activeId={activeId}
+                currentPath={location.pathname}
+                onNavigate={onNavigate}
+                onClose={onClose}
+                onPrefetch={onPrefetch}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-1 mt-4">
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Discover</p>
+          <div className="space-y-0.5">
+            {discoverItems.map((item) => (
+              <NavRow
+                key={item.id ?? item.to}
+                item={item}
+                activeId={activeId}
+                currentPath={location.pathname}
+                onNavigate={onNavigate}
+                onClose={onClose}
+                onPrefetch={onPrefetch}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-1 mt-4">
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Community</p>
+          <div className="space-y-0.5">
+            {communityItems.map((item, i) => (
+              <NavRow
+                key={`${item.id ?? item.to}-${i}`}
                 item={item}
                 activeId={activeId}
                 currentPath={location.pathname}
@@ -226,7 +282,7 @@ export const AppSidebar = ({
           <div className="space-y-0.5">
             {tradingItems.map((item) => (
               <NavRow
-                key={item.to}
+                key={item.to ?? item.id}
                 item={item}
                 activeId={activeId}
                 currentPath={location.pathname}
@@ -261,7 +317,7 @@ export const AppSidebar = ({
         <button
           type="button"
           onClick={onChangeMint}
-          className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left transition hover:border-og-cyan/40 hover:bg-white/[0.07]"
+          className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-white/[0.07]"
         >
           <div>
             <div className="text-[9px] font-bold uppercase tracking-widest text-white/40">Active mint</div>

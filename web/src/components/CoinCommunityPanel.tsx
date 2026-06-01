@@ -29,7 +29,7 @@ const MessageRow = ({ msg }: { msg: CCMessage }) => (
       {msg.profileImageUrl ? (
         <img src={msg.profileImageUrl} alt={msg.username} className="w-full h-full object-cover" loading="lazy" />
       ) : (
-        <div className="w-full h-full bg-[#0e1e33] grid place-items-center font-bold text-[10px] text-og-cyan">
+        <div className="w-full h-full bg-[#0e1e33] grid place-items-center font-bold text-[10px] text-primary">
           {msg.username?.slice(0, 1).toUpperCase()}
         </div>
       )}

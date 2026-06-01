@@ -745,7 +745,7 @@ export const VoicePanel = forwardRef<VoicePanelHandle, VoicePanelProps>(({
             <Badge className="ml-auto text-[8px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20 h-4 gap-1">
               <Mic className="h-2.5 w-2.5" />{speakerCount}/{maxSpeakers}
             </Badge>
-            <Badge className="text-[8px] bg-blue-500/10 text-blue-400 border-blue-500/20 h-4 gap-1">
+            <Badge className="text-[8px] bg-primary/10 text-primary border-primary/20 h-4 gap-1">
               <Headphones className="h-2.5 w-2.5" />{listeners.length}
             </Badge>
           </>
@@ -864,7 +864,7 @@ export const VoicePanel = forwardRef<VoicePanelHandle, VoicePanelProps>(({
                 {muted ? "🔇 You are muted" : "🎤 You are live — others can hear you"}
               </div>
             ) : (
-              <div className="text-center text-[10px] font-bold py-1.5 rounded-lg border bg-blue-500/5 border-blue-500/15 text-blue-400/80">
+              <div className="text-center text-[10px] font-bold py-1.5 rounded-lg border bg-primary/5 border-primary/15 text-primary/80">
                 🎧 Listening — {speakerCount < maxSpeakers ? "raise hand to speak" : "speaker slots full"}
               </div>
             )}

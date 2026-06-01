@@ -445,7 +445,7 @@ const ActivityFeed = ({ members, activeMembersList, onlineCount, onSwitchChannel
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           {[
             { label: "Voice Lobby", desc: "Join live voice chat", icon: Volume2, color: "og-lime", channel: "voice-rooms" as ChannelId },
-            { label: "Chat Room", desc: "Message the community", icon: MessageSquare, color: "og-cyan", channel: "general-chat" as ChannelId },
+            { label: "Chat Room", desc: "Message the community", icon: MessageSquare, color: "primary", channel: "general-chat" as ChannelId },
             { label: "Go Live", desc: "Start streaming", icon: Radio, color: "red-400", channel: "live-stream" as ChannelId },
             { label: "Voice Rooms", desc: "Create private rooms", icon: Headphones, color: "og-gold", channel: "voice-rooms" as ChannelId },
           ].map((action) => (
@@ -493,7 +493,7 @@ const ActivityFeed = ({ members, activeMembersList, onlineCount, onSwitchChannel
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[10px] font-bold text-og-cyan">{msg.username || "Anon"}</span>
+                    <span className="text-[10px] font-bold text-primary">{msg.username || "Anon"}</span>
                     <span className="text-[8px] text-white/20">
                       {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
                     </span>
@@ -511,7 +511,7 @@ const ActivityFeed = ({ members, activeMembersList, onlineCount, onSwitchChannel
         <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white/30">Community</h3>
         <div className="grid grid-cols-3 gap-2.5">
           {[
-            { label: "Members", value: members.length, color: "og-cyan" },
+            { label: "Members", value: members.length, color: "primary" },
             { label: "Online", value: onlineCount, color: "og-lime" },
             { label: "Messages", value: recentMessages.length, color: "og-gold" },
           ].map((stat) => (
@@ -791,7 +791,7 @@ const GeneralChat = () => {
                       <div className="flex items-baseline gap-2">
                         <span className={cn(
                           "text-[11px] font-bold",
-                          isOwn ? "text-og-lime" : "text-og-cyan",
+                          isOwn ? "text-og-lime" : "text-primary",
                         )}>
                           {isOwn ? "You" : msg.username || "Anon"}
                         </span>
@@ -811,7 +811,7 @@ const GeneralChat = () => {
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
                           onKeyDown={handleEditKeyDown}
-                          className="min-w-0 flex-1 rounded-lg border border-og-cyan/30 bg-og-cyan/5 px-2 py-1 text-[12px] text-white/80 outline-none focus:border-og-cyan/50"
+                          className="min-w-0 flex-1 rounded-lg border border-primary/30 bg-primary/5 px-2 py-1 text-[12px] text-white/80 outline-none focus:border-primary/50"
                         />
                         <button onClick={saveEdit} className="rounded p-1 text-og-lime hover:bg-og-lime/10">
                           <Check className="h-3.5 w-3.5" />
@@ -1338,7 +1338,7 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
                       <span className={cn("absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#0a1018]", m.is_online ? "bg-og-lime" : "bg-white/15")} />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-og-cyan">@{m.username || "Anon"}</span>
+                      <span className="text-xs font-bold text-primary">@{m.username || "Anon"}</span>
                       <p className={cn("text-[9px]", m.is_online ? "text-og-lime/60" : "text-white/20")}>{m.is_online ? "Online" : "Offline"}</p>
                     </div>
                   </div>

@@ -98,7 +98,7 @@ const SignInBanner = ({ onSignIn, signing }: { onSignIn: () => void; signing: bo
   <button
     onClick={onSignIn}
     disabled={signing}
-    className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.03] hover:border-og-cyan/40 hover:bg-og-cyan/5 transition-all text-white/50 hover:text-og-cyan text-[11px] font-mono uppercase tracking-widest"
+    className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.03] hover:border-primary/40 hover:bg-primary/5 transition-all text-white/50 hover:text-primary text-[11px] font-mono uppercase tracking-widest"
   >
     <Twitter className="h-3 w-3" />
     {signing ? "Connecting…" : "Sign in with X to interact"}
@@ -113,7 +113,7 @@ const ReplyCard = ({ reply }: { reply: CCReply }) => (
       {reply.profileImageUrl ? (
         <img src={reply.profileImageUrl} alt={reply.username} className="w-full h-full object-cover" loading="lazy" />
       ) : (
-        <div className="w-full h-full bg-[#0e2233] grid place-items-center font-bold text-[10px] text-og-cyan">
+        <div className="w-full h-full bg-[#0e2233] grid place-items-center font-bold text-[10px] text-primary">
           {(reply.username ?? "?").slice(0, 1).toUpperCase()}
         </div>
       )}
@@ -259,7 +259,7 @@ const PostCard = ({
           {msg.profileImageUrl ? (
             <img src={msg.profileImageUrl} alt={msg.username} className="w-full h-full object-cover" loading="lazy" />
           ) : (
-            <div className="w-full h-full bg-[#0e2233] grid place-items-center font-bold text-xs text-og-cyan">
+            <div className="w-full h-full bg-[#0e2233] grid place-items-center font-bold text-xs text-primary">
               {(msg.username ?? "?").slice(0, 1).toUpperCase()}
             </div>
           )}
@@ -271,7 +271,7 @@ const PostCard = ({
               {msg.displayName || msg.username}
             </span>
             {msg.followerCount > 500 && (
-              <span className="text-og-cyan text-[9px] font-mono">
+              <span className="text-primary text-[9px] font-mono">
                 {ccFmtCount(msg.followerCount)} followers
               </span>
             )}
@@ -312,8 +312,8 @@ const PostCard = ({
               className={cn(
                 "flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all",
                 showReplyBox
-                  ? "text-og-cyan bg-og-cyan/10"
-                  : "text-white/35 hover:text-og-cyan hover:bg-og-cyan/10",
+                  ? "text-primary bg-primary/10"
+                  : "text-white/35 hover:text-primary hover:bg-primary/10",
               )}
             >
               <MessageCircle className="h-3.5 w-3.5" />
@@ -341,7 +341,7 @@ const PostCard = ({
                 href={msg.userTwitterUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="ml-auto text-white/15 hover:text-og-cyan transition-colors p-1"
+                className="ml-auto text-white/15 hover:text-primary transition-colors p-1"
               >
                 <ExternalLink className="h-3 w-3" />
               </a>
@@ -357,7 +357,7 @@ const PostCard = ({
             {ccUser?.profileImageUrl ? (
               <img src={ccUser.profileImageUrl} alt="" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full bg-[#0e2233] grid place-items-center font-bold text-[10px] text-og-cyan">
+              <div className="w-full h-full bg-[#0e2233] grid place-items-center font-bold text-[10px] text-primary">
                 {(ccUser?.username ?? "?").slice(0, 1).toUpperCase()}
               </div>
             )}
@@ -372,7 +372,7 @@ const PostCard = ({
               }}
               placeholder="Write a reply… (Cmd+Enter to send)"
               rows={2}
-              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-[12px] text-white/80 placeholder:text-white/25 focus:outline-none focus:border-og-cyan/40 resize-none"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-[12px] text-white/80 placeholder:text-white/25 focus:outline-none focus:border-primary/40 resize-none"
             />
             <div className="flex items-center justify-between mt-1.5">
               <span className="text-white/20 text-[10px] font-mono">
@@ -391,7 +391,7 @@ const PostCard = ({
                   className={cn(
                     "flex items-center gap-1 px-3 py-1 rounded-lg text-[11px] font-bold transition-all",
                     replyText.trim() && !posting
-                      ? "bg-og-cyan text-black hover:bg-og-cyan/80"
+                      ? "bg-primary text-black hover:bg-primary/80"
                       : "bg-white/[0.06] text-white/25 cursor-not-allowed",
                   )}
                 >
@@ -514,7 +514,7 @@ export const CoinCommunityFull = ({
               {tokenImageUrl ? (
                 <img src={tokenImageUrl} alt={tokenSymbol} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full bg-[#0e2233] grid place-items-center font-bold text-lg text-og-cyan">
+                <div className="w-full h-full bg-[#0e2233] grid place-items-center font-bold text-lg text-primary">
                   {tokenSymbol.slice(0, 1)}
                 </div>
               )}
@@ -565,7 +565,7 @@ export const CoinCommunityFull = ({
               href={`https://coincommunities.org/community/${tokenAddress}`}
               target="_blank"
               rel="noreferrer"
-              className="shrink-0 flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-widest text-white/50 hover:border-og-cyan/40 hover:text-og-cyan transition-colors"
+              className="shrink-0 flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-widest text-white/50 hover:border-primary/40 hover:text-primary transition-colors"
             >
               <Globe className="h-3 w-3" />
               Open

@@ -84,6 +84,7 @@ const TokenIntel = lazy(() => importTokenIntel().then(m => ({ default: m.TokenIn
 const importCommunitiesPage = () => import("./Communities");
 const importCoinCommunitiesPage = () => import("./CoinCommunitiesPage");
 const importDiscoverPage = () => import("./Discover");
+const importDiscoverHub = () => import("./DiscoverHub");
 const importArtFeedPage = () => import("./ArtFeed");
 const importSpacesPage = () => import("./Spaces");
 const importSocialHubPage = () => import("./SocialHub");
@@ -96,6 +97,7 @@ const importTokenManagerPage = () => import("./TokenManager");
 const CommunitiesPage = lazy(importCommunitiesPage);
 const CoinCommunitiesPageLazy = lazy(() => importCoinCommunitiesPage().then(m => ({ default: m.CoinCommunitiesPage })));
 const DiscoverPage = lazy(importDiscoverPage);
+const DiscoverHub = lazy(importDiscoverHub);
 const ArtFeed = lazy(importArtFeedPage);
 const SpacesPage = lazy(importSpacesPage);
 const SocialHub = lazy(importSocialHubPage);
@@ -699,7 +701,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   /* ─── Social / community pages ─── */
   if (tab === "communities") return <CommunitiesInline />;
   if (tab === "coin-communities") return <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}><CoinCommunitiesPageLazy /></Suspense>;
-  if (tab === "discover") return <DiscoverInline />;
+  if (tab === "discover") return null; // rendered separately in JSX tree
   if (tab === "memes") return <ArtFeed inline />;
   if (tab === "spaces") return <SpacesPage />;
   if (tab === "social") return <SocialHub />;
@@ -978,6 +980,18 @@ const Index = () => {
           <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
             <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading Community...</div>}>
               <CommunityHub />
+            </Suspense>
+          </main>
+        ) : tab === "discover" ? (
+          <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
+            <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading Discover...</div>}>
+              <DiscoverHub />
+            </Suspense>
+          </main>
+        ) : tab === "live-feed-page" ? (
+          <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
+            <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading Streams...</div>}>
+              <LiveFeedPage />
             </Suspense>
           </main>
         ) : tab === "coin-communities" ? (
