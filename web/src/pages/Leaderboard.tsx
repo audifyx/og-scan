@@ -203,7 +203,7 @@ const Leaderboard = () => {
 
   return (
     <AppLayout>
-      <PageHeader title="OG Leaderboard" description="The most active and successful OGs" />
+      <PageHeader title="OG Leaderboard" description="The most active and successful OGs" backTo="/trading-hub" />
 
       <div className="p-4 lg:p-6 space-y-6">
         <div className="space-y-3 rounded-3xl border border-white/[0.07] bg-white/[0.03] p-3 sm:p-4">

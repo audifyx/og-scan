@@ -279,7 +279,7 @@ const Callouts = () => {
      ═══════════════════════════════════════════════════════════ */
   return (
     <AppLayout>
-      <PageHeader title="Alpha Callouts" description="Post token & wallet callouts to the community">
+      <PageHeader title="Alpha Callouts" description="Post token & wallet callouts to the community" backTo="/trading-hub">
         <div className="flex items-center gap-2">
           <Badge className="bg-green-500/20 text-green-500 border-green-500/30 gap-1.5">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />

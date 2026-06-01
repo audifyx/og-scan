@@ -228,7 +228,7 @@ const Tools = () => {
 
   return (
     <AppLayout>
-      <PageHeader title="OG Tools" description="Multi-chain analysis toolkit — 16+ chains">
+      <PageHeader title="OG Tools" showBack={false}>
         <div className="flex items-center gap-2">
           <CreditBalance compact />
         </div>
@@ -236,62 +236,34 @@ const Tools = () => {
 
       <div className="p-4 lg:p-6 space-y-6">
 
-        {/* ── Tool Grid — iOS App Store style ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {/* ── Tool Picker — compact pill chips ── */}
+        <div className="flex flex-wrap justify-center gap-2 px-2">
           {TOOL_CARDS.map((tool) => {
             const isActive = activeTool === tool.id;
-            const isPrimary = tool.accent === "primary";
             return (
               <button
                 key={tool.id}
                 onClick={() => setActiveTool(tool.id)}
                 className={cn(
-                  "group relative flex items-center gap-4 rounded-2xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98]",
+                  "inline-flex items-center gap-2 rounded-2xl border px-3 py-2 transition-all duration-200 active:scale-95",
                   isActive
-                    ? "border-primary/40 bg-primary/[0.08] shadow-[0_0_28px_-10px_hsl(var(--primary)/0.7)]"
-                    : "border-white/[0.07] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.06]",
+                    ? "border-primary/50 bg-primary/15 shadow-[0_0_16px_-6px_hsl(var(--primary)/0.8)]"
+                    : "border-white/[0.08] bg-white/[0.04] hover:border-primary/25 hover:bg-primary/[0.06]",
                 )}
               >
-                {/* App icon */}
                 <div className={cn(
-                  "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border transition-all duration-200",
-                  isActive
-                    ? isPrimary
-                      ? "border-primary/40 bg-primary/20 shadow-[0_0_20px_-6px_hsl(var(--primary)/0.6)]"
-                      : "border-secondary/40 bg-secondary/20 shadow-[0_0_20px_-6px_hsl(var(--secondary)/0.6)]"
-                    : "border-white/10 bg-white/[0.05]",
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl",
+                  isActive ? "bg-primary/25" : "bg-white/[0.06]",
                 )}>
                   <tool.icon className={cn(
-                    "h-6 w-6 transition-colors",
-                    isActive
-                      ? isPrimary ? "text-primary" : "text-secondary"
-                      : "text-white/50 group-hover:text-white/75",
+                    "h-3.5 w-3.5",
+                    isActive ? "text-primary" : "text-white/45",
                   )} />
                 </div>
-
-                {/* Text */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className={cn(
-                      "text-[13px] font-bold leading-tight truncate",
-                      isActive ? "text-white" : "text-white/80",
-                    )}>{tool.name}</p>
-                    <span className={cn(
-                      "shrink-0 rounded-full border px-1.5 py-px text-[9px] font-bold uppercase tracking-wider",
-                      isActive
-                        ? isPrimary
-                          ? "border-primary/40 bg-primary/15 text-primary"
-                          : "border-secondary/40 bg-secondary/15 text-secondary"
-                        : "border-white/10 bg-white/5 text-white/30",
-                    )}>{tool.category}</span>
-                  </div>
-                  <p className="text-[11px] text-white/40 leading-snug line-clamp-2">{tool.description}</p>
-                </div>
-
-                {/* Active indicator */}
-                {isActive && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />
-                )}
+                <span className={cn(
+                  "text-[11px] font-bold leading-none whitespace-nowrap",
+                  isActive ? "text-primary" : "text-white/55",
+                )}>{tool.name}</span>
               </button>
             );
           })}
