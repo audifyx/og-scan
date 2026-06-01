@@ -80,9 +80,9 @@ const SECTION_META: Record<AdminSection, { eyebrow: string; title: string; descr
     description: "Monitor lobby activity, access, and live interaction quality.",
   },
   tokens: {
-    eyebrow: "Listings",
+    eyebrow: "OGS Token",
     title: "Token listings",
-    description: "Review pending token submissions and keep listing operations clean.",
+    description: "Review pending token submissions, manage featured listings, and keep the OGS token queue clean.",
   },
   spaces: {
     eyebrow: "Audio",

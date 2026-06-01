@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+// useNavigate removed — trading hub uses in-app tab navigation to keep sidebar visible
 import {
   Rocket, MessageSquare, Bell, ArrowRight, Zap, Users,
   TrendingUp, Radio, ChevronRight,
@@ -7,9 +7,18 @@ import { cn } from "@/lib/utils";
 
 /* ─── Hub cards ─────────────────────────────────────────────────────────── */
 
+/** Hub card → in-app tab ID mapping (keeps sidebar visible) */
+const HUB_TAB_MAP: Record<string, string> = {
+  "/launch":           "snipe-feed",
+  "/trading-lobbies":  "community",   // voice lobbies live in community hub
+  "/callouts":         "trading-hub", // stays on hub (callouts tab inside community)
+  "/leaderboard":      "trading-hub",
+};
+
 const hubs = [
   {
     to: "/launch",
+    tabId: "snipe-feed",
     icon: Rocket,
     label: "Token Launcher",
     eyebrow: "Launch & track tokens",
@@ -28,6 +37,7 @@ const hubs = [
   },
   {
     to: "/trading-lobbies",
+    tabId: "community",
     icon: MessageSquare,
     label: "Trading Lobbies",
     eyebrow: "Voice + live charts",
@@ -46,6 +56,7 @@ const hubs = [
   },
   {
     to: "/callouts",
+    tabId: "trading-hub",
     icon: Bell,
     label: "Callouts",
     eyebrow: "Trade alerts",
@@ -67,8 +78,8 @@ const hubs = [
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 
 // Named export for use inside the tab system (no layout wrapper)
-export function TradingHubContent() {
-  const navigate = useNavigate();
+export function TradingHubContent({ onNavigate }: { onNavigate?: (tab: string) => void } = {}) {
+  const go = (tabId: string) => { if (onNavigate) onNavigate(tabId); };
   return (
     <div className="px-4 py-8 lg:px-8">
 
@@ -96,7 +107,7 @@ export function TradingHubContent() {
               <button
                 key={hub.to}
                 type="button"
-                onClick={() => navigate(hub.to)}
+                onClick={() => go(hub.tabId || hub.to)}
                 className={cn(
                   "group relative flex flex-col overflow-hidden rounded-2xl border bg-white/[0.03] p-6 text-left transition-all duration-300",
                   "hover:bg-white/[0.06] active:scale-[0.98]",
@@ -162,17 +173,17 @@ export function TradingHubContent() {
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30 mb-4">Quick Access</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
-              { label: "Launch Token", to: "/launch", icon: Rocket, color: "text-og-lime" },
-              { label: "Join Lobby", to: "/trading-lobbies", icon: Radio, color: "text-og-cyan" },
-              { label: "Post Callout", to: "/callouts", icon: Zap, color: "text-violet-300" },
-              { label: "Leaderboard", to: "/leaderboard", icon: Users, color: "text-amber-300" },
+              { label: "Launch Token", to: "/launch", tabId: "snipe-feed", icon: Rocket, color: "text-og-lime" },
+              { label: "Join Lobby", to: "/trading-lobbies", tabId: "community", icon: Radio, color: "text-og-cyan" },
+              { label: "Post Callout", to: "/callouts", tabId: "trading-hub", icon: Zap, color: "text-violet-300" },
+              { label: "Leaderboard", to: "/leaderboard", tabId: "trading-hub", icon: Users, color: "text-amber-300" },
             ].map((link) => {
               const Icon = link.icon;
               return (
                 <button
                   key={link.to}
                   type="button"
-                  onClick={() => navigate(link.to)}
+                  onClick={() => go(link.tabId)}
                   className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2.5 text-left transition hover:bg-white/[0.06] hover:border-white/[0.12] active:scale-[0.97]"
                 >
                   <Icon className={cn("h-3.5 w-3.5 shrink-0", link.color)} />

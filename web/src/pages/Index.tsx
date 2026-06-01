@@ -711,7 +711,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "live-trading") return <LiveTradingPage />;
   if (tab === "live-feed-page") return <LiveFeedPage />;
   if (tab === "token-manager") return <TokenManagerPage />;
-  if (tab === "trading-hub") return <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}><TradingHubContent /></Suspense>;
+  if (tab === "trading-hub") return <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}><TradingHubContent onNavigate={onNavigate} /></Suspense>;
   return null;
 };
 
