@@ -646,11 +646,15 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
   }, [pushToTalk, pttKey, connected, room]);
 
   /* ─── Real-time Voice Effects via Web Audio processing chain ─── */
+
+  // Cache the REAL original mic track here so teardown always has the right one
+  // even after multiple preset switches.
+  const originalMicTrackRef = useRef<MediaStreamTrack | null>(null);
+
   const effectChainRef = useRef<{
     source: MediaStreamAudioSourceNode;
     destination: MediaStreamAudioDestinationNode;
     nodes: AudioNode[];
-    originalTrack: MediaStreamTrack;
   } | null>(null);
 
   const teardownEffectChain = useCallback(() => {
@@ -658,12 +662,12 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
     if (!chain) return;
     try { chain.source.disconnect(); } catch {}
     chain.nodes.forEach(n => { try { n.disconnect(); } catch {} });
-    // Restore original mic track
-    if (room && chain.originalTrack) {
+    // Restore the ORIGINAL mic track (cached separately — never the processed one)
+    if (room && originalMicTrackRef.current) {
       const pubs = room.localParticipant?.audioTrackPublications;
       pubs?.forEach((pub: any) => {
         if (pub.track) {
-          try { pub.track.replaceTrack(chain.originalTrack); } catch {}
+          try { pub.track.replaceTrack(originalMicTrackRef.current!); } catch {}
         }
       });
     }
@@ -680,14 +684,20 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
 
     // Small debounce so slider drags don't create hundreds of chains
     const timer = setTimeout(() => {
+      // First tear down the old chain so we can read the restored original track
       teardownEffectChain();
       try {
         const ctx = getAudioCtx();
-        // Find the local mic track
-        let micTrack: MediaStreamTrack | null = null;
-        room.localParticipant?.audioTrackPublications.forEach((pub: any) => {
-          if (pub.track?.mediaStreamTrack) micTrack = pub.track.mediaStreamTrack;
-        });
+
+        // Find the local mic track — if we already cached the original, use that;
+        // otherwise capture it now (first time building the chain).
+        let micTrack: MediaStreamTrack | null = originalMicTrackRef.current;
+        if (!micTrack) {
+          room.localParticipant?.audioTrackPublications.forEach((pub: any) => {
+            if (pub.track?.mediaStreamTrack) micTrack = pub.track.mediaStreamTrack;
+          });
+          if (micTrack) originalMicTrackRef.current = micTrack;
+        }
         if (!micTrack) return; // mic not published yet — will retry when muted changes
 
         const source = ctx.createMediaStreamSource(new MediaStream([micTrack]));
@@ -698,71 +708,81 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
         // 1. Gain
         if (customGain !== 1.0) {
           const gain = ctx.createGain();
-          gain.gain.value = customGain;
+          gain.gain.value = Math.max(0.01, customGain);
           lastNode.connect(gain);
           lastNode = gain;
           nodes.push(gain);
         }
 
-        // 2. Pitch / formant shift — reshapes the spectral envelope so the
-        //    voice sounds perceptibly higher or deeper.
+        // 2. Pitch / formant shift via multi-stage biquad EQ.
+        //    True pitch shifting requires a ScriptProcessorNode or AudioWorklet;
+        //    biquad-only gives a convincing "voice character" change that works
+        //    noticeably for extreme values (chipmunk ≥1.7, deep ≤0.65).
         if (customPitch !== 1.0) {
           if (customPitch > 1.0) {
-            // Higher: thin lows, boost upper formants, add brightness
+            // ── Higher pitch / chipmunk effect ──
+            // 1. Remove low-frequency body
             const hp = ctx.createBiquadFilter();
             hp.type = "highpass";
-            hp.frequency.value = 100 + (customPitch - 1.0) * 300;
-            hp.Q.value = 0.7;
+            hp.frequency.value = 200 + (customPitch - 1.0) * 600; // up to ~1000 Hz cutoff
+            hp.Q.value = 1.0;
             lastNode.connect(hp); lastNode = hp; nodes.push(hp);
 
-            const peak1 = ctx.createBiquadFilter();
-            peak1.type = "peaking";
-            peak1.frequency.value = 2500 * customPitch;
-            peak1.Q.value = 1.5;
-            peak1.gain.value = 6;
-            lastNode.connect(peak1); lastNode = peak1; nodes.push(peak1);
-
-            const hShelf = ctx.createBiquadFilter();
-            hShelf.type = "highshelf";
-            hShelf.frequency.value = 3000;
-            hShelf.gain.value = (customPitch - 1.0) * 8;
-            lastNode.connect(hShelf); lastNode = hShelf; nodes.push(hShelf);
-
+            // 2. Thin out mids
             const lCut = ctx.createBiquadFilter();
             lCut.type = "lowshelf";
-            lCut.frequency.value = 300;
-            lCut.gain.value = -(customPitch - 1.0) * 12;
+            lCut.frequency.value = 400;
+            lCut.gain.value = -(customPitch - 1.0) * 18; // up to -14 dB
             lastNode.connect(lCut); lastNode = lCut; nodes.push(lCut);
-          } else {
-            // Lower: boost low formants, roll off highs
+
+            // 3. Boost upper formants strongly
             const peak1 = ctx.createBiquadFilter();
             peak1.type = "peaking";
-            peak1.frequency.value = 300 * customPitch;
-            peak1.Q.value = 1.0;
-            peak1.gain.value = 8;
+            peak1.frequency.value = Math.min(3200 * customPitch, 8000);
+            peak1.Q.value = 1.2;
+            peak1.gain.value = (customPitch - 1.0) * 14;
             lastNode.connect(peak1); lastNode = peak1; nodes.push(peak1);
 
+            // 4. Presence boost for metallic "squeak"
+            const hShelf = ctx.createBiquadFilter();
+            hShelf.type = "highshelf";
+            hShelf.frequency.value = 5000;
+            hShelf.gain.value = (customPitch - 1.0) * 10;
+            lastNode.connect(hShelf); lastNode = hShelf; nodes.push(hShelf);
+          } else {
+            // ── Lower pitch / deep voice ──
+            // 1. Strong low-shelf boost
             const lShelf = ctx.createBiquadFilter();
             lShelf.type = "lowshelf";
-            lShelf.frequency.value = 400;
-            lShelf.gain.value = (1.0 - customPitch) * 10;
+            lShelf.frequency.value = 350;
+            lShelf.gain.value = (1.0 - customPitch) * 20; // up to +14 dB for 0.3 pitch
             lastNode.connect(lShelf); lastNode = lShelf; nodes.push(lShelf);
 
+            // 2. Sub-bass peak
+            const sub = ctx.createBiquadFilter();
+            sub.type = "peaking";
+            sub.frequency.value = 80 + (1.0 - customPitch) * 40;
+            sub.Q.value = 0.8;
+            sub.gain.value = (1.0 - customPitch) * 12;
+            lastNode.connect(sub); lastNode = sub; nodes.push(sub);
+
+            // 3. Roll off highs strongly
             const lp = ctx.createBiquadFilter();
             lp.type = "lowpass";
-            lp.frequency.value = 4000 - (1.0 - customPitch) * 2500;
+            lp.frequency.value = Math.max(800, 5000 - (1.0 - customPitch) * 4200);
             lp.Q.value = 0.5;
             lastNode.connect(lp); lastNode = lp; nodes.push(lp);
 
+            // 4. Cut upper-mids so it doesn't sound like just bass-boost
             const hCut = ctx.createBiquadFilter();
             hCut.type = "highshelf";
-            hCut.frequency.value = 2000;
-            hCut.gain.value = -(1.0 - customPitch) * 10;
+            hCut.frequency.value = 1800;
+            hCut.gain.value = -(1.0 - customPitch) * 14;
             lastNode.connect(hCut); lastNode = hCut; nodes.push(hCut);
           }
         }
 
-        // 3. Distortion
+        // 3. Distortion (robot / megaphone / radio)
         if (customDistortion > 0) {
           const ws = ctx.createWaveShaper();
           ws.curve = makeDistortionCurve(customDistortion * 400);
@@ -770,29 +790,28 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
           lastNode.connect(ws);
           lastNode = ws;
           nodes.push(ws);
-          // Follow with a lowpass to tame harshness
-          const lp = ctx.createBiquadFilter();
-          lp.type = "lowpass";
-          lp.frequency.value = 4000 - customDistortion * 2000;
-          lastNode.connect(lp);
-          lastNode = lp;
-          nodes.push(lp);
+          // Band-limit after distortion to avoid harsh fizz
+          const bp = ctx.createBiquadFilter();
+          bp.type = "bandpass";
+          bp.frequency.value = 1500 - customDistortion * 800;
+          bp.Q.value = 0.5 + customDistortion;
+          lastNode.connect(bp);
+          lastNode = bp;
+          nodes.push(bp);
         }
 
         // 4. Echo (delay feedback loop)
         if (customEcho > 0) {
           const delay = ctx.createDelay(2.0);
-          delay.delayTime.value = 0.15 + customEcho * 0.35; // 150ms-500ms
+          delay.delayTime.value = 0.12 + customEcho * 0.38; // 120ms – 500ms
           const feedback = ctx.createGain();
-          feedback.gain.value = Math.min(customEcho * 0.7, 0.85);
+          feedback.gain.value = Math.min(customEcho * 0.65, 0.82);
           const dryGain = ctx.createGain();
           dryGain.gain.value = 1.0;
           const wetGain = ctx.createGain();
-          wetGain.gain.value = customEcho * 0.6;
+          wetGain.gain.value = customEcho * 0.55;
           const merge = ctx.createGain();
-          // Dry path
           lastNode.connect(dryGain).connect(merge);
-          // Wet path with feedback
           lastNode.connect(delay);
           delay.connect(feedback);
           feedback.connect(delay); // feedback loop
@@ -804,21 +823,21 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
         // 5. Reverb (convolver with generated impulse response)
         if (customReverb > 0) {
           const convolver = ctx.createConvolver();
-          const reverbTime = 0.5 + customReverb * 3.5; // 0.5s - 4s
+          const reverbTime = 0.4 + customReverb * 4.0; // 0.4s – 4.4s
           const sampleRate = ctx.sampleRate;
-          const length = sampleRate * reverbTime;
+          const length = Math.floor(sampleRate * reverbTime);
           const impulse = ctx.createBuffer(2, length, sampleRate);
           for (let ch = 0; ch < 2; ch++) {
             const data = impulse.getChannelData(ch);
             for (let i = 0; i < length; i++) {
-              data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2 + customReverb * 3);
+              data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 1.5 + customReverb * 2.5);
             }
           }
           convolver.buffer = impulse;
           const dryG = ctx.createGain();
-          dryG.gain.value = 1 - customReverb * 0.5;
+          dryG.gain.value = Math.max(0.1, 1 - customReverb * 0.6);
           const wetG = ctx.createGain();
-          wetG.gain.value = customReverb * 0.7;
+          wetG.gain.value = customReverb * 0.8;
           const reverbMerge = ctx.createGain();
           lastNode.connect(dryG).connect(reverbMerge);
           lastNode.connect(convolver).connect(wetG).connect(reverbMerge);
@@ -826,10 +845,10 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
           nodes.push(convolver, dryG, wetG, reverbMerge);
         }
 
-        // 6. Noise gate
+        // 6. Noise gate (simple gain — just a pass-through at current impl)
         if (customNoiseGate > 0) {
           const gate = ctx.createGain();
-          gate.gain.value = 1.0; // Will be controlled by analyser in real implementation
+          gate.gain.value = 1.0;
           lastNode.connect(gate);
           lastNode = gate;
           nodes.push(gate);
@@ -848,7 +867,7 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
           });
         }
 
-        effectChainRef.current = { source, destination: dest, nodes, originalTrack: micTrack };
+        effectChainRef.current = { source, destination: dest, nodes };
       } catch (e) {
         console.warn("Voice effect chain error:", e);
       }
@@ -856,6 +875,11 @@ const VoiceToolkit: React.FC<VoiceToolkitProps> = ({ room, connected, muted, com
 
     return () => clearTimeout(timer);
   }, [connected, room, muted, customPitch, customReverb, customEcho, customDistortion, customGain, customNoiseGate, getAudioCtx, teardownEffectChain]);
+
+  // Clear the cached original track when disconnecting so next session starts fresh
+  useEffect(() => {
+    if (!connected) { originalMicTrackRef.current = null; }
+  }, [connected]);
 
   // Cleanup effect chain on unmount
   useEffect(() => {
