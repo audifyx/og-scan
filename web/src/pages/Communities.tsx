@@ -1010,7 +1010,7 @@ function TopNav({
             )},
             { id: "explore" as MainView, label: "Explore", icon: <Search className="h-3.5 w-3.5" /> },
             { id: "x_posts" as MainView, label: "𝕏 Feed", icon: <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> },
-            { id: "smart_money" as MainView, label: "Smart $", icon: <Zap className="h-3.5 w-3.5 shrink-0" /> },
+            { id: "raids" as MainView, label: "Raids", icon: <Swords className="h-3.5 w-3.5 shrink-0 text-red-400" /> },
           ]).map(tab => (
             <button
               key={tab.id}
@@ -3933,7 +3933,7 @@ function ComposeModal({
       };
 
       // Determine X cross-post flag upfront
-      const willCrossPost = crossPostToX && xConnected && postType !== "article";
+      const willCrossPost = crossPostToX && postType !== "article";
 
       if (postType === "thread") {
         const { data: parent } = await supabase.from("community_posts").insert({
@@ -4010,7 +4010,7 @@ function ComposeModal({
             <XIcon className="h-4 w-4" />
           </button>
           <div className="flex-1" />
-          {xConnected && postType !== "article" && (
+          {postType !== "article" && (
             <button onClick={() => setCrossPostToX(v => !v)}
               className={cn("flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest transition-all mr-1",
                 crossPostToX ? "bg-white/10 border-white/30 text-white" : "border-white/[0.08] text-white/25 hover:text-white/50")}>
@@ -4340,14 +4340,22 @@ function XPostsFeed({ user, onSelectPost, onOpenProfile }: {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("community_posts")
-      .select("*")
-      .eq("is_x_post", true)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(40);
-    setPosts((data || []) as Post[]);
+    // Fetch posts marked as X cross-posts OR that have a linked tweet
+    const [{ data: flagged }, { data: withTweet }] = await Promise.all([
+      supabase.from("community_posts").select("*")
+        .eq("is_x_post", true).is("deleted_at", null)
+        .order("created_at", { ascending: false }).limit(40),
+      supabase.from("community_posts").select("*")
+        .not("tweet_url", "is", null).is("deleted_at", null)
+        .order("created_at", { ascending: false }).limit(20),
+    ]);
+    const seen = new Set<string>();
+    const merged: Post[] = [];
+    for (const p of [...(flagged || []), ...(withTweet || [])]) {
+      if (!seen.has(p.id)) { seen.add(p.id); merged.push(p as Post); }
+    }
+    merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setPosts(merged);
     setLoading(false);
   }, []);
 
@@ -5153,7 +5161,7 @@ function AlertsHub({ user }: { user: any }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Raids Hub — Community Raids 2.0
+   Raids Hub — Community Raids 3.0 (Premium)
    ═══════════════════════════════════════════════════════════════ */
 
 interface Raid {
@@ -5175,51 +5183,148 @@ interface Raid {
   created_by: string | null;
 }
 
+type RaidFilter = "active" | "all" | "mine" | "ended";
+type RaidTier = "legendary" | "gold" | "silver" | "bronze";
+
+function getRaidTier(raid: Raid): RaidTier {
+  const totalGoal = (raid.goal_likes || 0) + (raid.goal_reposts || 0) + (raid.goal_replies || 0);
+  if (totalGoal >= 2000) return "legendary";
+  if (totalGoal >= 800) return "gold";
+  if (totalGoal >= 300) return "silver";
+  return "bronze";
+}
+
+function getRaidTierStyle(tier: RaidTier) {
+  switch (tier) {
+    case "legendary": return { border: "border-og-gold/40", bg: "bg-og-gold/[0.05]", glow: "shadow-[0_0_20px_hsl(var(--og-gold)/0.12)]", label: "LEGENDARY", icon: "👑", color: "text-og-gold", pill: "bg-og-gold/15 border-og-gold/30 text-og-gold" };
+    case "gold":      return { border: "border-orange-400/30", bg: "bg-orange-400/[0.04]", glow: "shadow-[0_0_12px_rgba(251,146,60,0.1)]", label: "GOLD", icon: "🔥", color: "text-orange-400", pill: "bg-orange-400/15 border-orange-400/30 text-orange-400" };
+    case "silver":    return { border: "border-og-cyan/25", bg: "bg-og-cyan/[0.03]", glow: "", label: "SILVER", icon: "⚡", color: "text-og-cyan", pill: "bg-og-cyan/15 border-og-cyan/30 text-og-cyan" };
+    default:          return { border: "border-white/[0.08]", bg: "bg-white/[0.02]", glow: "", label: "BRONZE", icon: "⚔️", color: "text-white/40", pill: "bg-white/[0.06] border-white/[0.1] text-white/40" };
+  }
+}
+
+function getRaidCountdown(endsAt: string | null): { label: string; urgent: boolean } {
+  if (!endsAt) return { label: "", urgent: false };
+  const ms = new Date(endsAt).getTime() - Date.now();
+  if (ms <= 0) return { label: "ENDED", urgent: false };
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const urgent = h < 2;
+  return { label: h > 0 ? `${h}h ${m}m left` : `${m}m left`, urgent };
+}
+
+function detectPlatform(url: string | null): { name: string; icon: JSX.Element } {
+  if (!url) return { name: "Web", icon: <Globe className="h-3 w-3" /> };
+  if (url.includes("x.com") || url.includes("twitter.com")) return { name: "X / Twitter", icon: <svg viewBox="0 0 24 24" className="h-3 w-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.213 5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> };
+  if (url.includes("t.me") || url.includes("telegram")) return { name: "Telegram", icon: <MessageSquare className="h-3 w-3" /> };
+  if (url.includes("discord")) return { name: "Discord", icon: <Headphones className="h-3 w-3" /> };
+  return { name: "Web", icon: <Globe className="h-3 w-3" /> };
+}
+
+const RAID_PRESETS = [
+  { label: "Quick Blitz", likes: 50, reposts: 25, replies: 10, hours: 6, emoji: "⚡" },
+  { label: "Standard Raid", likes: 200, reposts: 100, replies: 50, hours: 24, emoji: "⚔️" },
+  { label: "Major Assault", likes: 500, reposts: 250, replies: 100, hours: 48, emoji: "🔥" },
+  { label: "Legendary Push", likes: 1000, reposts: 500, replies: 200, hours: 72, emoji: "👑" },
+];
+
 function RaidsHub({ user }: { user: any }) {
   const [raids, setRaids] = useState<Raid[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<RaidFilter>("active");
+  const [myRaidIds, setMyRaidIds] = useState<Set<string>>(new Set());
   const [showCreate, setShowCreate] = useState(false);
 
-  // Form
-  const [rTitle, setRTitle] = useState("");
-  const [rUrl, setRUrl] = useState("");
-  const [rGoalLikes, setRGoalLikes] = useState("100");
-  const [rGoalReposts, setRGoalReposts] = useState("50");
-  const [rEndsIn, setREndsIn] = useState("24");
+  // Create form
+  const [cTitle, setCTitle] = useState("");
+  const [cUrl, setCUrl] = useState("");
+  const [cLikes, setCLikes] = useState("200");
+  const [cReposts, setCReposts] = useState("100");
+  const [cReplies, setCReplies] = useState("50");
+  const [cHours, setCHours] = useState("24");
+  const [cDesc, setCDesc] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    supabase.from("community_raids").select("*").order("created_at", { ascending: false }).limit(20)
-      .then(({ data }) => { setRaids(data || []); setLoading(false); });
+  const loadRaids = useCallback(async () => {
+    const { data } = await supabase.from("community_raids").select("*")
+      .order("created_at", { ascending: false }).limit(50);
+    setRaids((data || []) as Raid[]);
+    setLoading(false);
   }, []);
 
-  const createRaid = async () => {
+  useEffect(() => {
+    loadRaids();
+    // Load user's joined raids
+    if (user) {
+      supabase.from("raid_participants").select("raid_id").eq("user_id", user.id)
+        .then(({ data }) => {
+          if (data) setMyRaidIds(new Set(data.map((r: any) => r.raid_id)));
+        });
+    }
+  }, [loadRaids, user]);
+
+  // Real-time subscription
+  useEffect(() => {
+    const channel = supabase.channel("raids-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_raids" }, () => {
+        loadRaids();
+      }).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadRaids]);
+
+  const isExpired = (r: Raid) => r.ends_at ? new Date(r.ends_at).getTime() < Date.now() : false;
+  const isLive = (r: Raid) => r.status === "active" && !isExpired(r);
+
+  const filteredRaids = raids.filter(r => {
+    if (filter === "active") return isLive(r);
+    if (filter === "mine") return myRaidIds.has(r.id);
+    if (filter === "ended") return !isLive(r);
+    return true;
+  });
+
+  const activeCount = raids.filter(isLive).length;
+  const totalRaiders = raids.reduce((s, r) => s + (r.participants || 0), 0);
+  const avgCompletion = raids.filter(isLive).length > 0
+    ? Math.round(raids.filter(isLive).reduce((s, r) => {
+        const total = (r.goal_likes || 0) + (r.goal_reposts || 0) + (r.goal_replies || 0);
+        const current = (r.current_likes || 0) + (r.current_reposts || 0) + (r.current_replies || 0);
+        return s + (total > 0 ? Math.min(100, (current / total) * 100) : 0);
+      }, 0) / raids.filter(isLive).length)
+    : 0;
+
+  const applyPreset = (preset: typeof RAID_PRESETS[0]) => {
+    setCLikes(String(preset.likes));
+    setCReposts(String(preset.reposts));
+    setCReplies(String(preset.replies));
+    setCHours(String(preset.hours));
+  };
+
+  const launchRaid = async () => {
     if (!user) { toast.error("Sign in first"); return; }
-    if (!rTitle.trim() || !rUrl.trim()) { toast.error("Title and URL required"); return; }
+    if (!cTitle.trim()) { toast.error("Give your raid a name"); return; }
+    if (!cUrl.trim()) { toast.error("Target URL is required"); return; }
     setSaving(true);
     try {
-      const endsAt = new Date(Date.now() + parseInt(rEndsIn) * 3600 * 1000).toISOString();
-      // Extract tweet ID from URL
-      const tweetMatch = rUrl.match(/status\/(\d+)/);
-      const tweetId = tweetMatch?.[1] || null;
+      const endsAt = new Date(Date.now() + parseInt(cHours) * 3600000).toISOString();
+      const tweetMatch = cUrl.match(/status\/(\d+)/);
       const { data, error } = await supabase.from("community_raids").insert({
         created_by: user.id,
-        title: rTitle.trim(),
-        target_url: rUrl.trim(),
-        goal_likes: parseInt(rGoalLikes) || 100,
-        goal_reposts: parseInt(rGoalReposts) || 50,
-        goal_replies: 20,
+        title: cTitle.trim(),
+        target_url: cUrl.trim(),
+        goal_likes: parseInt(cLikes) || 200,
+        goal_reposts: parseInt(cReposts) || 100,
+        goal_replies: parseInt(cReplies) || 50,
         current_likes: 0, current_reposts: 0, current_replies: 0,
         participants: 0,
         status: "active",
         ends_at: endsAt,
-        tweet_id: tweetId,
+        tweet_id: tweetMatch?.[1] || null,
       }).select().single();
       if (error) throw error;
-      setRaids(prev => [data, ...prev]);
-      setRTitle(""); setRUrl(""); setShowCreate(false);
-      toast.success("Raid launched! ⚔️");
-    } catch (e: any) { toast.error(e.message || "Failed"); }
+      setRaids(prev => [data as Raid, ...prev]);
+      setCTitle(""); setCUrl(""); setCDesc(""); setShowCreate(false);
+      toast.success("Raid launched! ⚔️ Let's go!");
+    } catch (e: any) { toast.error(e.message || "Failed to launch"); }
     setSaving(false);
   };
 
@@ -5228,12 +5333,12 @@ function RaidsHub({ user }: { user: any }) {
     try {
       await supabase.from("raid_participants").insert({ raid_id: raid.id, user_id: user.id });
       await supabase.from("community_raids").update({ participants: (raid.participants || 0) + 1 }).eq("id", raid.id);
+      setMyRaidIds(prev => new Set([...prev, raid.id]));
       setRaids(prev => prev.map(r => r.id === raid.id ? { ...r, participants: (r.participants || 0) + 1 } : r));
-      // Open tweet in new tab
       if (raid.target_url) window.open(raid.target_url, "_blank");
-      toast.success("Joined raid! Go engage! 🚀");
+      toast.success("Raid joined! 🚀 Go engage!");
     } catch (e: any) {
-      if ((e as any).code === "23505") { 
+      if ((e as any).code === "23505") {
         if (raid.target_url) window.open(raid.target_url, "_blank");
       } else {
         toast.error("Failed to join");
@@ -5241,161 +5346,341 @@ function RaidsHub({ user }: { user: any }) {
     }
   };
 
-  const progress = (current: number, goal: number) => goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
+  const pct = (current: number, goal: number) => goal > 0 ? Math.min(100, Math.round((current / goal) * 100)) : 0;
+
+  const FILTERS: { key: RaidFilter; label: string }[] = [
+    { key: "active", label: `Active ${activeCount > 0 ? `(${activeCount})` : ""}` },
+    { key: "all", label: "All" },
+    { key: "mine", label: "My Raids" },
+    { key: "ended", label: "Ended" },
+  ];
 
   return (
-    <div>
-      <div className="px-4 py-4 flex items-center justify-between border-b border-white/[0.04]">
-        <div>
+    <div className="flex flex-col min-h-full">
+
+      {/* ── Hero header ── */}
+      <div className="px-4 py-4 border-b border-white/[0.05] bg-gradient-to-b from-red-950/20 to-transparent">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Swords className="h-4 w-4 text-red-400" />
-            <h2 className="text-sm font-black text-white uppercase tracking-wide">Community Raids</h2>
+            <div className="w-8 h-8 rounded-xl bg-red-500/15 border border-red-500/25 flex items-center justify-center">
+              <Swords className="h-4 w-4 text-red-400" />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-white uppercase tracking-wider">Community Raids</h2>
+              <p className="text-[9px] text-white/30">Coordinate targeted engagement campaigns</p>
+            </div>
           </div>
-          <p className="text-[11px] text-white/30 mt-0.5">Coordinate engagement raids on target posts</p>
+          <button onClick={() => setShowCreate(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-black uppercase tracking-wide hover:bg-red-500/30 hover:scale-105 active:scale-95 transition-all">
+            <Plus className="h-3.5 w-3.5 stroke-[3]" /> Launch Raid
+          </button>
         </div>
-        <button onClick={() => setShowCreate(!showCreate)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/15 transition-colors">
-          <Plus className="h-3.5 w-3.5" /> New Raid
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Active Raids", value: activeCount, color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
+            { label: "Total Raiders", value: totalRaiders.toLocaleString(), color: "text-og-gold", bg: "bg-og-gold/10 border-og-gold/20" },
+            { label: "Avg Complete", value: `${avgCompletion}%`, color: "text-og-lime", bg: "bg-og-lime/10 border-og-lime/20" },
+          ].map(s => (
+            <div key={s.label} className={cn("rounded-xl border px-3 py-2 text-center", s.bg)}>
+              <p className={cn("text-sm font-black", s.color)}>{s.value}</p>
+              <p className="text-[9px] text-white/25 mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Filter pills ── */}
+      <div className="flex gap-1.5 px-4 py-2.5 border-b border-white/[0.04] overflow-x-auto scrollbar-hide">
+        {FILTERS.map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)}
+            className={cn("flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all",
+              filter === f.key
+                ? "bg-red-500/20 border border-red-500/35 text-red-400"
+                : "bg-white/[0.03] border border-white/[0.06] text-white/30 hover:text-white/60"
+            )}>
+            {f.label}
+          </button>
+        ))}
+        <button onClick={loadRaids} className="flex-shrink-0 p-1.5 rounded-lg border border-white/[0.06] text-white/20 hover:text-white/50 ml-auto transition-colors">
+          <RefreshCw className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      {showCreate && (
-        <div className="p-4 space-y-3 border-b border-white/[0.06] bg-red-500/[0.02]">
-          <p className="text-xs font-bold text-white">🎯 Launch a Raid</p>
-          <input value={rTitle} onChange={e => setRTitle(e.target.value)} placeholder="Raid name..."
-            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-red-400/40" />
-          <input value={rUrl} onChange={e => setRUrl(e.target.value)} placeholder="Target tweet URL..."
-            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-red-400/40" />
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { label: "Like goal", value: rGoalLikes, set: setRGoalLikes },
-              { label: "Repost goal", value: rGoalReposts, set: setRGoalReposts },
-              { label: "Duration (h)", value: rEndsIn, set: setREndsIn },
-            ].map(({ label, value, set }) => (
-              <div key={label}>
-                <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1">{label}</label>
-                <input type="number" value={value} onChange={e => set(e.target.value)}
-                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-2.5 py-2 text-xs text-white outline-none focus:border-red-400/40" />
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={createRaid} disabled={saving} className="flex-1 h-8 text-xs bg-red-500/80 hover:bg-red-500 text-white">
-              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : "⚔️ Launch Raid"}
-            </Button>
-            <button onClick={() => setShowCreate(false)} className="px-4 text-white/30 text-xs hover:text-white/60">Cancel</button>
-          </div>
-        </div>
-      )}
-
+      {/* ── Raids list ── */}
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-white/20" /></div>
-      ) : raids.length === 0 ? (
-        <div className="py-12 text-center">
-          <Swords className="h-8 w-8 text-white/10 mx-auto mb-2" />
-          <p className="text-sm text-white/20">No active raids</p>
-          <p className="text-[11px] text-white/10 mt-1">Launch a raid to coordinate community engagement</p>
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 className="h-7 w-7 animate-spin text-red-400/40" />
+          <p className="text-xs text-white/20">Loading raids...</p>
+        </div>
+      ) : filteredRaids.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-3">
+          <div className="w-14 h-14 rounded-2xl border border-white/[0.06] bg-white/[0.02] flex items-center justify-center text-2xl">
+            {filter === "mine" ? "🎯" : filter === "ended" ? "🏁" : "⚔️"}
+          </div>
+          <div>
+            <p className="text-sm font-bold text-white/30">
+              {filter === "active" ? "No active raids" : filter === "mine" ? "You haven't joined any raids" : filter === "ended" ? "No ended raids" : "No raids yet"}
+            </p>
+            <p className="text-xs text-white/15 mt-1">
+              {filter === "active" ? "Launch the first raid and rally the community!" : "Join a raid to see it here"}
+            </p>
+          </div>
+          {filter === "active" && (
+            <button onClick={() => setShowCreate(true)}
+              className="mt-1 px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-black uppercase tracking-wide hover:bg-red-500/30 transition-colors">
+              ⚔️ Launch First Raid
+            </button>
+          )}
         </div>
       ) : (
-        <div className="space-y-3 p-4">
-          {raids.map(raid => {
-            const likePct = progress(raid.current_likes, raid.goal_likes);
-            const repostPct = progress(raid.current_reposts, raid.goal_reposts);
-            const isActive = raid.status === "active";
-            const endsIn = raid.ends_at ? new Date(raid.ends_at).getTime() - Date.now() : null;
-            const expired = endsIn != null && endsIn < 0;
-            const totalProgress = Math.round((likePct + repostPct) / 2);
+        <div className="p-4 space-y-3">
+          {filteredRaids.map(raid => {
+            const tier = getRaidTier(raid);
+            const style = getRaidTierStyle(tier);
+            const live = isLive(raid);
+            const expired = isExpired(raid);
+            const { label: countdown, urgent } = getRaidCountdown(raid.ends_at);
+            const joined = myRaidIds.has(raid.id);
+            const platform = detectPlatform(raid.target_url);
 
-            // Format countdown
-            let countdown = "";
-            if (!expired && endsIn != null) {
-              const h = Math.floor(endsIn / 3600000);
-              const m = Math.floor((endsIn % 3600000) / 60000);
-              countdown = h > 0 ? `${h}h ${m}m` : `${m}m`;
-            }
+            const likePct = pct(raid.current_likes || 0, raid.goal_likes);
+            const repostPct = pct(raid.current_reposts || 0, raid.goal_reposts);
+            const replyPct = pct(raid.current_replies || 0, raid.goal_replies || 1);
+            const totalPct = Math.round((likePct + repostPct + (raid.goal_replies ? replyPct : 0)) / (raid.goal_replies ? 3 : 2));
 
             return (
-              <div key={raid.id} className={cn("rounded-2xl border p-4 space-y-3 transition-all",
-                isActive && !expired
-                  ? "border-red-500/20 bg-red-500/[0.03] hover:border-red-500/30"
-                  : "border-white/[0.06] bg-white/[0.02]"
+              <div key={raid.id} className={cn(
+                "rounded-2xl border p-4 space-y-3.5 transition-all",
+                style.border, style.bg, style.glow,
+                live && "hover:scale-[1.005]"
               )}>
-                {/* Header */}
+                {/* Tier + platform badge row */}
+                <div className="flex items-center gap-2">
+                  <span className={cn("text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-widest", style.pill)}>
+                    {style.icon} {style.label}
+                  </span>
+                  <span className="flex items-center gap-1 text-[9px] text-white/25 border border-white/[0.06] px-2 py-0.5 rounded-full">
+                    {platform.icon} {platform.name}
+                  </span>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    {live && (
+                      <span className="flex items-center gap-1 text-[8px] font-black uppercase text-red-400 bg-red-500/15 border border-red-500/25 px-2 py-0.5 rounded-full animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+                        LIVE
+                      </span>
+                    )}
+                    {expired && (
+                      <span className="text-[8px] font-black uppercase text-white/20 bg-white/[0.04] px-2 py-0.5 rounded-full">ENDED</span>
+                    )}
+                    {joined && live && (
+                      <span className="flex items-center gap-1 text-[8px] font-black text-og-lime bg-og-lime/10 border border-og-lime/20 px-2 py-0.5 rounded-full">
+                        <CheckCircle2 className="h-2.5 w-2.5" /> JOINED
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Title + meta */}
                 <div className="flex items-start gap-3">
-                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border",
-                    isActive && !expired ? "bg-red-500/15 border-red-500/25" : "bg-white/[0.04] border-white/[0.06]"
+                  <div className={cn("text-2xl shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border",
+                    live ? `bg-gradient-to-br from-red-500/20 to-transparent ${style.border}` : "border-white/[0.06] bg-white/[0.02]"
                   )}>
-                    {isActive && !expired ? "⚔️" : "🏁"}
+                    {expired ? "🏁" : style.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-sm font-black text-white">{raid.title || "Unnamed Raid"}</p>
-                      {isActive && !expired && (
-                        <span className="text-[8px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded-full font-black uppercase tracking-widest animate-pulse">
-                          LIVE
-                        </span>
-                      )}
-                      {expired && (
-                        <span className="text-[8px] bg-white/[0.06] text-white/30 px-1.5 py-0.5 rounded-full font-black uppercase">ENDED</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      <span className="text-[10px] text-white/25 flex items-center gap-1">
-                        <Users className="h-3 w-3" /> {raid.participants || 0} raiders
+                    <p className="text-sm font-black text-white leading-tight">{raid.title || "Unnamed Raid"}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+                      <span className="flex items-center gap-1 text-[10px] text-white/30">
+                        <Users className="h-3 w-3" />
+                        <span className="font-bold text-white/50">{(raid.participants || 0).toLocaleString()}</span> raiders
+                        {(raid.participants || 0) >= 10 && <Flame className="h-3 w-3 text-orange-400" />}
                       </span>
                       {countdown && (
-                        <span className="text-[10px] text-orange-400/70 flex items-center gap-1 font-bold">
-                          <Clock className="h-3 w-3" /> {countdown} left
+                        <span className={cn("flex items-center gap-1 text-[10px] font-bold",
+                          urgent ? "text-red-400" : "text-white/30"
+                        )}>
+                          <Clock className="h-3 w-3" /> {countdown}
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    {/* Total progress ring */}
-                    <span className={cn("text-[11px] font-black px-2 py-1 rounded-lg",
-                      totalProgress >= 75 ? "text-og-lime bg-og-lime/10" : totalProgress >= 50 ? "text-og-gold bg-og-gold/10" : "text-white/40 bg-white/[0.04]"
-                    )}>{totalProgress}%</span>
-                    <button onClick={() => joinRaid(raid)}
-                      disabled={expired || !isActive}
-                      className={cn("px-3 py-1.5 rounded-xl text-xs font-black transition-all",
-                        isActive && !expired
-                          ? "bg-red-500/20 border border-red-500/35 text-red-400 hover:bg-red-500/30 hover:scale-105 active:scale-95"
-                          : "bg-white/[0.04] border border-white/[0.06] text-white/20 cursor-not-allowed"
-                      )}>
-                      {isActive && !expired ? "🚀 Raid" : "✓"}
-                    </button>
+                  {/* Completion ring */}
+                  <div className="shrink-0 flex flex-col items-center gap-0.5">
+                    <div className={cn("text-base font-black px-2.5 py-1.5 rounded-xl",
+                      totalPct >= 80 ? "text-og-lime bg-og-lime/15" :
+                      totalPct >= 50 ? "text-og-gold bg-og-gold/10" :
+                      totalPct >= 25 ? "text-og-cyan bg-og-cyan/10" :
+                      "text-white/30 bg-white/[0.04]"
+                    )}>{totalPct}%</div>
+                    <p className="text-[8px] text-white/20">done</p>
                   </div>
                 </div>
 
                 {/* Progress bars */}
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {[
-                    { label: "❤️ Likes", current: raid.current_likes || 0, goal: raid.goal_likes, pct: likePct, color: "bg-red-400" },
-                    { label: "🔁 Reposts", current: raid.current_reposts || 0, goal: raid.goal_reposts, pct: repostPct, color: "bg-og-lime" },
-                    ...(raid.goal_replies ? [{ label: "💬 Replies", current: raid.current_replies || 0, goal: raid.goal_replies, pct: progress(raid.current_replies || 0, raid.goal_replies), color: "bg-og-cyan" }] : []),
+                    { label: "Likes", emoji: "❤️", current: raid.current_likes || 0, goal: raid.goal_likes, pct: likePct, bar: "bg-red-400" },
+                    { label: "Reposts", emoji: "🔁", current: raid.current_reposts || 0, goal: raid.goal_reposts, pct: repostPct, bar: "bg-og-lime" },
+                    ...(raid.goal_replies ? [{ label: "Replies", emoji: "💬", current: raid.current_replies || 0, goal: raid.goal_replies, pct: replyPct, bar: "bg-og-cyan" }] : []),
                   ].map(bar => (
                     <div key={bar.label}>
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] text-white/30">{bar.label}</span>
-                        <span className="text-[10px] font-bold text-white/40">{bar.current.toLocaleString()} / {bar.goal.toLocaleString()}</span>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] text-white/40 flex items-center gap-1">{bar.emoji} {bar.label}</span>
+                        <span className="text-[10px] font-bold text-white/30">
+                          {bar.current.toLocaleString()} <span className="text-white/15">/ {bar.goal.toLocaleString()}</span>
+                        </span>
                       </div>
-                      <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full transition-all duration-700", bar.color)} style={{ width: `${bar.pct}%` }} />
+                      <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                        <div className={cn("h-full rounded-full transition-all duration-1000", bar.bar)}
+                          style={{ width: `${bar.pct}%` }} />
                       </div>
                     </div>
                   ))}
                 </div>
 
-                {raid.target_url && (
-                  <a href={raid.target_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 w-full rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[10px] text-og-cyan/60 hover:text-og-cyan hover:border-og-cyan/20 transition-colors">
-                    <ExternalLink className="h-3 w-3" /> View target post
-                    <ArrowRight className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100" />
-                  </a>
-                )}
+                {/* Actions row */}
+                <div className="flex items-center gap-2 pt-0.5">
+                  {raid.target_url && (
+                    <a href={raid.target_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 flex-1 justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[11px] font-bold text-white/40 hover:text-white/70 hover:border-white/15 transition-all">
+                      <ExternalLink className="h-3.5 w-3.5" /> View Target
+                    </a>
+                  )}
+                  <button onClick={() => joinRaid(raid)}
+                    disabled={expired || !live}
+                    className={cn("flex items-center gap-1.5 flex-1 justify-center rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-wider transition-all",
+                      joined && live
+                        ? "bg-og-lime/15 border border-og-lime/30 text-og-lime hover:bg-og-lime/25"
+                        : live
+                          ? `bg-red-500/25 border ${style.border} ${style.color} hover:bg-red-500/35 hover:scale-105 active:scale-95`
+                          : "bg-white/[0.03] border border-white/[0.06] text-white/15 cursor-not-allowed"
+                    )}>
+                    {joined && live ? <><CheckCircle2 className="h-3.5 w-3.5" /> Engage Again</> :
+                     live ? <><Swords className="h-3.5 w-3.5" /> Join Raid</> :
+                     <><CheckCircle2 className="h-3.5 w-3.5" /> Finished</>}
+                  </button>
+                </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── Create Raid Modal ── */}
+      {showCreate && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center px-3 pb-0 sm:pb-0"
+          onClick={() => setShowCreate(false)}>
+          <div className="bg-[#08080e] border border-white/[0.09] rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[88vh] overflow-y-auto shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.06]">
+              <div className="w-8 h-8 rounded-xl bg-red-500/15 border border-red-500/25 flex items-center justify-center">
+                <Swords className="h-4 w-4 text-red-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-black text-white">Launch a Raid</h3>
+                <p className="text-[10px] text-white/30">Set your target and rally the community</p>
+              </div>
+              <button onClick={() => setShowCreate(false)} className="text-white/25 hover:text-white/60 transition-colors">
+                <XIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Presets */}
+              <div>
+                <p className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-2">Quick Presets</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {RAID_PRESETS.map(p => (
+                    <button key={p.label} onClick={() => applyPreset(p)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.07] bg-white/[0.03] hover:border-red-500/25 hover:bg-red-500/[0.05] transition-all text-left">
+                      <span className="text-sm">{p.emoji}</span>
+                      <div>
+                        <p className="text-[10px] font-black text-white/60">{p.label}</p>
+                        <p className="text-[8px] text-white/20">{p.likes}L · {p.reposts}RT · {p.hours}h</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Raid name */}
+              <div>
+                <label className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block">Raid Name *</label>
+                <input value={cTitle} onChange={e => setCTitle(e.target.value)}
+                  placeholder="e.g. Pump $OGS to trending…"
+                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-red-400/40 transition-colors" />
+              </div>
+
+              {/* Target URL */}
+              <div>
+                <label className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block">Target URL *</label>
+                <input value={cUrl} onChange={e => setCUrl(e.target.value)}
+                  placeholder="https://x.com/…"
+                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/20 outline-none focus:border-red-400/40 font-mono text-xs transition-colors" />
+                {cUrl && (
+                  <p className="mt-1.5 flex items-center gap-1 text-[10px] text-og-cyan/60">
+                    {detectPlatform(cUrl).icon} Detected: {detectPlatform(cUrl).name}
+                  </p>
+                )}
+              </div>
+
+              {/* Goals */}
+              <div>
+                <label className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block">Engagement Goals</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "❤️ Likes", value: cLikes, set: setCLikes },
+                    { label: "🔁 Reposts", value: cReposts, set: setCReposts },
+                    { label: "💬 Replies", value: cReplies, set: setCReplies },
+                  ].map(f => (
+                    <div key={f.label}>
+                      <label className="text-[9px] text-white/20 mb-1 block">{f.label}</label>
+                      <input type="number" value={f.value} onChange={e => f.set(e.target.value)}
+                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-2.5 py-2 text-sm text-white font-bold outline-none focus:border-red-400/40 text-center" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Duration */}
+              <div>
+                <label className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block">Duration</label>
+                <div className="flex gap-1.5">
+                  {[6, 12, 24, 48, 72].map(h => (
+                    <button key={h} onClick={() => setCHours(String(h))}
+                      className={cn("flex-1 py-2 rounded-xl text-xs font-black transition-all border",
+                        cHours === String(h)
+                          ? "bg-red-500/20 border-red-500/35 text-red-400"
+                          : "border-white/[0.08] text-white/25 hover:border-white/20 hover:text-white/50"
+                      )}>
+                      {h}h
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tier preview */}
+              {(parseInt(cLikes) || 0) + (parseInt(cReposts) || 0) + (parseInt(cReplies) || 0) > 0 && (() => {
+                const fakeRaid = { goal_likes: parseInt(cLikes) || 0, goal_reposts: parseInt(cReposts) || 0, goal_replies: parseInt(cReplies) || 0 } as Raid;
+                const t = getRaidTier(fakeRaid);
+                const ts = getRaidTierStyle(t);
+                return (
+                  <div className={cn("flex items-center gap-2 px-3 py-2 rounded-xl border", ts.pill)}>
+                    <span className="text-sm">{ts.icon}</span>
+                    <span className="text-[11px] font-black">{ts.label} TIER RAID</span>
+                    <span className="text-[10px] opacity-60 ml-auto">{parseInt(cLikes) + parseInt(cReposts) + parseInt(cReplies)} total engagements</span>
+                  </div>
+                );
+              })()}
+
+              <Button onClick={launchRaid} disabled={saving || !cTitle.trim() || !cUrl.trim()}
+                className="w-full h-11 rounded-xl bg-red-500 hover:bg-red-400 text-white font-black uppercase tracking-wider text-sm">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Swords className="h-4 w-4 mr-2" />}
+                {saving ? "Launching…" : "⚔️ Launch Raid"}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
