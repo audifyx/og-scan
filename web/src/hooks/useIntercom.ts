@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 
 declare global {
   interface Window {
@@ -9,50 +10,14 @@ declare global {
 }
 
 const APP_ID = "wlc3xyxr";
-const API_SECRET = "fH_Du3SxV-661q0cmStXwMH7BuAyOOveIrvqhkdpDY0";
-
-/* ── Minimal JWT (HMAC-SHA256) using Web Crypto ── */
-
-function base64url(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  let str = "";
-  for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
-  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function encodeUtf8(s: string): Uint8Array {
-  return new TextEncoder().encode(s);
-}
-
-async function signJwt(
-  payload: Record<string, unknown>,
-  secret: string,
-): Promise<string> {
-  const header = { alg: "HS256", typ: "JWT" };
-  const segments = [
-    base64url(encodeUtf8(JSON.stringify(header)).buffer),
-    base64url(encodeUtf8(JSON.stringify(payload)).buffer),
-  ];
-  const signingInput = segments.join(".");
-
-  const padded = secret.replace(/-/g, "+").replace(/_/g, "/");
-  const rawSecret = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    rawSecret,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, encodeUtf8(signingInput));
-  return `${signingInput}.${base64url(sig)}`;
-}
 
 /**
  * Keeps Intercom / Fin in sync with auth state.
- * index.html handles the initial boot via window.intercomSettings.
- * This hook only updates identity when a user logs in/out.
+ *
+ * - index.html handles the initial visitor boot via window.intercomSettings
+ * - On login  → fetches a signed JWT from the intercom-token edge function
+ *               (secret never leaves the server) then calls Intercom("update")
+ * - On logout → shutdown + re-boot as anonymous visitor
  */
 export function useIntercom() {
   const { user, profile } = useAuth();
@@ -64,26 +29,28 @@ export function useIntercom() {
 
     async function identify() {
       if (user) {
-        // Already identified this user — skip
+        // Already identified this user — nothing to do
         if (identifiedRef.current === user.id) return;
 
-        const now = Math.floor(Date.now() / 1000);
-        const jwt = await signJwt(
-          {
-            user_id: user.id,
-            email: user.email ?? undefined,
-            iat: now,
-            exp: now + 3600,
-          },
-          API_SECRET,
-        );
+        // Fetch server-signed JWT — secret stays server-side
+        let jwt: string | null = null;
+        try {
+          const { data, error } = await supabase.functions.invoke(
+            "intercom-token",
+            { method: "POST" },
+          );
+          if (!error && data?.token) jwt = data.token;
+        } catch {
+          // Edge function unreachable — fall back to unverified identity
+        }
 
         if (cancelled) return;
 
-        // Update Intercom with the logged-in user's identity
         window.Intercom("update", {
           app_id: APP_ID,
-          intercom_user_jwt: jwt,
+          ...(jwt
+            ? { intercom_user_jwt: jwt }
+            : { user_id: user.id, email: user.email ?? undefined }),
           name:
             profile?.display_name ??
             profile?.username ??
@@ -92,10 +59,9 @@ export function useIntercom() {
         });
         identifiedRef.current = user.id;
       } else {
-        // User logged out — reset to visitor
+        // Logged out — reset to anonymous visitor
         if (identifiedRef.current !== null) {
           window.Intercom("shutdown");
-          // Re-boot as visitor so launcher stays visible
           window.Intercom("boot", {
             api_base: "https://api-iam.intercom.io",
             app_id: APP_ID,
