@@ -5678,9 +5678,9 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
 
       {/* ── Create Raid Modal ── */}
       {showCreate && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center px-3 pb-0 sm:pb-0"
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center px-4 py-6"
           onClick={() => setShowCreate(false)}>
-          <div className="bg-[#08080e] border border-white/[0.09] rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[88vh] overflow-y-auto shadow-2xl"
+          <div className="bg-[#08080e] border border-white/[0.09] rounded-2xl w-full max-w-md flex flex-col max-h-[85vh] shadow-2xl"
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.06]">
               <div className="w-8 h-8 rounded-xl bg-red-500/15 border border-red-500/25 flex items-center justify-center">
@@ -5695,7 +5695,7 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
               {/* Presets */}
               <div>
                 <p className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-2">Quick Presets</p>
@@ -5783,6 +5783,9 @@ function RaidsHub({ user, prefill, onPrefillConsumed }: { user: any; prefill?: {
                 );
               })()}
 
+            </div>
+            {/* Sticky footer with Launch button */}
+            <div className="px-5 py-4 border-t border-white/[0.06] shrink-0">
               <Button onClick={launchRaid} disabled={saving || !cTitle.trim() || !cUrl.trim()}
                 className="w-full h-11 rounded-xl bg-red-500 hover:bg-red-400 text-white font-black uppercase tracking-wider text-sm">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Swords className="h-4 w-4 mr-2" />}
