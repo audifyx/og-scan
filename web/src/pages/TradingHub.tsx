@@ -1,4 +1,4 @@
-// useNavigate removed — trading hub uses in-app tab navigation to keep sidebar visible
+import { useNavigate } from "react-router-dom";
 import {
   Rocket, MessageSquare, Bell, ArrowRight, Zap, Users,
   TrendingUp, Radio, ChevronRight,
@@ -7,18 +7,9 @@ import { cn } from "@/lib/utils";
 
 /* ─── Hub cards ─────────────────────────────────────────────────────────── */
 
-/** Hub card → in-app tab ID mapping (keeps sidebar visible) */
-const HUB_TAB_MAP: Record<string, string> = {
-  "/launch":           "snipe-feed",
-  "/trading-lobbies":  "community",   // voice lobbies live in community hub
-  "/callouts":         "trading-hub", // stays on hub (callouts tab inside community)
-  "/leaderboard":      "trading-hub",
-};
-
 const hubs = [
   {
     to: "/launch",
-    tabId: "snipe-feed",
     icon: Rocket,
     label: "Token Launcher",
     eyebrow: "Launch & track tokens",
@@ -37,7 +28,6 @@ const hubs = [
   },
   {
     to: "/trading-lobbies",
-    tabId: "community",
     icon: MessageSquare,
     label: "Trading Lobbies",
     eyebrow: "Voice + live charts",
@@ -56,7 +46,6 @@ const hubs = [
   },
   {
     to: "/callouts",
-    tabId: "trading-hub",
     icon: Bell,
     label: "Callouts",
     eyebrow: "Trade alerts",
@@ -79,7 +68,8 @@ const hubs = [
 
 // Named export for use inside the tab system (no layout wrapper)
 export function TradingHubContent({ onNavigate }: { onNavigate?: (tab: string) => void } = {}) {
-  const go = (tabId: string) => { if (onNavigate) onNavigate(tabId); };
+  const navigate = useNavigate();
+
   return (
     <div className="px-4 py-8 lg:px-8">
 
@@ -100,47 +90,38 @@ export function TradingHubContent({ onNavigate }: { onNavigate?: (tab: string) =
         </div>
 
         {/* ── Hub cards ──────────────────────────────────────────────────── */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {hubs.map((hub) => {
             const Icon = hub.icon;
             return (
               <button
                 key={hub.to}
                 type="button"
-                onClick={() => go(hub.tabId || hub.to)}
+                onClick={() => navigate(hub.to)}
                 className={cn(
                   "group relative flex flex-col overflow-hidden rounded-2xl border bg-white/[0.03] p-6 text-left transition-all duration-300",
                   "hover:bg-white/[0.06] active:scale-[0.98]",
                   hub.border,
+                  hub.glow,
                 )}
               >
-                {/* ambient gradient */}
-                <div className={cn(
-                  "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-50 transition-opacity duration-300 group-hover:opacity-80",
-                  hub.accentFrom, hub.accentTo,
-                )} />
+                {/* glow bg */}
+                <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500", hub.accentFrom, hub.accentTo)} />
 
-                {/* top row */}
-                <div className="relative flex items-start justify-between mb-5">
-                  <div className={cn(
-                    "flex h-12 w-12 items-center justify-center rounded-xl border transition-all duration-300",
-                    hub.iconBg,
-                    `group-hover:${hub.glow}`,
-                  )}>
+                {/* tag */}
+                <span className={cn("relative mb-4 inline-flex items-center self-start rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest", hub.tagColor)}>
+                  {hub.tag}
+                </span>
+
+                {/* icon + label */}
+                <div className="relative flex items-center gap-3 mb-3">
+                  <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border", hub.iconBg)}>
                     <Icon className="h-5 w-5" />
                   </div>
-                  <span className={cn(
-                    "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                    hub.tagColor,
-                  )}>
-                    {hub.tag}
-                  </span>
-                </div>
-
-                {/* label */}
-                <div className="relative mb-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-0.5">{hub.eyebrow}</p>
-                  <h2 className="text-[18px] font-black text-white leading-tight">{hub.label}</h2>
+                  <div>
+                    <p className="text-[15px] font-black text-white leading-tight">{hub.label}</p>
+                    <p className="text-[10px] text-white/35 uppercase tracking-wider">{hub.eyebrow}</p>
+                  </div>
                 </div>
 
                 {/* description */}
@@ -173,17 +154,17 @@ export function TradingHubContent({ onNavigate }: { onNavigate?: (tab: string) =
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30 mb-4">Quick Access</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
-              { label: "Launch Token", to: "/launch", tabId: "snipe-feed", icon: Rocket, color: "text-og-lime" },
-              { label: "Join Lobby", to: "/trading-lobbies", tabId: "community", icon: Radio, color: "text-og-cyan" },
-              { label: "Post Callout", to: "/callouts", tabId: "trading-hub", icon: Zap, color: "text-violet-300" },
-              { label: "Leaderboard", to: "/leaderboard", tabId: "trading-hub", icon: Users, color: "text-amber-300" },
+              { label: "Launch Token",  to: "/launch",           icon: Rocket, color: "text-og-lime" },
+              { label: "Join Lobby",    to: "/trading-lobbies",  icon: Radio,  color: "text-og-cyan" },
+              { label: "Post Callout",  to: "/callouts",         icon: Zap,    color: "text-violet-300" },
+              { label: "Leaderboard",   to: "/leaderboard",      icon: Users,  color: "text-amber-300" },
             ].map((link) => {
               const Icon = link.icon;
               return (
                 <button
                   key={link.to}
                   type="button"
-                  onClick={() => go(link.tabId)}
+                  onClick={() => navigate(link.to)}
                   className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2.5 text-left transition hover:bg-white/[0.06] hover:border-white/[0.12] active:scale-[0.97]"
                 >
                   <Icon className={cn("h-3.5 w-3.5 shrink-0", link.color)} />

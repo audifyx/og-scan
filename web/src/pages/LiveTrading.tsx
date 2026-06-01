@@ -22,7 +22,7 @@ const LiveTrading = () => {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#0a0a0f]" style={{ minHeight: "calc(100vh - 4rem)" }}>
+    <div className="flex flex-col w-full bg-[#0a0a0f]" style={{ height: "100%", minHeight: "100%" }}>
 
       {/* ── Browser chrome ── */}
       <div className="shrink-0 bg-[#141420] border-b border-white/[0.06]">

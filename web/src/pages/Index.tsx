@@ -991,6 +991,12 @@ const Index = () => {
               <DiscoverHub />
             </Suspense>
           </main>
+        ) : tab === "live-trading" ? (
+          <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
+            <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading...</div>}>
+              <LiveTradingPage />
+            </Suspense>
+          </main>
         ) : tab === "live-feed-page" ? (
           <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
             <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading Streams...</div>}>
