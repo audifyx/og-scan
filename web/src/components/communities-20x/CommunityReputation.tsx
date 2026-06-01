@@ -41,7 +41,7 @@ interface Props {
 const LEVELS: Array<{ level: number; title: string; minXp: number; color: string }> = [
   { level: 1, title: "Newbie", minXp: 0, color: "text-white/30" },
   { level: 2, title: "Explorer", minXp: 100, color: "text-white/40" },
-  { level: 3, title: "Scout", minXp: 300, color: "text-blue-400" },
+  { level: 3, title: "Scout", minXp: 300, color: "text-primary" },
   { level: 4, title: "Analyst", minXp: 700, color: "text-cyan-400" },
   { level: 5, title: "Researcher", minXp: 1500, color: "text-emerald-400" },
   { level: 6, title: "Community Voice", minXp: 3000, color: "text-lime-400" },

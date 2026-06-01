@@ -54,17 +54,17 @@ const CreatePollModal = ({ spaceId, userId, onClose }: { spaceId: string; userId
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-sm bg-[#0c1219] rounded-2xl border border-white/[0.08] p-5 shadow-2xl">
         <h3 className="text-base font-black text-white mb-4 flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-blue-400" /> Create Poll
+          <BarChart3 className="h-4 w-4 text-primary" /> Create Poll
         </h3>
 
         <input value={question} onChange={e => setQuestion(e.target.value)} placeholder="Ask a question..."
-          className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/30 mb-3" />
+          className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-primary/20 mb-3" />
 
         <div className="space-y-2 mb-3">
           {options.map((opt, i) => (
             <div key={i} className="flex gap-2">
               <input value={opt} onChange={e => updateOption(i, e.target.value)} placeholder={`Option ${i + 1}`}
-                className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] text-sm text-white placeholder:text-white/15 focus:outline-none focus:border-blue-500/20" />
+                className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06] text-sm text-white placeholder:text-white/15 focus:outline-none focus:border-primary/20" />
               {options.length > 2 && (
                 <button onClick={() => removeOption(i)} className="p-2 rounded-lg bg-white/[0.04] hover:bg-red-500/10 text-white/20 hover:text-red-400 transition-colors">
                   <X className="h-3.5 w-3.5" />
@@ -75,7 +75,7 @@ const CreatePollModal = ({ spaceId, userId, onClose }: { spaceId: string; userId
         </div>
 
         {options.length < 6 && (
-          <button onClick={addOption} className="text-[11px] text-blue-400/60 hover:text-blue-400 font-bold mb-4 flex items-center gap-1">
+          <button onClick={addOption} className="text-[11px] text-primary/60 hover:text-primary font-bold mb-4 flex items-center gap-1">
             <Plus className="h-3 w-3" /> Add option
           </button>
         )}
@@ -83,7 +83,7 @@ const CreatePollModal = ({ spaceId, userId, onClose }: { spaceId: string; userId
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm font-bold text-white/40 hover:bg-white/[0.08] transition-all">Cancel</button>
           <button onClick={handleCreate} disabled={creating || !question.trim() || options.filter(o => o.trim()).length < 2}
-            className="flex-1 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-sm font-black transition-all disabled:opacity-30 flex items-center justify-center gap-1.5">
+            className="flex-1 py-2.5 rounded-xl bg-blue-500 hover:bg-primary text-white text-sm font-black transition-all disabled:opacity-30 flex items-center justify-center gap-1.5">
             {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Vote className="h-3.5 w-3.5" /> Launch Poll</>}
           </button>
         </div>
@@ -116,13 +116,13 @@ const PollCard = ({ poll, userId, isHost }: { poll: Poll; userId: string; isHost
   return (
     <div className={cn(
       "rounded-xl border p-3.5 transition-all",
-      poll.is_active ? "border-blue-500/15 bg-blue-500/[0.03]" : "border-white/[0.06] bg-white/[0.02] opacity-70"
+      poll.is_active ? "border-primary/20 bg-blue-500/[0.03]" : "border-white/[0.06] bg-white/[0.02] opacity-70"
     )}>
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-1.5 mb-1">
-            <BarChart3 className="h-3 w-3 text-blue-400" />
-            {poll.is_active && <span className="text-[8px] font-bold text-blue-400 px-1.5 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 uppercase">Live</span>}
+            <BarChart3 className="h-3 w-3 text-primary" />
+            {poll.is_active && <span className="text-[8px] font-bold text-primary px-1.5 py-0.5 rounded-full bg-primary/15 border border-primary/20 uppercase">Live</span>}
             {!poll.is_active && <span className="text-[8px] font-bold text-white/25 px-1.5 py-0.5 rounded-full bg-white/[0.04]">Ended</span>}
           </div>
           <p className="text-sm font-bold text-white leading-tight">{poll.question}</p>
@@ -144,22 +144,22 @@ const PollCard = ({ poll, userId, isHost }: { poll: Poll; userId: string; isHost
               className={cn(
                 "w-full text-left rounded-lg relative overflow-hidden transition-all",
                 !hasVoted && poll.is_active
-                  ? "px-3 py-2.5 bg-white/[0.04] border border-white/[0.08] hover:border-blue-500/25 hover:bg-blue-500/[0.03] cursor-pointer"
+                  ? "px-3 py-2.5 bg-white/[0.04] border border-white/[0.08] hover:border-primary/20 hover:bg-blue-500/[0.03] cursor-pointer"
                   : "px-3 py-2.5 bg-white/[0.02] border border-white/[0.04] cursor-default",
-                isMyVote && "border-blue-500/30 bg-blue-500/[0.05]",
+                isMyVote && "border-primary/20 bg-blue-500/[0.05]",
                 isWinner && "border-amber-500/30 bg-amber-500/[0.05]",
               )}>
               {/* Progress bar */}
               {(hasVoted || !poll.is_active) && (
                 <div className={cn(
                   "absolute inset-y-0 left-0 transition-all duration-700 ease-out rounded-lg",
-                  isWinner ? "bg-amber-500/10" : isMyVote ? "bg-blue-500/10" : "bg-white/[0.03]",
+                  isWinner ? "bg-amber-500/10" : isMyVote ? "bg-primary/15" : "bg-white/[0.03]",
                 )} style={{ width: `${pct}%` }} />
               )}
               <div className="relative flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  {isMyVote && <Check className="h-3 w-3 text-blue-400" />}
-                  <span className={cn("text-[12px] font-medium", isMyVote ? "text-blue-400" : "text-white/70")}>{opt}</span>
+                  {isMyVote && <Check className="h-3 w-3 text-primary" />}
+                  <span className={cn("text-[12px] font-medium", isMyVote ? "text-primary" : "text-white/70")}>{opt}</span>
                 </div>
                 {(hasVoted || !poll.is_active) && (
                   <div className="flex items-center gap-1.5">
@@ -213,14 +213,14 @@ const LivePolls: React.FC<LivePollsProps> = ({ spaceId, userId, isHost, isCoHost
       {/* Header */}
       <button onClick={() => setExpanded(!expanded)} className="flex items-center justify-between w-full px-1">
         <div className="flex items-center gap-2">
-          <BarChart3 className="h-3.5 w-3.5 text-blue-400" />
+          <BarChart3 className="h-3.5 w-3.5 text-primary" />
           <span className="text-[11px] font-bold text-white/50">Polls</span>
-          {activePolls.length > 0 && <span className="text-[9px] font-bold text-blue-400 px-1.5 py-0.5 rounded-full bg-blue-500/10">{activePolls.length} active</span>}
+          {activePolls.length > 0 && <span className="text-[9px] font-bold text-primary px-1.5 py-0.5 rounded-full bg-primary/15">{activePolls.length} active</span>}
         </div>
         <div className="flex items-center gap-2">
           {(isHost || isCoHost) && (
             <button onClick={(e) => { e.stopPropagation(); setShowCreate(true); }}
-              className="text-[10px] font-bold text-blue-400/60 hover:text-blue-400 px-2 py-1 rounded-lg bg-blue-500/5 hover:bg-blue-500/10 transition-all flex items-center gap-1">
+              className="text-[10px] font-bold text-primary/60 hover:text-primary px-2 py-1 rounded-lg bg-primary/15 hover:bg-primary/15 transition-all flex items-center gap-1">
               <Plus className="h-2.5 w-2.5" /> New Poll
             </button>
           )}

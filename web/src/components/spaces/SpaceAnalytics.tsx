@@ -76,7 +76,7 @@ const SpaceAnalytics: React.FC<SpaceAnalyticsProps> = ({ spaceId, isHost }) => {
 
       {expanded && stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <StatCard icon={Eye} label="Peak Listeners" value={stats.peakListeners} color="text-blue-400" />
+          <StatCard icon={Eye} label="Peak Listeners" value={stats.peakListeners} color="text-primary" />
           <StatCard icon={Clock} label="Duration" value={`${stats.durationMinutes}m`} color="text-amber-400" />
           <StatCard icon={MessageSquare} label="Messages" value={stats.totalMessages} color="text-purple-400" />
           <StatCard icon={Mic} label="Speakers" value={stats.totalSpeakers} color="text-emerald-400" />

@@ -147,7 +147,7 @@ const GreenRoom: React.FC<GreenRoomProps> = ({ spaceId, spaceName, isHost, userI
         <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Volume2 className="h-4 w-4 text-blue-400" /> Mic Check
+              <Volume2 className="h-4 w-4 text-primary" /> Mic Check
             </h3>
             {micOk && (
               <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
@@ -162,7 +162,7 @@ const GreenRoom: React.FC<GreenRoomProps> = ({ spaceId, spaceName, isHost, userI
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-75",
-                  micLevel > 60 ? "bg-emerald-400" : micLevel > 20 ? "bg-blue-400" : "bg-white/20"
+                  micLevel > 60 ? "bg-emerald-400" : micLevel > 20 ? "bg-primary" : "bg-white/20"
                 )}
                 style={{ width: `${micLevel}%` }}
               />
@@ -179,7 +179,7 @@ const GreenRoom: React.FC<GreenRoomProps> = ({ spaceId, spaceName, isHost, userI
               "w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
               micTesting
                 ? "bg-red-500/15 border border-red-500/25 text-red-400"
-                : "bg-blue-500/15 border border-blue-500/25 text-blue-400 hover:bg-blue-500/25"
+                : "bg-primary/15 border border-primary/20 text-primary hover:bg-primary/15"
             )}
           >
             {micTesting ? <><MicOff className="h-4 w-4" /> Stop Test</> : <><Mic className="h-4 w-4" /> Test Microphone</>}
