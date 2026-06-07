@@ -18,6 +18,7 @@ import {
 import { AppLayout } from "@/components/layout/AppLayout";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdmin } from "@/hooks/useAdmin";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import type { AdminSection } from "@/components/admin/types";
 
@@ -162,6 +163,7 @@ const APP_CHIPS = [
 export default function Admin() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdmin();
   const [section, setSection] = useState<AdminSection>("overview");
   const [badges, setBadges] = useState<Partial<Record<AdminSection, number>>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -201,6 +203,32 @@ export default function Admin() {
       });
     })();
   }, [section]);
+
+  // ── Owner-only gate ─────────────────────────────────────────────────────────
+  // ProtectedRoute only checks auth. We enforce owner-only here server-side style.
+  if (adminLoading) {
+    return (
+      <div className="min-h-screen bg-[#020915] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-og-lime" />
+      </div>
+    );
+  }
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-[#020915] flex flex-col items-center justify-center gap-4 text-white">
+        <Shield className="h-12 w-12 text-red-500" />
+        <h1 className="text-xl font-bold">Access Denied</h1>
+        <p className="text-white/50 text-sm">You don't have permission to view this page.</p>
+        <button
+          onClick={() => navigate("/")}
+          className="mt-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm transition-colors"
+        >
+          Go Home
+        </button>
+      </div>
+    );
+  }
+  // ────────────────────────────────────────────────────────────────────────────
 
   const activeMeta = SECTION_META[section];
 
