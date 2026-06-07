@@ -69,8 +69,10 @@ const baseHeaders = {
   "Content-Type": "application/json",
 };
 
+const IP_SIGNUP_LIMIT = 5; // max accounts per IP address
+
 function setCors(res: VercelResponse) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Origin", "https://ogscan.fun");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
@@ -110,6 +112,29 @@ async function fetchFirstProfileMatch(field: string, value: string, sinceIso: st
   }>;
 
   return rows[0] ?? null;
+}
+
+/** Count distinct accounts created from a given IP (using first_seen_ip — permanent signup IP) */
+async function countAccountsBySignupIp(ip: string): Promise<number> {
+  const params = new URLSearchParams();
+  params.set("select", "user_id");
+  params.set("first_seen_ip", `eq.${ip}`);
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?${params.toString()}`, {
+    headers: { ...baseHeaders, Prefer: "count=exact", "Range-Unit": "items", Range: "0-0" },
+  });
+
+  // Supabase returns count in Content-Range header: "0-0/COUNT"
+  const contentRange = response.headers.get("content-range") ?? "";
+  const match = contentRange.match(/\/(\d+)$/);
+  if (match) return parseInt(match[1], 10);
+
+  // Fallback: count from body
+  if (response.ok) {
+    const rows = await response.json();
+    return Array.isArray(rows) ? rows.length : 0;
+  }
+  return 0;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -195,18 +220,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sinceIso = new Date(Date.now() - YEAR_MS).toISOString();
     const clientIp = getClientIp(req);
 
-    const [deviceMatch, usernameMatch, lastIpMatch, firstIpMatch] = await Promise.all([
+    const [deviceMatch, usernameMatch, ipCount] = await Promise.all([
       fetchFirstProfileMatch("last_fingerprint", fingerprint, sinceIso),
       fetchFirstProfileMatch("username", cleanUsername, "1970-01-01T00:00:00.000Z"),
-      clientIp !== "unknown" ? fetchFirstProfileMatch("last_ip", clientIp, sinceIso) : Promise.resolve(null),
-      clientIp !== "unknown" ? fetchFirstProfileMatch("first_seen_ip", clientIp, sinceIso) : Promise.resolve(null),
+      clientIp !== "unknown" ? countAccountsBySignupIp(clientIp) : Promise.resolve(0),
     ]);
 
+    // 1 account per device (fingerprint) — hard block
     if (deviceMatch) {
       res.status(200).json({
         allowed: false,
         code: "device_limit",
-        message: "This device already created an account in the last year.",
+        message: "An account has already been created from this device.",
+      });
+      return;
+    }
+
+    // 5 accounts per IP — prevents bot farms while allowing families/shared Wi-Fi
+    if (clientIp !== "unknown" && ipCount >= IP_SIGNUP_LIMIT) {
+      res.status(200).json({
+        allowed: false,
+        code: "ip_limit",
+        message: `The maximum number of accounts (${IP_SIGNUP_LIMIT}) for this network has been reached.`,
       });
       return;
     }
@@ -223,14 +258,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json({
       allowed: true,
       rules: {
-        oneAccountPerDevicePerYear: true,
-        oneAccountPerIpPerYear: false,
+        oneAccountPerDevice: true,
+        fiveAccountsPerIp: true,
         humanVerificationRequired: true,
       },
       ipSignals: {
         detected: clientIp !== "unknown",
-        recentLastIpMatch: Boolean(lastIpMatch),
-        recentFirstSeenIpMatch: Boolean(firstIpMatch),
+        accountsOnThisIp: ipCount,
+        remainingSlots: Math.max(0, IP_SIGNUP_LIMIT - ipCount),
       },
     });
   } catch (error) {

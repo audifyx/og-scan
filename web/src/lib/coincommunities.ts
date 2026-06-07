@@ -5,7 +5,7 @@
  */
 
 export const CC_BASE = "https://api.coin-communities.xyz";
-export const CC_API_KEY = "cc_5c4e7d944c20b3f53a0f50b937494473f98061e0c79b2992cb9383deb438c4f2";
+export const CC_API_KEY = import.meta.env.VITE_CC_API_KEY ?? "";
 
 const ccFetch = async (path: string): Promise<unknown> => {
   const res = await fetch(`${CC_BASE}${path}`, {

@@ -15,7 +15,7 @@ const HELIUS_BASE = `https://api.helius.xyz/v0`;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 const cors = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://ogscan.fun",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 

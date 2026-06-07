@@ -24,7 +24,7 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const X_BEARER_TOKEN = Deno.env.get("X_BEARER_TOKEN") ?? "";
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://ogscan.fun",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 

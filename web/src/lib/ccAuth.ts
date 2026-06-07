@@ -14,8 +14,7 @@
 import { configureApi, api } from "@coin-communities/sdk";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const CC_API_KEY =
-  "cc_5c4e7d944c20b3f53a0f50b937494473f98061e0c79b2992cb9383deb438c4f2";
+const CC_API_KEY = import.meta.env.VITE_CC_API_KEY ?? "";
 const BASE_URL = "https://api.coin-communities.xyz";
 
 const LS_ACCESS   = "cc_access_token";

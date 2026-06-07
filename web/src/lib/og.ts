@@ -1,11 +1,11 @@
 // $OG SCANNER — API constants & helpers
-// All keys here are user-provided free tier API keys, intentionally inlined.
+// Keys loaded from environment variables — set these in Vercel project settings.
 
-export const JUPITER_API_KEY = "***REMOVED_JUPITER_KEY***";
-export const BIRDEYE_API_KEY = "d0b0455f927647d6806ca6d5730746e5";
-export const HELIUS_API_KEY = "***REMOVED_HELIUS_KEY***";
-export const ALCHEMY_API_KEY = "***REMOVED_ALCHEMY_KEY***";
-export const QUICKNODE_WSS = "wss://floral-few-frog.solana-mainnet.quiknode.pro/***REMOVED_QUICKNODE_TOKEN***/";
+export const JUPITER_API_KEY = import.meta.env.VITE_JUPITER_API_KEY ?? "";
+export const BIRDEYE_API_KEY = import.meta.env.VITE_BIRDEYE_API_KEY ?? "";
+export const HELIUS_API_KEY = import.meta.env.VITE_HELIUS_API_KEY ?? "";
+export const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY ?? "";
+export const QUICKNODE_WSS = import.meta.env.VITE_QUICKNODE_WSS ?? "";
 
 export const OGSCAN_SITE_URL = "https://ogscan.fun";
 export const OGSCAN_X_URL = "https://x.com/ogscanbackup";

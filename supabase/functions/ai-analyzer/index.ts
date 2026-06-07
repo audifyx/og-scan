@@ -8,7 +8,7 @@ const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
 const DEFAULT_MAX_TOKENS = Number(Deno.env.get("AI_MAX_TOKENS") || "1400");
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://ogscan.fun",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
