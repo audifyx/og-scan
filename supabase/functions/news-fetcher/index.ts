@@ -13,7 +13,7 @@ const MAX_PER_FEED = 10;
 const MAX_TOTAL = 40;
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://ogscan.fun",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 

@@ -30,7 +30,7 @@ const TWITTER_CONSUMER_KEY = Deno.env.get("TWITTER_CONSUMER_KEY") ?? "";
 const TWITTER_CONSUMER_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET") ?? "";
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://ogscan.fun",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 

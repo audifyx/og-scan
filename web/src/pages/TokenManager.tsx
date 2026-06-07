@@ -67,8 +67,7 @@ interface TokenMetadataFull {
 type PostConnectStep = "select" | "edit" | "signing" | "success";
 
 /* ─── Helpers ─── */
-const HELIUS_KEY = "6fb9660c-e27c-4309-a027-251e32fb7b6e";
-const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_KEY}`;
+import { HELIUS_RPC } from "@/lib/og";
 
 const shortAddr = (addr: string) =>
   addr.length > 10 ? `${addr.slice(0, 4)}…${addr.slice(-4)}` : addr;

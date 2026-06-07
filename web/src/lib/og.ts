@@ -1,11 +1,11 @@
 // $OG SCANNER — API constants & helpers
-// All keys here are user-provided free tier API keys, intentionally inlined.
+// Keys are loaded from environment variables only — never hardcoded.
 
-export const JUPITER_API_KEY = "jup_6e0d123f3459784011eaf91d3c3dc7799964432b0a1b98b566617f8c85c722f4";
-export const BIRDEYE_API_KEY = "d0b0455f927647d6806ca6d5730746e5";
-export const HELIUS_API_KEY = "6fb9660c-e27c-4309-a027-251e32fb7b6e";
-export const ALCHEMY_API_KEY = "PAq_PkRjwniLgnpJdLUtc";
-export const QUICKNODE_WSS = "wss://floral-few-frog.solana-mainnet.quiknode.pro/12dfccc83b82aad957cffaa9e22d37033c6ef947/";
+export const JUPITER_API_KEY = import.meta.env.VITE_JUPITER_API_KEY ?? "";
+export const BIRDEYE_API_KEY = import.meta.env.VITE_BIRDEYE_API_KEY ?? "";
+export const HELIUS_API_KEY = import.meta.env.VITE_HELIUS_API_KEY ?? "";
+export const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY ?? "";
+export const QUICKNODE_WSS = import.meta.env.VITE_QUICKNODE_WSS ?? "";
 
 export const OGSCAN_SITE_URL = "https://ogscan.fun";
 export const OGSCAN_X_URL = "https://x.com/ogscanbackup";
