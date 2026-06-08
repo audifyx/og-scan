@@ -60,7 +60,7 @@ interface SectionCardProps {
 
 export const SectionCard: React.FC<SectionCardProps> = ({ children, className, noPadding }) => (
   <div className={cn(
-    "rounded-2xl border border-white/[0.06] bg-white/[0.02]",
+    "rounded-2xl glass-card",
     !noPadding && "p-4",
     className,
   )}>
@@ -117,7 +117,7 @@ interface StatChipProps {
 }
 
 export const StatChip: React.FC<StatChipProps> = ({ label, value, trend }) => (
-  <div className="flex flex-col items-center rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+  <div className="flex flex-col items-center rounded-xl px-3 py-2 glass-sm">
     <span className="text-[8px] font-bold uppercase tracking-widest text-white/20">{label}</span>
     <span className={cn(
       "mt-0.5 text-sm font-black",
@@ -137,7 +137,7 @@ interface EmptyStateProps {
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ icon: Icon, title, description }) => (
   <div className="flex flex-col items-center justify-center py-16">
-    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+    <div className="flex h-14 w-14 items-center justify-center rounded-2xl glass-sm">
       <Icon className="h-6 w-6 text-white/[0.08]" />
     </div>
     <p className="mt-3 text-[12px] font-bold text-white/20">{title}</p>

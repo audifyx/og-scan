@@ -416,18 +416,20 @@ export default function ExternalStreams() {
       const { data, error } = await q;
       if (error) throw error;
 
-      // Enrich with profile data
-      const enriched = await Promise.all((data || []).map(async (c: any) => {
-        const { data: profile } = await supabase
+      // Enrich with profile data — single batch query instead of N+1
+      const userIds = [...new Set((data || []).map((c: any) => c.user_id).filter(Boolean))];
+      const profilesMap: Record<string, { username: string; avatar_url: string }> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
           .from("profiles")
-          .select("username, avatar_url")
-          .eq("user_id", c.user_id)
-          .maybeSingle();
-        return {
-          ...c,
-          host_username: profile?.username || c.username || "anon",
-          host_avatar: profile?.avatar_url || null,
-        };
+          .select("user_id, username, avatar_url")
+          .in("user_id", userIds);
+        (profiles || []).forEach((p: any) => { profilesMap[p.user_id] = p; });
+      }
+      const enriched = (data || []).map((c: any) => ({
+        ...c,
+        host_username: profilesMap[c.user_id]?.username || c.username || "anon",
+        host_avatar: profilesMap[c.user_id]?.avatar_url || null,
       }));
 
       setCards(enriched as StreamCard[]);

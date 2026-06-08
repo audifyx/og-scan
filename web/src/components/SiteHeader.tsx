@@ -18,7 +18,7 @@ export const SiteHeader = ({ navItems, activeId, onNavigate }: Props) => {
   const secondaryItems: NavItem[] = navItems.filter((item: NavItem) => !PRIMARY_NAV_IDS.includes(item.id));
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#020915]/95 shadow-[0_24px_80px_-58px_hsl(var(--og-cyan))] backdrop-blur-xl">
+    <header className="sticky top-0 z-40 glass-nav shadow-[0_24px_80px_-58px_hsl(var(--og-cyan)/0.6)]">
       {/* Token live announcement bar */}
       <div className="relative overflow-hidden border-b border-og-gold/30 bg-gradient-to-r from-og-gold/[0.07] via-og-gold/[0.13] to-og-gold/[0.07] px-4 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-og-gold">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_50%,hsl(var(--og-gold)/0.08),transparent_70%)]" />

@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext, type ReactNode } from "
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { trackActivity } from "@/lib/trackActivity";
+import { setSentryUser, clearSentryUser } from "@/lib/sentry";
 import {
   canUseReservedUsername,
   getReservedUsernameMessage,
@@ -91,8 +92,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
+        setSentryUser(sess.user.id, sess.user.user_metadata?.username);
         setTimeout(() => fetchProfile(sess.user.id, sess.user.email, sess.user.user_metadata), 0);
       } else {
+        clearSentryUser();
         setProfile(null);
       }
       if (!resolved) {

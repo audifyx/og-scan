@@ -518,24 +518,32 @@ export default function SpaceScheduler() {
       const { data, error } = await q;
       if (error) throw error;
 
-      // Enrich with host profile + rsvp_count
-      const enriched = await Promise.all((data || []).map(async (s: any) => {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("username, avatar_url")
-          .eq("user_id", s.host_id)
-          .single();
-        const { count } = await supabase
-          .from("space_rsvps")
-          .select("id", { count: "exact", head: true })
-          .eq("space_id", s.id)
-          .eq("rsvp_type", "going");
-        return {
-          ...s,
-          host_username: profile?.username || s.host_username || "anon",
-          host_avatar: profile?.avatar_url || s.host_avatar || null,
-          rsvp_count: count ?? 0,
-        };
+      // Enrich with host profile + rsvp_count — batched queries to avoid N+1
+      const hostIds = [...new Set((data || []).map((s: any) => s.host_id).filter(Boolean))];
+      const spaceIds = (data || []).map((s: any) => s.id).filter(Boolean);
+
+      const [profilesRes, rsvpRes] = await Promise.all([
+        hostIds.length > 0
+          ? supabase.from("profiles").select("user_id, username, avatar_url").in("user_id", hostIds)
+          : Promise.resolve({ data: [] }),
+        spaceIds.length > 0
+          ? supabase.from("space_rsvps").select("space_id").in("space_id", spaceIds).eq("rsvp_type", "going")
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const profilesMap: Record<string, any> = {};
+      (profilesRes.data || []).forEach((p: any) => { profilesMap[p.user_id] = p; });
+
+      const rsvpCountMap: Record<string, number> = {};
+      (rsvpRes.data || []).forEach((r: any) => {
+        rsvpCountMap[r.space_id] = (rsvpCountMap[r.space_id] || 0) + 1;
+      });
+
+      const enriched = (data || []).map((s: any) => ({
+        ...s,
+        host_username: profilesMap[s.host_id]?.username || s.host_username || "anon",
+        host_avatar: profilesMap[s.host_id]?.avatar_url || s.host_avatar || null,
+        rsvp_count: rsvpCountMap[s.id] ?? 0,
       }));
 
       setSpaces(enriched as ScheduledSpace[]);

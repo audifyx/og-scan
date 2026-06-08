@@ -59,7 +59,7 @@ export const SmartWatchlist: React.FC<Props> = ({ onSelectMint }) => {
   // Load from Supabase on mount
   useEffect(() => {
     if (!user) return;
-    supabase.from("smart_watchlist").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).then(({ data }) => {
+    supabase.from("smart_watchlist").select("id, mint, symbol, name, logo_uri, created_at, added_price, current_price, price_change, mcap, tags, alert_above, alert_below, notes").eq("user_id", user.id).order("created_at", { ascending: false }).then(({ data }) => {
       if (data && data.length > 0) {
         const loaded: WatchlistItem[] = data.map((r: any) => ({
           mint: r.mint, symbol: r.symbol || "???", name: r.name || "", logoURI: r.logo_uri,

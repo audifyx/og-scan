@@ -1001,7 +1001,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
     setLoading(true);
     try {
-      const { data: profile, error } = await supabase.from("profiles").select("*").eq("user_id", targetUserId).single();
+      const { data: profile, error } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url, banner_url, bio, badge, verified, is_official_account, affiliate_org_id, theme_preset, custom_wallpaper_url, referral_code, og_score, og_rank, og_streak, created_at, sol_wallet, x_username, x_connected, x_verified, x_followers, first_seen_ip, last_fingerprint").eq("user_id", targetUserId).single();
       if (error) throw error;
       const profileRecord = profile as ProfileData;
       setProfileData(profileRecord);

@@ -15,7 +15,7 @@ export const MobileHeader = () => {
 
   return (
     <header className="lg:hidden fixed top-0 left-0 right-0 z-50">
-      <div className="relative bg-card/98 backdrop-blur-xl border-b border-border/60">
+      <div className="relative glass-nav">
         {/* Bottom accent line */}
         <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/25 to-transparent" />
 

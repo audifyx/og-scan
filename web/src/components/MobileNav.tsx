@@ -44,7 +44,7 @@ export const MobileNav = ({ activeId, onNavigate }: { activeId: TabId; onNavigat
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.07] bg-card/90 px-2 pb-safe pt-2 backdrop-blur-lg lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 px-2 pb-safe pt-2 glass-bottom-nav lg:hidden">
       <div className="flex items-center justify-around">
         {items.map((item) => {
           const isActive = activeId === item.id;

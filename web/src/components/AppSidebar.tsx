@@ -198,11 +198,11 @@ export const AppSidebar = ({
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-border bg-card/80 backdrop-blur-xl transition-transform duration-300 lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col transition-transform duration-300 lg:translate-x-0 glass-panel",
         open ? "translate-x-0" : "-translate-x-full",
       )}
     >
-      <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-4">
+      <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-4" style={{backdropFilter:'none'}}>
         <button type="button" onClick={() => onNavigate("overview")} className="flex items-center gap-3 text-left">
           <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-og-lime/50 bg-og-lime/10">
             <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" />
@@ -314,7 +314,7 @@ export const AppSidebar = ({
         <button
           type="button"
           onClick={onChangeMint}
-          className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-white/[0.07]"
+          className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition hover:border-primary/40 glass-sm"
         >
           <div>
             <div className="text-[9px] font-bold uppercase tracking-widest text-white/40">Active mint</div>

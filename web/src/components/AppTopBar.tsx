@@ -75,7 +75,7 @@ export const AppTopBar = ({
   onNavigate: (t: string) => void;
 }) => {
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full flex-col border-b border-white/[0.07] bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex h-16 w-full flex-col glass-nav">
       <div className="relative flex h-16 w-full items-center justify-center px-4 lg:px-6">
         {/* Left: hamburger */}
         <div className="absolute left-4 flex items-center gap-4">

@@ -10,6 +10,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { MaintenanceLock } from "@/components/MaintenanceLock";
 import { IntercomSync } from "@/components/IntercomSync";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import BetaHome from "./pages/BetaHome";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -87,10 +88,21 @@ const DirectMessagesPage = () => (
   </AppLayout>
 );
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Retry failed requests up to 2 times before showing error state
+      retry: 2,
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
+      // Keep stale data visible while refetching
+      staleTime: 30_000,
+    },
+  },
+});
 const ArtFeedPage = lazy(() => import("./pages/ArtFeed"));
 
 const App = () => (
+  <ErrorBoundary>
   <MaintenanceLock>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -294,6 +306,7 @@ const App = () => (
     </AuthProvider>
   </QueryClientProvider>
   </MaintenanceLock>
+  </ErrorBoundary>
 );
 
 export default App;
