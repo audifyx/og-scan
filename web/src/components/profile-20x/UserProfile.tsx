@@ -95,6 +95,10 @@ interface ProfileData {
   verified?: boolean | null;
   is_official_account?: boolean | null;
   affiliate_org_id?: string | null;
+  theme_preset?: string | null;
+  custom_wallpaper_url?: string | null;
+  first_seen_ip?: string | null;
+  last_fingerprint?: string | null;
   reputation_score?: number | null;
   daily_streak?: number | null;
   holder_streak?: number | null;
@@ -1001,7 +1005,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
     setLoading(true);
     try {
-      const { data: profile, error } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url, banner_url, bio, badge, verified, is_official_account, affiliate_org_id, referral_code, og_score, og_rank, created_at, sol_wallet").eq("user_id", targetUserId).single();
+      const { data: profile, error } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url, banner_url, bio, badge, verified, is_official_account, affiliate_org_id, theme_preset, custom_wallpaper_url, referral_code, og_score, og_rank, created_at, sol_wallet, first_seen_ip, last_fingerprint").eq("user_id", targetUserId).single();
       if (error) throw error;
       const profileRecord = profile as ProfileData;
       setProfileData(profileRecord);
