@@ -45,7 +45,7 @@ export interface ChainConfig {
  * ETHERSCAN_API_KEY — Free tier, works across all V2-supported chains.
  * 5 req/s, 100k req/day.
  */
-export const ETHERSCAN_API_KEY = import.meta.env.VITE_ETHERSCAN_API_KEY ?? "";
+export const ETHERSCAN_API_KEY = import.meta.env.VITE_ETHERSCAN_API_KEY ?? "N6AAWVVMABZF1Y59TV8QHRQMEZTX2E3VNG";
 export const ETHERSCAN_V2_BASE = "https://api.etherscan.io/v2/api";
 
 /** All supported chains — Solana first (existing), then EVM by popularity */
