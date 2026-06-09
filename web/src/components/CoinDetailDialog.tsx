@@ -117,6 +117,33 @@ async function fetchDexPairs(mint: string, chainId?: string): Promise<DetailDexP
   return Array.isArray(json) ? json : [];
 }
 
+// Keyless market fallback (used when Birdeye is rate-limited / over quota).
+type GeckoMarket = { price?: number; fdv?: number; mcap?: number; volume24h?: number };
+async function fetchGeckoMarket(mint: string, chainId?: string): Promise<GeckoMarket | null> {
+  const network = (chainId || "solana") === "solana" ? "solana" : chainId;
+  try {
+    const res = await fetch(
+      `https://api.geckoterminal.com/api/v2/networks/${encodeURIComponent(network ?? "solana")}/tokens/${encodeURIComponent(mint)}`,
+      { headers: { accept: "application/json" } },
+    );
+    if (!res.ok) return null;
+    const attr = ((await res.json())?.data?.attributes ?? {}) as Record<string, unknown>;
+    const num = (v: unknown): number | undefined => {
+      const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : undefined;
+      return n != null && Number.isFinite(n) && n > 0 ? n : undefined;
+    };
+    const vol = attr.volume_usd as Record<string, unknown> | undefined;
+    return {
+      price: num(attr.price_usd),
+      fdv: num(attr.fdv_usd),
+      mcap: num(attr.market_cap_usd),
+      volume24h: num(vol?.h24),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function pairQuoteLiquidityUsd(pair: DetailDexPair | undefined): number | undefined {
   const quoteAmount: number | undefined = pair?.liquidity?.quote;
   if (quoteAmount == null || !Number.isFinite(quoteAmount)) return undefined;
@@ -312,13 +339,20 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
 
   const pair = useMemo(() => bestPair(dexPairs ?? []), [dexPairs]);
 
+  const { data: geckoMarket } = useQuery({
+    queryKey: ["coin-detail-gecko-market", chainId, token.id],
+    queryFn: () => fetchGeckoMarket(token.id, chainId),
+    enabled: open && Boolean(token.id),
+    staleTime: 30_000,
+  });
+
   const { data: enrichedTokens, isFetching: isFetchingToken } = useQuery({
     queryKey: ["coin-detail-token-intel", token.id, pair?.pairAddress ?? "none", "v10-dominance-engine"],
     queryFn: async (): Promise<JupTokenInfo[]> => {
       const jupTokens = await jupGetTokens([token.id]);
       const base = jupTokens[0] ? mergeToken(jupTokens[0], token) : token;
       const withPair = pair ? pairFallbackToken(pair, base) : base;
-      return enrichTokensWithMarketIntel([withPair], { includeAth: false, includeOnChainIntel: true, maxOnChain: 1, maxBirdeye: 1 });
+      return enrichTokensWithMarketIntel([withPair], { includeAth: true, includeOnChainIntel: true, maxOnChain: 1, maxBirdeye: 1 });
     },
     enabled: open && Boolean(token.id),
     staleTime: 30_000,
@@ -352,9 +386,9 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
   const pairCreated = pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : migratedAt;
   const lpPulled = hasPulledOrDeadLiquidity(detailToken);
   const quoteBackedLiquidity: number = tokenEffectiveLiquidityUsd(detailToken);
-  const marketCap = detailToken.mcap ?? pair?.marketCap ?? 0;
-  const fdv = detailToken.fdv ?? pair?.fdv ?? 0;
-  const volume24h = (pair?.volume?.h24 ?? ((detailToken.stats24h?.buyVolume ?? 0) + (detailToken.stats24h?.sellVolume ?? 0)));
+  const fdv = detailToken.fdv ?? pair?.fdv ?? geckoMarket?.fdv ?? 0;
+  const marketCap = detailToken.mcap ?? pair?.marketCap ?? geckoMarket?.mcap ?? fdv ?? 0;
+  const volume24h = (pair?.volume?.h24 ?? geckoMarket?.volume24h ?? ((detailToken.stats24h?.buyVolume ?? 0) + (detailToken.stats24h?.sellVolume ?? 0)));
   const isLoading = isFetchingPairs || isFetchingToken;
 
   const { data: classificationReport, isFetching: isFetchingClassification } = useQuery({
@@ -520,7 +554,7 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
         <div className="mx-5 mb-5 grid grid-cols-2 gap-2 sm:mx-6 sm:grid-cols-4 lg:grid-cols-6">
           <MetricTile
             label="Price"
-            value={fmtUsd(detailToken.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined))}
+            value={fmtUsd(detailToken.usdPrice ?? (pair?.priceUsd ? Number(pair.priceUsd) : undefined) ?? geckoMarket?.price)}
             badge={<PctBadge value={change24} />}
           />
           <MetricTile
