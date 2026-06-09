@@ -387,7 +387,9 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
 
   const forensicKey = `${detailToken.chainId ?? "solana"}:${detailToken.id}`;
   const forensicScore = classificationReport?.tokenScores[forensicKey];
-  const primaryLabel: string = forensicScore?.classification.primary_label ?? "SCANNING";
+  // "SCANNING" only while the fetch is in-flight; show "UNVERIFIED" when done but no score found
+  const primaryLabel: string = forensicScore?.classification.primary_label
+    ?? (isFetchingClassification ? "SCANNING" : "UNVERIFIED");
   const secondaryLabels: string[] = forensicScore?.classification.secondary_labels.slice(0, 6) ?? [];
 
   const primaryTone: "lime" | "gold" | "cyan" | "blood" | "muted" = primaryLabel.includes("TRUE OG")
@@ -585,9 +587,9 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
                 <DataRow label="Dominance score" value={forensicScore ? `${forensicScore.dominanceScore}%  ·  rank #${forensicScore.dominanceRank}` : "—"} />
                 <DataRow label="Origin score" value={forensicScore ? `${forensicScore.originScore}%` : "—"} />
                 <DataRow label="Clone score" value={forensicScore ? `${forensicScore.cloneScore}%` : "—"} />
-                <DataRow label="First mint" value={proofTimestampText(createdAt)} />
-                <DataRow label="Mint source" value={detailToken.firstMintSource ?? detailToken.creationSource ?? "—"} />
-                <DataRow label="Mint authority" value={shortAddr(detailToken.firstMintAuthorityWallet ?? detailToken.creatorFunding?.creatorWallet, 5)} />
+                <DataRow label="First mint" value={proofTimestampText(createdAt) ?? (migratedAt ? `~${shortDate(migratedAt)} (migration)` : undefined)} />
+                <DataRow label="Mint source" value={detailToken.firstMintSource ?? detailToken.creationSource ?? (detailToken.pumpFun?.isPumpFun ? "pump.fun" : detailToken.migrationCreatedAt ? "migrated" : "—")} />
+                <DataRow label="Mint authority" value={shortAddr(detailToken.firstMintAuthorityWallet ?? detailToken.creatorFunding?.creatorWallet ?? detailToken.pumpFun?.creator, 5)} />
               </div>
               {secondaryLabels.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -658,8 +660,31 @@ export const CoinDetailDialog = ({ token, trigger, onOpenScanner, actionLabel = 
               {!isSolana && <EvmChainInfoPanel token={detailToken} chainId={chainId} security={evmSecurity} />}
             </div>
 
-            {/* DEX pools */}
-            <DexPoolsPanel pools={detailToken.allPools ?? []} />
+            {/* DEX pools — synthesize from pair data when allPools[] is empty but a pair is known */}
+            <DexPoolsPanel pools={(() => {
+              const existing = detailToken.allPools ?? [];
+              if (existing.length > 0) return existing;
+              // Build a synthetic pool entry from the token's known pair data
+              if (detailToken.pairAddress || detailToken.dexUrl) {
+                return [{
+                  dexId: detailToken.pairDexId ?? "dex",
+                  pairAddress: detailToken.pairAddress,
+                  url: detailToken.dexUrl,
+                  quoteSymbol: "SOL",
+                  liquidityUsd: detailToken.reportedLiquidity ?? detailToken.liquidity,
+                  effectiveLiquidityUsd: detailToken.effectiveLiquidityUsd ?? detailToken.liquidity,
+                  quoteLiquidityUsd: detailToken.quoteLiquidityUsd,
+                  marketCap: detailToken.mcap,
+                  fdv: detailToken.fdv,
+                  volume24h: detailToken.stats24h?.buyVolume != null && detailToken.stats24h?.sellVolume != null
+                    ? detailToken.stats24h.buyVolume + detailToken.stats24h.sellVolume : undefined,
+                  buys24h: detailToken.stats24h?.numBuys,
+                  sells24h: detailToken.stats24h?.numSells,
+                  createdAt: detailToken.migrationCreatedAt ?? detailToken.firstPool?.createdAt,
+                }];
+              }
+              return [];
+            })()} />
 
             {/* Risk alerts */}
             <TokenRiskAlerts alerts={riskAlerts} title="Risk Flags" />
@@ -986,10 +1011,13 @@ const OnChainIntelPanel = ({ token }: { token: JupTokenInfo }) => {
   const authority = token.heliusAuthorities;
   const creator = token.creatorFunding;
   const topHolders = token.topHolders ?? [];
+  // A brand-new token may not yet be indexed by Helius — show INDEXING badge instead of silently showing dashes
+  const isNewToken = !!(token.migrationCreatedAt ?? token.pumpFun?.migrationAt ?? token.pumpFun?.launchAt);
+  const badgeLabel = authority?.source ?? creator?.source ?? (isNewToken && !authority ? "indexing" : "Helius");
 
   return (
     <Section title="On-Chain Truth" icon={<ShieldCheck className="h-3.5 w-3.5" />} accent="lime"
-      badge={<span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white/35">{authority?.source ?? creator?.source ?? "Helius"}</span>}>
+      badge={<span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white/35">{badgeLabel}</span>}>
       <div className="grid gap-1.5">
         <DataRow label="Mint authority" value={authority ? authority.mintAuthorityDisabled ? "Disabled" : shortAddr(authority.mintAuthority ?? undefined, 5) : token.audit?.mintAuthorityDisabled ? "Disabled" : "—"} highlight={authority?.mintAuthorityDisabled ? "lime" : "red"} />
         <DataRow label="Freeze authority" value={authority ? authority.freezeAuthorityDisabled ? "Disabled" : shortAddr(authority.freezeAuthority ?? undefined, 5) : token.audit?.freezeAuthorityDisabled ? "Disabled" : "—"} highlight={authority?.freezeAuthorityDisabled ? "lime" : "red"} />
