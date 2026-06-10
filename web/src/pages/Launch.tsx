@@ -233,7 +233,7 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
               </button>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#ab9ff2]/20 bg-[#ab9ff2]/5 px-4 py-1.5">
                 <Rocket className="h-4 w-4 text-[#ab9ff2]" />
-                <span className="text-xs font-bold text-[#ab9ff2] uppercase tracking-widest">Token Launcher</span>
+                <span className="text-xs font-bold text-[#ab9ff2] uppercase tracking-widest">OG Token Launcher</span>
               </div>
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white">
