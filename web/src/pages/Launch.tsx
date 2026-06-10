@@ -580,7 +580,10 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         feeTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
         setStatusMsg(`Pay $${LAUNCH_FEE_USD} launch fee (${(feeLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL)…`);
-        const feeSig = await sendTransaction(feeTx, connection);
+        const phantomProv = (window as any).phantom?.solana ?? (window as any).solana;
+        if (!phantomProv?.isPhantom) throw new Error("Phantom not found.");
+        const signedFeeTx = await phantomProv.signTransaction(feeTx);
+        const feeSig = await connection.sendRawTransaction(signedFeeTx.serialize());
 
         setStatusMsg("Confirming payment…");
         const feeConf = await connection.confirmTransaction(feeSig, "confirmed");
@@ -633,13 +636,18 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       }
       const { transaction: txBase64 } = await createRes.json();
 
-      /* Step 4 — Deserialize + sign */
+      /* Step 4 — Deserialize + sign via Phantom directly */
       setStep("signing");
       setStatusMsg("Sign the token creation transaction…");
       const txBytes = Uint8Array.from(atob(txBase64), (c) => c.charCodeAt(0));
       const tx = VersionedTransaction.deserialize(txBytes);
+      // Sign with the mint keypair first (required by pump.fun)
       tx.sign([mintKeypair]);
-      const signedTx = await signTransaction(tx);
+      // Sign with Phantom — use injected provider directly so it works on
+      // both desktop extension and Phantom in-app browser
+      const phantomProvider = (window as any).phantom?.solana ?? (window as any).solana;
+      if (!phantomProvider?.isPhantom) throw new Error("Phantom not found. Open this page inside the Phantom wallet browser.");
+      const signedTx = await phantomProvider.signTransaction(tx);
 
       /* Step 5 — Send */
       setStep("sending");
