@@ -496,7 +496,6 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const [txSignature, setTxSignature] = useState("");
   const [mintAddress, setMintAddress] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [showWalletPicker, setShowWalletPicker] = useState(false);
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [metadataUri, setMetadataUri] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -505,18 +504,28 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
   useEffect(() => {
     const fetchPrice = async () => {
+      // Try Helius price first, then CoinGecko fallback
       try {
-        const res = await fetch("https://api.jup.ag/price/v2?ids=So11111111111111111111111111111111111111112");
+        const res = await fetch(
+          "https://mainnet.helius-rpc.com/?api-key=***REMOVED_HELIUS_KEY***",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0", id: "sol-price", method: "getAsset",
+              params: { id: "So11111111111111111111111111111111111111112" },
+            }),
+          }
+        );
         const data = await res.json();
-        const price = parseFloat(data?.data?.["So11111111111111111111111111111111111111112"]?.price);
-        if (price && price > 0) setSolPrice(price);
-      } catch {
-        try {
-          const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
-          const data = await res.json();
-          if (data?.solana?.usd) setSolPrice(data.solana.usd);
-        } catch {}
-      }
+        const price = data?.result?.token_info?.price_info?.price_per_token;
+        if (price && price > 0) { setSolPrice(price); return; }
+      } catch {}
+      try {
+        const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+        const data = await res.json();
+        if (data?.solana?.usd) setSolPrice(data.solana.usd);
+      } catch {}
     };
     fetchPrice();
     const interval = setInterval(fetchPrice, 60_000);
@@ -684,10 +693,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   };
 
   const handleConnectWallet = () => {
-    const available = wallets.filter((w) => w.readyState === "Installed" || w.readyState === "Loadable");
-    if (available.length === 1) { select(available[0].adapter.name); setTimeout(() => connect().catch(() => {}), 100); }
-    else if (available.length > 1) setShowWalletPicker(true);
-    else window.open("https://phantom.app/download", "_blank");
+    select("Phantom" as any);
+    setTimeout(() => connect().catch(() => {}), 100);
   };
 
   const getStepIndex = (): number => {
@@ -987,22 +994,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                   className="w-full flex items-center justify-center gap-3 rounded-xl border border-[#ab9ff2]/20 bg-[#ab9ff2]/5 px-6 py-4 text-[#ab9ff2] font-bold hover:bg-[#ab9ff2]/10 transition-all">
                   <Wallet className="h-5 w-5" /> Connect Wallet to Launch
                 </button>
-                {showWalletPicker && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowWalletPicker(false)}>
-                    <div className="bg-[#12121a] border border-white/10 rounded-2xl p-6 w-[320px] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                      <h3 className="text-sm font-bold text-white mb-4">Select Wallet</h3>
-                      <div className="space-y-2">
-                        {wallets.filter((w) => w.readyState === "Installed" || w.readyState === "Loadable").map((w) => (
-                          <button key={w.adapter.name} onClick={() => { select(w.adapter.name); setShowWalletPicker(false); setTimeout(() => connect().catch(() => {}), 100); }}
-                            className="w-full flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-white/70 hover:bg-white/[0.05] hover:text-white transition-all">
-                            <img src={w.adapter.icon} alt="" className="h-6 w-6 rounded" />
-                            <span className="text-sm font-medium">{w.adapter.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
+
               </>
             ) : (
               <button onClick={handleLaunch} disabled={!canLaunch}
