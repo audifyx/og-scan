@@ -161,15 +161,17 @@ async function fetchTokenData(mintAddress: string): Promise<FetchedTokenData> {
     }
   } catch { /* ignore */ }
 
-  /* ── 4. Holder count (Birdeye) ── */
+  /* ── 4. Holder count (Jupiter — free, replaces Birdeye) ── */
   let holderCount = 0;
   try {
-    const beRes = await fetch(
-      `https://public-api.birdeye.so/defi/v3/token/holder?address=${mintAddress}`,
-      { headers: { "X-API-KEY": BIRDEYE_API_KEY, "x-chain": "solana" } }
+    const jupRes = await fetch(
+      `https://lite-api.jup.ag/tokens/v2/search?query=${mintAddress}`
     );
-    const beJson = await beRes.json();
-    if (beJson?.data?.total) holderCount = beJson.data.total;
+    const jupJson = await jupRes.json();
+    const jupTok = Array.isArray(jupJson)
+      ? (jupJson.find((t: { id?: string }) => t?.id === mintAddress) ?? jupJson[0])
+      : undefined;
+    if (jupTok?.holderCount) holderCount = jupTok.holderCount;
   } catch { /* ignore */ }
   if (!holderCount && dexPair?.info?.holders) holderCount = dexPair.info.holders;
 

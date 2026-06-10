@@ -2,7 +2,9 @@
 // Keys loaded from environment variables with hardcoded fallbacks for production resilience.
 
 export const JUPITER_API_KEY = import.meta.env.VITE_JUPITER_API_KEY ?? "jup_6e0d123f3459784011eaf91d3c3dc7799964432b0a1b98b566617f8c85c722f4";
-export const BIRDEYE_API_KEY = import.meta.env.VITE_BIRDEYE_API_KEY ?? "d0b0455f927647d6806ca6d5730746e5";
+// Birdeye fully replaced by Jupiter + GeckoTerminal (free, no compute-unit quota).
+// Kept only so existing imports resolve; no longer used for any request.
+export const BIRDEYE_API_KEY = import.meta.env.VITE_BIRDEYE_API_KEY ?? "";
 export const HELIUS_API_KEY = import.meta.env.VITE_HELIUS_API_KEY ?? "6fb9660c-e27c-4309-a027-251e32fb7b6e";
 export const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY ?? "PAq_PkRjwniLgnpJdLUtc";
 export const QUICKNODE_WSS = import.meta.env.VITE_QUICKNODE_WSS ?? "wss://floral-few-frog.solana-mainnet.quiknode.pro/12dfccc83b82aad957cffaa9e22d37033c6ef947/";
@@ -1050,21 +1052,41 @@ export async function dexPaidOrdersForToken(chainId: string, tokenAddress: strin
   return task;
 }
 
+// Free market overview — replaces Birdeye /defi/token_overview.
+// Aggregates Jupiter Token API v2 (price, market cap, FDV, liquidity, holders,
+// organic score) + GeckoTerminal token endpoint (keyless fallback). No API key,
+// no compute-unit quota. Returns a record whose keys match birdeyeMarketPatch().
 async function birdeyeTokenOverview(mint: string): Promise<Record<string, unknown> | null> {
   const cached = birdeyeOverviewCache.get(mint);
   if (cached) return cached;
 
   const task = (async (): Promise<Record<string, unknown> | null> => {
-    try {
-      const url = `${BIRDEYE_BASE}/defi/token_overview?address=${encodeURIComponent(mint)}`;
-      const response = await jget<BirdeyeOverviewResponse>(url, {
-        "X-API-KEY": BIRDEYE_API_KEY,
-        "x-chain": SOLANA_CHAIN_ID,
-      });
-      return response.data ?? null;
-    } catch {
-      return null;
-    }
+    const num = (v: unknown): number | undefined => {
+      const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : undefined;
+      return n != null && Number.isFinite(n) && n > 0 ? n : undefined;
+    };
+    const [jupRes, geckoRes] = await Promise.allSettled([
+      jget<JupTokenInfo[]>(`${JUPITER_BASE}/tokens/v2/search?query=${encodeURIComponent(mint)}`),
+      jget<{ data?: { attributes?: Record<string, unknown> } }>(
+        `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${encodeURIComponent(mint)}`,
+      ),
+    ]);
+    const jup: JupTokenInfo | undefined = jupRes.status === "fulfilled"
+      ? (jupRes.value.find((t) => t.id === mint) ?? jupRes.value[0])
+      : undefined;
+    const ga: Record<string, unknown> = geckoRes.status === "fulfilled" ? (geckoRes.value.data?.attributes ?? {}) : {};
+    const geckoVol = ga.volume_usd as Record<string, unknown> | undefined;
+    const overview: Record<string, unknown> = {
+      price: jup?.usdPrice ?? num(ga.price_usd),
+      liquidity: jup?.liquidity ?? num(ga.total_reserve_in_usd),
+      holders: jup?.holderCount,
+      mc: jup?.mcap ?? num(ga.market_cap_usd) ?? jup?.fdv ?? num(ga.fdv_usd),
+      fdv: jup?.fdv ?? num(ga.fdv_usd),
+      volume24h: num(geckoVol?.h24),
+      organicScore: jup?.organicScore,
+      organicScoreLabel: jup?.organicScoreLabel,
+    };
+    return Object.values(overview).some((v) => v != null) ? overview : null;
   })();
 
   birdeyeOverviewCache.set(mint, task);
@@ -1154,26 +1176,35 @@ function atlFromOverview(overview: Record<string, unknown> | null): PriceExtreme
   };
 }
 
+// GeckoTerminal pool cache for token -> top pool addresses (keyless).
+const geckoTokenPoolsCache = new Map<string, Promise<string[]>>();
+async function geckoTopPoolsForToken(mint: string): Promise<string[]> {
+  const cached = geckoTokenPoolsCache.get(mint);
+  if (cached) return cached;
+  const task = (async (): Promise<string[]> => {
+    try {
+      const json = await jget<{ data?: Array<{ attributes?: { address?: string } }> }>(
+        `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${encodeURIComponent(mint)}/pools?page=1`,
+      );
+      return (json.data ?? [])
+        .map((p) => p.attributes?.address)
+        .filter((a): a is string => Boolean(a))
+        .slice(0, 2);
+    } catch {
+      return [];
+    }
+  })();
+  geckoTokenPoolsCache.set(mint, task);
+  return task;
+}
+
+// ATH/ATL via GeckoTerminal pool OHLCV (keyless) — replaces Birdeye OHLCV.
 async function priceExtremesFromOhlcv(mint: string, fromIso: string | undefined): Promise<PriceExtremes> {
+  void fromIso;
   try {
-    const now = Math.floor(Date.now() / 1000);
-    const fromMs: number = fromIso ? new Date(fromIso).getTime() : Date.now() - 365 * 86_400_000;
-    const from = Number.isFinite(fromMs) ? Math.max(0, Math.floor(fromMs / 1000)) : now - 365 * 86_400;
-    const candles = await birdeyeOhlcv(mint, "1D", from, now);
-    const extremes = candles.reduce<{ high: { price: number; unixTime: number } | null; low: { price: number; unixTime: number } | null }>(
-      (current, candle) => {
-        const high: number = candle.h;
-        const low: number = candle.l;
-        if (Number.isFinite(high) && (!current.high || high > current.high.price)) current.high = { price: high, unixTime: candle.unixTime };
-        if (Number.isFinite(low) && low > 0 && (!current.low || low < current.low.price)) current.low = { price: low, unixTime: candle.unixTime };
-        return current;
-      },
-      { high: null, low: null },
-    );
-    return {
-      ath: extremes.high ? { price: extremes.high.price, at: new Date(extremes.high.unixTime * 1000).toISOString(), source: "Birdeye OHLCV" } : {},
-      atl: extremes.low ? { price: extremes.low.price, at: new Date(extremes.low.unixTime * 1000).toISOString(), source: "Birdeye OHLCV" } : {},
-    };
+    const pools = await geckoTopPoolsForToken(mint);
+    if (pools.length === 0) return { ath: {}, atl: {} };
+    return await priceExtremesFromGeckoPools(mint, pools);
   } catch {
     return { ath: {}, atl: {} };
   }
@@ -1477,18 +1508,22 @@ function unixSecondsToIso(value: number | null | undefined): string | undefined 
   return new Date(value * 1000).toISOString();
 }
 
+// Earliest pool creation from GeckoTerminal (keyless) — replaces Birdeye
+// token_creation_info. Helius DAS (heliusAssetMintCreatedAt) remains primary in
+// mintCreatedAt(); this only contributes a free proxy date when DAS is missing.
 async function birdeyeMintCreatedAt(mint: string): Promise<string | undefined> {
-  const url = `${BIRDEYE_BASE}/defi/token_creation_info?address=${encodeURIComponent(mint)}`;
-  const res = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-KEY": BIRDEYE_API_KEY,
-      "x-chain": SOLANA_CHAIN_ID,
-    },
-  });
-  if (!res.ok) return undefined;
-  const json = (await res.json()) as BirdeyeCreationResponse;
-  return unixSecondsToIso(json.data?.creationTime) ?? unixSecondsToIso(json.data?.mintTime);
+  try {
+    const json = await jget<{ data?: Array<{ attributes?: { pool_created_at?: string } }> }>(
+      `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${encodeURIComponent(mint)}/pools?page=1`,
+    );
+    const dates = (json.data ?? [])
+      .map((p) => p.attributes?.pool_created_at)
+      .filter((d): d is string => Boolean(d) && new Date(d).getTime() > 0);
+    if (dates.length === 0) return undefined;
+    return dates.reduce((a, b) => (new Date(a).getTime() < new Date(b).getTime() ? a : b));
+  } catch {
+    return undefined;
+  }
 }
 
 async function heliusTokenAuthorityIntel(mint: string): Promise<TokenAuthorityIntel | null> {
@@ -3720,16 +3755,31 @@ export async function tokenDevLaunchIntel(token: JupTokenInfo): Promise<TokenDev
 export type BirdeyeOhlcv = {
   data: { items: { unixTime: number; o: number; h: number; l: number; c: number; v: number }[] };
 };
+// OHLCV via GeckoTerminal (keyless) — replaces Birdeye /defi/ohlcv.
+// Signature kept for backward compatibility; `type` is mapped to a Gecko timeframe.
 export async function birdeyeOhlcv(mint: string, type = "15m", timeFrom?: number, timeTo?: number): Promise<BirdeyeOhlcv["data"]["items"]> {
   const now = Math.floor(Date.now() / 1000);
   const from = timeFrom ?? now - 60 * 60 * 24; // default 24h
   const to = timeTo ?? now;
-  const url = `${BIRDEYE_BASE}/defi/ohlcv?address=${mint}&type=${type}&time_from=${from}&time_to=${to}`;
-  const r = await jget<BirdeyeOhlcv>(url, {
-    "X-API-KEY": BIRDEYE_API_KEY,
-    "x-chain": SOLANA_CHAIN_ID,
-  });
-  return r?.data?.items ?? [];
+  const t = type.toLowerCase();
+  const timeframe: string = t.includes("d") ? "day" : t.includes("h") ? "hour" : "minute";
+  const aggregate: string = timeframe === "minute"
+    ? (parseInt(t, 10) > 0 ? String(parseInt(t, 10)) : "1")
+    : "1";
+  try {
+    const pools = await geckoTopPoolsForToken(mint);
+    if (pools.length === 0) return [];
+    const params = new URLSearchParams({ aggregate, limit: "1000", currency: "usd", token: mint });
+    const url = `https://api.geckoterminal.com/api/v2/networks/solana/pools/${encodeURIComponent(pools[0])}/ohlcv/${timeframe}?${params.toString()}`;
+    const json = await jget<GeckoOhlcvResponse>(url);
+    return (json.data?.attributes?.ohlcv_list ?? [])
+      .map(parseGeckoCandle)
+      .filter((c): c is GeckoOhlcvCandle => Boolean(c))
+      .filter((c) => c.unixTime >= from && c.unixTime <= to)
+      .map((c) => ({ unixTime: c.unixTime, o: c.o, h: c.h, l: c.l, c: c.c, v: c.v }));
+  } catch {
+    return [];
+  }
 }
 
 // Helius RPC — largest token accounts (whales)
