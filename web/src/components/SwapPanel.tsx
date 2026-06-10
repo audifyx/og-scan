@@ -85,7 +85,7 @@ export const SwapPanel = ({ ogMint, onSelectMint }: Props) => {
           <ToolHeader
             icon={Zap}
             title={`Swap — $${og?.symbol ?? "OG"}`}
-            subtitle="Live quote routed through Jupiter's aggregator — the same engine that powers jup.ag. Connect a wallet on Jupiter to execute."
+            subtitle="Live quote routed through Jupiter's aggregator — the same engine that powers jup.ag. Connect your Phantom wallet to execute."
             gradient="from-emerald-500 to-lime-400"
             glowColor="rgba(16,185,129,0.25)"
             badge="JUPITER"
@@ -197,13 +197,13 @@ export const SwapPanel = ({ ogMint, onSelectMint }: Props) => {
 
               <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                 <a
-                  href={`https://jup.ag/swap/SOL-${ogMint}`}
+                  href={`https://phantom.app/ul/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${ogMint}&amount=${lamports}`}
                   target="_blank"
                   rel="noreferrer"
                   className="group flex items-center justify-center gap-2 border border-og-lime bg-og-lime py-4 text-sm font-bold uppercase tracking-[0.3em] text-og-ink transition hover:bg-og-lime/90 pulse-glow"
                 >
                   <Zap className="h-4 w-4" />
-                  EXECUTE ON JUPITER
+                  SWAP ON PHANTOM
                 </a>
                 {og && <CoinDetailDialog token={og} onOpenScanner={() => onSelectMint(og.id)} actionLabel="Load" className="min-h-12 px-4" />}
               </div>
