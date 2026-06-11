@@ -43,6 +43,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
+import Games from "./pages/Games";
 import { XCallbackPage } from "./pages/XCallbackPage";
 import Admin from "./pages/Admin";
 import SpaceReplay from "./pages/SpaceReplay";
@@ -183,6 +184,7 @@ const App = () => (
             <Route path="/profile/:userId" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/wallets" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/games" element={<ProtectedRoute><Games /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
             {/* Credits removed */}
 
