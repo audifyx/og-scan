@@ -66,6 +66,7 @@ const PairTracker = lazy(() => import("@/components/PairTracker").then(m => ({ d
 const Migrations = lazy(() => import("@/components/Migrations").then(m => ({ default: m.Migrations })));
 const TxFeed = lazy(() => import("@/components/TxFeed").then(m => ({ default: m.TxFeed })));
 const Whales = lazy(() => import("@/components/Whales").then(m => ({ default: m.Whales })));
+const GamesPage = lazy(() => import("@/pages/Games").then(m => ({ default: m.default })));
 const SwapPanel = lazy(() => import("@/components/SwapPanel").then(m => ({ default: m.SwapPanel })));
 const TechStack = lazy(() => import("@/components/TechStack").then(m => ({ default: m.TechStack })));
 const OurCoin = lazy(() => import("@/components/OurCoin").then(m => ({ default: m.OurCoin })));
@@ -693,6 +694,7 @@ const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
     settings: "profile",
     "trading-hub": "trading-hub",
     wallets: "live-trading",
+    games: "games",
     "phantom-trade": "live-trading",
     "phantom-trading": "live-trading",
   },
@@ -739,6 +741,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "news-signal") return <MarketFeedSuite mint={mint} onSelect={updateMint} />;
 
   /* ─── Standalone tools ─── */
+  if (tab === "games") return <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading…</div>}><GamesPage /></Suspense>;
   if (tab === "swap") return <SwapPanel ogMint={mint} onSelectMint={updateMint} />;
 
   /* ─── Social / community pages ─── */

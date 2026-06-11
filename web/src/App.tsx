@@ -184,7 +184,7 @@ const App = () => (
             <Route path="/profile/:userId" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/wallets" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/games" element={<ProtectedRoute><Games /></ProtectedRoute>} />
+            <Route path="/games" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
             {/* Credits removed */}
 
