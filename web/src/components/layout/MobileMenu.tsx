@@ -2,6 +2,7 @@ import {
   Wallet, Coins, LineChart, Wrench, Rocket, Radio, Users, Bell, 
   Sparkles, LogOut, Zap, User, ChevronRight, MessageSquare, Settings,
   Crown, Shield, Webhook, Headphones, Globe2, ArrowLeftRight
+  Gamepad2,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ import { SheetClose } from "@/components/ui/sheet";
 
 const mainNavItems = [
   { to: "/wallets", icon: Wallet, label: "Phantom Trading Terminal" },
+  { to: "/games",   icon: Gamepad2, label: "Games" },
   { to: "/tokens", icon: Coins, label: "Tokens" },
   // Charts hidden from UI (redundant with Phantom Trading Terminal)
   // { to: "/charts", icon: LineChart, label: "Charts" },
