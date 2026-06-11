@@ -2,6 +2,7 @@ import {
   Bell, Gift, Headset, LineChart, LogOut, Mail,
   MessageSquare, Settings, Trophy, Rocket, TrendingUp,
   User, Wallet, X, Shield, Menu, Users, Wrench, Home,
+  Gamepad2,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const mainItems: NavItem[] = [
 
 const tradingItems: NavItem[] = [
   { to: "/wallets",         icon: Wallet,        label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
+  { to: "/games",           icon: Gamepad2,      label: "Games",          eyebrow: "Degen Tower" },
   { to: "/trading-hub",     icon: TrendingUp,    label: "Trading Hub",     eyebrow: "Launch · Lobbies · Callouts" },
 ];
 
