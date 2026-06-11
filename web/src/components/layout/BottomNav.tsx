@@ -1,4 +1,4 @@
-import { Home, Users, Wrench, User, Globe, Rocket, MessageCircle   Gamepad2,
+import { Home, Users, Wrench, User, Globe, Rocket, MessageCircle, Gamepad2,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
