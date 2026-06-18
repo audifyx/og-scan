@@ -45,6 +45,8 @@ import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
 import Games from "./pages/Games";
 import AdvancedIntelligence from "./pages/AdvancedIntelligence";
+import IntelligenceAdmin from "./pages/IntelligenceAdmin";
+import AlertSettings from "./pages/AlertSettings";
 import { XCallbackPage } from "./pages/XCallbackPage";
 import Admin from "./pages/Admin";
 import SpaceReplay from "./pages/SpaceReplay";
@@ -300,6 +302,8 @@ const App = () => (
 
             {/* ── Catch-all slug handler (must be last) ── */}
             <Route path="/advanced/:mint" element={<ProtectedRoute><AdvancedIntelligence /></ProtectedRoute>} />
+            <Route path="/intelligence-admin" element={<AdminRoute><IntelligenceAdmin /></AdminRoute>} />
+            <Route path="/alert-settings" element={<ProtectedRoute><AlertSettings /></ProtectedRoute>} />
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
