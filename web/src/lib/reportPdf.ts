@@ -253,6 +253,7 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     if (s.classification?.layers) {
       rows([
         ["Origin Identity", s.classification.layers.origin_identity ?? "—"],
+        ["Original Contract", s.classification.layers.original_contract ?? "—"],
         ["Control Status", s.classification.layers.control_status ?? "—"],
         ["Lifecycle Status", s.classification.layers.lifecycle_status ?? "—"],
       ]);
