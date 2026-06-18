@@ -48,6 +48,9 @@ import {
 } from "@/lib/og";
 import { cn } from "@/lib/utils";
 import { HelpLabel, ScoreMeter, TokenTruthLegend, labelToneClass, scoreTextClass } from "@/components/TokenTruthKit";
+import { OgVerdict } from "@/components/scanner-20x/OgVerdict";
+import { classifyToken, TIER_LABEL } from "@/lib/classification";
+import { forensicToInput } from "@/lib/classificationAdapter";
 
 import { getChain, explorerAddressUrl, isSolana } from "@/lib/chains";
 
@@ -240,6 +243,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   const highRiskVisible: number = filteredResults.filter((token) => (tokenScore(report, token)?.riskScore ?? 0) >= 65 || hasPulledOrDeadLiquidity(token)).length;
   const primaryToken: JupTokenInfo | undefined = report?.primaryToken ?? filteredResults.find((token) => tokenScore(report, token)?.isPrimaryToken);
   const firstMintToken: JupTokenInfo | undefined = report?.firstMintToken ?? filteredResults.find((token) => tokenScore(report, token)?.isFirstMintToken);
+  const primaryScore: TokenForensicScores | undefined = primaryToken ? tokenScore(report, primaryToken) : undefined;
 
   return (
     <section id="scanner" className="relative scroll-mt-36">
@@ -357,6 +361,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <div className="mt-3">
               <TokenTruthLegend compact />
             </div>
+            {primaryToken && <OgVerdict token={primaryToken} score={primaryScore} report={report} />}
           </>
         )}
 
@@ -467,6 +472,8 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
   const riskScore: number = score?.riskScore ?? (hasPulledOrDeadLiquidity(t) ? 92 : 0);
   const dominanceScore: number = score?.dominanceScore ?? 0;
   const label: string = score?.classification.primary_label ?? "SCANNED";
+  const ogTier = classifyToken(forensicToInput(t, score)).tier;
+  const tierToneMap: Record<string, string> = { OG_TOKEN: "border-og-lime/50 text-og-lime", SAFE_CLONE: "border-og-cyan/50 text-og-cyan", RISKY_TOKEN: "border-og-gold/50 text-og-gold", DANGEROUS_TOKEN: "border-og-blood/50 text-og-blood" };
   const secondaryLabels: string[] = score?.classification.secondary_labels.slice(0, 3) ?? [];
   const chartUrl: string = dexScreenerChartUrl(t);
   const lpPulled: boolean = hasPulledOrDeadLiquidity(t);
@@ -537,6 +544,9 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
         </span>
         <span className="rounded-full border border-og-grid px-2 py-0.5 text-muted-foreground">
           H {fmtHolderCount(t.holderCount)}
+        </span>
+        <span className={`rounded-full border px-2 py-0.5 ${tierToneMap[ogTier]} font-display font-black text-[9px]`}>
+          {TIER_LABEL[ogTier]}
         </span>
         <span className={`rounded-full border px-2 py-0.5 ${labelToneClass(label)} border-current/30 font-display font-black text-[9px]`}>
           {label}

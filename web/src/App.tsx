@@ -13,11 +13,6 @@ import { IntercomSync } from "@/components/IntercomSync";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import BetaHome from "./pages/BetaHome";
 import Index from "./pages/Index";
-import IntelScan from "./pages/IntelScan";
-import IntelToken from "./pages/IntelToken";
-import IntelDiscovery from "./pages/IntelDiscovery";
-import IntelHistory from "./pages/IntelHistory";
-import IntelAnalytics from "./pages/IntelAnalytics";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Setup from "./pages/Setup";
@@ -161,12 +156,6 @@ const App = () => (
             <Route path="/trending" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/communities" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/discover" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/intel-scan" element={<IntelScan />} />
-            <Route path="/intel-token/:mint" element={<IntelToken />} />
-            <Route path="/intel-token" element={<IntelToken />} />
-            <Route path="/intel-discovery" element={<IntelDiscovery />} />
-            <Route path="/intel-history" element={<IntelHistory />} />
-            <Route path="/intel-analytics" element={<IntelAnalytics />} />
             <Route path="/whales" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tx-feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tape" element={<ProtectedRoute><Index /></ProtectedRoute>} />
