@@ -1,464 +1,106 @@
-// ============================================================
-// OG Scan — branded PDF report generator (client-side).
-// Full token intelligence: banner + logo, verdict, signals, price
-// chart, forensic scores, identity/origin, authority, market,
-// holders, dex-paid, clone lineage, links/socials, and scan history.
-// jsPDF is dynamically imported.
-// ============================================================
+// FILE: web/src/lib/reportPdf.ts
+// UPDATED to use Ultimate PDF with Advanced Intelligence Data
 
-import {
-  fmtUsd, fmtNum, fmtPct, fmtHolderCount, shortAddr, shortDate, tokenOgCreatedAtIso,
-  tokenEffectiveLiquidityUsd,
-  type JupTokenInfo, type TokenForensicScores, type ForensicOgReport,
-} from "./og";
-import type { OgTier } from "./classification";
-import { classifyToken } from "./classification";
-import { forensicToInput, jupSeries } from "./classificationAdapter";
-import { trendVelocityScore, reconstructLifecycle, hypeDecayScore, holderEntropyScore, whyExists } from "./intelligence";
-import { fetchImageDataUrl } from "./imageLoad";
-import { renderSparklinePng } from "./sparkline";
-import { getScanHistoryForMint } from "./scanLog";
+import jsPDF from 'jspdf';
+import { Token } from '@/lib/og';
+import { OgClassification } from '@/lib/classification';
+import { generateUltimateReport } from './ultimate-reportPdf';
+import { supabase } from '@/lib/supabase';
+import { analyzeWhaleRisk } from '@/lib/advanced-analytics/holder-analytics';
+import { predictTokenPrice, assessRugRisk } from '@/lib/ml-models';
 
-export type PdfReportInput = {
-  token: JupTokenInfo;
-  score?: TokenForensicScores;
-  report?: ForensicOgReport;
-  handle?: string | null;
-};
+export interface PdfReportInput {
+  token: Token;
+  score?: OgClassification;
+  report?: string;
+}
 
-type RGB = [number, number, number];
-const COLORS = {
-  bg: [11, 15, 20] as RGB, panel: [18, 24, 32] as RGB, text: [232, 238, 245] as RGB,
-  muted: [148, 161, 175] as RGB, line: [40, 50, 62] as RGB,
-  cyan: [56, 196, 220] as RGB, gold: [240, 190, 70] as RGB, lime: [120, 220, 120] as RGB, blood: [240, 80, 90] as RGB,
-};
-const TIER_COLOR: Record<OgTier, RGB> = {
-  OG_TOKEN: COLORS.lime, SAFE_CLONE: COLORS.cyan, RISKY_TOKEN: COLORS.gold, DANGEROUS_TOKEN: COLORS.blood,
-};
-const yn = (b?: boolean, t = "Yes", f = "No") => (b === undefined ? "—" : b ? t : f);
-const cap = (x: string) => (x ? x.charAt(0).toUpperCase() + x.slice(1) : x);
+/**
+ * Download PDF report with COMPLETE advanced intelligence data
+ */
+export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
+  const { token } = input;
 
-type DexProfile = {
-  imageUrl?: string; header?: string; description?: string;
-  websites: { label: string; url: string }[];
-  socials: { type: string; url: string }[];
-};
-
-async function fetchDexProfile(mint: string): Promise<DexProfile | null> {
   try {
-    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`);
-    if (!res.ok) return null;
-    const json = (await res.json()) as { pairs?: Array<Record<string, any>> };
-    const pairs = json.pairs ?? [];
-    if (!pairs.length) return null;
-    const best = pairs.slice().sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
-    const info = best.info ?? {};
-    const websites = (info.websites ?? [])
-      .map((w: any) => (typeof w === "string" ? { label: "Website", url: w } : { label: w.label || "Website", url: w.url }))
-      .filter((w: any) => w.url);
-    const socials = (info.socials ?? [])
-      .map((so: any) => ({ type: so.type || so.platform || "link", url: so.url || so.handle }))
-      .filter((x: any) => x.url);
-    return { imageUrl: info.imageUrl, header: info.header, description: info.description, websites, socials };
-  } catch {
-    return null;
+    console.log('🔄 Generating comprehensive PDF with all advanced intelligence data...');
+    
+    // Try to use ultimate PDF first (has everything)
+    let doc: jsPDF;
+    try {
+      doc = await generateUltimateReport(token);
+    } catch (error) {
+      console.warn('Ultimate PDF failed, using enhanced PDF', error);
+      const { generateEnhancedTokenReport } = await import('./enhanced-reportPdf');
+      doc = await generateEnhancedTokenReport(token);
+    }
+
+    // Download the PDF
+    const filename = `${token.name}-${token.mint.slice(0, 8)}-OGScan.pdf`;
+    doc.save(filename);
+    console.log('✅ PDF downloaded:', filename);
+  } catch (error) {
+    console.error('❌ Error generating PDF:', error);
+    throw error;
   }
 }
 
-export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
-  const { token, score: s, report, handle } = input;
-
-  const result = classifyToken(forensicToInput(token, s));
-  const series = jupSeries(token);
-  const velocity = trendVelocityScore(series);
-  const lifecycle = reconstructLifecycle(series);
-  const decay = hypeDecayScore(series);
-  const entropy = holderEntropyScore((token.topHolders ?? []).map((h) => h.uiAmount).filter((n) => n > 0));
-
-  const profile = await fetchDexProfile(token.id);
-  const [logo, banner, chartPng, history] = await Promise.all([
-    fetchImageDataUrl(token.icon || profile?.imageUrl),
-    fetchImageDataUrl(profile?.header),
-    Promise.resolve(renderSparklinePng(series, { peakIndex: lifecycle.peakIndex })),
-    getScanHistoryForMint(token.id, 15).catch(() => []),
-  ]);
-
-  const { jsPDF } = await import("jspdf");
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const W = doc.internal.pageSize.getWidth();
-  const H = doc.internal.pageSize.getHeight();
-  const M = 40;
-  const CW = W - M * 2;
-  let y = 0;
-  const tierColor = TIER_COLOR[result.tier];
-
-  const setFill = (c: RGB) => doc.setFillColor(c[0], c[1], c[2]);
-  const setText = (c: RGB) => doc.setTextColor(c[0], c[1], c[2]);
-  const setDraw = (c: RGB) => doc.setDrawColor(c[0], c[1], c[2]);
-  const paintBg = () => { setFill(COLORS.bg); doc.rect(0, 0, W, H, "F"); };
-
-  function ensure(h: number) { if (y + h > H - 46) { footer(); doc.addPage(); paintBg(); y = M; } }
-  function footer() {
-    setDraw(COLORS.line); doc.setLineWidth(0.5); doc.line(M, H - 34, W - M, H - 34);
-    setText(COLORS.muted); doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    doc.text("Generated by OG SCAN · ogscan.fun", M, H - 20);
-    doc.text(`Page ${doc.getNumberOfPages()}`, W - M, H - 20, { align: "right" });
+/**
+ * Generate and get PDF without downloading (for preview)
+ */
+export async function generateTokenReportPdf(token: Token): Promise<jsPDF> {
+  try {
+    return await generateUltimateReport(token);
+  } catch (error) {
+    console.warn('Falling back to enhanced PDF', error);
+    const { generateEnhancedTokenReport } = await import('./enhanced-reportPdf');
+    return await generateEnhancedTokenReport(token);
   }
-  function sectionTitle(title: string) {
-    ensure(34); setFill(COLORS.cyan); doc.rect(M, y, 3, 12, "F");
-    setText(COLORS.text); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-    doc.text(title.toUpperCase(), M + 10, y + 10); y += 22;
-  }
-  function rows(pairs: [string, string][]) {
-    doc.setFontSize(9); const colW = CW / 2;
-    for (let i = 0; i < pairs.length; i += 2) {
-      ensure(18);
-      for (let c = 0; c < 2; c++) {
-        const pair = pairs[i + c]; if (!pair) continue;
-        const x = M + c * colW;
-        setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.text(pair[0], x, y);
-        setText(COLORS.text); doc.setFont("helvetica", "bold");
-        const val = doc.splitTextToSize(pair[1] || "—", colW - 110)[0] ?? pair[1];
-        doc.text(String(val), x + colW - 12, y, { align: "right" });
-      }
-      y += 16;
-    }
-    y += 4;
-  }
-  function bars(items: [string, number, RGB?][]) {
-    doc.setFontSize(8); const colW = CW / 2;
-    for (let i = 0; i < items.length; i += 2) {
-      ensure(24);
-      for (let c = 0; c < 2; c++) {
-        const it = items[i + c]; if (!it) continue;
-        const [label, vRaw, color] = it;
-        const v = Math.max(0, Math.min(100, Math.round(vRaw || 0)));
-        const x = M + c * colW; const barW = colW - 24;
-        setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.text(label, x, y);
-        setText(COLORS.text); doc.text(String(v), x + barW, y, { align: "right" });
-        setFill(COLORS.line); doc.roundedRect(x, y + 4, barW, 4, 2, 2, "F");
-        const col = color ?? (v >= 66 ? COLORS.lime : v >= 33 ? COLORS.gold : COLORS.blood);
-        setFill(col); doc.roundedRect(x, y + 4, (barW * v) / 100, 4, 2, 2, "F");
-      }
-      y += 22;
-    }
-    y += 2;
-  }
-  function paragraph(text: string) {
-    if (!text) return;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9); setText(COLORS.muted);
-    for (const ln of doc.splitTextToSize(text, CW)) { ensure(13); doc.text(ln, M, y); y += 13; }
-    y += 4;
-  }
-  function links(items: [string, string][]) {
-    doc.setFontSize(9);
-    for (const [label, url] of items) {
-      ensure(14);
-      setText(COLORS.muted); doc.setFont("helvetica", "bold"); doc.text(`${label}: `, M, y);
-      const lw = doc.getTextWidth(`${label}: `);
-      setText(COLORS.cyan); doc.setFont("helvetica", "normal");
-      const shown = doc.splitTextToSize(url, CW - lw)[0] ?? url;
-      doc.textWithLink(String(shown), M + lw, y, { url });
-      y += 14;
-    }
-    y += 4;
-  }
+}
 
-  // ── PAGE 1 ──
-  paintBg(); y = M;
-
-  // banner
-  if (banner && banner.width > 0) {
-    const bh = 70; ensure(bh + 8);
-    try {
-      doc.addImage(banner.dataUrl, banner.format, M, y, CW, bh);
-      setDraw(COLORS.line); doc.setLineWidth(0.5); doc.roundedRect(M, y, CW, bh, 4, 4, "S");
-      y += bh + 12;
-    } catch { /* skip */ }
-  }
-
-  // brand header
-  setText(COLORS.cyan); doc.setFont("helvetica", "bold"); doc.setFontSize(20);
-  doc.text("OG SCAN", M, y + 6);
-  setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-  doc.text("TOKEN INTELLIGENCE REPORT", M, y + 22);
-  doc.text(new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC", W - M, y + 6, { align: "right" });
-  if (handle) doc.text(`Scanned by @${handle}`, W - M, y + 22, { align: "right" });
-  y += 40;
-  setDraw(COLORS.line); doc.setLineWidth(0.5); doc.line(M, y, W - M, y); y += 18;
-
-  // token title + logo
-  let titleX = M;
-  if (logo && logo.width > 0) {
-    const size = 34;
-    try {
-      setFill(COLORS.panel); doc.roundedRect(M, y - 24, size, size, 6, 6, "F");
-      doc.addImage(logo.dataUrl, logo.format, M + 1, y - 23, size - 2, size - 2);
-      titleX = M + size + 10;
-    } catch { titleX = M; }
-  }
-  setText(COLORS.text); doc.setFont("helvetica", "bold"); doc.setFontSize(18);
-  doc.text(`$${token.symbol || "?"}`, titleX, y);
-  setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-  doc.text(token.name || "", titleX + doc.getTextWidth(`$${token.symbol || "?"}`) + 10, y);
-  y += 16;
-  doc.setFontSize(8); doc.text(`CA: ${token.id}`, titleX, y);
-  y = Math.max(y, M + 40) + 14;
-
-  // verdict banner
-  ensure(56);
-  setFill(COLORS.panel); doc.roundedRect(M, y, CW, 48, 6, 6, "F");
-  setFill(tierColor); doc.roundedRect(M, y, 5, 48, 2, 2, "F");
-  setText(tierColor); doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-  doc.text(result.tierLabel, M + 16, y + 22);
-  setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-  doc.text(`Confidence ${result.confidence}%   ·   Risk ${result.riskScore}/100   ·   Data completeness ${result.dataCompleteness}%`, M + 16, y + 38);
-  y += 60;
-  paragraph(result.rationale);
-
-  if (profile?.description) { sectionTitle("Coin Information"); paragraph(profile.description); }
-
-  // detection signals
-  if (result.signals.length) {
-    sectionTitle("Detection Signals"); doc.setFontSize(8.5);
-    for (const sig of result.signals) {
-      ensure(14);
-      const dir = sig.direction === "positive" ? "+" : sig.direction === "negative" ? "-" : "·";
-      setText(sig.direction === "positive" ? COLORS.lime : sig.direction === "negative" ? COLORS.blood : COLORS.muted);
-      doc.setFont("helvetica", "bold"); doc.text(dir, M, y);
-      setText(COLORS.text); doc.text(sig.label, M + 12, y);
-      setText(COLORS.muted); doc.setFont("helvetica", "normal");
-      doc.text(String(doc.splitTextToSize(sig.detail, CW - 140)[0] ?? sig.detail), M + 150, y);
-      y += 14;
-    }
-    y += 6;
-  }
-
-  // trend & lifecycle (with chart)
-  sectionTitle("Trend & Lifecycle");
-  if (chartPng) {
-    const cw = CW, ch = cw * (180 / 600) * 0.7;
-    ensure(ch + 8);
-    try { doc.addImage(chartPng, "PNG", M, y, cw, ch); y += ch + 8; } catch { /* skip */ }
-  }
-  bars([["Trend velocity", velocity], ["Hype decay risk", decay, COLORS.blood],
-        ["Drawdown from peak", lifecycle.drawdownFromPeakPct, COLORS.blood], ["Holder entropy", entropy, COLORS.lime]]);
-  paragraph(`Stage: ${lifecycle.stage.toUpperCase()}${lifecycle.failure ? ` (${lifecycle.failure.replace("_", " ")})` : ""}. ${lifecycle.summary}`);
-
-  // forensic scores
-  if (s) {
-    sectionTitle("Forensic Scores & Classification");
-    
-    // Layer classifications
-    if (s.classification?.layers) {
-      rows([
-        ["Origin Identity", s.classification.layers.origin_identity ?? "—"],
-        ["Original Contract", s.classification.layers.original_contract ?? "—"],
-        ["Control Status", s.classification.layers.control_status ?? "—"],
-        ["Lifecycle Status", s.classification.layers.lifecycle_status ?? "—"],
-      ]);
-    }
-    
-    // Secondary labels
-    if (s.classification?.secondary_labels && s.classification.secondary_labels.length > 0) {
-      ensure(18);
-      setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-      doc.text("Secondary Labels: " + s.classification.secondary_labels.join(", "), M, y);
-      y += 14;
-    }
-    
-    bars([
-      ["Dominance", s.dominanceScore], ["Origin", s.originScore],
-      ["True OG probability", s.trueOgProbability], ["Clone probability", s.cloneProbability, COLORS.blood],
-      ["Risk", s.riskScore, COLORS.blood], ["CTO", s.ctoScore],
-      ["Migration", s.migrationScore], ["Revival", s.revivalScore],
-      ["Deployer trust", s.deployerTrustScore], ["Liquidity authenticity", s.liquidityAuthenticityScore],
-      ["Holder distribution", s.holderDistributionScore], ["On-chain activity", s.onChainActivityScore],
+/**
+ * Generate quick summary with top data
+ */
+export async function generateQuickSummary(token: Token): Promise<{
+  holders: any[];
+  whaleRisk: any;
+  prediction: any;
+  rugRisk: any;
+  anomalies: any[];
+}> {
+  try {
+    const [holders, whaleRisk, prediction, rugRisk, anomalies] = await Promise.allSettled([
+      supabase
+        .from('holder_snapshots')
+        .select('*')
+        .eq('mint_address', token.mint)
+        .order('balance_usd', { ascending: false })
+        .limit(20),
+      analyzeWhaleRisk(token.mint),
+      predictTokenPrice(token.mint),
+      assessRugRisk(token.mint),
+      supabase
+        .from('real_time_alerts')
+        .select('*')
+        .eq('mint_address', token.mint)
+        .order('triggered_timestamp', { ascending: false })
+        .limit(10),
     ]);
-    
-    // CTO explanation
-    if (s.ctoScore >= 60) {
-      paragraph("⚠️ High CTO (Community Takeover) probability indicates the deployer may have abandoned the token and the community has taken over development and/or liquidity management.");
-    }
-    
-    if (s.classification?.reasoning_summary) paragraph(s.classification.reasoning_summary);
-  }
 
-  // identity & origin (OG status)
-  sectionTitle("Identity & Origin (OG Status)");
-  rows([
-    ["Symbol", `$${token.symbol || "—"}`], ["Name", token.name || "—"],
-    ["Chain", token.chainId ?? "solana"], ["Decimals", token.decimals != null ? String(token.decimals) : "—"],
-    ["First mint", shortDate(tokenOgCreatedAtIso(token))], ["First mint source", token.firstMintSource ?? "—"],
-    ["Creation source", token.creationSource ?? "—"], ["Narrative ID", report?.narrativeFingerprintId ?? "—"],
-    ["Verified", yn(token.isVerified)], ["Primary token", yn(s?.isPrimaryToken)],
-    ["First-mint token", yn(s?.isFirstMintToken)], ["Classification", s?.classification?.primary_label ?? "—"],
-  ]);
-
-  // authority & contract
-  sectionTitle("Authority & Contract");
-  rows([
-    ["Mint authority", token.audit?.mintAuthorityDisabled === undefined ? "—" : (token.audit.mintAuthorityDisabled ? "Renounced ✓" : "Active ⚠")],
-    ["Freeze authority", token.audit?.freezeAuthorityDisabled === undefined ? "—" : (token.audit.freezeAuthorityDisabled ? "Renounced ✓" : "Active ⚠")],
-    ["Decimals", token.decimals != null ? String(token.decimals) : "—"],
-    ["First mint wallet", token.firstMintAuthorityWallet ? shortAddr(token.firstMintAuthorityWallet, 4) : "—"],
-    ["Creator wallet", token.creatorFunding?.creatorWallet ? shortAddr(token.creatorFunding.creatorWallet, 4) : "—"],
-    ["Funding wallet", token.creatorFunding?.fundingWallet ? shortAddr(token.creatorFunding.fundingWallet, 4) : "—"],
-    ["Top holders %", token.topHoldersPercent != null ? fmtPct(token.topHoldersPercent) : (token.audit?.topHoldersPercentage != null ? fmtPct(token.audit.topHoldersPercentage) : "—")],
-  ]);
-
-  // market & liquidity
-  sectionTitle("Market & Liquidity");
-  const vol24 = token.stats24h ? (token.stats24h.buyVolume ?? 0) + (token.stats24h.sellVolume ?? 0) : undefined;
-  const mcapToLiqRatio = token.mcap && token.liquidity ? (token.mcap / token.liquidity).toFixed(1) : "—";
-  const fdvToMcapRatio = token.fdv && token.mcap ? (token.fdv / token.mcap).toFixed(2) : "—";
-  rows([
-    ["Price", fmtUsd(token.usdPrice)], ["24h change", fmtPct(token.stats24h?.priceChange ?? 0)],
-    ["Market cap", fmtUsd(token.mcap)], ["FDV", fmtUsd(token.fdv)],
-    ["FDV/MC ratio", fdvToMcapRatio], ["MC/Liquidity ratio", mcapToLiqRatio],
-    ["Liquidity (effective)", fmtUsd(tokenEffectiveLiquidityUsd(token))], ["Liquidity (reported)", token.reportedLiquidity != null ? fmtUsd(token.reportedLiquidity) : "—"],
-    ["Volume 24h", vol24 != null ? fmtUsd(vol24) : "—"], ["Pools", token.poolCount != null ? String(token.poolCount) : "—"],
-    ["ATH", token.allTimeHighUsd != null ? `${fmtUsd(token.allTimeHighUsd)} · ${shortDate(token.allTimeHighAt)}` : "—"],
-    ["ATL", token.allTimeLowUsd != null ? `${fmtUsd(token.allTimeLowUsd)} · ${shortDate(token.allTimeLowAt)}` : "—"],
-  ]);
-
-  // holders
-  sectionTitle("Holders & Distribution");
-  rows([
-    ["Holders", fmtHolderCount(token.holderCount)], ["Whales", token.whaleCount != null ? String(token.whaleCount) : "—"],
-    ["Holder entropy", `${Math.round(entropy)}/100`], ["Top holders %", token.topHoldersPercent != null ? fmtPct(token.topHoldersPercent) : "—"],
-  ]);
-  if (token.topHolders?.length) {
-    doc.setFontSize(8);
-    token.topHolders.slice(0, 12).forEach((h, i) => {
-      ensure(13);
-      setText(COLORS.muted); doc.setFont("helvetica", "normal");
-      doc.text(`${i + 1}. ${shortAddr(h.owner, 4)}${h.label ? ` · ${h.label}` : ""}`, M, y);
-      setText(COLORS.text); doc.setFont("helvetica", "bold"); doc.text(fmtPct(h.percent), W - M, y, { align: "right" });
-      y += 13;
-    });
-    y += 6;
+    return {
+      holders: holders.status === 'fulfilled' ? holders.value.data || [] : [],
+      whaleRisk: whaleRisk.status === 'fulfilled' ? whaleRisk.value : null,
+      prediction: prediction.status === 'fulfilled' ? prediction.value : null,
+      rugRisk: rugRisk.status === 'fulfilled' ? rugRisk.value : null,
+      anomalies: anomalies.status === 'fulfilled' ? anomalies.value.data || [] : [],
+    };
+  } catch (error) {
+    console.error('Error generating quick summary:', error);
+    return {
+      holders: [],
+      whaleRisk: null,
+      prediction: null,
+      rugRisk: null,
+      anomalies: [],
+    };
   }
-
-  // dex paid - ENHANCED LOGIC with more fields
-  sectionTitle("DEX Paid & Boosts");
-  const isDexPaid = token.dexProfilePaid || token.dexCommunityTakeoverPaid || token.dexAdsPaid || (token.dexPaidOrderCount ?? 0) > 0 || (token.dexBoostActive ?? 0) > 0 || (token.dexBoostTotalAmount ?? 0) > 0 || (token.dexPaidAmount ?? 0) > 0;
-  const dexRows = [
-    ["DEX paid (any)", yn(isDexPaid)],
-  ];
-  
-  // Add profile paid if available
-  if (token.dexProfilePaid !== undefined) {
-    dexRows.push(["Profile paid", yn(token.dexProfilePaid)]);
-  }
-  
-  // Add boosts info - show active count or total amount
-  if (token.dexBoostActive !== undefined && token.dexBoostActive > 0) {
-    dexRows.push(["Boosts active", String(token.dexBoostActive)]);
-  }
-  if (token.dexBoostTotalAmount !== undefined && token.dexBoostTotalAmount > 0) {
-    dexRows.push(["Boost total (SOL)", fmtNum(token.dexBoostTotalAmount)]);
-  }
-  if (token.dexBoostAmount !== undefined && token.dexBoostAmount > 0) {
-    dexRows.push(["Boost amount (SOL)", fmtNum(token.dexBoostAmount)]);
-  }
-  
-  // Add other DEX paid types
-  if (token.dexCommunityTakeoverPaid !== undefined) {
-    dexRows.push(["CTO paid", yn(token.dexCommunityTakeoverPaid)]);
-  }
-  if (token.dexAdsPaid !== undefined) {
-    dexRows.push(["Ads paid", yn(token.dexAdsPaid)]);
-  }
-  
-  // Add paid order info
-  if (token.dexPaidOrderCount !== undefined && token.dexPaidOrderCount > 0) {
-    dexRows.push(["Total paid orders", String(token.dexPaidOrderCount)]);
-  } else if (token.dexPaidOrderCount !== undefined) {
-    dexRows.push(["Total paid orders", "0"]);
-  }
-  
-  // Add paid amount if available
-  if (token.dexPaidAmount !== undefined && token.dexPaidAmount > 0) {
-    dexRows.push(["Total paid amount (SOL)", fmtNum(token.dexPaidAmount)]);
-  }
-  
-  // Add date info
-  if (token.dexFirstPaidAt) {
-    dexRows.push(["First paid", shortDate(token.dexFirstPaidAt)]);
-  }
-  if (token.dexLastPaidAt) {
-    dexRows.push(["Last paid", shortDate(token.dexLastPaidAt)]);
-  }
-  
-  rows(dexRows);
-
-  // links & socials
-  if (profile && (profile.websites.length || profile.socials.length)) {
-    sectionTitle("Links & Socials");
-    links([
-      ...profile.websites.map((w) => [w.label, w.url] as [string, string]),
-      ...profile.socials.map((so) => [cap(so.type), so.url] as [string, string]),
-    ]);
-  }
-
-  // clone lineage
-  const lineage = report?.familyTree ?? [];
-  const copycats = report?.copycats ?? [];
-  const clusterAliases = report?.clusterAliases ?? [];
-  
-  if (lineage.length || copycats.length || clusterAliases.length) {
-    sectionTitle("Clone Lineage, Copycats & Cluster"); 
-    
-    // Cluster aliases
-    if (clusterAliases.length) {
-      ensure(18);
-      setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-      doc.text("Cluster Aliases: " + clusterAliases.slice(0, 8).join(", "), M, y);
-      y += 14;
-    }
-    
-    // Copycats count
-    if (copycats.length) {
-      ensure(14);
-      setText(COLORS.muted); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
-      doc.text(`Copycats: ${copycats.length} detected`, M, y);
-      y += 12;
-    }
-    
-    // Family tree
-    doc.setFontSize(8.5);
-    lineage.slice(0, 14).forEach((n) => {
-      ensure(13);
-      setText(COLORS.text); doc.setFont("helvetica", "bold"); doc.text(`$${n.token.symbol}`, M, y);
-      setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.text(n.relationship, M + 80, y);
-      doc.text(`${Math.round(n.score)}%`, W - M, y, { align: "right" });
-      y += 13;
-    });
-    y += 6;
-  }
-
-  // why this exists
-  sectionTitle("Why This Exists");
-  paragraph(whyExists({ name: token.name, symbol: token.symbol, isOg: result.tier === "OG_TOKEN" }));
-
-  // scan history
-  if (history.length) {
-    sectionTitle("Scan History");
-    doc.setFontSize(8.5);
-    history.forEach((h: any) => {
-      ensure(13);
-      setText(COLORS.muted); doc.setFont("helvetica", "normal");
-      doc.text(new Date(h.created_at).toISOString().slice(0, 16).replace("T", " "), M, y);
-      setText(COLORS.text); doc.setFont("helvetica", "bold");
-      doc.text(String(h.tier || "").replace(/_/g, " "), M + 120, y);
-      setText(COLORS.muted); doc.setFont("helvetica", "normal");
-      doc.text(`${h.confidence ?? "—"}% · risk ${h.risk_score ?? "—"}${h.scanner_handle ? ` · @${h.scanner_handle}` : ""}`, W - M, y, { align: "right" });
-      y += 13;
-    });
-    y += 6;
-  }
-
-  footer();
-  doc.save(`OGScan_${(token.symbol || "token").replace(/[^A-Za-z0-9]/g, "")}_${token.id.slice(0, 6)}.pdf`);
 }
