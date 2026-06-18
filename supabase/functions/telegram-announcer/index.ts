@@ -154,6 +154,34 @@ function buildNewUserMessage(record: Record<string, unknown>, eventType: string)
   );
 }
 
+
+function buildOgScanMessage(record: Record<string, unknown>, eventType: string): string | null {
+  if (eventType !== "INSERT") return null;
+  const tier = String(record["tier"] || "");
+  // Only announce high-signal verdicts to avoid spamming the community
+  if (tier !== "OG_TOKEN" && tier !== "DANGEROUS_TOKEN") return null;
+  const sym = record["symbol"]
+    ? `$${escapeHtml(String(record["symbol"]))}`
+    : escapeHtml(String(record["name"] || "Token"));
+  const conf = Number(record["confidence"] || 0);
+  const risk = Number(record["risk_score"] || 0);
+  const mint = String(record["mint"] || "");
+  const handle = record["scanner_handle"] ? `@${escapeHtml(String(record["scanner_handle"]))}` : "an OG";
+  const rationale = escapeHtml(truncate(String(record["rationale"] || ""), 160));
+  const head = tier === "OG_TOKEN"
+    ? `✅ <b>OG TOKEN identified on OG SCAN!</b>`
+    : `🛑 <b>DANGEROUS token flagged on OG SCAN!</b>`;
+  const link = `https://www.ogscan.fun/intel-token/${mint}`;
+  return (
+    `${head}\n\n` +
+    `🪙 <b>${sym}</b> · scanned by ${handle}\n` +
+    `🎯 Confidence: <b>${conf}%</b> · Risk: <b>${risk}/100</b>\n` +
+    (rationale ? `💬 ${rationale}\n` : "") +
+    `🔎 <code>${escapeHtml(mint)}</code>\n\n` +
+    `🔗 <a href="${link}">View full intel →</a>`
+  );
+}
+
 // ─── Route webhook payload to correct builder ────────────────────────────────
 
 type WebhookPayload = {
@@ -185,6 +213,8 @@ function buildMessage(payload: WebhookPayload): string | null {
       return buildTradingLobbyMessage(record, type);
     case "profiles":
       return buildNewUserMessage(record, type);
+    case "ogi_scan_log":
+      return buildOgScanMessage(record, type);
     default:
       return null;
   }
