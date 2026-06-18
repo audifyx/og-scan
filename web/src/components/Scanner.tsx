@@ -361,7 +361,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <div className="mt-3">
               <TokenTruthLegend compact />
             </div>
-            {primaryToken && <OgVerdict token={primaryToken} score={primaryScore} />}
+            {primaryToken && <OgVerdict token={primaryToken} score={primaryScore} report={report} />}
           </>
         )}
 

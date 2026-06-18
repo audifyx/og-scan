@@ -45,19 +45,19 @@ export function ShareScanCard({ mint, symbol, name, result, scanId, className }:
   }
 
   return (
-    <div className={cn("rounded-xl border bg-card/60 p-4", className)}>
+    <div className={cn("glass-card border border-white/10 p-4", className)}>
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
         <Share2 className="h-4 w-4" /> Share this scan
       </div>
 
-      <div className="mb-3 rounded-lg border bg-gradient-to-br from-background to-muted/40 p-4">
+      <div className="mb-3 rounded-xl border border-white/10 bg-white/[0.03] p-4">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold tracking-widest text-muted-foreground">{card.title}</span>
           <span className="text-xs text-muted-foreground">{card.date}</span>
         </div>
         <div className="mt-2 flex items-baseline gap-2">
           <span className="text-xl font-bold">{card.ticker}</span>
-          <span className="text-sm font-semibold text-primary">{card.tierLabel}</span>
+          <span className="text-sm font-semibold text-og-cyan">{card.tierLabel}</span>
         </div>
         <div className="mt-1 text-xs text-muted-foreground">
           Confidence {card.confidence}% · Risk {card.risk}/100 · by {card.attribution}

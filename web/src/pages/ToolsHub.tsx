@@ -76,7 +76,7 @@ const FeaturedCard: React.FC<{ tool: ToolItem; onNavigate: (id: string) => void 
   <button
     type="button"
     onClick={() => onNavigate(tool.id)}
-    className="group relative w-full overflow-hidden rounded-[24px] border border-primary/30 bg-gradient-to-br from-primary/[0.12] to-secondary/[0.06] p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50"
+    className="glass-card group relative w-full overflow-hidden border border-primary/30 p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50"
   >
     <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary blur-3xl opacity-20 transition-opacity group-hover:opacity-30" />
     <div className="relative flex items-start gap-4">
@@ -103,10 +103,8 @@ const ToolCard: React.FC<{ tool: ToolItem; onNavigate: (id: string) => void }> =
       type="button"
       onClick={() => onNavigate(tool.id)}
       className={cn(
-        "group relative overflow-hidden rounded-[22px] border text-left transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97]",
-        isPrimary
-          ? "border-primary/20 bg-primary/[0.06] hover:border-primary/40 hover:bg-primary/[0.10]"
-          : "border-secondary/20 bg-secondary/[0.06] hover:border-secondary/40 hover:bg-secondary/[0.10]",
+        "glass-card group relative overflow-hidden text-left transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97]",
+        isPrimary ? "hover:border-primary/40" : "hover:border-secondary/40",
       )}
     >
       <div className={cn("pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full blur-2xl opacity-20 transition-opacity duration-300 group-hover:opacity-35", isPrimary ? "bg-primary" : "bg-secondary")} />
