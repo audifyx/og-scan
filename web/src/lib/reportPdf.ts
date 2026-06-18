@@ -12,21 +12,20 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   const { token } = input;
 
   try {
-    console.log('🔍 Scanning blockchain and generating OG Scan report...');
+    console.log('📄 Scanning blockchain and generating OG Scan PDF...');
     
-    const html = await generateOgScanReport(token);
+    const pdfBlob = await generateOgScanReport(token);
 
-    const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(pdfBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${token.name}-${token.mint.slice(0, 8)}-OGScan.html`;
+    link.download = `${token.name}-${token.mint.slice(0, 8)}-OGScan.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    console.log('✅ Report downloaded:', link.download);
+    console.log('✅ PDF Report downloaded:', link.download);
   } catch (error) {
     console.error('❌ Error:', error);
     alert('Error generating report. Try again!');
