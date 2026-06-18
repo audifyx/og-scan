@@ -590,8 +590,8 @@ const ResultRow = ({ t, score, report, onSelect }: { t: JupTokenInfo; score?: To
           <QuickTool href={chartUrl} icon={<BarChart3 className="h-3 w-3" />} label="Chart" />
           <QuickTool href={explorerAddressUrl(t.chainId ?? "solana", t.id)} icon={<ExternalLink className="h-3 w-3" />} label="Explorer" />
           {isSolana(t.chainId ?? "solana") && <QuickTool href={`${PUMPFUN_BASE_URL}/${t.id}`} icon={<Flame className="h-3 w-3" />} label="Pump" />}
-          <button type="button" onClick={handlePdf} disabled={pdfBusy} title="Download PDF report" className="collector-action px-2 py-1 inline-flex items-center gap-1 disabled:opacity-50">
-            {pdfBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileDown className="h-3 w-3" />} PDF
+          <button type="button" onClick={handlePdf} disabled={pdfBusy} title="Generate OG Scan Intelligence Report" className="collector-action px-2 py-1 inline-flex items-center gap-1 disabled:opacity-50">
+            {pdfBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileDown className="h-3 w-3" />} Report
           </button>
           <CoinDetailDialog token={t} onOpenScanner={() => onSelect()} actionLabel="Intel" className="collector-action px-2 py-1" />
           <CopyMintButton mint={t.id} label="Copy" copiedLabel="✓" className="collector-action border-og-cyan/45 px-2 py-1 text-og-cyan" />
