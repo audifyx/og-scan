@@ -138,3 +138,65 @@ export async function getScanHistoryForMint(mint: string, limit = 50) {
   }
   return data ?? [];
 }
+
+// ── Social / attribution + trend helpers (section D, 8, 9) ──
+
+export type ShareChannel = "x" | "telegram" | "card" | "link";
+
+/** Record a share event for attribution + virality analytics. */
+export async function logShare(mint: string, channel: ShareChannel, handle?: string | null, scanId?: string | null): Promise<void> {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    await supabase.from("ogi_share_event").insert({
+      mint, channel, handle: handle ?? null,
+      shared_by: auth?.user?.id ?? null, scan_id: scanId ?? null,
+    });
+  } catch (err) {
+    console.warn("[scanLog] share log failed", err);
+  }
+}
+
+export type LeaderboardRow = {
+  handle: string;
+  total_scans: number;
+  og_finds: number;
+  unique_tokens: number;
+  last_active: string;
+};
+
+export async function getScannerLeaderboard(limit = 25): Promise<LeaderboardRow[]> {
+  const { data, error } = await supabase.from("ogi_scanner_leaderboard").select("*").limit(limit);
+  if (error) { console.warn("[scanLog] leaderboard failed", error); return []; }
+  return (data ?? []) as LeaderboardRow[];
+}
+
+export type TrendingRow = { mint: string; symbol: string | null; name: string | null; scans_24h: number; common_tier: string };
+
+export async function getTrendingScans(limit = 50): Promise<TrendingRow[]> {
+  const { data, error } = await supabase.from("ogi_trending_scans").select("*").limit(limit);
+  if (error) { console.warn("[scanLog] trending failed", error); return []; }
+  return (data ?? []) as TrendingRow[];
+}
+
+/** Recent scans across all tokens (public history explorer). */
+export async function getRecentScans(limit = 50) {
+  const { data, error } = await supabase
+    .from("ogi_scan_log")
+    .select("id, mint, symbol, name, tier, confidence, risk_score, scanner_handle, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) { console.warn("[scanLog] recent failed", error); return []; }
+  return data ?? [];
+}
+
+/** Capture a trend snapshot for time-series velocity. */
+export async function captureTrendSnapshot(mint: string, m: { priceUsd?: number; volume24h?: number; liquidityUsd?: number; velocity?: number }): Promise<void> {
+  try {
+    await supabase.from("ogi_trend_snapshot").insert({
+      mint, price_usd: m.priceUsd ?? null, volume_24h: m.volume24h ?? null,
+      liquidity_usd: m.liquidityUsd ?? null, velocity: m.velocity ?? null,
+    });
+  } catch (err) {
+    console.warn("[scanLog] snapshot failed", err);
+  }
+}

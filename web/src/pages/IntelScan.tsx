@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClassificationCard } from "@/components/scanner-20x/ClassificationCard";
+import { ShareScanCard } from "@/components/intel/ShareScanCard";
+import { IntelNav } from "@/components/intel/IntelNav";
 import { classifyToken, type ClassificationInput, type OgClassification } from "@/lib/classification";
 import { logScan, getPublicMetrics, getTopScanned, type PublicMetrics, type TopScannedRow } from "@/lib/scanLog";
 
@@ -63,6 +65,8 @@ export default function IntelScan() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OgClassification | null>(null);
   const [symbol, setSymbol] = useState<string | undefined>();
+  const [scannedMint, setScannedMint] = useState<string | undefined>();
+  const [scanId, setScanId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<PublicMetrics | null>(null);
   const [top, setTop] = useState<TopScannedRow[]>([]);
 
@@ -85,7 +89,9 @@ export default function IntelScan() {
       const classification = classifyToken(input);
       setResult(classification);
       setSymbol(sym);
-      await logScan({ mint: addr.trim(), chain: resolvedChain, symbol: sym, name }, classification);
+      const id = await logScan({ mint: addr.trim(), chain: resolvedChain, symbol: sym, name }, classification);
+      setScannedMint(addr.trim());
+      setScanId(id);
       await refreshStats();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scan failed");
@@ -96,6 +102,7 @@ export default function IntelScan() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
+      <IntelNav />
       <div className="mb-6">
         <h1 className="flex items-center gap-2 text-2xl font-bold">
           <ShieldCheck className="h-6 w-6 text-emerald-400" /> OG Scan Intelligence
@@ -137,6 +144,9 @@ export default function IntelScan() {
 
       {/* Classification module */}
       {result && <ClassificationCard result={result} symbol={symbol} className="mb-6" />}
+      {result && scannedMint && (
+        <ShareScanCard mint={scannedMint} symbol={symbol} result={result} scanId={scanId} className="mb-6" />
+      )}
 
       {/* Public transparency metrics */}
       <Card>
