@@ -5,12 +5,13 @@
 
 import type { ScanCardPayload } from "./social";
 import type { OgTier } from "./classification";
+import { fetchImageDataUrl, loadImageElement } from "./imageLoad";
 
 const TIER_HEX: Record<OgTier, string> = {
   OG_TOKEN: "#78dc78", SAFE_CLONE: "#38c4dc", RISKY_TOKEN: "#f0be46", DANGEROUS_TOKEN: "#f0505a",
 };
 
-export function downloadScanCardImage(card: ScanCardPayload): void {
+export async function downloadScanCardImage(card: ScanCardPayload, iconUrl?: string | null): Promise<void> {
   const W = 1200, H = 630;
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
@@ -42,6 +43,21 @@ export function downloadScanCardImage(card: ScanCardPayload): void {
   ctx.textAlign = "right";
   ctx.fillText(card.date, W - PAD, 95);
   ctx.textAlign = "left";
+
+  // token logo (best-effort, cross-origin safe)
+  const logo = await fetchImageDataUrl(iconUrl);
+  if (logo) {
+    const img = await loadImageElement(logo.dataUrl);
+    if (img) {
+      const size = 96, lx = W - PAD - size, ly = 150;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(lx + size / 2, ly + size / 2, size / 2, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+      ctx.drawImage(img, lx, ly, size, size);
+      ctx.restore();
+      ctx.strokeStyle = accent; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(lx + size / 2, ly + size / 2, size / 2, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
 
   // ticker
   ctx.fillStyle = "#e8eef5"; ctx.font = "bold 92px Helvetica, Arial, sans-serif";

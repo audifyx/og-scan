@@ -7,6 +7,7 @@ import {
   Coins,
   Crown,
   Crosshair,
+  FileDown,
   ExternalLink,
   Filter,
   Fingerprint,
@@ -49,6 +50,7 @@ import {
 import { cn } from "@/lib/utils";
 import { HelpLabel, ScoreMeter, TokenTruthLegend, labelToneClass, scoreTextClass } from "@/components/TokenTruthKit";
 import { OgVerdict } from "@/components/scanner-20x/OgVerdict";
+import { downloadReportPdf } from "@/lib/reportPdf";
 import { classifyToken, TIER_LABEL } from "@/lib/classification";
 import { forensicToInput } from "@/lib/classificationAdapter";
 
@@ -367,7 +369,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
 
         <div className={`mt-4 grid grid-cols-1 gap-2 transition-opacity duration-500 ${isFetching ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
           {filteredResults.slice(0, 18).map((t) => (
-            <ResultRow key={forensicKey(t)} t={t} score={tokenScore(report, t)} onSelect={() => onSelect(t.id)} />
+            <ResultRow key={forensicKey(t)} t={t} score={tokenScore(report, t)} report={report} onSelect={() => onSelect(t.id)} />
           ))}
           {debounced.length >= 2 && !isFetching && rawResults.length === 0 && (
             <div className="col-span-full border border-og-grid bg-og-ink/70 p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
@@ -461,7 +463,9 @@ const FilterToggle = ({
   </button>
 );
 
-const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForensicScores; onSelect: () => void }) => {
+const ResultRow = ({ t, score, report, onSelect }: { t: JupTokenInfo; score?: TokenForensicScores; report?: ForensicOgReport; onSelect: () => void }) => {
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const handlePdf = async () => { setPdfBusy(true); try { await downloadReportPdf({ token: t, score, report }); } catch (e) { console.error(e); } finally { setPdfBusy(false); } };
   const ch: number = t.stats24h?.priceChange ?? 0;
   const up: boolean = ch >= 0;
   const firstMintDate: string = shortDate(tokenOgCreatedAtIso(t));
@@ -567,6 +571,9 @@ const ResultRow = ({ t, score, onSelect }: { t: JupTokenInfo; score?: TokenForen
           <QuickTool href={chartUrl} icon={<BarChart3 className="h-3 w-3" />} label="Chart" />
           <QuickTool href={explorerAddressUrl(t.chainId ?? "solana", t.id)} icon={<ExternalLink className="h-3 w-3" />} label="Explorer" />
           {isSolana(t.chainId ?? "solana") && <QuickTool href={`${PUMPFUN_BASE_URL}/${t.id}`} icon={<Flame className="h-3 w-3" />} label="Pump" />}
+          <button type="button" onClick={handlePdf} disabled={pdfBusy} title="Download PDF report" className="collector-action px-2 py-1 inline-flex items-center gap-1 disabled:opacity-50">
+            {pdfBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileDown className="h-3 w-3" />} PDF
+          </button>
           <CoinDetailDialog token={t} onOpenScanner={() => onSelect()} actionLabel="Intel" className="collector-action px-2 py-1" />
           <CopyMintButton mint={t.id} label="Copy" copiedLabel="✓" className="collector-action border-og-cyan/45 px-2 py-1 text-og-cyan" />
         </span>
