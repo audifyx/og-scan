@@ -1,10 +1,9 @@
 // FILE: web/src/lib/reportPdf.ts
-// PDF Report Generator - WORKING VERSION
+// Download interactive HTML report (replaces PDF)
 
-import jsPDF from 'jspdf';
 import { Token } from '@/lib/og';
 import { OgClassification } from '@/lib/classification';
-import { generateRealReport } from './real-reportPdf';
+import { generateHtmlReport } from './generateHtmlReport';
 
 export interface PdfReportInput {
   token: Token;
@@ -13,29 +12,53 @@ export interface PdfReportInput {
 }
 
 /**
- * Download comprehensive PDF report
+ * Download HTML report (beautiful interactive version)
  */
 export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   const { token } = input;
 
   try {
-    console.log('📄 Generating comprehensive PDF report...');
+    console.log('🔍 Scanning blockchain and generating report...');
     
-    const doc = await generateRealReport(token);
+    // Generate HTML with all blockchain data
+    const html = await generateHtmlReport(token);
 
-    // Download
-    const filename = `${token.name}-${token.mint.slice(0, 8)}-OGScan.pdf`;
-    doc.save(filename);
-    console.log('✅ PDF saved:', filename);
+    // Download as HTML file
+    const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${token.name}-${token.mint.slice(0, 8)}-OGScan.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    console.log('✅ Report downloaded:', link.download);
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ Error generating report:', error);
+    // Show error to user
+    alert('Error generating report. Check console for details.');
     throw error;
   }
 }
 
 /**
- * Generate PDF for preview
+ * Open HTML report in new tab
  */
-export async function generateTokenReportPdf(token: Token): Promise<jsPDF> {
-  return await generateRealReport(token);
+export async function openReportInNewTab(token: Token): Promise<void> {
+  try {
+    console.log('🌐 Opening report in new tab...');
+    
+    const html = await generateHtmlReport(token);
+    const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+
+    console.log('✅ Report opened in new tab');
+  } catch (error) {
+    console.error('❌ Error:', error);
+    alert('Error opening report. Check console for details.');
+    throw error;
+  }
 }
