@@ -1,7 +1,6 @@
 /**
- * ToolsHub — Premium square icon grid layout for OG Scan tools.
- * Clean, no overlapping text. Each tool is a square card with icon.
- * Fully theme-aware with CSS variables.
+ * ToolsHub — Clean square icon grid layout for OG Scan tools.
+ * Compact squares with large icons. Fully theme-aware.
  */
 import React, { useMemo, useState } from "react";
 import {
@@ -37,10 +36,10 @@ const CATEGORY_ICON: Record<Category, React.ComponentType<{ className?: string }
 };
 
 const THEME_COLORS = [
-  { bg: "hsl(var(--primary) / 0.15)", border: "hsl(var(--primary) / 0.3)", text: "hsl(var(--primary))", icon: "hsl(var(--primary))" },
-  { bg: "hsl(var(--secondary) / 0.15)", border: "hsl(var(--secondary) / 0.3)", text: "hsl(var(--secondary))", icon: "hsl(var(--secondary))" },
-  { bg: "hsl(var(--accent) / 0.15)", border: "hsl(var(--accent) / 0.3)", text: "hsl(var(--accent))", icon: "hsl(var(--accent))" },
-  { bg: "hsl(var(--ring) / 0.12)", border: "hsl(var(--ring) / 0.25)", text: "hsl(var(--ring))", icon: "hsl(var(--ring))" },
+  { bg: "hsl(var(--primary) / 0.2)", border: "hsl(var(--primary) / 0.4)", text: "hsl(var(--primary))", icon: "hsl(var(--primary))" },
+  { bg: "hsl(var(--secondary) / 0.2)", border: "hsl(var(--secondary) / 0.4)", text: "hsl(var(--secondary))", icon: "hsl(var(--secondary))" },
+  { bg: "hsl(var(--accent) / 0.2)", border: "hsl(var(--accent) / 0.4)", text: "hsl(var(--accent))", icon: "hsl(var(--accent))" },
+  { bg: "hsl(var(--ring) / 0.15)", border: "hsl(var(--ring) / 0.3)", text: "hsl(var(--ring))", icon: "hsl(var(--ring))" },
 ];
 
 interface ToolsHubProps {
@@ -52,52 +51,59 @@ const ToolCard: React.FC<{ tool: ToolItem; onNavigate: (id: string) => void }> =
   const [hovering, setHovering] = useState(false);
 
   return (
-    <button
-      type="button"
-      onClick={() => onNavigate(tool.id)}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
-      className="group relative flex flex-col items-center justify-center gap-2 rounded-2xl transition-all duration-300"
-      style={{
-        aspectRatio: "1 / 1",
-        backgroundColor: color.bg,
-        borderColor: color.border,
-        borderWidth: "1.5px",
-        transform: hovering ? "translateY(-4px) scale(1.02)" : "translateY(0) scale(1)",
-        boxShadow: hovering ? `0 12px 24px ${color.text}20` : "0 4px 12px rgba(0,0,0,0.2)",
-      }}
-    >
-      {/* Hover glow effect */}
-      {hovering && (
-        <div
-          className="pointer-events-none absolute inset-0 rounded-2xl blur-2xl opacity-20"
-          style={{ backgroundColor: color.text }}
-        />
-      )}
-
-      {/* Icon */}
-      <div
-        className="relative flex h-12 w-12 items-center justify-center transition-transform duration-300 group-hover:scale-110"
-        style={{ color: color.icon }}
+    <div className="flex flex-col items-center gap-2">
+      {/* Square Icon Button */}
+      <button
+        type="button"
+        onClick={() => onNavigate(tool.id)}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+        className="group relative flex items-center justify-center transition-all duration-300 rounded-lg"
+        style={{
+          width: "60px",
+          height: "60px",
+          backgroundColor: color.bg,
+          borderColor: color.border,
+          borderWidth: "1.5px",
+          transform: hovering ? "translateY(-3px) scale(1.08)" : "translateY(0) scale(1)",
+          boxShadow: hovering ? `0 8px 20px ${color.text}30` : "0 2px 8px rgba(0,0,0,0.2)",
+        }}
       >
-        <tool.Icon className="h-7 w-7" strokeWidth={1.5} />
-      </div>
+        {/* Glow on hover */}
+        {hovering && (
+          <div
+            className="pointer-events-none absolute inset-0 rounded-lg blur-xl opacity-30"
+            style={{ backgroundColor: color.text }}
+          />
+        )}
 
-      {/* Label */}
+        {/* Large Icon */}
+        <div
+          className="relative flex items-center justify-center transition-transform duration-300"
+          style={{ color: color.icon, transform: hovering ? "scale(1.15)" : "scale(1)" }}
+        >
+          <tool.Icon className="h-8 w-8" strokeWidth={1.8} />
+        </div>
+      </button>
+
+      {/* Label Below */}
       <span
-        className="relative text-center text-xs font-bold leading-tight transition-colors duration-300"
+        className="text-center text-[11px] font-bold leading-tight transition-colors duration-300"
         style={{ color: "hsl(var(--foreground))" }}
       >
-        {tool.label}
+        {tool.label.split(" ")[0]}
       </span>
 
-      {/* Tooltip on hover */}
+      {/* Full Tooltip on Hover */}
       {hovering && (
-        <div className="pointer-events-none absolute -bottom-16 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border px-3 py-2 text-[10px] font-medium animate-fade-in" style={{ backgroundColor: "hsl(var(--card))", borderColor: color.border, color: "hsl(var(--foreground))" }}>
+        <div
+          className="pointer-events-none absolute top-20 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-[9px] font-medium z-10 animate-fade-in"
+          style={{ backgroundColor: "hsl(var(--card))", borderColor: color.border, color: "hsl(var(--foreground))" }}
+        >
           {tool.tooltip}
         </div>
       )}
-    </button>
+    </div>
   );
 };
 
@@ -119,7 +125,7 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onNavigate }) => {
     .filter((g) => g.items.length > 0);
 
   return (
-    <div className="space-y-10 pb-8">
+    <div className="space-y-8 pb-8">
       {/* Header */}
       <div>
         <div className="mb-4 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.4em]">
@@ -168,7 +174,7 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onNavigate }) => {
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground/60">
               <CatIcon className="h-4 w-4" /> {cat}
             </div>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            <div className="flex flex-wrap gap-6 sm:gap-8">
               {items.map((tool) => (
                 <ToolCard key={tool.id} tool={tool} onNavigate={onNavigate} />
               ))}
