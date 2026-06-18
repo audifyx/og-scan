@@ -1,36 +1,26 @@
 import { Token } from '@/lib/og';
-import { OgClassification } from '@/lib/classification';
-import { generateOgScanReport, ReportData } from './generateOgScanReport';
+import { generateOgScanReport } from './generateOgScanReport';
+import { fetchCompleteTokenData } from './fetchCompleteTokenData';
 
 export interface PdfReportInput {
   token: Token;
   score?: any;
   report?: any;
-  holders?: any[];
-  transactions?: any[];
-  anomalies?: any[];
-  whaleRisk?: any;
-  predictions?: any;
-  rugRisk?: any;
 }
 
 export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   try {
-    console.log('📄 Generating PDF from page data...');
+    console.log('📄 Fetching complete token data & generating PDF...');
     
-    const reportData: ReportData = {
+    // Fetch ALL comprehensive data
+    const completeData = await fetchCompleteTokenData(input.token);
+
+    const pdfBlob = await generateOgScanReport({
       token: input.token,
       score: input.score,
       report: input.report,
-      holders: input.holders,
-      transactions: input.transactions,
-      anomalies: input.anomalies,
-      whaleRisk: input.whaleRisk,
-      predictions: input.predictions,
-      rugRisk: input.rugRisk
-    };
-
-    const pdfBlob = await generateOgScanReport(reportData);
+      ...completeData,
+    });
 
     const url = URL.createObjectURL(pdfBlob);
     const link = document.createElement('a');
@@ -41,7 +31,7 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    console.log('✅ PDF downloaded from page data');
+    console.log('✅ PDF with complete data downloaded');
   } catch (error) {
     console.error('❌ Error:', error);
     alert('Error generating report');
