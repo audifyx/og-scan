@@ -14,7 +14,7 @@ import {
 import type { OgTier } from "./classification";
 import { classifyToken } from "./classification";
 import { forensicToInput, jupSeries } from "./classificationAdapter";
-import { trendVelocityScore, reconstructLifecycle, hypeDecayScore, holderEntropyScore } from "./intelligence";
+import { trendVelocityScore, reconstructLifecycle, hypeDecayScore, holderEntropyScore, whyExists } from "./intelligence";
 import { fetchImageDataUrl } from "./imageLoad";
 import { renderSparklinePng } from "./sparkline";
 import { getScanHistoryForMint } from "./scanLog";
@@ -247,7 +247,25 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
 
   // forensic scores
   if (s) {
-    sectionTitle("Forensic Scores");
+    sectionTitle("Forensic Scores & Classification");
+    
+    // Layer classifications
+    if (s.classification?.layers) {
+      rows([
+        ["Origin Identity", s.classification.layers.origin_identity ?? "—"],
+        ["Control Status", s.classification.layers.control_status ?? "—"],
+        ["Lifecycle Status", s.classification.layers.lifecycle_status ?? "—"],
+      ]);
+    }
+    
+    // Secondary labels
+    if (s.classification?.secondary_labels && s.classification.secondary_labels.length > 0) {
+      ensure(18);
+      setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      doc.text("Secondary Labels: " + s.classification.secondary_labels.join(", "), M, y);
+      y += 14;
+    }
+    
     bars([
       ["Dominance", s.dominanceScore], ["Origin", s.originScore],
       ["True OG probability", s.trueOgProbability], ["Clone probability", s.cloneProbability, COLORS.blood],
@@ -256,6 +274,12 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
       ["Deployer trust", s.deployerTrustScore], ["Liquidity authenticity", s.liquidityAuthenticityScore],
       ["Holder distribution", s.holderDistributionScore], ["On-chain activity", s.onChainActivityScore],
     ]);
+    
+    // CTO explanation
+    if (s.ctoScore >= 60) {
+      paragraph("⚠️ High CTO (Community Takeover) probability indicates the deployer may have abandoned the token and the community has taken over development and/or liquidity management.");
+    }
+    
     if (s.classification?.reasoning_summary) paragraph(s.classification.reasoning_summary);
   }
 
@@ -273,8 +297,9 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   // authority & contract
   sectionTitle("Authority & Contract");
   rows([
-    ["Mint authority", token.audit?.mintAuthorityDisabled === undefined ? "—" : (token.audit.mintAuthorityDisabled ? "Renounced" : "Active")],
-    ["Freeze authority", token.audit?.freezeAuthorityDisabled === undefined ? "—" : (token.audit.freezeAuthorityDisabled ? "Renounced" : "Active")],
+    ["Mint authority", token.audit?.mintAuthorityDisabled === undefined ? "—" : (token.audit.mintAuthorityDisabled ? "Renounced ✓" : "Active ⚠")],
+    ["Freeze authority", token.audit?.freezeAuthorityDisabled === undefined ? "—" : (token.audit.freezeAuthorityDisabled ? "Renounced ✓" : "Active ⚠")],
+    ["Decimals", token.decimals != null ? String(token.decimals) : "—"],
     ["First mint wallet", token.firstMintAuthorityWallet ? shortAddr(token.firstMintAuthorityWallet, 4) : "—"],
     ["Creator wallet", token.creatorFunding?.creatorWallet ? shortAddr(token.creatorFunding.creatorWallet, 4) : "—"],
     ["Funding wallet", token.creatorFunding?.fundingWallet ? shortAddr(token.creatorFunding.fundingWallet, 4) : "—"],
@@ -284,9 +309,12 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   // market & liquidity
   sectionTitle("Market & Liquidity");
   const vol24 = token.stats24h ? (token.stats24h.buyVolume ?? 0) + (token.stats24h.sellVolume ?? 0) : undefined;
+  const mcapToLiqRatio = token.mcap && token.liquidity ? (token.mcap / token.liquidity).toFixed(1) : "—";
+  const fdvToMcapRatio = token.fdv && token.mcap ? (token.fdv / token.mcap).toFixed(2) : "—";
   rows([
     ["Price", fmtUsd(token.usdPrice)], ["24h change", fmtPct(token.stats24h?.priceChange ?? 0)],
     ["Market cap", fmtUsd(token.mcap)], ["FDV", fmtUsd(token.fdv)],
+    ["FDV/MC ratio", fdvToMcapRatio], ["MC/Liquidity ratio", mcapToLiqRatio],
     ["Liquidity (effective)", fmtUsd(tokenEffectiveLiquidityUsd(token))], ["Liquidity (reported)", token.reportedLiquidity != null ? fmtUsd(token.reportedLiquidity) : "—"],
     ["Volume 24h", vol24 != null ? fmtUsd(vol24) : "—"], ["Pools", token.poolCount != null ? String(token.poolCount) : "—"],
     ["ATH", token.allTimeHighUsd != null ? `${fmtUsd(token.allTimeHighUsd)} · ${shortDate(token.allTimeHighAt)}` : "—"],
@@ -311,15 +339,19 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     y += 6;
   }
 
-  // dex paid
+  // dex paid - FIXED LOGIC
   sectionTitle("DEX Paid & Boosts");
+  const isDexPaid = token.dexProfilePaid || token.dexCommunityTakeoverPaid || token.dexAdsPaid || (token.dexPaidOrderCount ?? 0) > 0 || (token.dexBoostActive ?? 0) > 0;
   rows([
-    ["DEX paid", yn(token.dexProfilePaid || (token.dexPaidOrderCount ?? 0) > 0)],
+    ["DEX paid (any)", yn(isDexPaid)],
     ["Profile paid", yn(token.dexProfilePaid)],
     ["Boosts active", token.dexBoostActive != null ? String(token.dexBoostActive) : "—"],
-    ["Boost amount", token.dexBoostAmount != null ? fmtNum(token.dexBoostAmount) : "—"],
-    ["CTO paid", yn(token.dexCommunityTakeoverPaid)], ["Ads paid", yn(token.dexAdsPaid)],
-    ["First paid", shortDate(token.dexFirstPaidAt)], ["Last paid", shortDate(token.dexLastPaidAt)],
+    ["Boost amount (SOL)", token.dexBoostAmount != null ? fmtNum(token.dexBoostAmount) : "—"],
+    ["CTO paid", yn(token.dexCommunityTakeoverPaid)],
+    ["Ads paid", yn(token.dexAdsPaid)],
+    ["Total paid orders", token.dexPaidOrderCount ?? "—"],
+    ["First paid", shortDate(token.dexFirstPaidAt)],
+    ["Last paid", shortDate(token.dexLastPaidAt)],
   ]);
 
   // links & socials
@@ -333,8 +365,30 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
 
   // clone lineage
   const lineage = report?.familyTree ?? [];
-  if (lineage.length) {
-    sectionTitle("Clone Lineage & Cluster"); doc.setFontSize(8.5);
+  const copycats = report?.copycats ?? [];
+  const clusterAliases = report?.clusterAliases ?? [];
+  
+  if (lineage.length || copycats.length || clusterAliases.length) {
+    sectionTitle("Clone Lineage, Copycats & Cluster"); 
+    
+    // Cluster aliases
+    if (clusterAliases.length) {
+      ensure(18);
+      setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      doc.text("Cluster Aliases: " + clusterAliases.slice(0, 8).join(", "), M, y);
+      y += 14;
+    }
+    
+    // Copycats count
+    if (copycats.length) {
+      ensure(14);
+      setText(COLORS.muted); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+      doc.text(`Copycats: ${copycats.length} detected`, M, y);
+      y += 12;
+    }
+    
+    // Family tree
+    doc.setFontSize(8.5);
     lineage.slice(0, 14).forEach((n) => {
       ensure(13);
       setText(COLORS.text); doc.setFont("helvetica", "bold"); doc.text(`$${n.token.symbol}`, M, y);
@@ -344,6 +398,10 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     });
     y += 6;
   }
+
+  // why this exists
+  sectionTitle("Why This Exists");
+  paragraph(whyExists({ name: token.name, symbol: token.symbol, isOg: result.tier === "OG_TOKEN" }));
 
   // scan history
   if (history.length) {
