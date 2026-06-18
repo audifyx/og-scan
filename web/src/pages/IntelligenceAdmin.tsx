@@ -1,11 +1,10 @@
-
 // FILE: web/src/pages/IntelligenceAdmin.tsx
 // Admin panel for managing advanced intelligence system
 
 import React, { useState } from 'react';
 import { Zap, RefreshCw, Database, BarChart3, Settings } from 'lucide-react';
 import { populateTokenData } from '@/lib/helius-integration';
-import { scheduler } from '@/jobs/data-refresh-scheduler';
+import { clientScheduler } from '@/lib/client-scheduler';
 import { supabase } from '@/lib/supabase';
 
 export default function IntelligenceAdmin() {
@@ -22,6 +21,7 @@ export default function IntelligenceAdmin() {
         type: 'success',
         message: `✅ Populated ${result.transactionCount} transactions, ${result.snapshotCount} snapshots`,
       });
+      setTokenMint('');
     } catch (error) {
       setStatus({ type: 'error', message: `❌ Error: ${String(error)}` });
     } finally {
@@ -31,28 +31,40 @@ export default function IntelligenceAdmin() {
 
   const handleStartJobs = () => {
     setJobsRunning(true);
-    scheduler.initializeAll();
+    clientScheduler.initializeAll();
     setStatus({
       type: 'success',
-      message: 'All scheduled jobs started',
+      message: '✅ All scheduled jobs started - updates will run hourly',
+    });
+  };
+
+  const handleStopJobs = () => {
+    clientScheduler.stopAll();
+    setJobsRunning(false);
+    setStatus({
+      type: 'success',
+      message: '✅ All scheduled jobs stopped',
     });
   };
 
   const handleClearOldData = async () => {
     setLoading(true);
     try {
-      const ninetyDaysAgo = Math.floor((Date.now() - 90 * 24 * 3600 * 1000) / 1000);
-      await supabase
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+      
+      const { error } = await supabase
         .from('price_candles_extended')
         .delete()
-        .lt('created_at', new Date(ninetyDaysAgo * 1000).toISOString());
+        .lt('created_at', ninetyDaysAgo);
+
+      if (error) throw error;
 
       setStatus({
         type: 'success',
         message: '✅ Old data cleared successfully',
       });
     } catch (error) {
-      setStatus({ type: 'error', message: \`❌ Error: \${String(error)}\` });
+      setStatus({ type: 'error', message: `❌ Error: ${String(error)}` });
     } finally {
       setLoading(false);
     }
@@ -67,11 +79,11 @@ export default function IntelligenceAdmin() {
         </div>
 
         {status && (
-          <div className={\`p-4 rounded-lg mb-6 \${
+          <div className={`p-4 rounded-lg mb-6 ${
             status.type === 'success'
               ? 'bg-og-lime/10 border border-og-lime/30 text-og-lime'
               : 'bg-og-red/10 border border-og-red/30 text-og-red'
-          }\`}>
+          }`}>
             {status.message}
           </div>
         )}
@@ -128,13 +140,23 @@ export default function IntelligenceAdmin() {
               </div>
             </div>
 
-            <button
-              onClick={handleStartJobs}
-              disabled={jobsRunning}
-              className="w-full px-4 py-3 bg-og-gold text-black rounded-lg font-bold hover:bg-og-gold/80 disabled:opacity-50"
-            >
-              {jobsRunning ? 'Jobs Running' : 'Start All Jobs'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={handleStartJobs}
+                disabled={jobsRunning}
+                className="flex-1 px-4 py-3 bg-og-gold text-black rounded-lg font-bold hover:bg-og-gold/80 disabled:opacity-50"
+              >
+                {jobsRunning ? '✅ Jobs Running' : 'Start All Jobs'}
+              </button>
+              {jobsRunning && (
+                <button
+                  onClick={handleStopJobs}
+                  className="flex-1 px-4 py-3 bg-og-red/20 text-og-red border border-og-red/30 rounded-lg font-bold hover:bg-og-red/30"
+                >
+                  Stop Jobs
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
