@@ -13,6 +13,8 @@ import {
   Fingerprint,
   Flame,
   Gauge,
+  Info,
+  ChevronDown,
   GitBranch,
   Loader2,
   RadioTower,
@@ -361,7 +363,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
               <ForensicStat icon={ShieldAlert} label="Risk Queue" value={`${report.summary.highRiskCount} flagged`} accent={report.summary.highRiskCount > 0 ? "text-og-blood" : "text-og-lime"} />
             </div>
             <div className="mt-3">
-              <TokenTruthLegend compact />
+              <LegendToggle />
             </div>
             {primaryToken && <OgVerdict token={primaryToken} score={primaryScore} report={report} />}
           </>
@@ -462,6 +464,23 @@ const FilterToggle = ({
     {label} · {value ? "ON" : "OFF"}
   </button>
 );
+
+const LegendToggle = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.02]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan transition hover:text-og-lime"
+      >
+        <Info className="h-3 w-3" /> How scoring works
+        <ChevronDown className={cn("ml-auto h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && <div className="border-t border-white/5 px-3 py-3"><TokenTruthLegend compact /></div>}
+    </div>
+  );
+};
 
 const ResultRow = ({ t, score, report, onSelect }: { t: JupTokenInfo; score?: TokenForensicScores; report?: ForensicOgReport; onSelect: () => void }) => {
   const [pdfBusy, setPdfBusy] = useState(false);
