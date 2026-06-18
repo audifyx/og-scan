@@ -12,42 +12,67 @@ import { predictTokenPrice, assessRugRisk } from '@/lib/ml-models';
 export async function generateOgScanReport(token: Token): Promise<string> {
   console.log('🎨 Generating OG Scan themed report for:', token.name);
 
-  // Fetch all blockchain data
-  const [
-    { data: holders },
-    { data: transactions },
-    { data: anomalies },
-    { data: candles },
-  ] = await Promise.all([
-    supabase
-      .from('holder_snapshots')
-      .select('*')
-      .eq('mint_address', token.mint)
-      .order('balance_usd', { ascending: false })
-      .limit(1000),
-    supabase
-      .from('transactions_extended')
-      .select('*')
-      .eq('mint_address', token.mint)
-      .order('blockchain_timestamp', { ascending: false })
-      .limit(2000),
-    supabase
-      .from('real_time_alerts')
-      .select('*')
-      .eq('mint_address', token.mint)
-      .order('triggered_timestamp', { ascending: false })
-      .limit(500),
-    supabase
-      .from('price_candles_extended')
-      .select('*')
-      .eq('mint_address', token.mint)
-      .order('candle_timestamp', { ascending: false })
-      .limit(500),
-  ]);
+  // Fetch all blockchain data with error handling
+  let holders = [];
+  let transactions = [];
+  let anomalies = [];
+  let candles = [];
+  let whaleRisk = null;
+  let predictions = null;
+  let rugRisk = null;
 
-  const whaleRisk = await analyzeWhaleRisk(token.mint);
-  const predictions = await predictTokenPrice(token.mint);
-  const rugRisk = await assessRugRisk(token.mint);
+  try {
+    const [h, t, a, c] = await Promise.all([
+      supabase
+        .from('holder_snapshots')
+        .select('*')
+        .eq('mint_address', token.mint)
+        .order('balance_usd', { ascending: false })
+        .limit(1000),
+      supabase
+        .from('transactions_extended')
+        .select('*')
+        .eq('mint_address', token.mint)
+        .order('blockchain_timestamp', { ascending: false })
+        .limit(2000),
+      supabase
+        .from('real_time_alerts')
+        .select('*')
+        .eq('mint_address', token.mint)
+        .order('triggered_timestamp', { ascending: false })
+        .limit(500),
+      supabase
+        .from('price_candles_extended')
+        .select('*')
+        .eq('mint_address', token.mint)
+        .order('candle_timestamp', { ascending: false })
+        .limit(500),
+    ]);
+    holders = h.data || [];
+    transactions = t.data || [];
+    anomalies = a.data || [];
+    candles = c.data || [];
+  } catch (err) {
+    console.warn('⚠️ Could not fetch blockchain data:', err);
+  }
+
+  try {
+    whaleRisk = await analyzeWhaleRisk(token.mint);
+  } catch (err) {
+    console.warn('⚠️ Could not analyze whale risk:', err);
+  }
+
+  try {
+    predictions = await predictTokenPrice(token.mint);
+  } catch (err) {
+    console.warn('⚠️ Could not predict price:', err);
+  }
+
+  try {
+    rugRisk = await assessRugRisk(token.mint);
+  } catch (err) {
+    console.warn('⚠️ Could not assess rug risk:', err);
+  }
 
   const topHolders = (holders || []).slice(0, 20);
   const recentTransactions = (transactions || []).slice(0, 20);
@@ -551,7 +576,7 @@ export async function generateOgScanReport(token: Token): Promise<string> {
       <div class="data-grid">
         <div class="data-card">
           <div class="card-label">Total Whale Power</div>
-          <div class="card-value">${whaleRisk?.totalWhalePower.toFixed(1) || '0'}%</div>
+          <div class="card-value">${(whaleRisk?.totalWhalePower || 0).toFixed(1)}%</div>
         </div>
         <div class="data-card">
           <div class="card-label">Critical Risk Wallets</div>
