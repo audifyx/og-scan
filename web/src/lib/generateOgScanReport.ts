@@ -1,39 +1,22 @@
 import { Token } from '@/lib/og';
-import { supabase } from '@/lib/supabase';
-import { analyzeWhaleRisk } from '@/lib/advanced-analytics/holder-analytics';
-import { predictTokenPrice, assessRugRisk } from '@/lib/ml-models';
 
-export async function generateOgScanReport(token: Token): Promise<Blob> {
+export interface ReportData {
+  token: Token;
+  score?: any;
+  report?: any;
+  holders?: any[];
+  transactions?: any[];
+  anomalies?: any[];
+  whaleRisk?: any;
+  predictions?: any;
+  rugRisk?: any;
+}
+
+export async function generateOgScanReport(data: ReportData): Promise<Blob> {
   const { jsPDF } = await import('jspdf');
-  
-  console.log('📄 Generating OG Scan PDF report for:', token.name);
+  const { token, score, report, holders = [], transactions = [], anomalies = [], whaleRisk, predictions, rugRisk } = data;
 
-  let holders: any[] = [];
-  let transactions: any[] = [];
-  let anomalies: any[] = [];
-  let candles: any[] = [];
-  let whaleRisk: any = null;
-  let predictions: any = null;
-  let rugRisk: any = null;
-
-  try {
-    const [h, t, a, c] = await Promise.all([
-      supabase.from('holder_snapshots').select('*').eq('mint_address', token.mint).order('balance_usd', { ascending: false }).limit(1000),
-      supabase.from('transactions_extended').select('*').eq('mint_address', token.mint).order('blockchain_timestamp', { ascending: false }).limit(2000),
-      supabase.from('real_time_alerts').select('*').eq('mint_address', token.mint).order('triggered_timestamp', { ascending: false }).limit(500),
-      supabase.from('price_candles_extended').select('*').eq('mint_address', token.mint).order('candle_timestamp', { ascending: false }).limit(500),
-    ]);
-    holders = h.data || [];
-    transactions = t.data || [];
-    anomalies = a.data || [];
-    candles = c.data || [];
-  } catch (err) {
-    console.warn('⚠️ Data fetch error:', err);
-  }
-
-  try { whaleRisk = await analyzeWhaleRisk(token.mint); } catch (err) { console.warn('Whale risk error:', err); }
-  try { predictions = await predictTokenPrice(token.mint); } catch (err) { console.warn('Prediction error:', err); }
-  try { rugRisk = await assessRugRisk(token.mint); } catch (err) { console.warn('Rug risk error:', err); }
+  console.log('📄 Generating PDF from page data...');
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -41,7 +24,6 @@ export async function generateOgScanReport(token: Token): Promise<Blob> {
   const margin = 12;
   const goldColor = [255, 215, 0];
   const blackColor = [26, 26, 26];
-  const whiteColor = [255, 255, 255];
   const greenColor = [100, 255, 0];
   const redColor = [255, 68, 68];
   
@@ -54,7 +36,7 @@ export async function generateOgScanReport(token: Token): Promise<Blob> {
   doc.setFontSize(28);
   doc.text('OG SCAN', margin, 20);
   doc.setFontSize(10);
-  doc.text('Blockchain Intelligence Report', margin, 28);
+  doc.text('Intelligence Report', margin, 28);
 
   yPos = 40;
 
@@ -93,6 +75,27 @@ export async function generateOgScanReport(token: Token): Promise<Blob> {
 
   yPos += 4;
 
+  // Forensic Scores
+  if (score) {
+    doc.setTextColor(...goldColor);
+    doc.setFontSize(11);
+    doc.text('FORENSIC SCORES', margin, yPos);
+    yPos += 5;
+
+    doc.setFontSize(9);
+    doc.setTextColor(...blackColor);
+    const scoreData = [
+      [`Dominance: ${score.dominanceScore || 0}%`, `Origin: ${score.originScore || 0}%`],
+      [`Risk: ${score.riskScore || 0}%`, `Clone: ${score.cloneScore || 0}%`]
+    ];
+    scoreData.forEach(([left, right]) => {
+      doc.text(left, margin + 3, yPos);
+      doc.text(right, pageWidth / 2, yPos);
+      yPos += 4;
+    });
+    yPos += 2;
+  }
+
   // Contract Details
   doc.setTextColor(...goldColor);
   doc.setFontSize(11);
@@ -115,13 +118,13 @@ export async function generateOgScanReport(token: Token): Promise<Blob> {
   yPos += 3;
 
   // Top Holders Table
-  if (holders.length > 0) {
+  if (holders && holders.length > 0) {
     doc.setTextColor(...goldColor);
     doc.setFontSize(11);
     doc.text(`TOP HOLDERS (${Math.min(holders.length, 15)})`, margin, yPos);
     yPos += 5;
 
-    const holderTableData = holders.slice(0, 15).map((h, idx) => [
+    const holderTableData = holders.slice(0, 15).map((h: any, idx: number) => [
       `${idx + 1}`,
       h.wallet_address?.slice(0, 12) || 'N/A',
       `$${((h.balance_usd || 0) / 1000).toFixed(1)}K`,
@@ -143,67 +146,45 @@ export async function generateOgScanReport(token: Token): Promise<Blob> {
     yPos = (doc as any).lastAutoTable.finalY + 5;
   }
 
-  // Check if we need new page
-  if (yPos > pageHeight - 40) {
-    doc.addPage();
-    yPos = 15;
-  }
-
   // Whale Analysis
-  doc.setTextColor(...goldColor);
-  doc.setFontSize(11);
-  doc.text('WHALE ANALYSIS', margin, yPos);
-  yPos += 5;
-
-  doc.setFontSize(9);
-  doc.setTextColor(...blackColor);
-  const whaleData = [
-    [`Total Whale Power: ${(whaleRisk?.totalWhalePower || 0).toFixed(1)}%`, `Critical Risk: ${(whaleRisk?.criticalRiskWallets?.length || 0)}`],
-    [`Dump Probability: ${(whaleRisk?.dumpProbability || 0).toFixed(0)}%`, `Price Impact: ${(whaleRisk?.priceImpact || 0).toFixed(2)}%`]
-  ];
-  whaleData.forEach(([left, right]) => {
-    doc.text(left, margin + 3, yPos);
-    doc.text(right, pageWidth / 2, yPos);
-    yPos += 4;
-  });
-
-  yPos += 3;
-
-  // Anomalies
-  if (anomalies.length > 0 && yPos < pageHeight - 30) {
-    doc.setTextColor(...goldColor);
-    doc.setFontSize(11);
-    doc.text(`REAL-TIME ANOMALIES (${Math.min(anomalies.length, 10)})`, margin, yPos);
-    yPos += 5;
-
-    doc.setFontSize(8);
-    doc.setTextColor(...blackColor);
-    anomalies.slice(0, 10).forEach(a => {
-      const time = new Date((a.triggered_timestamp || 0) * 1000).toLocaleDateString();
-      doc.text(`${a.alert_type || 'Alert'} [${(a.severity || 'INFO').toUpperCase()}] - ${time}`, margin + 3, yPos);
-      yPos += 3;
-      if (yPos > pageHeight - 20) {
-        doc.addPage();
-        yPos = 15;
-      }
-    });
-  }
-
-  yPos += 3;
-
-  // Transactions Table
-  if (transactions.length > 0) {
-    if (yPos > pageHeight - 50) {
+  if (whaleRisk) {
+    if (yPos > pageHeight - 40) {
       doc.addPage();
       yPos = 15;
     }
 
     doc.setTextColor(...goldColor);
     doc.setFontSize(11);
+    doc.text('WHALE ANALYSIS', margin, yPos);
+    yPos += 5;
+
+    doc.setFontSize(9);
+    doc.setTextColor(...blackColor);
+    const whaleData = [
+      [`Total Whale Power: ${(whaleRisk.totalWhalePower || 0).toFixed(1)}%`, `Critical Risk: ${(whaleRisk.criticalRiskWallets?.length || 0)}`],
+      [`Dump Probability: ${(whaleRisk.dumpProbability || 0).toFixed(0)}%`, `Price Impact: ${(whaleRisk.priceImpact || 0).toFixed(2)}%`]
+    ];
+    whaleData.forEach(([left, right]) => {
+      doc.text(left, margin + 3, yPos);
+      doc.text(right, pageWidth / 2, yPos);
+      yPos += 4;
+    });
+  }
+
+  // Transactions Table
+  if (transactions && transactions.length > 0) {
+    if (yPos > pageHeight - 50) {
+      doc.addPage();
+      yPos = 15;
+    }
+
+    yPos += 3;
+    doc.setTextColor(...goldColor);
+    doc.setFontSize(11);
     doc.text(`RECENT TRANSACTIONS (${Math.min(transactions.length, 20)})`, margin, yPos);
     yPos += 5;
 
-    const txTableData = transactions.slice(0, 20).map(t => [
+    const txTableData = transactions.slice(0, 20).map((t: any) => [
       new Date((t.blockchain_timestamp || 0) * 1000).toLocaleDateString(),
       (t.direction || 'SWAP').toUpperCase(),
       `${((t.token_amount || 0) / 1e6).toFixed(2)}`,
@@ -225,29 +206,31 @@ export async function generateOgScanReport(token: Token): Promise<Blob> {
     yPos = (doc as any).lastAutoTable.finalY + 5;
   }
 
-  // ML Predictions
-  if (yPos > pageHeight - 40) {
-    doc.addPage();
-    yPos = 15;
+  // Anomalies
+  if (anomalies && anomalies.length > 0) {
+    if (yPos > pageHeight - 40) {
+      doc.addPage();
+      yPos = 15;
+    }
+
+    yPos += 3;
+    doc.setTextColor(...goldColor);
+    doc.setFontSize(11);
+    doc.text(`ANOMALIES (${Math.min(anomalies.length, 10)})`, margin, yPos);
+    yPos += 5;
+
+    doc.setFontSize(8);
+    doc.setTextColor(...blackColor);
+    anomalies.slice(0, 10).forEach((a: any) => {
+      const time = new Date((a.triggered_timestamp || 0) * 1000).toLocaleDateString();
+      doc.text(`${a.alert_type || 'Alert'} [${(a.severity || 'INFO').toUpperCase()}] - ${time}`, margin + 3, yPos);
+      yPos += 3;
+      if (yPos > pageHeight - 20) {
+        doc.addPage();
+        yPos = 15;
+      }
+    });
   }
-
-  doc.setTextColor(...goldColor);
-  doc.setFontSize(11);
-  doc.text('ML PREDICTIONS', margin, yPos);
-  yPos += 5;
-
-  doc.setFontSize(9);
-  doc.setTextColor(...blackColor);
-  const mlData = [
-    [`1H Forecast: $${(predictions?.price_1h || token.priceUsd || 0).toFixed(8)}`, `Direction: ${predictions?.direction_1h || 'NEUTRAL'}`],
-    [`24H Forecast: $${(predictions?.price_24h || token.priceUsd || 0).toFixed(8)}`, `Direction: ${predictions?.direction_24h || 'NEUTRAL'}`],
-    [`Rug Probability: ${(rugRisk?.rug_probability || 0).toFixed(1)}%`, `Verdict: ${rugRisk?.rug_verdict || 'UNKNOWN'}`]
-  ];
-  mlData.forEach(([left, right]) => {
-    doc.text(left, margin + 3, yPos);
-    doc.text(right, pageWidth / 2, yPos);
-    yPos += 4;
-  });
 
   // Footer
   doc.setTextColor(150, 150, 150);

@@ -1,33 +1,49 @@
 import { Token } from '@/lib/og';
 import { OgClassification } from '@/lib/classification';
-import { generateOgScanReport } from './generateOgScanReport';
+import { generateOgScanReport, ReportData } from './generateOgScanReport';
 
 export interface PdfReportInput {
   token: Token;
-  score?: OgClassification;
-  report?: string;
+  score?: any;
+  report?: any;
+  holders?: any[];
+  transactions?: any[];
+  anomalies?: any[];
+  whaleRisk?: any;
+  predictions?: any;
+  rugRisk?: any;
 }
 
 export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
-  const { token } = input;
-
   try {
-    console.log('📄 Scanning blockchain and generating OG Scan PDF...');
+    console.log('📄 Generating PDF from page data...');
     
-    const pdfBlob = await generateOgScanReport(token);
+    const reportData: ReportData = {
+      token: input.token,
+      score: input.score,
+      report: input.report,
+      holders: input.holders,
+      transactions: input.transactions,
+      anomalies: input.anomalies,
+      whaleRisk: input.whaleRisk,
+      predictions: input.predictions,
+      rugRisk: input.rugRisk
+    };
+
+    const pdfBlob = await generateOgScanReport(reportData);
 
     const url = URL.createObjectURL(pdfBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${token.name}-${token.mint.slice(0, 8)}-OGScan.pdf`;
+    link.download = `${input.token.name}-${input.token.mint.slice(0, 8)}-OGScan.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    console.log('✅ PDF Report downloaded:', link.download);
+    console.log('✅ PDF downloaded from page data');
   } catch (error) {
     console.error('❌ Error:', error);
-    alert('Error generating report. Try again!');
+    alert('Error generating report');
   }
 }
