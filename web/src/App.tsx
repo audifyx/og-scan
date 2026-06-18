@@ -44,6 +44,7 @@ import Privacy from "./pages/Privacy";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
 import Games from "./pages/Games";
+import AdvancedIntelligence from "./pages/AdvancedIntelligence";
 import { XCallbackPage } from "./pages/XCallbackPage";
 import Admin from "./pages/Admin";
 import SpaceReplay from "./pages/SpaceReplay";
@@ -298,6 +299,7 @@ const App = () => (
             <Route path="/export-clips" element={<ProtectedRoute><ClipVideoExport /></ProtectedRoute>} />
 
             {/* ── Catch-all slug handler (must be last) ── */}
+            <Route path="/advanced/:mint" element={<ProtectedRoute><AdvancedIntelligence /></ProtectedRoute>} />
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
