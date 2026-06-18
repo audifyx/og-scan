@@ -3,7 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Bell, Mail, MessageCircle, Webhook, Save, Plus, Trash2 } from 'lucide-react';
-import { alertSystem, type AlertConfig, type AlertChannel } from '@/lib/alert-system';
+import { alertSystem } from '@/lib/alert-system';
+import type { AlertConfig, AlertChannel } from '@/lib/alert-system';
 import { supabase } from '@/lib/supabase';
 
 export default function AlertSettings() {

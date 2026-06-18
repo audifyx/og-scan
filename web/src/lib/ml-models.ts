@@ -114,6 +114,7 @@ export async function assessRugRisk(mint: string): Promise<RugRiskAssessment | n
 
     // Calculate rug factors (0-100 scale)
     let whaleConcentration = 0;
+    let deployerSuccessRate = 0;
     let liquidityRisk = 0;
     let authorityRisk = 0;
     let volumeAnomalies = 0;
@@ -135,12 +136,13 @@ export async function assessRugRisk(mint: string): Promise<RugRiskAssessment | n
       whaleConcentration = Math.min(30, whaleConcentration + profitableWhales * 5);
     }
 
-    // 2. Deployer History (0-30 pts)
-    const deployerSuccessRate = token.deployerSuccessRate || 0.5;
-    if (deployerSuccessRate < 0.1) deployerRisk = 30;
-    else if (deployerSuccessRate < 0.2) deployerRisk = 25;
-    else if (deployerSuccessRate < 0.4) deployerRisk = 15;
-    else if (deployerSuccessRate < 0.6) deployerRisk = 8;
+    // 2. Deployer History (0-25 pts)
+    const deployerHistoryRate = token.deployerSuccessRate || 0.5;
+    let deployerRisk = 0;
+    if (deployerHistoryRate < 0.1) deployerRisk = 30;
+    else if (deployerHistoryRate < 0.2) deployerRisk = 25;
+    else if (deployerHistoryRate < 0.4) deployerRisk = 15;
+    else if (deployerHistoryRate < 0.6) deployerRisk = 8;
     else deployerRisk = 2;
 
     // 3. Liquidity Risk (0-20 pts)
