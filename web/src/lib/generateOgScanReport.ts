@@ -536,16 +536,16 @@ export async function generateOgScanReport(token: Token): Promise<string> {
             </tr>
           </thead>
           <tbody>
-            ${topHolders.map((h, idx) => \`
+            ${topHolders.map((h, idx) => `
               <tr>
-                <td>#\${idx + 1}</td>
-                <td>\${h.wallet_address.slice(0, 14)}...</td>
-                <td>$\${(h.balance_usd / 1000).toFixed(1)}K</td>
-                <td>\${(h.balance_percent_of_supply || 0).toFixed(2)}%</td>
-                <td style="color: \${h.unrealized_pnl_percent >= 0 ? '#64FF00' : '#FF4444'}">\${h.unrealized_pnl_percent?.toFixed(0) || 'N/A'}%</td>
-                <td>\${h.classification || 'Unknown'}</td>
+                <td>#${idx + 1}</td>
+                <td>${h.wallet_address.slice(0, 14)}...</td>
+                <td>$${(h.balance_usd / 1000).toFixed(1)}K</td>
+                <td>${(h.balance_percent_of_supply || 0).toFixed(2)}%</td>
+                <td style="color: ${h.unrealized_pnl_percent >= 0 ? '#64FF00' : '#FF4444'}">${h.unrealized_pnl_percent?.toFixed(0) || 'N/A'}%</td>
+                <td>${h.classification || 'Unknown'}</td>
               </tr>
-            \`).join('')}
+            `).join('')}
           </tbody>
         </table>
       </div>
@@ -557,19 +557,19 @@ export async function generateOgScanReport(token: Token): Promise<string> {
       <div class="data-grid">
         <div class="data-card">
           <div class="card-label">Total Whale Power</div>
-          <div class="card-value">\${whaleRisk?.totalWhalePower.toFixed(1) || '0'}%</div>
+          <div class="card-value">${whaleRisk?.totalWhalePower.toFixed(1) || '0'}%</div>
         </div>
         <div class="data-card">
           <div class="card-label">Critical Risk Wallets</div>
-          <div class="card-value">\${whaleRisk?.criticalRiskWallets || '0'}</div>
+          <div class="card-value">${whaleRisk?.criticalRiskWallets || '0'}</div>
         </div>
         <div class="data-card">
           <div class="card-label">Dump Probability</div>
-          <div class="card-value">\${whaleRisk?.dumpProbability.toFixed(0) || '0'}%</div>
+          <div class="card-value">${whaleRisk?.dumpProbability.toFixed(0) || '0'}%</div>
         </div>
         <div class="data-card">
           <div class="card-label">Price Impact</div>
-          <div class="card-value">\${whaleRisk?.priceImpactPercent.toFixed(1) || '0'}%</div>
+          <div class="card-value">${whaleRisk?.priceImpactPercent.toFixed(1) || '0'}%</div>
         </div>
       </div>
     </div>
@@ -578,15 +578,15 @@ export async function generateOgScanReport(token: Token): Promise<string> {
     <div class="section">
       <h2 class="section-title">⚠️ Real-Time Anomalies (${anomalies?.length || 0})</h2>
       <div class="data-grid" style="grid-template-columns: 1fr;">
-        ${recentAnomalies.map(a => \`
+        ${recentAnomalies.map(a => `
           <div class="data-card" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div class="card-label">\${a.alert_type}</div>
-              <div style="font-size: 0.85em; color: #999;">\${new Date(a.triggered_timestamp * 1000).toLocaleString()}</div>
+              <div class="card-label">${a.alert_type}</div>
+              <div style="font-size: 0.85em; color: #999;">${new Date(a.triggered_timestamp * 1000).toLocaleString()}</div>
             </div>
-            <span class="badge badge-\${a.severity}">\${a.severity.toUpperCase()}</span>
+            <span class="badge badge-${a.severity}">${a.severity.toUpperCase()}</span>
           </div>
-        \`).join('')}
+        `).join('')}
       </div>
     </div>
 
@@ -605,15 +605,15 @@ export async function generateOgScanReport(token: Token): Promise<string> {
             </tr>
           </thead>
           <tbody>
-            ${recentTransactions.map(t => \`
+            ${recentTransactions.map(t => `
               <tr>
-                <td>\${new Date(t.blockchain_timestamp * 1000).toLocaleDateString()}</td>
-                <td>\${t.direction?.toUpperCase() || 'SWAP'}</td>
-                <td>\${(Number(t.token_amount) / 1e6).toFixed(2)}</td>
-                <td>$\${(t.usd_volume || 0).toFixed(0)}</td>
-                <td style="color: \${(t.profit_loss_usd || 0) >= 0 ? '#64FF00' : '#FF4444'}'>\${(t.profit_loss_usd || 0) >= 0 ? '+' : ''}$\${(t.profit_loss_usd || 0).toFixed(0)}</td>
+                <td>${new Date(t.blockchain_timestamp * 1000).toLocaleDateString()}</td>
+                <td>${t.direction?.toUpperCase() || 'SWAP'}</td>
+                <td>${(Number(t.token_amount) / 1e6).toFixed(2)}</td>
+                <td>$${(t.usd_volume || 0).toFixed(0)}</td>
+                <td style="color: ${(t.profit_loss_usd || 0) >= 0 ? '#64FF00' : '#FF4444'}'>${(t.profit_loss_usd || 0) >= 0 ? '+' : ''}$${(t.profit_loss_usd || 0).toFixed(0)}</td>
               </tr>
-            \`).join('')}
+            `).join('')}
           </tbody>
         </table>
       </div>
@@ -625,27 +625,27 @@ export async function generateOgScanReport(token: Token): Promise<string> {
       <div class="data-grid">
         <div class="data-card">
           <div class="card-label">1H Price Forecast</div>
-          <div class="card-value">$\${predictions?.nextHourPrice.toFixed(10) || 'N/A'}</div>
+          <div class="card-value">$${predictions?.nextHourPrice.toFixed(10) || 'N/A'}</div>
         </div>
         <div class="data-card">
           <div class="card-label">24H Forecast</div>
-          <div class="card-value">$\${predictions?.next24hPrice.toFixed(10) || 'N/A'}</div>
+          <div class="card-value">$${predictions?.next24hPrice.toFixed(10) || 'N/A'}</div>
         </div>
         <div class="data-card">
           <div class="card-label">Direction</div>
-          <div class="card-value">\${predictions?.direction.toUpperCase() || 'N/A'}</div>
+          <div class="card-value">${predictions?.direction.toUpperCase() || 'N/A'}</div>
         </div>
         <div class="data-card">
           <div class="card-label">Confidence</div>
-          <div class="card-value">\${predictions ? (predictions.confidence * 100).toFixed(0) : '0'}%</div>
+          <div class="card-value">${predictions ? (predictions.confidence * 100).toFixed(0) : '0'}%</div>
         </div>
         <div class="data-card">
           <div class="card-label">Rug Probability</div>
-          <div class="card-value">\${rugRisk?.rugProbability.toFixed(0) || '0'}%</div>
+          <div class="card-value">${rugRisk?.rugProbability.toFixed(0) || '0'}%</div>
         </div>
         <div class="data-card">
           <div class="card-label">Rug Verdict</div>
-          <div class="card-value">\${rugRisk?.verdict.toUpperCase() || 'UNKNOWN'}</div>
+          <div class="card-value">${rugRisk?.verdict.toUpperCase() || 'UNKNOWN'}</div>
         </div>
       </div>
     </div>
