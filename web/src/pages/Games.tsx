@@ -1,36 +1,66 @@
 /**
- * Games page — Browser-style wrapper for Degen Tower.
+ * Partnerships page — Browser-style wrapper for partner sites.
  * Matches the Phantom Trade tab setup exactly.
+ * Supports swipping/switching between Degen Tower and solno.fun
  */
 
 import { useState, useRef } from "react";
-import { RefreshCw, ExternalLink, Lock, ArrowLeft, ArrowRight, Gamepad2 } from "lucide-react";
+import { RefreshCw, ExternalLink, Lock, ArrowLeft, ArrowRight, Gamepad2, Zap } from "lucide-react";
 
-const GAMES_URL = "https://degen-tower.vercel.app/";
+const PARTNERSHIPS = [
+  { id: "degen-tower", name: "Degen Tower", url: "https://degen-tower.vercel.app/", icon: Gamepad2, color: "text-og-lime" },
+  { id: "solno", name: "Solno", url: "http://solno.fun/", icon: Zap, color: "text-og-gold" },
+];
 
-const Games = () => {
+const Partnerships = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [loading, setLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
+  const [activePartnership, setActivePartnership] = useState(0);
+
+  const currentPartnership = PARTNERSHIPS[activePartnership];
+  const CurrentIcon = currentPartnership.icon;
 
   const handleReload = () => {
     setLoading(true);
     setIframeError(false);
-    if (iframeRef.current) iframeRef.current.src = GAMES_URL;
+    if (iframeRef.current) iframeRef.current.src = currentPartnership.url;
+  };
+
+  const switchPartnership = (id: string) => {
+    const index = PARTNERSHIPS.findIndex(p => p.id === id);
+    if (index !== -1) {
+      setActivePartnership(index);
+      setLoading(true);
+      setIframeError(false);
+    }
   };
 
   return (
-      <div className="flex flex-col h-[calc(100vh-8rem)] w-full bg-[#0a0a0f]">
+      <div className="flex flex-col h-[calc(100vh-3.5rem)] w-full bg-[#0a0a0f]">
         {/* Browser chrome */}
         <div className="shrink-0 bg-[#141420] border-b border-white/[0.06]">
-          {/* Tab bar */}
-          <div className="flex items-center gap-1 px-3 pt-2">
-            <div className="flex items-center gap-2 bg-[#1c1c2e] rounded-t-lg px-4 py-2 border border-white/[0.08] border-b-0 max-w-[240px]">
-              <Gamepad2 className="w-4 h-4 text-og-lime shrink-0" />
-              <span className="text-[11px] text-white/70 font-medium truncate">
-                Degen Tower
-              </span>
-            </div>
+          {/* Partnership tab switcher */}
+          <div className="flex items-center gap-1 px-3 pt-2 overflow-x-auto">
+            {PARTNERSHIPS.map((partner, idx) => {
+              const Icon = partner.icon;
+              return (
+                <button
+                  key={partner.id}
+                  onClick={() => switchPartnership(partner.id)}
+                  className={`flex items-center gap-2 rounded-t-lg px-4 py-2 border border-white/[0.08] border-b-0 transition shrink-0 ${
+                    idx === activePartnership 
+                      ? "bg-[#1c1c2e] border-white/[0.12]" 
+                      : "bg-[#0d0d18] border-white/[0.04] hover:bg-[#12121f]"
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${partner.color}`} />
+                  <span className="text-[11px] text-white/70 font-medium whitespace-nowrap">
+                    {partner.name}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Nav + address bar */}
@@ -50,12 +80,12 @@ const Games = () => {
             <div className="flex-1 flex items-center gap-2 bg-[#0d0d18] rounded-lg px-3 py-1.5 border border-white/[0.06]">
               <Lock className="h-3 w-3 text-green-400/60 shrink-0" />
               <span className="text-[12px] text-white/50 font-mono truncate select-all">
-                degen-tower.vercel.app
+                {currentPartnership.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
               </span>
             </div>
 
             <a
-              href={GAMES_URL}
+              href={currentPartnership.url}
               target="_blank"
               rel="noopener noreferrer"
               className="p-1.5 rounded-md text-white/30 hover:text-white/60 hover:bg-white/[0.05] transition"
@@ -67,7 +97,7 @@ const Games = () => {
         </div>
 
         {/* iframe */}
-        <div className="flex-1 relative bg-[#0d0d14]">
+        <div className="flex-1 relative bg-[#0d0d14] overflow-hidden">
           {loading && (
             <div className="absolute top-0 left-0 right-0 h-[2px] z-10">
               <div className="h-full bg-og-lime rounded-full animate-pulse w-2/3" />
@@ -75,9 +105,10 @@ const Games = () => {
           )}
 
           <iframe
+            key={currentPartnership.id}
             ref={iframeRef}
-            src={GAMES_URL}
-            title="Degen Tower"
+            src={currentPartnership.url}
+            title={currentPartnership.name}
             className="w-full h-full border-0"
             allow="clipboard-write; clipboard-read; accelerometer; autoplay"
             sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"
@@ -88,23 +119,23 @@ const Games = () => {
 
           {iframeError && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0d0d14] gap-6 px-6">
-              <div className="w-16 h-16 rounded-2xl bg-og-lime/10 border border-og-lime/20 flex items-center justify-center">
-                <Gamepad2 className="h-8 w-8 text-og-lime" />
+              <div className={`w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center`}>
+                <CurrentIcon className={`h-8 w-8 ${currentPartnership.color}`} />
               </div>
               <div className="text-center">
-                <h2 className="text-lg font-black text-white mb-2">Open Degen Tower</h2>
+                <h2 className="text-lg font-black text-white mb-2">Open {currentPartnership.name}</h2>
                 <p className="text-sm text-white/40 max-w-sm">
-                  Tap below to play Degen Tower in a new window.
+                  Tap below to visit {currentPartnership.name} in a new window.
                 </p>
               </div>
               <a
-                href={GAMES_URL}
+                href={currentPartnership.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 bg-og-lime text-black px-6 py-3 rounded-xl font-black text-sm hover:bg-og-lime/90 transition active:scale-[0.98]"
               >
                 <ExternalLink className="h-4 w-4" />
-                Play Degen Tower
+                Visit {currentPartnership.name}
               </a>
             </div>
           )}
@@ -113,4 +144,4 @@ const Games = () => {
   );
 };
 
-export default Games;
+export default Partnerships;

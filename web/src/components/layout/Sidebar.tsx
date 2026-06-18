@@ -25,7 +25,7 @@ const mainItems: NavItem[] = [
 
 const tradingItems: NavItem[] = [
   { to: "/wallets",         icon: Wallet,        label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
-  { to: "/games",           icon: Gamepad2,      label: "Games",          eyebrow: "Degen Tower" },
+  { to: "/games",           icon: Gamepad2,      label: "Partnerships",    eyebrow: "Degen Tower · Solno" },
   { to: "/trading-hub",     icon: TrendingUp,    label: "Trading Hub",     eyebrow: "Launch · Lobbies · Callouts" },
 ];
 

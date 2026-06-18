@@ -13,7 +13,7 @@ const navItems = [
   { to: "/community", icon: Users, label: "Community" },
   { to: "/tools", icon: Wrench, label: "Tools" },
   // { to: "/support", icon: MessageCircle, label: "Support" }, // hidden
-  { to: "/games", icon: Gamepad2, label: "Games" },
+  { to: "/games", icon: Gamepad2, label: "Partnerships" },
   { to: "/profile", icon: User, label: "Profile" },
 ];
 
