@@ -70,7 +70,7 @@ export function WhaleRiskAnalysis({ mint }: { mint: string }) {
       </div>
 
       <div className="rounded-xl border border-border bg-card p-6 overflow-x-auto">
-        <h3 className="font-bold text-lg mb-4">Top Whales (>1% holdings)</h3>
+        <h3 className="font-bold text-lg mb-4">Top Whales (&gt;1% holdings)</h3>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/50 text-foreground/60 font-bold">

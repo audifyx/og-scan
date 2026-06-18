@@ -3,3 +3,4 @@ node_modules
 .expo
 .rork
 Communities.tsx.bak
+.vercel
