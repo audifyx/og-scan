@@ -15,10 +15,11 @@ interface Props {
   name?: string | null;
   result: OgClassification;
   scanId?: string | null;
+  iconUrl?: string | null;
   className?: string;
 }
 
-export function ShareScanCard({ mint, symbol, name, result, scanId, className }: Props) {
+export function ShareScanCard({ mint, symbol, name, result, scanId, iconUrl, className }: Props) {
   const [handle, setHandle] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -41,7 +42,7 @@ export function ShareScanCard({ mint, symbol, name, result, scanId, className }:
 
   function downloadImage() {
     void logShare(mint, "card", input.handle, scanId);
-    downloadScanCardImage(card);
+    void downloadScanCardImage(card, iconUrl);
   }
 
   function shareTelegram() {

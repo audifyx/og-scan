@@ -81,7 +81,7 @@ export function OgVerdict({ token, score, report }: { token: JupTokenInfo; score
   async function handleDownloadPdf() {
     setPdfBusy(true);
     try {
-      await downloadReportPdf({ token, score, result, velocity, decay, entropy, lifecycle, report });
+      await downloadReportPdf({ token, score, report });
     } catch (e) {
       console.error("PDF export failed", e);
     } finally {
@@ -280,7 +280,7 @@ export function OgVerdict({ token, score, report }: { token: JupTokenInfo; score
         <p className="text-sm text-muted-foreground">{whyExists({ name: token.name, symbol: token.symbol, isOg: result.tier === "OG_TOKEN" })}</p>
       </Section>
 
-      <ShareScanCard mint={token.id} symbol={token.symbol} name={token.name} result={result} />
+      <ShareScanCard mint={token.id} symbol={token.symbol} name={token.name} result={result} iconUrl={token.icon} />
     </div>
   );
 }
