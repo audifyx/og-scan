@@ -1,12 +1,13 @@
 /** Viral scan card + X / Telegram / copy share actions (spec section D & 9). */
 import { useState } from "react";
-import { Share2, Send, Copy, Check } from "lucide-react";
+import { Share2, Send, Copy, Check, ImageDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { OgClassification } from "@/lib/classification";
 import { buildTweet, buildXShareUrl, buildScanCard, buildTelegramAlert, normalizeHandle } from "@/lib/social";
 import { logShare } from "@/lib/scanLog";
+import { downloadScanCardImage } from "@/lib/scanCardImage";
 
 interface Props {
   mint: string;
@@ -36,6 +37,11 @@ export function ShareScanCard({ mint, symbol, name, result, scanId, className }:
   function shareX() {
     void logShare(mint, "x", input.handle, scanId);
     window.open(buildXShareUrl(input), "_blank", "noopener,noreferrer");
+  }
+
+  function downloadImage() {
+    void logShare(mint, "card", input.handle, scanId);
+    downloadScanCardImage(card);
   }
 
   function shareTelegram() {
@@ -81,6 +87,9 @@ export function ShareScanCard({ mint, symbol, name, result, scanId, className }:
         <Button onClick={copyTweet} size="sm" variant="outline">
           {copied ? <Check className="mr-1.5 h-4 w-4" /> : <Copy className="mr-1.5 h-4 w-4" />}
           {copied ? "Copied" : "Copy tweet"}
+        </Button>
+        <Button onClick={downloadImage} size="sm" variant="outline">
+          <ImageDown className="mr-1.5 h-4 w-4" /> Download image
         </Button>
       </div>
     </div>

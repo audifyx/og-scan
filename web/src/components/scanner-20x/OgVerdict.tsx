@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Sparkles, TrendingUp, GitBranch, ChevronDown, ShieldCheck, Coins,
-  Users, BadgeDollarSign, Fingerprint, Crown,
+  Users, BadgeDollarSign, Fingerprint, Crown, FileDown, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ClassificationCard } from "@/components/scanner-20x/ClassificationCard";
@@ -16,6 +16,7 @@ import { classifyToken } from "@/lib/classification";
 import { forensicToInput, jupSeries } from "@/lib/classificationAdapter";
 import { trendVelocityScore, reconstructLifecycle, hypeDecayScore, holderEntropyScore, whyExists, type LifecycleStage } from "@/lib/intelligence";
 import { logScan, captureTrendSnapshot } from "@/lib/scanLog";
+import { downloadReportPdf } from "@/lib/reportPdf";
 import {
   fmtUsd, fmtNum, fmtPct, fmtHolderCount, shortAddr, shortDate, tokenOgCreatedAtIso,
   tokenEffectiveLiquidityUsd,
@@ -76,6 +77,17 @@ export function OgVerdict({ token, score, report }: { token: JupTokenInfo; score
   const lifecycle = useMemo(() => reconstructLifecycle(series), [series]);
   const decay = useMemo(() => hypeDecayScore(series), [series]);
   const entropy = useMemo(() => holderEntropyScore((token.topHolders ?? []).map((h) => h.uiAmount).filter((n) => n > 0)), [token]);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  async function handleDownloadPdf() {
+    setPdfBusy(true);
+    try {
+      await downloadReportPdf({ token, score, result, velocity, decay, entropy, lifecycle, report });
+    } catch (e) {
+      console.error("PDF export failed", e);
+    } finally {
+      setPdfBusy(false);
+    }
+  }
 
   const loggedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -97,8 +109,19 @@ export function OgVerdict({ token, score, report }: { token: JupTokenInfo; score
 
   return (
     <div className="mt-4 space-y-3">
-      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
-        <Sparkles className="h-3 w-3" /> OG Verdict · full report
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">
+          <Sparkles className="h-3 w-3" /> OG Verdict · full report
+        </div>
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          disabled={pdfBusy}
+          className="inline-flex items-center gap-1.5 rounded-full border border-og-cyan/40 bg-og-cyan/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-og-cyan transition hover:bg-og-cyan/20 disabled:opacity-50"
+        >
+          {pdfBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+          {pdfBusy ? "Building…" : "Download PDF"}
+        </button>
       </div>
 
       <ClassificationCard result={result} symbol={token.symbol} />
