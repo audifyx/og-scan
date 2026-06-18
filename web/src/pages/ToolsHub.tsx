@@ -1,14 +1,13 @@
 /**
- * ToolsHub — Theme-aware tools discovery page.
- * Fully respects user's theme settings. Glass-morphism cards with dynamic colors.
- * Featured hero tool, search filter, and category-grouped cards with progressive disclosure.
+ * ToolsHub — Premium square icon grid layout for OG Scan tools.
+ * Clean, no overlapping text. Each tool is a square card with icon.
+ * Fully theme-aware with CSS variables.
  */
 import React, { useMemo, useState } from "react";
 import {
-  Search, Target, Rss, Activity, Zap, Coins, Star, ArrowUpRight,
-  ShieldCheck, Compass, BarChart3,
+  Search, Target, Rss, Activity, Zap, Coins, Star,
+  ShieldCheck, Compass, BarChart3, X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
 type Category = "Forensics" | "Discovery" | "Analytics" | "Trade" | "Info";
@@ -16,51 +15,20 @@ type Category = "Forensics" | "Discovery" | "Analytics" | "Trade" | "Info";
 interface ToolItem {
   id: string;
   label: string;
-  description: string;
-  detail: string;
+  tooltip: string;
   Icon: React.ComponentType<{ className?: string }>;
-  colorIndex: number; // 0-4 for different accent colors
+  colorIndex: number;
   category: Category;
-  badge?: string;
-  featured?: boolean;
 }
 
 const TOOLS: ToolItem[] = [
-  {
-    id: "scanner", label: "Truth Scanner", category: "Forensics", featured: true,
-    description: "Scan any mint for its OG verdict — a 4-tier explainable classification (OG / SAFE / RISKY / DANGEROUS) with confidence, rug score, clone lineage, dev wallet DNA, holder risk and bundle detection.",
-    detail: "OG Verdict · Lifecycle · Share · History", Icon: ShieldCheck, colorIndex: 0, badge: "Core",
-  },
-  {
-    id: "snipe-feed", label: "Launch Radar", category: "Discovery",
-    description: "Fresh mints, migrations, repeat-dev flags, and snipe alerts in real time.",
-    detail: "Launches · Migrations · Alerts", Icon: Target, colorIndex: 1, badge: "Live",
-  },
-  {
-    id: "feed", label: "Market Feed", category: "Discovery",
-    description: "Trending tokens, whale moves, narrative clusters and news signals.",
-    detail: "Trending · News · Heatmap", Icon: Rss, colorIndex: 2, badge: "Hot",
-  },
-  {
-    id: "market-pulse", label: "Token Intel", category: "Analytics",
-    description: "Open any token for vitals, whale watch, pairs and live TX flow.",
-    detail: "Vitals · Whales · TX Feed", Icon: Activity, colorIndex: 3,
-  },
-  {
-    id: "swap", label: "Swap", category: "Trade",
-    description: "Fast Jupiter-routed swaps with live quotes and clean execution.",
-    detail: "Route · Quote · Confirm", Icon: Zap, colorIndex: 0,
-  },
-  {
-    id: "listings", label: "Token Listings", category: "Discovery",
-    description: "List and promote tokens with pulled data and AI analysis.",
-    detail: "List · Analyze · Publish", Icon: Star, colorIndex: 2, badge: "New",
-  },
-  {
-    id: "our-coin", label: "About OGScan", category: "Info",
-    description: "Official token info, roadmap, infrastructure and community.",
-    detail: "Token · Roadmap · Infra", Icon: Coins, colorIndex: 1,
-  },
+  { id: "scanner", label: "Truth Scanner", tooltip: "Scan any mint for OG verdict", Icon: ShieldCheck, colorIndex: 0, category: "Forensics" },
+  { id: "snipe-feed", label: "Launch Radar", tooltip: "Fresh mints & migrations live", Icon: Target, colorIndex: 1, category: "Discovery" },
+  { id: "feed", label: "Market Feed", tooltip: "Trending tokens & whale moves", Icon: Rss, colorIndex: 2, category: "Discovery" },
+  { id: "market-pulse", label: "Token Intel", tooltip: "Open any token for vitals", Icon: Activity, colorIndex: 3, category: "Analytics" },
+  { id: "swap", label: "Swap", tooltip: "Fast Jupiter-routed swaps", Icon: Zap, colorIndex: 0, category: "Trade" },
+  { id: "listings", label: "Token Listings", tooltip: "List & promote tokens", Icon: Star, colorIndex: 2, category: "Discovery" },
+  { id: "our-coin", label: "About OGScan", tooltip: "Official token & roadmap", Icon: Coins, colorIndex: 1, category: "Info" },
 ];
 
 const CATEGORY_ORDER: Category[] = ["Forensics", "Discovery", "Analytics", "Trade", "Info"];
@@ -68,119 +36,67 @@ const CATEGORY_ICON: Record<Category, React.ComponentType<{ className?: string }
   Forensics: ShieldCheck, Discovery: Compass, Analytics: BarChart3, Trade: Zap, Info: Coins,
 };
 
-// Theme color accent slots that cycle through - uses CSS variables for full theme support
-const THEME_ACCENTS = [
-  { bg: "hsl(var(--primary) / 0.12)", border: "hsl(var(--primary) / 0.25)", text: "hsl(var(--primary))", icon: "hsl(var(--primary) / 0.8)" },
-  { bg: "hsl(var(--secondary) / 0.12)", border: "hsl(var(--secondary) / 0.25)", text: "hsl(var(--secondary))", icon: "hsl(var(--secondary) / 0.8)" },
-  { bg: "hsl(var(--accent) / 0.12)", border: "hsl(var(--accent) / 0.25)", text: "hsl(var(--accent))", icon: "hsl(var(--accent) / 0.8)" },
-  { bg: "hsl(var(--ring) / 0.1)", border: "hsl(var(--ring) / 0.2)", text: "hsl(var(--ring))", icon: "hsl(var(--ring) / 0.7)" },
-  { bg: "hsl(var(--foreground) / 0.08)", border: "hsl(var(--foreground) / 0.15)", text: "hsl(var(--foreground))", icon: "hsl(var(--foreground) / 0.7)" },
+const THEME_COLORS = [
+  { bg: "hsl(var(--primary) / 0.15)", border: "hsl(var(--primary) / 0.3)", text: "hsl(var(--primary))", icon: "hsl(var(--primary))" },
+  { bg: "hsl(var(--secondary) / 0.15)", border: "hsl(var(--secondary) / 0.3)", text: "hsl(var(--secondary))", icon: "hsl(var(--secondary))" },
+  { bg: "hsl(var(--accent) / 0.15)", border: "hsl(var(--accent) / 0.3)", text: "hsl(var(--accent))", icon: "hsl(var(--accent))" },
+  { bg: "hsl(var(--ring) / 0.12)", border: "hsl(var(--ring) / 0.25)", text: "hsl(var(--ring))", icon: "hsl(var(--ring))" },
 ];
 
 interface ToolsHubProps {
   onNavigate: (tabId: string) => void;
 }
 
-const FeaturedCard: React.FC<{ tool: ToolItem; onNavigate: (id: string) => void }> = ({ tool, onNavigate }) => {
-  const accent = THEME_ACCENTS[tool.colorIndex];
-  return (
-    <button
-      type="button"
-      onClick={() => onNavigate(tool.id)}
-      className="glass-card group relative w-full overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-      style={{
-        borderColor: accent.border,
-        borderWidth: "1px",
-      }}
-    >
-      <div 
-        className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full blur-3xl opacity-15 transition-opacity group-hover:opacity-25"
-        style={{ backgroundColor: accent.text }}
-      />
-      <div className="relative flex items-start gap-4 p-6">
-        <div 
-          className="flex h-16 w-16 flex-none items-center justify-center rounded-2xl border transition-transform group-hover:scale-110"
-          style={{
-            backgroundColor: accent.bg,
-            borderColor: accent.border,
-          }}
-        >
-          <tool.Icon className="h-8 w-8" style={{ color: accent.icon }} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="text-lg font-black text-foreground">{tool.label}</p>
-            {tool.badge && (
-              <span 
-                className="rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider"
-                style={{
-                  backgroundColor: accent.bg,
-                  borderColor: accent.border,
-                  color: accent.text,
-                }}
-              >
-                {tool.badge}
-              </span>
-            )}
-          </div>
-          <p className="mt-2 text-sm leading-relaxed text-foreground/60">{tool.description}</p>
-          <p className="mt-3 text-[11px] font-bold uppercase tracking-wider opacity-70" style={{ color: accent.text }}>{tool.detail}</p>
-        </div>
-        <ArrowUpRight className="h-5 w-5 flex-none text-foreground/30 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-      </div>
-    </button>
-  );
-};
-
 const ToolCard: React.FC<{ tool: ToolItem; onNavigate: (id: string) => void }> = ({ tool, onNavigate }) => {
-  const accent = THEME_ACCENTS[tool.colorIndex];
-  
+  const color = THEME_COLORS[tool.colorIndex];
+  const [hovering, setHovering] = useState(false);
+
   return (
     <button
       type="button"
       onClick={() => onNavigate(tool.id)}
-      className="glass-card group relative overflow-hidden text-left transition-all duration-300 hover:-translate-y-1 active:scale-[0.97]"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+      className="group relative flex flex-col items-center justify-center gap-2 rounded-2xl transition-all duration-300"
       style={{
-        borderColor: accent.border,
-        borderWidth: "1px",
+        aspectRatio: "1 / 1",
+        backgroundColor: color.bg,
+        borderColor: color.border,
+        borderWidth: "1.5px",
+        transform: hovering ? "translateY(-4px) scale(1.02)" : "translateY(0) scale(1)",
+        boxShadow: hovering ? `0 12px 24px ${color.text}20` : "0 4px 12px rgba(0,0,0,0.2)",
       }}
     >
-      <div 
-        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl opacity-12 transition-opacity duration-300 group-hover:opacity-20"
-        style={{ backgroundColor: accent.text }}
-      />
-      <div className="relative flex flex-col gap-3.5 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div 
-            className="flex h-12 w-12 items-center justify-center rounded-xl border transition-transform group-hover:scale-105"
-            style={{
-              backgroundColor: accent.bg,
-              borderColor: accent.border,
-            }}
-          >
-            <tool.Icon className="h-5 w-5" style={{ color: accent.icon }} />
-          </div>
-          {tool.badge ? (
-            <span 
-              className="rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-wider whitespace-nowrap"
-              style={{
-                backgroundColor: accent.bg,
-                borderColor: accent.border,
-                color: accent.text,
-              }}
-            >
-              {tool.badge}
-            </span>
-          ) : (
-            <ArrowUpRight className="h-3.5 w-3.5 text-foreground/20 opacity-0 transition-opacity group-hover:opacity-100" />
-          )}
-        </div>
-        <div>
-          <p className="text-sm font-black leading-tight text-foreground">{tool.label}</p>
-          <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-foreground/50">{tool.description}</p>
-        </div>
-        <p className="text-[9px] font-bold uppercase tracking-wider opacity-60" style={{ color: accent.text }}>{tool.detail}</p>
+      {/* Hover glow effect */}
+      {hovering && (
+        <div
+          className="pointer-events-none absolute inset-0 rounded-2xl blur-2xl opacity-20"
+          style={{ backgroundColor: color.text }}
+        />
+      )}
+
+      {/* Icon */}
+      <div
+        className="relative flex h-12 w-12 items-center justify-center transition-transform duration-300 group-hover:scale-110"
+        style={{ color: color.icon }}
+      >
+        <tool.Icon className="h-7 w-7" strokeWidth={1.5} />
       </div>
+
+      {/* Label */}
+      <span
+        className="relative text-center text-xs font-bold leading-tight transition-colors duration-300"
+        style={{ color: "hsl(var(--foreground))" }}
+      >
+        {tool.label}
+      </span>
+
+      {/* Tooltip on hover */}
+      {hovering && (
+        <div className="pointer-events-none absolute -bottom-16 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border px-3 py-2 text-[10px] font-medium animate-fade-in" style={{ backgroundColor: "hsl(var(--card))", borderColor: color.border, color: "hsl(var(--foreground))" }}>
+          {tool.tooltip}
+        </div>
+      )}
     </button>
   );
 };
@@ -193,66 +109,73 @@ const ToolsHub: React.FC<ToolsHubProps> = ({ onNavigate }) => {
     if (!q) return TOOLS;
     return TOOLS.filter((t) =>
       t.label.toLowerCase().includes(q) ||
-      t.description.toLowerCase().includes(q) ||
-      t.category.toLowerCase().includes(q));
+      t.tooltip.toLowerCase().includes(q) ||
+      t.category.toLowerCase().includes(q)
+    );
   }, [query]);
 
-  const featured = filtered.find((t) => t.featured);
   const grouped = CATEGORY_ORDER
-    .map((cat) => ({ cat, items: filtered.filter((t) => t.category === cat && !t.featured) }))
+    .map((cat) => ({ cat, items: filtered.filter((t) => t.category === cat) }))
     .filter((g) => g.items.length > 0);
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="space-y-10 pb-8">
       {/* Header */}
       <div>
-        <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.4em]">
+        <div className="mb-4 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.4em]">
           <div className="h-px w-10" style={{ backgroundColor: "hsl(var(--primary))" }} />
-          <span style={{ color: "hsl(var(--primary))" }}>Tools</span>
+          <span style={{ color: "hsl(var(--primary))" }}>Tools & Scanners</span>
         </div>
-        <h2 className="font-display text-3xl font-black tracking-tight text-foreground sm:text-4xl">Everything you need to scan, discover, and trade</h2>
-        <p className="mt-2 max-w-2xl text-sm text-foreground/50">One command hub for OG Scan's forensic scanner, discovery feeds, token intelligence, and trading.</p>
+        <h1 className="font-display text-4xl font-black tracking-tight text-foreground">
+          Investigation Command Center
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm text-foreground/55">
+          Forensic scanners, discovery feeds, token intelligence, and trading tools — all in one place.
+        </p>
       </div>
 
-      {/* Search */}
+      {/* Search Bar */}
       <div className="relative max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/40" />
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tools…"
-          className="pl-9"
+          className="pl-12 py-2.5"
         />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/60 transition"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
+      {/* Empty state */}
       {filtered.length === 0 && (
-        <p className="text-sm text-foreground/50">No tools match "{query}".</p>
+        <div className="py-12 text-center">
+          <p className="text-sm text-foreground/50">No tools match "{query}"</p>
+        </div>
       )}
 
-      {/* Featured */}
-      {featured && !query && <FeaturedCard tool={featured} onNavigate={onNavigate} />}
-
-      {/* Grouped categories */}
+      {/* Tools Grid by Category */}
       {grouped.map(({ cat, items }) => {
         const CatIcon = CATEGORY_ICON[cat];
         return (
-          <section key={cat} className="space-y-3">
+          <section key={cat} className="space-y-4">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground/60">
-              <CatIcon className="h-3.5 w-3.5" /> {cat}
+              <CatIcon className="h-4 w-4" /> {cat}
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {items.map((tool) => <ToolCard key={tool.id} tool={tool} onNavigate={onNavigate} />)}
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {items.map((tool) => (
+                <ToolCard key={tool.id} tool={tool} onNavigate={onNavigate} />
+              ))}
             </div>
           </section>
         );
       })}
-
-      {/* When searching, show the featured tool inline within results too */}
-      {featured && query && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <ToolCard tool={featured} onNavigate={onNavigate} />
-        </div>
-      )}
     </div>
   );
 };
