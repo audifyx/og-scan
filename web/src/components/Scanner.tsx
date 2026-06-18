@@ -252,7 +252,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   return (
     <section id="scanner" className="relative scroll-mt-36">
       <div>
-        <div className="mb-6">
+        <div className="mb-8">
           <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-og-cyan">
             <span className="h-px w-10 bg-og-cyan" /> SCANNER.EXE
           </div>
@@ -260,13 +260,13 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <span className="text-foreground">SCAN ANY</span>{" "}
             <span className="text-og-cyan text-glow">MINT</span>
           </h2>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+          <p className="mt-3 max-w-4xl text-sm leading-relaxed text-muted-foreground">
             Search any ticker, meme, brand, narrative, or CA across 16+ chains. The scanner layers OG proof, dominance, holder concentration, liquidity authenticity, authority status, DEX paid signals, and quick investigation tools into one triage board.
           </p>
         </div>
 
-        <div className="relative">
-          <div className="og-search-box px-3">
+        <div className="relative w-full">
+          <div className="og-search-box px-3 w-full">
             <Search className="h-4 w-4 text-og-cyan" />
             <input
               value={q}

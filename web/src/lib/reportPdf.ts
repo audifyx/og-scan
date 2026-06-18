@@ -339,20 +339,58 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     y += 6;
   }
 
-  // dex paid - FIXED LOGIC
+  // dex paid - ENHANCED LOGIC with more fields
   sectionTitle("DEX Paid & Boosts");
-  const isDexPaid = token.dexProfilePaid || token.dexCommunityTakeoverPaid || token.dexAdsPaid || (token.dexPaidOrderCount ?? 0) > 0 || (token.dexBoostActive ?? 0) > 0;
-  rows([
+  const isDexPaid = token.dexProfilePaid || token.dexCommunityTakeoverPaid || token.dexAdsPaid || (token.dexPaidOrderCount ?? 0) > 0 || (token.dexBoostActive ?? 0) > 0 || (token.dexBoostTotalAmount ?? 0) > 0 || (token.dexPaidAmount ?? 0) > 0;
+  const dexRows = [
     ["DEX paid (any)", yn(isDexPaid)],
-    ["Profile paid", yn(token.dexProfilePaid)],
-    ["Boosts active", token.dexBoostActive != null ? String(token.dexBoostActive) : "—"],
-    ["Boost amount (SOL)", token.dexBoostAmount != null ? fmtNum(token.dexBoostAmount) : "—"],
-    ["CTO paid", yn(token.dexCommunityTakeoverPaid)],
-    ["Ads paid", yn(token.dexAdsPaid)],
-    ["Total paid orders", token.dexPaidOrderCount ?? "—"],
-    ["First paid", shortDate(token.dexFirstPaidAt)],
-    ["Last paid", shortDate(token.dexLastPaidAt)],
-  ]);
+  ];
+  
+  // Add profile paid if available
+  if (token.dexProfilePaid !== undefined) {
+    dexRows.push(["Profile paid", yn(token.dexProfilePaid)]);
+  }
+  
+  // Add boosts info - show active count or total amount
+  if (token.dexBoostActive !== undefined && token.dexBoostActive > 0) {
+    dexRows.push(["Boosts active", String(token.dexBoostActive)]);
+  }
+  if (token.dexBoostTotalAmount !== undefined && token.dexBoostTotalAmount > 0) {
+    dexRows.push(["Boost total (SOL)", fmtNum(token.dexBoostTotalAmount)]);
+  }
+  if (token.dexBoostAmount !== undefined && token.dexBoostAmount > 0) {
+    dexRows.push(["Boost amount (SOL)", fmtNum(token.dexBoostAmount)]);
+  }
+  
+  // Add other DEX paid types
+  if (token.dexCommunityTakeoverPaid !== undefined) {
+    dexRows.push(["CTO paid", yn(token.dexCommunityTakeoverPaid)]);
+  }
+  if (token.dexAdsPaid !== undefined) {
+    dexRows.push(["Ads paid", yn(token.dexAdsPaid)]);
+  }
+  
+  // Add paid order info
+  if (token.dexPaidOrderCount !== undefined && token.dexPaidOrderCount > 0) {
+    dexRows.push(["Total paid orders", String(token.dexPaidOrderCount)]);
+  } else if (token.dexPaidOrderCount !== undefined) {
+    dexRows.push(["Total paid orders", "0"]);
+  }
+  
+  // Add paid amount if available
+  if (token.dexPaidAmount !== undefined && token.dexPaidAmount > 0) {
+    dexRows.push(["Total paid amount (SOL)", fmtNum(token.dexPaidAmount)]);
+  }
+  
+  // Add date info
+  if (token.dexFirstPaidAt) {
+    dexRows.push(["First paid", shortDate(token.dexFirstPaidAt)]);
+  }
+  if (token.dexLastPaidAt) {
+    dexRows.push(["Last paid", shortDate(token.dexLastPaidAt)]);
+  }
+  
+  rows(dexRows);
 
   // links & socials
   if (profile && (profile.websites.length || profile.socials.length)) {
