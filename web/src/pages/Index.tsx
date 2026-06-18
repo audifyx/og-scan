@@ -1455,20 +1455,19 @@ const marketSuiteOptions: SuiteOption<"feed" | "trending" | "news-signal">[] = [
 ];
 
 const TruthScanSuite = ({ onSelect }: { onSelect: (m: string) => void }) => {
-  const [active, setActive] = useState<"scanner" | "og-finder">("scanner");
+  // Unified OG Scanner — Truth Scanner + OG Finder merged into a single tool.
   return (
     <section className="space-y-4">
       <ToolHeader
         icon={Crosshair}
-        title="Truth Scanner"
-        subtitle="Verify any token's origin, detect clones, and surface the real OG with forensic-grade chain analysis."
+        title="OG Scanner"
+        subtitle="Scan any token for its OG verdict, origin proof, clone lineage, holders, liquidity, dev wallet and risk — one unified forensic scanner. Export the full report as PDF."
         gradient="from-emerald-500 to-green-400"
         glowColor="rgba(16,185,129,0.25)"
         badge="FORENSIC"
         badgeColor="lime"
       />
-      <SuiteNav options={truthSuiteOptions} activeId={active} onChange={setActive} />
-      {active === "scanner" ? <Scanner onSelect={onSelect} /> : <OgFinder onSelect={onSelect} />}
+      <Scanner onSelect={onSelect} />
       {/* 20x Features */}
       <div className="space-y-3 mt-4">
         <ScanHistory onSelect={onSelect} />

@@ -1,8 +1,9 @@
 // ============================================================
 // OG Scan — branded PDF report generator (client-side).
-// Computes the full report from token + forensic score + cluster
-// report, embeds the token logo and a price sparkline, and renders
-// a multi-page OG-branded PDF. jsPDF is dynamically imported.
+// Full token intelligence: banner + logo, verdict, signals, price
+// chart, forensic scores, identity/origin, authority, market,
+// holders, dex-paid, clone lineage, links/socials, and scan history.
+// jsPDF is dynamically imported.
 // ============================================================
 
 import {
@@ -16,6 +17,7 @@ import { forensicToInput, jupSeries } from "./classificationAdapter";
 import { trendVelocityScore, reconstructLifecycle, hypeDecayScore, holderEntropyScore } from "./intelligence";
 import { fetchImageDataUrl } from "./imageLoad";
 import { renderSparklinePng } from "./sparkline";
+import { getScanHistoryForMint } from "./scanLog";
 
 export type PdfReportInput = {
   token: JupTokenInfo;
@@ -34,11 +36,38 @@ const TIER_COLOR: Record<OgTier, RGB> = {
   OG_TOKEN: COLORS.lime, SAFE_CLONE: COLORS.cyan, RISKY_TOKEN: COLORS.gold, DANGEROUS_TOKEN: COLORS.blood,
 };
 const yn = (b?: boolean, t = "Yes", f = "No") => (b === undefined ? "—" : b ? t : f);
+const cap = (x: string) => (x ? x.charAt(0).toUpperCase() + x.slice(1) : x);
+
+type DexProfile = {
+  imageUrl?: string; header?: string; description?: string;
+  websites: { label: string; url: string }[];
+  socials: { type: string; url: string }[];
+};
+
+async function fetchDexProfile(mint: string): Promise<DexProfile | null> {
+  try {
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`);
+    if (!res.ok) return null;
+    const json = (await res.json()) as { pairs?: Array<Record<string, any>> };
+    const pairs = json.pairs ?? [];
+    if (!pairs.length) return null;
+    const best = pairs.slice().sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
+    const info = best.info ?? {};
+    const websites = (info.websites ?? [])
+      .map((w: any) => (typeof w === "string" ? { label: "Website", url: w } : { label: w.label || "Website", url: w.url }))
+      .filter((w: any) => w.url);
+    const socials = (info.socials ?? [])
+      .map((so: any) => ({ type: so.type || so.platform || "link", url: so.url || so.handle }))
+      .filter((x: any) => x.url);
+    return { imageUrl: info.imageUrl, header: info.header, description: info.description, websites, socials };
+  } catch {
+    return null;
+  }
+}
 
 export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   const { token, score: s, report, handle } = input;
 
-  // ── compute the full report ──
   const result = classifyToken(forensicToInput(token, s));
   const series = jupSeries(token);
   const velocity = trendVelocityScore(series);
@@ -46,10 +75,12 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   const decay = hypeDecayScore(series);
   const entropy = holderEntropyScore((token.topHolders ?? []).map((h) => h.uiAmount).filter((n) => n > 0));
 
-  // ── assets (logo + chart), best-effort ──
-  const [logo, chartPng] = await Promise.all([
-    fetchImageDataUrl(token.icon),
+  const profile = await fetchDexProfile(token.id);
+  const [logo, banner, chartPng, history] = await Promise.all([
+    fetchImageDataUrl(token.icon || profile?.imageUrl),
+    fetchImageDataUrl(profile?.header),
     Promise.resolve(renderSparklinePng(series, { peakIndex: lifecycle.peakIndex })),
+    getScanHistoryForMint(token.id, 15).catch(() => []),
   ]);
 
   const { jsPDF } = await import("jspdf");
@@ -119,9 +150,34 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     for (const ln of doc.splitTextToSize(text, CW)) { ensure(13); doc.text(ln, M, y); y += 13; }
     y += 4;
   }
+  function links(items: [string, string][]) {
+    doc.setFontSize(9);
+    for (const [label, url] of items) {
+      ensure(14);
+      setText(COLORS.muted); doc.setFont("helvetica", "bold"); doc.text(`${label}: `, M, y);
+      const lw = doc.getTextWidth(`${label}: `);
+      setText(COLORS.cyan); doc.setFont("helvetica", "normal");
+      const shown = doc.splitTextToSize(url, CW - lw)[0] ?? url;
+      doc.textWithLink(String(shown), M + lw, y, { url });
+      y += 14;
+    }
+    y += 4;
+  }
 
   // ── PAGE 1 ──
   paintBg(); y = M;
+
+  // banner
+  if (banner && banner.width > 0) {
+    const bh = 70; ensure(bh + 8);
+    try {
+      doc.addImage(banner.dataUrl, banner.format, M, y, CW, bh);
+      setDraw(COLORS.line); doc.setLineWidth(0.5); doc.roundedRect(M, y, CW, bh, 4, 4, "S");
+      y += bh + 12;
+    } catch { /* skip */ }
+  }
+
+  // brand header
   setText(COLORS.cyan); doc.setFont("helvetica", "bold"); doc.setFontSize(20);
   doc.text("OG SCAN", M, y + 6);
   setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.setFontSize(9);
@@ -159,6 +215,8 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   doc.text(`Confidence ${result.confidence}%   ·   Risk ${result.riskScore}/100   ·   Data completeness ${result.dataCompleteness}%`, M + 16, y + 38);
   y += 60;
   paragraph(result.rationale);
+
+  if (profile?.description) { sectionTitle("Coin Information"); paragraph(profile.description); }
 
   // detection signals
   if (result.signals.length) {
@@ -201,14 +259,15 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     if (s.classification?.reasoning_summary) paragraph(s.classification.reasoning_summary);
   }
 
-  // identity & origin
-  sectionTitle("Identity & Origin");
+  // identity & origin (OG status)
+  sectionTitle("Identity & Origin (OG Status)");
   rows([
     ["Symbol", `$${token.symbol || "—"}`], ["Name", token.name || "—"],
-    ["Chain", token.chainId ?? "solana"], ["First mint", shortDate(tokenOgCreatedAtIso(token))],
-    ["First mint source", token.firstMintSource ?? "—"], ["Creation source", token.creationSource ?? "—"],
-    ["Narrative ID", report?.narrativeFingerprintId ?? "—"], ["Verified", yn(token.isVerified)],
-    ["Primary token", yn(s?.isPrimaryToken)], ["Classification", s?.classification?.primary_label ?? "—"],
+    ["Chain", token.chainId ?? "solana"], ["Decimals", token.decimals != null ? String(token.decimals) : "—"],
+    ["First mint", shortDate(tokenOgCreatedAtIso(token))], ["First mint source", token.firstMintSource ?? "—"],
+    ["Creation source", token.creationSource ?? "—"], ["Narrative ID", report?.narrativeFingerprintId ?? "—"],
+    ["Verified", yn(token.isVerified)], ["Primary token", yn(s?.isPrimaryToken)],
+    ["First-mint token", yn(s?.isFirstMintToken)], ["Classification", s?.classification?.primary_label ?? "—"],
   ]);
 
   // authority & contract
@@ -218,6 +277,7 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     ["Freeze authority", token.audit?.freezeAuthorityDisabled === undefined ? "—" : (token.audit.freezeAuthorityDisabled ? "Renounced" : "Active")],
     ["First mint wallet", token.firstMintAuthorityWallet ? shortAddr(token.firstMintAuthorityWallet, 4) : "—"],
     ["Creator wallet", token.creatorFunding?.creatorWallet ? shortAddr(token.creatorFunding.creatorWallet, 4) : "—"],
+    ["Funding wallet", token.creatorFunding?.fundingWallet ? shortAddr(token.creatorFunding.fundingWallet, 4) : "—"],
     ["Top holders %", token.topHoldersPercent != null ? fmtPct(token.topHoldersPercent) : (token.audit?.topHoldersPercentage != null ? fmtPct(token.audit.topHoldersPercentage) : "—")],
   ]);
 
@@ -230,7 +290,7 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     ["Liquidity (effective)", fmtUsd(tokenEffectiveLiquidityUsd(token))], ["Liquidity (reported)", token.reportedLiquidity != null ? fmtUsd(token.reportedLiquidity) : "—"],
     ["Volume 24h", vol24 != null ? fmtUsd(vol24) : "—"], ["Pools", token.poolCount != null ? String(token.poolCount) : "—"],
     ["ATH", token.allTimeHighUsd != null ? `${fmtUsd(token.allTimeHighUsd)} · ${shortDate(token.allTimeHighAt)}` : "—"],
-    ["ATL", token.allTimeLowUsd != null ? fmtUsd(token.allTimeLowUsd) : "—"],
+    ["ATL", token.allTimeLowUsd != null ? `${fmtUsd(token.allTimeLowUsd)} · ${shortDate(token.allTimeLowAt)}` : "—"],
   ]);
 
   // holders
@@ -241,7 +301,7 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   ]);
   if (token.topHolders?.length) {
     doc.setFontSize(8);
-    token.topHolders.slice(0, 10).forEach((h, i) => {
+    token.topHolders.slice(0, 12).forEach((h, i) => {
       ensure(13);
       setText(COLORS.muted); doc.setFont("helvetica", "normal");
       doc.text(`${i + 1}. ${shortAddr(h.owner, 4)}${h.label ? ` · ${h.label}` : ""}`, M, y);
@@ -254,10 +314,22 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   // dex paid
   sectionTitle("DEX Paid & Boosts");
   rows([
-    ["Profile paid", yn(token.dexProfilePaid)], ["Boosts active", token.dexBoostActive != null ? String(token.dexBoostActive) : "—"],
-    ["Boost amount", token.dexBoostAmount != null ? fmtNum(token.dexBoostAmount) : "—"], ["CTO paid", yn(token.dexCommunityTakeoverPaid)],
-    ["Ads paid", yn(token.dexAdsPaid)], ["First paid", shortDate(token.dexFirstPaidAt)],
+    ["DEX paid", yn(token.dexProfilePaid || (token.dexPaidOrderCount ?? 0) > 0)],
+    ["Profile paid", yn(token.dexProfilePaid)],
+    ["Boosts active", token.dexBoostActive != null ? String(token.dexBoostActive) : "—"],
+    ["Boost amount", token.dexBoostAmount != null ? fmtNum(token.dexBoostAmount) : "—"],
+    ["CTO paid", yn(token.dexCommunityTakeoverPaid)], ["Ads paid", yn(token.dexAdsPaid)],
+    ["First paid", shortDate(token.dexFirstPaidAt)], ["Last paid", shortDate(token.dexLastPaidAt)],
   ]);
+
+  // links & socials
+  if (profile && (profile.websites.length || profile.socials.length)) {
+    sectionTitle("Links & Socials");
+    links([
+      ...profile.websites.map((w) => [w.label, w.url] as [string, string]),
+      ...profile.socials.map((so) => [cap(so.type), so.url] as [string, string]),
+    ]);
+  }
 
   // clone lineage
   const lineage = report?.familyTree ?? [];
@@ -268,6 +340,23 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
       setText(COLORS.text); doc.setFont("helvetica", "bold"); doc.text(`$${n.token.symbol}`, M, y);
       setText(COLORS.muted); doc.setFont("helvetica", "normal"); doc.text(n.relationship, M + 80, y);
       doc.text(`${Math.round(n.score)}%`, W - M, y, { align: "right" });
+      y += 13;
+    });
+    y += 6;
+  }
+
+  // scan history
+  if (history.length) {
+    sectionTitle("Scan History");
+    doc.setFontSize(8.5);
+    history.forEach((h: any) => {
+      ensure(13);
+      setText(COLORS.muted); doc.setFont("helvetica", "normal");
+      doc.text(new Date(h.created_at).toISOString().slice(0, 16).replace("T", " "), M, y);
+      setText(COLORS.text); doc.setFont("helvetica", "bold");
+      doc.text(String(h.tier || "").replace(/_/g, " "), M + 120, y);
+      setText(COLORS.muted); doc.setFont("helvetica", "normal");
+      doc.text(`${h.confidence ?? "—"}% · risk ${h.risk_score ?? "—"}${h.scanner_handle ? ` · @${h.scanner_handle}` : ""}`, W - M, y, { align: "right" });
       y += 13;
     });
     y += 6;
