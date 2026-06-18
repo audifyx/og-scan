@@ -1,4 +1,12 @@
 import type { JupTokenInfo, TokenForensicScores, ForensicOgReport } from '@/lib/og';
+import { 
+  analyzeHolder,
+  getTopHoldersByPnL,
+  analyzeWhaleRisk,
+  getTopTradersByPnL,
+  calculateTokenRiskScore,
+  detectAnomalies
+} from '@/lib/advanced-analytics';
 
 export interface PdfReportInput {
   token: JupTokenInfo;
@@ -15,12 +23,24 @@ function safe(val: any, fallback = 'N/A'): string {
 
 export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   try {
-    console.log('📄 Generating PDF...');
+    console.log('📄 Generating comprehensive forensic PDF...');
     const { jsPDF } = await import('jspdf');
     
     const token = input.token;
     const score = input.score;
     const report = input.report;
+
+    // Fetch ALL additional analytics data
+    console.log('📊 Fetching analytics data...');
+    const mint = token.id;
+    const [topHolders, topTraders, whaleRisk, anomalies, riskProfile] = await Promise.all([
+      getTopHoldersByPnL(mint, 20).catch(() => []),
+      getTopTradersByPnL(mint, 20).catch(() => []),
+      analyzeWhaleRisk(mint).catch(() => null),
+      detectAnomalies(mint).catch(() => []),
+      calculateTokenRiskScore({ token, score, report }).catch(() => null),
+    ]);
+    console.log('✓ Fetched:', topHolders.length, 'holders,', topTraders.length, 'traders, anomalies:', anomalies.length);
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -45,7 +65,7 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
       y += lines.length * (size * 0.35 + 1);
     };
 
-    // PAGE 1: HEADER & TOKEN INFO
+    // ===== PAGE 1: HEADER & TOKEN INFO =====
     setColor(244, 162, 97);
     text('OG SCAN FORENSIC INTELLIGENCE REPORT', margin, 16, true);
     
@@ -61,7 +81,7 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     text(`Symbol: ${safe(token.symbol)}`, margin + 2, 9);
     text(`Contract: ${safe(token.id)}`, margin + 2, 9);
     text(`Decimals: ${safe(token.decimals, '9')}`, margin + 2, 9);
-    text(`Created: ${safe(token.onChainCreatedAt || token.firstMintAt || 'Unknown')}`, margin + 2, 9);
+    text(`Created: ${safe(token.onChainCreatedAt || token.firstMintAt)}`, margin + 2, 9);
     y += 3;
 
     // KEY METRICS
@@ -89,32 +109,110 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     setColor(255, 255, 255);
     if (score) {
       text(`Dominance: ${score.dominanceScore} | Origin: ${score.originScore} | Risk: ${score.riskScore}`, margin + 2, 8);
-      text(`Clone Prob: ${score.cloneProbability}% | Rug Risk: ${score.riskScore} | CTO Prob: ${score.ctoProbability}%`, margin + 2, 8);
-      text(`True OG Prob: ${score.trueOgProbability}% | Migration Prob: ${score.migrationProbability}%`, margin + 2, 8);
-      text(`Deployer Trust: ${score.deployerTrustScore} | Liquidity Auth: ${score.liquidityAuthenticityScore}`, margin + 2, 8);
+      text(`Clone Prob: ${score.cloneProbability}% | CTO Prob: ${score.ctoProbability}% | Migration Prob: ${score.migrationProbability}%`, margin + 2, 8);
+      text(`True OG Prob: ${score.trueOgProbability}% | Deployer Trust: ${score.deployerTrustScore}`, margin + 2, 8);
       text(`Holder Distribution: ${score.holderDistributionScore} | On-Chain Activity: ${score.onChainActivityScore}`, margin + 2, 8);
-      text(`Chain Origin: ${score.chainOriginScore} | Earliest Liquidity: ${score.earliestLiquidityScore}`, margin + 2, 8);
-      text(`Social Narrative: ${score.socialNarrativeAdoptionScore} | Creator Strength: ${score.creatorTeamStrengthScore}`, margin + 2, 8);
     }
     y += 3;
 
     if (y > pageHeight - 40) addNewPage();
 
-    // PAGE 2: HOLDER & AUTHORITY DATA
+    // ===== PAGE 2: AUTHORITY & WHALE ANALYSIS =====
     setColor(244, 162, 97);
     text('AUTHORITY & CONTRACT STATUS', margin, 12, true);
     
     setColor(255, 255, 255);
-    const mintAuth = token.audit?.mintAuthorityDisabled ? 'RENOUNCED (Permanent)' : 'ACTIVE';
-    const freezeAuth = token.audit?.freezeAuthorityDisabled ? 'RENOUNCED (Permanent)' : 'ACTIVE';
+    const mintAuth = token.audit?.mintAuthorityDisabled ? 'RENOUNCED' : 'ACTIVE';
+    const freezeAuth = token.audit?.freezeAuthorityDisabled ? 'RENOUNCED' : 'ACTIVE';
     text(`Mint Authority: ${mintAuth}`, margin + 2, 9);
     text(`Freeze Authority: ${freezeAuth}`, margin + 2, 9);
     text(`Top Holders %: ${safe(token.audit?.topHoldersPercentage ? token.audit.topHoldersPercentage.toFixed(1) + '%' : 'N/A')}`, margin + 2, 9);
-    text(`First Pool Created: ${safe(token.firstPool?.createdAt || 'Unknown')}`, margin + 2, 9);
-    text(`First Mint Source: ${safe(token.firstMintSource || 'Unknown')}`, margin + 2, 9);
     y += 3;
 
-    // CLASSIFICATION & ANALYSIS
+    // WHALE RISK ANALYSIS
+    setColor(244, 162, 97);
+    text('WHALE RISK ANALYSIS', margin, 12, true);
+    
+    setColor(255, 255, 255);
+    if (whaleRisk) {
+      text(`Total Whale Power: ${safe(whaleRisk.totalWhalePower.toFixed(1))}%`, margin + 2, 9);
+      text(`Critical Risk Wallets: ${safe(whaleRisk.criticalRiskWallets)}`, margin + 2, 9);
+      text(`Dump Probability: ${safe((whaleRisk.dumpProbability * 100).toFixed(1))}%`, margin + 2, 9);
+      text(`Price Impact (10% dump): ${safe((whaleRisk.priceImpactPercent || 0).toFixed(2))}%`, margin + 2, 9);
+    }
+    y += 3;
+
+    // TOP HOLDERS BY PnL
+    setColor(244, 162, 97);
+    text(`TOP HOLDERS BY PnL (${topHolders.length})`, margin, 11, true);
+    
+    setColor(255, 255, 255);
+    topHolders.slice(0, 8).forEach((h: any) => {
+      if (y > pageHeight - 20) addNewPage();
+      text(`${h.wallet.slice(0, 8)}... | $${(h.balanceUsd || 0).toFixed(0)} | PnL: ${(h.unrealizedPnL || 0).toFixed(1)}% | Hold: ${h.holdingDays}d`, margin + 2, 7);
+    });
+    y += 2;
+
+    if (y > pageHeight - 40) addNewPage();
+
+    // ===== PAGE 3: TRADERS & ANOMALIES =====
+    setColor(244, 162, 97);
+    text(`TOP TRADERS BY PnL (${topTraders.length})`, margin, 11, true);
+    
+    setColor(255, 255, 255);
+    topTraders.slice(0, 10).forEach((t: any) => {
+      if (y > pageHeight - 20) addNewPage();
+      text(`${t.wallet.slice(0, 8)}... | PnL: $${(t.totalPnL || 0).toFixed(0)} | Volume: $${(t.totalVolume / 1e3).toFixed(1)}K | Trades: ${t.tradeCount} | Win: ${(t.winRate || 0).toFixed(0)}%`, margin + 2, 7);
+    });
+    y += 3;
+
+    // ANOMALIES & ALERTS
+    setColor(244, 162, 97);
+    text(`ANOMALIES & ALERTS (${anomalies.length})`, margin, 11, true);
+    
+    setColor(255, 255, 255);
+    if (anomalies.length > 0) {
+      anomalies.slice(0, 12).forEach((anom: any) => {
+        if (y > pageHeight - 20) addNewPage();
+        text(`${safe(anom.type || 'Alert')}: ${safe(anom.description || 'Anomaly detected')} (${safe(anom.severity || 'Medium')})`, margin + 2, 7);
+      });
+    } else {
+      text('No anomalies detected', margin + 2, 9);
+    }
+    y += 3;
+
+    if (y > pageHeight - 40) addNewPage();
+
+    // ===== PAGE 4: RISK PROFILE & BEHAVIORAL =====
+    setColor(244, 162, 97);
+    text('RISK PROFILE ASSESSMENT', margin, 12, true);
+    
+    setColor(255, 255, 255);
+    if (riskProfile) {
+      text(`Overall Risk Score: ${safe(riskProfile.overallRisk)}/100`, margin + 2, 10, true);
+      text(`Security Risk: ${safe(riskProfile.securityRisk || 'N/A')}`, margin + 2, 9);
+      text(`Market Risk: ${safe(riskProfile.marketRisk || 'N/A')}`, margin + 2, 9);
+      text(`Operational Risk: ${safe(riskProfile.operationalRisk || 'N/A')}`, margin + 2, 9);
+    }
+    y += 3;
+
+    // BEHAVIORAL ANALYSIS
+    setColor(244, 162, 97);
+    text('BEHAVIORAL & AUTHENTICITY ANALYSIS', margin, 12, true);
+    
+    setColor(255, 255, 255);
+    if (score) {
+      text(`Wallet Behavior: ${score.walletBehaviorScore}`, margin + 2, 8);
+      text(`Anti-Clone Confidence: ${score.antiCloneConfidence}`, margin + 2, 8);
+      text(`Metadata Stability: ${score.metadataStability}`, margin + 2, 8);
+      text(`Organic Growth Pattern: ${score.organicGrowthPattern}`, margin + 2, 8);
+      text(`Deployer Authenticity: ${score.deployerAuthenticity}`, margin + 2, 8);
+      text(`Liquidity Survival: ${score.liquiditySurvivalScore}`, margin + 2, 8);
+      text(`Narrative Continuity: ${score.narrativeContinuityScore}`, margin + 2, 8);
+    }
+    y += 3;
+
+    // CLASSIFICATION
     setColor(244, 162, 97);
     text('CLASSIFICATION & ANALYSIS', margin, 12, true);
     
@@ -125,104 +223,57 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
     }
     if (report?.summary) {
       text(`Narrative Cluster: ${safe(report.narrativeFingerprintId)}`, margin + 2, 9);
-      text(`Candidates in Cluster: ${safe(report.summary.candidateCount)}`, margin + 2, 9);
-      text(`Clone Count: ${safe(report.summary.cloneCount)}`, margin + 2, 9);
-      text(`Migration Count: ${safe(report.summary.migrationCount)}`, margin + 2, 9);
-      text(`High Risk Count in Cluster: ${safe(report.summary.highRiskCount)}`, margin + 2, 9);
-      text(`Primary Dominance Score: ${safe(report.summary.primaryDominanceScore)}`, margin + 2, 9);
+      text(`Candidates: ${safe(report.summary.candidateCount)} | Clones: ${safe(report.summary.cloneCount)} | Migrations: ${safe(report.summary.migrationCount)}`, margin + 2, 9);
     }
     y += 3;
 
     if (y > pageHeight - 40) addNewPage();
 
-    // PAGE 3: BEHAVIORAL ANALYSIS
+    // ===== PAGE 5: FORENSIC SCORES DETAIL =====
     setColor(244, 162, 97);
-    text('BEHAVIORAL & AUTHENTICITY ANALYSIS', margin, 12, true);
+    text('COMPLETE FORENSIC SCORE BREAKDOWN', margin, 12, true);
     
     setColor(255, 255, 255);
     if (score) {
-      text(`Wallet Behavior Score: ${score.walletBehaviorScore}`, margin + 2, 8);
-      text(`Anti-Clone Confidence: ${score.antiCloneConfidence}`, margin + 2, 8);
-      text(`Metadata Stability: ${score.metadataStability}`, margin + 2, 8);
-      text(`Social Origin Alignment: ${score.socialOriginAlignment}`, margin + 2, 8);
-      text(`Organic Growth Pattern: ${score.organicGrowthPattern}`, margin + 2, 8);
-      text(`First Transaction Score: ${score.firstTransactionScore}`, margin + 2, 8);
-      text(`First Holder Distribution: ${score.firstHolderDistribution}`, margin + 2, 8);
-      text(`Deployer Authenticity: ${score.deployerAuthenticity}`, margin + 2, 8);
-      text(`Liquidity Survival Score: ${score.liquiditySurvivalScore}`, margin + 2, 8);
-      text(`Narrative Continuity: ${score.narrativeContinuityScore}`, margin + 2, 8);
-      text(`Artificial Trend Probability: ${score.artificialTrendProbability}%`, margin + 2, 8);
-      text(`Manipulated Relaunch Probability: ${score.manipulatedRelaunchProbability}%`, margin + 2, 8);
+      const allScores = [
+        ['Chain Origin', score.chainOriginScore],
+        ['Earliest Liquidity', score.earliestLiquidityScore],
+        ['First Transaction', score.firstTransactionScore],
+        ['First Holder Dist', score.firstHolderDistribution],
+        ['Deployer Auth', score.deployerAuthenticity],
+        ['Metadata Stability', score.metadataStability],
+        ['Social Origin', score.socialOriginAlignment],
+        ['Organic Growth', score.organicGrowthPattern],
+        ['Anti-Clone', score.antiCloneConfidence],
+        ['Liquidity Depth', score.liquidityDepthPoolAgeScore],
+        ['Market Cap Rank', score.marketCapRankScore],
+        ['Creator Strength', score.creatorTeamStrengthScore],
+        ['Earliest Mint Bonus', score.earliestMintBonusScore],
+        ['Official Verification', score.officialVerificationScore],
+      ];
+      allScores.forEach(([label, value]) => {
+        if (y > pageHeight - 20) addNewPage();
+        text(`${label}: ${value}`, margin + 2, 8);
+      });
     }
     y += 3;
 
-    // RISK ASSESSMENT
+    // PROBABILITIES
     setColor(244, 162, 97);
-    text('RISK ASSESSMENT', margin, 12, true);
+    text('PROBABILITY ANALYSIS', margin, 12, true);
     
     setColor(255, 255, 255);
     if (score) {
-      text(`Overall Risk Score: ${score.riskScore}/100`, margin + 2, 10, true);
+      text(`True OG Probability: ${score.trueOgProbability}%`, margin + 2, 9);
       text(`Clone Probability: ${score.cloneProbability}%`, margin + 2, 9);
       text(`CTO/Relaunch Probability: ${score.ctoProbability}%`, margin + 2, 9);
       text(`Migration Probability: ${score.migrationProbability}%`, margin + 2, 9);
-      text(`Revival Probability: ${score.revivalScore}`, margin + 2, 9);
+      text(`Artificial Trend Probability: ${score.artificialTrendProbability}%`, margin + 2, 9);
+      text(`Manipulated Relaunch Probability: ${score.manipulatedRelaunchProbability}%`, margin + 2, 9);
     }
     y += 5;
-
-    if (y > pageHeight - 40) addNewPage();
-
-    // PAGE 4: LIQUIDITY & FAMILY
-    setColor(244, 162, 97);
-    text('LIQUIDITY & MARKET POSITION', margin, 12, true);
-    
-    setColor(255, 255, 255);
-    if (score) {
-      text(`Liquidity Depth & Pool Age Score: ${score.liquidityDepthPoolAgeScore}`, margin + 2, 9);
-      text(`Liquidity Authenticity Score: ${score.liquidityAuthenticityScore}`, margin + 2, 9);
-      text(`Liquidity Survival Score: ${score.liquiditySurvivalScore}`, margin + 2, 9);
-      text(`Market Cap Rank Score: ${score.marketCapRankScore}`, margin + 2, 9);
-    }
-    y += 3;
-
-    // NARRATIVE & FAMILY TREE
-    setColor(244, 162, 97);
-    text('NARRATIVE & TOKEN FAMILY', margin, 12, true);
-    
-    setColor(255, 255, 255);
-    if (report) {
-      text(`Primary Token: ${safe(report.primaryToken?.name || 'N/A')} (${safe(report.primaryToken?.symbol)})`, margin + 2, 9);
-      text(`First Mint Token: ${safe(report.firstMintToken?.name || 'N/A')} (${safe(report.firstMintToken?.symbol)})`, margin + 2, 9);
-      text(`OG Token: ${safe(report.og?.name || 'Unknown')}`, margin + 2, 9);
-      if (report.contestedTokens && report.contestedTokens.length > 0) {
-        text(`Contested Tokens: ${report.contestedTokens.length}`, margin + 2, 9);
-      }
-      if (report.copycats && report.copycats.length > 0) {
-        text(`Known Copycats/Clones: ${report.copycats.length}`, margin + 2, 9);
-      }
-      if (report.clusterAliases && report.clusterAliases.length > 0) {
-        text(`Cluster Aliases: ${safe(report.clusterAliases.join(', '))}`, margin + 2, 9);
-      }
-    }
-    y += 3;
-
-    if (y > pageHeight - 40) addNewPage();
-
-    // PAGE 5: TIMELINE
-    setColor(244, 162, 97);
-    text('FORENSIC TIMELINE', margin, 12, true);
-    
-    setColor(255, 255, 255);
-    if (report?.timeline && report.timeline.length > 0) {
-      const events = report.timeline.slice(0, 15);
-      events.forEach((evt: any) => {
-        if (y > pageHeight - 20) addNewPage();
-        text(`${safe(evt.timestamp)}: ${safe(evt.eventType)} - ${safe(evt.description)}`, margin + 2, 7);
-      });
-    }
 
     // FINAL DISCLAIMER
-    y += 5;
     setColor(255, 100, 100);
     text('DISCLAIMER: This report is for informational purposes only. Not financial advice. Cryptocurrencies are high-risk.', margin, 7);
 
