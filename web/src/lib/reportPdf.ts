@@ -32,6 +32,38 @@ const esc = (s: any): string =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const shortCa = (s?: string): string => (s ? s.slice(0, 4) + '...' + s.slice(-4) : 'N/A');
 
+// Fetch an image and return a base64 data URL (reliable for html2canvas,
+// which renders cross-origin <img> as blank). Returns null on any failure.
+async function toDataUrl(url?: string, timeoutMs = 5000): Promise<string | null> {
+  if (!url) return null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const res = await fetch(url, { signal: ctrl.signal, mode: 'cors' });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    if (!blob.type.startsWith('image/') || blob.size === 0) return null;
+    return await new Promise((resolve) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(typeof fr.result === 'string' ? fr.result : null);
+      fr.onerror = () => resolve(null);
+      fr.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+// Try a list of candidate URLs, return first that resolves to a data URL.
+async function firstWorkingImage(urls: (string | undefined)[]): Promise<string | null> {
+  for (const u of urls) {
+    const r = await toDataUrl(u);
+    if (r) return r;
+  }
+  return null;
+}
+
 export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
   try {
     const { token, score } = input;
@@ -44,7 +76,21 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
       detectAnomalies(mint).catch(() => []),
     ]);
 
-    const html = buildReportHtml({ token, score, topHolders, topTraders, whaleRisk });
+    // Token logo + banner from metadata (base64 so html2canvas renders them).
+    const ca = token.id;
+    const [logo, banner] = await Promise.all([
+      firstWorkingImage([
+        token.icon,
+        `https://dd.dexscreener.com/ds-data/tokens/solana/${ca}.png`,
+        `https://image.solanatracker.io/proxy?url=${encodeURIComponent(token.icon || '')}`,
+      ]),
+      firstWorkingImage([
+        `https://dd.dexscreener.com/ds-data/tokens/solana/${ca}/header.png`,
+        `https://dd.dexscreener.com/ds-data/tokens/solana/${ca}/header.jpg`,
+      ]),
+    ]);
+
+    const html = buildReportHtml({ token, score, topHolders, topTraders, whaleRisk, logo, banner });
 
     // Render HTML off-screen, capture to canvas, slice into PDF pages.
     const [{ jsPDF }, html2canvasMod] = await Promise.all([
@@ -67,6 +113,8 @@ export async function downloadReportPdf(input: PdfReportInput): Promise<void> {
       scale: 2,
       backgroundColor: '#0a0a0a',
       useCORS: true,
+      allowTaint: false,
+      imageTimeout: 8000,
       logging: false,
     });
 
@@ -106,8 +154,10 @@ function buildReportHtml(d: {
   topHolders: any[];
   topTraders: any[];
   whaleRisk: any;
+  logo?: string | null;
+  banner?: string | null;
 }): string {
-  const { token, score, topHolders, topTraders } = d;
+  const { token, score, topHolders, topTraders, logo, banner } = d;
 
   const conf = score?.dominanceScore ?? 88;
   const risk = score?.riskScore ?? 17;
@@ -267,6 +317,20 @@ function buildReportHtml(d: {
     .subbar { background:#111; color:#666; font-size:8px; padding:4px 24px;
       border-bottom:1px solid #222; }
     .body { padding:18px 24px; }
+    .banner-wrap { position:relative; width:100%; height:130px; border-radius:8px;
+      overflow:hidden; margin-bottom:14px; border:1px solid #2a2a2a; background:#111; }
+    .banner-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
+    .banner-fade { position:absolute; inset:0;
+      background:linear-gradient(180deg,rgba(10,10,10,0) 30%,rgba(10,10,10,.92) 100%); }
+    .token-id { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+    .token-id .logo { width:54px; height:54px; border-radius:50%; object-fit:cover;
+      border:2px solid #f4a261; background:#1a1a1a; flex:none; }
+    .token-id .logo-fallback { width:54px; height:54px; border-radius:50%;
+      border:2px solid #f4a261; background:#1a1a1a; display:flex; align-items:center;
+      justify-content:center; color:#f4a261; font-weight:700; font-size:20px; flex:none; }
+    .token-id .ti-name { color:#fff; font-size:18px; font-weight:700; }
+    .token-id .ti-sym { color:#f4a261; font-size:12px; margin-top:2px; }
+    .token-id .ti-ca { color:#777; font-size:8px; margin-top:3px; font-family:monospace; }
     .hero { background:linear-gradient(135deg,#16210f,#1a1a1a); border:1px solid #2d4a1a;
       border-radius:8px; padding:16px 20px; margin-bottom:16px; }
     .hero h1 { margin:0; color:#f4a261; font-size:20px; letter-spacing:.5px; }
@@ -313,6 +377,17 @@ function buildReportHtml(d: {
   <div class="subbar">CA: ${esc(token.id)} | ${nowUtc} • Data Completeness 100% • NOT FINANCIAL ADVICE</div>
 
   <div class="body">
+    ${banner ? `<div class="banner-wrap"><img src="${banner}" alt="banner"/><div class="banner-fade"></div></div>` : ''}
+    <div class="token-id">
+      ${logo
+        ? `<img class="logo" src="${logo}" alt="logo"/>`
+        : `<div class="logo-fallback">${esc((token.symbol || token.name || '?').slice(0, 2).toUpperCase())}</div>`}
+      <div>
+        <div class="ti-name">${esc(token.name || 'Unknown Token')}</div>
+        <div class="ti-sym">${sym ? '$' + esc(sym) : ''}</div>
+        <div class="ti-ca">${esc(token.id)}</div>
+      </div>
+    </div>
     <div class="hero">
       <h1>★ TRUE OG TOKEN — VERIFIED ORIGINAL</h1>
       <div class="meta">Confidence ${conf}% • Risk ${risk}/100 • Data Completeness 100%</div>
