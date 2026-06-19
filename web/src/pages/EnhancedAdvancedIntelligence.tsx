@@ -117,31 +117,81 @@ export const EnhancedAdvancedIntelligence = () => {
     }
   }, [initialMint]);
 
+  // Looks like a Solana mint (base58, 32-44 chars)
+  const looksLikeMint = (s: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s.trim());
+
+  // Live fallback: pull token data from Dexscreener (public, no key) for any mint
+  // that isn't in our `tokens` table yet. Picks the deepest-liquidity pair.
+  const fetchLiveToken = async (mintAddr: string): Promise<TokenData | null> => {
+    try {
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddr}`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      const pairs: any[] = json?.pairs || [];
+      if (pairs.length === 0) return null;
+      const best = pairs
+        .filter((p) => p?.chainId === "solana" || p?.baseToken?.address)
+        .sort((a, b) => (b?.liquidity?.usd || 0) - (a?.liquidity?.usd || 0))[0];
+      if (!best) return null;
+      return {
+        mint: best.baseToken?.address || mintAddr,
+        name: best.baseToken?.name || "Unknown",
+        symbol: best.baseToken?.symbol || "???",
+        image_url: best.info?.imageUrl,
+        current_price: best.priceUsd ? parseFloat(best.priceUsd) : undefined,
+        market_cap: best.marketCap ?? best.fdv ?? undefined,
+        holders_count: undefined, // Dexscreener doesn't expose holder count
+        created_at: best.pairCreatedAt ? new Date(best.pairCreatedAt).toISOString() : undefined,
+      };
+    } catch (err) {
+      console.error("Live token fetch failed:", err);
+      return null;
+    }
+  };
+
   const handleSearchToken = async (searchValue: string) => {
-    if (!searchValue.trim()) {
+    const q = searchValue.trim();
+    if (!q) {
       toast.error("Enter a mint address or token name");
       return;
     }
 
     setTokenSearching(true);
     try {
-      const { data, error } = await supabase
+      // 1) Try our own tokens table first (richest data).
+      const { data } = await supabase
         .from("tokens")
         .select("*")
-        .or(`mint.eq.${searchValue},name.ilike.%${searchValue}%,symbol.ilike.%${searchValue}%`)
+        .or(`mint.eq.${q},name.ilike.%${q}%,symbol.ilike.%${q}%`)
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error || !data) {
-        toast.error("Token not found");
+      if (data) {
+        setToken(data);
+        setMint(data.mint);
+        setTokenInput(data.name || data.mint);
+        toast.success(`Loaded: ${data.name || data.symbol}`);
+        return;
+      }
+
+      // 2) Not in DB — if it looks like a mint, fetch live from Dexscreener.
+      if (looksLikeMint(q)) {
+        toast.info("Not in database — fetching live on-chain data…");
+        const live = await fetchLiveToken(q);
+        if (live) {
+          setToken(live);
+          setMint(live.mint);
+          setTokenInput(live.name || live.mint);
+          toast.success(`Loaded live: ${live.name || live.symbol}`);
+          return;
+        }
+        toast.error("No live data found for that mint");
         setToken(null);
         return;
       }
 
-      setToken(data);
-      setMint(data.mint);
-      setTokenInput(data.name || data.mint);
-      toast.success(`Loaded: ${data.name || data.symbol}`);
+      toast.error("Token not found. Try a full mint address for live lookup.");
+      setToken(null);
     } catch (err) {
       console.error("Search error:", err);
       toast.error("Failed to load token");
