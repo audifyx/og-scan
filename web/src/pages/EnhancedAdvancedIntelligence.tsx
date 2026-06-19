@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { MODEL_TEAMS, Team } from "@/lib/modelTeams";
+import { getTokenHolders } from "@/lib/solana-tools";
 import { openReportHtml, downloadReportHtml } from "@/lib/reportHtml";
 import { SmartSignals } from "./advanced-intelligence/components/SmartSignals";
 import { TokenMaturityScore } from "./advanced-intelligence/components/TokenMaturityScore";
@@ -122,17 +123,25 @@ export const EnhancedAdvancedIntelligence = () => {
 
   // Live fallback: pull token data from Dexscreener (public, no key) for any mint
   // that isn't in our `tokens` table yet. Picks the deepest-liquidity pair.
+  // Fetches holders in parallel so analysis tabs have fresh data.
   const fetchLiveToken = async (mintAddr: string): Promise<TokenData | null> => {
     try {
-      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddr}`);
-      if (!res.ok) return null;
-      const json = await res.json();
+      // Parallel: Dexscreener for price/market data + Helius for holder data
+      const [dexRes, holders] = await Promise.all([
+        fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddr}`),
+        getTokenHolders(mintAddr, 100).catch(() => []),
+      ]);
+      
+      if (!dexRes.ok) return null;
+      const json = await dexRes.json();
       const pairs: any[] = json?.pairs || [];
       if (pairs.length === 0) return null;
+      
       const best = pairs
         .filter((p) => p?.chainId === "solana" || p?.baseToken?.address)
         .sort((a, b) => (b?.liquidity?.usd || 0) - (a?.liquidity?.usd || 0))[0];
       if (!best) return null;
+      
       return {
         mint: best.baseToken?.address || mintAddr,
         name: best.baseToken?.name || "Unknown",
@@ -140,7 +149,7 @@ export const EnhancedAdvancedIntelligence = () => {
         image_url: best.info?.imageUrl,
         current_price: best.priceUsd ? parseFloat(best.priceUsd) : undefined,
         market_cap: best.marketCap ?? best.fdv ?? undefined,
-        holders_count: undefined, // Dexscreener doesn't expose holder count
+        holders_count: holders.length > 0 ? holders.length : undefined, // Top holders count from Helius
         created_at: best.pairCreatedAt ? new Date(best.pairCreatedAt).toISOString() : undefined,
       };
     } catch (err) {

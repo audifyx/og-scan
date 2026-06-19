@@ -5,6 +5,7 @@ import {
   getTopTradersByPnL,
   detectAnomalies,
 } from '@/lib/advanced-analytics';
+import { getTokenHolders } from '@/lib/solana-tools';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -462,8 +463,22 @@ export async function buildReportHtml(input: HtmlReportInput): Promise<string> {
   const { token, score, report } = input;
   const mint = token.id;
 
+  // Try to get holders from DB first (richer data with PnL), fallback to Helius live data
+  const getHolders = async () => {
+    const dbHolders = await getTopHoldersByPnL(mint, 10).catch(() => []);
+    if (dbHolders.length > 0) return dbHolders;
+    // Fallback: fetch live holders from Helius for tokens not in DB
+    const liveHolders = await getTokenHolders(mint, 10).catch(() => []);
+    return liveHolders.map((h: any) => ({
+      address: h.address,
+      percentage: h.percentage,
+      pnl: undefined, // Helius doesn't give us PnL
+      value: h.value,
+    }));
+  };
+
   const [topHolders, topTraders, whaleRisk, anomalies, ai] = await Promise.all([
-    getTopHoldersByPnL(mint, 10).catch(() => []),
+    getHolders(),
     getTopTradersByPnL(mint, 10).catch(() => []),
     analyzeWhaleRisk(mint).catch(() => null),
     detectAnomalies(mint).catch(() => []),
