@@ -96,7 +96,7 @@ const CAL_STORAGE_KEY = "ogscan_intel_calendar_v2";
 const NEWS_CACHE_KEY = "ogscan_intel_news_v2";
 const NEWS_CACHE_TTL = 15 * 60 * 1000;
 const MAX_PER_CATEGORY = 40;
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmamlwbmtoY2VianZ0dGxpcHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1Mjc5NDgsImV4cCI6MjA5MzEwMzk0OH0.aXu8bbpVVwc8KOJf1-lHqO3cz_0GZD10_TE0GlKQ1BI";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
 const EDGE_NEWS_URL = "https://ffjipnkhcebjvttliptb.supabase.co/functions/v1/news-fetcher";
 
 const RSS_FEEDS = [

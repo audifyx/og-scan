@@ -1,6 +1,28 @@
+# dependencies
 node_modules
+
+# env / secrets
 .env
+.env.*
+!.env.example
+*.local
+
+# build output
+dist
+dist-ssr
+build
+
+# expo / rork / vercel
 .expo
 .rork
-Communities.tsx.bak
 .vercel
+
+# os / editor
+.DS_Store
+*.suo
+*.swp
+*.bak
+
+# logs
+*-debug.log*
+npm-debug.log*

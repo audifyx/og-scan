@@ -1,0 +1,36 @@
+# OG Scan
+
+On-chain intelligence and trading suite for Solana — token scanners, live feeds,
+migration & whale tracking, communities/spaces, and an AI analysis agent.
+
+## Structure
+- `web/` — Vite + React front end (the ogscan.fun app)
+- `supabase/functions/` — Supabase Edge Functions (APIs, AI agent, data sync)
+- `api/` — Vercel serverless functions
+- `docs/` — internal guides and specs
+
+## Local setup
+```bash
+cd web
+npm install
+cp ../.env.example .env   # fill in your own keys (see below)
+npm run dev
+```
+
+## Environment variables
+No secrets are committed. Provide your own via env (e.g. Vercel project settings
+or `web/.env`). Front-end keys are prefixed `VITE_`:
+
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- `VITE_HELIUS_API_KEY`, `VITE_JUPITER_API_KEY`, `VITE_ALCHEMY_API_KEY`, `VITE_QUICKNODE_WSS`
+
+Edge function secrets are configured in Supabase (never in source):
+`HELIUS_API_KEY`, `BIRDEYE_API_KEY`, `JUPITER_API_KEY`, `NVIDIA_API_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY`, etc.
+
+> Note: any `VITE_*` value is shipped in the public browser bundle by design —
+> use keys that are safe to expose client-side (or proxy them through an edge
+> function), and keep privileged keys server-side only.
+
+## License
+Proprietary — © OG Scan. All rights reserved.

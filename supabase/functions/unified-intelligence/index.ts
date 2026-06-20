@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const NVIDIA_API_KEY = "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";
+const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
 const NVIDIA_API_BASE = "https://integrate.api.nvidia.com/v1";
 
 // Tool definitions for AI to use
