@@ -1,4 +1,4 @@
-import { Home, Users, Wrench, User, Globe, Rocket, MessageCircle, Gamepad2,
+import { Home, Users, Wrench, User, Globe, Rocket, MessageCircle, Gamepad2, Sparkles,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { to: "/app", icon: Home, label: "Home" },
   { to: "/community", icon: Users, label: "Community" },
+  { to: "/intelligence", icon: Sparkles, label: "AI" },
   { to: "/tools", icon: Wrench, label: "Tools" },
   // { to: "/support", icon: MessageCircle, label: "Support" }, // hidden
   { to: "/games", icon: Gamepad2, label: "Partnerships" },
@@ -37,6 +38,7 @@ const routeToNav: Record<string, string> = {
   "/trading-lobbies": "/community",
   "/leaderboard": "/community",
 
+  "/intelligence": "/intelligence",
   /* Tools — scanners, feeds, charts, trading, all instruments */
   "/tools": "/tools",
   "/scanner": "/tools",
