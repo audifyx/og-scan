@@ -9,7 +9,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const HELIUS_API_KEY = "***REMOVED_HELIUS_KEY***";
+const HELIUS_API_KEY = Deno.env.get("HELIUS_API_KEY") || "";
 const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const HELIUS_BASE = `https://api.helius.xyz/v0`;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
