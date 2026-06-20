@@ -123,7 +123,7 @@ const Tools = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<TokenAnalysis | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [activeTool, setActiveTool] = useState("ai-intelligence");
+  const [activeTool, setActiveTool] = useState("rug-checker");
   const { spendCredits, canAfford } = useCredits();
 
   // Wallet Profiler state
