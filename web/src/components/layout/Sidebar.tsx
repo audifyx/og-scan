@@ -1,8 +1,6 @@
 import {
-  Bell, Gift, Headset, LineChart, LogOut, Mail,
-  MessageSquare, Settings, Trophy, Rocket, TrendingUp,
-  User, Wallet, X, Shield, Menu, Users, Wrench, Home,
-  Gamepad2, Sparkles,
+  Coins, Compass, Hash, LogOut, Mail, Pencil,
+  Settings, TrendingUp, User, Wallet, X, Shield, Menu, Wrench, Home,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -13,28 +11,33 @@ import { useState, useRef, useEffect } from "react";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
 
 // ── nav sections ────────────────────────────────────────────────────────
+// IMPORTANT: This list MUST stay in sync with components/AppSidebar.tsx so the
+// sidebar shows the exact same tabs no matter which route/tab the user is on.
+// AppSidebar (used inside the Index shell) is the source of truth; the items
+// below mirror it 1:1 as path-based links.
 
 type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; label: string; eyebrow: string };
 
-const mainItems: NavItem[] = [
-  { to: "/app",         icon: Home,          label: "Home",              eyebrow: "Command hub" },
-  { to: "/intelligence", icon: Sparkles,      label: "AI Intelligence",   eyebrow: "40+ models & reports" },
-  { to: "/community",   icon: Users,         label: "Community",         eyebrow: "Social & voice" },
-  { to: "/tools",       icon: Wrench,        label: "Tools",             eyebrow: "Scanners & feeds" },
-  { to: "/profile",     icon: User,          label: "Profile",           eyebrow: "Your account" },
+const primaryItems: NavItem[] = [
+  { to: "/app",           icon: Home,    label: "Home",         eyebrow: "Command hub" },
+  { to: "/our-coin",      icon: Coins,   label: "OFFICIAL OGS", eyebrow: "Official token room" },
+  { to: "/tools",         icon: Wrench,  label: "Tools",        eyebrow: "Scanners & Feeds" },
+  { to: "/profile",       icon: User,    label: "Profile",      eyebrow: "Your account" },
+];
+
+const discoverItems: NavItem[] = [
+  { to: "/discover",      icon: Compass, label: "Discover",     eyebrow: "LaunchPad · Explore · Live Feed" },
+];
+
+const communityItems: NavItem[] = [
+  { to: "/community",     icon: Hash,    label: "Social",       eyebrow: "Channels · Rooms · Spaces · Voice" },
 ];
 
 const tradingItems: NavItem[] = [
-  { to: "/wallets",         icon: Wallet,        label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
-  { to: "/games",           icon: Gamepad2,      label: "Partnerships",    eyebrow: "Degen Tower · Solno" },
-  { to: "/trading-hub",     icon: TrendingUp,    label: "Trading Hub",     eyebrow: "Launch · Lobbies · Callouts" },
-];
-
-const socialItems: NavItem[] = [
-  // Invite — hidden from UI for now (route preserved at /invite)
-  // { to: "/invite", icon: Gift, label: "Invite", eyebrow: "Referral contest" },
-  { to: "/messages",        icon: Mail,          label: "Messages",        eyebrow: "Direct messages" },
-  // { to: "/support", icon: Headset, label: "Support", eyebrow: "Help & tickets" }, // hidden
+  { to: "/live-trading",  icon: Wallet,     label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
+  { to: "/trading-hub",   icon: TrendingUp, label: "Trading Hub",  eyebrow: "Launch · Lobbies · Callouts" },
+  { to: "/messages",      icon: Mail,       label: "Messages",     eyebrow: "Direct messages" },
+  { to: "/token-manager", icon: Pencil,     label: "Token Manager", eyebrow: "Free metadata update" },
 ];
 
 // ── NavRow ────────────────────────────────────────────────────────────────
@@ -58,7 +61,7 @@ const NavRow = ({ item, onClick }: { item: NavItem; onClick?: () => void }) => {
         className={cn(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition",
           isActive
-            ? "border-og-cyan/40 bg-og-cyan/10 text-og-cyan"
+            ? "border-og-lime/40 bg-og-lime/10 text-og-lime"
             : "border-white/10 bg-white/[0.04]",
         )}
       >
@@ -69,7 +72,7 @@ const NavRow = ({ item, onClick }: { item: NavItem; onClick?: () => void }) => {
         <span className="block truncate text-[10px] text-white/35">{item.eyebrow}</span>
       </span>
       {isActive && (
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-cyan" />
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-og-lime" />
       )}
     </NavLink>
   );
@@ -87,6 +90,7 @@ export const Sidebar = () => {
   const { user, profile, signOut } = useAuth();
   const { isAdmin } = useAdmin();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const closeMobile = () => setMobileOpen(false);
@@ -139,7 +143,7 @@ export const Sidebar = () => {
             </div>
             <div>
               <div className="text-sm font-black uppercase tracking-wide text-white">OGScan</div>
-              <div className="text-[10px] font-semibold tracking-widest text-og-cyan/80">PRO TRADING SUITE</div>
+              <div className="text-[10px] font-semibold tracking-widest text-primary/80">PRO TRADING SUITE</div>
             </div>
           </NavLink>
           <button
@@ -151,12 +155,26 @@ export const Sidebar = () => {
           </button>
         </div>
 
-        {/* Nav — ALWAYS show all items consistently */}
+        {/* Nav — ALWAYS show the same items, identical to AppSidebar, on every route */}
         <nav ref={scrollRef} className="sidebar-scrollbar flex-1 overflow-y-auto px-2 py-3 pr-1">
-          <div className="mb-1 mt-3">
-            <SectionLabel label="Main" />
+          <div className="mb-1 mt-2">
+            <SectionLabel label="Navigation" />
             <div className="space-y-0.5">
-              {mainItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
+              {primaryItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
+            </div>
+          </div>
+
+          <div className="mb-1 mt-4">
+            <SectionLabel label="Discover" />
+            <div className="space-y-0.5">
+              {discoverItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
+            </div>
+          </div>
+
+          <div className="mb-1 mt-4">
+            <SectionLabel label="Community" />
+            <div className="space-y-0.5">
+              {communityItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
             </div>
           </div>
 
@@ -167,16 +185,9 @@ export const Sidebar = () => {
             </div>
           </div>
 
-          <div className="mb-1 mt-4">
-            <SectionLabel label="Social" />
-            <div className="space-y-0.5">
-              {socialItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
-            </div>
-          </div>
-
           {isAdmin && (
             <div className="mb-1 mt-4">
-              <SectionLabel label="Admin" />
+              <SectionLabel label="Admin Apps" />
               <div className="space-y-0.5">
                 <NavRow
                   item={{ to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Dashboard + apps hub" }}
@@ -243,4 +254,3 @@ export const Sidebar = () => {
     </>
   );
 };
-// Force rebuild 1781917192
