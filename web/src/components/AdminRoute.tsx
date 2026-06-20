@@ -3,6 +3,7 @@ import { Loader2, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import type { ReactNode } from "react";
+import { isPreview } from "@/lib/preview";
 
 interface AdminRouteProps {
   children: ReactNode;
@@ -20,6 +21,8 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const location = useLocation();
+
+  if (isPreview()) return <>{children}</>;
 
   if (authLoading || adminLoading) {
     return (
