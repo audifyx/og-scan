@@ -219,6 +219,10 @@ function mergeToken(parts: any[]) {
   return out.sources.length ? out : null;
 }
 
+// Crypto X/news spam + scam patterns (engagement farming, phishing, airdrop bait, etc.)
+const SCAM_RE = /(vote\s*(for|now|us)|moonshot\s*vote|\bvote\b.{0,20}(list|moonshot|win)|airdrop|claim\s*(your|now|free|reward)|free\s*(mint|sol|tokens?|crypto|nft|airdrop)|g|giveaway|presale|guaranteed|\b1?0{2,}x\b|connect\s*(your\s*)?wallet|verify\s*(your\s*)?wallet|drain|dm\s*me|send\s*\d+\s*sol|double\s*your|whitelist|\bWL\b|follow.{0,18}retweet|like.{0,18}retweet|retweet.{0,18}follow|join\s*(the\s*)?(telegram|presale|raid)|t\.me\/|bit\.ly\/|tinyurl|\bclaim\b.{0,15}\b(now|here)\b)/i;
+function isScamText(t: string) { return SCAM_RE.test(t || ""); }
+
 async function rugcheck(mint: string) {
   const d = await fetchJson(`https://api.rugcheck.xyz/v1/tokens/${mint}/report`, {}, 10000);
   if (!d) return null;
@@ -250,7 +254,7 @@ async function googleNews(query: string) {
     const link = decodeXml((blk.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || "");
     const date = decodeXml((blk.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || "");
     const source = decodeXml((blk.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || "");
-    if (title) items.push({ title, link, date, source });
+    if (title && !isScamText(title)) items.push({ title, link, date, source });
   }
   return items;
 }
@@ -265,14 +269,30 @@ async function xSearch(query: string) {
     9000,
   );
   if (!d?.data) return null;
-  const tweets = d.data.map((t: any) => ({
+  let tweets = d.data.map((t: any) => ({
     text: (t.text || "").replace(/\s+/g, " ").slice(0, 220),
     likes: t.public_metrics?.like_count ?? 0,
     retweets: t.public_metrics?.retweet_count ?? 0,
     date: t.created_at,
   }));
-  const totalEngagement = tweets.reduce((a: number, t: any) => a + t.likes + t.retweets, 0);
-  return { recentCount: tweets.length, totalEngagement, topTweets: tweets.sort((a: any, b: any) => (b.likes + b.retweets) - (a.likes + a.retweets)).slice(0, 6) };
+  const scanned = tweets.length;
+  // Dedupe near-identical (bot spam often posts the same copy)
+  const seen = new Set<string>();
+  tweets = tweets.filter((tw: any) => {
+    const k = tw.text.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 60);
+    if (seen.has(k)) return false; seen.add(k); return true;
+  });
+  const clean = tweets.filter((tw: any) => !isScamText(tw.text));
+  const spamFilteredOut = scanned - clean.length;
+  const totalEngagement = clean.reduce((a: number, t: any) => a + t.likes + t.retweets, 0);
+  return {
+    scannedCount: scanned,
+    realCount: clean.length,
+    spamFilteredOut,
+    mostlySpam: scanned > 0 && spamFilteredOut / scanned >= 0.5,
+    totalEngagement,
+    topTweets: clean.sort((a: any, b: any) => (b.likes + b.retweets) - (a.likes + a.retweets)).slice(0, 6),
+  };
 }
 
 // ── Tool definitions exposed to the model ────────────────────────────────────
@@ -517,6 +537,7 @@ Deno.serve(async (req: Request) => {
       `- For "is it safe / rug?": weigh SAFETY (risk score, mint & freeze authority renounced, LP locked %, top-10 holder concentration), plus liquidity vs market cap and token age. Spell out the actual risks.\n` +
       `- For "is it an OG?": judge legitimacy from token age, holder count, liquidity depth, LP lock, renounced authorities, and real social/community presence. Say clearly if it's an established OG vs a fresh pump.fun launch.\n` +
       `- For "why is it viral / tell me about the project": use NEWS, X_BUZZ, and the token's socials/website to explain the narrative, who's behind it, and what's driving attention. If social data is thin, say so honestly.\n` +
+      `- SCAM AWARENESS: X_BUZZ/NEWS are already scam-filtered, but stay skeptical. "Vote for us on Moonshot", airdrops, giveaways, "connect/verify wallet", presale/100x hype = engagement-farming/scam spam, NOT organic virality. If X_BUZZ shows mostlySpam=true, a high spamFilteredOut, or low realCount/engagement, say the hype looks manufactured/bot-driven and treat it as a RED FLAG — do not present spammy campaigns as genuine community momentum.\n` +
       `- Highlight only the 2-5 things that matter for the question. Be concise, opinionated, human. Use a few numbers where they matter, not all of them.\n` +
       `- End with a one-line, non-preachy "not financial advice" note ONLY when you lean bullish/bearish.\n` +
       (dataBlock ? `\n=== LIVE DATA ===\n${dataBlock}` : `\n(No specific token detected — answer conversationally and ask for a mint/symbol if needed.)`) +
