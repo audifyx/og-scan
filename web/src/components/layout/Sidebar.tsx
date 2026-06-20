@@ -2,7 +2,7 @@ import {
   Bell, Gift, Headset, LineChart, LogOut, Mail,
   MessageSquare, Settings, Trophy, Rocket, TrendingUp,
   User, Wallet, X, Shield, Menu, Users, Wrench, Home,
-  Gamepad2,
+  Gamepad2, Sparkles,
 } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -17,10 +17,11 @@ import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
 type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; label: string; eyebrow: string };
 
 const mainItems: NavItem[] = [
-  { to: "/app",        icon: Home,          label: "Home",      eyebrow: "Command hub" },
-  { to: "/community",  icon: Users,         label: "Community", eyebrow: "Social & voice" },
-  { to: "/tools",      icon: Wrench,        label: "Tools",     eyebrow: "Scanners & feeds" },
-  { to: "/profile",    icon: User,          label: "Profile",   eyebrow: "Your account" },
+  { to: "/app",         icon: Home,          label: "Home",              eyebrow: "Command hub" },
+  { to: "/intelligence", icon: Sparkles,      label: "AI Intelligence",   eyebrow: "40+ models & reports" },
+  { to: "/community",   icon: Users,         label: "Community",         eyebrow: "Social & voice" },
+  { to: "/tools",       icon: Wrench,        label: "Tools",             eyebrow: "Scanners & feeds" },
+  { to: "/profile",     icon: User,          label: "Profile",           eyebrow: "Your account" },
 ];
 
 const tradingItems: NavItem[] = [

@@ -6,7 +6,7 @@ import {
   Calendar, Wallet, BarChart3, Copy, Check,
   Globe, Twitter, MessageCircle, Zap, Eye,
   Wrench, Crosshair, Activity, Calculator, Cpu,
-  ArrowRight, Sparkles, Star
+  ArrowRight, Star
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { cn } from "@/lib/utils";
@@ -42,16 +42,6 @@ interface TokenAnalysis {
 // Theme-aware accent: alternates between primary and secondary CSS vars so cards
 // automatically match whatever theme the user has selected.
 const TOOL_CARDS = [
-  {
-    id: "ai-intelligence",
-    name: "AI Intelligence",
-    description: "Talk to 40+ AI models, ensemble analysis, and generate beautiful AI reports",
-    icon: Sparkles,
-    accent: "primary" as const,
-    category: "AI",
-    active: true,
-    route: "/intelligence",
-  },
   {
     id: "rug-checker",
     name: "Rug Checker",
@@ -280,27 +270,6 @@ const Tools = () => {
             );
           })}
         </div>
-
-        {activeTool === "ai-intelligence" && (
-          <div className="space-y-4">
-            <Card className="p-6 glass-card border-white/10">
-              <div className="flex items-center gap-3 mb-4">
-                <Sparkles className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-bold">AI Intelligence</h3>
-              </div>
-              <p className="text-white/60 mb-4">
-                Talk to 40+ AI models across 5 specialized teams, generate AI-powered token reports, and analyze any token with ensemble voting.
-              </p>
-              <Button 
-                onClick={() => navigate("/intelligence")}
-                className="w-full btn-3d gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                Open AI Intelligence
-              </Button>
-            </Card>
-          </div>
-        )}
 
         {activeTool === "rug-checker" && (
           <div className="space-y-5">
