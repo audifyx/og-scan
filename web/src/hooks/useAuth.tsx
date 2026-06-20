@@ -45,14 +45,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-import { isPreview, previewUser, previewProfile } from "@/lib/preview";
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const _preview = isPreview();
-  const [user, setUser] = useState<User | null>(_preview ? (previewUser() as unknown as User) : null);
+  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(_preview ? (previewProfile() as unknown as Profile) : null);
-  const [loading, setLoading] = useState(!_preview);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string, userEmail?: string, userMeta?: Record<string, unknown>) => {
     const { data, error } = await supabase
@@ -85,7 +82,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    if (_preview) return; // preview mode: skip real auth
     let resolved = false;
 
     // Safety timeout — if Supabase auth doesn't resolve in 5s, unblock the app

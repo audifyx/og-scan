@@ -6,10 +6,6 @@ import { Buffer } from "buffer";
 import { initSentry } from "./lib/sentry";
 initSentry();
 
-import { initPreview, installPreviewGuards } from "./lib/preview";
-initPreview();
-installPreviewGuards();
-
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
