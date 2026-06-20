@@ -203,6 +203,13 @@ Deno.serve(async (req: Request) => {
   try {
     const { messages, team, models, useEnsemble, context, token } = await req.json();
 
+    // Validate inputs
+    if (!models || !Array.isArray(models) || models.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "models must be a non-empty array of model IDs" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
     // Initialize Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
