@@ -233,9 +233,14 @@ Deno.serve(async (req: Request) => {
     const toolResults: Record<string, string> = {};
     for (const toolCall of allToolCalls) {
       if (!toolResults[toolCall.function.name]) {
+        // Parse tool arguments from JSON string (NVIDIA returns string)
+        const args = typeof toolCall.function.arguments === "string" 
+          ? JSON.parse(toolCall.function.arguments) 
+          : toolCall.function.arguments;
+        
         toolResults[toolCall.function.name] = await executeTool(
           toolCall.function.name,
-          toolCall.function.arguments,
+          args,
           supabaseClient
         );
       }
