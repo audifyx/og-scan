@@ -235,7 +235,7 @@ Current Token Being Analyzed:
 `
         : "";
 
-      // Call enhanced intelligence edge function
+      // Call enhanced intelligence edge function (single Llama 3.1 405B)
       const { data: responseData, error } = await supabase.functions.invoke(
         "enhanced-intelligence",
         {
@@ -244,12 +244,7 @@ Current Token Being Analyzed:
               role: msg.role,
               content: msg.content,
             })),
-            team: selectedTeam.id,
-            models: selectedTeam.models.map((m) => m.id),
-            useEnsemble,
             context: `${context}\n${tokenContext}`,
-            userMessage,
-            token: token || undefined,
           },
         }
       );
@@ -275,7 +270,7 @@ Current Token Being Analyzed:
         },
       ]);
 
-      toast.success(`Analysis complete (${(consensus * 100).toFixed(0)}% consensus)`);
+      toast.success(`✓ Analysis by Llama 3.1 405B`);
     } catch (err: any) {
       console.error("Error:", err);
       toast.error(err.message || "Failed to get response");
