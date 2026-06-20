@@ -80,7 +80,6 @@ import PodcastPublisher from "./pages/PodcastPublisher";
 import ClipVideoExport from "./pages/ClipVideoExport";
 import InstallApp from "./pages/InstallApp";
 import { AppLayout } from "./components/layout/AppLayout";
-import { PreviewBanner } from "./components/PreviewBanner";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PushNotificationPrompt } from "./components/notifications/PushNotificationPrompt";
 import { PresenceHeartbeat } from "./components/PresenceHeartbeat";
@@ -123,7 +122,6 @@ const App = () => (
         <SecurityTracker />
         <IntercomSync />
         <BrowserRouter>
-          <PreviewBanner />
           <SupportNotificationBanner />
           <Routes>
             {/* ── Public routes (no auth required) ── */}

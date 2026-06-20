@@ -2,7 +2,6 @@ import { Navigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import type { ReactNode } from "react";
-import { isPreview } from "@/lib/preview";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -17,8 +16,6 @@ interface ProtectedRouteProps {
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const location = useLocation();
-
-  if (isPreview()) return <>{children}</>;
 
   if (loading) {
     return (
