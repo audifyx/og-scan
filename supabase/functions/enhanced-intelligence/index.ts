@@ -588,7 +588,14 @@ Deno.serve(async (req: Request) => {
     const userTurns = messages.filter((m: any) => m.role === "user").map((m: any) => String(m.content || ""));
     const lastUser = userTurns[userTurns.length - 1] || "";
     const allText = `${context || ""} ${userTurns.join(" ")}`;
-    const mintMatches = (allText.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/g) || []);
+    const MINT_RE = /[1-9A-HJ-NP-Za-km-z]{32,44}/g;
+    // PRIORITY: a mint the user actually typed (latest message first, then any
+    // user turn) ALWAYS wins over a mint sitting in page context (previously
+    // loaded token). This prevents analyzing the wrong token.
+    const mintMatches =
+      (lastUser.match(MINT_RE) || []).length ? (lastUser.match(MINT_RE) || [])
+      : (userTurns.join(" ").match(MINT_RE) || []).length ? (userTurns.join(" ").match(MINT_RE) || [])
+      : (allText.match(MINT_RE) || []);
     const wantWallet = /\bwallet\b|this address|holdings of|portfolio/i.test(allText);
 
     let dataBlock = "";
