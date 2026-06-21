@@ -4,9 +4,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
+import { supabase, SUPABASE_URL } from "@/lib/supabase";
 import { toast } from "sonner";
-import { FileText, ExternalLink, Loader2, RefreshCw, Sparkles, Download } from "lucide-react";
+import { FileText, ExternalLink, Loader2, RefreshCw, Sparkles, Download, Eye, X } from "lucide-react";
 
 type Report = {
   id: string; query: string | null; instructions: string | null;
@@ -21,15 +21,23 @@ const ago = (iso: string) => {
   return Math.floor(h / 24) + "d ago";
 };
 
+// CORS-enabled raw HTML source (for fetch/srcDoc + download).
+const sourceUrl = (r: Report) => `${SUPABASE_URL}/functions/v1/report-view?id=${r.id}`;
+// Shareable, rendered link on our own domain.
+const shareUrl = (r: Report) => `/r/${r.id}`;
+
 const fileName = (r: Report) => {
   const base = (r.token_symbol || r.token_name || "report").replace(/[^a-z0-9]/gi, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
   return `${base || "report"}_report.html`;
 };
+const titleOf = (r: Report) => `${r.token_name || r.token_symbol || "Report"}${r.token_symbol ? ` ($${r.token_symbol})` : ""}`;
 
 export default function Reports() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [preview, setPreview] = useState<Report | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -40,23 +48,44 @@ export default function Reports() {
   };
   useEffect(() => { load(); }, []);
 
-  // Fetch the report as a blob and save it as an .html file so it opens
-  // fully rendered locally (the hosted file is served as text).
+  // Fetch report HTML for the live preview modal.
+  useEffect(() => {
+    if (!preview) { setPreviewHtml(null); return; }
+    let alive = true;
+    setPreviewHtml(null);
+    (async () => {
+      try {
+        const res = await fetch(sourceUrl(preview));
+        const text = await res.text();
+        if (alive) setPreviewHtml(text);
+      } catch {
+        if (alive) setPreviewHtml("<p style='font:16px system-ui;padding:24px'>Failed to load report.</p>");
+      }
+    })();
+    return () => { alive = false; };
+  }, [preview]);
+
+  useEffect(() => {
+    if (!preview) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPreview(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [preview]);
+
   const download = async (r: Report) => {
-    if (!r.public_url) { toast.error("No file for this report"); return; }
     setDownloading(r.id);
     try {
-      const res = await fetch(r.public_url);
+      const res = await fetch(sourceUrl(r));
       if (!res.ok) throw new Error(String(res.status));
-      const blob = await res.blob();
-      const url = URL.createObjectURL(new Blob([blob], { type: "text/html" }));
+      const text = await res.text();
+      const url = URL.createObjectURL(new Blob([text], { type: "text/html" }));
       const a = document.createElement("a");
       a.href = url; a.download = fileName(r);
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
-      toast.success("Report downloaded — open it to view");
+      toast.success("Report downloaded");
     } catch {
-      toast.error("Download failed. Try Open instead.");
+      toast.error("Download failed");
     } finally { setDownloading(null); }
   };
 
@@ -77,28 +106,30 @@ export default function Reports() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {reports.map((r) => (
               <Card key={r.id} className="glass-card p-4 flex flex-col">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <FileText className="h-4 w-4 text-og-lime shrink-0" />
-                  <span className="font-semibold text-white/90 text-[14px] truncate">{r.token_name || r.token_symbol || "Report"}{r.token_symbol ? ` ($${r.token_symbol})` : ""}</span>
-                  <Badge variant="outline" className="ml-auto text-[9px] uppercase shrink-0">{r.source || "bot"}</Badge>
-                </div>
-                {r.instructions ? (
-                  <div className="text-white/45 text-[11px] flex items-start gap-1 mb-1.5"><Sparkles className="h-3 w-3 mt-0.5 text-og-cyan shrink-0" /><span className="line-clamp-2">{r.instructions}</span></div>
-                ) : null}
-                {r.token_mint ? <div className="text-white/25 text-[10px] font-mono truncate">{r.token_mint}</div> : null}
-                <div className="text-white/30 text-[10px] mt-0.5 mb-3">{ago(r.created_at)}</div>
+                <button onClick={() => setPreview(r)} className="text-left">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <FileText className="h-4 w-4 text-og-lime shrink-0" />
+                    <span className="font-semibold text-white/90 text-[14px] truncate">{titleOf(r)}</span>
+                    <Badge variant="outline" className="ml-auto text-[9px] uppercase shrink-0">{r.source || "bot"}</Badge>
+                  </div>
+                  {r.instructions ? (
+                    <div className="text-white/45 text-[11px] flex items-start gap-1 mb-1.5"><Sparkles className="h-3 w-3 mt-0.5 text-og-cyan shrink-0" /><span className="line-clamp-2">{r.instructions}</span></div>
+                  ) : null}
+                  {r.token_mint ? <div className="text-white/25 text-[10px] font-mono truncate">{r.token_mint}</div> : null}
+                  <div className="text-white/30 text-[10px] mt-0.5 mb-3">{ago(r.created_at)}</div>
+                </button>
 
                 <div className="flex items-center gap-2 mt-auto">
-                  <Button size="sm" disabled={downloading === r.id || !r.public_url} onClick={() => download(r)}
+                  <Button size="sm" onClick={() => setPreview(r)}
                     className="flex-1 rounded-xl bg-og-lime/90 text-black hover:bg-og-lime font-bold">
-                    {downloading === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Download className="h-3.5 w-3.5 mr-1.5" />}
-                    Download
+                    <Eye className="h-3.5 w-3.5 mr-1.5" /> Preview
                   </Button>
-                  {r.public_url ? (
-                    <a href={r.public_url} target="_blank" rel="noreferrer">
-                      <Button size="sm" variant="outline" className="rounded-xl" title="Open in new tab"><ExternalLink className="h-3.5 w-3.5" /></Button>
-                    </a>
-                  ) : null}
+                  <Button size="sm" variant="outline" disabled={downloading === r.id} onClick={() => download(r)} title="Download" className="rounded-xl">
+                    {downloading === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                  </Button>
+                  <a href={shareUrl(r)} target="_blank" rel="noreferrer">
+                    <Button size="sm" variant="outline" className="rounded-xl" title="Open in new tab"><ExternalLink className="h-3.5 w-3.5" /></Button>
+                  </a>
                 </div>
               </Card>
             ))}
@@ -107,6 +138,29 @@ export default function Reports() {
           <div className="text-white/30 text-[13px] p-4">No reports yet. Generate one with <code className="text-white/50">/report &lt;ca&gt;</code> in the bot.</div>
         )}
       </div>
+
+      {preview ? (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col" onClick={() => setPreview(null)}>
+          <div className="flex items-center justify-between gap-2 px-4 py-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div className="min-w-0">
+              <div className="text-white font-semibold text-[14px] truncate">{titleOf(preview)}</div>
+              {preview.instructions ? <div className="text-white/40 text-[11px] truncate">“{preview.instructions}”</div> : null}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button size="sm" variant="outline" onClick={() => download(preview)} className="rounded-xl"><Download className="h-3.5 w-3.5 mr-1.5" /> Download</Button>
+              <a href={shareUrl(preview)} target="_blank" rel="noreferrer"><Button size="sm" variant="outline" className="rounded-xl"><ExternalLink className="h-3.5 w-3.5" /></Button></a>
+              <Button size="sm" variant="outline" onClick={() => setPreview(null)} className="rounded-xl"><X className="h-4 w-4" /></Button>
+            </div>
+          </div>
+          <div className="flex-1 mx-2 mb-2 rounded-xl overflow-hidden bg-white relative" onClick={(e) => e.stopPropagation()}>
+            {previewHtml == null ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-white text-black/50 text-[13px]"><Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading report…</div>
+            ) : (
+              <iframe title="report-preview" srcDoc={previewHtml} className="w-full h-full" sandbox="allow-scripts allow-popups allow-same-origin" />
+            )}
+          </div>
+        </div>
+      ) : null}
     </AppLayout>
   );
 }

@@ -40,6 +40,13 @@ function alertText(m: any) {
     `Ask me about it — just paste the CA.`;
 }
 
+function tweetText(m: any) {
+  const sym = m.symbol || (m.mint ? m.mint.slice(0, 6) : "");
+  const url = m.dexUrl || m.dex_url || `https://dexscreener.com/solana/${m.mint}`;
+  const name = m.name && m.name !== m.symbol ? ` (${m.name})` : "";
+  return `🚀 $${sym}${name} just migrated on pump.fun\nMC ${fmtUsd(m.marketCap ?? m.market_cap)} · Liq ${fmtUsd(m.liquidityUsd ?? m.liquidity_usd)}\n${url}`.slice(0, 279);
+}
+
 function discordEmbed(m: any) {
   return {
     title: `🚀 ${m.symbol || m.mint.slice(0, 6)} migrated`,
@@ -90,7 +97,18 @@ Deno.serve(async (req) => {
     // Discord webhooks subscribed to migration alerts.
     const { data: discords } = await admin.from("discord_integrations").select("webhook_url, alerts_migrations, min_marketcap").eq("alerts_migrations", true);
 
-    let sent = 0, sentDiscord = 0;
+    // X accounts opted into migration auto-posting.
+    const { data: xAccts } = await admin.from("x_accounts").select("user_id").eq("enabled", true).eq("auto_migrations", true);
+    const xPosted: Record<string, number> = {};
+    const X_MIN_MC = 30000, X_MAX_PER_RUN = 3;
+
+    // BYO Discord bots: channels subscribed via /subscribe.
+    const { data: botChannels } = await admin
+      .from("discord_bot_channels")
+      .select("channel_id, application_id, discord_bots(bot_token, enabled)")
+      .eq("alerts_migrations", true);
+
+    let sent = 0, sentDiscord = 0, sentX = 0, sentBotDiscord = 0;
     for (const m of pending) {
       const mapped = { ...m, marketCap: m.market_cap, liquidityUsd: m.liquidity_usd, volume24h: null, dexUrl: m.dex_url };
       // Telegram
@@ -113,9 +131,30 @@ Deno.serve(async (req) => {
         }).catch(() => {});
         sentDiscord++;
       }
+      // X auto-post (per opted-in account, capped + market-cap floor)
+      if ((m.market_cap || 0) >= X_MIN_MC) {
+        for (const x of xAccts || []) {
+          if ((xPosted[x.user_id] || 0) >= X_MAX_PER_RUN) continue;
+          await fetch(`${SUPABASE_URL}/functions/v1/x-poster`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+            body: JSON.stringify({ action: "post", user_id: x.user_id, text: tweetText(mapped) }),
+          }).then(() => { xPosted[x.user_id] = (xPosted[x.user_id] || 0) + 1; sentX++; }).catch(() => {});
+        }
+      }
+      // BYO Discord bots: post embed to each subscribed channel via the bot token.
+      for (const ch of botChannels || []) {
+        const bot: any = (ch as any).discord_bots;
+        if (!bot || bot.enabled === false || !bot.bot_token) continue;
+        await fetch(`https://discord.com/api/v10/channels/${(ch as any).channel_id}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bot ${bot.bot_token}` },
+          body: JSON.stringify({ embeds: [discordEmbed(mapped)] }),
+        }).then(() => { sentBotDiscord++; }).catch(() => {});
+      }
       await admin.from("pumpfun_migrations").update({ alerted: true }).eq("signature", m.signature);
     }
-    return json({ ok: true, new: pending.length, telegramSent: sent, discordSent: sentDiscord });
+    return json({ ok: true, new: pending.length, telegramSent: sent, discordSent: sentDiscord, xSent: sentX, botDiscordSent: sentBotDiscord });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
