@@ -164,6 +164,18 @@ function runAfterAck(work: Promise<unknown>) {
   else void work;
 }
 
+// Write helpers (service role) for channel subscriptions.
+async function restWrite(method: string, path: string, body?: unknown, extraHeaders: Record<string,string> = {}) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      method,
+      headers: { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}`, "Content-Type": "application/json", ...extraHeaders },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) { console.error("restWrite", e); }
+}
+const ephemeral = (content: string) => Response.json({ type: R.CHANNEL_MESSAGE, data: { content, flags: 64 } });
+
 Deno.serve(async (req) => {
   const sig = req.headers.get("X-Signature-Ed25519") || "";
   const ts = req.headers.get("X-Signature-Timestamp") || "";
@@ -222,6 +234,22 @@ Deno.serve(async (req) => {
     if (name === "alpha") {
       runAfterAck(alphaText().then((t) => editOriginal(appId, token, t)));
       return Response.json({ type: R.DEFERRED_CHANNEL_MESSAGE });
+    }
+
+    if (name === "subscribe") {
+      const channelId = String(body.channel_id || "");
+      const guildId = body.guild_id ? String(body.guild_id) : null;
+      if (!channelId) return ephemeral("Couldn't read this channel. Try again in a server text channel.");
+      const bots = await rest(`discord_bots?select=id&application_id=eq.${encodeURIComponent(appId)}&limit=1`);
+      const botId = bots[0]?.id || null;
+      await restWrite("POST", "discord_bot_channels", { bot_id: botId, application_id: appId, channel_id: channelId, guild_id: guildId, alerts_migrations: true }, { Prefer: "resolution=merge-duplicates" });
+      return ephemeral("✅ This channel will now get pump.fun migration alerts. Use /unsubscribe to stop.");
+    }
+
+    if (name === "unsubscribe") {
+      const channelId = String(body.channel_id || "");
+      await restWrite("DELETE", `discord_bot_channels?application_id=eq.${encodeURIComponent(appId)}&channel_id=eq.${encodeURIComponent(channelId)}`);
+      return ephemeral("🛑 Migration alerts disabled for this channel.");
     }
 
     return Response.json({ type: R.CHANNEL_MESSAGE, data: { content: "Unknown command." } });

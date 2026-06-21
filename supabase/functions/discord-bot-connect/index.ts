@@ -55,6 +55,8 @@ const COMMANDS = [
   { name: "migrations", description: "Latest pump.fun migrations (last 24h)" },
   { name: "news", description: "Latest crypto news" },
   { name: "alpha", description: "Latest alpha callouts" },
+  { name: "subscribe", description: "Get pump.fun migration alerts in this channel" },
+  { name: "unsubscribe", description: "Stop migration alerts in this channel" },
 ];
 
 async function registerCommands(appId: string, botToken: string) {
@@ -143,6 +145,14 @@ Deno.serve(async (req) => {
       const { data, error } = await admin.from("discord_bots").update(patch).eq("user_id", user.id).select().maybeSingle();
       if (error) return json({ error: error.message }, 400);
       return json({ bot: safe(data) });
+    }
+
+    if (action === "register") {
+      const { data } = await admin.from("discord_bots").select("application_id, bot_token").eq("user_id", user.id).maybeSingle();
+      if (!data) return json({ error: "Connect a bot first" }, 400);
+      try { await registerCommands(data.application_id, data.bot_token); }
+      catch (e) { return json({ error: (e as Error).message }, 400); }
+      return json({ ok: true });
     }
 
     if (action === "disconnect") {

@@ -779,7 +779,7 @@ async function customizeTheme(instructions: string): Promise<any> {
       body: html,
     });
     if (!up.ok) { console.error("report upload", up.status, await up.text().catch(()=> "")); return null; }
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/reports/${path}`;
+    const publicUrl = `https://ogscan.fun/r/${id}`;
     await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
       method: "POST",
       headers: { Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE, "Content-Type": "application/json", Prefer: "return=minimal" },
