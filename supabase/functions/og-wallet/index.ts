@@ -50,17 +50,39 @@ async function heliusTxs(address: string, limit = 100): Promise<any[]> {
 
 async function walletPnl(addr: string) {
   const [txs, sp] = await Promise.all([heliusTxs(addr, 100), solPrice()]);
-  let totalIn = 0, totalOut = 0, swapCount = 0;
+  let totalIn = 0, totalOut = 0, swaps = 0, buySol = 0, sellSol = 0, biggestBuy = 0, biggestSell = 0;
+  const tokens = new Set<string>();
+  let firstTs = Infinity, lastTs = 0;
   for (const tx of txs) {
-    const type = tx.type || "";
-    if (type === "SWAP" || String(type).includes("SWAP")) swapCount++;
+    if (tx.timestamp) { firstTs = Math.min(firstTs, tx.timestamp); lastTs = Math.max(lastTs, tx.timestamp); }
     for (const nt of tx.nativeTransfers || []) {
       if (nt.toUserAccount === addr) totalIn += (nt.amount || 0) / 1e9;
       if (nt.fromUserAccount === addr) totalOut += (nt.amount || 0) / 1e9;
     }
+    const sw = tx.events?.swap;
+    if (sw) {
+      swaps++;
+      const inSol = (sw.nativeInput?.amount || 0) / 1e9;   // SOL spent (buy)
+      const outSol = (sw.nativeOutput?.amount || 0) / 1e9; // SOL received (sell)
+      buySol += inSol; sellSol += outSol;
+      biggestBuy = Math.max(biggestBuy, inSol); biggestSell = Math.max(biggestSell, outSol);
+      for (const ti of (sw.tokenInputs || [])) if (ti.mint) tokens.add(ti.mint);
+      for (const to of (sw.tokenOutputs || [])) if (to.mint) tokens.add(to.mint);
+    } else if (String(tx.type || "").includes("SWAP")) {
+      swaps++;
+    }
+    for (const tt of tx.tokenTransfers || []) {
+      if (tt.mint && (tt.toUserAccount === addr || tt.fromUserAccount === addr)) tokens.add(tt.mint);
+    }
   }
   const netSol = totalIn - totalOut;
-  return { address: addr, totalInSol: totalIn, totalOutSol: totalOut, netSol, netUsd: netSol * sp, swapCount, transactionCount: txs.length, solPrice: sp };
+  const tradePnlSol = sellSol - buySol;
+  return {
+    address: addr, transactionCount: txs.length, swaps, tokensTraded: tokens.size,
+    buySol, sellSol, tradePnlSol, tradePnlUsd: tradePnlSol * sp,
+    netSol, netUsd: netSol * sp, biggestBuy, biggestSell,
+    firstTs: isFinite(firstTs) ? firstTs : null, lastTs: lastTs || null, solPrice: sp,
+  };
 }
 
 Deno.serve(async (req) => {

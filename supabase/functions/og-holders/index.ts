@@ -24,13 +24,29 @@ Deno.serve(async (req) => {
     ]);
     const accounts = largest?.value || [];
     const total = supply?.value?.uiAmount || 0;
-    const holders = accounts.slice(0, 10).map((a: any, i: number) => ({
-      rank: i + 1,
-      uiAmount: a.uiAmount || 0,
-      pct: total > 0 ? (a.uiAmount / total) * 100 : null,
-    }));
-    const top10pct = total > 0 ? accounts.slice(0, 10).reduce((s: number, a: any) => s + (a.uiAmount || 0), 0) / total * 100 : null;
-    return json({ ok: true, mint: m, totalSupply: total, top10pct, holders });
+    const top = accounts.slice(0, 10);
+    // Resolve the OWNER wallet behind each top token account (one batched call).
+    let owners: (string | null)[] = [];
+    try {
+      const mul = await rpc("getMultipleAccounts", [top.map((a: any) => a.address), { encoding: "jsonParsed" }]);
+      owners = (mul?.value || []).map((v: any) => v?.data?.parsed?.info?.owner || null);
+    } catch { owners = []; }
+    const holders = top.map((a: any, i: number) => {
+      const pct = total > 0 ? (a.uiAmount / total) * 100 : null;
+      return {
+        rank: i + 1,
+        owner: owners[i] || null,
+        tokenAccount: a.address,
+        uiAmount: a.uiAmount || 0,
+        pct,
+        label: pct == null ? null : pct >= 10 ? "mega-whale" : pct >= 5 ? "whale" : pct >= 2 ? "large" : "holder",
+      };
+    });
+    const top10pct = total > 0 ? top.reduce((s: number, a: any) => s + (a.uiAmount || 0), 0) / total * 100 : null;
+    // concentration risk rating
+    let risk = "unknown";
+    if (top10pct != null) risk = top10pct >= 50 ? "very high" : top10pct >= 30 ? "high" : top10pct >= 20 ? "moderate" : top10pct >= 10 ? "low" : "very low";
+    return json({ ok: true, mint: m, totalSupply: total, top10pct, concentrationRisk: risk, holders });
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
   }

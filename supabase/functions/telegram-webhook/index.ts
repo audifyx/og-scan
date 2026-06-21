@@ -188,11 +188,20 @@ async function ogHolders(mint: string): Promise<any> {
     return await r.json();
   } catch { return { ok: false }; }
 }
-function formatHolders(h: any, sym: string): string {
-  const lines = [`\uD83D\uDC0B <b>Top holders \u2014 $${escHtml(sym || "?")}</b>`];
-  if (h.top10pct != null) lines.push(`Top 10 hold <b>${Number(h.top10pct).toFixed(1)}%</b> of supply`);
+function shortAddr(a: any){ return a ? a.slice(0,4) + "\u2026" + a.slice(-4) : "?"; }
+function bar10(pctOfTop: any){ const n=Math.max(0,Math.min(10,Math.round((pctOfTop||0)/10))); return "\u2588".repeat(n)+"\u2591".repeat(10-n); }
+function formatHolders(h: any, sym: string){
+  const lines=[`\uD83D\uDC0B <b>Top Holders \u2014 $${escHtml(sym||"?")}</b>`];
+  if(h.top10pct!=null) lines.push(`Top 10 control <b>${Number(h.top10pct).toFixed(1)}%</b> \u00B7 concentration risk: <b>${escHtml(h.concentrationRisk||"?")}</b>`);
   lines.push("");
-  for (const x of h.holders || []) lines.push(`${x.rank}. ${x.pct != null ? Number(x.pct).toFixed(2) + "%" : "?"}`);
+  const emo: Record<string,string>={"mega-whale":"\uD83D\uDC0B","whale":"\uD83D\uDC33","large":"\uD83D\uDD37","holder":"\u2022"};
+  for(const x of h.holders||[]){
+    const tag=x.label?(emo[x.label]||"\u2022"):"\u2022";
+    const who=x.owner?`<a href="https://solscan.io/account/${x.owner}">${escHtml(shortAddr(x.owner))}</a>`:`<a href="https://solscan.io/account/${x.tokenAccount}">${escHtml(shortAddr(x.tokenAccount))}</a>`;
+    const pct=x.pct!=null?Number(x.pct).toFixed(2)+"%":"?";
+    lines.push(`${tag} <b>${pct}</b> \u00B7 ${who}`);
+  }
+  lines.push("", `<i>Lower concentration = healthier distribution.</i>`);
   return lines.join("\n");
 }
 async function ogPnl(address: string): Promise<any> {
@@ -201,16 +210,24 @@ async function ogPnl(address: string): Promise<any> {
     return await r.json();
   } catch { return { ok: false }; }
 }
-function formatPnl(p: any): string {
-  const short = p.address.slice(0, 4) + "\u2026" + p.address.slice(-4);
-  const net = p.netSol >= 0 ? "+" : "";
-  return [
+function sUsd(n: any){ const v=Number(n); if(!isFinite(v)) return "$0.00"; const a=Math.abs(v); const sign=v<0?"-":""; if(a>=1e9)return sign+"$"+(a/1e9).toFixed(2)+"B"; if(a>=1e6)return sign+"$"+(a/1e6).toFixed(2)+"M"; if(a>=1e3)return sign+"$"+(a/1e3).toFixed(1)+"K"; return sign+"$"+a.toFixed(2); }
+function sSol(n: any){ const v=Number(n)||0; return (v>=0?"+":"")+v.toFixed(2); }
+function formatPnl(p: any){
+  const short=p.address.slice(0,4)+"\u2026"+p.address.slice(-4);
+  const days=(p.firstTs&&p.lastTs)?Math.max(1,Math.round((p.lastTs-p.firstTs)/86400)):null;
+  const dt=(ts: any)=>ts?new Date(ts*1000).toISOString().slice(0,10):"?";
+  const lines=[
     `\uD83D\uDCCA <b>Wallet PnL \u2014 ${escHtml(short)}</b> <i>(last ${p.transactionCount} txns)</i>`,
-    `Net SOL: <b>${net}${Number(p.netSol).toFixed(2)}</b> (${fmtUsd(p.netUsd)})`,
-    `In ${Number(p.totalInSol).toFixed(2)} \u00B7 Out ${Number(p.totalOutSol).toFixed(2)} SOL`,
-    `Swaps: ${p.swapCount}`,
-    `<a href="https://solscan.io/account/${p.address}">solscan</a>`,
-  ].join("\n");
+    `\uD83E\uDE99 Tokens traded: <b>${p.tokensTraded}</b> \u00B7 Swaps: <b>${p.swaps}</b>`,
+    `\uD83D\uDFE2 Bought: <b>${p.buySol.toFixed(2)} SOL</b> \u00B7 \uD83D\uDD34 Sold: <b>${p.sellSol.toFixed(2)} SOL</b>`,
+    `\uD83D\uDCB5 Trading PnL: <b>${sSol(p.tradePnlSol)} SOL</b> (${sUsd(p.tradePnlUsd)})`,
+    `\u2195 Net SOL flow: <b>${sSol(p.netSol)} SOL</b> (${sUsd(p.netUsd)})`,
+  ];
+  if(p.biggestBuy||p.biggestSell) lines.push(`\uD83C\uDFAF Biggest buy ${p.biggestBuy.toFixed(2)} SOL \u00B7 biggest sell ${p.biggestSell.toFixed(2)} SOL`);
+  if(days) lines.push(`\u23F1 Active window: ${dt(p.firstTs)} \u2192 ${dt(p.lastTs)} (~${days}d)`);
+  if(p.transactionCount===0||(p.swaps===0&&p.buySol===0&&p.sellSol===0&&p.netSol===0)) lines.push(`<i>No recent trading activity found \u2014 this may be an inactive wallet or a token mint (use /scan for tokens).</i>`);
+  lines.push(`<a href="https://solscan.io/account/${p.address}">solscan</a>`);
+  return lines.join("\n");
 }
 const MINT_DETECT = /\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/;
 
