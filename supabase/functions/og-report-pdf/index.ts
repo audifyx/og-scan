@@ -678,7 +678,7 @@ ${mon}
 </div></body></html>`;
 }
 
-async function vibecodeHtml(scan: any, social: any, holders: any): Promise<string | null> {
+async function vibecodeHtml(scan: any, social: any, holders: any, instructions = ""): Promise<string | null> {
   const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
   const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
   const MODEL = Deno.env.get("NVIDIA_HTML_MODEL") || "meta/llama-3.1-8b-instruct";
@@ -727,7 +727,7 @@ Deno.serve(async (req) => {
     const social = await gatherSocial(scan.token.mint);
     if (body.mode === "html") {
       const holders = await getHoldersCtx(scan.token.mint);
-      let html = await vibecodeHtml(scan, social, holders);
+      let html = await vibecodeHtml(scan, social, holders, String(body.instructions || "").slice(0, 600));
       if (!html) { const aiF = await synthesize(scan, social); html = htmlTemplate(scan, aiF, social); }
       const symH = (scan.token.symbol || "token").replace(/[^a-zA-Z0-9]/g, "");
       return new Response(html, { status: 200, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "Content-Disposition": `attachment; filename="OG_SCAN_PRO_${symH}.html"` } });

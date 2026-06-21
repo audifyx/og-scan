@@ -253,12 +253,12 @@ async function sendDocument(botToken: string, chatId: number, bytes: Uint8Array,
   } catch (e) { console.error("sendDocument err", e); }
 }
 
-async function getReportHtml(query: string): Promise<{ bytes: Uint8Array; name: string } | null> {
+async function getReportHtml(query: string, instructions = ""): Promise<{ bytes: Uint8Array; name: string } | null> {
   try {
     const r = await fetch(`${SUPABASE_URL}/functions/v1/og-report-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
-      body: JSON.stringify({ query, mode: "html" }),
+      body: JSON.stringify({ query, mode: "html", instructions }),
     });
     if (!r.ok || !(r.headers.get("content-type") || "").includes("text/html")) return null;
     const bytes = new Uint8Array(await r.arrayBuffer());
@@ -775,13 +775,18 @@ Deno.serve(async (req) => {
     if (cmd === "/report" || cmd === "/pdf") {
       const arg = text.replace(/^\S+\s*/, "").trim();
       if (!arg) {
-        await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token: /report <mint address or $TICKER>" });
+        await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token: /report <mint or $TICKER> [your custom request]\ne.g. /report BcHE...pump make it neon pink and add a roadmap section" });
         return ok();
       }
-      await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83C\uDFA8 Vibecoding your OG Scan PRO report into a custom HTML page\u2026 ~30-60s." });
+      // Split into the token (CA or ticker) and an optional custom design request.
+      let rQuery = arg, rInstr = "";
+      const caM = arg.match(MINT_DETECT);
+      if (caM) { rQuery = caM[1]; rInstr = arg.replace(caM[1], "").trim(); }
+      else { const parts = arg.split(/\s+/); rQuery = parts[0]; rInstr = parts.slice(1).join(" "); }
+      await tg(token, "sendMessage", { chat_id: chatId, text: rInstr ? `\uD83C\uDFA8 Vibecoding your custom report (\u201C${escHtml(rInstr).slice(0,80)}\u201D)\u2026 ~30-60s.` : "\uD83C\uDFA8 Vibecoding your OG Scan PRO report into a custom HTML page\u2026 ~30-60s." });
       await tg(token, "sendChatAction", { chat_id: chatId, action: "upload_document" });
       const work = (async () => {
-        const rep = await getReportHtml(arg);
+        const rep = await getReportHtml(rQuery, rInstr);
         if (rep) {
           await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 full interactive OG Scan PRO report.", isGroup ? { reply_to_message_id: msg.message_id } : {}, "text/html");
         } else {
@@ -827,10 +832,11 @@ Deno.serve(async (req) => {
     if (bot.auto_scan !== false && !cmd.startsWith("/")) {
       const mm = text.match(MINT_DETECT);
       if (mm) {
-        await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83C\uDFA8 CA detected \u2014 vibecoding a custom OG Scan PRO report\u2026", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
+        const dropInstr = text.replace(mm[1], "").replace(new RegExp(`@${botUser}`, "ig"), "").replace(/\s+/g, " ").trim();
+        await tg(token, "sendMessage", { chat_id: chatId, text: dropInstr ? `\uD83C\uDFA8 CA detected \u2014 vibecoding your custom report (\u201C${escHtml(dropInstr).slice(0,80)}\u201D)\u2026` : "\uD83C\uDFA8 CA detected \u2014 vibecoding a custom OG Scan PRO report\u2026", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
         await tg(token, "sendChatAction", { chat_id: chatId, action: "upload_document" });
         const work = (async () => {
-          const rep = await getReportHtml(mm[1]);
+          const rep = await getReportHtml(mm[1], dropInstr);
           if (rep) {
             await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 full OG Scan PRO report.", isGroup ? { reply_to_message_id: msg.message_id } : {}, "text/html");
           } else {
