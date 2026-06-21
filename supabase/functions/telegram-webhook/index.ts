@@ -432,6 +432,32 @@ function formatScan(s: any): string {
   ].filter(Boolean).join("\n");
 }
 
+// Conversational reply for normal chat. Talks naturally; only goes into crypto
+// analysis if the user gives a CA/wallet or explicitly asks about a token/project.
+async function chatReply(userText: string, identity = "", knowledge = ""): Promise<string> {
+  const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
+  const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
+  const MODEL = Deno.env.get("NVIDIA_CHAT_MODEL") || "meta/llama-3.3-70b-instruct";
+  const sys =
+    (identity || "You are a friendly, helpful assistant for OG Scan, a Solana analytics bot.") +
+    `\n\nYou are chatting on Telegram. Reply naturally and conversationally, matching the user's tone and length. Keep it human and brief.\n` +
+    `RULES:\n` +
+    `- For greetings, small talk, jokes, or general questions, just reply normally (e.g. if they say "gm", say gm back). Do NOT output token analysis, prices, market data, risk flags, or score breakdowns unless the user gives a contract address or explicitly asks about a specific token, wallet, or project.\n` +
+    `- Never invent token prices or stats. If they want data on a token/wallet, tell them to paste the contract address or use /scan, /wallet, or /report.\n` +
+    `- Stay in character if a persona is set, but don't force crypto talk into casual conversation.` +
+    (knowledge ? `\n\nReference info from the bot owner (use only if relevant to the user's message):\n${knowledge}` : "");
+  try {
+    const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
+      body: JSON.stringify({ model: MODEL, messages: [{ role: "system", content: sys }, { role: "user", content: userText }], temperature: 0.7, max_tokens: 500 }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const j = await r.json();
+    return String(j.choices?.[0]?.message?.content || "").trim() || "gm";
+  } catch { return "gm"; }
+}
+
 async function askGrim(text: string, knowledge = "", identity = "") {
   try {
     const context = "Source: Telegram bot"
@@ -720,8 +746,13 @@ Deno.serve(async (req) => {
         return ok();
       }
       await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
+      const ca = prompt.match(MINT_DETECT);
+      if (ca) {
+        const scan = await ogScan(ca[1]);
+        if (scan && scan.ok) { await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) }); return ok(); }
+      }
       const knowledge = await retrieveKnowledge(bot.id, prompt);
-      const answer = await askGrim(prompt, knowledge, identity);
+      const answer = await chatReply(prompt, identity, knowledge);
       await sendLong(token, chatId, answer, isGroup ? { reply_to_message_id: msg.message_id } : {});
       return ok();
     }
@@ -779,29 +810,37 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Auto-scan: if a contract address is pasted (in DM or group), reply with the
-    // quick scan card automatically. Group-friendly (no @mention needed).
-    if (bot.auto_scan !== false && !cmd.startsWith("/scan") && !cmd.startsWith("/report")) {
+    // Auto-scan: when a contract address is pasted (DM or group), auto-send the
+    // full OG Scan PRO dossier. Group-friendly (no @mention needed).
+    if (bot.auto_scan !== false && !cmd.startsWith("/")) {
       const mm = text.match(MINT_DETECT);
       if (mm) {
-        const scan = await ogScan(mm[1]);
-        if (scan && scan.ok) {
-          await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
-          await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
-          return ok();
-        }
+        await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83D\uDCDC CA detected \u2014 building OG Scan PRO dossier\u2026", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
+        await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
+        const work = (async () => {
+          const d = await ogReportData(mm[1]);
+          if (d && d.ok) {
+            for (const part of formatDossier(d.scan, d.ai, d.social)) await tg(token, "sendMessage", { chat_id: chatId, text: part, parse_mode: "HTML", disable_web_page_preview: true });
+          } else {
+            const scan = await ogScan(mm[1]);
+            if (scan && scan.ok) await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML" });
+          }
+        })();
+        // @ts-ignore EdgeRuntime provided by Supabase runtime
+        if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) EdgeRuntime.waitUntil(work); else await work;
+        return ok();
       }
     }
 
-    // Anything else -> Grim AI (same models + APIs as the in-app chat).
+    // Anything else -> normal conversation (talks freely; only analyzes tokens
+    // when the user provides a CA/wallet or asks about a specific project).
     if (bot.ai_enabled) {
       // In groups, only reply when tagged or replied-to — never spam the chat.
       if (isGroup && !addressed) return ok();
       const prompt = cleanText || "gm";
       await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
       const knowledge = await retrieveKnowledge(bot.id, prompt);
-      const answer = await askGrim(prompt, knowledge, identity);
-      // Reply in-thread in groups so the conversation is easy to follow.
+      const answer = await chatReply(prompt, identity, knowledge);
       await sendLong(token, chatId, answer, isGroup ? { reply_to_message_id: msg.message_id } : {});
     }
     return ok();
