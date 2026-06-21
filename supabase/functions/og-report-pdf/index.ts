@@ -535,6 +535,187 @@ async function buildPdf(scan: any, ai: any, social: any): Promise<Uint8Array> {
   return await D.doc.save();
 }
 
+
+// ---------- HTML report: AI vibecode + deterministic fallback ----------
+function esc(s: any): string { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function fUsd(n: any): string { const v = Number(n); if (!isFinite(v) || !v) return "N/A"; if (v >= 1e9) return "$" + (v / 1e9).toFixed(2) + "B"; if (v >= 1e6) return "$" + (v / 1e6).toFixed(2) + "M"; if (v >= 1e3) return "$" + (v / 1e3).toFixed(1) + "K"; return "$" + v.toFixed(2); }
+function fNum(n: any): string { return (n == null || !isFinite(Number(n))) ? "N/A" : Number(n).toLocaleString(); }
+
+function htmlTemplate(scan: any, ai: any, social: any): string {
+  const t = scan.token, sig = scan.score.signals, f = scan.flags;
+  const sym = (t.symbol || "TOKEN").replace(/^\$/, "");
+  const day = new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
+  const sec = scan.score.total;
+  const proScore = Number.isFinite(Number(ai.proScore)) ? Math.max(0, Math.min(100, Math.round(Number(ai.proScore)))) : sec;
+  const mc = ai.marketContext || {}, si = ai.securityImplications || {};
+  const volTotal = (t.buyVolume24h || 0) + (t.sellVolume24h || 0);
+  const badge = (label: string, ok: boolean | null, warn = false) => `<span class="badge ${ok === true ? "ok" : ok === false ? "bad" : warn ? "warn" : "neutral"}">${esc(label)}</span>`;
+  const bar = (label: string, v: number) => `<div class="bar"><span class="bl">${esc(label)}</span><div class="bt"><div class="bf" style="width:${Math.max(0, Math.min(100, v))}%"></div></div><span class="bv">${v}</span></div>`;
+  const mrow = (k: string, v: string, c?: string) => `<tr><td class="k">${esc(k)}</td><td class="v">${esc(v)}</td><td class="c">${esc(c || "")}</td></tr>`;
+  const verdictColor = proScore >= 66 ? "#2fe38a" : proScore >= 40 ? "#e8c63d" : "#ff5470";
+
+  const secRows = [
+    ["Mint Authority", f.mintAuthorityDisabled === true ? "DISABLED" : f.mintAuthorityDisabled === false ? "ENABLED" : "UNKNOWN", f.mintAuthorityDisabled === true, si.mint],
+    ["Freeze Authority", f.freezeAuthorityDisabled === true ? "DISABLED" : f.freezeAuthorityDisabled === false ? "ENABLED" : "UNKNOWN", f.freezeAuthorityDisabled === true, si.freeze],
+    ["Liquidity", f.lpPulled ? "PULLED / DEAD" : "INTACT", !f.lpPulled, si.liquidity],
+    ["Min Liquidity", f.minLiquidity ? "MET" : "BELOW MIN", !!f.minLiquidity, si.minLiq],
+    ["Jupiter Verified", f.isVerified ? "YES" : "NO", !!f.isVerified, si.verified],
+    ["Deploy Pattern", f.isPumpFun ? (f.migratedFromPumpFun ? "PUMP.FUN (MIGRATED)" : "PUMP.FUN") : "NON-PUMP.FUN", null, si.deploy],
+    ["Pool Age", t.poolAgeDays != null ? t.poolAgeDays + "d" : "N/A", (t.poolAgeDays ?? 0) >= 7, si.poolAge],
+  ].map((r: any) => `<tr><td class="k">${esc(r[0])}</td><td>${badge(r[1], r[2], true)}</td><td class="c">${esc(r[3] || "")}</td></tr>`).join("");
+
+  const fd: [string, string][] = [["Age / Novelty", String(sig.age)], ["Holder Profile", String(sig.holderProfile)], ["Narrative Strength", "n/s"], ["KOL / Smart Money", "n/s"], ["Risk Flags (Security)", (f.lpPulled || f.unsafeAuthority) ? "Mixed" : "Good"], ["Volume & Liquidity", String(sig.athMcap)]];
+  const pf = ai.proFactors || {};
+  const split = (k: string): [string, string] => { const v = pf[k]; if (!v) return ["-", ""]; const p = String(v).split("|"); return [p[0]?.trim() || "-", p.slice(1).join("|").trim()]; };
+  const scoreRows = fd.map(([n, o]) => { const [pr, rt] = split(n); return `<tr><td class="k">${esc(n)}</td><td>${esc(o)}</td><td class="pro">${esc(pr)}</td><td class="c">${esc(rt)}</td></tr>`; }).join("") +
+    `<tr class="total"><td>OVERALL OG SCORE</td><td class="bad">${sec}/100</td><td class="pro">${proScore}/100</td><td class="c">Category-adjusted PRO synthesis</td></tr>`;
+
+  const kolRows = (Array.isArray(ai.kolTable) && ai.kolTable.length) ? `<table class="tbl"><thead><tr><th>KOL / Entity</th><th>Role</th><th>Notes</th></tr></thead><tbody>${ai.kolTable.slice(0, 8).map((k: any) => `<tr><td class="link">${esc(k.entity)}</td><td>${esc(k.role)}</td><td class="c">${esc(k.notes)}</td></tr>`).join("")}</tbody></table>` : "";
+  const links: string[] = [];
+  if (social?.xUrl) links.push(`<a href="${esc(social.xUrl)}">X ${social.handle ? "@" + esc(social.handle) : ""}${social.followers ? " · " + esc(social.followers) + " followers" : ""}</a>`);
+  if (social?.website) links.push(`<a href="${esc(social.website)}">Website</a>`);
+  if (social?.telegram) links.push(`<a href="${esc(social.telegram)}">Telegram</a>`);
+  links.push(`<a href="${esc(t.dexUrl)}">DexScreener</a>`);
+  if (t.pumpFunUrl) links.push(`<a href="${esc(t.pumpFunUrl)}">pump.fun</a>`);
+
+  const risks = (ai.memeRisks && ai.memeRisks.length ? ai.memeRisks : ["Pure speculative asset — capital at severe risk.", "Narrative fatigue: attention rotates fast.", "Liquidity/slippage on large size.", "Concentration & platform risk."]).map((r: string) => `<li>${esc(r)}</li>`).join("");
+  const mon = (ai.monitoring && ai.monitoring.length) ? `<h3>Recommended Monitoring</h3><ul>${ai.monitoring.slice(0, 8).map((m: string) => `<li>${esc(m)}</li>`).join("")}</ul>` : "";
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OG SCAN PRO — ${esc(t.name)} ($${esc(sym)})</title>
+<style>
+:root{--bg:#0a0b0d;--card:#14161a;--card2:#1b1e24;--line:#262b33;--ink:#e8edf2;--mut:#8b94a0;--green:#2fe38a;--blue:#5b8def;--gold:#e8c63d;--red:#ff5470}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(1200px 600px at 70% -10%,#10261d 0,transparent 60%),var(--bg);color:var(--ink);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;padding:0 0 60px}
+.wrap{max-width:880px;margin:0 auto;padding:0 20px}
+header{background:linear-gradient(180deg,#0d1512,transparent);border-bottom:2px solid var(--green);padding:34px 0 26px;text-align:center;margin-bottom:8px}
+.brand{font-size:13px;letter-spacing:4px;color:var(--green);font-weight:800}
+h1{font-size:40px;font-weight:900;letter-spacing:1px;background:linear-gradient(90deg,#2fe38a,#7af0c0);-webkit-background-clip:text;background-clip:text;color:transparent;margin:6px 0 2px}
+.sub{color:var(--mut);letter-spacing:2px;font-size:13px}
+.token{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--card);border:1px solid var(--green);border-radius:16px;padding:22px;margin:22px 0}
+.token .nm{font-size:26px;font-weight:800;color:var(--green)}
+.token .ca{font-family:ui-monospace,Menlo,monospace;color:var(--mut);font-size:12px;word-break:break-all;text-align:center}
+.token .tag{color:var(--blue);font-size:15px;text-align:center}
+.section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;margin:18px 0}
+h2{color:var(--green);font-size:19px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+h3{color:var(--green);font-size:14px;margin:16px 0 8px;opacity:.9}
+.verdicts{display:grid;gap:10px;margin:6px 0 14px}
+.vbar{border-radius:12px;padding:14px 18px;font-weight:800;color:#06140e}
+.vbar.orig{background:linear-gradient(90deg,#ff5470,#ff7a91);color:#fff}
+.vbar.pro{background:linear-gradient(90deg,#2fe38a,#1fb673);color:#06140e}
+.callout{border-left:3px solid var(--blue);background:#0f1722;color:#c7d3e6;padding:12px 14px;border-radius:8px;font-style:italic;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:6px 0}
+.stat{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stat .l{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.stat .n{font-size:20px;font-weight:800;margin-top:3px}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}
+.tbl th{background:#0e1014;color:#cfd6df;text-align:left;padding:10px 12px;font-size:11px;letter-spacing:.5px}
+.tbl td{border-bottom:1px solid var(--line);padding:10px 12px;vertical-align:top}
+.tbl td.k{color:var(--mut)} .tbl td.v{font-weight:700} .tbl td.c{color:var(--mut);font-size:12px} .tbl td.pro{color:var(--green);font-weight:800} .tbl td.bad{color:var(--red);font-weight:800} .tbl td.link{color:var(--blue);font-weight:700}
+.tbl tr.total td{background:#0f1a14;font-weight:800;border-top:2px solid var(--green)}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800}
+.badge.ok{background:rgba(47,227,138,.15);color:var(--green)} .badge.bad{background:rgba(255,84,112,.15);color:var(--red)} .badge.warn{background:rgba(232,198,61,.15);color:var(--gold)} .badge.neutral{background:#222831;color:var(--mut)}
+.bar{display:flex;align-items:center;gap:10px;margin:7px 0}.bl{width:120px;color:var(--mut);font-size:12px}.bt{flex:1;height:9px;background:#0e1014;border-radius:6px;overflow:hidden}.bf{height:100%;background:linear-gradient(90deg,#2fe38a,#7af0c0)}.bv{width:30px;text-align:right;font-weight:700;font-size:12px}
+.score{display:flex;align-items:center;justify-content:center;gap:24px;margin:8px 0}
+.ring{--p:0;width:120px;height:120px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(${verdictColor} calc(var(--p)*1%),#1b1e24 0)}
+.ring .in{width:92px;height:92px;border-radius:50%;background:var(--card);display:grid;place-items:center;text-align:center}
+.ring .in b{font-size:28px;color:${verdictColor}}.ring .in span{font-size:10px;color:var(--mut)}
+ul{padding-left:20px}li{margin:5px 0}
+.links a{display:inline-block;margin:4px 10px 4px 0;color:var(--blue);text-decoration:none;border:1px solid var(--line);padding:6px 12px;border-radius:20px;font-size:13px}
+.disc{border:1px solid rgba(255,84,112,.4);background:rgba(255,84,112,.07);color:#ff9aab;border-radius:12px;padding:14px;font-size:12px;margin-top:16px}
+footer{text-align:center;color:var(--mut);font-size:12px;margin-top:24px}
+</style></head><body>
+<header><div class="wrap"><div class="brand">OG SCAN PRO</div><h1>ADVANCED TOKEN INTELLIGENCE DOSSIER</h1><div class="sub">NFA · REAL-TIME SYNTHESIS · ${esc(day)}</div></div></header>
+<div class="wrap">
+<div class="token"><div class="nm">${esc(t.name)} ($${esc(sym)})</div><div class="ca">${esc(t.mint)}</div>${ai.subtitle ? `<div class="tag">${esc(ai.subtitle)}</div>` : ""}</div>
+
+<div class="section"><h2>⚖️ Verdict Evolution</h2>
+<div class="score"><div class="ring" style="--p:${proScore}"><div class="in"><b>${proScore}</b><span>PRO / 100</span></div></div>
+<div style="flex:1"><div class="verdicts"><div class="vbar orig">ORIGINAL: ${esc(scan.verdict)} — ${sec}/100</div><div class="vbar pro">PRO: ${esc(ai.proVerdictTitle || "Category-adjusted re-evaluation")}</div></div></div></div>
+${ai.reassessment ? `<div class="callout">${esc(ai.reassessment)}</div>` : ""}</div>
+
+<div class="section"><h2>📊 Real-Time Market Snapshot</h2>
+<div class="grid">
+<div class="stat"><div class="l">Price</div><div class="n">${t.priceUsd != null ? "$" + Number(t.priceUsd).toPrecision(4) : "N/A"}</div></div>
+<div class="stat"><div class="l">Market Cap</div><div class="n">${fUsd(t.mcap)}</div></div>
+<div class="stat"><div class="l">Liquidity</div><div class="n">${fUsd(t.liquidity)}</div></div>
+<div class="stat"><div class="l">24h Volume</div><div class="n">${fUsd(volTotal)}</div></div>
+<div class="stat"><div class="l">Holders</div><div class="n">${fNum(t.holderCount)}</div></div>
+<div class="stat"><div class="l">Top Holders</div><div class="n">${t.topHoldersPct != null ? Number(t.topHoldersPct).toFixed(1) + "%" : "N/A"}</div></div>
+<div class="stat"><div class="l">Age</div><div class="n">${t.ageDays != null ? "~" + t.ageDays + "d" : "N/A"}</div></div>
+<div class="stat"><div class="l">Txns 24h</div><div class="n">${fNum(t.txns24h)}</div></div>
+<div class="stat"><div class="l">Organic</div><div class="n">${t.organicScore != null ? Math.round(t.organicScore) : "N/A"}</div></div>
+</div>
+${ai.keyInsight ? `<div class="callout"><b>Key Insight:</b> ${esc(ai.keyInsight)}</div>` : ""}</div>
+
+<div class="section"><h2>🔎 On-Chain Fundamentals</h2>
+<table class="tbl"><thead><tr><th>Flag</th><th>Status</th><th>Implication</th></tr></thead><tbody>${secRows}</tbody></table>
+${ai.txnFlow ? `<h3>Transaction Flow (24h)</h3><p>${esc(ai.txnFlow)}</p>` : ""}
+${ai.godTierObservation ? `<div class="callout">${esc(ai.godTierObservation)}</div>` : ""}
+${ai.holderDistribution ? `<h3>Holder Distribution</h3><p>${esc(ai.holderDistribution)}</p>` : ""}
+${ai.riskNote ? `<p style="margin-top:8px"><b style="color:var(--gold)">Risk Note:</b> ${esc(ai.riskNote)}</p>` : ""}</div>
+
+<div class="section"><h2>🧠 Narrative & Social Intelligence</h2>
+<div class="links">${links.join("")}</div>
+${ai.narrative ? `<p style="margin-top:10px">${esc(ai.narrative)}</p>` : ""}
+${ai.firstPrinciples ? `<div class="callout"><b>First-Principles Advantage:</b> ${esc(ai.firstPrinciples)}</div>` : ""}
+${ai.socialActivity ? `<h3>X / Twitter Activity</h3><p>${esc(ai.socialActivity)}</p>` : ""}
+${kolRows ? `<h3>KOL & Influencer Map</h3>${kolRows}` : ""}
+${ai.godTierSynthesis ? `<div class="callout"><b>God-Tier Synthesis:</b> ${esc(ai.godTierSynthesis)}</div>` : ""}</div>
+
+<div class="section"><h2>🛡️ Risk Matrix & Score Re-Evaluation</h2>
+<h3>OG Signals</h3>${bar("Age", sig.age)}${bar("ATH Mcap", sig.athMcap)}${bar("Holder Profile", sig.holderProfile)}${bar("Deploy", sig.deployPattern)}${bar("Pool Age", sig.poolAge)}
+<h3>Inherent Risks</h3><ul>${risks}</ul>
+${ai.boughtSold ? `<h3>Bought vs Sold</h3><p>${esc(ai.boughtSold)}</p>` : ""}
+<h3>OG Score Re-Evaluation</h3><table class="tbl"><thead><tr><th>Factor</th><th>Original</th><th>PRO</th><th>Rationale</th></tr></thead><tbody>${scoreRows}</tbody></table>
+${ai.finalVerdict ? `<div class="callout"><b>Final Verdict:</b> ${esc(ai.finalVerdict)}</div>` : ""}</div>
+
+<div class="section"><h2>📚 Appendix</h2>
+<p style="color:var(--mut);font-size:13px">Sources: DexScreener, Jupiter, Helius, OG Scan scoring engine${social?.website ? ", " + esc(social.website) : ""}.</p>
+${mon}
+<div class="disc"><b>NOT FINANCIAL ADVICE.</b> AI-augmented intelligence synthesis for educational purposes only. Crypto, especially meme coins, carries extreme risk — you could lose all capital. Always DYOR.</div></div>
+<footer>— OG SCAN PRO · Generated ${esc(day)} · ogscan.fun —</footer>
+</div></body></html>`;
+}
+
+async function vibecodeHtml(scan: any, social: any, holders: any): Promise<string | null> {
+  const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
+  const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
+  const MODEL = Deno.env.get("NVIDIA_HTML_MODEL") || "meta/llama-3.1-8b-instruct";
+  const t = scan.token;
+  const data = {
+    token: t, score: scan.score, flags: scan.flags, verdict: scan.verdict,
+    social: social ? { x: social.xUrl, handle: social.handle, website: social.website, telegram: social.telegram, followers: social.followers, posts: social.posts, dexId: social.dexId } : null,
+    holders, websiteLore: (social?.siteText || "").slice(0, 1500), xProfile: (social?.xText || "").slice(0, 700),
+  };
+  const prompt = `You are an elite analyst + web designer. Using ONLY the real data below, ANALYZE this Solana token and DESIGN a COMPLETE, single-file, self-contained HTML5 document (one <style> block; NO external CSS/JS/fonts/images) branded "OG SCAN PRO - Advanced Token Intelligence Dossier".
+
+VISUAL: stunning modern dark theme, neon-green (#2fe38a) + blue accents, subtle gradients, glassy rounded cards, a circular score gauge via CSS conic-gradient, colored status badges, CSS score bars, clean tables, generous spacing, mobile-responsive.
+
+CONTENT sections (use the real numbers; base narrative on the website lore; never fabricate): token identity + tagline; verdict evolution (original OG score ${scan.score.total}/100 vs your PRO re-evaluation 0-100 consistent with your verdict); full market snapshot (price, mc/fdv, liquidity, 24h volume + buys/sells, holders, top-holder %, age, txns/traders, organic); on-chain security/authority statuses with badges; holder distribution (use the provided top holders); narrative & social with the real links; KOL section if any real names; risk matrix (bullets); OG score re-evaluation table (Original vs PRO + rationale); appendix + NFA disclaimer. Write substantive, confident analyst prose (no generic hedging). Format ALL numbers human-readably (e.g. $9.9M, $791K, price to 4 significant figures, counts with commas like 8,753). Your PRO score must be a genuine 0-100 re-evaluation that weighs narrative/community/holders, not 0.
+
+Output ONLY raw HTML starting with <!DOCTYPE html> and ending with </html>. No markdown, no code fences.
+
+DATA (JSON):
+${JSON.stringify(data)}`;
+  try {
+    const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
+      body: JSON.stringify({ model: MODEL, messages: [{ role: "system", content: "You output only one complete HTML document. No markdown fences, no commentary." }, { role: "user", content: prompt }], temperature: 0.6, max_tokens: 6000 }),
+      signal: AbortSignal.timeout(60000),
+    });
+    const j = await r.json();
+    let html = String(j.choices?.[0]?.message?.content || "").trim();
+    html = html.replace(/^```html\s*/i, "").replace(/```\s*$/i, "").trim();
+    const lo = html.toLowerCase();
+    const i = lo.indexOf("<!doctype");
+    const e = lo.lastIndexOf("</html>");
+    if (i >= 0 && e > i) html = html.slice(i, e + 7);
+    if (html.length > 2500 && /<\/html>/i.test(html) && /<style/i.test(html)) return html;
+  } catch { /* fall through */ }
+  return null;
+}
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -544,6 +725,13 @@ Deno.serve(async (req) => {
     const scan = await getScan(q);
     if (!scan || !scan.ok) return jsonResp({ ok: false, error: scan?.error || "Token not found." }, 404);
     const social = await gatherSocial(scan.token.mint);
+    if (body.mode === "html") {
+      const holders = await getHoldersCtx(scan.token.mint);
+      let html = await vibecodeHtml(scan, social, holders);
+      if (!html) { const aiF = await synthesize(scan, social); html = htmlTemplate(scan, aiF, social); }
+      const symH = (scan.token.symbol || "token").replace(/[^a-zA-Z0-9]/g, "");
+      return new Response(html, { status: 200, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "Content-Disposition": `attachment; filename="OG_SCAN_PRO_${symH}.html"` } });
+    }
     const ai = await synthesize(scan, social);
     if (body.mode === "data") return jsonResp({ ok: true, scan, ai, social });
     const pdf = await buildPdf(scan, ai, social);

@@ -242,15 +242,30 @@ async function ogScan(query: string): Promise<any> {
   } catch { return { ok: false, error: "scan failed" }; }
 }
 
-async function sendDocument(botToken: string, chatId: number, bytes: Uint8Array, filename: string, caption: string, extra: object = {}) {
+async function sendDocument(botToken: string, chatId: number, bytes: Uint8Array, filename: string, caption: string, extra: object = {}, mime = "application/pdf") {
   const form = new FormData();
   form.append("chat_id", String(chatId));
   if (caption) form.append("caption", caption);
   for (const [k, v] of Object.entries(extra)) form.append(k, String(v));
-  form.append("document", new Blob([bytes as unknown as BlobPart], { type: "application/pdf" }), filename);
+  form.append("document", new Blob([bytes as unknown as BlobPart], { type: mime }), filename);
   try {
     await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: "POST", body: form });
   } catch (e) { console.error("sendDocument err", e); }
+}
+
+async function getReportHtml(query: string): Promise<{ bytes: Uint8Array; name: string } | null> {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/og-report-pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+      body: JSON.stringify({ query, mode: "html" }),
+    });
+    if (!r.ok || !(r.headers.get("content-type") || "").includes("text/html")) return null;
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    const cd = r.headers.get("content-disposition") || "";
+    const m = cd.match(/filename="([^"]+)"/);
+    return { bytes, name: m ? m[1] : "OG_SCAN_PRO_report.html" };
+  } catch { return null; }
 }
 
 async function ogReportData(query: string): Promise<any> {
@@ -763,17 +778,14 @@ Deno.serve(async (req) => {
         await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token: /report <mint address or $TICKER>" });
         return ok();
       }
-      await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83D\uDCDC Building your OG Scan PRO dossier\u2026 ~20-40s." });
-      await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
+      await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83C\uDFA8 Vibecoding your OG Scan PRO report into a custom HTML page\u2026 ~30-60s." });
+      await tg(token, "sendChatAction", { chat_id: chatId, action: "upload_document" });
       const work = (async () => {
-        const d = await ogReportData(arg);
-        if (d && d.ok) {
-          const parts = formatDossier(d.scan, d.ai, d.social);
-          for (const part of parts) {
-            await tg(token, "sendMessage", { chat_id: chatId, text: part, parse_mode: "HTML", disable_web_page_preview: true });
-          }
+        const rep = await getReportHtml(arg);
+        if (rep) {
+          await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 full interactive OG Scan PRO report.", isGroup ? { reply_to_message_id: msg.message_id } : {}, "text/html");
         } else {
-          await tg(token, "sendMessage", { chat_id: chatId, text: d?.error || "Couldn't build a dossier for that token." });
+          await tg(token, "sendMessage", { chat_id: chatId, text: "Couldn't build a report for that token." });
         }
       })();
       // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime.
@@ -815,12 +827,12 @@ Deno.serve(async (req) => {
     if (bot.auto_scan !== false && !cmd.startsWith("/")) {
       const mm = text.match(MINT_DETECT);
       if (mm) {
-        await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83D\uDCDC CA detected \u2014 building OG Scan PRO dossier\u2026", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
-        await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
+        await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83C\uDFA8 CA detected \u2014 vibecoding a custom OG Scan PRO report\u2026", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
+        await tg(token, "sendChatAction", { chat_id: chatId, action: "upload_document" });
         const work = (async () => {
-          const d = await ogReportData(mm[1]);
-          if (d && d.ok) {
-            for (const part of formatDossier(d.scan, d.ai, d.social)) await tg(token, "sendMessage", { chat_id: chatId, text: part, parse_mode: "HTML", disable_web_page_preview: true });
+          const rep = await getReportHtml(mm[1]);
+          if (rep) {
+            await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 full OG Scan PRO report.", isGroup ? { reply_to_message_id: msg.message_id } : {}, "text/html");
           } else {
             const scan = await ogScan(mm[1]);
             if (scan && scan.ok) await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML" });
