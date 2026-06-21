@@ -7,6 +7,10 @@
 //   { action: "disconnect" }             -> deleteWebhook + remove row
 //   { action: "status" }                 -> current bot info (no token leaked)
 //   { action: "settings", alerts_migrations?, ai_enabled?, min_marketcap? }
+//   { action: "set_identity", bot_name?, persona? }  -> name + persona (also set on Telegram)
+//   { action: "commands_list" }
+//   { action: "command_upsert", command, description?, response_type?, content }
+//   { action: "command_delete", command }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -24,9 +28,48 @@ const json = (o: unknown, status = 200) =>
 
 const safe = (b: any) => b && ({
   id: b.id, bot_username: b.bot_username, bot_id: b.bot_id,
+  bot_name: b.bot_name, persona: b.persona,
   alerts_migrations: b.alerts_migrations, ai_enabled: b.ai_enabled,
   min_marketcap: b.min_marketcap, created_at: b.created_at,
 });
+
+// Commands the bot handles natively — users can't override these.
+const RESERVED_COMMANDS = new Set([
+  "start", "help", "chat", "ask", "grim", "c", "scan", "analyze",
+  "news", "alpha", "calls", "callouts", "migrations", "migrated",
+  "graduations", "alerts",
+]);
+
+function normalizeCommand(raw: string): string {
+  return String(raw || "").trim().toLowerCase().replace(/^\//, "").replace(/[^a-z0-9_]/g, "");
+}
+
+// Refresh the Telegram command menu = built-ins + this bot's custom commands.
+async function refreshCommandMenu(admin: any, botToken: string, botRowId: string) {
+  const base = [
+    { command: "chat", description: "Chat with the AI analyst" },
+    { command: "scan", description: "Full token risk report" },
+    { command: "news", description: "Latest crypto headlines" },
+    { command: "alpha", description: "Community alpha callouts" },
+    { command: "migrations", description: "Pump.fun graduations (last 24h)" },
+    { command: "alerts", description: "Migration alerts: on | off" },
+    { command: "help", description: "Show commands" },
+  ];
+  const { data: customs } = await admin
+    .from("telegram_custom_commands")
+    .select("command, description, enabled")
+    .eq("bot_id", botRowId).eq("enabled", true).limit(50);
+  const extra = (customs || []).map((c: any) => ({
+    command: c.command,
+    description: (c.description || "Custom command").slice(0, 256),
+  }));
+  // Telegram allows up to 100 commands; keep within bounds.
+  const commands = [...base, ...extra].slice(0, 100);
+  await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ commands }),
+  }).catch(() => {});
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -132,6 +175,75 @@ Deno.serve(async (req) => {
       }).catch(() => {});
 
       return json({ ok: true, bot: safe(saved) });
+    }
+
+    if (action === "set_identity") {
+      const { data: existing } = await admin.from("telegram_bots").select("*").eq("user_id", user.id).maybeSingle();
+      if (!existing) return json({ error: "Connect a bot first." }, 400);
+      const patch: any = { updated_at: new Date().toISOString() };
+      if (typeof body.bot_name === "string") patch.bot_name = body.bot_name.trim().slice(0, 64) || null;
+      if (typeof body.persona === "string") patch.persona = body.persona.trim().slice(0, 2000) || null;
+      const { data, error } = await admin.from("telegram_bots").update(patch).eq("user_id", user.id).select().single();
+      if (error) return json({ error: error.message }, 400);
+      // Make the name + description permanent on Telegram itself (best-effort).
+      if (patch.bot_name) {
+        await fetch(`https://api.telegram.org/bot${existing.bot_token}/setMyName`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: patch.bot_name.slice(0, 64) }),
+        }).catch(() => {});
+      }
+      if (patch.persona) {
+        const short = patch.persona.slice(0, 120);
+        await fetch(`https://api.telegram.org/bot${existing.bot_token}/setMyShortDescription`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ short_description: short }),
+        }).catch(() => {});
+        await fetch(`https://api.telegram.org/bot${existing.bot_token}/setMyDescription`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ description: patch.persona.slice(0, 512) }),
+        }).catch(() => {});
+      }
+      return json({ ok: true, bot: safe(data) });
+    }
+
+    if (action === "commands_list") {
+      const { data: existing } = await admin.from("telegram_bots").select("id").eq("user_id", user.id).maybeSingle();
+      if (!existing) return json({ commands: [] });
+      const { data } = await admin.from("telegram_custom_commands")
+        .select("id, command, description, response_type, content, enabled, updated_at")
+        .eq("bot_id", existing.id).order("command", { ascending: true });
+      return json({ commands: data || [] });
+    }
+
+    if (action === "command_upsert") {
+      const { data: existing } = await admin.from("telegram_bots").select("id, bot_token").eq("user_id", user.id).maybeSingle();
+      if (!existing) return json({ error: "Connect a bot first." }, 400);
+      const command = normalizeCommand(body.command);
+      if (!command) return json({ error: "Command must be letters, numbers or underscore." }, 400);
+      if (RESERVED_COMMANDS.has(command)) return json({ error: `/${command} is a built-in command and can't be overridden.` }, 400);
+      const response_type = body.response_type === "ai" ? "ai" : "text";
+      const content = String(body.content || "").slice(0, 4000);
+      if (!content.trim()) return json({ error: "Add a response (text or AI instruction)." }, 400);
+      const row = {
+        bot_id: existing.id, user_id: user.id, command,
+        description: String(body.description || "").slice(0, 256) || null,
+        response_type, content, enabled: body.enabled !== false,
+        updated_at: new Date().toISOString(),
+      };
+      const { data, error } = await admin.from("telegram_custom_commands")
+        .upsert(row, { onConflict: "bot_id,command" }).select().single();
+      if (error) return json({ error: error.message }, 400);
+      await refreshCommandMenu(admin, existing.bot_token, existing.id);
+      return json({ ok: true, command: data });
+    }
+
+    if (action === "command_delete") {
+      const { data: existing } = await admin.from("telegram_bots").select("id, bot_token").eq("user_id", user.id).maybeSingle();
+      if (!existing) return json({ error: "Connect a bot first." }, 400);
+      const command = normalizeCommand(body.command);
+      await admin.from("telegram_custom_commands").delete().eq("bot_id", existing.id).eq("command", command);
+      await refreshCommandMenu(admin, existing.bot_token, existing.id);
+      return json({ ok: true });
     }
 
     return json({ error: "Unknown action" }, 400);
