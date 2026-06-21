@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { Loader2, RefreshCw, Trophy, Target, Flame, Skull } from "lucide-react";
+import { Loader2, RefreshCw, Trophy, Target, Flame, Skull, Users } from "lucide-react";
 
 type Bucket = { avg_peak: number; win_rate_2x: number; count: number };
 type Best = { symbol: string | null; name: string | null; mint: string; og_score: number | null; market_cap: number | null; peak_market_cap: number | null; mult: number | null; created_at: string };
@@ -23,13 +23,18 @@ const scoreColor = (s: number) => s >= 80 ? "text-og-lime" : s >= 60 ? "text-eme
 
 export default function TrackRecord() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [board, setBoard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.rpc("grim_track_record_stats");
+      const [{ data }, lb] = await Promise.all([
+        supabase.rpc("grim_track_record_stats"),
+        supabase.rpc("grim_leaderboard"),
+      ]);
       setStats(data as Stats);
+      setBoard(lb.data);
     } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
@@ -107,6 +112,33 @@ export default function TrackRecord() {
             <div className="text-white/30 text-[13px]">No tracked calls yet. As tokens get scanned and prices update, Grim's record fills in here.</div>
           )}
         </Card>
+
+        {board?.groups?.length ? (
+          <Card className="glass-card p-5">
+            <div className="flex items-center gap-2 mb-3"><Users className="h-4 w-4 text-og-cyan" /><h3 className="font-bold text-white text-[15px]">Top groups by realized performance</h3></div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead><tr className="text-white/35 text-[10px] uppercase tracking-wider text-left">
+                  <th className="py-2 pr-2">#</th><th className="py-2 px-2">Group</th><th className="py-2 px-2 text-center">Calls</th>
+                  <th className="py-2 px-2 text-right">Avg peak</th><th className="py-2 px-2 text-right">2x rate</th><th className="py-2 pl-2 text-right">Best</th>
+                </tr></thead>
+                <tbody>
+                  {board.groups.map((g: any, i: number) => (
+                    <tr key={i} className="border-t border-white/[0.05]">
+                      <td className="py-2.5 pr-2 text-white/40">{i + 1}</td>
+                      <td className="py-2.5 px-2 font-semibold text-white/90 truncate max-w-[180px]">{g.title}</td>
+                      <td className="py-2.5 px-2 text-center text-white/55">{g.calls}</td>
+                      <td className="py-2.5 px-2 text-right font-bold text-og-lime">{g.avg_peak}x</td>
+                      <td className="py-2.5 px-2 text-right text-white/55">{g.win_rate}%</td>
+                      <td className="py-2.5 pl-2 text-right text-emerald-400 font-bold">{g.best}x</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="text-white/30 text-[10px] mt-2">Groups running an OG Scan bot, ranked by the realized peak multiple of the tokens they scanned. Min 3 tracked calls.</div>
+          </Card>
+        ) : null}
 
         <div className="text-white/30 text-[11px] text-center">Multiples are peak market cap since the scan vs market cap at scan time. Updated every 30 min. <a href="/app" className="text-og-lime hover:underline">Scan a token →</a></div>
       </div>

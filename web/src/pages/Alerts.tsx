@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { Bell, Trash2, Loader2, Plus, Webhook, Bot, Twitter, Send } from "lucide-react";
+import { Bell, Trash2, Loader2, Plus, Webhook, Bot, Twitter, Send, Radar } from "lucide-react";
 
 export default function Alerts() {
   const [rules, setRules] = useState<any[]>([]);
@@ -112,6 +112,8 @@ export default function Alerts() {
           )}
         </Card>
 
+        <MigrationWatchCard />
+
         {/* full bot + auto-poster live in Settings > Connections */}
         <Card className="p-4 glass-card">
           <div className="flex items-center gap-2 mb-1"><Bot className="h-4 w-4 text-[#5865F2]" /><Twitter className="h-4 w-4 text-og-cyan" /><h4 className="font-bold text-white text-[13px]">Want a full Discord bot or X auto-poster?</h4></div>
@@ -124,3 +126,55 @@ export default function Alerts() {
   );
 }
 
+
+// ── Conversational migration watches (firehose filters) ────────────────────────
+function MigrationWatchCard() {
+  const [watches, setWatches] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [nl, setNl] = useState("");
+  const [url, setUrl] = useState("");
+
+  const fn = async (body: any) => {
+    const { data, error } = await supabase.functions.invoke("migration-watch", { body });
+    if (error || data?.error) throw new Error(data?.error || error?.message);
+    return data;
+  };
+  const load = async () => { setLoading(true); try { const d = await fn({ action: "list" }); setWatches(d.watches || []); } catch { /* ignore */ } finally { setLoading(false); } };
+  useEffect(() => { load(); }, []);
+
+  const create = async () => {
+    if (!url.trim()) { toast.error("Webhook URL required"); return; }
+    setBusy(true);
+    try { await fn({ action: "create", nl_request: nl.trim() || null, webhook_url: url.trim() }); setNl(""); toast.success("Watch created - AI compiled your filter"); await load(); }
+    catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+  };
+  const toggle = async (w: any) => { try { await fn({ action: "update", id: w.id, enabled: !w.enabled }); await load(); } catch (e: any) { toast.error(e.message); } };
+  const del = async (w: any) => { try { await fn({ action: "delete", id: w.id }); await load(); } catch (e: any) { toast.error(e.message); } };
+
+  return (
+    <Card className="p-5 glass-card">
+      <div className="flex items-center gap-2 mb-1"><Radar className="h-4 w-4 text-og-cyan" /><h3 className="font-bold text-white text-[15px]">Migration watches</h3><Badge className="ml-auto text-[9px] bg-og-cyan/15 text-og-cyan border-0">AI</Badge></div>
+      <p className="text-white/40 text-[11px] mb-3">Describe what you want in plain English. Grim watches every pump.fun graduation and pings you only when one matches.</p>
+      <Textarea value={nl} onChange={(e) => setNl(e.target.value)} placeholder="e.g. alert me on migrations with 50+ holders, revoked mint, and over $30k market cap" className="bg-white/5 border-white/10 text-sm min-h-[60px]" />
+      <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Discord webhook or any webhook URL" className="bg-white/5 border-white/10 text-sm mt-2" />
+      <Button onClick={create} disabled={busy} className="rounded-xl bg-og-cyan/90 text-black hover:bg-og-cyan font-bold mt-2">{busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />} Create watch</Button>
+
+      {loading ? null : watches.length ? (
+        <div className="space-y-2 mt-4">
+          {watches.map((w) => (
+            <div key={w.id} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+              <Radar className="h-3.5 w-3.5 text-og-cyan shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-white/85 text-[12px] truncate">{w.nl_request || "every migration"}</div>
+                <div className="text-white/30 text-[10px]">{(w.conditions?.length || 0)} condition(s){w.webhook_hint ? ` · ${w.webhook_hint}` : ""}</div>
+              </div>
+              <Switch checked={!!w.enabled} onCheckedChange={() => toggle(w)} />
+              <Button size="sm" variant="ghost" onClick={() => del(w)} className="h-8 px-2 text-red-400/70 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></Button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </Card>
+  );
+}

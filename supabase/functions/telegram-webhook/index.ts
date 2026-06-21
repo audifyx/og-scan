@@ -646,7 +646,7 @@ Deno.serve(async (req) => {
       const arg = text.replace(/^\S+\s*/, "").trim();
       if (!arg) { await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token: /holders <mint or $TICKER>" }); return ok(); }
       await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
-      const scan = await ogScan(arg);
+      const scan = await ogScan(arg, { bot_id: bot.id, chat_id: chatId, scanned_by: msg.from?.id });
       if (!scan || !scan.ok) { await tg(token, "sendMessage", { chat_id: chatId, text: scan?.error || "Token not found." }); return ok(); }
       const h = await ogHolders(scan.token.mint);
       if (h && h.ok && (h.holders || []).length) {
@@ -662,7 +662,7 @@ Deno.serve(async (req) => {
     if (cmd === "/watch") {
       const arg = text.replace(/^\S+\s*/, "").trim();
       if (!arg) { await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token to watch: /watch <mint or $TICKER>" }); return ok(); }
-      const scan = await ogScan(arg);
+      const scan = await ogScan(arg, { bot_id: bot.id, chat_id: chatId, scanned_by: msg.from?.id });
       if (!scan || !scan.ok) { await tg(token, "sendMessage", { chat_id: chatId, text: scan?.error || "Token not found." }); return ok(); }
       await admin.from("telegram_watchlist").upsert(
         { bot_id: bot.id, chat_id: chatId, mint: scan.token.mint, symbol: scan.token.symbol, last_price: scan.token.priceUsd ?? null },
@@ -707,7 +707,7 @@ Deno.serve(async (req) => {
         return ok();
       }
       await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
-      const scan = await ogScan(arg);
+      const scan = await ogScan(arg, { bot_id: bot.id, chat_id: chatId, scanned_by: msg.from?.id });
       if (scan && scan.ok) {
         await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
         // Optional grounded one-paragraph take, in character, using the scan data.
@@ -763,7 +763,7 @@ Deno.serve(async (req) => {
       await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
       const ca = prompt.match(MINT_DETECT);
       if (ca) {
-        const scan = await ogScan(ca[1]);
+        const scan = await ogScan(ca[1], { bot_id: bot.id, chat_id: chatId, scanned_by: msg.from?.id });
         if (scan && scan.ok) { await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) }); return ok(); }
       }
       const knowledge = await retrieveKnowledge(bot.id, prompt);
@@ -840,7 +840,7 @@ Deno.serve(async (req) => {
           if (rep) {
             await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 your OG Scan PRO sample report." + (rep.url ? "\n\n\uD83D\uDD17 Shareable link: " + rep.url : ""), { ...(isGroup ? { reply_to_message_id: msg.message_id } : {}), reply_markup: JSON.stringify({ inline_keyboard: [[...(rep.url ? [{ text: "\uD83D\uDD17 Open Report", url: rep.url }] : []), { text: "\uD83C\uDF10 Full Report on OG Scan", url: "https://ogscan.fun" }]] }) }, "text/html");
           } else {
-            const scan = await ogScan(mm[1]);
+            const scan = await ogScan(mm[1], { bot_id: bot.id, chat_id: chatId, scanned_by: msg.from?.id });
             if (scan && scan.ok) await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML" });
           }
         })();

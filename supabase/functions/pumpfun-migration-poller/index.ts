@@ -9,6 +9,36 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+async function fullScan(mint: string): Promise<any | null> {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/og-scan-token`, {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+      body: JSON.stringify({ query: mint, source: "migration-watch" }),
+    });
+    const j = await r.json();
+    return j?.ok ? j : null;
+  } catch { return null; }
+}
+
+function watchPasses(data: any, conds: any[]): boolean {
+  const t = data.token || {}; const score = data.score?.total; const f = data.flags || {};
+  for (const c of conds || []) {
+    if (c.metric === "mint_revoked") { if ((f.mintAuthorityDisabled === true) !== (c.value !== false)) return false; continue; }
+    if (c.metric === "freeze_revoked") { if ((f.freezeAuthorityDisabled === true) !== (c.value !== false)) return false; continue; }
+    let cur: number;
+    if (c.metric === "mcap") cur = Number(t.mcap);
+    else if (c.metric === "liquidity") cur = Number(t.liquidity);
+    else if (c.metric === "holders") cur = Number(t.holderCount);
+    else if (c.metric === "momentum") cur = Number(t.momentum);
+    else if (c.metric === "og_score") cur = Number(score);
+    else continue;
+    if (!isFinite(cur)) return false;
+    if (c.op === "above" && !(cur >= Number(c.value))) return false;
+    if (c.op === "below" && !(cur <= Number(c.value))) return false;
+  }
+  return true;
+}
+
 function ogCard(m: any): string {
   const p = new URLSearchParams({ mint: m.mint });
   if (m.symbol) p.set("sym", m.symbol);
@@ -116,7 +146,10 @@ Deno.serve(async (req) => {
       .select("channel_id, application_id, discord_bots(bot_token, enabled)")
       .eq("alerts_migrations", true);
 
-    let sent = 0, sentDiscord = 0, sentX = 0, sentBotDiscord = 0;
+    // Active conversational migration watches.
+    const { data: mwatches } = await admin.from("migration_watches").select("*").eq("enabled", true);
+
+    let sent = 0, sentDiscord = 0, sentX = 0, sentBotDiscord = 0, sentWatch = 0;
     for (const m of pending) {
       const mapped = { ...m, marketCap: m.market_cap, liquidityUsd: m.liquidity_usd, volume24h: null, dexUrl: m.dex_url };
       // Telegram
@@ -160,9 +193,28 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ embeds: [discordEmbed(mapped)] }),
         }).then(() => { sentBotDiscord++; }).catch(() => {});
       }
+      // Conversational migration watches: one full scan, evaluate each filter.
+      if (mwatches && mwatches.length) {
+        const ageMin = (Date.now() - new Date(m.migrated_at).getTime()) / 60000;
+        const eligible = mwatches.filter((w: any) => ageMin >= (w.min_age_min || 0) && w.webhook_url);
+        if (eligible.length) {
+          const scan = await fullScan(m.mint);
+          if (scan) {
+            for (const w of eligible) {
+              if (!watchPasses(scan, w.conditions || [])) continue;
+              await fetch(w.webhook_url, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: "OG Scan", content: w.nl_request ? `Matched your watch: ${w.nl_request}` : undefined, embeds: [discordEmbed(mapped)] }),
+              }).catch(() => {});
+              await admin.from("migration_watches").update({ last_fired_at: new Date().toISOString() }).eq("id", w.id);
+              sentWatch++;
+            }
+          }
+        }
+      }
       await admin.from("pumpfun_migrations").update({ alerted: true }).eq("signature", m.signature);
     }
-    return json({ ok: true, new: pending.length, telegramSent: sent, discordSent: sentDiscord, xSent: sentX, botDiscordSent: sentBotDiscord });
+    return json({ ok: true, new: pending.length, telegramSent: sent, discordSent: sentDiscord, xSent: sentX, botDiscordSent: sentBotDiscord, watchSent: sentWatch });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
