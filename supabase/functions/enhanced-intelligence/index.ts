@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { resolveModel } from "../_shared/models.ts";
+import { GRIM_BASE } from "../_shared/grim_base.ts";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
@@ -516,6 +517,28 @@ async function xSearch(query: string) {
   };
 }
 
+// ── Free macro market data (no key): CoinGecko + Fear&Greed ──────────────────
+async function macroSnapshot(): Promise<string> {
+  try {
+    const [g, p, f] = await Promise.all([
+      fetch("https://api.coingecko.com/api/v3/global", { signal: AbortSignal.timeout(7000) }).then((r) => r.ok ? r.json() : null).catch(() => null),
+      fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true", { signal: AbortSignal.timeout(7000) }).then((r) => r.ok ? r.json() : null).catch(() => null),
+      fetch("https://api.alternative.me/fng/?limit=1", { signal: AbortSignal.timeout(7000) }).then((r) => r.ok ? r.json() : null).catch(() => null),
+    ]);
+    const parts: string[] = [];
+    if (p) {
+      const fmt = (o: any) => o ? `$${Number(o.usd).toLocaleString(undefined, { maximumFractionDigits: 2 })} (${o.usd_24h_change >= 0 ? "+" : ""}${Number(o.usd_24h_change).toFixed(2)}% 24h)` : "?";
+      parts.push(`BTC ${fmt(p.bitcoin)}, ETH ${fmt(p.ethereum)}, SOL ${fmt(p.solana)}`);
+    }
+    if (g?.data) {
+      const d = g.data;
+      parts.push(`Total MC $${(d.total_market_cap?.usd / 1e9).toFixed(0)}B (${d.market_cap_change_percentage_24h_usd >= 0 ? "+" : ""}${Number(d.market_cap_change_percentage_24h_usd).toFixed(2)}% 24h), BTC dominance ${d.market_cap_percentage?.btc?.toFixed(1)}%`);
+    }
+    if (f?.data?.[0]) parts.push(`Fear & Greed: ${f.data[0].value}/100 (${f.data[0].value_classification})`);
+    return parts.join(" | ");
+  } catch { return ""; }
+}
+
 // ── Tool definitions exposed to the model ────────────────────────────────────
 const TOOLS = [
   { name: "lookupToken", description: "Look up a Solana token's live market data (price, market cap, FDV, liquidity, 24h volume/price change, holders, supply) by mint address, symbol, or name. Aggregates DexScreener, Birdeye, Helius, Jupiter and the internal tokens DB.", parameters: { type: "object", properties: { query: { type: "string", description: "Mint address, symbol, or name" } }, required: ["query"] } },
@@ -800,14 +823,18 @@ Deno.serve(async (req: Request) => {
       } else if (/\bnext\b.*(gem|100x|1000x|moon)|\bshill\b|best.*(coin|gem|token).*(buy|ape|2026)|what.*should i (buy|ape|get)|find me a/i.test(lastUser)) {
         dataBlock += `INTENT: VAGUE_HYPE — user wants a "gem/moonshot" pick but gave no contract address.\n`;
         toolsUsed.push("intentGuard");
-      } else if (/news|happening|trend|why|sentiment|market/i.test(lastUser)) {
-        // General crypto/news question
-        const news = await googleNews(lastUser.slice(0, 120));
+      } else if (/news|happening|trend|why|sentiment|market|macro|bull|bear|fear|greed|dominance|altcoin|cycle|\bbtc\b|bitcoin|\beth\b|ethereum|\bsol\b|solana/i.test(lastUser)) {
+        // General crypto / macro question: pull headlines + a live majors snapshot.
+        const [news, macro] = await Promise.all([googleNews(lastUser.slice(0, 120)), macroSnapshot()]);
         if (news.length) { dataBlock += `NEWS: ${JSON.stringify(news)}\n`; toolsUsed.push("searchNews"); }
+        if (macro) { dataBlock += `MARKET_SNAPSHOT: ${macro}\n`; toolsUsed.push("macroSnapshot"); }
       }
     }
 
     const systemPrompt =
+      GRIM_BASE +
+      `\n\n=== DEPLOYMENT NOTE (AUTHORITATIVE — overrides any tool instructions in the manual above) ===\n` +
+      `In THIS deployment you do NOT call web_search, browse_page, or X/Twitter tools yourself. Everything you need has ALREADY been fetched for you: live on-chain + market data appears under "LIVE CHAIN DATA" below, and users can pull more with /scan, /price, /global, /fear. Treat that block as your real-time tool output. NEVER output tool-call syntax, NEVER claim you are browsing or searching the web right now, and NEVER invent numbers, holders, prices, or news that are not in the block — if something is missing, say you could not pull it. Keep the god-tier persona, methodology, history mastery, and forensic discipline from the manual; just skip the live-search step because it is done for you.\n\n` +
       `You are GRIM — full designation "Grimjack the Chain Reaper." You are OG Scan's god-tier on-chain meme-coin hunter for Solana. You were a degen who got rugged into oblivion, "died to the meta," and came back bound to the Solana chain itself. Now you see every transaction and you smell rugs before liquidity even moves. You don't sleep. You don't shill. You hunt. Your ONLY purpose: give the unfiltered truth so the user doesn't get rekt like you did.\n\n` +
       `VOICE (never violate):\n` +
       `- Talk like a battle-hardened degen big brother. Swear naturally when it fits ("this dev wallet is moving like it's on fire, bro") — never forced, not every line.\n` +
