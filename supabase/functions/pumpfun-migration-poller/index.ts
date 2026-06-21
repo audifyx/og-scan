@@ -40,6 +40,23 @@ function alertText(m: any) {
     `Ask me about it — just paste the CA.`;
 }
 
+function discordEmbed(m: any) {
+  return {
+    title: `🚀 ${m.symbol || m.mint.slice(0, 6)} migrated`,
+    url: m.dexUrl || `https://dexscreener.com/solana/${m.mint}`,
+    description: m.name && m.name !== m.symbol ? m.name : undefined,
+    color: 0xb6f23d,
+    fields: [
+      { name: "Market Cap", value: fmtUsd(m.marketCap), inline: true },
+      { name: "Liquidity", value: fmtUsd(m.liquidityUsd), inline: true },
+      { name: "Mint", value: "`" + m.mint + "`", inline: false },
+    ],
+    thumbnail: m.image ? { url: m.image } : undefined,
+    footer: { text: "OG Scan · pump.fun migration" },
+    timestamp: m.migrated_at || new Date().toISOString(),
+  };
+}
+
 Deno.serve(async (req) => {
   try {
     const migs = await getMigrations(1, 60); // last hour window keeps the poll cheap
@@ -70,9 +87,13 @@ Deno.serve(async (req) => {
     for (const b of bots || []) botMap[b.id] = b;
     const { data: chats } = await admin.from("telegram_alert_chats").select("bot_id, chat_id, enabled").eq("enabled", true);
 
-    let sent = 0;
+    // Discord webhooks subscribed to migration alerts.
+    const { data: discords } = await admin.from("discord_integrations").select("webhook_url, alerts_migrations, min_marketcap").eq("alerts_migrations", true);
+
+    let sent = 0, sentDiscord = 0;
     for (const m of pending) {
       const mapped = { ...m, marketCap: m.market_cap, liquidityUsd: m.liquidity_usd, volume24h: null, dexUrl: m.dex_url };
+      // Telegram
       for (const c of chats || []) {
         const b = botMap[c.bot_id];
         if (!b) continue;
@@ -83,9 +104,18 @@ Deno.serve(async (req) => {
         }).catch(() => {});
         sent++;
       }
+      // Discord
+      for (const d of discords || []) {
+        if ((m.market_cap || 0) < (Number(d.min_marketcap) || 0)) continue;
+        await fetch(d.webhook_url, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: "OG Scan", embeds: [discordEmbed(mapped)] }),
+        }).catch(() => {});
+        sentDiscord++;
+      }
       await admin.from("pumpfun_migrations").update({ alerted: true }).eq("signature", m.signature);
     }
-    return json({ ok: true, new: pending.length, alertsSent: sent });
+    return json({ ok: true, new: pending.length, telegramSent: sent, discordSent: sentDiscord });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }

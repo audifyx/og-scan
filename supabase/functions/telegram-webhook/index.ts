@@ -75,12 +75,30 @@ function migrationsText(migs: any[], hours: number) {
   return `🚀 <b>Pump.fun migrations · last ${hours}h</b> (${migs.length})\n\n` + lines.join("\n\n");
 }
 
-async function askGrim(text: string) {
+// Retrieve the bot owner's uploaded training knowledge most relevant to the
+// query (Postgres full-text search) so Grim can use it as extra context.
+async function retrieveKnowledge(botRowId: string, query: string): Promise<string> {
   try {
+    const { data } = await admin
+      .from("bot_knowledge")
+      .select("filename, content")
+      .eq("bot_id", botRowId)
+      .textSearch("tsv", query, { type: "plain", config: "english" })
+      .limit(5);
+    if (!data || !data.length) return "";
+    return data.map((r: any) => `[${r.filename}] ${r.content}`).join("\n---\n").slice(0, 6000);
+  } catch { return ""; }
+}
+
+async function askGrim(text: string, knowledge = "") {
+  try {
+    const context = "Source: Telegram bot" + (knowledge
+      ? `\n\nThe bot owner trained you with these reference docs — use them when relevant, and prefer them over generic knowledge:\n${knowledge}`
+      : "");
     const r = await fetch(`${SUPABASE_URL}/functions/v1/enhanced-intelligence`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
-      body: JSON.stringify({ messages: [{ role: "user", content: text }], context: "Source: Telegram bot" }),
+      body: JSON.stringify({ messages: [{ role: "user", content: text }], context }),
     });
     const j = await r.json();
     return j.content || j.error || "Couldn't read the chain right now, try again.";
@@ -168,7 +186,8 @@ Deno.serve(async (req) => {
     // Anything else -> Grim AI (same models + APIs as the in-app chat).
     if (bot.ai_enabled) {
       await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
-      const answer = await askGrim(text);
+      const knowledge = await retrieveKnowledge(bot.id, text);
+      const answer = await askGrim(text, knowledge);
       await sendLong(token, chatId, answer);
     }
     return ok();

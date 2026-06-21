@@ -228,6 +228,15 @@ export const EnhancedAdvancedIntelligence = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Prefill + auto-send from a ?q= deep link (e.g. wallet card -> "analyze wallet X").
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q && selectedTeam && messages.length === 0) {
+      handleSendMessage(q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTeam]);
+
   // Load token when mounted with query param
   useEffect(() => {
     if (initialMint) {

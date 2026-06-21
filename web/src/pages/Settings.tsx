@@ -23,6 +23,7 @@ import {
 import { ThemePicker } from "@/components/settings/ThemePicker";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
 import {
   canUseReservedUsername,
@@ -36,7 +37,7 @@ import {
   Check, Loader2, KeyRound, Mail, Link, Twitter, MessageSquare, Globe,
   Wallet, Star, Copy, Flame, Trophy, Zap, Clock, ChevronRight, Users, Gift, Share2,
   Code2, Radio, Maximize2, ExternalLink, Plug, AlertTriangle, Trash2,
-  Rocket, RefreshCw, Bot, Send,
+  Rocket, RefreshCw, Bot, Send, Upload, FileText, MessageCircle, Power,
 } from "lucide-react";
 import {
   ccGetStoredUser,
@@ -1369,6 +1370,15 @@ function ConnectionsTab() {
       {/* Pump.fun migrations (24h) — powers the Telegram alerts + on-demand view */}
       <MigrationsPanel />
 
+      {/* Discord migration alerts (incoming webhook) */}
+      <DiscordCard />
+
+      {/* Wallet connect */}
+      <WalletCard />
+
+      {/* Browser push notifications */}
+      <PushCard />
+
       {/* More integrations coming soon */}
       <Card className="p-5 glass-card border-white/[0.04] opacity-60">
         <div className="flex items-center gap-3">
@@ -1478,6 +1488,8 @@ function TelegramBotCard() {
                 </div>
               </div>
 
+              <BotTraining />
+
               <div className="flex items-center gap-2 mt-4">
                 <Button variant="outline" size="sm" onClick={disconnect} disabled={busy}
                   className="text-red-400 border-red-400/20 hover:bg-red-400/10 hover:text-red-300 rounded-xl">
@@ -1579,5 +1591,245 @@ function MigrationsPanel() {
     </Card>
   );
 }
+
+
+/* BotTraining — upload files to give your bot custom knowledge (RAG). */
+function BotTraining() {
+  const [files, setFiles] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    try {
+      const { data } = await supabase.functions.invoke("bot-knowledge", { body: { action: "list" } });
+      setFiles(data?.files || []);
+    } catch { /* ignore */ }
+  };
+  useEffect(() => { load(); }, []);
+
+  const onUpload = async (e: any) => {
+    const list = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!list.length) return;
+    setBusy(true);
+    try {
+      for (const file of list) {
+        if (file.size > 1_000_000) { toast.error(`${file.name} is too big (max 1MB of text)`); continue; }
+        const content = await file.text();
+        const { data, error } = await supabase.functions.invoke("bot-knowledge", { body: { action: "add", filename: file.name, content } });
+        if (error || data?.error) toast.error(data?.error || `Failed: ${file.name}`);
+        else toast.success(`Trained on ${file.name} (${data.chunks} chunks)`);
+      }
+      await load();
+    } finally { setBusy(false); }
+  };
+  const del = async (filename: string) => {
+    await supabase.functions.invoke("bot-knowledge", { body: { action: "delete", filename } });
+    load();
+  };
+
+  return (
+    <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="text-white/80 text-[13px] font-semibold flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-[#229ED9]" /> Train your bot</div>
+        <label className={`flex items-center gap-1.5 rounded-lg bg-white/5 border border-white/10 px-2.5 py-1 text-[12px] cursor-pointer hover:bg-white/10 ${busy ? "opacity-50 pointer-events-none" : ""}`}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Upload
+          <input type="file" multiple accept=".txt,.md,.csv,.json,.log,text/*" className="hidden" onChange={onUpload} />
+        </label>
+      </div>
+      <p className="text-white/35 text-[11px] mb-2">Upload .txt / .md / .csv / .json. Grim uses the most relevant parts when answering in your bot.</p>
+      {files.length === 0 ? (
+        <p className="text-white/25 text-[12px] py-1">No training files yet.</p>
+      ) : (
+        <div className="space-y-1">
+          {files.map((f) => (
+            <div key={f.filename} className="flex items-center justify-between gap-2 rounded-lg bg-black/20 px-2.5 py-1.5">
+              <div className="min-w-0"><div className="text-white/80 text-[12px] truncate">{f.filename}</div><div className="text-white/30 text-[10px]">{f.chunks} chunks · {(f.chars / 1000).toFixed(1)}k chars</div></div>
+              <button onClick={() => del(f.filename)} className="text-red-400/70 hover:text-red-400 shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* DiscordCard — migration alerts to a Discord channel via incoming webhook. */
+function DiscordCard() {
+  const [integ, setInteg] = useState<any>(null);
+  const [url, setUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    try { const { data } = await supabase.functions.invoke("discord-connect", { body: { action: "status" } }); setInteg(data?.integration || null); }
+    catch { /* ignore */ } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+  const connect = async () => {
+    if (!url.trim()) return; setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("discord-connect", { body: { action: "connect", webhookUrl: url.trim() } });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      setInteg(data.integration); setUrl(""); toast.success("Discord connected — check your channel!");
+    } catch (e: any) { toast.error(e.message || "Failed"); } finally { setBusy(false); }
+  };
+  const disconnect = async () => { setBusy(true); try { await supabase.functions.invoke("discord-connect", { body: { action: "disconnect" } }); setInteg(null); toast.success("Discord disconnected"); } finally { setBusy(false); } };
+  const toggle = async (v: boolean) => { const p = integ; setInteg({ ...integ, alerts_migrations: v }); try { const { data } = await supabase.functions.invoke("discord-connect", { body: { action: "settings", alerts_migrations: v } }); setInteg(data.integration); } catch { setInteg(p); } };
+
+  return (
+    <Card className="p-5 glass-card">
+      <div className="flex items-start gap-4">
+        <div className="h-11 w-11 rounded-2xl bg-[#5865F2]/15 border border-[#5865F2]/30 flex items-center justify-center shrink-0">
+          <MessageCircle className="w-5 h-5 text-[#5865F2]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <h3 className="font-bold text-white text-[15px]">Discord</h3>
+            {integ ? <span className="rounded-full bg-og-lime/15 border border-og-lime/25 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-og-lime">Connected</span>
+                   : <span className="rounded-full bg-[#5865F2]/[0.12] px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-[#5865F2]/70">Alerts</span>}
+          </div>
+          {loading ? (
+            <div className="flex items-center gap-2 text-white/40 text-[13px] mt-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+          ) : integ ? (
+            <>
+              <div className="text-white/60 text-[13px] mt-1">Posting to <span className="text-white/80 font-semibold">{integ.channel_name || "your channel"}</span></div>
+              <div className="text-white/30 text-[11px] font-mono mt-0.5">{integ.webhook_hint}</div>
+              <div className="flex items-center justify-between gap-3 mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                <div><div className="text-white/80 text-[13px] font-semibold flex items-center gap-1.5"><Rocket className="h-3.5 w-3.5 text-og-lime" /> Migration alerts</div><div className="text-white/35 text-[11px]">Every pump.fun graduation, posted as an embed</div></div>
+                <Switch checked={!!integ.alerts_migrations} onCheckedChange={toggle} />
+              </div>
+              <Button variant="outline" size="sm" onClick={disconnect} disabled={busy} className="text-red-400 border-red-400/20 hover:bg-red-400/10 hover:text-red-300 rounded-xl mt-4">
+                {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5 mr-1.5" />} Disconnect
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-white/45 text-[13px] leading-relaxed mt-1">Get pump.fun migration alerts in your Discord. Create a channel webhook and paste the URL.</p>
+              <ol className="mt-3 space-y-1 text-white/40 text-[12px] list-decimal list-inside">
+                <li>Channel → Edit Channel → Integrations → Webhooks</li>
+                <li>New Webhook → Copy Webhook URL</li>
+                <li>Paste it below</li>
+              </ol>
+              <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://discord.com/api/webhooks/…" className="bg-white/5 border-white/10 text-sm font-mono" />
+                <Button onClick={connect} disabled={busy || !url.trim()} className="rounded-xl bg-[#5865F2] hover:bg-[#5865F2]/90 text-white font-bold shrink-0">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <MessageCircle className="h-4 w-4 mr-1.5" />} Connect
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/* WalletCard — link a Solana wallet (Phantom / Solflare / Backpack) via injection. */
+function WalletCard() {
+  const [addr, setAddr] = useState<string | null>(() => localStorage.getItem("og_linked_wallet"));
+  const [busy, setBusy] = useState<string | null>(null);
+  const providers: { key: string; label: string; get: () => any }[] = [
+    { key: "phantom", label: "Phantom", get: () => (window as any).solana?.isPhantom ? (window as any).solana : null },
+    { key: "solflare", label: "Solflare", get: () => (window as any).solflare },
+    { key: "backpack", label: "Backpack", get: () => (window as any).backpack?.solana || ((window as any).backpack) },
+  ];
+  const connect = async (p: { key: string; label: string; get: () => any }) => {
+    const prov = p.get();
+    if (!prov) { toast.error(`${p.label} not detected. Install the extension.`); return; }
+    setBusy(p.key);
+    try {
+      const res = await prov.connect();
+      const pk = (res?.publicKey || prov.publicKey)?.toString();
+      if (!pk) throw new Error("No public key returned");
+      localStorage.setItem("og_linked_wallet", pk);
+      setAddr(pk);
+      toast.success(`${p.label} linked`);
+    } catch (e: any) { toast.error(e?.message || "Connect cancelled"); } finally { setBusy(null); }
+  };
+  const disconnect = () => { localStorage.removeItem("og_linked_wallet"); setAddr(null); toast.success("Wallet unlinked"); };
+
+  return (
+    <Card className="p-5 glass-card">
+      <div className="flex items-start gap-4">
+        <div className="h-11 w-11 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0">
+          <Wallet className="w-5 h-5 text-purple-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <h3 className="font-bold text-white text-[15px]">Wallet</h3>
+            {addr ? <span className="rounded-full bg-og-lime/15 border border-og-lime/25 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-og-lime">Linked</span>
+                  : <span className="rounded-full bg-purple-500/[0.12] px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-purple-300/70">Solana</span>}
+          </div>
+          {addr ? (
+            <>
+              <div className="flex items-center gap-2 mt-2">
+                <code className="text-white/80 text-[12px] bg-white/5 rounded px-2 py-1">{addr.slice(0, 6)}…{addr.slice(-6)}</code>
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <a href={`/intelligence?q=${encodeURIComponent("analyze wallet " + addr)}`}
+                  className="flex items-center gap-1.5 rounded-xl bg-[#22d3ee] text-black font-bold text-[13px] px-4 py-2 hover:bg-[#22d3ee]/90">💀 Ask Grim about my wallet</a>
+                <Button variant="outline" size="sm" onClick={disconnect} className="text-red-400 border-red-400/20 hover:bg-red-400/10 hover:text-red-300 rounded-xl">
+                  <LogOut className="h-3.5 w-3.5 mr-1.5" /> Unlink
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-white/45 text-[13px] leading-relaxed mt-1">Link a Solana wallet to run Grim's wallet intel on your own holdings and unlock portfolio features.</p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {providers.map((p) => (
+                  <Button key={p.key} onClick={() => connect(p)} disabled={!!busy} variant="outline" className="border-white/10 bg-white/5 rounded-xl">
+                    {busy === p.key ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Wallet className="h-4 w-4 mr-1.5" />} {p.label}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/* PushCard — browser push notifications (reuses existing VAPID infra). */
+function PushCard() {
+  const { permission, supported, subscription, isSyncing, requestPermission, unsubscribe, sendTestPush } = usePushNotifications();
+  const enabled = permission === "granted" && !!subscription;
+  return (
+    <Card className="p-5 glass-card">
+      <div className="flex items-start gap-4">
+        <div className="h-11 w-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+          <Bell className="w-5 h-5 text-amber-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <h3 className="font-bold text-white text-[15px]">Browser Notifications</h3>
+            {enabled ? <span className="rounded-full bg-og-lime/15 border border-og-lime/25 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-og-lime">On</span>
+                     : <span className="rounded-full bg-amber-500/[0.12] px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-amber-300/70">Push</span>}
+          </div>
+          {!supported ? (
+            <p className="text-white/45 text-[13px] mt-1">Push isn't supported in this browser.</p>
+          ) : enabled ? (
+            <>
+              <p className="text-white/45 text-[13px] mt-1">You're getting alerts on this device — price targets, whale moves, mentions, and more.</p>
+              <div className="flex items-center gap-2 mt-4">
+                <Button variant="outline" size="sm" onClick={() => sendTestPush()} className="border-white/10 bg-white/5 rounded-xl">Send test</Button>
+                <Button variant="outline" size="sm" onClick={() => unsubscribe()} disabled={isSyncing} className="text-red-400 border-red-400/20 hover:bg-red-400/10 hover:text-red-300 rounded-xl">
+                  {isSyncing ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Power className="h-3.5 w-3.5 mr-1.5" />} Turn off
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-white/45 text-[13px] mt-1">Turn on push to get alerts on this device even when OG Scan is closed.</p>
+              <Button onClick={() => requestPermission()} disabled={isSyncing} className="rounded-xl bg-amber-500 hover:bg-amber-500/90 text-black font-bold mt-3">
+                {isSyncing ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Bell className="h-4 w-4 mr-1.5" />} Enable notifications
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 
 export default Settings;
