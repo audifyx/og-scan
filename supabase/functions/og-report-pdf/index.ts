@@ -40,7 +40,48 @@ async function getScan(query: string): Promise<any> {
   return await r.json();
 }
 
-async function synthesize(scan: any): Promise<any> {
+// Keyless social/narrative intel: DexScreener for official links + boosts,
+// r.jina.ai reader to pull the official site lore and the X profile stats.
+async function jinaRead(url: string, maxChars = 3500): Promise<string> {
+  try {
+    const r = await fetch(`https://r.jina.ai/${url}`, {
+      headers: { "X-Return-Format": "markdown" },
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!r.ok) return "";
+    return (await r.text()).slice(0, maxChars);
+  } catch { return ""; }
+}
+
+async function gatherSocial(mint: string): Promise<any> {
+  const out: any = { xHandle: null, xUrl: null, website: null, telegram: null, followers: null, posts: null, boosts: null, dexId: null, xText: "", siteText: "" };
+  try {
+    const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { signal: AbortSignal.timeout(8000) });
+    const j = await r.json();
+    const pairs = (j.pairs || []).slice().sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+    const p = pairs[0];
+    if (p) {
+      out.dexId = p.dexId || null;
+      out.boosts = p.boosts?.active ?? null;
+      for (const sc of (p.info?.socials || [])) {
+        if (sc.type === "twitter") out.xUrl = sc.url;
+        if (sc.type === "telegram") out.telegram = sc.url;
+      }
+      out.website = p.info?.websites?.[0]?.url || null;
+    }
+  } catch { /* ignore */ }
+  if (out.xUrl) out.xHandle = (out.xUrl.match(/x\.com\/([^/?#]+)/i) || [])[1] || (out.xUrl.match(/twitter\.com\/([^/?#]+)/i) || [])[1] || null;
+  const [xText, siteText] = await Promise.all([
+    out.xUrl ? jinaRead(out.xUrl, 2500) : Promise.resolve(""),
+    out.website ? jinaRead(out.website, 3500) : Promise.resolve(""),
+  ]);
+  out.xText = xText; out.siteText = siteText;
+  const fm = xText.match(/([\d,.]+)\s*Followers/i); if (fm) out.followers = fm[1];
+  const pm = xText.match(/([\d,.]+)\s*posts/i); if (pm) out.posts = pm[1];
+  return out;
+}
+
+async function synthesize(scan: any, social: any): Promise<any> {
   const t = scan.token;
   const facts = {
     name: t.name, symbol: t.symbol, mint: t.mint,
@@ -83,16 +124,40 @@ async function synthesize(scan: any): Promise<any> {
 REAL DATA:
 ${JSON.stringify(facts)}
 
+REAL SOCIAL/NARRATIVE CONTEXT (keyless sources - use ONLY this; NEVER invent handles, tweets, or engagement numbers not present here):
+Official X: ${social.xUrl || "unknown"} | followers: ${social.followers || "unknown"} | posts: ${social.posts || "unknown"}
+Telegram: ${social.telegram || "unknown"} | Website: ${social.website || "unknown"} | DEX: ${social.dexId || "unknown"} | Dex boosts: ${social.boosts ?? "none"}
+OFFICIAL WEBSITE CONTENT (basis for Narrative Archaeology):
+${(social.siteText || "none").slice(0, 1800)}
+X PROFILE CONTENT:
+${(social.xText || "none").slice(0, 1200)}
+
+Rules: Base "narrative"/"firstPrinciples" on the website content above. Base social/KOL on the real official handle + any real names in the context. If you lack tweet-level engagement data, set "socialTable" and "kolTable" to [] and describe presence qualitatively using the real follower/post counts. Do NOT fabricate.
+
 Return ONLY this JSON shape:
 ${schema}`;
+  // Call the NVIDIA model directly (single completion) instead of the heavy
+  // enhanced-intelligence agent — much faster and controllable for JSON output.
+  const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
+  const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
+  const MODEL = Deno.env.get("NVIDIA_MODEL") || "meta/llama-3.3-70b-instruct";
   try {
-    const r = await fetch(`${SUPABASE_URL}/functions/v1/enhanced-intelligence`, {
+    const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
-      body: JSON.stringify({ messages: [{ role: "user", content: prompt }], context: "Generating OG SCAN PRO dossier JSON" }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: "system", content: "You are OG SCAN PRO. Output ONLY a single valid minified JSON object. No markdown, no prose, no code fences." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.5,
+        max_tokens: 2400,
+      }),
+      signal: AbortSignal.timeout(38000),
     });
     const j = await r.json();
-    let txt = String(j.content || "").trim();
+    let txt = String(j.choices?.[0]?.message?.content || "").trim();
     const a = txt.indexOf("{"), b = txt.lastIndexOf("}");
     if (a >= 0 && b > a) txt = txt.slice(a, b + 1);
     return JSON.parse(txt);
@@ -254,7 +319,7 @@ function verdictBar(D: Doc, text: string, bg: any) {
   D.y -= h + 6;
 }
 
-async function buildPdf(scan: any, ai: any): Promise<Uint8Array> {
+async function buildPdf(scan: any, ai: any, social: any): Promise<Uint8Array> {
   const t = scan.token, sig = scan.score.signals, f = scan.flags;
   const D = new Doc();
   await D.init();
@@ -329,6 +394,18 @@ async function buildPdf(scan: any, ai: any): Promise<Uint8Array> {
 
   // ---- Narrative & social ----
   D.heading("Narrative Archaeology & Social Intelligence");
+  // Verified, keyless social presence (DexScreener + r.jina.ai) - always real.
+  if (social && (social.xUrl || social.website || social.telegram)) {
+    const presence: Cell[][] = [];
+    if (social.xUrl) presence.push([{ text: "Official X", bold: true }, { text: social.xHandle ? "@" + social.xHandle : social.xUrl, color: C.blue }, { text: [social.followers ? social.followers + " followers" : "", social.posts ? social.posts + " posts" : ""].filter(Boolean).join(" \u00B7 ") || "verified account" }]);
+    if (social.website) presence.push([{ text: "Website", bold: true }, { text: social.website, color: C.blue }, { text: "Official site" }]);
+    if (social.telegram) presence.push([{ text: "Telegram", bold: true }, { text: social.telegram, color: C.blue }, { text: "Community" }]);
+    if (social.dexId) presence.push([{ text: "DEX", bold: true }, { text: String(social.dexId), bold: true }, { text: social.boosts ? `${social.boosts} active boosts` : "no active boosts" }]);
+    if (presence.length) {
+      D.subheading("Verified Links & Social Presence");
+      table(D, ["CHANNEL", "HANDLE / URL", "SIGNAL"], presence, [110, 230, CW - 340]);
+    }
+  }
   if (ai.narrative) D.para(ai.narrative);
   if (ai.firstPrinciples) { D.gap(2); D.para("First-Principles Advantage: " + ai.firstPrinciples, { font: D.ital, color: C.indigo }); }
   if (ai.socialActivity || (ai.socialTable && ai.socialTable.length)) {
@@ -429,8 +506,9 @@ Deno.serve(async (req) => {
     if (!q) return jsonResp({ ok: false, error: "Provide a mint or ticker." }, 400);
     const scan = await getScan(q);
     if (!scan || !scan.ok) return jsonResp({ ok: false, error: scan?.error || "Token not found." }, 404);
-    const ai = await synthesize(scan);
-    const pdf = await buildPdf(scan, ai);
+    const social = await gatherSocial(scan.token.mint);
+    const ai = await synthesize(scan, social);
+    const pdf = await buildPdf(scan, ai, social);
     const sym = (scan.token.symbol || "token").replace(/[^a-zA-Z0-9]/g, "");
     return new Response(pdf as unknown as BodyInit, {
       status: 200,

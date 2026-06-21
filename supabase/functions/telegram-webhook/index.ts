@@ -438,13 +438,18 @@ Deno.serve(async (req) => {
         await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token to report on: /report <mint address or $TICKER>" });
         return ok();
       }
+      // The PRO dossier takes ~30-60s (live data + AI synthesis), longer than
+      // Telegram will wait on the webhook. ACK now, build + send in background.
+      await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83D\uDCC4 Building your OG Scan PRO dossier\u2026 this takes ~30-60s." });
       await tg(token, "sendChatAction", { chat_id: chatId, action: "upload_document" });
-      const rep = await getReportPdf(arg);
-      if (rep) {
-        await sendDocument(token, chatId, rep.bytes, rep.sym, "\uD83D\uDCC4 OG Scan report", isGroup ? { reply_to_message_id: msg.message_id } : {});
-      } else {
-        await tg(token, "sendMessage", { chat_id: chatId, text: "Couldn't generate a report for that token." });
-      }
+      const work = (async () => {
+        const rep = await getReportPdf(arg);
+        if (rep) await sendDocument(token, chatId, rep.bytes, rep.sym, "\uD83D\uDCC4 OG Scan PRO report", isGroup ? { reply_to_message_id: msg.message_id } : {});
+        else await tg(token, "sendMessage", { chat_id: chatId, text: "Couldn't generate a report for that token." });
+      })();
+      // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime.
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) EdgeRuntime.waitUntil(work);
+      else await work;
       return ok();
     }
 
