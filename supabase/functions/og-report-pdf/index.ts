@@ -541,8 +541,15 @@ function esc(s: any): string { return String(s ?? "").replace(/&/g, "&amp;").rep
 function fUsd(n: any): string { const v = Number(n); if (!isFinite(v) || !v) return "N/A"; if (v >= 1e9) return "$" + (v / 1e9).toFixed(2) + "B"; if (v >= 1e6) return "$" + (v / 1e6).toFixed(2) + "M"; if (v >= 1e3) return "$" + (v / 1e3).toFixed(1) + "K"; return "$" + v.toFixed(2); }
 function fNum(n: any): string { return (n == null || !isFinite(Number(n))) ? "N/A" : Number(n).toLocaleString(); }
 
-function htmlTemplate(scan: any, ai: any, social: any): string {
+function htmlTemplate(scan: any, ai: any, social: any, theme: any = {}): string {
   const t = scan.token, sig = scan.score.signals, f = scan.flags;
+  const DEF: Record<string,string> = { "--bg":"#0a0b0d","--card":"#14161a","--card2":"#1b1e24","--line":"#262b33","--ink":"#e8edf2","--mut":"#8b94a0","--green":"#2fe38a","--blue":"#5b8def","--gold":"#e8c63d","--red":"#ff5470" };
+  const TV = (theme && theme.vars && typeof theme.vars === "object") ? theme.vars : {};
+  const colors: Record<string,string> = { ...DEF };
+  for (const k of Object.keys(DEF)) { const v = TV[k]; if (typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v.trim())) colors[k] = v.trim(); }
+  const rootVars = ":root{" + Object.entries(colors).map(([k,v])=>k+":"+v).join(";") + "}";
+  const extraCss = (theme && typeof theme.extraCss === "string") ? theme.extraCss.slice(0, 4000) : "";
+  const extraSection = (theme && typeof theme.extraSection === "string") ? theme.extraSection.slice(0, 6000) : "";
   const sym = (t.symbol || "TOKEN").replace(/^\$/, "");
   const day = new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
   const sec = scan.score.total;
@@ -584,7 +591,7 @@ function htmlTemplate(scan: any, ai: any, social: any): string {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OG SCAN PRO — ${esc(t.name)} ($${esc(sym)})</title>
 <style>
-:root{--bg:#0a0b0d;--card:#14161a;--card2:#1b1e24;--line:#262b33;--ink:#e8edf2;--mut:#8b94a0;--green:#2fe38a;--blue:#5b8def;--gold:#e8c63d;--red:#ff5470}
+${rootVars}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:radial-gradient(1200px 600px at 70% -10%,#10261d 0,transparent 60%),var(--bg);color:var(--ink);font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;padding:0 0 60px}
 .wrap{max-width:880px;margin:0 auto;padding:0 20px}
@@ -626,7 +633,8 @@ ul{padding-left:20px}li{margin:5px 0}
 footer{text-align:center;color:var(--mut);font-size:12px;margin-top:24px}
 .cta{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:linear-gradient(90deg,#10261d,#0f1722);border:1px solid var(--green);border-radius:16px;padding:18px 20px;margin:18px 0}
 .cta b{color:var(--green)}.cta span{color:var(--mut);font-size:13px}
-.ctabtn{background:linear-gradient(90deg,#2fe38a,#1fb673);color:#06140e;font-weight:800;text-decoration:none;padding:11px 18px;border-radius:12px;white-space:nowrap}
+.ctabtn{background:linear-gradient(90deg,var(--green),#1fb673);color:#06140e;font-weight:800;text-decoration:none;padding:11px 18px;border-radius:12px;white-space:nowrap}
+${extraCss}
 </style></head><body>
 <header><div class="wrap"><div class="brand">OG SCAN PRO</div><h1>ADVANCED TOKEN INTELLIGENCE DOSSIER</h1><div class="sub">NFA · REAL-TIME SYNTHESIS · ${esc(day)}</div></div></header>
 <div class="wrap">
@@ -682,45 +690,38 @@ ${mon}
 </div></body></html>`;
 }
 
-async function vibecodeHtml(scan: any, social: any, holders: any, instructions = ""): Promise<string | null> {
+async function customizeTheme(instructions: string): Promise<any> {
+  if (!instructions || !instructions.trim()) return {};
   const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
   const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
-  const MODEL = Deno.env.get("NVIDIA_HTML_MODEL") || "meta/llama-3.1-8b-instruct";
-  const t = scan.token;
-  const data = {
-    token: t, score: scan.score, flags: scan.flags, verdict: scan.verdict,
-    social: social ? { x: social.xUrl, handle: social.handle, website: social.website, telegram: social.telegram, followers: social.followers, posts: social.posts, dexId: social.dexId } : null,
-    holders, websiteLore: (social?.siteText || "").slice(0, 1500), xProfile: (social?.xText || "").slice(0, 700),
-  };
-  const prompt = `You are an elite analyst + web designer. Using ONLY the real data below, ANALYZE this Solana token and DESIGN a COMPLETE, single-file, self-contained HTML5 document (one <style> block; NO external CSS/JS/fonts/images) branded "OG SCAN PRO - Advanced Token Intelligence Dossier".
-
-VISUAL: stunning modern dark theme, neon-green (#2fe38a) + blue accents, subtle gradients, glassy rounded cards, a circular score gauge via CSS conic-gradient, colored status badges, CSS score bars, clean tables, generous spacing, mobile-responsive.
-
-CONTENT sections (use the real numbers; base narrative on the website lore; never fabricate): token identity + tagline; verdict evolution (original OG score ${scan.score.total}/100 vs your PRO re-evaluation 0-100 consistent with your verdict); full market snapshot (price, mc/fdv, liquidity, 24h volume + buys/sells, holders, top-holder %, age, txns/traders, organic); on-chain security/authority statuses with badges; holder distribution (use the provided top holders); narrative & social with the real links; KOL section if any real names; risk matrix (bullets); OG score re-evaluation table (Original vs PRO + rationale); appendix + NFA disclaimer. ALSO include a prominent, eye-catching highlighted CTA banner near the TOP and again at the BOTTOM that says this is a SAMPLE / preview report and that the COMPLETE report \u2014 with full holder lists, complete transaction history, and every data point \u2014 is available on the OG Scan website, with a button-style link to https://ogscan.fun (label it 'Get the Full Report on OG Scan'). Write substantive, confident analyst prose (no generic hedging). Format ALL numbers human-readably (e.g. $9.9M, $791K, price to 4 significant figures, counts with commas like 8,753). Your PRO score must be a genuine 0-100 re-evaluation that weighs narrative/community/holders, not 0.
-
-Output ONLY raw HTML starting with <!DOCTYPE html> and ending with </html>. No markdown, no code fences.
-
-DATA (JSON):
-${JSON.stringify(data)}`;
+  const MODEL = Deno.env.get("NVIDIA_THEME_MODEL") || "meta/llama-3.3-70b-instruct";
+  const prompt = `A user wants a custom visual theme (and optionally an extra section) for a crypto token intelligence report web page. Their EXACT request: "${instructions}"\n\n` +
+    `Return ONLY minified JSON: {"vars":{"--bg":"#hex","--card":"#hex","--card2":"#hex","--line":"#hex","--ink":"#hex","--mut":"#hex","--green":"#hex","--blue":"#hex","--gold":"#hex","--red":"#hex"},"extraCss":"","extraSection":"","headline":""}\n\n` +
+    `RULES:\n` +
+    `- Pick colors that PRECISELY match the request. If they name colors (purple, pink, gold, red, blue, matrix-green, orange, etc.), USE THOSE. --green is the PRIMARY accent, --blue the SECONDARY accent, --gold/--red are status colors.\n` +
+    `- --bg must stay dark for readability (unless they explicitly ask for light/white), and --ink must strongly contrast --bg. Cards (--card/--card2) slightly lighter than --bg.\n` +
+    `- Omit any var you don't want to change.\n` +
+    `- extraSection: ONLY if they explicitly asked for an extra section (roadmap, FAQ, tokenomics, etc.). Return a complete <div class=\"section\"><h2>Title</h2> ... </div> reusing existing classes (section, grid, stat, tbl, callout, badge, bar). Otherwise "".\n` +
+    `- extraCss: optional small tasteful extra CSS rules (no <script>, no @import, no external URLs). Otherwise "".\n` +
+    `Output JSON only, no markdown.`;
   try {
     const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
-      body: JSON.stringify({ model: MODEL, messages: [{ role: "system", content: "You output only one complete HTML document. No markdown fences, no commentary." }, { role: "user", content: prompt }], temperature: 0.6, max_tokens: 6000 }),
-      signal: AbortSignal.timeout(60000),
+      body: JSON.stringify({ model: MODEL, messages: [{ role: "system", content: "You output only one minified JSON object. No markdown, no commentary." }, { role: "user", content: prompt }], temperature: 0.4, max_tokens: 1500 }),
+      signal: AbortSignal.timeout(40000),
     });
     const j = await r.json();
-    let html = String(j.choices?.[0]?.message?.content || "").trim();
-    html = html.replace(/^```html\s*/i, "").replace(/```\s*$/i, "").trim();
-    const lo = html.toLowerCase();
-    const i = lo.indexOf("<!doctype");
-    const e = lo.lastIndexOf("</html>");
-    if (i >= 0 && e > i) html = html.slice(i, e + 7);
-    if (html.length > 2500 && /<\/html>/i.test(html) && /<style/i.test(html)) return html;
-  } catch { /* fall through */ }
-  return null;
-}
-Deno.serve(async (req) => {
+    let txt = String(j.choices?.[0]?.message?.content || "").trim();
+    const a = txt.indexOf("{"), b = txt.lastIndexOf("}");
+    if (a >= 0 && b > a) txt = txt.slice(a, b + 1);
+    const parsed = JSON.parse(txt);
+    // sanitize extraSection/extraCss: no scripts
+    if (typeof parsed.extraSection === "string" && /<script/i.test(parsed.extraSection)) parsed.extraSection = "";
+    if (typeof parsed.extraCss === "string" && /<\/?script|@import|url\s*\(/i.test(parsed.extraCss)) parsed.extraCss = "";
+    return parsed;
+  } catch { return {}; }
+}Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const body = await req.json().catch(() => ({}));
@@ -730,9 +731,9 @@ Deno.serve(async (req) => {
     if (!scan || !scan.ok) return jsonResp({ ok: false, error: scan?.error || "Token not found." }, 404);
     const social = await gatherSocial(scan.token.mint);
     if (body.mode === "html") {
-      const holders = await getHoldersCtx(scan.token.mint);
-      let html = await vibecodeHtml(scan, social, holders, String(body.instructions || "").slice(0, 600));
-      if (!html) { const aiF = await synthesize(scan, social); html = htmlTemplate(scan, aiF, social); }
+      const instr = String(body.instructions || "").slice(0, 600);
+      const [aiH, theme] = await Promise.all([synthesize(scan, social), instr ? customizeTheme(instr) : Promise.resolve({})]);
+      const html = htmlTemplate(scan, aiH, social, theme);
       const symH = (scan.token.symbol || "token").replace(/[^a-zA-Z0-9]/g, "");
       return new Response(html, { status: 200, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "Content-Disposition": `attachment; filename="OG_SCAN_PRO_${symH}.html"` } });
     }
