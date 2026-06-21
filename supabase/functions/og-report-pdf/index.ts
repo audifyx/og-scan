@@ -369,6 +369,7 @@ async function buildPdf(scan: any, ai: any, social: any): Promise<Uint8Array> {
   D.gap(2);
   D.para("Key Insight: " + (ai.keyInsight || "Volume and holder trends relative to market cap indicate the current market structure; balanced two-way flow is generally healthier than one-sided pressure."), { font: D.bold, size: 9.5 });
 
+  D.addPage();
   // ---- On-chain fundamentals ----
   D.heading("On-Chain Fundamentals & Transaction Intelligence");
   D.subheading("Security & Authority Status (Verified)");
@@ -392,6 +393,7 @@ async function buildPdf(scan: any, ai: any, social: any): Promise<Uint8Array> {
   D.para(ai.holderDistribution || `Total holders ~${fmtNum(t.holderCount)}; top holders control ~${t.topHoldersPct != null ? Number(t.topHoldersPct).toFixed(1) + "%" : "N/A"} (OG Scan metric). Lower concentration indicates the launch was not heavily front-run.`);
   if (ai.riskNote) { D.gap(2); D.para("Risk Note: " + ai.riskNote, { font: D.bold }); }
 
+  D.addPage();
   // ---- Narrative & social ----
   D.heading("Narrative Archaeology & Social Intelligence");
   // Verified, keyless social presence (DexScreener + r.jina.ai) - always real.
@@ -426,6 +428,7 @@ async function buildPdf(scan: any, ai: any, social: any): Promise<Uint8Array> {
   }
   if (ai.godTierSynthesis) { D.gap(2); D.para("God-Tier Synthesis: " + ai.godTierSynthesis, { font: D.ital, color: C.indigo }); }
 
+  D.addPage();
   // ---- Risk matrix & re-eval ----
   D.heading("Comprehensive Risk Matrix & Score Re-Evaluation");
   D.subheading("Inherent Risks (Non-Negotiable)");
@@ -468,6 +471,7 @@ async function buildPdf(scan: any, ai: any, social: any): Promise<Uint8Array> {
   D.gap(2);
   D.para("Final Verdict: " + (ai.finalVerdict || "The PRO-adjusted score reflects a category-aware reassessment of the raw OG signals. Treat as one input among many; position sizing and active monitoring are mandatory."), { font: D.ital, color: C.indigo });
 
+  D.addPage();
   // ---- Appendix ----
   D.heading("Appendix: Data Sources, Links & Methodology");
   D.subheading("Primary Data Sources");
