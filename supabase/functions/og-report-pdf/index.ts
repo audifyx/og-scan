@@ -684,6 +684,7 @@ ${ai.reassessment ? `<div class="callout">${esc(ai.reassessment)}</div>` : ""}</
 <div class="stat"><div class="l">6h</div><div class="n">${pchg(t.priceChange6h)}</div></div>
 <div class="stat"><div class="l">24h</div><div class="n">${pchg(t.priceChange24h)}</div></div>
 <div class="stat"><div class="l">Net Buyers 24h</div><div class="n">${t.netBuyers24h != null ? ((t.netBuyers24h >= 0 ? "+" : "") + fNum(t.netBuyers24h)) : "N/A"}</div></div>
+<div class="stat"><div class="l">Momentum</div><div class="n">${t.momentum != null ? t.momentum + "/100" : "N/A"}${t.momentumLabel ? " <span style=\"font-size:11px;color:var(--mut)\">" + esc(t.momentumLabel) + "</span>" : ""}</div></div>
 </div>
 ${ai.keyInsight ? `<div class="callout"><b>Key Insight:</b> ${esc(ai.keyInsight)}</div>` : ""}</div>
 
@@ -768,7 +769,27 @@ async function customizeTheme(instructions: string): Promise<any> {
     parsed.font = fontOk(parsed.font); parsed.headingFont = fontOk(parsed.headingFont);
     return parsed;
   } catch { return {}; }
-}Deno.serve(async (req) => {
+}async function saveReport(html: string, scan: any, query: string, instructions: string): Promise<string | null> {
+  try {
+    const id = crypto.randomUUID();
+    const path = `${id}.html`;
+    const up = await fetch(`${SUPABASE_URL}/storage/v1/object/reports/${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE, "Content-Type": "text/html", "x-upsert": "true" },
+      body: html,
+    });
+    if (!up.ok) { console.error("report upload", up.status, await up.text().catch(()=> "")); return null; }
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/reports/${path}`;
+    await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ id, query, instructions: instructions || null, token_name: scan.token.name, token_symbol: scan.token.symbol, token_mint: scan.token.mint, source: "telegram", html_path: path, public_url: publicUrl }),
+    }).catch((e) => console.error("report insert", e));
+    return publicUrl;
+  } catch (e) { console.error("saveReport", e); return null; }
+}
+
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const body = await req.json().catch(() => ({}));
@@ -782,7 +803,8 @@ async function customizeTheme(instructions: string): Promise<any> {
       const [aiH, theme] = await Promise.all([synthesize(scan, social), instr ? customizeTheme(instr) : Promise.resolve({})]);
       const html = htmlTemplate(scan, aiH, social, theme);
       const symH = (scan.token.symbol || "token").replace(/[^a-zA-Z0-9]/g, "");
-      return new Response(html, { status: 200, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "Content-Disposition": `attachment; filename="OG_SCAN_PRO_${symH}.html"` } });
+      const publicUrl = await saveReport(html, scan, q, instr);
+      return new Response(html, { status: 200, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "Content-Disposition": `attachment; filename="OG_SCAN_PRO_${symH}.html"`, ...(publicUrl ? { "X-Report-Url": publicUrl } : {}) } });
     }
     const ai = await synthesize(scan, social);
     if (body.mode === "data") return jsonResp({ ok: true, scan, ai, social });

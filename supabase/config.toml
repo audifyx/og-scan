@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.sync-bot-commands]
 verify_jwt = false
+
+[functions.alerts]
+verify_jwt = true
+
+[functions.alert-checker]
+verify_jwt = false

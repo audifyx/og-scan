@@ -241,6 +241,20 @@ Deno.serve(async (req) => {
     };
 
     const soc = await getSocials(token.id);
+    const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
+    let mom = 50;
+    const pc24 = Number(token.stats24h?.priceChange);
+    if (isFinite(pc24)) mom += clamp(pc24 / 4, -25, 25);
+    const bv = Number(token.stats24h?.buyVolume) || 0, sv = Number(token.stats24h?.sellVolume) || 0;
+    const br = (bv + sv) > 0 ? bv / (bv + sv) : 0.5;
+    mom += br > 0.55 ? 8 : br < 0.45 ? -8 : 0;
+    const nb = Number(token.stats24h?.numNetBuyers); if (isFinite(nb)) mom += nb > 0 ? 8 : -8;
+    const hc = Number(token.stats24h?.holderChange); if (isFinite(hc)) mom += clamp(hc, -10, 10);
+    const liq = tokenEffectiveLiquidityUsd(token) || 0; const vol = bv + sv;
+    if (liq > 0) mom += (vol / liq) > 2 ? 6 : (vol / liq) < 0.3 ? -6 : 0;
+    const org = Number(token.organicScore); if (isFinite(org)) mom += org > 70 ? 6 : org < 30 ? -6 : 0;
+    mom = Math.round(clamp(mom, 0, 100));
+    const momLabel = mom >= 75 ? "\uD83D\uDD25 hot" : mom >= 55 ? "warming" : mom >= 40 ? "neutral" : mom >= 25 ? "cooling" : "cold";
     const out = {
       ok: true,
       query: q,
@@ -266,6 +280,7 @@ Deno.serve(async (req) => {
         holderCount: token.holderCount ?? null,
         topHoldersPct: token.audit?.topHoldersPercentage ?? token.topHoldersPercent ?? null,
         organicScore: token.organicScore ?? null, organicScoreLabel: token.organicScoreLabel ?? null,
+        momentum: mom, momentumLabel: momLabel,
         athMcap: tokenAthMarketCapUsd(token) || null,
         priceChange24h: token.stats24h?.priceChange ?? null,
         buyVolume24h: token.stats24h?.buyVolume ?? null, sellVolume24h: token.stats24h?.sellVolume ?? null,

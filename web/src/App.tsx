@@ -18,6 +18,8 @@ import Auth from "./pages/Auth";
 import Setup from "./pages/Setup";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import Reports from "./pages/Reports";
+import Alerts from "./pages/Alerts";
 import Tokens from "./pages/Tokens";
 import Tools from "./pages/Tools";
 // AdvancedTools removed
@@ -187,6 +189,8 @@ const App = () => (
             <Route path="/profile" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/profile/:userId" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
             <Route path="/wallets" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/games" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />

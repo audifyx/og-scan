@@ -1,7 +1,6 @@
 import {
   Coins, Compass, Hash, LogOut, Mail, Pencil,
-  Settings, TrendingUp, User, Wallet, X, Shield, Menu, Wrench, Home,
-} from "lucide-react";
+  Settings, TrendingUp, User, Wallet, X, Shield, Menu, Wrench, Home, FileText, Bell} from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,6 +21,8 @@ const primaryItems: NavItem[] = [
   { to: "/app",           icon: Home,    label: "Home",         eyebrow: "Command hub" },
   { to: "/our-coin",      icon: Coins,   label: "OFFICIAL OGS", eyebrow: "Official token room" },
   { to: "/tools",         icon: Wrench,  label: "Tools",        eyebrow: "Scanners & Feeds" },
+  { to: "/reports",       icon: FileText, label: "Reports",     eyebrow: "AI report feed" },
+  { to: "/alerts",        icon: Bell,    label: "Alerts",       eyebrow: "Discord & webhooks" },
   { to: "/profile",       icon: User,    label: "Profile",      eyebrow: "Your account" },
 ];
 
