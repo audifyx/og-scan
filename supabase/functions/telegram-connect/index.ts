@@ -41,6 +41,7 @@ const RESERVED_COMMANDS = new Set([
   "start", "help", "chat", "ask", "grim", "c", "scan", "analyze",
   "news", "alpha", "calls", "callouts", "migrations", "migrated",
   "graduations", "alerts", "digest",
+  "vibecodeanything", "vibecode", "vibe", "vca",
   "price", "p", "btc", "eth", "sol", "global", "market", "fear", "fng", "feargreed", "tvl",
   "trending", "trend", "wallet", "portfolio", "pnl", "holders", "watch", "watchlist", "unwatch", "report", "pdf",
 ]);
@@ -55,6 +56,7 @@ async function refreshCommandMenu(admin: any, botToken: string, botRowId: string
     { command: "chat", description: "Chat with the AI analyst" },
     { command: "scan", description: "Full token risk report" },
     { command: "report", description: "PDF intelligence report" },
+    { command: "vibecodeanything", description: "Build ANY custom HTML5 page from a prompt" },
     { command: "wallet", description: "Wallet portfolio snapshot" },
     { command: "pnl", description: "Wallet PnL (last 100 txns)" },
     { command: "holders", description: "Top holder distribution" },

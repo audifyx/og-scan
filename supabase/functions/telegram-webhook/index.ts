@@ -327,6 +327,60 @@ async function sendDocument(botToken: string, chatId: number, bytes: Uint8Array,
   } catch (e) { console.error("sendDocument err", e); }
 }
 
+// ── Vibe-coder: build ANY high-quality single-file HTML5 page from a prompt ──
+const VIBE_MODEL = "deepseek-ai/deepseek-v4-pro"; // strong free coder; falls back to llama-3.3-70b
+async function vibeCodeHtml(prompt: string): Promise<{ bytes: Uint8Array; name: string; url: string } | null> {
+  const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
+  const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
+  const sys =
+    `You are an elite front-end engineer and creative web designer — a world-class "vibe coder". Build EXACTLY what the user describes, word for word, as ONE self-contained HTML5 document.\n` +
+    `HARD RULES:\n` +
+    `- Output ONLY raw HTML. No markdown, no code fences, no commentary before or after. Start with <!DOCTYPE html> and end with </html>.\n` +
+    `- Single file: inline ALL CSS in <style> and ALL JS in <script>. You MAY use CDNs (Google Fonts, Tailwind CDN, Font Awesome, GSAP, etc.) when they raise quality.\n` +
+    `- High-class, modern, polished design: deliberate color palette, great typography, generous spacing, responsive layout, smooth CSS animations/transitions, hover states, and micro-interactions. NEVER ship boring default-browser HTML.\n` +
+    `- Implement every specific detail the user names (exact colors, components, dropdowns, sections, copy, behavior) precisely and literally.\n` +
+    `- Fully functional and interactive with real vanilla JS — no "TODO"/placeholder stubs. Build the real thing.\n` +
+    `- Accessible, mobile-friendly, and self-contained so it works by just opening the file.`;
+  const tryModel = async (m: string): Promise<string | null> => {
+    try {
+      const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
+        body: JSON.stringify({ model: m, messages: [{ role: "system", content: sys }, { role: "user", content: prompt }], temperature: 0.7, max_tokens: 8000 }),
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!r.ok) return null;
+      const j = await r.json();
+      return String(j.choices?.[0]?.message?.content || "").trim() || null;
+    } catch { return null; }
+  };
+  let raw = await tryModel(VIBE_MODEL);
+  if (!raw) raw = await tryModel("meta/llama-3.3-70b-instruct");
+  if (!raw) return null;
+  // Clean up: strip accidental code fences, trim to the actual document.
+  let html = raw.replace(/^```[a-zA-Z]*\s*/, "").replace(/\s*```$/, "").trim();
+  const dt = html.search(/<!DOCTYPE html>/i);
+  if (dt > 0) html = html.slice(dt);
+  const endIdx = html.toLowerCase().lastIndexOf("</html>");
+  if (endIdx !== -1) html = html.slice(0, endIdx + 7);
+  if (!/<html|<!doctype/i.test(html)) {
+    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${html}</body></html>`;
+  }
+  // Host it on the public reports bucket for a shareable live link (best effort).
+  let url = "";
+  try {
+    const id = crypto.randomUUID();
+    const path = `vibe/${id}.html`;
+    const up = await fetch(`${SUPABASE_URL}/storage/v1/object/reports/${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE, "Content-Type": "text/html", "x-upsert": "true" },
+      body: html,
+    });
+    if (up.ok) url = `${SUPABASE_URL}/storage/v1/object/public/reports/${path}`;
+  } catch { /* hosting is optional */ }
+  return { bytes: new TextEncoder().encode(html), name: "vibecode.html", url };
+}
+
 async function getReportHtml(query: string, instructions = ""): Promise<{ bytes: Uint8Array; name: string; url: string } | null> {
   try {
     const r = await fetch(`${SUPABASE_URL}/functions/v1/og-report-pdf`, {
@@ -771,6 +825,7 @@ Deno.serve(async (req) => {
           `/fear — crypto Fear & Greed index\n` +
           `/tvl [chain] — DeFi TVL by chain\n` +
           `/report <token> — PDF intelligence report\n` +
+          `/vibecodeanything <prompt> — build ANY custom HTML5 page from a prompt\n` +
           `/wallet <address> — wallet portfolio snapshot\n` +
           `/pnl <address> — wallet PnL (last 100 txns)\n` +
           `/holders <token> — top holder distribution\n` +
@@ -1015,6 +1070,34 @@ Deno.serve(async (req) => {
           await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 your OG Scan PRO sample report." + (rep.url ? "\n\n\uD83D\uDD17 Shareable link: " + rep.url : "") + "\n\nThis is a sample. For the FULL report visit ogscan.fun.", { ...(isGroup ? { reply_to_message_id: msg.message_id } : {}), reply_markup: JSON.stringify({ inline_keyboard: [[...(rep.url ? [{ text: "\uD83D\uDD17 Open Report", url: rep.url }] : []), { text: "\uD83C\uDF10 Full Report on OG Scan", url: "https://ogscan.fun" }]] }) }, "text/html");
         } else {
           await tg(token, "sendMessage", { chat_id: chatId, text: "Couldn't build a report for that token." });
+        }
+      })();
+      // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime.
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) EdgeRuntime.waitUntil(work);
+      else await work;
+      return ok();
+    }
+
+    if (cmd === "/vibecodeanything" || cmd === "/vibecode" || cmd === "/vibe" || cmd === "/vca") {
+      const arg = text.replace(/^\S+\s*/, "").trim();
+      if (!arg) {
+        await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83C\uDFA8 /vibecodeanything <describe what to build>\ne.g. /vibecodeanything a blue calendar website with dropdown menus and smooth animations" });
+        return ok();
+      }
+      await tg(token, "sendMessage", { chat_id: chatId, text: `\uD83C\uDFA8 Vibecoding: \u201C${escHtml(arg).slice(0, 140)}\u201D\u2026 building a full HTML5 page, ~30-90s.` });
+      await tg(token, "sendChatAction", { chat_id: chatId, action: "upload_document" });
+      const work = (async () => {
+        const out = await vibeCodeHtml(arg);
+        if (out) {
+          const slug = arg.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "vibecode";
+          await sendDocument(
+            token, chatId, out.bytes, `${slug}.html`,
+            `\u2705 Built it \u2014 open in your browser.${out.url ? "\n\n\uD83D\uDD17 Live: " + out.url : ""}`,
+            { ...(isGroup ? { reply_to_message_id: msg.message_id } : {}), ...(out.url ? { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "\uD83D\uDD17 Open Live Page", url: out.url }]] }) } : {}) },
+            "text/html",
+          );
+        } else {
+          await tg(token, "sendMessage", { chat_id: chatId, text: "Couldn't build that one \u2014 try again or rephrase the prompt." });
         }
       })();
       // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime.

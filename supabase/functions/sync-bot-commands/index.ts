@@ -12,6 +12,7 @@ const BASE_COMMANDS = [
   { command: "chat", description: "Chat with the AI analyst" },
   { command: "scan", description: "Full token risk report" },
   { command: "report", description: "PDF intelligence report" },
+  { command: "vibecodeanything", description: "Build ANY custom HTML5 page from a prompt" },
   { command: "wallet", description: "Wallet portfolio snapshot" },
   { command: "pnl", description: "Wallet PnL (last 100 txns)" },
   { command: "holders", description: "Top holder distribution" },
