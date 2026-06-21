@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { resolveModel } from "../_shared/models.ts";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
@@ -683,7 +684,8 @@ Deno.serve(async (req: Request) => {
 
     let body: any = {};
     try { body = await req.json(); } catch { return json({ error: "Invalid JSON body" }, 400); }
-    const { messages, context, stream: wantStream } = body || {};
+    const { messages, context, stream: wantStream, model: requestedModel } = body || {};
+    const chosenModel = resolveModel(requestedModel);
     if (!messages || !Array.isArray(messages)) return json({ error: "messages required" }, 400);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -836,8 +838,8 @@ Deno.serve(async (req: Request) => {
 
     const convo: any[] = [{ role: "system", content: systemPrompt }, ...messages];
     const meta = {
-      model: MODEL,
-      modelsUsed: [MODEL],
+      model: chosenModel,
+      modelsUsed: [chosenModel],
       consensus: 0.85,
       toolsUsed: [...new Set(toolsUsed)],
       token: structuredToken,
@@ -847,7 +849,7 @@ Deno.serve(async (req: Request) => {
 
     // ── Real SSE streaming branch ───────────────────────────────────────────
     if (wantStream) {
-      const upstream = await callNvidiaStream({ model: MODEL, messages: convo, temperature: 0.85, max_tokens: 1600 });
+      const upstream = await callNvidiaStream({ model: chosenModel, messages: convo, temperature: 0.85, max_tokens: 1600 });
       if (!upstream.ok || !upstream.body) {
         const errText = await upstream.text().catch(() => "");
         return json({ error: `Model error: ${errText || upstream.status}` }, 502);
@@ -897,7 +899,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const result = await callNvidia({ model: MODEL, messages: convo, temperature: 0.85, max_tokens: 1600 });
+    const result = await callNvidia({ model: chosenModel, messages: convo, temperature: 0.85, max_tokens: 1600 });
     if (!result.ok) {
       const msg = result.parsed?.error?.message || result.text || `NVIDIA error ${result.status}`;
       return json({ error: `Model error: ${msg}` }, 502);

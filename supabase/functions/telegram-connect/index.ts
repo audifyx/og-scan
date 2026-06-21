@@ -13,6 +13,7 @@
 //   { action: "command_delete", command }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { BOT_MODELS, resolveModel } from "../_shared/models.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -30,6 +31,7 @@ const safe = (b: any) => b && ({
   id: b.id, bot_username: b.bot_username, bot_id: b.bot_id,
   bot_name: b.bot_name, persona: b.persona,
   alerts_migrations: b.alerts_migrations, ai_enabled: b.ai_enabled,
+  ai_model: b.ai_model,
   auto_scan: b.auto_scan, digest_enabled: b.digest_enabled,
   min_marketcap: b.min_marketcap, created_at: b.created_at,
 });
@@ -108,9 +110,14 @@ Deno.serve(async (req) => {
       if (body.min_marketcap != null) patch.min_marketcap = Number(body.min_marketcap) || 0;
       if (typeof body.auto_scan === "boolean") patch.auto_scan = body.auto_scan;
       if (typeof body.digest_enabled === "boolean") patch.digest_enabled = body.digest_enabled;
+      if (typeof body.ai_model === "string") patch.ai_model = resolveModel(body.ai_model);
       const { data, error } = await admin.from("telegram_bots").update(patch).eq("user_id", user.id).select().maybeSingle();
       if (error) return json({ error: error.message }, 400);
       return json({ bot: safe(data) });
+    }
+
+    if (action === "models") {
+      return json({ models: BOT_MODELS });
     }
 
     if (action === "disconnect") {

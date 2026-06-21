@@ -5,6 +5,7 @@
 // No JWT (Telegram calls it). Deploy with --no-verify-jwt.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveModel } from "../_shared/models.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -449,10 +450,10 @@ function formatScan(s: any): string {
 
 // Conversational reply for normal chat. Talks naturally; only goes into crypto
 // analysis if the user gives a CA/wallet or explicitly asks about a token/project.
-async function chatReply(userText: string, identity = "", knowledge = ""): Promise<string> {
+async function chatReply(userText: string, identity = "", knowledge = "", model = ""): Promise<string> {
   const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
   const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
-  const MODEL = Deno.env.get("NVIDIA_CHAT_MODEL") || "meta/llama-3.3-70b-instruct";
+  const MODEL = resolveModel(model || Deno.env.get("NVIDIA_CHAT_MODEL"));
   const sys =
     (identity || "You are a friendly, helpful assistant for OG Scan, a Solana analytics bot.") +
     `\n\nYou are chatting on Telegram. Reply naturally and conversationally, matching the user's tone and length. Keep it human and brief.\n` +
@@ -473,7 +474,7 @@ async function chatReply(userText: string, identity = "", knowledge = ""): Promi
   } catch { return "gm"; }
 }
 
-async function askGrim(text: string, knowledge = "", identity = "") {
+async function askGrim(text: string, knowledge = "", identity = "", model = "") {
   try {
     const context = "Source: Telegram bot"
       + (identity ? `\n\n${identity}` : "")
@@ -483,7 +484,7 @@ async function askGrim(text: string, knowledge = "", identity = "") {
     const r = await fetch(`${SUPABASE_URL}/functions/v1/enhanced-intelligence`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
-      body: JSON.stringify({ messages: [{ role: "user", content: text }], context }),
+      body: JSON.stringify({ messages: [{ role: "user", content: text }], context, model: resolveModel(model) }),
     });
     const j = await r.json();
     return j.content || j.error || "Couldn't read the chain right now, try again.";
@@ -714,7 +715,7 @@ Deno.serve(async (req) => {
         if (bot.ai_enabled) {
           const take = await askGrim(
             `Give a sharp 2-3 sentence verdict on this token based ONLY on this OG Scan data. No preamble.\n\n${JSON.stringify(scan)}`,
-            "", identity,
+            "", identity, bot.ai_model,
           );
           if (take) await sendLong(token, chatId, take, isGroup ? { reply_to_message_id: msg.message_id } : {});
         }
@@ -724,7 +725,7 @@ Deno.serve(async (req) => {
       if (bot.ai_enabled) {
         const scanPrompt = `Run a full OG Scan token analysis of: ${arg}. Cover liquidity, holder concentration, LP/contract risk, dev history, and finish with a clear verdict.`;
         const knowledge = await retrieveKnowledge(bot.id, arg);
-        const answer = await askGrim(scanPrompt, knowledge, identity);
+        const answer = await askGrim(scanPrompt, knowledge, identity, bot.ai_model);
         await sendLong(token, chatId, answer, isGroup ? { reply_to_message_id: msg.message_id } : {});
       } else {
         await tg(token, "sendMessage", { chat_id: chatId, text: scan?.error || "Couldn't find that token." });
@@ -767,7 +768,7 @@ Deno.serve(async (req) => {
         if (scan && scan.ok) { await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) }); return ok(); }
       }
       const knowledge = await retrieveKnowledge(bot.id, prompt);
-      const answer = await chatReply(prompt, identity, knowledge);
+      const answer = await chatReply(prompt, identity, knowledge, bot.ai_model);
       await sendLong(token, chatId, answer, isGroup ? { reply_to_message_id: msg.message_id } : {});
       return ok();
     }
@@ -816,7 +817,7 @@ Deno.serve(async (req) => {
           await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
           const prompt = `${custom.content}\n\nUser input: ${arg || "(none)"}`;
           const knowledge = await retrieveKnowledge(bot.id, arg || custom.content);
-          const answer = await askGrim(prompt, knowledge, identity);
+          const answer = await askGrim(prompt, knowledge, identity, bot.ai_model);
           await sendLong(token, chatId, answer, isGroup ? { reply_to_message_id: msg.message_id } : {});
         } else {
           const uname = msg.from?.username ? "@" + msg.from.username : (msg.from?.first_name || "there");
@@ -858,7 +859,7 @@ Deno.serve(async (req) => {
       const prompt = cleanText || "gm";
       await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
       const knowledge = await retrieveKnowledge(bot.id, prompt);
-      const answer = await chatReply(prompt, identity, knowledge);
+      const answer = await chatReply(prompt, identity, knowledge, bot.ai_model);
       await sendLong(token, chatId, answer, isGroup ? { reply_to_message_id: msg.message_id } : {});
     }
     return ok();
