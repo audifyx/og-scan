@@ -51,7 +51,7 @@ export default function Alerts() {
 
   return (
     <AppLayout>
-      <PageHeader title="Webhook Alerts" subtitle="Get token & migration alerts in Discord or any webhook — no full bot needed" />
+      <PageHeader title="Webhook Alerts" description="Get token & migration alerts in Discord or any webhook — no full bot needed" />
       <div className="px-4 pb-24 max-w-[820px] mx-auto space-y-4">
         {/* create */}
         <Card className="p-5 glass-card">

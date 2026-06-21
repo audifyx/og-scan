@@ -37,7 +37,7 @@ export default function Reports() {
 
   return (
     <AppLayout>
-      <PageHeader title="Reports" subtitle="Every AI-generated OG Scan report from the bot" />
+      <PageHeader title="Reports" description="Every AI-generated OG Scan report from the bot" />
       <div className="px-4 pb-24 max-w-[1200px] mx-auto">
         <div className="flex items-center justify-between mb-3">
           <div className="text-white/40 text-[12px]">{reports.length} report{reports.length === 1 ? "" : "s"}</div>
