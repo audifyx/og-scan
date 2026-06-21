@@ -788,7 +788,7 @@ Deno.serve(async (req) => {
       const work = (async () => {
         const rep = await getReportHtml(rQuery, rInstr);
         if (rep) {
-          await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 full interactive OG Scan PRO report.", isGroup ? { reply_to_message_id: msg.message_id } : {}, "text/html");
+          await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 your OG Scan PRO sample report.\n\nThis is a sample. For the FULL report (complete holder lists, full tx history, every data point) visit ogscan.fun.", { ...(isGroup ? { reply_to_message_id: msg.message_id } : {}), reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "\uD83C\uDF10 Get the Full Report on OG Scan", url: "https://ogscan.fun" }]] }) }, "text/html");
         } else {
           await tg(token, "sendMessage", { chat_id: chatId, text: "Couldn't build a report for that token." });
         }
@@ -838,7 +838,7 @@ Deno.serve(async (req) => {
         const work = (async () => {
           const rep = await getReportHtml(mm[1], dropInstr);
           if (rep) {
-            await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 full OG Scan PRO report.", isGroup ? { reply_to_message_id: msg.message_id } : {}, "text/html");
+            await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 your OG Scan PRO sample report.\n\nThis is a sample. For the FULL report with every data point, visit ogscan.fun.", { ...(isGroup ? { reply_to_message_id: msg.message_id } : {}), reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "\uD83C\uDF10 Get the Full Report on OG Scan", url: "https://ogscan.fun" }]] }) }, "text/html");
           } else {
             const scan = await ogScan(mm[1]);
             if (scan && scan.ok) await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML" });

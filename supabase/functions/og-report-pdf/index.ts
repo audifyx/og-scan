@@ -624,10 +624,14 @@ ul{padding-left:20px}li{margin:5px 0}
 .links a{display:inline-block;margin:4px 10px 4px 0;color:var(--blue);text-decoration:none;border:1px solid var(--line);padding:6px 12px;border-radius:20px;font-size:13px}
 .disc{border:1px solid rgba(255,84,112,.4);background:rgba(255,84,112,.07);color:#ff9aab;border-radius:12px;padding:14px;font-size:12px;margin-top:16px}
 footer{text-align:center;color:var(--mut);font-size:12px;margin-top:24px}
+.cta{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:linear-gradient(90deg,#10261d,#0f1722);border:1px solid var(--green);border-radius:16px;padding:18px 20px;margin:18px 0}
+.cta b{color:var(--green)}.cta span{color:var(--mut);font-size:13px}
+.ctabtn{background:linear-gradient(90deg,#2fe38a,#1fb673);color:#06140e;font-weight:800;text-decoration:none;padding:11px 18px;border-radius:12px;white-space:nowrap}
 </style></head><body>
 <header><div class="wrap"><div class="brand">OG SCAN PRO</div><h1>ADVANCED TOKEN INTELLIGENCE DOSSIER</h1><div class="sub">NFA · REAL-TIME SYNTHESIS · ${esc(day)}</div></div></header>
 <div class="wrap">
 <div class="token"><div class="nm">${esc(t.name)} ($${esc(sym)})</div><div class="ca">${esc(t.mint)}</div>${ai.subtitle ? `<div class="tag">${esc(ai.subtitle)}</div>` : ""}</div>
+<div class="cta"><div><b>This is a sample report.</b><br><span>For the complete report \u2014 full holder lists, complete transaction history, and every data point \u2014 visit OG Scan.</span></div><a class="ctabtn" href="https://ogscan.fun">Get the Full Report \u2192</a></div>
 
 <div class="section"><h2>⚖️ Verdict Evolution</h2>
 <div class="score"><div class="ring" style="--p:${proScore}"><div class="in"><b>${proScore}</b><span>PRO / 100</span></div></div>
@@ -692,7 +696,7 @@ async function vibecodeHtml(scan: any, social: any, holders: any, instructions =
 
 VISUAL: stunning modern dark theme, neon-green (#2fe38a) + blue accents, subtle gradients, glassy rounded cards, a circular score gauge via CSS conic-gradient, colored status badges, CSS score bars, clean tables, generous spacing, mobile-responsive.
 
-CONTENT sections (use the real numbers; base narrative on the website lore; never fabricate): token identity + tagline; verdict evolution (original OG score ${scan.score.total}/100 vs your PRO re-evaluation 0-100 consistent with your verdict); full market snapshot (price, mc/fdv, liquidity, 24h volume + buys/sells, holders, top-holder %, age, txns/traders, organic); on-chain security/authority statuses with badges; holder distribution (use the provided top holders); narrative & social with the real links; KOL section if any real names; risk matrix (bullets); OG score re-evaluation table (Original vs PRO + rationale); appendix + NFA disclaimer. Write substantive, confident analyst prose (no generic hedging). Format ALL numbers human-readably (e.g. $9.9M, $791K, price to 4 significant figures, counts with commas like 8,753). Your PRO score must be a genuine 0-100 re-evaluation that weighs narrative/community/holders, not 0.
+CONTENT sections (use the real numbers; base narrative on the website lore; never fabricate): token identity + tagline; verdict evolution (original OG score ${scan.score.total}/100 vs your PRO re-evaluation 0-100 consistent with your verdict); full market snapshot (price, mc/fdv, liquidity, 24h volume + buys/sells, holders, top-holder %, age, txns/traders, organic); on-chain security/authority statuses with badges; holder distribution (use the provided top holders); narrative & social with the real links; KOL section if any real names; risk matrix (bullets); OG score re-evaluation table (Original vs PRO + rationale); appendix + NFA disclaimer. ALSO include a prominent, eye-catching highlighted CTA banner near the TOP and again at the BOTTOM that says this is a SAMPLE / preview report and that the COMPLETE report \u2014 with full holder lists, complete transaction history, and every data point \u2014 is available on the OG Scan website, with a button-style link to https://ogscan.fun (label it 'Get the Full Report on OG Scan'). Write substantive, confident analyst prose (no generic hedging). Format ALL numbers human-readably (e.g. $9.9M, $791K, price to 4 significant figures, counts with commas like 8,753). Your PRO score must be a genuine 0-100 re-evaluation that weighs narrative/community/holders, not 0.
 
 Output ONLY raw HTML starting with <!DOCTYPE html> and ending with </html>. No markdown, no code fences.
 
