@@ -649,7 +649,7 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:24px}
 .section.collapsed .chev{transform:rotate(-90deg)}
 .sbody{overflow:hidden;transition:max-height .4s ease,opacity .3s ease;max-height:6000px;opacity:1}
 .section.collapsed .sbody{max-height:0;opacity:0;margin:0}
-.reveal{opacity:0;transform:translateY(16px)}.reveal.in{opacity:1;transform:none;transition:opacity .55s ease,transform .55s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}body.anim .section,body.anim .token,body.anim .cta,body.anim .hero{animation:fadeUp .55s ease both}body.anim .section:nth-of-type(2){animation-delay:.05s}body.anim .section:nth-of-type(3){animation-delay:.1s}body.anim .section:nth-of-type(4){animation-delay:.15s}body.anim .section:nth-of-type(5){animation-delay:.2s}
 .stat,.ctabtn,.badge{transition:transform .2s ease,box-shadow .2s ease,filter .2s ease}
 .stat:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,.35);border-color:var(--green)}
 .ctabtn:hover{filter:brightness(1.08);transform:translateY(-1px)}
@@ -726,10 +726,7 @@ ${mon}
     h.insertAdjacentHTML('beforeend','<span class=\\"chev\\">\\u25BE</span>');
     h.addEventListener('click',function(){ sec.classList.toggle('collapsed'); });
   });
-  if(${animate} && 'IntersectionObserver' in window){
-    var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } })},{threshold:0.06});
-    document.querySelectorAll('.section,.token,.cta,.hero').forEach(function(el){ el.classList.add('reveal'); io.observe(el); });
-  }
+  if(${animate}){ document.body.classList.add('anim'); }
 })();
 </script>
 </body></html>`;
