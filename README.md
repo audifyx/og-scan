@@ -9,6 +9,15 @@ migration & whale tracking, communities/spaces, and an AI analysis agent.
 - `api/` — Vercel serverless functions
 - `docs/` — internal guides and specs
 
+
+## Bots (chat with Grim)
+- **Telegram** (`telegram-connect` + `telegram-webhook`): users connect their own
+  BotFather bot. `/chat <message>` (aliases `/ask`, `/grim`) talks to Grim in DMs
+  and groups without needing an @mention; `/migrations` and `/alerts on|off` too.
+- **Discord** (`discord-interactions`): `/chat` and `/migrations` slash commands.
+  See `supabase/functions/discord-interactions/README.md` for setup. Alert-only
+  webhook delivery still lives in `discord-connect`.
+
 ## Local setup
 ```bash
 cd web

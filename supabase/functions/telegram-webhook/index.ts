@@ -1,6 +1,6 @@
 // telegram-webhook — receives updates for ALL user-connected bots (multi-tenant).
 // Routed by ?bot=<uuid>; authenticated by per-bot secret_token header.
-// Commands: /start /help /migrations /alerts on|off. Any other text -> Grim AI
+// Commands: /start /help /chat /migrations /alerts on|off. Any other text -> Grim AI
 // (reuses our enhanced-intelligence fn = same NVIDIA models + our live APIs).
 // No JWT (Telegram calls it). Deploy with --no-verify-jwt.
 
@@ -168,6 +168,7 @@ Deno.serve(async (req) => {
         text:
           `💀 <b>Grim is online.</b>\n\nI read the Solana chain and rip tokens apart — no hopium.\n\n` +
           `<b>Commands</b>\n` +
+          `/chat — ask Grim anything (works in groups too)\n` +
           `/migrations — pump.fun graduations (last 24h)\n` +
           `/alerts on|off — instant migration alerts in this chat\n` +
           `/help — this menu\n\n` +
@@ -193,6 +194,29 @@ Deno.serve(async (req) => {
         await registerChat(bot.id, chatId, msg.chat.title || null);
         await tg(token, "sendMessage", { chat_id: chatId, text: "🔔 Migration alerts ON. You'll get every pump.fun graduation here instantly." });
       }
+      return ok();
+    }
+
+    // Explicit chat command — talk to Grim directly. Works everywhere (DMs and
+    // groups) WITHOUT needing an @mention, so it's reliable even when Telegram
+    // privacy mode hides group messages. Aliases: /ask /grim /c.
+    if (cmd === "/chat" || cmd === "/ask" || cmd === "/grim" || cmd === "/c") {
+      if (!bot.ai_enabled) {
+        await tg(token, "sendMessage", { chat_id: chatId, text: "AI chat is off for this bot. The owner can enable it in OG Scan settings." });
+        return ok();
+      }
+      // Prompt = text after the command, or the message being replied to.
+      const afterCmd = text.replace(/^\S+\s*/, "").trim();
+      const repliedText = msg.reply_to_message?.text || msg.reply_to_message?.caption || "";
+      const prompt = (afterCmd || repliedText).trim();
+      if (!prompt) {
+        await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83D\uDC80 Ask me something, e.g. /chat is SOL gonna pump? — or reply to any message with /chat." });
+        return ok();
+      }
+      await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
+      const knowledge = await retrieveKnowledge(bot.id, prompt);
+      const answer = await askGrim(prompt, knowledge);
+      await sendLong(token, chatId, answer, isGroup ? { reply_to_message_id: msg.message_id } : {});
       return ok();
     }
 

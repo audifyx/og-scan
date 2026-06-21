@@ -114,6 +114,20 @@ Deno.serve(async (req) => {
       const setJson = await setRes.json();
       if (!setJson.ok) return json({ error: "Connected, but failed to set webhook: " + (setJson.description || "unknown") }, 400);
 
+      // Register the command menu so /chat, /migrations, etc. show in Telegram's UI.
+      await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          commands: [
+            { command: "chat", description: "Chat with Grim (AI analyst)" },
+            { command: "migrations", description: "Pump.fun graduations (last 24h)" },
+            { command: "alerts", description: "Migration alerts: on | off" },
+            { command: "help", description: "Show commands" },
+          ],
+        }),
+      }).catch(() => {});
+
       return json({ ok: true, bot: safe(saved) });
     }
 
