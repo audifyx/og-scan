@@ -26,6 +26,32 @@ const corsHeaders = {
 const json = (o: unknown, s = 200) =>
   new Response(JSON.stringify(o), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+// Log every scan with the score + price at this moment (fire-and-forget).
+// Powers Grim's track record + caller leaderboards.
+function logScan(out: any, ctx: any) {
+  try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_ROLE || !out?.token?.mint) return;
+    const t = out.token;
+    const row = {
+      mint: t.mint, symbol: t.symbol || null, name: t.name || null,
+      og_score: out.score?.total ?? null, momentum: t.momentum ?? null,
+      price_usd: t.priceUsd ?? null, market_cap: t.mcap ?? null,
+      liquidity_usd: t.liquidity ?? null, holder_count: t.holderCount ?? null,
+      source: ctx?.source || "web", bot_id: ctx?.bot_id || null,
+      chat_id: ctx?.chat_id ? String(ctx.chat_id) : null, scanned_by: ctx?.scanned_by ? String(ctx.scanned_by) : null,
+    };
+    const work = fetch(`${SUPABASE_URL}/rest/v1/scan_log`, {
+      method: "POST",
+      headers: { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(row),
+    }).catch(() => {});
+    // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime.
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) EdgeRuntime.waitUntil(work);
+  } catch { /* ignore */ }
+}
+
 type Jt = any;
 
 // ---- date / value helpers (ported) ----
@@ -206,8 +232,10 @@ async function getSocials(mint: string): Promise<any> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { query } = await req.json().catch(() => ({ query: "" }));
+    const body = await req.json().catch(() => ({}));
+    const query = body.query;
     const q = String(query || "").trim();
+    const logCtx = { source: body.source, bot_id: body.bot_id, chat_id: body.chat_id, scanned_by: body.scanned_by };
     if (!q) return json({ ok: false, error: "Provide a mint address or ticker." }, 400);
 
     const candidates = await searchTokens(q);
@@ -300,6 +328,7 @@ Deno.serve(async (req) => {
       score, flags,
       verdict: verdictFor(score.total, flags),
     };
+    logScan(out, logCtx);
     return json(out);
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);

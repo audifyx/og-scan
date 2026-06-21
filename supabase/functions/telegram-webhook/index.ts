@@ -231,12 +231,12 @@ function formatPnl(p: any){
 }
 const MINT_DETECT = /\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/;
 
-async function ogScan(query: string): Promise<any> {
+async function ogScan(query: string, ctx: { bot_id?: string; chat_id?: string | number; scanned_by?: string | number } = {}): Promise<any> {
   try {
     const r = await fetch(`${SUPABASE_URL}/functions/v1/og-scan-token`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, source: "telegram", bot_id: ctx.bot_id, chat_id: ctx.chat_id, scanned_by: ctx.scanned_by }),
     });
     return await r.json();
   } catch { return { ok: false, error: "scan failed" }; }
