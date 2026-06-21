@@ -14,6 +14,8 @@ migration & whale tracking, communities/spaces, and an AI analysis agent.
 - **Telegram** (`telegram-connect` + `telegram-webhook`): users connect their own
   BotFather bot. `/chat <message>` (aliases `/ask`, `/grim`) talks to Grim in DMs
   and groups without needing an @mention; `/migrations` and `/alerts on|off` too.
+- **Super Bot identity**: name your bot and give it a persona in OG Scan settings; it responds in character (name + description are also set on Telegram).
+- **Custom commands**: define your own slash commands in settings (static text with {arg}/{user}, or AI-instruction commands). They appear in the bot's command menu automatically.
 - **Discord** (`discord-interactions`): `/chat` and `/migrations` slash commands.
   See `supabase/functions/discord-interactions/README.md` for setup. Alert-only
   webhook delivery still lives in `discord-connect`.

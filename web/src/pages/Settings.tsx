@@ -38,6 +38,7 @@ import {
   Wallet, Star, Copy, Flame, Trophy, Zap, Clock, ChevronRight, Users, Gift, Share2,
   Code2, Radio, Maximize2, ExternalLink, Plug, AlertTriangle, Trash2,
   Rocket, RefreshCw, Bot, Send, Upload, FileText, MessageCircle, Power,
+  Sparkles, Save, Pencil, Plus,
 } from "lucide-react";
 import {
   ccGetStoredUser,
@@ -1403,6 +1404,116 @@ function ConnectionsTab() {
    Telegram Bot — connect your OWN bot for pump.fun migration alerts +
    Grim AI chat (same models + APIs as the in-app intelligence chat).
    ────────────────────────────────────────────────────────────────── */
+function BotIdentity({ bot, onSaved }: { bot: any; onSaved: (b: any) => void }) {
+  const [name, setName] = useState(bot.bot_name || "");
+  const [persona, setPersona] = useState(bot.persona || "");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-connect", { body: { action: "set_identity", bot_name: name, persona } });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      onSaved(data.bot);
+      toast.success("Identity saved");
+    } catch (e: any) { toast.error(e.message || "Failed to save"); } finally { setBusy(false); }
+  };
+  return (
+    <div className="mt-4 space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+      <div className="text-white/80 text-[13px] font-semibold flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-og-lime" /> Bot identity</div>
+      <div>
+        <Label className="text-white/50 text-[11px]">Name</Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Grim, AlphaBot, ScanGod" maxLength={64} className="bg-white/5 border-white/10 text-sm mt-1" />
+      </div>
+      <div>
+        <Label className="text-white/50 text-[11px]">Persona / instructions</Label>
+        <Textarea value={persona} onChange={(e) => setPersona(e.target.value)} placeholder="Describe how your bot talks and behaves. This becomes its permanent personality." maxLength={2000} className="bg-white/5 border-white/10 text-sm mt-1 min-h-[72px]" />
+      </div>
+      <Button size="sm" onClick={save} disabled={busy} className="rounded-xl bg-[#229ED9] hover:bg-[#229ED9]/90 text-white font-bold">
+        {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />} Save identity
+      </Button>
+    </div>
+  );
+}
+
+function CustomCommands() {
+  const [cmds, setCmds] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [command, setCommand] = useState("");
+  const [description, setDescription] = useState("");
+  const [responseType, setResponseType] = useState("text");
+  const [content, setContent] = useState("");
+
+  const load = async () => {
+    try {
+      const { data } = await supabase.functions.invoke("telegram-connect", { body: { action: "commands_list" } });
+      setCmds(data?.commands || []);
+    } catch { /* ignore */ } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    if (!command.trim() || !content.trim()) { toast.error("Command and response are required"); return; }
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-connect", { body: { action: "command_upsert", command, description, response_type: responseType, content } });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      setCommand(""); setDescription(""); setContent(""); setResponseType("text");
+      await load();
+      toast.success("Command saved");
+    } catch (e: any) { toast.error(e.message || "Failed to save"); } finally { setBusy(false); }
+  };
+  const edit = (c: any) => { setCommand(c.command); setDescription(c.description || ""); setResponseType(c.response_type); setContent(c.content); };
+  const del = async (c: string) => {
+    setBusy(true);
+    try { await supabase.functions.invoke("telegram-connect", { body: { action: "command_delete", command: c } }); await load(); toast.success("Deleted"); }
+    catch (e: any) { toast.error(e.message || "Failed"); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="mt-4 space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+      <div className="text-white/80 text-[13px] font-semibold flex items-center gap-1.5"><Code2 className="h-3.5 w-3.5 text-og-lime" /> Custom commands</div>
+      <p className="text-white/35 text-[11px]">Create your own slash commands. Text replies support <code className="text-white/60">{"{arg}"}</code> and <code className="text-white/60">{"{user}"}</code>. AI commands use your text as an instruction for the bot.</p>
+
+      {loading ? (
+        <div className="text-white/40 text-[12px] flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</div>
+      ) : cmds.length ? (
+        <div className="space-y-1.5">
+          {cmds.map((c) => (
+            <div key={c.id} className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5">
+              <div className="min-w-0">
+                <div className="text-white/80 text-[12px] font-mono">/{c.command} <span className="text-white/30">· {c.response_type}</span></div>
+                {c.description ? <div className="text-white/35 text-[10px] truncate">{c.description}</div> : null}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button variant="ghost" size="sm" onClick={() => edit(c)} className="h-7 px-2 text-white/50 hover:text-white"><Pencil className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="sm" onClick={() => del(c.command)} disabled={busy} className="h-7 px-2 text-red-400/70 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-white/30 text-[11px]">No custom commands yet.</div>
+      )}
+
+      <div className="space-y-2 rounded-lg border border-white/[0.06] p-2.5">
+        <div className="flex gap-2">
+          <Input value={command} onChange={(e) => setCommand(e.target.value)} placeholder="command (e.g. rules)" className="bg-white/5 border-white/10 text-sm font-mono" />
+          <Select value={responseType} onValueChange={setResponseType}>
+            <SelectTrigger className="w-[110px] bg-white/5 border-white/10 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="text">Text</SelectItem><SelectItem value="ai">AI</SelectItem></SelectContent>
+          </Select>
+        </div>
+        <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="short description (shows in command menu)" className="bg-white/5 border-white/10 text-sm" />
+        <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder={responseType === "ai" ? "Instruction for the AI, e.g. Explain the given token like I'm 5" : "Reply text. Use {arg} for the user's input and {user} for their name."} className="bg-white/5 border-white/10 text-sm min-h-[64px]" />
+        <Button size="sm" onClick={save} disabled={busy} className="rounded-xl bg-[#229ED9] hover:bg-[#229ED9]/90 text-white font-bold">
+          {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />} Save command
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function TelegramBotCard() {
   const [bot, setBot] = useState<any>(null);
   const [tokenInput, setTokenInput] = useState("");
@@ -1487,6 +1598,10 @@ function TelegramBotCard() {
                   <Switch checked={!!bot.ai_enabled} onCheckedChange={(v) => setSetting({ ai_enabled: v })} />
                 </div>
               </div>
+
+              <BotIdentity bot={bot} onSaved={setBot} />
+
+              <CustomCommands />
 
               <BotTraining />
 
