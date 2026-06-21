@@ -149,6 +149,18 @@ Deno.serve(async (req) => {
 
     const cmd = text.toLowerCase().split(/\s+/)[0].replace(/@.*$/, "");
 
+    // Group awareness: in groups, only engage when the bot is actually
+    // addressed (@mention or a reply to one of its messages). In DMs, always.
+    const chatType = msg.chat?.type || "private";
+    const isGroup = chatType === "group" || chatType === "supergroup";
+    const botUser = (bot.bot_username || "").toLowerCase();
+    const mentionRe = botUser ? new RegExp(`(^|[^a-z0-9_])@${botUser}([^a-z0-9_]|$)`, "i") : null;
+    const isMentioned = !!(mentionRe && mentionRe.test(text));
+    const isReplyToBot = !!(msg.reply_to_message && msg.reply_to_message.from && msg.reply_to_message.from.id === bot.bot_id);
+    const addressed = isMentioned || isReplyToBot;
+    // Strip the bot's @handle so Grim gets a clean prompt.
+    const cleanText = (botUser ? text.replace(new RegExp(`@${botUser}`, "ig"), " ") : text).replace(/\s+/g, " ").trim();
+
     if (cmd === "/start" || cmd === "/help") {
       await registerChat(bot.id, chatId, msg.chat.title || msg.chat.username || null);
       await tg(token, "sendMessage", {
@@ -159,7 +171,8 @@ Deno.serve(async (req) => {
           `/migrations — pump.fun graduations (last 24h)\n` +
           `/alerts on|off — instant migration alerts in this chat\n` +
           `/help — this menu\n\n` +
-          `Or just send me a contract address, a wallet, or a ticker and I'll analyze it live.`,
+          `Or just send me a contract address, a wallet, or a ticker and I'll analyze it live.\n\n` +
+          `<b>In groups:</b> tag me <b>@${bot.bot_username}</b> (or reply to my messages) to chat. To let me read every message, open @BotFather → /setprivacy → Disable.`,
       });
       return ok();
     }
@@ -185,10 +198,14 @@ Deno.serve(async (req) => {
 
     // Anything else -> Grim AI (same models + APIs as the in-app chat).
     if (bot.ai_enabled) {
+      // In groups, only reply when tagged or replied-to — never spam the chat.
+      if (isGroup && !addressed) return ok();
+      const prompt = cleanText || "gm";
       await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
-      const knowledge = await retrieveKnowledge(bot.id, text);
-      const answer = await askGrim(text, knowledge);
-      await sendLong(token, chatId, answer);
+      const knowledge = await retrieveKnowledge(bot.id, prompt);
+      const answer = await askGrim(prompt, knowledge);
+      // Reply in-thread in groups so the conversation is easy to follow.
+      await sendLong(token, chatId, answer, isGroup ? { reply_to_message_id: msg.message_id } : {});
     }
     return ok();
   } catch (e) {
