@@ -20,6 +20,7 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import ReportView from "./pages/ReportView";
+import TrackRecord from "./pages/TrackRecord";
 import Alerts from "./pages/Alerts";
 import Tokens from "./pages/Tokens";
 import Tools from "./pages/Tools";
@@ -133,6 +134,7 @@ const App = () => (
             <Route path="/setup" element={<Setup />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/r/:id" element={<ReportView />} />
+            <Route path="/track-record" element={<TrackRecord />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/cc-callback" element={<CCCallbackPage />} />
             <Route path="/x-callback" element={<XCallbackPage />} />
