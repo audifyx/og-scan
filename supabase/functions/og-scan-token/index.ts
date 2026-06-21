@@ -179,6 +179,25 @@ async function searchTokens(query: string): Promise<Jt[]> {
   return Array.isArray(data) ? data : [];
 }
 
+async function getSocials(mint: string): Promise<any> {
+  try {
+    const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { signal: AbortSignal.timeout(6000) });
+    const j = await r.json();
+    const pairs = (j.pairs || []).slice().sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+    const p = pairs[0];
+    if (!p) return null;
+    let x: string | null = null, telegram: string | null = null;
+    for (const sc of (p.info?.socials || [])) {
+      if (sc.type === "twitter") x = sc.url;
+      if (sc.type === "telegram") telegram = sc.url;
+    }
+    const website = p.info?.websites?.[0]?.url || null;
+    if (!x && !telegram && !website) return null;
+    const handle = x ? ((x.match(/(?:x|twitter)\.com\/([^/?#]+)/i) || [])[1] || null) : null;
+    return { x, handle, telegram, website, dexId: p.dexId || null };
+  } catch { return null; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -240,6 +259,7 @@ Deno.serve(async (req) => {
         pairDexId: token.pairDexId ?? null,
         dexUrl: token.dexUrl ?? `https://dexscreener.com/solana/${token.id}`,
         pumpFunUrl: `https://pump.fun/coin/${token.id}`,
+        socials: await getSocials(token.id),
       },
       score, flags,
       verdict: verdictFor(score.total, flags),

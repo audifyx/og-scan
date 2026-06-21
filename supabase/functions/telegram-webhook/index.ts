@@ -153,6 +153,35 @@ async function getTrendingText(limit = 10): Promise<string> {
   } catch { return "Couldn't fetch trending right now."; }
 }
 
+async function ogWallet(address: string): Promise<any> {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/og-wallet`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+      body: JSON.stringify({ address }),
+    });
+    return await r.json();
+  } catch { return { ok: false, error: "wallet lookup failed" }; }
+}
+
+function formatWallet(w: any): string {
+  const short = w.address.slice(0, 4) + "\u2026" + w.address.slice(-4);
+  const lines = [
+    `\uD83D\uDC5B <b>Wallet ${escHtml(short)}</b>`,
+    `\uD83D\uDCB0 Total <b>${fmtUsd(w.totalValueUsd)}</b> \u00B7 SOL ${w.sol != null ? Number(w.sol).toFixed(2) : "?"} (${fmtUsd(w.solUsd)}) \u00B7 Tokens ${fmtUsd(w.totalTokenValueUsd)}`,
+    `\uD83E\uDE99 ${w.tokenCount} token${w.tokenCount === 1 ? "" : "s"}`,
+  ];
+  const top = (w.top || []).filter((a: any) => (a.valueUsd || 0) > 0.5).slice(0, 8);
+  if (top.length) {
+    lines.push("", "<b>Top holdings</b>");
+    top.forEach((a: any, i: number) => {
+      lines.push(`${i + 1}. <b>$${escHtml(a.symbol || "?")}</b> \u2014 ${fmtUsd(a.valueUsd)} (${Number(a.amount).toLocaleString(undefined, { maximumFractionDigits: 2 })})`);
+    });
+  }
+  lines.push(`<a href="https://solscan.io/account/${w.address}">solscan</a>`);
+  return lines.join("\n");
+}
+
 async function ogScan(query: string): Promise<any> {
   try {
     const r = await fetch(`${SUPABASE_URL}/functions/v1/og-scan-token`, {
@@ -201,6 +230,15 @@ function authStr(disabled: boolean | null): string {
   return "?";
 }
 
+function socialLine(soc: any): string {
+  if (!soc) return "";
+  const parts: string[] = [];
+  if (soc.x) parts.push(`<a href="${soc.x}">${soc.handle ? "@" + escHtml(soc.handle) : "X"}</a>`);
+  if (soc.website) parts.push(`<a href="${soc.website}">site</a>`);
+  if (soc.telegram) parts.push(`<a href="${soc.telegram}">TG</a>`);
+  return parts.length ? "\uD83D\uDD17 " + parts.join(" \u00B7 ") : "";
+}
+
 // Site-identical scan card (same data + OG score as ogscan.fun).
 function formatScan(s: any): string {
   const t = s.token, sig = s.score.signals, f = s.flags;
@@ -220,7 +258,8 @@ function formatScan(s: any): string {
     ``,
     `<i>Signals \u2014 Age ${sig.age} \u00B7 ATH ${sig.athMcap} \u00B7 Holders ${sig.holderProfile} \u00B7 Deploy ${sig.deployPattern} \u00B7 Pool ${sig.poolAge}</i>`,
     `<a href="${t.dexUrl}">chart</a> \u00B7 <code>${escHtml(t.mint)}</code>`,
-  ].join("\n");
+    socialLine(t.socials),
+  ].filter(Boolean).join("\n");
 }
 
 async function askGrim(text: string, knowledge = "", identity = "") {
@@ -328,6 +367,7 @@ Deno.serve(async (req) => {
           `/scan <token> — full token risk report (same as the site)\n` +
           `/trending — top trending tokens (24h)\n` +
           `/report <token> — PDF intelligence report\n` +
+          `/wallet <address> — wallet portfolio snapshot\n` +
           `/news — latest crypto headlines\n` +
           `/alpha — community alpha callouts\n` +
           `/migrations — pump.fun graduations (last 24h)\n` +
@@ -362,6 +402,19 @@ Deno.serve(async (req) => {
     if (cmd === "/trending" || cmd === "/trend") {
       await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
       await sendLong(token, chatId, await getTrendingText(10), { parse_mode: "HTML" });
+      return ok();
+    }
+
+    if (cmd === "/wallet" || cmd === "/portfolio") {
+      const addr = text.replace(/^\S+\s*/, "").trim();
+      if (!addr) {
+        await tg(token, "sendMessage", { chat_id: chatId, text: "Send a wallet to check: /wallet <solana address>" });
+        return ok();
+      }
+      await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
+      const w = await ogWallet(addr);
+      if (w && w.ok) await sendLong(token, chatId, formatWallet(w.wallet), { parse_mode: "HTML", disable_web_page_preview: true, ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
+      else await tg(token, "sendMessage", { chat_id: chatId, text: w?.error || "Couldn't read that wallet." });
       return ok();
     }
 
