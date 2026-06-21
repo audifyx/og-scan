@@ -1,52 +1,65 @@
-// discord-interactions — Discord slash commands for Grim.
-// Adds true two-way chat to Discord (the discord-connect integration is
-// alerts-only). Handles /chat and /migrations. Verifies the Ed25519 request
-// signature with DISCORD_PUBLIC_KEY, immediately ACKs with a deferred response
-// (Discord requires a reply within 3s, but Grim can take longer), then edits
-// the original message with the real answer via the interaction token.
+// discord-interactions — Discord slash commands, MULTI-TENANT.
+// Serves the original OG Scan bot (env DISCORD_PUBLIC_KEY/DISCORD_APP_ID) AND
+// every bring-your-own bot registered via discord-bot-connect. For each request
+// we read the application_id from the (untrusted) body, look up that bot's
+// public_key + app_id in discord_bots, and verify the Ed25519 signature against
+// it. A forged application_id can't pass verification without the matching key.
+//
+// Handles /chat /migrations /news /alpha. ACKs deferred (<3s), then edits the
+// original message with the real answer via the interaction token.
 //
 // Env: DISCORD_PUBLIC_KEY, DISCORD_APP_ID, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 // No JWT (Discord calls it). Deploy with --no-verify-jwt.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const PUBLIC_KEY = Deno.env.get("DISCORD_PUBLIC_KEY") || "";
-const APP_ID = Deno.env.get("DISCORD_APP_ID") || "";
+const ENV_PUBLIC_KEY = Deno.env.get("DISCORD_PUBLIC_KEY") || "";
+const ENV_APP_ID = Deno.env.get("DISCORD_APP_ID") || "";
 const API = "https://discord.com/api/v10";
 
-// Discord interaction + response type enums we use.
 const T = { PING: 1, APPLICATION_COMMAND: 2 };
 const R = { PONG: 1, CHANNEL_MESSAGE: 4, DEFERRED_CHANNEL_MESSAGE: 5 };
 
 const hexToBytes = (hex: string) =>
   new Uint8Array((hex.match(/.{1,2}/g) || []).map((b) => parseInt(b, 16)));
 
-let cachedKey: CryptoKey | null = null;
-async function getPublicKey(): Promise<CryptoKey> {
-  if (!cachedKey) {
-    cachedKey = await crypto.subtle.importKey(
-      "raw",
-      hexToBytes(PUBLIC_KEY),
-      { name: "Ed25519" },
-      false,
-      ["verify"],
-    );
+// Cache imported CryptoKeys by public-key hex string.
+const keyCache = new Map<string, CryptoKey>();
+async function importKey(hex: string): Promise<CryptoKey | null> {
+  if (!hex) return null;
+  const cached = keyCache.get(hex);
+  if (cached) return cached;
+  try {
+    const k = await crypto.subtle.importKey("raw", hexToBytes(hex), { name: "Ed25519" }, false, ["verify"]);
+    keyCache.set(hex, k);
+    return k;
+  } catch {
+    return null;
   }
-  return cachedKey;
 }
 
-// Discord signs every request with Ed25519 over (timestamp + raw body).
-async function verifySignature(body: string, sig: string, ts: string): Promise<boolean> {
+async function verifyWith(hex: string, body: string, sig: string, ts: string): Promise<boolean> {
+  const key = await importKey(hex);
+  if (!key) return false;
   try {
-    const key = await getPublicKey();
-    return await crypto.subtle.verify(
-      { name: "Ed25519" },
-      key,
-      hexToBytes(sig),
-      new TextEncoder().encode(ts + body),
-    );
+    return await crypto.subtle.verify({ name: "Ed25519" }, key, hexToBytes(sig), new TextEncoder().encode(ts + body));
   } catch {
     return false;
+  }
+}
+
+// Look up a BYO bot by its Discord application_id (service role, no JWT).
+async function lookupBot(appId: string): Promise<{ public_key: string; application_id: string; ai_enabled: boolean; enabled: boolean } | null> {
+  if (!appId) return null;
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/discord_bots?select=public_key,application_id,ai_enabled,enabled&application_id=eq.${encodeURIComponent(appId)}&limit=1`,
+      { headers: { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}` } },
+    );
+    const rows = await r.json();
+    return Array.isArray(rows) && rows.length ? rows[0] : null;
+  } catch {
+    return null;
   }
 }
 
@@ -105,7 +118,6 @@ function decodeEntities(s: string) {
     .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
 }
 
-// Query PostgREST directly (no supabase-js needed) with the service role key.
 async function rest(path: string): Promise<any[]> {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -136,18 +148,16 @@ async function alphaText(): Promise<string> {
   }).join("\n");
 }
 
-// Edit the original (deferred) interaction message with the final content.
-// Discord caps message content at 2000 chars.
-async function editOriginal(token: string, content: string) {
-  const body = content.length > 1990 ? content.slice(0, 1989) + "…" : content;
-  await fetch(`${API}/webhooks/${APP_ID}/${token}/messages/@original`, {
+// Edit the original (deferred) interaction message. Each tenant uses its own app id.
+async function editOriginal(appId: string, token: string, content: string) {
+  const out = content.length > 1990 ? content.slice(0, 1989) + "…" : content;
+  await fetch(`${API}/webhooks/${appId}/${token}/messages/@original`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content: body, allowed_mentions: { parse: [] } }),
+    body: JSON.stringify({ content: out, allowed_mentions: { parse: [] } }),
   }).catch((e) => console.error("editOriginal err", e));
 }
 
-// Run async work after we've already returned the deferred ACK.
 function runAfterAck(work: Promise<unknown>) {
   // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime.
   if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) EdgeRuntime.waitUntil(work);
@@ -158,15 +168,29 @@ Deno.serve(async (req) => {
   const sig = req.headers.get("X-Signature-Ed25519") || "";
   const ts = req.headers.get("X-Signature-Timestamp") || "";
   const raw = await req.text();
+  if (!sig || !ts) return new Response("invalid request signature", { status: 401 });
 
-  if (!sig || !ts || !(await verifySignature(raw, sig, ts))) {
+  // Parse (untrusted) body just to read the application_id.
+  let body: any;
+  try { body = JSON.parse(raw); } catch { return new Response("bad json", { status: 400 }); }
+  const reqAppId: string = String(body.application_id || "");
+
+  // Resolve which key + app id to use: a BYO bot, else the env (OG Scan) bot.
+  let pubKey = ENV_PUBLIC_KEY;
+  let appId = ENV_APP_ID || reqAppId;
+  let aiEnabled = true;
+  if (reqAppId && reqAppId !== ENV_APP_ID) {
+    const bot = await lookupBot(reqAppId);
+    if (!bot || !bot.enabled) return new Response("unknown application", { status: 401 });
+    pubKey = bot.public_key;
+    appId = bot.application_id;
+    aiEnabled = bot.ai_enabled;
+  }
+
+  if (!(await verifyWith(pubKey, raw, sig, ts))) {
     return new Response("invalid request signature", { status: 401 });
   }
 
-  let body: any;
-  try { body = JSON.parse(raw); } catch { return new Response("bad json", { status: 400 }); }
-
-  // Discord endpoint health check.
   if (body.type === T.PING) return Response.json({ type: R.PONG });
 
   if (body.type === T.APPLICATION_COMMAND) {
@@ -175,25 +199,28 @@ Deno.serve(async (req) => {
 
     if (name === "chat") {
       const prompt = String(body.data?.options?.find((o: any) => o.name === "message")?.value || "").trim();
+      if (!aiEnabled) {
+        return Response.json({ type: R.CHANNEL_MESSAGE, data: { content: "AI chat is turned off for this bot." } });
+      }
       if (!prompt) {
         return Response.json({ type: R.CHANNEL_MESSAGE, data: { content: "Ask me something: `/chat message: is SOL gonna pump?`" } });
       }
-      runAfterAck(askGrim(prompt).then((a) => editOriginal(token, a)));
+      runAfterAck(askGrim(prompt).then((a) => editOriginal(appId, token, a)));
       return Response.json({ type: R.DEFERRED_CHANNEL_MESSAGE });
     }
 
     if (name === "migrations") {
-      runAfterAck(migrationsText().then((t) => editOriginal(token, t)));
+      runAfterAck(migrationsText().then((t) => editOriginal(appId, token, t)));
       return Response.json({ type: R.DEFERRED_CHANNEL_MESSAGE });
     }
 
     if (name === "news") {
-      runAfterAck(newsText().then((t) => editOriginal(token, t)));
+      runAfterAck(newsText().then((t) => editOriginal(appId, token, t)));
       return Response.json({ type: R.DEFERRED_CHANNEL_MESSAGE });
     }
 
     if (name === "alpha") {
-      runAfterAck(alphaText().then((t) => editOriginal(token, t)));
+      runAfterAck(alphaText().then((t) => editOriginal(appId, token, t)));
       return Response.json({ type: R.DEFERRED_CHANNEL_MESSAGE });
     }
 

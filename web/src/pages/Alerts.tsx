@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { Bell, Trash2, Loader2, Plus, Webhook, Bot, Twitter, Send } from "lucide-react";
+import { Bell, Trash2, Loader2, Plus, Webhook, Bot, Twitter, Send, Copy } from "lucide-react";
 
 export default function Alerts() {
   const [rules, setRules] = useState<any[]>([]);
@@ -112,20 +112,142 @@ export default function Alerts() {
           )}
         </Card>
 
-        {/* coming soon */}
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Card className="p-4 glass-card opacity-80">
-            <div className="flex items-center gap-2 mb-1"><Bot className="h-4 w-4 text-[#5865F2]" /><h4 className="font-bold text-white text-[13px]">Bring your own Discord bot</h4><Badge variant="outline" className="ml-auto text-[9px]">SOON</Badge></div>
-            <p className="text-white/40 text-[11px]">Paste your Discord app ID, public key & bot token to run a full branded Discord bot (slash commands), instead of webhooks.</p>
-          </Card>
-          <Card className="p-4 glass-card opacity-80">
-            <div className="flex items-center gap-2 mb-1"><Twitter className="h-4 w-4 text-og-cyan" /><h4 className="font-bold text-white text-[13px]">X / Twitter auto-poster</h4><Badge variant="outline" className="ml-auto text-[9px]">SOON</Badge></div>
-            <p className="text-white/40 text-[11px]">Auto-post migrations, top calls & reports to X. Coming once X posting credits are enabled.</p>
-          </Card>
+        {/* power integrations */}
+        <div className="grid sm:grid-cols-2 gap-3 items-start">
+          <DiscordBotCard />
+          <XPosterCard />
         </div>
 
         <div className="text-white/30 text-[11px] text-center">Want the full experience (scans, PDFs/HTML reports, wallet tools, chat)? Use the Telegram super bot. Webhooks are the lightweight alerts-only channel.</div>
       </div>
     </AppLayout>
   );
+}
+
+// ── Bring-your-own Discord bot ─────────────────────────────────────────────────
+function DiscordBotCard() {
+  const [bot, setBot] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [appId, setAppId] = useState("");
+  const [pubKey, setPubKey] = useState("");
+  const [botToken, setBotToken] = useState("");
+  const [endpoint, setEndpoint] = useState("");
+
+  const fn = async (body: any) => {
+    const { data, error } = await supabase.functions.invoke("discord-bot-connect", { body });
+    if (error || data?.error) throw new Error(data?.error || error?.message);
+    return data;
+  };
+  const load = async () => { setLoading(true); try { const d = await fn({ action: "status" }); setBot(d.bot); } catch { /* ignore */ } finally { setLoading(false); } };
+  useEffect(() => { load(); }, []);
+
+  const connect = async () => {
+    if (!appId.trim() || !pubKey.trim() || !botToken.trim()) { toast.error("All three fields are required"); return; }
+    setBusy(true);
+    try {
+      const d = await fn({ action: "connect", application_id: appId.trim(), public_key: pubKey.trim(), bot_token: botToken.trim() });
+      setBot(d.bot); setEndpoint(d.interactions_url || ""); setBotToken("");
+      toast.success("Discord bot connected — commands registered");
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+  };
+  const setFlag = async (k: string, v: boolean) => { try { const d = await fn({ action: "settings", [k]: v }); setBot(d.bot); } catch (e: any) { toast.error(e.message); } };
+  const disconnect = async () => { setBusy(true); try { await fn({ action: "disconnect" }); setBot(null); toast.success("Disconnected"); } catch (e: any) { toast.error(e.message); } finally { setBusy(false); } };
+  const copy = (s: string) => { navigator.clipboard.writeText(s); toast.success("Copied"); };
+
+  return (
+    <Card className="p-4 glass-card">
+      <div className="flex items-center gap-2 mb-2"><Bot className="h-4 w-4 text-[#5865F2]" /><h4 className="font-bold text-white text-[13px]">Bring your own Discord bot</h4>{bot && <Badge className="ml-auto text-[9px] bg-og-lime/20 text-og-lime border-0">LIVE</Badge>}</div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-white/40 text-[12px]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</div>
+      ) : bot ? (
+        <div className="space-y-2.5">
+          <div className="text-white/60 text-[11px]">Connected as <span className="text-white/90 font-semibold">{bot.bot_username || bot.application_id}</span> · token {bot.token_hint}</div>
+          <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-2">
+            <div className="text-white/40 text-[10px] mb-1">Interactions Endpoint URL — paste into your Discord app → General Information</div>
+            <div className="flex items-center gap-1.5">
+              <code className="text-white/70 text-[10px] truncate flex-1">{endpoint || `${supabaseFnBase()}/discord-interactions`}</code>
+              <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => copy(endpoint || `${supabaseFnBase()}/discord-interactions`)}><Copy className="h-3 w-3" /></Button>
+            </div>
+          </div>
+          <label className="flex items-center justify-between"><span className="text-white/60 text-[11px]">Bot enabled</span><Switch checked={!!bot.enabled} onCheckedChange={(v) => setFlag("enabled", v)} /></label>
+          <label className="flex items-center justify-between"><span className="text-white/60 text-[11px]">AI chat (/chat)</span><Switch checked={!!bot.ai_enabled} onCheckedChange={(v) => setFlag("ai_enabled", v)} /></label>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={disconnect} className="h-7 px-2 text-red-400/70 hover:text-red-300 text-[11px]"><Trash2 className="h-3 w-3 mr-1" /> Disconnect</Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-white/40 text-[11px]">Run a full branded Discord bot (slash commands: /chat /migrations /news /alpha). Create an app at discord.com/developers, then paste:</p>
+          <Input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="Application ID" className="bg-white/5 border-white/10 text-xs font-mono h-8" />
+          <Input value={pubKey} onChange={(e) => setPubKey(e.target.value)} placeholder="Public Key" className="bg-white/5 border-white/10 text-xs font-mono h-8" />
+          <Input value={botToken} onChange={(e) => setBotToken(e.target.value)} type="password" placeholder="Bot Token" className="bg-white/5 border-white/10 text-xs font-mono h-8" />
+          <Button size="sm" disabled={busy} onClick={connect} className="rounded-lg bg-[#5865F2] hover:bg-[#4752c4] text-white font-bold text-[12px] w-full">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Bot className="h-3.5 w-3.5 mr-1.5" />} Connect bot</Button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ── X / Twitter auto-poster ────────────────────────────────────────────────────
+function XPosterCard() {
+  const [acct, setAcct] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [k1, setK1] = useState(""); const [k2, setK2] = useState(""); const [k3, setK3] = useState(""); const [k4, setK4] = useState("");
+
+  const fn = async (body: any) => {
+    const { data, error } = await supabase.functions.invoke("x-poster", { body });
+    if (error || data?.error) throw new Error(data?.error || error?.message);
+    return data;
+  };
+  const load = async () => { setLoading(true); try { const d = await fn({ action: "status" }); setAcct(d.account); } catch { /* ignore */ } finally { setLoading(false); } };
+  useEffect(() => { load(); }, []);
+
+  const connect = async () => {
+    if (!k1.trim() || !k2.trim() || !k3.trim() || !k4.trim()) { toast.error("All four keys are required"); return; }
+    setBusy(true);
+    try {
+      const d = await fn({ action: "connect", api_key: k1.trim(), api_secret: k2.trim(), access_token: k3.trim(), access_secret: k4.trim() });
+      setAcct(d.account); setK1(""); setK2(""); setK3(""); setK4("");
+      toast.success("X account connected");
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+  };
+  const setFlag = async (k: string, v: boolean) => { try { const d = await fn({ action: "settings", [k]: v }); setAcct(d.account); } catch (e: any) { toast.error(e.message); } };
+  const testTweet = async () => { setBusy(true); try { const d = await fn({ action: "test" }); toast[d.ok ? "success" : "error"](d.ok ? "Test tweet posted" : (d.error || "Failed")); } catch (e: any) { toast.error(e.message); } finally { setBusy(false); } };
+  const disconnect = async () => { setBusy(true); try { await fn({ action: "disconnect" }); setAcct(null); toast.success("Disconnected"); } catch (e: any) { toast.error(e.message); } finally { setBusy(false); } };
+
+  return (
+    <Card className="p-4 glass-card">
+      <div className="flex items-center gap-2 mb-2"><Twitter className="h-4 w-4 text-og-cyan" /><h4 className="font-bold text-white text-[13px]">X / Twitter auto-poster</h4>{acct && <Badge className="ml-auto text-[9px] bg-og-lime/20 text-og-lime border-0">LIVE</Badge>}</div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-white/40 text-[12px]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</div>
+      ) : acct ? (
+        <div className="space-y-2.5">
+          <div className="text-white/60 text-[11px]">Posting as <span className="text-white/90 font-semibold">{acct.handle || "your account"}</span> · key {acct.key_hint}</div>
+          <label className="flex items-center justify-between"><span className="text-white/60 text-[11px]">Enabled</span><Switch checked={!!acct.enabled} onCheckedChange={(v) => setFlag("enabled", v)} /></label>
+          <label className="flex items-center justify-between"><span className="text-white/60 text-[11px]">Auto-post migrations</span><Switch checked={!!acct.auto_migrations} onCheckedChange={(v) => setFlag("auto_migrations", v)} /></label>
+          <label className="flex items-center justify-between"><span className="text-white/60 text-[11px]">Auto-post reports</span><Switch checked={!!acct.auto_reports} onCheckedChange={(v) => setFlag("auto_reports", v)} /></label>
+          <div className="flex gap-2">
+            <Button size="sm" disabled={busy} onClick={testTweet} variant="outline" className="rounded-lg text-[11px] h-7"><Send className="h-3 w-3 mr-1" /> Test tweet</Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={disconnect} className="h-7 px-2 text-red-400/70 hover:text-red-300 text-[11px]"><Trash2 className="h-3 w-3 mr-1" /> Disconnect</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-white/40 text-[11px]">Auto-post migrations & reports to your own X account. Create an app at developer.x.com (OAuth 1.0a, Read+Write), then paste your keys:</p>
+          <Input value={k1} onChange={(e) => setK1(e.target.value)} placeholder="API Key (consumer key)" className="bg-white/5 border-white/10 text-xs font-mono h-8" />
+          <Input value={k2} onChange={(e) => setK2(e.target.value)} type="password" placeholder="API Secret" className="bg-white/5 border-white/10 text-xs font-mono h-8" />
+          <Input value={k3} onChange={(e) => setK3(e.target.value)} placeholder="Access Token" className="bg-white/5 border-white/10 text-xs font-mono h-8" />
+          <Input value={k4} onChange={(e) => setK4(e.target.value)} type="password" placeholder="Access Token Secret" className="bg-white/5 border-white/10 text-xs font-mono h-8" />
+          <Button size="sm" disabled={busy} onClick={connect} className="rounded-lg bg-og-cyan/90 hover:bg-og-cyan text-black font-bold text-[12px] w-full">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Twitter className="h-3.5 w-3.5 mr-1.5" />} Connect X</Button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function supabaseFnBase() {
+  const u = (import.meta as any).env?.VITE_SUPABASE_URL || "";
+  return u ? `${u}/functions/v1` : "/functions/v1";
 }
