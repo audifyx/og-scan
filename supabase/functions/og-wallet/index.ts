@@ -39,12 +39,37 @@ async function solPrice(): Promise<number> {
   } catch { return 0; }
 }
 
+const HELIUS_BASE = "https://api.helius.xyz/v0";
+async function heliusTxs(address: string, limit = 100): Promise<any[]> {
+  try {
+    const r = await fetch(`${HELIUS_BASE}/addresses/${address}/transactions?api-key=${HELIUS_API_KEY}&limit=${limit}`, { signal: AbortSignal.timeout(15000) });
+    const j = await r.json();
+    return Array.isArray(j) ? j : [];
+  } catch { return []; }
+}
+
+async function walletPnl(addr: string) {
+  const [txs, sp] = await Promise.all([heliusTxs(addr, 100), solPrice()]);
+  let totalIn = 0, totalOut = 0, swapCount = 0;
+  for (const tx of txs) {
+    const type = tx.type || "";
+    if (type === "SWAP" || String(type).includes("SWAP")) swapCount++;
+    for (const nt of tx.nativeTransfers || []) {
+      if (nt.toUserAccount === addr) totalIn += (nt.amount || 0) / 1e9;
+      if (nt.fromUserAccount === addr) totalOut += (nt.amount || 0) / 1e9;
+    }
+  }
+  const netSol = totalIn - totalOut;
+  return { address: addr, totalInSol: totalIn, totalOutSol: totalOut, netSol, netUsd: netSol * sp, swapCount, transactionCount: txs.length, solPrice: sp };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { address } = await req.json().catch(() => ({ address: "" }));
-    const addr = String(address || "").trim();
+    const body = await req.json().catch(() => ({}));
+    const addr = String(body.address || "").trim();
     if (!ADDR_RE.test(addr)) return json({ ok: false, error: "Provide a valid Solana wallet address." }, 400);
+    if (body.mode === "pnl") return json({ ok: true, pnl: await walletPnl(addr) });
 
     const [result, sp] = await Promise.all([dasSearch(addr), solPrice()]);
     const items = result?.items || [];

@@ -182,6 +182,38 @@ function formatWallet(w: any): string {
   return lines.join("\n");
 }
 
+async function ogHolders(mint: string): Promise<any> {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/og-holders`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE }, body: JSON.stringify({ mint }) });
+    return await r.json();
+  } catch { return { ok: false }; }
+}
+function formatHolders(h: any, sym: string): string {
+  const lines = [`\uD83D\uDC0B <b>Top holders \u2014 $${escHtml(sym || "?")}</b>`];
+  if (h.top10pct != null) lines.push(`Top 10 hold <b>${Number(h.top10pct).toFixed(1)}%</b> of supply`);
+  lines.push("");
+  for (const x of h.holders || []) lines.push(`${x.rank}. ${x.pct != null ? Number(x.pct).toFixed(2) + "%" : "?"}`);
+  return lines.join("\n");
+}
+async function ogPnl(address: string): Promise<any> {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/og-wallet`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE }, body: JSON.stringify({ address, mode: "pnl" }) });
+    return await r.json();
+  } catch { return { ok: false }; }
+}
+function formatPnl(p: any): string {
+  const short = p.address.slice(0, 4) + "\u2026" + p.address.slice(-4);
+  const net = p.netSol >= 0 ? "+" : "";
+  return [
+    `\uD83D\uDCCA <b>Wallet PnL \u2014 ${escHtml(short)}</b> <i>(last ${p.transactionCount} txns)</i>`,
+    `Net SOL: <b>${net}${Number(p.netSol).toFixed(2)}</b> (${fmtUsd(p.netUsd)})`,
+    `In ${Number(p.totalInSol).toFixed(2)} \u00B7 Out ${Number(p.totalOutSol).toFixed(2)} SOL`,
+    `Swaps: ${p.swapCount}`,
+    `<a href="https://solscan.io/account/${p.address}">solscan</a>`,
+  ].join("\n");
+}
+const MINT_DETECT = /\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/;
+
 async function ogScan(query: string): Promise<any> {
   try {
     const r = await fetch(`${SUPABASE_URL}/functions/v1/og-scan-token`, {
@@ -368,6 +400,9 @@ Deno.serve(async (req) => {
           `/trending — top trending tokens (24h)\n` +
           `/report <token> — PDF intelligence report\n` +
           `/wallet <address> — wallet portfolio snapshot\n` +
+          `/pnl <address> — wallet PnL (last 100 txns)\n` +
+          `/holders <token> — top holder distribution\n` +
+          `/watch <token> — price-move alerts · /watchlist · /unwatch\n` +
           `/news — latest crypto headlines\n` +
           `/alpha — community alpha callouts\n` +
           `/migrations — pump.fun graduations (last 24h)\n` +
@@ -415,6 +450,74 @@ Deno.serve(async (req) => {
       const w = await ogWallet(addr);
       if (w && w.ok) await sendLong(token, chatId, formatWallet(w.wallet), { parse_mode: "HTML", disable_web_page_preview: true, ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
       else await tg(token, "sendMessage", { chat_id: chatId, text: w?.error || "Couldn't read that wallet." });
+      return ok();
+    }
+
+    if (cmd === "/pnl") {
+      const addr = text.replace(/^\S+\s*/, "").trim();
+      if (!addr) { await tg(token, "sendMessage", { chat_id: chatId, text: "Send a wallet: /pnl <solana address>" }); return ok(); }
+      await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
+      const r = await ogPnl(addr);
+      if (r && r.ok) await sendLong(token, chatId, formatPnl(r.pnl), { parse_mode: "HTML", disable_web_page_preview: true, ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
+      else await tg(token, "sendMessage", { chat_id: chatId, text: r?.error || "Couldn't compute PnL." });
+      return ok();
+    }
+
+    if (cmd === "/holders") {
+      const arg = text.replace(/^\S+\s*/, "").trim();
+      if (!arg) { await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token: /holders <mint or $TICKER>" }); return ok(); }
+      await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
+      const scan = await ogScan(arg);
+      if (!scan || !scan.ok) { await tg(token, "sendMessage", { chat_id: chatId, text: scan?.error || "Token not found." }); return ok(); }
+      const h = await ogHolders(scan.token.mint);
+      if (h && h.ok && (h.holders || []).length) {
+        await sendLong(token, chatId, formatHolders(h, scan.token.symbol), { parse_mode: "HTML", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
+      } else if (scan.token.topHoldersPct != null) {
+        await tg(token, "sendMessage", { chat_id: chatId, parse_mode: "HTML", text: `\uD83D\uDC0B <b>Top holders \u2014 $${escHtml(scan.token.symbol || "?")}</b>\nTop holders concentration: <b>${Number(scan.token.topHoldersPct).toFixed(1)}%</b>\n<i>(Per-account breakdown unavailable for this token.)</i>` });
+      } else {
+        await tg(token, "sendMessage", { chat_id: chatId, text: "Couldn't fetch holder data for that token." });
+      }
+      return ok();
+    }
+
+    if (cmd === "/watch") {
+      const arg = text.replace(/^\S+\s*/, "").trim();
+      if (!arg) { await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token to watch: /watch <mint or $TICKER>" }); return ok(); }
+      const scan = await ogScan(arg);
+      if (!scan || !scan.ok) { await tg(token, "sendMessage", { chat_id: chatId, text: scan?.error || "Token not found." }); return ok(); }
+      await admin.from("telegram_watchlist").upsert(
+        { bot_id: bot.id, chat_id: chatId, mint: scan.token.mint, symbol: scan.token.symbol, last_price: scan.token.priceUsd ?? null },
+        { onConflict: "bot_id,chat_id,mint" },
+      );
+      await tg(token, "sendMessage", { chat_id: chatId, parse_mode: "HTML", text: `\uD83D\uDC40 Watching <b>$${escHtml(scan.token.symbol || "?")}</b>. You'll get a ping on \u00B1${"25"}% moves.` });
+      return ok();
+    }
+
+    if (cmd === "/unwatch") {
+      const arg = text.replace(/^\S+\s*/, "").trim();
+      if (!arg) { await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token: /unwatch <mint or $TICKER>" }); return ok(); }
+      const isMint = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(arg);
+      let qb = admin.from("telegram_watchlist").delete().eq("bot_id", bot.id).eq("chat_id", chatId);
+      if (isMint) qb = qb.eq("mint", arg); else qb = qb.ilike("symbol", arg.replace(/^\$/, ""));
+      await qb;
+      await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83D\uDEAB Removed from your watchlist (if it was there)." });
+      return ok();
+    }
+
+    if (cmd === "/watchlist") {
+      const { data } = await admin.from("telegram_watchlist").select("symbol, mint, last_price").eq("bot_id", bot.id).eq("chat_id", chatId).order("created_at", { ascending: true });
+      if (!data || !data.length) { await tg(token, "sendMessage", { chat_id: chatId, text: "Your watchlist is empty. Add one with /watch <token>." }); return ok(); }
+      const lines = ["\uD83D\uDC40 <b>Watchlist</b>", ...data.map((w: any, i: number) => `${i + 1}. <b>$${escHtml(w.symbol || "?")}</b> <code>${escHtml(w.mint.slice(0, 8))}\u2026</code>`)];
+      await sendLong(token, chatId, lines.join("\n"), { parse_mode: "HTML" });
+      return ok();
+    }
+
+    if (cmd === "/digest") {
+      const arg2 = text.split(/\s+/)[1]?.toLowerCase();
+      await registerChat(bot.id, chatId, msg.chat.title || null);
+      const on = arg2 !== "off";
+      await admin.from("telegram_alert_chats").update({ digest_enabled: on }).eq("bot_id", bot.id).eq("chat_id", chatId);
+      await tg(token, "sendMessage", { chat_id: chatId, text: on ? "\uD83C\uDF05 Daily digest ON for this chat." : "\uD83D\uDD15 Daily digest OFF for this chat." });
       return ok();
     }
 
@@ -531,6 +634,20 @@ Deno.serve(async (req) => {
           await sendLong(token, chatId, out || "(empty command)", isGroup ? { reply_to_message_id: msg.message_id } : {});
         }
         return ok();
+      }
+    }
+
+    // Auto-scan: if a contract address is pasted (in DM or group), reply with the
+    // quick scan card automatically. Group-friendly (no @mention needed).
+    if (bot.auto_scan !== false && !cmd.startsWith("/scan") && !cmd.startsWith("/report")) {
+      const mm = text.match(MINT_DETECT);
+      if (mm) {
+        const scan = await ogScan(mm[1]);
+        if (scan && scan.ok) {
+          await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
+          await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
+          return ok();
+        }
       }
     }
 

@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.discord-interactions]
 verify_jwt = false
+
+[functions.daily-digest]
+verify_jwt = false
+
+[functions.watch-checker]
+verify_jwt = false
