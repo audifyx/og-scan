@@ -33,7 +33,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       <Sidebar />
 
       {/* Main content — offset by sidebar width on desktop, bottom padding for mobile nav */}
-      <main className="flex-1 lg:ml-[260px] overflow-auto min-h-screen pb-[68px] lg:pb-0 relative z-10">
+      <main className="main-scroll flex-1 lg:ml-[260px] overflow-auto min-h-screen pb-[68px] lg:pb-0 relative z-10">
         {children}
       </main>
 

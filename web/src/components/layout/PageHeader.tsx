@@ -31,7 +31,7 @@ export const PageHeader = ({ title, description, children, showBack = true, back
             </button>
           )}
           <div className="text-center">
-            <h1 className="text-xl lg:text-2xl font-bold">{title}</h1>
+            <h1 className="text-xl lg:text-2xl font-black tracking-tight gradient-text">{title}</h1>
             {description && (
               <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
             )}

@@ -1,6 +1,6 @@
 import {
   Coins, Compass, Hash, LogOut, Mail, Pencil,
-  Settings, TrendingUp, User, Wallet, X, Shield, Menu, Wrench, Home, FileText, Bell, Trophy} from "lucide-react";
+  Settings, TrendingUp, User, Wallet, X, Shield, Menu, Wrench, Home, FileText, Bell, Trophy, Radar, LineChart} from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,17 +18,18 @@ import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
 type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; label: string; eyebrow: string };
 
 const primaryItems: NavItem[] = [
-  { to: "/app",           icon: Home,    label: "Home",         eyebrow: "Command hub" },
-  { to: "/our-coin",      icon: Coins,   label: "OFFICIAL OGS", eyebrow: "Official token room" },
-  { to: "/tools",         icon: Wrench,  label: "Tools",        eyebrow: "Scanners & Feeds" },
-  { to: "/reports",       icon: FileText, label: "Reports",     eyebrow: "AI report feed" },
-  { to: "/track-record", icon: Trophy,   label: "Track Record", eyebrow: "Grim's receipts" },
-  { to: "/alerts",        icon: Bell,    label: "Alerts",       eyebrow: "Discord & webhooks" },
-  { to: "/profile",       icon: User,    label: "Profile",      eyebrow: "Your account" },
+  { to: "/app",           icon: Home,     label: "Home",         eyebrow: "Command hub" },
+  { to: "/discover",      icon: LineChart, label: "Markets",     eyebrow: "Coins · Launchpads · Trending · New" },
+  { to: "/scanner",       icon: Radar,    label: "Scanner",      eyebrow: "Scan any token · Grim score" },
+  { to: "/reports",       icon: FileText, label: "Reports",      eyebrow: "AI report feed" },
+  { to: "/track-record",  icon: Trophy,   label: "Track Record", eyebrow: "Grim's receipts" },
+  { to: "/alerts",        icon: Bell,     label: "Alerts",       eyebrow: "Watches · Discord · X" },
 ];
 
-const discoverItems: NavItem[] = [
-  { to: "/discover",      icon: Compass, label: "Discover",     eyebrow: "LaunchPad · Explore · Live Feed" },
+const toolsItems: NavItem[] = [
+  { to: "/tools",         icon: Wrench,  label: "Tools",        eyebrow: "Swap · Listings · utilities" },
+  { to: "/our-coin",      icon: Coins,   label: "OFFICIAL OGS", eyebrow: "Official token room" },
+  { to: "/profile",       icon: User,    label: "Profile",      eyebrow: "Your account" },
 ];
 
 const communityItems: NavItem[] = [
@@ -36,7 +37,7 @@ const communityItems: NavItem[] = [
 ];
 
 const tradingItems: NavItem[] = [
-  { to: "/live-trading",  icon: Wallet,     label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
+  { to: "/live-trading",  icon: Wallet,     label: "Phantom Terminal", eyebrow: "Phantom Trade" },
   { to: "/trading-hub",   icon: TrendingUp, label: "Trading Hub",  eyebrow: "Launch · Lobbies · Callouts" },
   { to: "/messages",      icon: Mail,       label: "Messages",     eyebrow: "Direct messages" },
   { to: "/token-manager", icon: Pencil,     label: "Token Manager", eyebrow: "Free metadata update" },
@@ -167,9 +168,9 @@ export const Sidebar = () => {
           </div>
 
           <div className="mb-1 mt-4">
-            <SectionLabel label="Discover" />
+            <SectionLabel label="More" />
             <div className="space-y-0.5">
-              {discoverItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
+              {toolsItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
             </div>
           </div>
 

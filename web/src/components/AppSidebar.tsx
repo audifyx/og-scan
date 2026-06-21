@@ -13,6 +13,8 @@ import {
   Menu,
   Mic,
   Pencil,
+  Radar,
+  FileText,
   MessageSquare,
   Radio,
   Shield,
@@ -170,13 +172,17 @@ export const AppSidebar = ({
 
   const primaryItems: NavItem[] = [
     { id: "overview", icon: Home, label: "Home", eyebrow: "Command hub" },
-    { id: "our-coin", icon: Coins, label: "OFFICIAL OGS", eyebrow: "Official token room" },
-    { id: "tools", icon: Wrench, label: "Tools", eyebrow: "Scanners & Feeds" },
-    { id: "profile", icon: User, label: "Profile", eyebrow: "Your account" },
+    { id: "discover", icon: LineChart, label: "Markets", eyebrow: "Coins · Launchpads · Trending · New" },
+    { to: "/scanner", icon: Radar, label: "Scanner", eyebrow: "Scan any token · Grim score" },
+    { to: "/reports", icon: FileText, label: "Reports", eyebrow: "AI report feed" },
+    { to: "/track-record", icon: Trophy, label: "Track Record", eyebrow: "Grim's receipts" },
+    { to: "/alerts", icon: Bell, label: "Alerts", eyebrow: "Watches · Discord · X" },
   ];
 
   const discoverItems: NavItem[] = [
-    { id: "discover", icon: Compass, label: "Discover", eyebrow: "LaunchPad · Explore · Live Feed" },
+    { id: "tools", icon: Wrench, label: "Tools", eyebrow: "Swap · Listings · utilities" },
+    { id: "our-coin", icon: Coins, label: "OFFICIAL OGS", eyebrow: "Official token room" },
+    { id: "profile", icon: User, label: "Profile", eyebrow: "Your account" },
   ];
 
   const communityItems: NavItem[] = [
@@ -241,7 +247,7 @@ export const AppSidebar = ({
         </div>
 
         <div className="mb-1 mt-4">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Discover</p>
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">More</p>
           <div className="space-y-0.5">
             {discoverItems.map((item) => (
               <NavRow

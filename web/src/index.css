@@ -19,39 +19,39 @@
 
 @layer base {
   :root {
-    --background: 210 40% 3%;
-    --foreground: 120 60% 90%;
+    --background: 222 26% 4%;
+    --foreground: 210 22% 96%;
 
-    --card: 210 30% 5%;
-    --card-foreground: 120 50% 88%;
+    --card: 222 22% 6%;
+    --card-foreground: 210 18% 94%;
 
-    --popover: 210 30% 5%;
-    --popover-foreground: 120 50% 88%;
+    --popover: 222 24% 6%;
+    --popover-foreground: 210 18% 94%;
 
-    --primary: 120 100% 50%;
-    --primary-foreground: 210 40% 3%;
+    --primary: 76 85% 58%;
+    --primary-foreground: 222 45% 5%;
 
-    --secondary: 210 25% 10%;
-    --secondary-foreground: 120 40% 75%;
+    --secondary: 220 16% 12%;
+    --secondary-foreground: 210 16% 84%;
 
-    --muted: 210 20% 8%;
-    --muted-foreground: 120 10% 45%;
+    --muted: 220 16% 10%;
+    --muted-foreground: 218 12% 60%;
 
-    --accent: 120 80% 35%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 187 88% 52%;
+    --accent-foreground: 222 45% 5%;
 
-    --destructive: 0 92% 62%;
-    --destructive-foreground: 0 0% 96%;
+    --destructive: 0 84% 63%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 120 30% 12%;
-    --input: 210 20% 12%;
-    --ring: 120 100% 50%;
+    --border: 220 14% 15%;
+    --input: 220 16% 14%;
+    --ring: 76 85% 58%;
 
-    --radius: 22px;
+    --radius: 16px;
 
     /* OG palette tokens */
     --og-lime: var(--primary);
-    --og-gold: var(--primary);
+    --og-gold: 45 95% 58%;
     --og-cyan: var(--accent);
     --og-blood: 0 92% 62%;
     --og-ink: var(--background);
@@ -1157,4 +1157,43 @@ button, a, input, select, textarea { touch-action: manipulation; }
 /* Push Intercom launcher above mobile bottom nav */
 @media (max-width: 1024px) {
   .intercom-launcher, #intercom-container .intercom-launcher, iframe.intercom-launcher-frame { bottom: 80px !important; }
+}
+
+
+/* ═══ Redesign 2026 — modern utilities ═══ */
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(1000px 560px at 10% -12%, hsl(var(--primary) / 0.08), transparent 60%),
+    radial-gradient(900px 520px at 100% -6%, hsl(var(--accent) / 0.07), transparent 58%);
+}
+.gradient-text {
+  background: linear-gradient(92deg, hsl(var(--primary)), hsl(var(--accent)));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.lift { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.lift:hover { transform: translateY(-2px); }
+.fade-in { animation: ogFadeIn .45s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes ogFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.glow-primary { box-shadow: 0 0 0 1px hsl(var(--primary) / 0.35), 0 0 36px -12px hsl(var(--primary)); }
+.glow-accent  { box-shadow: 0 0 0 1px hsl(var(--accent) / 0.35), 0 0 36px -12px hsl(var(--accent)); }
+.delta-up { color: #22e38a; }
+.delta-down { color: #f87171; }
+.chip {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .15rem .5rem; border-radius: 9999px; font-size: 11px; font-weight: 700;
+  background: hsl(var(--primary) / 0.12); color: hsl(var(--primary));
+  border: 1px solid hsl(var(--primary) / 0.25);
+}
+.stat-tile {
+  border-radius: 14px; padding: 12px 14px;
+  background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07);
+}
+.hairline { border-color: rgba(255,255,255,0.07) !important; }
+/* premium scrollbar for main content */
+@media (hover: hover) and (pointer: fine) {
+  .main-scroll::-webkit-scrollbar { width: 10px; }
+  .main-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+  .main-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); background-clip: padding-box; }
 }
