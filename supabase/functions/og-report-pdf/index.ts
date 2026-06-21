@@ -550,6 +550,14 @@ function htmlTemplate(scan: any, ai: any, social: any, theme: any = {}): string 
   const rootVars = ":root{" + Object.entries(colors).map(([k,v])=>k+":"+v).join(";") + "}";
   const extraCss = (theme && typeof theme.extraCss === "string") ? theme.extraCss.slice(0, 4000) : "";
   const extraSection = (theme && typeof theme.extraSection === "string") ? theme.extraSection.slice(0, 6000) : "";
+  const fontName = (theme && typeof theme.font === "string") ? theme.font : "";
+  const headFont = (theme && typeof theme.headingFont === "string") ? theme.headingFont : "";
+  const animate = !theme || theme.animate !== false;
+  const extraSecs: string[] = Array.isArray(theme && theme.extraSections) ? theme.extraSections : (extraSection ? [extraSection] : []);
+  const gfUrl = (n: string) => "https://fonts.googleapis.com/css2?family=" + encodeURIComponent(n).replace(/%20/g, "+") + ":wght@400;600;700;900&display=swap";
+  const fontLink = (fontName || headFont) ? ('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="' + gfUrl(fontName || headFont) + '" rel="stylesheet">' + ((headFont && headFont !== fontName) ? ('<link href="' + gfUrl(headFont) + '" rel="stylesheet">') : "")) : "";
+  const fontCss = (fontName ? ("body{font-family:'" + fontName + "',-apple-system,Segoe UI,Roboto,sans-serif}") : "") + (headFont ? ("h1,h2,h3,.brand,.token .nm{font-family:'" + headFont + "',inherit}") : "");
+  const pchg = (v: any) => { if (v == null || !isFinite(Number(v))) return '<span style="color:var(--mut)">N/A</span>'; const n = Number(v); return '<span style="color:' + (n >= 0 ? "var(--green)" : "var(--red)") + '">' + (n >= 0 ? "+" : "") + n.toFixed(1) + '%</span>'; };
   const sym = (t.symbol || "TOKEN").replace(/^\$/, "");
   const day = new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
   const sec = scan.score.total;
@@ -590,6 +598,7 @@ function htmlTemplate(scan: any, ai: any, social: any, theme: any = {}): string 
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OG SCAN PRO — ${esc(t.name)} ($${esc(sym)})</title>
+${fontLink}
 <style>
 ${rootVars}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -634,11 +643,24 @@ footer{text-align:center;color:var(--mut);font-size:12px;margin-top:24px}
 .cta{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:linear-gradient(90deg,#10261d,#0f1722);border:1px solid var(--green);border-radius:16px;padding:18px 20px;margin:18px 0}
 .cta b{color:var(--green)}.cta span{color:var(--mut);font-size:13px}
 .ctabtn{background:linear-gradient(90deg,var(--green),#1fb673);color:#06140e;font-weight:800;text-decoration:none;padding:11px 18px;border-radius:12px;white-space:nowrap}
+.hero{height:170px;background-size:cover;background-position:center;border-radius:0 0 22px 22px}
+.logo{width:78px;height:78px;border-radius:50%;border:3px solid var(--green);object-fit:cover;background:var(--card);margin-top:-50px;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.chev{float:right;transition:transform .3s ease;opacity:.6;font-size:14px}
+.section.collapsed .chev{transform:rotate(-90deg)}
+.sbody{overflow:hidden;transition:max-height .4s ease,opacity .3s ease;max-height:6000px;opacity:1}
+.section.collapsed .sbody{max-height:0;opacity:0;margin:0}
+.reveal{opacity:0;transform:translateY(16px)}.reveal.in{opacity:1;transform:none;transition:opacity .55s ease,transform .55s ease}
+.stat,.ctabtn,.badge{transition:transform .2s ease,box-shadow .2s ease,filter .2s ease}
+.stat:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,.35);border-color:var(--green)}
+.ctabtn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+h2{cursor:pointer}
+${fontCss}
 ${extraCss}
 </style></head><body>
 <header><div class="wrap"><div class="brand">OG SCAN PRO</div><h1>ADVANCED TOKEN INTELLIGENCE DOSSIER</h1><div class="sub">NFA · REAL-TIME SYNTHESIS · ${esc(day)}</div></div></header>
 <div class="wrap">
-<div class="token"><div class="nm">${esc(t.name)} ($${esc(sym)})</div><div class="ca">${esc(t.mint)}</div>${ai.subtitle ? `<div class="tag">${esc(ai.subtitle)}</div>` : ""}</div>
+${t.banner ? (`<div class="hero" style="background-image:linear-gradient(180deg,rgba(0,0,0,.15),var(--bg)),url(` + "'" + esc(t.banner) + "'" + `)"></div>`) : ""}
+<div class="token">${t.image ? (`<img class="logo" src="${esc(t.image)}" alt="logo">`) : ""}<div class="nm">${esc(t.name)} ($${esc(sym)})</div><div class="ca">${esc(t.mint)}</div>${ai.subtitle ? `<div class="tag">${esc(ai.subtitle)}</div>` : ""}</div>
 <div class="cta"><div><b>This is a sample report.</b><br><span>For the complete report \u2014 full holder lists, complete transaction history, and every data point \u2014 visit OG Scan.</span></div><a class="ctabtn" href="https://ogscan.fun">Get the Full Report \u2192</a></div>
 
 <div class="section"><h2>⚖️ Verdict Evolution</h2>
@@ -657,6 +679,11 @@ ${ai.reassessment ? `<div class="callout">${esc(ai.reassessment)}</div>` : ""}</
 <div class="stat"><div class="l">Age</div><div class="n">${t.ageDays != null ? "~" + t.ageDays + "d" : "N/A"}</div></div>
 <div class="stat"><div class="l">Txns 24h</div><div class="n">${fNum(t.txns24h)}</div></div>
 <div class="stat"><div class="l">Organic</div><div class="n">${t.organicScore != null ? Math.round(t.organicScore) : "N/A"}</div></div>
+<div class="stat"><div class="l">5m</div><div class="n">${pchg(t.priceChange5m)}</div></div>
+<div class="stat"><div class="l">1h</div><div class="n">${pchg(t.priceChange1h)}</div></div>
+<div class="stat"><div class="l">6h</div><div class="n">${pchg(t.priceChange6h)}</div></div>
+<div class="stat"><div class="l">24h</div><div class="n">${pchg(t.priceChange24h)}</div></div>
+<div class="stat"><div class="l">Net Buyers 24h</div><div class="n">${t.netBuyers24h != null ? ((t.netBuyers24h >= 0 ? "+" : "") + fNum(t.netBuyers24h)) : "N/A"}</div></div>
 </div>
 ${ai.keyInsight ? `<div class="callout"><b>Key Insight:</b> ${esc(ai.keyInsight)}</div>` : ""}</div>
 
@@ -682,12 +709,30 @@ ${ai.boughtSold ? `<h3>Bought vs Sold</h3><p>${esc(ai.boughtSold)}</p>` : ""}
 <h3>OG Score Re-Evaluation</h3><table class="tbl"><thead><tr><th>Factor</th><th>Original</th><th>PRO</th><th>Rationale</th></tr></thead><tbody>${scoreRows}</tbody></table>
 ${ai.finalVerdict ? `<div class="callout"><b>Final Verdict:</b> ${esc(ai.finalVerdict)}</div>` : ""}</div>
 
+${extraSecs.join("\n")}
 <div class="section"><h2>📚 Appendix</h2>
 <p style="color:var(--mut);font-size:13px">Sources: DexScreener, Jupiter, Helius, OG Scan scoring engine${social?.website ? ", " + esc(social.website) : ""}.</p>
 ${mon}
 <div class="disc"><b>NOT FINANCIAL ADVICE.</b> AI-augmented intelligence synthesis for educational purposes only. Crypto, especially meme coins, carries extreme risk — you could lose all capital. Always DYOR.</div></div>
 <footer>— OG SCAN PRO · Generated ${esc(day)} · ogscan.fun —</footer>
-</div></body></html>`;
+</div>
+<script>
+(function(){
+  document.querySelectorAll('.section').forEach(function(sec){
+    var h=sec.querySelector('h2'); if(!h) return;
+    var b=document.createElement('div'); b.className='sbody';
+    while(h.nextSibling){ b.appendChild(h.nextSibling); }
+    sec.appendChild(b);
+    h.insertAdjacentHTML('beforeend','<span class=\\"chev\\">\\u25BE</span>');
+    h.addEventListener('click',function(){ sec.classList.toggle('collapsed'); });
+  });
+  if(${animate} && 'IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } })},{threshold:0.06});
+    document.querySelectorAll('.section,.token,.cta,.hero').forEach(function(el){ el.classList.add('reveal'); io.observe(el); });
+  }
+})();
+</script>
+</body></html>`;
 }
 
 async function customizeTheme(instructions: string): Promise<any> {
@@ -696,13 +741,14 @@ async function customizeTheme(instructions: string): Promise<any> {
   const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
   const MODEL = Deno.env.get("NVIDIA_THEME_MODEL") || "meta/llama-3.3-70b-instruct";
   const prompt = `A user wants a custom visual theme (and optionally an extra section) for a crypto token intelligence report web page. Their EXACT request: "${instructions}"\n\n` +
-    `Return ONLY minified JSON: {"vars":{"--bg":"#hex","--card":"#hex","--card2":"#hex","--line":"#hex","--ink":"#hex","--mut":"#hex","--green":"#hex","--blue":"#hex","--gold":"#hex","--red":"#hex"},"extraCss":"","extraSection":"","headline":""}\n\n` +
-    `RULES:\n` +
-    `- Pick colors that PRECISELY match the request. If they name colors (purple, pink, gold, red, blue, matrix-green, orange, etc.), USE THOSE. --green is the PRIMARY accent, --blue the SECONDARY accent, --gold/--red are status colors.\n` +
-    `- --bg must stay dark for readability (unless they explicitly ask for light/white), and --ink must strongly contrast --bg. Cards (--card/--card2) slightly lighter than --bg.\n` +
-    `- Omit any var you don't want to change.\n` +
-    `- extraSection: ONLY if they explicitly asked for an extra section (roadmap, FAQ, tokenomics, etc.). Return a complete <div class=\"section\"><h2>Title</h2> ... </div> reusing existing classes (section, grid, stat, tbl, callout, badge, bar). Otherwise "".\n` +
-    `- extraCss: optional small tasteful extra CSS rules (no <script>, no @import, no external URLs). Otherwise "".\n` +
+    `Return ONLY minified JSON: {"vars":{"--bg":"#hex","--card":"#hex","--card2":"#hex","--line":"#hex","--ink":"#hex","--mut":"#hex","--green":"#hex","--blue":"#hex","--gold":"#hex","--red":"#hex"},"font":"","headingFont":"","animate":true,"interactive":true,"extraCss":"","extraSections":[],"headline":""}\n\n` +
+    `RULES (honor the user's request precisely):\n` +
+    `- COLORS: if they name colors (purple, pink, gold, red, blue, matrix-green, orange, neon, pastel, etc.), USE THEM exactly. --green is the PRIMARY accent, --blue SECONDARY, --gold/--red are status colors. --bg must stay dark for readability unless they ask for light; --ink must strongly contrast --bg.\n` +
+    `- FONTS: if they request a font/typography style, set "font" to a valid Google Fonts family name for body text (e.g. "Inter","Orbitron","Space Grotesk","Poppins","JetBrains Mono") and "headingFont" for headings (e.g. "Orbitron"). Pick fonts that match the vibe (futuristic=>Orbitron, clean=>Inter, playful=>Poppins). Leave "" to keep defaults.\n` +
+    `- ANIMATIONS: set "animate" true (default) for tasteful entrance/hover animations; add custom @keyframes/animations/hover effects in "extraCss" if they ask for specific motion.\n` +
+    `- DROPDOWNS/INTERACTIVITY: set "interactive" true (default) so sections are collapsible; the page already supports this.\n` +
+    `- extraSections: array of FULL extra sections ONLY if explicitly requested (roadmap, FAQ, tokenomics, etc.). Each item: a complete <div class=\"section\"><h2>Title</h2> ... </div> reusing existing classes (section, grid, stat, tbl, callout, badge, bar). Otherwise [].\n` +
+    `- extraCss: optional CSS rules for animations/hover/glows/custom styling of existing classes. Pure CSS only \u2014 NO <script>, NO @import, NO url(), NO external resources.\n` +
     `Output JSON only, no markdown.`;
   try {
     const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
@@ -716,9 +762,13 @@ async function customizeTheme(instructions: string): Promise<any> {
     const a = txt.indexOf("{"), b = txt.lastIndexOf("}");
     if (a >= 0 && b > a) txt = txt.slice(a, b + 1);
     const parsed = JSON.parse(txt);
-    // sanitize extraSection/extraCss: no scripts
-    if (typeof parsed.extraSection === "string" && /<script/i.test(parsed.extraSection)) parsed.extraSection = "";
-    if (typeof parsed.extraCss === "string" && /<\/?script|@import|url\s*\(/i.test(parsed.extraCss)) parsed.extraCss = "";
+    if (typeof parsed.extraCss === "string" && /<\/?script|@import|url\s*\(|javascript:/i.test(parsed.extraCss)) parsed.extraCss = "";
+    const cleanSec = (h: any) => (typeof h === "string" && !/<script|onerror=|onclick=|javascript:/i.test(h)) ? h.slice(0, 6000) : "";
+    if (Array.isArray(parsed.extraSections)) parsed.extraSections = parsed.extraSections.map(cleanSec).filter(Boolean).slice(0, 4);
+    else if (typeof parsed.extraSection === "string") parsed.extraSections = [cleanSec(parsed.extraSection)].filter(Boolean);
+    else parsed.extraSections = [];
+    const fontOk = (x: any) => (typeof x === "string" && /^[a-zA-Z0-9 ]{2,40}$/.test(x.trim())) ? x.trim() : "";
+    parsed.font = fontOk(parsed.font); parsed.headingFont = fontOk(parsed.headingFont);
     return parsed;
   } catch { return {}; }
 }Deno.serve(async (req) => {

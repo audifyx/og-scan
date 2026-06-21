@@ -192,9 +192,14 @@ async function getSocials(mint: string): Promise<any> {
       if (sc.type === "telegram") telegram = sc.url;
     }
     const website = p.info?.websites?.[0]?.url || null;
-    if (!x && !telegram && !website) return null;
     const handle = x ? ((x.match(/(?:x|twitter)\.com\/([^/?#]+)/i) || [])[1] || null) : null;
-    return { x, handle, telegram, website, dexId: p.dexId || null };
+    return {
+      x, handle, telegram, website, dexId: p.dexId || null,
+      image: p.info?.imageUrl || null,
+      banner: p.info?.header || null,
+      openGraph: p.info?.openGraph || null,
+      priceChange: p.priceChange ? { m5: p.priceChange.m5 ?? null, h1: p.priceChange.h1 ?? null, h6: p.priceChange.h6 ?? null, h24: p.priceChange.h24 ?? null } : null,
+    };
   } catch { return null; }
 }
 
@@ -235,11 +240,27 @@ Deno.serve(async (req) => {
       migratedFromPumpFun: !!token.pumpFun?.migrationAt,
     };
 
+    const soc = await getSocials(token.id);
     const out = {
       ok: true,
       query: q,
       token: {
         mint: token.id, name: token.name, symbol: token.symbol, icon: token.icon,
+        image: token.icon || soc?.image || null,
+        banner: soc?.banner || null,
+        openGraph: soc?.openGraph || null,
+        priceChange5m: token.stats5m?.priceChange ?? soc?.priceChange?.m5 ?? null,
+        priceChange1h: token.stats1h?.priceChange ?? soc?.priceChange?.h1 ?? null,
+        priceChange6h: soc?.priceChange?.h6 ?? null,
+        holderChange1h: token.stats1h?.holderChange ?? null,
+        holderChange24h: token.stats24h?.holderChange ?? null,
+        netBuyers1h: token.stats1h?.numNetBuyers ?? null,
+        netBuyers24h: token.stats24h?.numNetBuyers ?? null,
+        organicBuyVol24h: token.stats24h?.buyOrganicVolume ?? null,
+        totalSupply: token.totalSupply ?? token.supply ?? null,
+        circSupply: token.circSupply ?? null,
+        decimals: token.decimals ?? null,
+        isVerifiedJup: !!token.isVerified,
         priceUsd: token.usdPrice ?? null, mcap: token.mcap ?? null, fdv: token.fdv ?? null,
         liquidity: tokenEffectiveLiquidityUsd(token) || null,
         holderCount: token.holderCount ?? null,
@@ -259,7 +280,7 @@ Deno.serve(async (req) => {
         pairDexId: token.pairDexId ?? null,
         dexUrl: token.dexUrl ?? `https://dexscreener.com/solana/${token.id}`,
         pumpFunUrl: `https://pump.fun/coin/${token.id}`,
-        socials: await getSocials(token.id),
+        socials: soc,
       },
       score, flags,
       verdict: verdictFor(score.total, flags),
