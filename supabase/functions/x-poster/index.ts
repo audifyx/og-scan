@@ -81,14 +81,36 @@ async function verify(c: Creds): Promise<{ ok: boolean; handle?: string; error?:
   return { ok: false, error: `X rejected the credentials (${r.status}): ${t.slice(0, 160)}` };
 }
 
-async function postTweet(c: Creds, text: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+// Upload an image via OAuth 1.0a (v1.1 media/upload, multipart). Body params are
+// not part of the signature base for multipart, so we sign the bare URL.
+async function uploadMedia(c: Creds, imageUrl: string): Promise<string | null> {
+  try {
+    const img = await fetch(imageUrl, { signal: AbortSignal.timeout(8000) });
+    if (!img.ok) return null;
+    const bytes = new Uint8Array(await img.arrayBuffer());
+    if (bytes.byteLength > 5_000_000) return null;
+    const url = "https://upload.twitter.com/1.1/media/upload.json";
+    const header = await authHeader("POST", url, c);
+    const form = new FormData();
+    form.append("media", new Blob([bytes], { type: img.headers.get("content-type") || "image/png" }));
+    const r = await fetch(url, { method: "POST", headers: { Authorization: header }, body: form });
+    const j = await r.json().catch(() => ({}));
+    return j?.media_id_string || null;
+  } catch { return null; }
+}
+
+async function postTweet(c: Creds, text: string, imageUrl?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
   const url = "https://api.twitter.com/2/tweets";
-  // JSON body params are NOT part of the OAuth 1.0a signature base string.
   const header = await authHeader("POST", url, c);
+  const payload: any = { text };
+  if (imageUrl) {
+    const mediaId = await uploadMedia(c, imageUrl);
+    if (mediaId) payload.media = { media_ids: [mediaId] };
+  }
   const r = await fetch(url, {
     method: "POST",
     headers: { Authorization: header, "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(payload),
   });
   const j = await r.json().catch(() => ({}));
   if (r.ok && j?.data?.id) return { ok: true, id: j.data.id };
@@ -131,7 +153,7 @@ Deno.serve(async (req) => {
       if (!uid || !text) return json({ error: "user_id and text required" }, 400);
       const { data } = await admin.from("x_accounts").select("*").eq("user_id", uid).maybeSingle();
       if (!data || !data.enabled) return json({ error: "No enabled X account for user" }, 404);
-      const res = await postTweet(credsOf(data), text);
+      const res = await postTweet(credsOf(data), text, body.imageUrl || null);
       return json(res, res.ok ? 200 : 400);
     }
 
@@ -186,7 +208,7 @@ Deno.serve(async (req) => {
       const { data } = await admin.from("x_accounts").select("*").eq("user_id", user.id).maybeSingle();
       if (!data) return json({ error: "Connect an X account first" }, 400);
       const text = `OG Scan connected ✅ auto-posting is live. ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`;
-      const res = await postTweet(credsOf(data), text);
+      const res = await postTweet(credsOf(data), text, body.imageUrl || null);
       return json(res, res.ok ? 200 : 400);
     }
 

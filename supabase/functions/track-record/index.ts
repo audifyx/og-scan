@@ -74,7 +74,7 @@ Deno.serve(async () => {
           const mult = Number(w.peak_multiple).toFixed(1);
           const text = `\u{1F480} Grim called $${w.symbol || w.mint.slice(0, 6)} at ${fmtUsd(w.market_cap)} mcap \u2014 now ${fmtUsd(w.peak_market_cap)} (${mult}x).\nhttps://dexscreener.com/solana/${w.mint}`;
           for (const x of xAccts) {
-            await fetch(`${SUPABASE_URL}/functions/v1/x-poster`, { method: "POST", headers: H, body: JSON.stringify({ action: "post", user_id: x.user_id, text }) }).catch(() => {});
+            await fetch(`${SUPABASE_URL}/functions/v1/x-poster`, { method: "POST", headers: H, body: JSON.stringify({ action: "post", user_id: x.user_id, text, imageUrl: `${SUPABASE_URL}/functions/v1/og-card?mint=${w.mint}` }) }).catch(() => {});
             winsPosted++;
           }
         }

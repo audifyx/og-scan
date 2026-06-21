@@ -9,6 +9,14 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+function ogCard(m: any): string {
+  const p = new URLSearchParams({ mint: m.mint });
+  if (m.symbol) p.set("sym", m.symbol);
+  if (m.name) p.set("name", m.name);
+  if (m.market_cap != null) p.set("mc", String(m.market_cap));
+  return `${SUPABASE_URL}/functions/v1/og-card?${p.toString()}`;
+}
+
 const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json" } });
 
 function fmtUsd(n: any) {
@@ -138,7 +146,7 @@ Deno.serve(async (req) => {
           await fetch(`${SUPABASE_URL}/functions/v1/x-poster`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
-            body: JSON.stringify({ action: "post", user_id: x.user_id, text: tweetText(mapped) }),
+            body: JSON.stringify({ action: "post", user_id: x.user_id, text: tweetText(mapped), imageUrl: ogCard(mapped) }),
           }).then(() => { xPosted[x.user_id] = (xPosted[x.user_id] || 0) + 1; sentX++; }).catch(() => {});
         }
       }

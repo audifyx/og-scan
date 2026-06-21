@@ -101,7 +101,15 @@ export default function ReportView() {
     setMetaTag("name", "description", desc);
     setMetaTag("property", "og:title", `${name || sym} — OG Scan report`);
     setMetaTag("property", "og:description", desc);
-  }, [live, meta]);
+    if (id) {
+      const card = `${SUPABASE_URL}/functions/v1/og-card?id=${id}`;
+      setMetaTag("property", "og:image", card);
+      setMetaTag("name", "twitter:card", "summary_large_image");
+      setMetaTag("name", "twitter:image", card);
+      setMetaTag("name", "twitter:title", `${name || sym} — OG Scan report`);
+      setMetaTag("name", "twitter:description", desc);
+    }
+  }, [live, meta, id]);
 
   const rerun = useCallback(async () => {
     const mint = meta?.token_mint; if (!mint) return;
