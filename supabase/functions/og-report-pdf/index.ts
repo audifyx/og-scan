@@ -46,7 +46,7 @@ async function jinaRead(url: string, maxChars = 3500): Promise<string> {
   try {
     const r = await fetch(`https://r.jina.ai/${url}`, {
       headers: { "X-Return-Format": "markdown" },
-      signal: AbortSignal.timeout(9000),
+      signal: AbortSignal.timeout(45000),
     });
     if (!r.ok) return "";
     return (await r.text()).slice(0, maxChars);
@@ -56,7 +56,7 @@ async function jinaRead(url: string, maxChars = 3500): Promise<string> {
 async function gatherSocial(mint: string): Promise<any> {
   const out: any = { xHandle: null, xUrl: null, website: null, telegram: null, followers: null, posts: null, boosts: null, dexId: null, xText: "", siteText: "" };
   try {
-    const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { signal: AbortSignal.timeout(45000) });
     const j = await r.json();
     const pairs = (j.pairs || []).slice().sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
     const p = pairs[0];
@@ -81,7 +81,20 @@ async function gatherSocial(mint: string): Promise<any> {
   return out;
 }
 
+async function getHoldersCtx(mint: string): Promise<any> {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/og-holders`, {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+      body: JSON.stringify({ mint }), signal: AbortSignal.timeout(45000),
+    });
+    const j = await r.json();
+    if (!j.ok) return null;
+    return { top10pct: j.top10pct, risk: j.concentrationRisk, top: (j.holders || []).slice(0, 5).map((h: any) => ({ pct: Number(h.pct||0).toFixed(2), label: h.label })) };
+  } catch { return null; }
+}
+
 async function synthesize(scan: any, social: any): Promise<any> {
+  const holdersCtx = await getHoldersCtx(scan.token.mint);
   const t = scan.token;
   const facts = {
     name: t.name, symbol: t.symbol, mint: t.mint,
@@ -99,7 +112,7 @@ async function synthesize(scan: any, social: any): Promise<any> {
 "reassessment": "1 paragraph first-principles reassessment vs the original score",
 "marketContext": {"price":"trend note","mcap":"note","liquidity":"note","volume":"note","holders":"note","topHolders":"note","age":"note","txns":"note","organic":"note"},
 "keyInsight": "1 short paragraph",
-"securityImplications": {"mint":"impl","freeze":"impl","liquidity":"impl","minLiq":"impl","verified":"impl","deploy":"impl","poolAge":"impl"},
+"securityImplications": {"mint":"1-line implication of mint authority status","freeze":"1-line implication of freeze authority","liquidity":"1-line implication of LP status","minLiq":"1-line implication","verified":"1-line implication","deploy":"1-line implication of deploy pattern","poolAge":"1-line implication of pool age"},
 "txnFlow": "1 paragraph 24h transaction flow analysis",
 "godTierObservation": "1 short paragraph",
 "holderDistribution": "1 paragraph",
@@ -114,12 +127,12 @@ async function synthesize(scan: any, social: any): Promise<any> {
 "memeRisks": ["risk bullet", "..."],
 "boughtSold": "1 paragraph bought vs sold flow analysis",
 "flowBullets": ["bullet", "..."],
-"proFactors": {"Age / Novelty":"pro|rationale","Holder Profile":"pro|rationale","Narrative Strength":"pro|rationale","KOL / Smart Money":"pro|rationale","Risk Flags (Security)":"pro|rationale","Volume & Liquidity":"pro|rationale"},
-"proScore": 72,
+"proFactors": {"Age / Novelty":"<newScore>|<short rationale>","Holder Profile":"pro|rationale","Narrative Strength":"pro|rationale","KOL / Smart Money":"pro|rationale","Risk Flags (Security)":"pro|rationale","Volume & Liquidity":"pro|rationale"},
+"proScore": "<integer 0-100, your category-adjusted score, consistent with the verdict>",
 "finalVerdict": "1 paragraph final verdict",
 "monitoring": ["bullet", "..."]
 }`;
-  const prompt = `You are OG SCAN PRO, a god-tier Solana token intelligence analyst. Produce an ADVANCED INTELLIGENCE DOSSIER for this token as STRICT JSON only (no markdown, no commentary). Ground every number in the REAL DATA provided; for narrative/social/KOL use what you genuinely know about this specific token/CA and the wider meta — if unknown, give measured, non-fabricated, clearly-hedged analysis (never invent fake handles or fake on-chain events). Keep each text field tight and high signal. Tone: sharp, first-principles, NFA.
+  const prompt = `You are OG SCAN PRO, a god-tier Solana token intelligence analyst. Produce an ADVANCED INTELLIGENCE DOSSIER for this token as STRICT JSON only (no markdown, no commentary). Ground every number in the REAL DATA provided; for narrative/social/KOL use what you genuinely know about this specific token/CA and the wider meta — if unknown, give measured, non-fabricated, clearly-hedged analysis (never invent fake handles or fake on-chain events). Write with depth, specificity and conviction \u2014 god-tier analyst voice, first-principles, NFA. Use the REAL holder %s, follower counts, and website lore provided. Each paragraph field should be 2-4 substantive sentences. Do not restate the contract address as an 'implication'.
 
 REAL DATA:
 ${JSON.stringify(facts)}
@@ -131,8 +144,11 @@ OFFICIAL WEBSITE CONTENT (basis for Narrative Archaeology):
 ${(social.siteText || "none").slice(0, 1800)}
 X PROFILE CONTENT:
 ${(social.xText || "none").slice(0, 1200)}
+TOP HOLDER DISTRIBUTION: ${holdersCtx ? JSON.stringify(holdersCtx) : "unavailable"}
 
 Rules: Base "narrative"/"firstPrinciples" on the website content above. Base social/KOL on the real official handle + any real names in the context. If you lack tweet-level engagement data, set "socialTable" and "kolTable" to [] and describe presence qualitatively using the real follower/post counts. Do NOT fabricate.
+
+GROUNDING: Treat the WEBSITE CONTENT as the ground-truth origin/lore (never call documented lore fabricated). CONSISTENCY: proScore must agree with proVerdictTitle and finalVerdict (bullish verdict => higher score, bearish => lower). Use the real holder %s, follower counts and lore in your prose. Avoid generic hedging.
 
 Return ONLY this JSON shape:
 ${schema}`;
@@ -140,30 +156,47 @@ ${schema}`;
   // enhanced-intelligence agent — much faster and controllable for JSON output.
   const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
   const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
-  const MODEL = Deno.env.get("NVIDIA_MODEL") || "meta/llama-3.3-70b-instruct";
-  try {
-    const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: "system", content: "You are OG SCAN PRO. Output ONLY a single valid minified JSON object. No markdown, no prose, no code fences." },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.5,
-        max_tokens: 2400,
-      }),
-      signal: AbortSignal.timeout(38000),
-    });
-    const j = await r.json();
-    let txt = String(j.choices?.[0]?.message?.content || "").trim();
-    const a = txt.indexOf("{"), b = txt.lastIndexOf("}");
-    if (a >= 0 && b > a) txt = txt.slice(a, b + 1);
-    return JSON.parse(txt);
-  } catch (_e) {
-    return {};
+  const MODEL = Deno.env.get("NVIDIA_DOSSIER_MODEL") || "meta/llama-3.1-8b-instruct";
+  const tolerant = (raw: string): any => {
+    let txt = String(raw || "").trim();
+    const a = txt.indexOf("{"); if (a < 0) return null;
+    const b = txt.lastIndexOf("}");
+    if (b > a) { try { return JSON.parse(txt.slice(a, b + 1)); } catch { /* repair below */ } }
+    // brace-balance repair for truncated output
+    txt = txt.slice(a);
+    let depth = 0, inStr = false, esc = false, end = -1;
+    for (let i = 0; i < txt.length; i++) {
+      const c = txt[i];
+      if (esc) { esc = false; continue; }
+      if (c === "\\") { esc = true; continue; }
+      if (c === '"') inStr = !inStr;
+      else if (!inStr) { if (c === "{") depth++; else if (c === "}") { depth--; if (depth === 0) { end = i; break; } } }
+    }
+    if (end > 0) { try { return JSON.parse(txt.slice(0, end + 1)); } catch { /* fallthrough */ } }
+    return null;
+  };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [
+            { role: "system", content: "You are OG SCAN PRO. Output ONLY a single valid minified JSON object. No markdown, no prose, no code fences. Ensure the JSON is complete and closed." },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.45,
+          max_tokens: 2200,
+        }),
+        signal: AbortSignal.timeout(45000),
+      });
+      const j = await r.json();
+      const parsed = tolerant(j.choices?.[0]?.message?.content || "");
+      if (parsed && Object.keys(parsed).length > 5) return parsed;
+    } catch { /* retry */ }
   }
+  return {};
 }
 
 // ---------- PDF layout engine ----------
@@ -505,13 +538,14 @@ async function buildPdf(scan: any, ai: any, social: any): Promise<Uint8Array> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { query } = await req.json().catch(() => ({ query: "" }));
-    const q = String(query || "").trim();
+    const body = await req.json().catch(() => ({}));
+    const q = String(body.query || "").trim();
     if (!q) return jsonResp({ ok: false, error: "Provide a mint or ticker." }, 400);
     const scan = await getScan(q);
     if (!scan || !scan.ok) return jsonResp({ ok: false, error: scan?.error || "Token not found." }, 404);
     const social = await gatherSocial(scan.token.mint);
     const ai = await synthesize(scan, social);
+    if (body.mode === "data") return jsonResp({ ok: true, scan, ai, social });
     const pdf = await buildPdf(scan, ai, social);
     const sym = (scan.token.symbol || "token").replace(/[^a-zA-Z0-9]/g, "");
     return new Response(pdf as unknown as BodyInit, {

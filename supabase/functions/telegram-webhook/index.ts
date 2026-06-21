@@ -253,6 +253,127 @@ async function sendDocument(botToken: string, chatId: number, bytes: Uint8Array,
   } catch (e) { console.error("sendDocument err", e); }
 }
 
+async function ogReportData(query: string): Promise<any> {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/og-report-pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+      body: JSON.stringify({ query, mode: "data" }),
+    });
+    return await r.json();
+  } catch { return { ok: false }; }
+}
+
+// Build the full OG SCAN PRO dossier as a sequence of Telegram HTML messages.
+function formatDossier(scan: any, ai: any, social: any): string[] {
+  const t = scan.token, sig = scan.score.signals, f = scan.flags;
+  const sym = (t.symbol || "TOKEN").replace(/^\$/, "");
+  const day = new Date().toISOString().slice(0, 10);
+  const E = escHtml;
+  const sec = scan.score.total;
+  const volTotal = (t.buyVolume24h || 0) + (t.sellVolume24h || 0);
+  const mc = ai.marketContext || {};
+  const si = ai.securityImplications || {};
+  const yn = (d: any, on: string, off: string) => d === true ? on : d === false ? off : "UNKNOWN";
+  const chunks: string[] = [];
+
+  // 1) Header + verdict
+  chunks.push(
+    `\uD83D\uDC80 <b>OG SCAN PRO</b>\n<b>${E(sym.toUpperCase())} DEEP DIVE INTELLIGENCE DOSSIER</b> | NFA | REAL-TIME SYNTHESIS\n` +
+    `<i>Generated ${day} \u00B7 ogscan.fun</i>\n<code>${E(t.mint)}</code>\n\n` +
+    `<b>${E(t.name || "?")} ($${E(sym)})</b>\n${ai.subtitle ? "<i>" + E(ai.subtitle) + "</i>\n" : ""}\n` +
+    `<b>VERDICT EVOLUTION</b>\n` +
+    `\uD83D\uDD34 Original OG Scan: <b>${E(scan.verdict)} \u2014 ${sec}/100</b>\n` +
+    `\uD83D\uDFE2 PRO Analysis: <b>${E(ai.proVerdictTitle || "Category-adjusted re-evaluation")}</b>\n\n` +
+    (ai.reassessment ? "<i>" + E(ai.reassessment) + "</i>" : ""),
+  );
+
+  // 2) Market snapshot
+  const row = (k: string, v: string, c?: string) => `\u2022 <b>${k}:</b> ${v}${c ? " \u2014 <i>" + E(c) + "</i>" : ""}`;
+  chunks.push(
+    `\uD83D\uDCCA <b>REAL-TIME MARKET SNAPSHOT</b>\n\n` +
+    [
+      row("Price", t.priceUsd != null ? "$" + Number(t.priceUsd).toPrecision(4) : "N/A", mc.price),
+      row("MC / FDV", `${fmtUsd(t.mcap)} / ${fmtUsd(t.fdv)}`, mc.mcap),
+      row("Liquidity", fmtUsd(t.liquidity), mc.liquidity || (social?.dexId ? "Pair on " + social.dexId : "")),
+      row("24h Volume", fmtUsd(volTotal), mc.volume || `Buys ${fmtUsd(t.buyVolume24h)} / Sells ${fmtUsd(t.sellVolume24h)}`),
+      row("Holders", t.holderCount != null ? Number(t.holderCount).toLocaleString() : "N/A", mc.holders),
+      row("Top Holders", t.topHoldersPct != null ? Number(t.topHoldersPct).toFixed(1) + "%" : "N/A", mc.topHolders),
+      row("Age", t.ageDays != null ? `~${t.ageDays} days` : "N/A", mc.age),
+      row("Txns 24h", t.txns24h != null ? `${Number(t.txns24h).toLocaleString()} txns / ${Number(t.numTraders24h||0).toLocaleString()} traders` : "N/A", mc.txns),
+      row("Organic / Holder Profile", `${t.organicScore != null ? Math.round(t.organicScore) : "N/A"} / ${sig.holderProfile}`, mc.organic),
+    ].join("\n") +
+    (ai.keyInsight ? `\n\n\uD83D\uDD11 <b>Key Insight:</b> ${E(ai.keyInsight)}` : ""),
+  );
+
+  // 3) On-chain fundamentals
+  chunks.push(
+    `\uD83D\uDD0E <b>ON-CHAIN FUNDAMENTALS</b>\n\n<b>Security & Authority</b>\n` +
+    [
+      `\u2022 Mint Authority: <b>${yn(f.mintAuthorityDisabled, "DISABLED \u2705", "ENABLED \u26A0\uFE0F")}</b>`,
+      `\u2022 Freeze Authority: <b>${yn(f.freezeAuthorityDisabled, "DISABLED \u2705", "ENABLED \u26A0\uFE0F")}</b>`,
+      `\u2022 Liquidity: <b>${f.lpPulled ? "PULLED / DEAD \u26D4" : "INTACT \u2705"}</b>`,
+      `\u2022 Min Liquidity: <b>${f.minLiquidity ? "MET \u2705" : "BELOW MIN"}</b>`,
+      `\u2022 Jupiter Verified: <b>${f.isVerified ? "YES \u2705" : "NO"}</b>`,
+      `\u2022 Deploy: <b>${f.isPumpFun ? (f.migratedFromPumpFun ? "pump.fun (migrated)" : "standard pump.fun") : "non-pump.fun"}</b>`,
+      `\u2022 Pool Age: <b>${t.poolAgeDays != null ? t.poolAgeDays + "d " + (t.poolAgeDays >= 7 ? "(matured)" : "(new)") : "N/A"}</b>`,
+    ].join("\n") +
+    (ai.txnFlow ? `\n\n<b>Transaction Flow (24h)</b>\n${E(ai.txnFlow)}` : "") +
+    (ai.godTierObservation ? `\n\n<i>God-Tier Observation: ${E(ai.godTierObservation)}</i>` : "") +
+    (ai.holderDistribution ? `\n\n<b>Holder Distribution</b>\n${E(ai.holderDistribution)}` : "") +
+    (ai.riskNote ? `\n\n\u26A0\uFE0F <b>Risk Note:</b> ${E(ai.riskNote)}` : ""),
+  );
+
+  // 4) Narrative & social
+  let nar = `\uD83E\uDDE0 <b>NARRATIVE ARCHAEOLOGY & SOCIAL INTELLIGENCE</b>\n`;
+  if (social && (social.xUrl || social.website)) {
+    nar += "\n<b>Verified Links</b>\n";
+    if (social.xUrl) nar += `\u2022 X: ${social.xUrl}${social.followers ? " (" + social.followers + " followers)" : ""}\n`;
+    if (social.website) nar += `\u2022 Site: ${social.website}\n`;
+    if (social.telegram) nar += `\u2022 TG: ${social.telegram}\n`;
+  }
+  if (ai.narrative) nar += `\n${E(ai.narrative)}`;
+  if (ai.firstPrinciples) nar += `\n\n<i>First-Principles Advantage: ${E(ai.firstPrinciples)}</i>`;
+  if (ai.socialActivity) nar += `\n\n<b>X / Twitter Activity</b>\n${E(ai.socialActivity)}`;
+  if (Array.isArray(ai.kolTable) && ai.kolTable.length) {
+    nar += `\n\n<b>KOL & Influencer Map</b>\n` + ai.kolTable.slice(0, 6).map((k: any) => `\u2022 <b>${E(k.entity || "")}</b> \u2014 ${E(k.role || "")}${k.notes ? ": " + E(k.notes) : ""}`).join("\n");
+  } else if (ai.kolIntro) nar += `\n\n<b>KOL Map</b>\n${E(ai.kolIntro)}`;
+  if (ai.godTierSynthesis) nar += `\n\n<i>God-Tier Synthesis: ${E(ai.godTierSynthesis)}</i>`;
+  chunks.push(nar);
+
+  // 5) Risk matrix + score re-eval
+  const pf = ai.proFactors || {};
+  const split = (k: string): [string, string] => { const v = pf[k]; if (!v) return ["-", ""]; const p = String(v).split("|"); return [p[0]?.trim() || "-", p.slice(1).join("|").trim()]; };
+  const fd: [string, string][] = [["Age / Novelty", String(sig.age)], ["Holder Profile", String(sig.holderProfile)], ["Narrative Strength", "n/s"], ["KOL / Smart Money", "n/s"], ["Risk Flags", (f.lpPulled || f.unsafeAuthority) ? "Mixed" : "Good"], ["Volume & Liquidity", String(sig.athMcap)]];
+  const proScore = Number.isFinite(Number(ai.proScore)) ? Math.max(0, Math.min(100, Math.round(Number(ai.proScore)))) : sec;
+  let risk = `\u2696\uFE0F <b>RISK MATRIX & OG SCORE RE-EVALUATION</b>\n\n`;
+  const risks = (ai.memeRisks && ai.memeRisks.length ? ai.memeRisks : ["Pure speculative asset \u2014 capital at severe risk.", "Narrative fatigue: attention rotates fast.", "Liquidity/slippage on large size.", "Concentration & platform risk."]);
+  risk += "<b>Inherent Risks</b>\n" + risks.slice(0, 7).map((r: string) => "\u2022 " + E(r)).join("\n");
+  if (ai.boughtSold) risk += `\n\n<b>Bought vs Sold</b>\n${E(ai.boughtSold)}`;
+  risk += `\n\n<b>OG Score Re-Evaluation</b>\n` + fd.map(([n, o]) => { const [pr, rt] = split(n); return `\u2022 ${n}: ${o} \u2192 <b>${pr}</b>${rt ? " \u2014 <i>" + E(rt) + "</i>" : ""}`; }).join("\n");
+  risk += `\n\u2022 <b>OVERALL: ${sec}/100 \u2192 ${proScore}/100</b>`;
+  if (ai.finalVerdict) risk += `\n\n\uD83C\uDFAF <b>Final Verdict:</b> ${E(ai.finalVerdict)}`;
+  chunks.push(risk);
+
+  // 6) Appendix
+  let app = `\uD83D\uDCDA <b>APPENDIX</b>\n\n<b>Data Sources:</b> DexScreener, Jupiter, Helius, OG Scan scoring engine${social?.website ? ", " + social.website : ""}${social?.xUrl ? ", X" : ""}.\n`;
+  if (Array.isArray(ai.monitoring) && ai.monitoring.length) app += `\n<b>Monitoring</b>\n` + ai.monitoring.slice(0, 6).map((m: string) => "\u2022 " + E(m)).join("\n") + "\n";
+  app += `\n<a href="${t.dexUrl}">chart</a>${t.pumpFunUrl ? ` \u00B7 <a href="${t.pumpFunUrl}">pump.fun</a>` : ""}\n\n<i>NFA. AI-augmented synthesis for educational purposes. Meme coins carry extreme risk \u2014 you could lose all capital. DYOR.</i>\n\n\u2014 END OF OG SCAN PRO DOSSIER \u2014`;
+  chunks.push(app);
+
+  // Telegram hard cap 4096; split any oversized chunk on newlines.
+  const out: string[] = [];
+  for (const c of chunks) {
+    if (c.length <= 3900) { out.push(c); continue; }
+    let buf = "";
+    for (const line of c.split("\n")) {
+      if ((buf + "\n" + line).length > 3900) { out.push(buf); buf = line; } else buf = buf ? buf + "\n" + line : line;
+    }
+    if (buf) out.push(buf);
+  }
+  return out;
+}
+
 async function getReportPdf(query: string): Promise<{ bytes: Uint8Array; sym: string } | null> {
   try {
     const r = await fetch(`${SUPABASE_URL}/functions/v1/og-report-pdf`, {
@@ -608,17 +729,21 @@ Deno.serve(async (req) => {
     if (cmd === "/report" || cmd === "/pdf") {
       const arg = text.replace(/^\S+\s*/, "").trim();
       if (!arg) {
-        await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token to report on: /report <mint address or $TICKER>" });
+        await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token: /report <mint address or $TICKER>" });
         return ok();
       }
-      // The PRO dossier takes ~30-60s (live data + AI synthesis), longer than
-      // Telegram will wait on the webhook. ACK now, build + send in background.
-      await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83D\uDCC4 Building your OG Scan PRO dossier\u2026 this takes ~30-60s." });
-      await tg(token, "sendChatAction", { chat_id: chatId, action: "upload_document" });
+      await tg(token, "sendMessage", { chat_id: chatId, text: "\uD83D\uDCDC Building your OG Scan PRO dossier\u2026 ~20-40s." });
+      await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
       const work = (async () => {
-        const rep = await getReportPdf(arg);
-        if (rep) await sendDocument(token, chatId, rep.bytes, rep.sym, "\uD83D\uDCC4 OG Scan PRO report", isGroup ? { reply_to_message_id: msg.message_id } : {});
-        else await tg(token, "sendMessage", { chat_id: chatId, text: "Couldn't generate a report for that token." });
+        const d = await ogReportData(arg);
+        if (d && d.ok) {
+          const parts = formatDossier(d.scan, d.ai, d.social);
+          for (const part of parts) {
+            await tg(token, "sendMessage", { chat_id: chatId, text: part, parse_mode: "HTML", disable_web_page_preview: true });
+          }
+        } else {
+          await tg(token, "sendMessage", { chat_id: chatId, text: d?.error || "Couldn't build a dossier for that token." });
+        }
       })();
       // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime.
       if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) EdgeRuntime.waitUntil(work);
