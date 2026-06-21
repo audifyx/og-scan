@@ -18,6 +18,8 @@ import {
   Play,
 } from "lucide-react";
 import { CoinDetailDialog } from "@/components/CoinDetailDialog";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 import { CopyMintButton } from "@/components/CopyMintButton";
 import {
   jupSearchToken,

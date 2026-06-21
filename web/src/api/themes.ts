@@ -1,4 +1,4 @@
-import { supabaseClient } from '../lib/supabase';
+import { supabase as supabaseClient } from '../lib/supabase';
 import { Theme } from '../interfaces/Theme';
 
 const updatePreferredTheme = async (theme: Theme) => {

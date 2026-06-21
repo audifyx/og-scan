@@ -1,7 +1,7 @@
 import { 
   Wallet, Coins, LineChart, Wrench, Rocket, Radio, Users, Bell, 
   Sparkles, LogOut, Zap, User, ChevronRight, MessageSquare, Settings,
-  Crown, Shield, Webhook, Headphones, Globe2, ArrowLeftRight
+  Crown, Shield, Webhook, Headphones, Globe2, ArrowLeftRight,
   Gamepad2,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";

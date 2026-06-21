@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "./supabase-ssr";
+import { supabase } from "@/lib/supabase-ssr";
 
 interface UseEmailVerificationProps {
   onVerified?: () => void;
