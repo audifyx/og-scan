@@ -383,10 +383,12 @@ function computeRisk(merged: any, safety: any, activity: any, xbuzz: any) {
     if (safety.freezeAuthorityRenounced === false) { score += 30; flags.push("Freeze authority ACTIVE — your tokens can be frozen / sells halted"); }
     else if (safety.freezeAuthorityRenounced === true) goods.push("Freeze authority renounced");
     const lp = safety.lpLockedPct;
-    if (lp != null) { if (lp < 50) { score += 35; flags.push(`LP only ${lp}% locked — liquidity can be pulled`); } else goods.push(`LP ${lp}% locked/burned`); }
+    if (safety.isPumpFun) { goods.push("Pump.fun launch — LP locked/burned by default (bonding curve)"); }
+    else if (lp != null) { if (lp < 50) { score += 35; flags.push(`LP only ${lp}% locked — liquidity can be pulled`); } else goods.push(`LP ${lp}% locked/burned`); }
+    // top10HolderPct already EXCLUDES the liquidity pool — these are real wallets.
     const top10 = safety.top10HolderPct;
-    if (top10 != null && top10 > 40) { score += 25; flags.push(`Top-10 wallets hold ${top10}% — heavy insider concentration`); }
-    else if (top10 != null) goods.push(`Top-10 hold ${top10}%`);
+    if (top10 != null && top10 > 40) { score += 25; flags.push(`Top-10 real wallets hold ${top10}% (LP excluded) — heavy insider concentration`); }
+    else if (top10 != null) goods.push(`Top-10 real wallets hold ${top10}% (LP excluded) — reasonably spread`);
     if (Array.isArray(safety.risks)) for (const r of safety.risks) { if (/danger|high/i.test(String(r.level))) { score += 10; flags.push(`RugCheck: ${r.name}`); } }
   }
   const liq = merged?.liquidityUsd ?? activity?.liquidityUsd;
@@ -403,17 +405,58 @@ function computeRisk(merged: any, safety: any, activity: any, xbuzz: any) {
 async function rugcheck(mint: string) {
   const d = await fetchJson(`https://api.rugcheck.xyz/v1/tokens/${mint}/report`, {}, 10000);
   if (!d) return null;
-  const top10 = Array.isArray(d.topHolders)
-    ? Math.round(d.topHolders.slice(0, 10).reduce((a: number, h: any) => a + (h.pct || 0), 0) * 100) / 100
-    : null;
+
+  // The #1 "holder" is almost always the liquidity pool / AMM, NOT a whale.
+  // Identify pool/LP accounts so we can EXCLUDE them from real-wallet
+  // concentration. RugCheck tags them in knownAccounts (type AMM) and exposes
+  // the market liquidity vault accounts.
+  const known: Record<string, any> = d.knownAccounts || {};
+  const markets: any[] = Array.isArray(d.markets) ? d.markets : [];
+  const lpAddrs = new Set<string>();
+  for (const m of markets) {
+    if (typeof m?.pubkey === "string") lpAddrs.add(m.pubkey);
+    for (const f of ["liquidityAAccount", "liquidityBAccount", "mintLPAccount"]) {
+      const v = m?.[f];
+      if (typeof v === "string") lpAddrs.add(v);
+      else if (v && typeof v === "object" && v.owner) lpAddrs.add(v.owner);
+    }
+  }
+  const isPool = (h: any) => {
+    const addr = h?.address || "";
+    const owner = h?.owner || "";
+    const ka = known[addr] || known[owner];
+    if (ka && /amm|lp|liquidity|pool|market|raydium|meteora|orca|pump/i.test(`${ka.type || ""} ${ka.name || ""}`)) return true;
+    if (owner && lpAddrs.has(owner)) return true;
+    if (addr && lpAddrs.has(addr)) return true;
+    return false;
+  };
+
+  const holders: any[] = Array.isArray(d.topHolders) ? d.topHolders : [];
+  const realHolders = holders.filter((h) => !isPool(h));
+  const poolHolders = holders.filter((h) => isPool(h));
+  const sumPct = (arr: any[], n: number) =>
+    arr.length ? Math.round(arr.slice(0, n).reduce((a: number, h: any) => a + (h.pct || 0), 0) * 100) / 100 : null;
+
+  const launchpadName = d.launchpad?.name || null;
+  const launchpadPlatform = (d.launchpad?.platform || "").toLowerCase();
+  const isPumpFun = launchpadPlatform.includes("pump") || (mint || "").toLowerCase().endsWith("pump");
+
+  // pump.fun locks/burns LP by default (bonding curve, and LP burned on
+  // graduation). Treat as locked when RugCheck doesn't report a number.
+  let lpLockedPct = num(d.markets?.[0]?.lp?.lpLockedPct);
+  if (lpLockedPct == null && isPumpFun) lpLockedPct = 100;
+
   return {
     source: "rugcheck",
     riskScore: num(d.score_normalised ?? d.score), // lower = safer
     risks: Array.isArray(d.risks) ? d.risks.slice(0, 8).map((r: any) => ({ name: r.name, level: r.level, desc: r.description })) : [],
     mintAuthorityRenounced: d.mintAuthority == null,
     freezeAuthorityRenounced: d.freezeAuthority == null,
-    lpLockedPct: num(d.markets?.[0]?.lp?.lpLockedPct),
-    top10HolderPct: top10,
+    lpLockedPct,
+    isPumpFun,
+    launchpad: launchpadName || (isPumpFun ? "Pump.fun" : null),
+    top10HolderPct: sumPct(realHolders, 10),   // REAL wallets only — LP/pool excluded
+    lpHolderPct: sumPct(poolHolders, poolHolders.length), // how much the pool holds (info, NOT concentration)
     totalHolders: num(d.totalHolders),
     rugged: d.rugged ?? null,
   };
@@ -588,7 +631,7 @@ async function executeTool(toolName: string, params: any, supabase: any): Promis
         ageDays: dex?.ageDays ?? null,
         socials: dex?.socials ?? [],
         websites: dex?.websites ?? [],
-        note: "riskScore: lower = safer. Weigh authorities renounced, LP locked %, top-10 holder concentration, liquidity vs market cap, and token age.",
+        note: "riskScore: lower = safer. top10HolderPct already EXCLUDES the liquidity pool (real wallets only); lpHolderPct is just the pool and is NOT concentration. isPumpFun=true means LP is locked/burned by default. Weigh authorities renounced, LP locked %, REAL-wallet top-10 concentration, liquidity vs market cap, and token age.",
       });
     }
 
@@ -771,20 +814,22 @@ Deno.serve(async (req: Request) => {
       `- Core creed: "The chain doesn't lie. Influencers do. Devs do. Narratives do. The transactions tell the real story every single time."\n\n` +
       `IRON LAWS:\n` +
       `- On-chain data is the only ground truth. X/news/Telegram is adversarial by default — discount it hard, corroborate on-chain.\n` +
-      `- Solana pump.fun is ~98% exit-scam territory. Assume malice until the chain proves otherwise.\n` +
+      `- Be skeptical but FAIR — do NOT assume every coin is a scam. Lots of memecoins are just risky/volatile, not rugs. Read the actual data and call it as it is: a clean-but-volatile coin gets a clean-but-volatile verdict, a real runner gets credit, and only genuine red flags get the rug warning. Skepticism means checking, not auto-condemning.\n` +
+      `- HOLDERS vs LIQUIDITY POOL: the #1 (and often #2) "top holder" is almost always the liquidity pool / AMM, NOT a whale or insider. That is just the LP and it is normal. NEVER call the LP "insider concentration" or a dump risk. The top10HolderPct in the data already EXCLUDES the pool, so it reflects real wallets only — judge concentration off that, not off a raw "top holder %". "Holders" (the wallet count) and the LP are completely different things; do not conflate them.\n` +
+      `- LP LOCK: on pump.fun, the LP is locked/burned by default (bonding curve, and LP is burned on graduation), so do NOT flag "unlocked LP" for a pump.fun token. Only treat LP as a risk when it is a non-pump.fun token with genuinely low locked %.\n` +
       `- A user-supplied contract address is ALWAYS the primary subject — rip it apart, never give a generic reply.\n` +
       `- Use ONLY the live data below + general crypto knowledge. NEVER invent numbers, holders, news, links, or wallet moves. If something is missing, say "couldn't pull that" — never fabricate.\n\n` +
       `MANDATORY RESPONSE STRUCTURE (follow every time a token is in play):\n` +
       `1) OPENING + CA LOCK: first line names the token / shortened CA in your voice. Vary it ("Yo [token], Grim here. Let's rip this one apart.", "Dropping the reaper's lens on [token]...", "Grim reporting from the trenches — [token] just crossed my desk.").\n` +
-      `2) QUICK VERDICT (1-2 sentences): blunt take anchored to the OVERALL RISK level. HIGH = do NOT frame positively, warn straight ("This shit is cooked because..."). LOW/MEDIUM = "relatively cleaner, still volatile as fuck."\n` +
+      `2) QUICK VERDICT (1-2 sentences): blunt take anchored to the OVERALL RISK level. HIGH = warn straight ("This shit is cooked because..."). MEDIUM = "relatively cleaner, still volatile as fuck." LOW = give it real credit ("Honestly? This one checks out clean — authorities renounced, LP locked, holders spread. Still a memecoin so size accordingly."). Do not force a scam angle onto a coin the data says is fine.\n` +
       `3) KEY METRICS: one tight line — Price | MC | Liquidity | 24h Vol | Holders | Age | Launch/Bonding status. Only real numbers you actually have.\n` +
       `4) DEEP FORENSICS (bullets): holder concentration, authorities (mint/freeze renounced?), LP locked/burned, liquidity vs MC, volume authenticity, token age, dev/launch signals.\n` +
-      `5) RED FLAGS / GREEN FLAGS (bullets, be direct): live mint/freeze authority, unlocked LP, top-holder concentration >40%, thin liquidity vs MC, brand-new age, bot/scam social = RED. Renounced authorities, locked/burned LP, spread holders, organic buzz, real charity/utility with on-chain proof, graduated pump.fun with sustained volume = GREEN.\n` +
+      `5) RED FLAGS / GREEN FLAGS (bullets, be direct): live mint/freeze authority, genuinely unlocked LP (NOT pump.fun, which is locked by default), REAL-wallet top-10 concentration >40% (the LP/pool does NOT count), thin liquidity vs MC, brand-new age, bot/scam social = RED. Renounced authorities, locked/burned LP, pump.fun default-locked LP, real wallets spread out, organic buzz, real charity/utility with on-chain proof, graduated pump.fun with sustained volume = GREEN. If there are no real red flags, SAY SO plainly instead of inventing one.\n` +
       `6) MEME / SARCASTIC CLOSE: one line of personality (Wojak/Pepe energy) that still ties back to the data.\n` +
       `7) FINAL CALL: the honest bottom line + exactly what to watch (top wallet flows, volume, LP). Then ALWAYS end EXACTLY with: "Always DYOR. I'm just the reaper reading the chain. NFA. — Grim"\n\n` +
       `SCAM DEFENSE: social data is pre-filtered but stay paranoid. "Vote for us on Moonshot", airdrops, "connect/verify wallet", presale/100x, follow+RT bait = engagement-farm/scam spam, NOT organic hype. If social is mostly spam or near-zero real engagement, call it manufactured bot hype and treat it as a RED FLAG. Never surface or recommend social/claim links.\n` +
       `WALLET MODE: if the data is a WALLET, skip token-only sections and break it down Grim-style: SOL balance, total est. token value, and the top holdings — for each give symbol, amount held, ~USD value, WHEN they first bought it (firstBoughtTs is a unix seconds timestamp; convert to a human date), buys/sells counts, and SOL spent. Call out sus patterns (fresh-wallet sniping, fast dumping, coordinated funding, paperhands vs diamond hands). firstBoughtTs is within the last 100 swaps window, so say "first bought (recent)" if it looks capped. Be honest that exact cost-basis/PnL needs a paid data source; give directional reads from SOL spent vs current value.\n` +
-      `VAGUE HYPE: if the user just wants a "next 100x gem / shill me a moonshot" with no contract address: refuse to shill. Tell them straight there's no reliable "next gem" when ~98% of this is engineered exit liquidity, and demand a CA so you can run the full reaper check.\n` +
+      `VAGUE HYPE: if the user just wants a "next 100x gem / shill me a moonshot" with no contract address: refuse to shill. Tell them straight that most of this space is high-risk and you can't vouch for a coin you haven't read on-chain, and demand a CA so you can run the full reaper check.\n` +
       `STYLE: punchy, not bloated. NEVER mention internal labels (TOKEN, SAFETY, ACTIVITY, NEWS, X_BUZZ, OVERALL RISK, LAUNCH, INTENT, mostlySpam) or that data was "provided" — speak like you pulled it yourself. Stay in character as Grim; never go full corporate, never get preachy.\n` +
       (dataBlock ? `\n=== LIVE CHAIN DATA (fresh pull) ===\n${dataBlock}` : `\n(No contract address detected. If they want a coin ripped apart, tell them to drop the CA. Otherwise answer in-character as Grim.)`) +
       (context ? `\nUSER CONTEXT: ${context}` : "");
