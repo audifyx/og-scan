@@ -49,6 +49,7 @@ async function refreshCommandMenu(admin: any, botToken: string, botRowId: string
   const base = [
     { command: "chat", description: "Chat with the AI analyst" },
     { command: "scan", description: "Full token risk report" },
+    { command: "report", description: "PDF intelligence report" },
     { command: "trending", description: "Top trending tokens (24h)" },
     { command: "news", description: "Latest crypto headlines" },
     { command: "alpha", description: "Community alpha callouts" },

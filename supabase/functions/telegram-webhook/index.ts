@@ -164,6 +164,32 @@ async function ogScan(query: string): Promise<any> {
   } catch { return { ok: false, error: "scan failed" }; }
 }
 
+async function sendDocument(botToken: string, chatId: number, bytes: Uint8Array, filename: string, caption: string, extra: object = {}) {
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  if (caption) form.append("caption", caption);
+  for (const [k, v] of Object.entries(extra)) form.append(k, String(v));
+  form.append("document", new Blob([bytes as unknown as BlobPart], { type: "application/pdf" }), filename);
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: "POST", body: form });
+  } catch (e) { console.error("sendDocument err", e); }
+}
+
+async function getReportPdf(query: string): Promise<{ bytes: Uint8Array; sym: string } | null> {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/og-report-pdf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+      body: JSON.stringify({ query }),
+    });
+    if (!r.ok || !(r.headers.get("content-type") || "").includes("pdf")) return null;
+    const buf = new Uint8Array(await r.arrayBuffer());
+    const cd = r.headers.get("content-disposition") || "";
+    const m = cd.match(/filename="([^"]+)"/);
+    return { bytes: buf, sym: m ? m[1] : "ogscan_report.pdf" };
+  } catch { return null; }
+}
+
 function pctStr(n: any): string {
   if (n == null || !isFinite(Number(n))) return "?";
   const v = Number(n); return (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
@@ -301,6 +327,7 @@ Deno.serve(async (req) => {
           `/chat — ask Grim anything (works in groups too)\n` +
           `/scan <token> — full token risk report (same as the site)\n` +
           `/trending — top trending tokens (24h)\n` +
+          `/report <token> — PDF intelligence report\n` +
           `/news — latest crypto headlines\n` +
           `/alpha — community alpha callouts\n` +
           `/migrations — pump.fun graduations (last 24h)\n` +
@@ -402,6 +429,22 @@ Deno.serve(async (req) => {
       const knowledge = await retrieveKnowledge(bot.id, prompt);
       const answer = await askGrim(prompt, knowledge, identity);
       await sendLong(token, chatId, answer, isGroup ? { reply_to_message_id: msg.message_id } : {});
+      return ok();
+    }
+
+    if (cmd === "/report" || cmd === "/pdf") {
+      const arg = text.replace(/^\S+\s*/, "").trim();
+      if (!arg) {
+        await tg(token, "sendMessage", { chat_id: chatId, text: "Send a token to report on: /report <mint address or $TICKER>" });
+        return ok();
+      }
+      await tg(token, "sendChatAction", { chat_id: chatId, action: "upload_document" });
+      const rep = await getReportPdf(arg);
+      if (rep) {
+        await sendDocument(token, chatId, rep.bytes, rep.sym, "\uD83D\uDCC4 OG Scan report", isGroup ? { reply_to_message_id: msg.message_id } : {});
+      } else {
+        await tg(token, "sendMessage", { chat_id: chatId, text: "Couldn't generate a report for that token." });
+      }
       return ok();
     }
 
