@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.alert-checker]
 verify_jwt = false
+
+[functions.vibe-code]
+verify_jwt = false

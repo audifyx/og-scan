@@ -1086,23 +1086,17 @@ Deno.serve(async (req) => {
       }
       await tg(token, "sendMessage", { chat_id: chatId, text: `\uD83C\uDFA8 Vibecoding: \u201C${escHtml(arg).slice(0, 140)}\u201D\u2026 building a full HTML5 page, ~30-90s.` });
       await tg(token, "sendChatAction", { chat_id: chatId, action: "upload_document" });
-      const work = (async () => {
-        const out = await vibeCodeHtml(arg);
-        if (out) {
-          const slug = arg.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "vibecode";
-          await sendDocument(
-            token, chatId, out.bytes, `${slug}.html`,
-            `\u2705 Built it \u2014 open in your browser.${out.url ? "\n\n\uD83D\uDD17 Live: " + out.url : ""}`,
-            { ...(isGroup ? { reply_to_message_id: msg.message_id } : {}), ...(out.url ? { reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "\uD83D\uDD17 Open Live Page", url: out.url }]] }) } : {}) },
-            "text/html",
-          );
-        } else {
-          await tg(token, "sendMessage", { chat_id: chatId, text: "Couldn't build that one \u2014 try again or rephrase the prompt." });
-        }
-      })();
+      // Offload to the dedicated vibe-code worker (its own isolate = full time
+      // budget). It generates, hosts, and sends the document itself, so it
+      // completes even if this webhook isolate is recycled.
+      const trigger = fetch(`${SUPABASE_URL}/functions/v1/vibe-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+        body: JSON.stringify({ prompt: arg, bot_token: token, chat_id: chatId, reply_to_message_id: isGroup ? msg.message_id : null }),
+      }).catch((e) => console.error("vibe-code trigger", e));
       // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime.
-      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) EdgeRuntime.waitUntil(work);
-      else await work;
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) EdgeRuntime.waitUntil(trigger);
+      else await trigger;
       return ok();
     }
 
