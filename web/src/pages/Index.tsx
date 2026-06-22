@@ -123,6 +123,7 @@ const FirstBuyersForensics = lazy(() => import("@/components/launch-radar-20x/Fi
 const LaunchAlerts = lazy(() => import("@/components/launch-radar-20x/LaunchAlerts").then(m => ({ default: m.LaunchAlerts })));
 const MomentumHeatmap = lazy(() => import("@/components/market-feed-20x/MomentumHeatmap").then(m => ({ default: m.MomentumHeatmap })));
 const NarrativeClusters = lazy(() => import("@/components/market-feed-20x/NarrativeClusters").then(m => ({ default: m.NarrativeClusters })));
+const CryptoNewsFeed = lazy(() => import("@/components/market-feed-20x/CryptoNewsFeed").then(m => ({ default: m.CryptoNewsFeed })));
 const CrossReferenceCard = lazy(() => import("@/components/market-feed-20x/CrossReferenceCard").then(m => ({ default: m.CrossReferenceCard })));
 const CustomFeedBuilder = lazy(() => import("@/components/market-feed-20x/CustomFeedBuilder").then(m => ({ default: m.CustomFeedBuilder })));
 const WalletXRay = lazy(() => import("@/components/wallets-20x/WalletXRay").then(m => ({ default: m.WalletXRay })));
@@ -1563,7 +1564,7 @@ type MarketTab = "feed" | "trending" | "signals";
 const MARKET_TABS: { id: MarketTab; label: string; Icon?: ComponentType<{ className?: string }> }[] = [
   { id: "feed", label: "Live Feed", Icon: Rss },
   { id: "trending", label: "Trending", Icon: Flame },
-  { id: "signals", label: "Signals", Icon: Radio },
+  { id: "signals", label: "News", Icon: Radio },
 ];
 const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: string) => void }) => {
   void mint;
@@ -1578,18 +1579,8 @@ const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: strin
       />
       <SegmentedTabs tabs={MARKET_TABS} active={active} onChange={setActive} />
       {active === "feed" && <Feed onSelect={onSelect} />}
-      {active === "trending" && (
-        <div className="space-y-3">
-          <Trending onSelect={onSelect} />
-          <MomentumHeatmap onSelectMint={onSelect} />
-        </div>
-      )}
-      {active === "signals" && (
-        <div className="space-y-3">
-          <NewsSignal onSelect={onSelect} />
-          <NarrativeClusters onSelectMint={onSelect} />
-        </div>
-      )}
+      {active === "trending" && <Trending onSelect={onSelect} />}
+      {active === "signals" && <CryptoNewsFeed />}
     </section>
   );
 };
