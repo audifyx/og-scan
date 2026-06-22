@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext, type ReactNode } from "
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { trackActivity } from "@/lib/trackActivity";
+import { getDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import { setSentryUser, clearSentryUser } from "@/lib/sentry";
 import {
   canUseReservedUsername,
@@ -132,14 +133,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: new Error(getReservedUsernameMessage()), userId: null };
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: { username: cleanUsername },
-      },
+    // Guarded signup: account creation is server-side only (public GoTrue
+    // signup is disabled). The edge function enforces 1 account per device
+    // and 3 accounts per IP, then we establish the session here.
+    const fingerprint = getDeviceFingerprint();
+    const { error: guardErr } = await supabase.functions.invoke("signup-guard", {
+      body: { email, password, username: cleanUsername, fingerprint },
     });
+    if (guardErr) {
+      let message = "Sign up failed";
+      try {
+        const body = await (guardErr as { context?: { json?: () => Promise<{ message?: string }> } })?.context?.json?.();
+        if (body?.message) message = body.message;
+      } catch { /* ignore */ }
+      return { error: new Error(message), userId: null };
+    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     // Process referral if ?ref= was captured
     if (!error && data?.user) {

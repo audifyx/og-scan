@@ -91,3 +91,6 @@ verify_jwt = true
 verify_jwt = false
 [functions.x-stream-listener]
 verify_jwt = false
+
+[functions.signup-guard]
+verify_jwt = false
