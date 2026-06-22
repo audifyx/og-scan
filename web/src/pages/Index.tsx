@@ -55,7 +55,7 @@ import { AuthButton } from "@/components/AuthButton";
 import { AppTopBar } from "@/components/AppTopBar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { ToolHeader } from "@/components/ToolPageShell";
+import { ToolHeader, EmeraldHeader, SegmentedTabs } from "@/components/ToolPageShell";
 
 /* ─── Standard Feature imports ─── */
 const OgStats = lazy(() => import("@/components/OgStats").then(m => ({ default: m.OgStats })));
@@ -67,7 +67,6 @@ const Migrations = lazy(() => import("@/components/Migrations").then(m => ({ def
 const TxFeed = lazy(() => import("@/components/TxFeed").then(m => ({ default: m.TxFeed })));
 const Whales = lazy(() => import("@/components/Whales").then(m => ({ default: m.Whales })));
 const GamesPage = lazy(() => import("@/pages/Games").then(m => ({ default: m.default })));
-const SwapPanel = lazy(() => import("@/components/SwapPanel").then(m => ({ default: m.SwapPanel })));
 const TechStack = lazy(() => import("@/components/TechStack").then(m => ({ default: m.TechStack })));
 const OurCoin = lazy(() => import("@/components/OurCoin").then(m => ({ default: m.OurCoin })));
 const SnipeFeed = lazy(() => import("@/components/SnipeFeed").then(m => ({ default: m.SnipeFeed })));
@@ -742,7 +741,6 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
 
   /* ─── Standalone tools ─── */
   if (tab === "games") return <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading…</div>}><GamesPage /></Suspense>;
-  if (tab === "swap") return <SwapPanel ogMint={mint} onSelectMint={updateMint} />;
 
   /* ─── Social / community pages ─── */
   if (tab === "communities") return (
@@ -1120,7 +1118,6 @@ const TOOL_TABS: { id: TabId; label: string }[] = [
   { id: "snipe-feed", label: "Launch Radar" },
   { id: "feed", label: "Market Feed" },
   { id: "market-pulse", label: "Token Intel" },
-  { id: "swap", label: "Swap" },
   { id: "listings", label: "Listings" },
   { id: "token-manager", label: "Token Manager" },
 ];
@@ -1145,7 +1142,6 @@ const ToolsTabbed = ({ mint, onSelectMint }: { mint: string; onSelectMint: (m: s
         {active === "snipe-feed" && <LaunchRadarSuite onSelect={onSelectMint} />}
         {active === "feed" && <MarketFeedSuite mint={mint} onSelect={onSelectMint} />}
         {active === "market-pulse" && <TokenIntel mint={mint} onSelect={onSelectMint} initialTab="vitals" />}
-        {active === "swap" && <SwapPanel ogMint={mint} onSelectMint={onSelectMint} />}
         {active === "listings" && <TokenListings />}
         {active === "token-manager" && <TokenManagerPage />}
       </Suspense>
@@ -1570,30 +1566,38 @@ const LaunchRadarSuite = ({ onSelect }: { onSelect: (m: string) => void }) => {
   );
 };
 
+type MarketTab = "feed" | "trending" | "news-signal" | "heatmap" | "narratives" | "leaders";
+const MARKET_TABS: { id: MarketTab; label: string; Icon?: ComponentType<{ className?: string }> }[] = [
+  { id: "feed", label: "Live Feed", Icon: Rss },
+  { id: "trending", label: "Trending", Icon: Flame },
+  { id: "news-signal", label: "News", Icon: Radio },
+  { id: "heatmap", label: "Heatmap" },
+  { id: "narratives", label: "Narratives" },
+  { id: "leaders", label: "Leaders" },
+];
 const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: string) => void }) => {
-  const [active, setActive] = useState<"feed" | "trending" | "news-signal">("feed");
+  void mint;
+  const [active, setActive] = useState<MarketTab>("feed");
   return (
     <section className="space-y-4">
-      <ToolHeader
+      <EmeraldHeader
         icon={Rss}
         title="Market Feed"
-        subtitle="Trending tokens, narrative signals, and live market tape — the pulse of Solana in one view."
-        gradient="from-cyan-500 to-blue-400"
-        glowColor="rgba(6,182,212,0.25)"
-        badge="STREAMING"
-        badgeColor="cyan"
+        subtitle="Trending tokens, narrative signals, momentum and the live market tape — the pulse of Solana, organized into one clean view."
+        badge="Streaming"
       />
-      <SuiteNav options={marketSuiteOptions} activeId={active} onChange={setActive} />
+      <SegmentedTabs tabs={MARKET_TABS} active={active} onChange={setActive} />
       {active === "feed" && <Feed onSelect={onSelect} />}
       {active === "trending" && <Trending onSelect={onSelect} />}
       {active === "news-signal" && <NewsSignal onSelect={onSelect} />}
-      {/* 20x Features */}
-      <div className="space-y-3 mt-4">
-        <MomentumHeatmap onSelectMint={onSelect} />
-        <NarrativeClusters onSelectMint={onSelect} />
-        <TradingLobbies onSelectMint={onSelect} />
-        <CalloutLeaderboard />
-      </div>
+      {active === "heatmap" && <MomentumHeatmap onSelectMint={onSelect} />}
+      {active === "narratives" && <NarrativeClusters onSelectMint={onSelect} />}
+      {active === "leaders" && (
+        <div className="space-y-3">
+          <CalloutLeaderboard />
+          <TradingLobbies onSelectMint={onSelect} />
+        </div>
+      )}
     </section>
   );
 };

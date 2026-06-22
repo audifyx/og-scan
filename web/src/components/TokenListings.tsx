@@ -13,6 +13,7 @@ import {
   Share2, Link as LinkIcon, Layers, Target, FileWarning,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EmeraldHeader } from "@/components/ToolPageShell";
 import { supabase } from "@/lib/supabase";
 import { HELIUS_API_KEY, HELIUS_RPC, HELIUS_BASE, BIRDEYE_API_KEY } from "@/lib/og";
 import { useAuth } from "@/hooks/useAuth";
@@ -1290,30 +1291,37 @@ export const TokenListings: React.FC<{ initialMint?: string }> = ({ initialMint 
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/15" />
-          <input
-            type="text" value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tokens..."
-            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] pl-9 pr-3 py-2.5 text-xs text-white placeholder:text-white/15 outline-none focus:border-og-cyan/30 transition-colors"
-          />
-        </div>
-        <button onClick={() => setShowListPanel(true)}
-          className="flex items-center gap-1.5 rounded-xl border border-og-lime/20 bg-og-lime/5 px-4 py-2.5 text-[11px] font-bold text-og-lime hover:bg-og-lime/10 transition-colors shrink-0">
-          <Plus className="h-3.5 w-3.5" /> List Token
-        </button>
+      <EmeraldHeader
+        icon={Megaphone}
+        title="Listings"
+        subtitle="List and promote any token on OG Scan — paste a contract and we pull live market, holder and safety data into a clean public card."
+        badge="Community"
+        right={(
+          <button onClick={() => setShowListPanel(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-500/30 transition hover:brightness-110">
+            <Plus className="h-4 w-4" /> List Token
+          </button>
+        )}
+      />
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-400/70" />
+        <input
+          type="text" value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search listings..."
+          className="w-full rounded-2xl border border-emerald-500/20 bg-white/[0.03] py-3 pl-10 pr-3 text-sm text-white placeholder:text-white/25 outline-none transition focus:border-emerald-400/60"
+        />
       </div>
 
-      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {(["all", "promoted", "bullish", "bearish", "newest"] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all shrink-0",
-              filter === f ? "bg-white/10 text-white" : "text-white/25 hover:text-white/50",
+              "shrink-0 rounded-xl border px-3.5 py-1.5 text-[11px] font-bold transition",
+              filter === f ? "border-emerald-400/50 bg-emerald-500/[0.08] text-emerald-300" : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70",
             )}>
-            {f === "all" ? "All" : f === "promoted" ? "⭐ Promoted" : f === "bullish" ? "🟢 Bullish" : f === "bearish" ? "🔴 Bearish" : "🕐 Newest"}
+            {f === "all" ? "All" : f === "promoted" ? "Promoted" : f === "bullish" ? "Bullish" : f === "bearish" ? "Bearish" : "Newest"}
           </button>
         ))}
       </div>

@@ -152,3 +152,55 @@ export const LoadingState: React.FC<{ text?: string }> = ({ text = "Loading..." 
     <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-white/20">{text}</p>
   </div>
 );
+
+/* ─── Emerald Header (matches OG Scanner shell) ─── */
+interface EmeraldHeaderProps {
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  right?: React.ReactNode;
+}
+export const EmeraldHeader: React.FC<EmeraldHeaderProps> = ({ icon: Icon, title, subtitle, badge, right }) => (
+  <div className="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.06] via-white/[0.02] to-transparent p-5">
+    <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl" />
+    <div className="relative flex flex-wrap items-start justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <div className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-400 shadow-lg shadow-emerald-500/30">
+          <Icon className="h-6 w-6 text-white" strokeWidth={2.2} />
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-black tracking-tight text-white">{title}</h2>
+            {badge && <span className="rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-300">{badge}</span>}
+          </div>
+          {subtitle && <p className="mt-1 max-w-md text-xs leading-relaxed text-white/45">{subtitle}</p>}
+        </div>
+      </div>
+      {right && <div className="flex items-center gap-2">{right}</div>}
+    </div>
+  </div>
+);
+
+/* ─── Segmented Tabs (emerald pill nav) ─── */
+interface SegTab<T extends string> { id: T; label: string; Icon?: React.ComponentType<{ className?: string }>; }
+export function SegmentedTabs<T extends string>({ tabs, active, onChange }: { tabs: SegTab<T>[]; active: T; onChange: (t: T) => void; }) {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          onClick={() => onChange(t.id)}
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3.5 py-2 text-[11px] font-bold transition",
+            active === t.id ? "border-emerald-400/50 bg-emerald-500/[0.08] text-emerald-300" : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70",
+          )}
+        >
+          {t.Icon && <t.Icon className={cn("h-3.5 w-3.5", active === t.id ? "text-emerald-300" : "text-white/30")} />}
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}

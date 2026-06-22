@@ -15,6 +15,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { supabase } from "@/lib/supabase";
+import { EmeraldHeader } from "@/components/ToolPageShell";
 import {
   getMetadataPDA,
   deserializeMetadata,
@@ -664,27 +665,20 @@ export default function TokenManager() {
   const showPostConnect = walletReady;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 py-6">
-      {/* ── Header ── */}
-      <div className="text-center">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-og-lime/20 bg-og-lime/5 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-og-lime">
-          <Zap className="h-3 w-3" /> Free On-Chain Update
-        </div>
-        <h1 className="text-2xl font-black tracking-tight text-white md:text-3xl">
-          Token Manager
-        </h1>
-        <p className="mt-2 text-sm text-white/40">
-          Update your token's image, description & links — changes show on{" "}
-          <span className="text-white/60">every platform</span> (DexScreener,
-          Jupiter, Birdeye, wallets).
-        </p>
-        {walletReady && (
-          <p className="mt-1 text-[10px] text-white/20">
-            Connected: <span className="font-mono text-og-cyan/60">{shortAddr(publicKey!.toBase58())}</span>
-            <button onClick={() => disconnect()} className="ml-2 text-white/15 hover:text-white/40 underline">disconnect</button>
-          </p>
-        )}
-      </div>
+    <div className="mx-auto max-w-2xl space-y-5 px-4 py-6">
+      <EmeraldHeader
+        icon={Zap}
+        title="Token Manager"
+        subtitle="Update your token's image, description and links on-chain — changes propagate to DexScreener, Jupiter, Birdeye and wallets. Free."
+        badge="On-Chain"
+        right={walletReady ? (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
+            <div className="text-[9px] uppercase tracking-widest text-white/30">Connected</div>
+            <div className="font-mono text-xs text-emerald-300">{shortAddr(publicKey!.toBase58())}</div>
+            <button onClick={() => disconnect()} className="text-[9px] text-white/30 underline hover:text-white/60">disconnect</button>
+          </div>
+        ) : undefined}
+      />
 
       {/* ── Error banner ── */}
       {error && (
