@@ -1,6 +1,7 @@
 import { type ComponentType, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Activity,
   ArrowRight,
   BadgeDollarSign,
   BarChart3,
@@ -63,6 +64,11 @@ import {
 import { cn } from "@/lib/utils";
 import { HelpLabel, ScoreMeter, TokenTruthLegend, labelToneClass, scoreTextClass } from "@/components/TokenTruthKit";
 import { OgVerdict } from "@/components/scanner-20x/OgVerdict";
+import { OgStats } from "@/components/OgStats";
+import { Whales } from "@/components/Whales";
+import { TxFeed } from "@/components/TxFeed";
+import { WalletXRay } from "@/components/wallets-20x/WalletXRay";
+import { CopyTradingFeed } from "@/components/wallets-20x/CopyTradingFeed";
 import { ScanHistory, addToScanHistory } from "@/components/scanner-20x/ScanHistory";
 import { ComparativeScan } from "@/components/scanner-20x/ComparativeScan";
 import { downloadReportPdf } from "@/lib/reportPdf";
@@ -227,6 +233,8 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   const [debounced, setDebounced] = useState<string>(initialQuery.trim());
   const [filters, setFilters] = useState<ScanFilters>(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [showIntel, setShowIntel] = useState<boolean>(false);
+  const [intelWallet, setIntelWallet] = useState<string>("");
 
   useEffect(() => {
     const cleanQuery: string = initialQuery.trim();
@@ -261,6 +269,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   const primaryToken: JupTokenInfo | undefined = report?.primaryToken ?? filteredResults.find((token) => tokenScore(report, token)?.isPrimaryToken);
   const firstMintToken: JupTokenInfo | undefined = report?.firstMintToken ?? filteredResults.find((token) => tokenScore(report, token)?.isFirstMintToken);
   const primaryScore: TokenForensicScores | undefined = primaryToken ? tokenScore(report, primaryToken) : undefined;
+  const intelMint: string = primaryToken?.id ?? firstMintToken?.id ?? filteredResults[0]?.id ?? "";
 
   // Persist completed scans to the global scan history feed
   useEffect(() => {
@@ -433,6 +442,27 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
               <div className="rounded-2xl border border-dashed border-white/12 p-8 text-center text-xs uppercase tracking-widest text-white/40">NO RESULTS PASS FILTERS · RESET OR LOWER THE BAR</div>
             )}
           </div>
+
+          {/* Token Intel — relocated here so the scanned token's full deep-dive lives with the Scanner */}
+          {intelMint && (
+            <div className="mt-3">
+              <button type="button" onClick={() => setShowIntel((v) => !v)} className="flex w-full items-center gap-2 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.05] px-4 py-3 text-left transition hover:border-emerald-400/40">
+                <Activity className="h-4 w-4 flex-none text-emerald-300" />
+                <span className="text-sm font-bold text-white">Token Intel</span>
+                <span className="hidden text-[11px] text-white/40 sm:inline">vitals · whales · wallets · live TX</span>
+                <ChevronDown className={cn("ml-auto h-4 w-4 flex-none text-white/40 transition-transform", showIntel && "rotate-180")} />
+              </button>
+              {showIntel && (
+                <div className="mt-3 space-y-4">
+                  <OgStats mint={intelMint} onSelect={onSelect} />
+                  <Whales mint={intelMint} onSelectWallet={setIntelWallet} />
+                  {intelWallet && <WalletXRay walletAddress={intelWallet} compact={false} />}
+                  <CopyTradingFeed onSelectMint={onSelect} />
+                  <TxFeed mint={intelMint} />
+                </div>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-5">

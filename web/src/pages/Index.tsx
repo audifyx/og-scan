@@ -1116,7 +1116,6 @@ const TokenDetailPopupWrapper = ({ token, onClose, onOpenScanner }: { token: Jup
 const TOOL_TABS: { id: TabId; label: string }[] = [
   { id: "scanner", label: "Scanner" },
   { id: "snipe-feed", label: "Market Radar" },
-  { id: "market-pulse", label: "Token Intel" },
   { id: "listings", label: "Listings" },
   // Token Manager hidden from view for now (still routable directly).
 ];
@@ -1139,7 +1138,6 @@ const ToolsTabbed = ({ mint, onSelectMint }: { mint: string; onSelectMint: (m: s
       <Suspense fallback={fallback}>
         {active === "scanner" && <TruthScanSuite onSelect={onSelectMint} />}
         {active === "snipe-feed" && <MarketRadarSuite mint={mint} onSelect={onSelectMint} />}
-        {active === "market-pulse" && <TokenIntel mint={mint} onSelect={onSelectMint} initialTab="vitals" />}
         {active === "listings" && <TokenListings />}
       </Suspense>
     </div>
@@ -1599,10 +1597,11 @@ const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: strin
 };
 
 /* ─── Market Radar — Launch Radar + Market Feed merged into one tab ─── */
-type RadarTab = "launches" | "migrations" | "feed" | "trending" | "signals";
+type RadarTab = "launches" | "migrations" | "pairs" | "feed" | "trending" | "signals";
 const RADAR_TABS: { id: RadarTab; label: string; Icon?: ComponentType<{ className?: string }> }[] = [
   { id: "launches", label: "Launches", Icon: Target },
   { id: "migrations", label: "Migrations", Icon: Rocket },
+  { id: "pairs", label: "New Pairs", Icon: Activity },
   { id: "feed", label: "Live Feed", Icon: Rss },
   { id: "trending", label: "Trending", Icon: Flame },
   { id: "signals", label: "Signals", Icon: Radio },
@@ -1626,6 +1625,7 @@ const MarketRadarSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: stri
         </div>
       )}
       {active === "migrations" && <Migrations onSelect={onSelect} />}
+      {active === "pairs" && <PairTracker onSelect={onSelect} />}
       {active === "feed" && <Feed onSelect={onSelect} />}
       {active === "trending" && (
         <div className="space-y-3">
