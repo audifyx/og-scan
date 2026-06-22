@@ -1,54 +1,24 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-const JUPITER_API_KEY = Deno.env.get("JUPITER_API_KEY");
-const JUPITER_API_URL = "https://api.jup.ag/v1";
-Deno.serve(async (req)=>{
+const JUPITER_BASE = "https://lite-api.jup.ag";
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*"
-      }
-    });
+    return new Response("ok", { headers: { "Access-Control-Allow-Origin": "*" } });
   }
   try {
-    const { ids, showExtraInfo = true } = await req.json();
-    if (!ids || ids.length === 0) {
-      throw new Error("At least one token ID is required");
-    }
-    const priceUrl = new URL(`${JUPITER_API_URL}/price`);
-    ids.forEach((id)=>priceUrl.searchParams.append("ids", id));
-    if (showExtraInfo) {
-      priceUrl.searchParams.set("showExtraInfo", "true");
-    }
-    const priceResponse = await fetch(priceUrl.toString(), {
-      headers: {
-        "Authorization": `Bearer ${JUPITER_API_KEY}`
-      }
-    });
-    if (!priceResponse.ok) {
-      throw new Error(`Jupiter price error: ${priceResponse.statusText}`);
-    }
+    const { ids } = await req.json();
+    const idList = Array.isArray(ids) ? ids : String(ids || "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (idList.length === 0) throw new Error("At least one token ID is required");
+    const priceUrl = new URL(`${JUPITER_BASE}/price/v3`);
+    priceUrl.searchParams.set("ids", idList.join(","));
+    const priceResponse = await fetch(priceUrl.toString());
+    if (!priceResponse.ok) throw new Error(`Jupiter price error: ${priceResponse.status} ${priceResponse.statusText}`);
     const priceData = await priceResponse.json();
-    return new Response(JSON.stringify({
-      success: true,
-      data: priceData,
-      timestamp: new Date().toISOString()
-    }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      }
+    return new Response(JSON.stringify({ success: true, data: priceData, timestamp: new Date().toISOString() }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   } catch (error) {
-    console.error("Error:", error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error"
-    }), {
-      status: 400,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
-      }
+    return new Response(JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }), {
+      status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 });

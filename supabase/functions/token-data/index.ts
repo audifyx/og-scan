@@ -11,17 +11,24 @@ Deno.serve(async (req)=>{
   try {
     const { token_address, action } = await req.json();
     if (action === "get_metadata") {
-      // Fetch from Helius
-      const response = await fetch(`https://api.helius.xyz/v0/tokens?api-key=${HELIUS_API_KEY}`);
-      const tokens = await response.json();
-      const token = tokens.find((t)=>t.token === token_address);
-      return new Response(JSON.stringify({
-        success: true,
-        token
-      }), {
-        headers: {
-          "Content-Type": "application/json"
-        }
+      // Helius DAS getAsset (legacy /v0/tokens was removed by Helius).
+      const response = await fetch(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: "meta", method: "getAsset", params: { id: token_address } }),
+      });
+      const j = await response.json();
+      const a = j?.result;
+      const token = a ? {
+        token: token_address,
+        name: a.content?.metadata?.name ?? null,
+        symbol: a.content?.metadata?.symbol ?? null,
+        image: a.content?.links?.image ?? a.content?.files?.[0]?.uri ?? null,
+        decimals: a.token_info?.decimals ?? null,
+        supply: a.token_info?.supply ?? null,
+      } : null;
+      return new Response(JSON.stringify({ success: true, token }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       });
     }
     if (action === "trending") {

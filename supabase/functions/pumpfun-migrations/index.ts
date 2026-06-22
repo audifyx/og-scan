@@ -27,7 +27,8 @@ async function bitqueryToken(): Promise<string> {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `grant_type=client_credentials&client_id=${encodeURIComponent(id)}&client_secret=${encodeURIComponent(secret)}&scope=api`,
   });
-  const j = await res.json();
+  const raw = await res.text();
+  let j: any; try { j = JSON.parse(raw); } catch { throw new Error("Bitquery auth non-JSON: " + raw.slice(0, 150)); }
   if (!j.access_token) throw new Error("Bitquery auth failed: " + JSON.stringify(j).slice(0, 200));
   cachedToken = { token: j.access_token, exp: now + (j.expires_in || 600) * 1000 };
   return j.access_token;
@@ -57,7 +58,8 @@ async function fetchMigrations(sinceISO: string, limit: number) {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ query, variables: { since: sinceISO, limit } }),
   });
-  const j = await res.json();
+  const raw = await res.text();
+  let j: any; try { j = JSON.parse(raw); } catch { throw new Error("Bitquery query non-JSON (likely quota/points): " + raw.slice(0, 150)); }
   const rows = j?.data?.Solana?.Instructions || [];
   const seen = new Set<string>();
   const out: any[] = [];
@@ -123,6 +125,7 @@ Deno.serve(async (req) => {
     await enrich(migs);
     return json({ migrations: migs, count: migs.length, hours, source: "bitquery", generatedAt: new Date().toISOString() });
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    // Degrade gracefully so the UI feed never hard-errors (e.g. Bitquery quota/points exhausted).
+    return json({ migrations: [], count: 0, source: "unavailable", error: e instanceof Error ? e.message : String(e), generatedAt: new Date().toISOString() }, 200);
   }
 });

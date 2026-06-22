@@ -206,7 +206,7 @@ Always fetch data before responding with analysis. If a tool call returns an err
           Authorization: `Bearer ${NVIDIA_API_KEY}`,
         },
         body: JSON.stringify({
-          model: model || "meta/llama-3.1-70b-instruct",
+          model: model || "meta/llama-3.3-70b-instruct",
           messages: conversationMessages,
           tools: TOOLS.map((tool) => ({
             type: "function",
@@ -260,12 +260,22 @@ Always fetch data before responding with analysis. If a tool call returns an err
       }
     }
 
-    // If we got here, too many iterations
-    return new Response(
-      JSON.stringify({
-        error: "Tool execution exceeded maximum iterations",
+    // Max tool iterations reached: make one final call WITHOUT tools to force a text answer.
+    const finalResp = await fetch(`${NVIDIA_API_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
+      body: JSON.stringify({
+        model: model || "meta/llama-3.3-70b-instruct",
+        messages: conversationMessages,
+        temperature: 0.7,
+        max_tokens: 1024,
       }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+    });
+    const finalData = await finalResp.json();
+    const finalContent = finalData?.choices?.[0]?.message?.content || "I could not complete that request.";
+    return new Response(
+      JSON.stringify({ content: finalContent, model: model, toolsUsed: true }),
+      { headers: { "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     console.error("Error:", error);
