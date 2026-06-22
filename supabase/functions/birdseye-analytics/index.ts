@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-const BIRDSEYE_API_KEY = Deno.env.get("BIRDSEYE_API_KEY");
+const BIRDSEYE_API_KEY = Deno.env.get("BIRDEYE_API_KEY") || Deno.env.get("BIRDSEYE_API_KEY");
 Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") {
     return new Response("ok", {
