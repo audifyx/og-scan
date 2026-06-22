@@ -381,6 +381,18 @@ async function vibeCodeHtml(prompt: string): Promise<{ bytes: Uint8Array; name: 
   return { bytes: new TextEncoder().encode(html), name: "vibecode.html", url };
 }
 
+// Share the public live coin page. The /share/<mint> URL serves OG meta (banner +
+// score) so Telegram renders a rich preview, then redirects to /t/<mint>.
+async function sendShare(botToken: string, chatId: number, mint: string, replyTo?: number) {
+  if (!mint) return;
+  await tg(botToken, "sendMessage", {
+    chat_id: chatId,
+    text: `\uD83D\uDD17 Live public report: https://ogscan.fun/share/${mint}`,
+    reply_markup: JSON.stringify({ inline_keyboard: [[{ text: "\uD83D\uDCCA Open Full Report", url: `https://ogscan.fun/t/${mint}` }]] }),
+    ...(replyTo ? { reply_to_message_id: replyTo } : {}),
+  });
+}
+
 async function getReportHtml(query: string, instructions = ""): Promise<{ bytes: Uint8Array; name: string; url: string } | null> {
   try {
     const r = await fetch(`${SUPABASE_URL}/functions/v1/og-report-pdf`, {
@@ -991,6 +1003,7 @@ Deno.serve(async (req) => {
       const scan = await ogScan(arg, { bot_id: bot.id, chat_id: chatId, scanned_by: msg.from?.id });
       if (scan && scan.ok) {
         await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) });
+        await sendShare(token, chatId, scan.token?.mint, isGroup ? msg.message_id : undefined);
         // Optional grounded one-paragraph take, in character, using the scan data.
         if (bot.ai_enabled) {
           const take = await askGrim(
@@ -1044,7 +1057,7 @@ Deno.serve(async (req) => {
       const ca = prompt.match(MINT_DETECT);
       if (ca) {
         const scan = await ogScan(ca[1], { bot_id: bot.id, chat_id: chatId, scanned_by: msg.from?.id });
-        if (scan && scan.ok) { await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) }); return ok(); }
+        if (scan && scan.ok) { await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML", ...(isGroup ? { reply_to_message_id: msg.message_id } : {}) }); await sendShare(token, chatId, scan.token?.mint, isGroup ? msg.message_id : undefined); return ok(); }
       }
       const knowledge = await retrieveKnowledge(bot.id, prompt);
       await streamToTelegram(token, chatId, chatReplyStream(prompt, identity, knowledge, bot.ai_model), isGroup ? { replyTo: msg.message_id } : {});
@@ -1141,7 +1154,7 @@ Deno.serve(async (req) => {
             await sendDocument(token, chatId, rep.bytes, rep.name, "\uD83D\uDCC4 Open in your browser \u2014 your OG Scan PRO sample report." + (rep.url ? "\n\n\uD83D\uDD17 Shareable link: " + rep.url : ""), { ...(isGroup ? { reply_to_message_id: msg.message_id } : {}), reply_markup: JSON.stringify({ inline_keyboard: [[...(rep.url ? [{ text: "\uD83D\uDD17 Open Report", url: rep.url }] : []), { text: "\uD83C\uDF10 Full Report on OG Scan", url: "https://ogscan.fun" }]] }) }, "text/html");
           } else {
             const scan = await ogScan(mm[1], { bot_id: bot.id, chat_id: chatId, scanned_by: msg.from?.id });
-            if (scan && scan.ok) await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML" });
+            if (scan && scan.ok) { await sendLong(token, chatId, formatScan(scan), { parse_mode: "HTML" }); await sendShare(token, chatId, scan.token?.mint, isGroup ? msg.message_id : undefined); }
           }
         })();
         // @ts-ignore EdgeRuntime provided by Supabase runtime

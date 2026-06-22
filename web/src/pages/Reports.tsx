@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/card";
@@ -32,8 +33,36 @@ const fileName = (r: Report) => {
 };
 const titleOf = (r: Report) => `${r.token_name || r.token_symbol || "Report"}${r.token_symbol ? ` ($${r.token_symbol})` : ""}`;
 
+type Scan = { mint: string; symbol: string | null; name: string | null; og_score: number | null; market_cap: number | null; price_usd: number | null; source: string | null; created_at: string };
+const fmtUsd = (n: any) => { const v = Number(n); if (!isFinite(v) || v === 0) return "--"; if (v >= 1e9) return "$" + (v/1e9).toFixed(2) + "B"; if (v >= 1e6) return "$" + (v/1e6).toFixed(2) + "M"; if (v >= 1e3) return "$" + (v/1e3).toFixed(1) + "K"; return "$" + v.toFixed(2); };
+const scoreColor = (s: any) => { const v = Number(s); return v >= 80 ? "#22e38a" : v >= 60 ? "#b6f23d" : v >= 40 ? "#fbbf24" : "#f87171"; };
+
+function ScansGrid({ scans, loading }: { scans: Scan[]; loading: boolean }) {
+  if (loading && !scans.length) return <div className="flex items-center gap-2 text-white/40 text-[13px] p-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading scans…</div>;
+  if (!scans.length) return <div className="text-white/30 text-[13px] p-4">No scans yet. Send a contract address to the bot, or scan one in the app.</div>;
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {scans.map((s) => (
+        <Link key={s.mint} to={`/t/${s.mint}`} className="block">
+          <Card className="glass-card p-4 hover:border-white/20 transition h-full">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="font-bold text-white/90 text-[14px] truncate">{s.name || s.symbol || "Token"}{s.symbol ? ` ($${s.symbol})` : ""}</span>
+              {s.og_score != null && <span className="ml-auto rounded-lg px-2 py-0.5 text-[11px] font-black shrink-0" style={{ color: scoreColor(s.og_score), background: `${scoreColor(s.og_score)}1a` }}>{s.og_score}</span>}
+            </div>
+            <div className="text-white/40 text-[11px]">MC {fmtUsd(s.market_cap)} · {ago(s.created_at)}{s.source ? ` · ${s.source}` : ""}</div>
+            <div className="text-white/25 text-[10px] font-mono truncate mt-1">{s.mint}</div>
+            <div className="mt-2 flex items-center gap-1 text-og-lime text-[11px] font-bold">Open report <ExternalLink className="h-3 w-3" /></div>
+          </Card>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 export default function Reports() {
   const [reports, setReports] = useState<Report[]>([]);
+  const [scans, setScans] = useState<Scan[]>([]);
+  const [view, setView] = useState<"scans" | "reports">("scans");
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [preview, setPreview] = useState<Report | null>(null);
@@ -42,8 +71,14 @@ export default function Reports() {
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from("reports").select("*").order("created_at", { ascending: false }).limit(60);
+      const [{ data }, { data: sc }] = await Promise.all([
+        supabase.from("reports").select("*").order("created_at", { ascending: false }).limit(60),
+        supabase.from("scan_log").select("mint,symbol,name,og_score,market_cap,price_usd,source,created_at").order("created_at", { ascending: false }).limit(150),
+      ]);
       setReports((data as Report[]) || []);
+      const seen = new Set<string>(); const uniq: Scan[] = [];
+      for (const row of ((sc as Scan[]) || [])) { if (!row.mint || seen.has(row.mint)) continue; seen.add(row.mint); uniq.push(row); if (uniq.length >= 60) break; }
+      setScans(uniq);
     } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
@@ -91,16 +126,25 @@ export default function Reports() {
 
   return (
     <AppLayout>
-      <PageHeader title="Reports" description="Every AI-generated OG Scan report from the bot" />
+      <PageHeader title="Reports" description="Live token scans + AI-generated reports from the bot" />
+      <div className="px-4 max-w-[1100px] mx-auto">
+        <div className="flex items-center gap-2">
+          {([["scans","Scans"],["reports","AI Reports"]] as const).map(([v,l]) => (
+            <button key={v} onClick={() => setView(v)} className={`rounded-full px-4 py-1.5 text-[12px] font-bold transition ${view===v ? "bg-primary text-primary-foreground" : "border border-white/10 bg-white/[0.03] text-white/50 hover:text-white/80"}`}>{l}</button>
+          ))}
+        </div>
+      </div>
       <div className="px-4 pb-24 max-w-[1100px] mx-auto">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-white/40 text-[12px]">{reports.length} report{reports.length === 1 ? "" : "s"}</div>
+          <div className="text-white/40 text-[12px]">{view === "scans" ? `${scans.length} scan${scans.length===1?"":"s"}` : `${reports.length} report${reports.length===1?"":"s"}`}</div>
           <Button size="sm" variant="outline" onClick={load} disabled={loading} className="rounded-xl">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           </Button>
         </div>
 
-        {loading && !reports.length ? (
+        {view === "scans" ? (
+          <ScansGrid scans={scans} loading={loading} />
+        ) : loading && !reports.length ? (
           <div className="flex items-center gap-2 text-white/40 text-[13px] p-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading reports…</div>
         ) : reports.length ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
