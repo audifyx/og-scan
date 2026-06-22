@@ -1566,14 +1566,11 @@ const LaunchRadarSuite = ({ onSelect }: { onSelect: (m: string) => void }) => {
   );
 };
 
-type MarketTab = "feed" | "trending" | "news-signal" | "heatmap" | "narratives" | "leaders";
+type MarketTab = "feed" | "trending" | "signals";
 const MARKET_TABS: { id: MarketTab; label: string; Icon?: ComponentType<{ className?: string }> }[] = [
   { id: "feed", label: "Live Feed", Icon: Rss },
   { id: "trending", label: "Trending", Icon: Flame },
-  { id: "news-signal", label: "News", Icon: Radio },
-  { id: "heatmap", label: "Heatmap" },
-  { id: "narratives", label: "Narratives" },
-  { id: "leaders", label: "Leaders" },
+  { id: "signals", label: "Signals", Icon: Radio },
 ];
 const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: string) => void }) => {
   void mint;
@@ -1583,19 +1580,21 @@ const MarketFeedSuite = ({ mint, onSelect }: { mint: string; onSelect: (m: strin
       <EmeraldHeader
         icon={Rss}
         title="Market Feed"
-        subtitle="Trending tokens, narrative signals, momentum and the live market tape — the pulse of Solana, organized into one clean view."
+        subtitle="The pulse of Solana — live market tape, trending movers with momentum, and narrative + news signals, in three clean views."
         badge="Streaming"
       />
       <SegmentedTabs tabs={MARKET_TABS} active={active} onChange={setActive} />
       {active === "feed" && <Feed onSelect={onSelect} />}
-      {active === "trending" && <Trending onSelect={onSelect} />}
-      {active === "news-signal" && <NewsSignal onSelect={onSelect} />}
-      {active === "heatmap" && <MomentumHeatmap onSelectMint={onSelect} />}
-      {active === "narratives" && <NarrativeClusters onSelectMint={onSelect} />}
-      {active === "leaders" && (
+      {active === "trending" && (
         <div className="space-y-3">
-          <CalloutLeaderboard />
-          <TradingLobbies onSelectMint={onSelect} />
+          <Trending onSelect={onSelect} />
+          <MomentumHeatmap onSelectMint={onSelect} />
+        </div>
+      )}
+      {active === "signals" && (
+        <div className="space-y-3">
+          <NewsSignal onSelect={onSelect} />
+          <NarrativeClusters onSelectMint={onSelect} />
         </div>
       )}
     </section>
