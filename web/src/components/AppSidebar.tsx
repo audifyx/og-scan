@@ -176,21 +176,21 @@ export const AppSidebar = ({
     { id: "overview", icon: Home, label: "Home", eyebrow: "Command hub" },
     { id: "discover", icon: LineChart, label: "Markets", eyebrow: "Coins · Launchpads · Trending · New" },
     { to: "/scanner", icon: Radar, label: "Scanner", eyebrow: "Scan any token · Grim score" },
-    { to: "/reports", icon: FileText, label: "Reports", eyebrow: "AI report feed" },
-    { to: "/track-record", icon: Trophy, label: "Track Record", eyebrow: "Grim's receipts" },
-    { to: "/alerts", icon: Bell, label: "Alerts", eyebrow: "Watches · Discord · X" },
-    { to: "/intelligence", icon: Sparkles, label: "AI Intelligence", eyebrow: "Grim AI · live analysis" },
-    { to: "/games", icon: Gamepad2, label: "Partnerships", eyebrow: "Games · partner apps" },
+    { id: "tools", icon: Wrench, label: "Tools", eyebrow: "Scanners · Swap · Listings · utilities" },
+    { id: "community", icon: Hash, label: "Community", eyebrow: "Chat · Rooms · Spaces" },
   ];
 
   const discoverItems: NavItem[] = [
-    { id: "tools", icon: Wrench, label: "Tools", eyebrow: "Swap · Listings · utilities" },
-    { id: "our-coin", icon: Coins, label: "OFFICIAL OGS", eyebrow: "Official token room" },
-    { id: "profile", icon: User, label: "Profile", eyebrow: "Your account" },
+    { to: "/reports", icon: FileText, label: "Reports", eyebrow: "Scans + AI report feed" },
+    { to: "/track-record", icon: Trophy, label: "Track Record", eyebrow: "Grim's receipts" },
+    { to: "/alerts", icon: Bell, label: "Alerts", eyebrow: "Watches · Discord · X" },
+    { to: "/intelligence", icon: Sparkles, label: "AI Intelligence", eyebrow: "Grim AI · live analysis" },
   ];
 
   const communityItems: NavItem[] = [
-    { id: "community", icon: Hash, label: "Social", eyebrow: "Channels · Rooms · Spaces · Voice" },
+    { id: "our-coin", icon: Coins, label: "OFFICIAL OGS", eyebrow: "Official token room" },
+    { to: "/games", icon: Gamepad2, label: "Partnerships", eyebrow: "Games · partner apps" },
+    { id: "profile", icon: User, label: "Profile", eyebrow: "Your account" },
   ];
 
   const tradingItems: NavItem[] = [
@@ -250,7 +250,7 @@ export const AppSidebar = ({
         </div>
 
         <div className="mb-1 mt-4">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">More</p>
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Signals</p>
           <div className="space-y-0.5">
             {discoverItems.map((item) => (
               <NavRow
@@ -267,7 +267,7 @@ export const AppSidebar = ({
         </div>
 
         <div className="mb-1 mt-4">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Community</p>
+          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Account</p>
           <div className="space-y-0.5">
             {communityItems.map((item, i) => (
               <NavRow
