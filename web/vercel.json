@@ -10,7 +10,7 @@
     },
     {
       "source": "/share/:mint",
-      "destination": "https://ffjipnkhcebjvttliptb.supabase.co/functions/v1/token-og?mint=:mint"
+      "destination": "/api/share?mint=:mint"
     },
     {
       "source": "/(.*)",

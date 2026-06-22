@@ -35,6 +35,7 @@ export default function TokenPublic() {
   const [scan, setScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("Overview");
+  const [holders, setHolders] = useState<any>(null);
 
   useEffect(() => {
     let on = true;
@@ -44,6 +45,9 @@ export default function TokenPublic() {
       .then(({ data }) => { if (on) setScan((data as Scan) || { ok: false, error: "No data" }); })
       .catch(() => { if (on) setScan({ ok: false, error: "Scan failed" }); })
       .finally(() => { if (on) setLoading(false); });
+    supabase.functions.invoke("og-holders", { body: { mint } })
+      .then(({ data }) => { if (on && data?.ok) setHolders(data); })
+      .catch(() => {});
     return () => { on = false; };
   }, [mint]);
 
@@ -130,6 +134,15 @@ export default function TokenPublic() {
               <span className="text-[13px] font-black" style={{ color: scoreColor(total) }}>{scan.verdict}</span>
             </div>
 
+            {/* socials */}
+            {(t.socials?.x || t.socials?.telegram || t.socials?.website) && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {t.socials?.x && <a href={t.socials.x} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-bold text-white/70 hover:text-white">𝕏 Twitter</a>}
+                {t.socials?.telegram && <a href={t.socials.telegram} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-bold text-white/70 hover:text-white">Telegram</a>}
+                {t.socials?.website && <a href={t.socials.website} target="_blank" rel="noreferrer" className="rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-bold text-white/70 hover:text-white">Website</a>}
+              </div>
+            )}
+
             {/* price row */}
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1">
               <div><span className="text-2xl font-black">{fmtUsd(t.priceUsd)}</span></div>
@@ -174,6 +187,22 @@ export default function TokenPublic() {
             <Stat label="Holder Δ 24h" value={pct(t.holderChange24h)} accent={pctColor(t.holderChange24h)} />
             <Stat label="Net Buyers 1h" value={fmtNum(t.netBuyers1h)} />
             <Stat label="Net Buyers 24h" value={fmtNum(t.netBuyers24h)} />
+            {holders?.concentrationRisk && <Stat label="Concentration" value={holders.concentrationRisk} accent={/high/i.test(holders.concentrationRisk) ? "text-red-400" : "text-emerald-400"} />}
+            {Array.isArray(holders?.holders) && holders.holders.length > 0 && (
+              <div className="col-span-2 sm:col-span-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-3.5">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-white/35 mb-2">Top Holders</div>
+                <div className="space-y-1.5">
+                  {holders.holders.slice(0, 10).map((h: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2 text-[12px]">
+                      <span className="w-5 text-white/30 font-mono">{i + 1}</span>
+                      <span className="font-mono text-white/55 truncate flex-1">{short(h.owner || h.tokenAccount || "", 4, 4)}</span>
+                      {h.label && <span className="rounded px-1.5 py-0.5 text-[9px] font-bold text-white/50 bg-white/[0.06]">{h.label}</span>}
+                      <span className="font-black text-white w-14 text-right">{h.pct != null ? `${Number(h.pct).toFixed(2)}%` : "--"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>)}
 
           {tab === "Dev / Origin" && (<>
