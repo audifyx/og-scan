@@ -1,4 +1,5 @@
 import { type CSSProperties, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
   Rocket,
@@ -240,122 +241,66 @@ export const Migrations = ({ onSelect }: Props) => {
   }, [filtered]);
 
   return (
-    <section className="relative">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-og-lime">
-            <span className="h-px w-10 bg-og-lime" /> /MIGRATIONS · LIVE FEED
-          </div>
-          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-            <span className="text-foreground">RECENTLY</span>{" "}
-            <span className="text-og-lime text-glow">MIGRATED</span>
-          </h2>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            <Rocket className="mr-1 inline h-3.5 w-3.5 text-og-lime" />
-            Coins that just graduated from launchpads to live DEX pools, polled live from DexScreener every 30s.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isFetching && <Loader2 className="h-4 w-4 animate-spin text-og-lime" />}
-          <button
-            onClick={() => refetch()}
-            className="rounded-full border border-white/12 bg-white/[0.04] px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-foreground/70 hover:border-og-lime hover:text-og-lime"
-          >
-            REFRESH
-          </button>
-        </div>
-      </div>
-
-      {/* Source selector */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <section className="space-y-3">
+      {/* Source pills + refresh */}
+      <div className="flex flex-wrap items-center gap-2">
         {SOURCES.map((s) => {
           const active = s.id === src;
           return (
             <button
               key={s.id}
+              type="button"
               onClick={() => setSrc(s.id)}
-              className={`group relative overflow-hidden border p-3 text-left transition ${
-                active
-                  ? "border-og-lime bg-og-lime/10"
-                  : "border-white/10 bg-white/[0.04] hover:border-og-lime/60"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <s.Icon className={`h-4 w-4 ${active ? "text-og-lime" : s.color}`} />
-                <span className={`font-display text-sm font-bold ${active ? "text-og-lime" : "text-foreground"}`}>
-                  {s.label}
-                </span>
-              </div>
-              <div className="mt-1 text-[10px] leading-tight text-muted-foreground">
-                {s.desc}
-              </div>
-              {active && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-og-lime" />
+              className={cn(
+                "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition",
+                active ? "border-emerald-400/50 bg-emerald-500/[0.08]" : "border-white/10 bg-white/[0.03] hover:border-emerald-400/30 hover:bg-white/[0.05]"
               )}
+            >
+              <s.Icon className={cn("h-4 w-4", active ? "text-emerald-300" : "text-white/40")} />
+              <span className="min-w-0">
+                <span className={cn("block text-xs font-bold", active ? "text-emerald-300" : "text-white")}>{s.label}</span>
+                <span className="block font-mono text-[8px] uppercase tracking-widest text-white/30">{s.desc}</span>
+              </span>
             </button>
           );
         })}
+        <div className="ml-auto flex items-center gap-2">
+          {isFetching && <Loader2 className="h-4 w-4 animate-spin text-emerald-300" />}
+          <button onClick={() => refetch()} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-white/55 transition hover:border-emerald-400/40 hover:text-emerald-300">Refresh</button>
+        </div>
       </div>
 
-      {/* Stats strip */}
-      <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl sm:grid-cols-4">
-        <Stat label="MATCHES" value={String(stats.total)} icon={<Activity className="h-3 w-3" />} />
-        <Stat
-          label="NEWEST"
-          value={stats.newest ? `${timeAgo(Math.floor(stats.newest / 1000))} ago` : "—"}
-          icon={<Sparkles className="h-3 w-3" />}
-        />
-        <Stat label="Σ LIQUIDITY" value={fmtUsd(stats.totalLiq)} icon={<Droplets className="h-3 w-3" />} />
-        <Stat label="Σ VOL 24H" value={fmtUsd(stats.totalVol)} icon={<TrendingUp className="h-3 w-3" />} />
+      {/* Stat chips */}
+      <div className="flex flex-wrap items-center gap-2">
+        <MStat Icon={Activity} value={String(stats.total)} label="matches" />
+        <MStat Icon={Sparkles} value={stats.newest ? `${timeAgo(Math.floor(stats.newest / 1000))}` : "—"} label="newest" />
+        <MStat Icon={Droplets} value={fmtUsd(stats.totalLiq)} label="liquidity" />
+        <MStat Icon={TrendingUp} value={fmtUsd(stats.totalVol)} label="vol 24h" />
       </div>
 
       {/* Filters */}
-      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.3em] text-og-lime">
-            <Filter className="h-3 w-3" /> filters
-          </div>
+          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-emerald-300"><Filter className="h-3 w-3" /> filters</span>
           <PresetButton label="OPEN" active={qualityEquals(q, DEFAULT_Q)} onClick={() => setQ(DEFAULT_Q)} />
           <PresetButton label="GOOD" active={qualityEquals(q, GOOD_Q)} onClick={() => setQ(GOOD_Q)} />
           <PresetButton label="STRICT" active={qualityEquals(q, STRICT_Q)} onClick={() => setQ(STRICT_Q)} />
-          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            <span className="text-og-lime">{filtered.length}</span> shown · <span className="text-og-blood">{dropped}</span> filtered
-          </div>
-          <button
-            onClick={() => setQ(DEFAULT_Q)}
-            className="ml-auto border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-foreground/60 transition hover:border-og-lime hover:text-og-lime"
-          >
-            RESET
-          </button>
+          <span className="font-mono text-[10px] uppercase tracking-widest text-white/40"><span className="text-emerald-300">{filtered.length}</span> shown · <span className="text-red-400">{dropped}</span> filtered</span>
+          <button onClick={() => setQ(DEFAULT_Q)} className="ml-auto rounded-lg border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/55 transition hover:border-emerald-400/40 hover:text-emerald-300">RESET</button>
         </div>
         <div className="grid gap-2 sm:grid-cols-4">
           <Range label="LIQ" value={q.minLiq} suffix="$" step={1000} onChange={(v) => setQ({ ...q, minLiq: v })} />
           <Range label="VOL24H" value={q.minVol} suffix="$" step={500} onChange={(v) => setQ({ ...q, minVol: v })} />
-          <Range
-            label="AGE"
-            value={q.maxAgeHours}
-            suffix="h"
-            step={6}
-            max={168}
-            onChange={(v) => setQ({ ...q, maxAgeHours: v })}
-          />
+          <Range label="AGE" value={q.maxAgeHours} suffix="h" step={6} max={168} onChange={(v) => setQ({ ...q, maxAgeHours: v })} />
           <Range label="BUYS" value={q.minBuys} step={5} onChange={(v) => setQ({ ...q, minBuys: v })} />
         </div>
       </div>
 
       {/* List */}
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl">
-        <div className="hidden grid-cols-12 gap-2 border-b border-white/10 px-3 py-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground md:grid">
-          <div className="col-span-4">PAIR</div>
-          <div className="col-span-1 text-right">PRICE</div>
-          <div className="col-span-1 text-right">24H Δ</div>
-          <div className="col-span-2 text-right">LIQ / VOL</div>
-          <div className="col-span-2 text-right">B / S 24H</div>
-          <div className="col-span-2 text-right">AGE / DEX</div>
-        </div>
+      <div className="space-y-2">
         {filtered.length === 0 && !isFetching && (
-          <div className="p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
-            {error ? "FEED ERROR · RETRY" : "NO MATCHES · LOOSEN FILTERS"}
+          <div className="rounded-2xl border border-dashed border-white/12 p-8 text-center font-mono text-xs uppercase tracking-widest text-white/40">
+            {error ? "Feed error · retry" : "No matches · loosen filters"}
           </div>
         )}
         {filtered.slice(0, 40).map((p) => (
@@ -363,8 +308,8 @@ export const Migrations = ({ onSelect }: Props) => {
         ))}
       </div>
 
-      <div className="mt-3 text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-        SOURCE · DexScreener public API · auto-refresh 30s · ranking = liq×vol×buy-pressure×recency
+      <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/25">
+        Source · DexScreener · auto-refresh 30s · rank = liq × vol × buy-pressure × recency
       </div>
     </section>
   );
@@ -440,6 +385,13 @@ const Range = ({
   </label>
 );
 
+const MStat = ({ Icon, value, label }: { Icon: React.ComponentType<{ className?: string }>; value: string; label: string }) => (
+  <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5">
+    <Icon className="h-3.5 w-3.5 text-emerald-300" />
+    <span className="font-display text-sm font-black text-white">{value}</span>
+    <span className="font-mono text-[9px] uppercase tracking-widest text-white/35">{label}</span>
+  </div>
+);
 const PairRow = ({ p, token, onSelect }: { p: DSPair; token?: JupTokenInfo; onSelect: () => void }) => {
   const ch = p.priceChange?.h24 ?? 0;
   const up = ch >= 0;
@@ -454,82 +406,49 @@ const PairRow = ({ p, token, onSelect }: { p: DSPair; token?: JupTokenInfo; onSe
   const dexPaid = token ? tokenDexPaidLabel(token) : "—";
 
   return (
-    <div className="border-b border-white/10/50 p-3 transition hover:bg-og-lime/5 last:border-b-0 md:grid md:grid-cols-12 md:items-center md:gap-2 md:px-3 md:py-2.5">
-      <button onClick={onSelect} className="flex min-w-0 items-center gap-3 text-left md:col-span-4 md:gap-2">
-        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.05] md:h-8 md:w-8">
+    <article className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 transition hover:border-emerald-400/40 hover:bg-white/[0.05]">
+      <div className="flex items-start gap-3">
+        <div className="relative h-10 w-10 flex-none overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]">
           {p.info?.imageUrl ? (
             <img src={p.info.imageUrl} alt={p.baseToken.symbol} className="h-full w-full object-cover" loading="lazy" />
           ) : (
-            <div className="grid h-full w-full place-items-center text-[10px] text-og-lime">
-              {p.baseToken.symbol?.[0]}
-            </div>
+            <div className="grid h-full w-full place-items-center text-xs font-black text-emerald-300">{p.baseToken.symbol?.[0]}</div>
           )}
-          {fresh && (
-            <div className="absolute -right-px -top-px bg-og-lime px-1 font-mono text-[8px] font-bold text-og-ink md:px-0.5">
-              NEW
-            </div>
-          )}
+          {fresh && <div className="absolute -right-px -top-px bg-emerald-400 px-1 font-mono text-[7px] font-black text-black">NEW</div>}
         </div>
-        <div className="min-w-0 flex-1">
+        <button onClick={onSelect} className="min-w-0 flex-1 text-left">
           <div className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate font-display text-base font-bold text-og-gold md:text-sm">${p.baseToken.symbol}</span>
-            <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted-foreground">/ {p.quoteToken.symbol}</span>
+            <span className="truncate font-display text-base font-black tracking-tight text-white">${p.baseToken.symbol}</span>
+            <span className="flex-none font-mono text-[9px] uppercase tracking-widest text-white/30">/ {p.quoteToken.symbol}</span>
           </div>
-          <div className="truncate text-[10px] uppercase tracking-widest text-muted-foreground">
-            {p.baseToken.name}
+          <div className="truncate text-[11px] text-white/40">{p.baseToken.name}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 font-mono text-[9px] uppercase tracking-widest text-white/30">
+            <span className="text-emerald-300/80">{created ? timeAgo(created) : "—"}</span>
+            <span>CA {shortAddr(p.baseToken.address, 4)}</span>
+            <span className="text-emerald-300/70">{p.dexId}</span>
+            {dexPaid !== "—" ? <span className="text-emerald-300/70">DEX {dexPaid}</span> : null}
           </div>
-          <div className="mt-1 truncate font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-            ATH <span className="text-og-gold">{fmtUsd(token?.allTimeHighUsd)}</span> <span className="text-og-gold/70">{shortDate(token?.allTimeHighAt)}</span> · ATL <span className="text-og-cyan">{fmtUsd(token?.allTimeLowUsd)}</span> · Migrated <span className="text-og-cyan">{shortDate(token ? tokenMigrationDateIso(token) : undefined)}</span> · DEX <span className={dexPaid === "—" ? "" : "text-og-lime"}>{dexPaid}</span>
-          </div>
-        </div>
-      </button>
-
-      <div className="mt-3 grid grid-cols-2 gap-2 md:contents">
-        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2 text-left font-mono md:col-span-1 md:border-0 md:bg-transparent md:p-0 md:text-right">
-          <div className="mb-1 text-[8px] uppercase tracking-[0.22em] text-muted-foreground md:hidden">Price</div>
-          <div className="whitespace-nowrap text-xs text-foreground">{p.priceUsd ? fmtUsd(Number(p.priceUsd)) : "—"}</div>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2 text-left font-mono md:col-span-1 md:border-0 md:bg-transparent md:p-0 md:text-right">
-          <div className="mb-1 text-[8px] uppercase tracking-[0.22em] text-muted-foreground md:hidden">24H Δ</div>
-          <div className={`whitespace-nowrap text-xs ${up ? "text-og-lime" : "text-og-blood"}`}>{fmtPct(ch)}</div>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2 text-left font-mono text-[10px] uppercase tracking-widest text-muted-foreground md:col-span-2 md:border-0 md:bg-transparent md:p-0 md:text-right">
-          <div className="mb-1 text-[8px] tracking-[0.22em] md:hidden">Liq / Vol</div>
-          <div className="whitespace-nowrap text-og-cyan">L {fmtUsd(p.liquidity?.usd)}</div>
-          <div className="whitespace-nowrap">V {fmtUsd(p.volume?.h24)}</div>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2 text-left md:col-span-2 md:border-0 md:bg-transparent md:p-0 md:text-right">
-          <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground md:hidden">Buys / Sells</div>
-          <div className="font-mono text-[10px]">
-            <span className="text-og-lime">{fmtNum(buys)}</span>
-            <span className="text-muted-foreground"> / </span>
-            <span className="text-og-blood">{fmtNum(sells)}</span>
-          </div>
-          <div className="mt-1 h-1 w-full overflow-hidden border border-white/10 md:ml-auto md:w-20">
-            <div className="h-full bg-og-lime" style={meterWidth} />
-          </div>
-        </div>
-        <div className="col-span-2 flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground md:col-span-2 md:justify-end md:border-0 md:bg-transparent md:p-0">
-          <div className="text-left md:text-right">
-            <div className="text-foreground">{created ? timeAgo(created) : "—"}</div>
-            <div className="max-w-[180px] truncate text-og-lime md:max-w-[120px]">{p.dexId}</div>
-            <div className="text-muted-foreground">CA {shortAddr(p.baseToken.address, 4)}</div>
-            <div className="text-og-gold">ATH {fmtUsd(token?.allTimeHighUsd)} · {shortDate(token?.allTimeHighAt)}</div>
-            <div className="text-og-cyan">ATL {fmtUsd(token?.allTimeLowUsd)}</div>
-          </div>
-          <CoinDetailDialog token={detailToken} onOpenScanner={() => onSelect()} actionLabel="Load" className="shrink-0 px-2 py-2 md:px-1" />
-          <CopyMintButton mint={p.baseToken.address} label="copy" copiedLabel="copied" className="shrink-0 px-2 py-2 md:px-1" iconClassName="h-3 w-3" />
-          <a
-            href={p.url}
-            target="_blank"
-            rel="noreferrer"
-            className="shrink-0 border border-white/10 p-2 hover:border-og-lime hover:text-og-lime md:p-1"
-            title="Open on DexScreener"
-          >
-            <ExternalLink className="h-3.5 w-3.5 md:h-3 md:w-3" />
-          </a>
+        </button>
+        <div className="flex-none text-right font-mono">
+          <div className="text-sm font-bold text-white">{p.priceUsd ? fmtUsd(Number(p.priceUsd)) : "—"}</div>
+          <div className={cn("text-[10px]", up ? "text-emerald-300" : "text-red-400")}>{fmtPct(ch)} 24H</div>
         </div>
       </div>
-    </div>
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-white/[0.06] pt-2.5 font-mono text-[9px] uppercase tracking-widest">
+        <span className="rounded-full border border-white/10 px-2 py-0.5 text-white/45">LIQ {fmtUsd(p.liquidity?.usd)}</span>
+        <span className="rounded-full border border-white/10 px-2 py-0.5 text-white/45">VOL24H {fmtUsd(p.volume?.h24)}</span>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-2 py-0.5 text-white/45">
+          <span className="text-emerald-300">{fmtNum(buys)}</span>/<span className="text-red-400">{fmtNum(sells)}</span>
+          <span className="hidden h-1 w-12 overflow-hidden rounded-full bg-white/10 sm:block"><span className="block h-full bg-emerald-400" style={meterWidth} /></span>
+        </span>
+        {token?.allTimeHighUsd ? <span className="rounded-full border border-og-gold/30 px-2 py-0.5 text-og-gold">ATH {fmtUsd(token.allTimeHighUsd)}</span> : null}
+        <div className="ml-auto flex items-center gap-1.5">
+          <CoinDetailDialog token={detailToken} onOpenScanner={() => onSelect()} actionLabel="Load" className="rounded-lg border border-white/10 px-2 py-1 text-[9px] text-white/55" />
+          <CopyMintButton mint={p.baseToken.address} label="CA" copiedLabel="ok" className="rounded-lg border border-white/10 px-2 py-1 text-[9px] text-white/55" iconClassName="h-3 w-3" />
+          <a href={p.url} target="_blank" rel="noreferrer" title="Open on DexScreener" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[9px] uppercase tracking-widest text-white/55 transition hover:border-emerald-400/40 hover:text-emerald-300">chart <ExternalLink className="h-3 w-3" /></a>
+        </div>
+      </div>
+    </article>
   );
 };

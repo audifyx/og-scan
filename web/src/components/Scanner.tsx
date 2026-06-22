@@ -63,7 +63,7 @@ import {
 import { cn } from "@/lib/utils";
 import { HelpLabel, ScoreMeter, TokenTruthLegend, labelToneClass, scoreTextClass } from "@/components/TokenTruthKit";
 import { OgVerdict } from "@/components/scanner-20x/OgVerdict";
-import { ScanHistory } from "@/components/scanner-20x/ScanHistory";
+import { ScanHistory, addToScanHistory } from "@/components/scanner-20x/ScanHistory";
 import { ComparativeScan } from "@/components/scanner-20x/ComparativeScan";
 import { downloadReportPdf } from "@/lib/reportPdf";
 import { classifyToken, TIER_LABEL } from "@/lib/classification";
@@ -261,6 +261,24 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   const primaryToken: JupTokenInfo | undefined = report?.primaryToken ?? filteredResults.find((token) => tokenScore(report, token)?.isPrimaryToken);
   const firstMintToken: JupTokenInfo | undefined = report?.firstMintToken ?? filteredResults.find((token) => tokenScore(report, token)?.isFirstMintToken);
   const primaryScore: TokenForensicScores | undefined = primaryToken ? tokenScore(report, primaryToken) : undefined;
+
+  // Persist completed scans to the global scan history feed
+  useEffect(() => {
+    const tok = primaryToken ?? firstMintToken ?? filteredResults[0];
+    if (!tok || !report) return;
+    const sc = tokenScore(report, tok);
+    addToScanHistory({
+      mint: tok.id,
+      symbol: tok.symbol ?? "",
+      name: tok.name ?? "",
+      rugScore: sc?.riskScore ?? null,
+      liquidity: tokenEffectiveLiquidityUsd(tok),
+      marketCap: tok.mcap ?? tok.fdv ?? null,
+      holders: tok.holderCount ?? null,
+      priceAtScan: tok.usdPrice ?? null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report?.narrativeFingerprintId, primaryToken?.id, firstMintToken?.id]);
 
   const cleanAll = filters.authoritySafeOnly && filters.hideLpPulled;
   const moduleDefs: Array<{ key: string; label: string; desc: string; icon: ComponentType<{ className?: string }>; active: boolean; onToggle: () => void }> = [
