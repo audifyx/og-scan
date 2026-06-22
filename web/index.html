@@ -3,210 +3,273 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>OG Scan — One platform. Everything crypto.</title>
-<meta name="description" content="OG Scan is on-chain intelligence and a Social-Fi ecosystem for Solana and 16 chains: OG Score token scanner, wallet intelligence, early-launch detection, live news, AI analyst, PDF reports, webhook alerts and custom bots."/>
-<meta property="og:title" content="OG Scan — One platform. Everything crypto."/>
-<meta property="og:description" content="Scan tokens, analyze wallets, detect launches early, and let AI dissect any contract — across 16 chains."/>
+<title>OG Scan — On-Chain Intelligence. Multi-Chain. Real-Time.</title>
+<meta name="description" content="Scan tokens across 16 chains. AI-powered wallet intelligence. Early launch detection. PDF reports. Telegram bot. X integration. Webhooks. The unified crypto intelligence platform."/>
 <style>
-:root{--bg:#04060a;--em:#10b981;--cy:#22d3ee;--pu:#8b5cf6;--ink:#eafff8;--mut:#93a7b6;--glass:rgba(255,255,255,.055);--stroke:rgba(255,255,255,.12)}
+:root{--bg:#04060a;--em:#10b981;--cy:#22d3ee;--pu:#8b5cf6;--ink:#eafff8;--mut:#93a7b6;--glass:rgba(255,255,255,.055);--stroke:rgba(255,255,255,.12);--dark-em:rgba(16,185,129,.15)}
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{background:#04060a;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+html{scroll-behavior:smooth;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Space Mono",monospace}
+body{background:#04060a;color:var(--ink);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
-#space{position:fixed;inset:0;z-index:0}
-.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;background:
- radial-gradient(60% 50% at 18% 12%,rgba(139,92,246,.22),transparent 60%),
- radial-gradient(55% 45% at 85% 18%,rgba(34,211,238,.18),transparent 60%),
- radial-gradient(70% 60% at 50% 108%,rgba(16,185,129,.20),transparent 60%);
- filter:blur(10px);animation:drift 22s ease-in-out infinite alternate}
-@keyframes drift{0%{transform:translate3d(0,0,0) scale(1)}100%{transform:translate3d(0,-24px,0) scale(1.06)}}
+#bg{position:fixed;inset:0;z-index:0;overflow:hidden}
+.aurora{position:absolute;inset:0;pointer-events:none;background:
+ radial-gradient(60% 50% at 18% 12%,rgba(139,92,246,.25),transparent 60%),
+ radial-gradient(55% 45% at 85% 18%,rgba(34,211,238,.2),transparent 60%),
+ radial-gradient(70% 60% at 50% 108%,rgba(16,185,129,.22),transparent 60%);
+ filter:blur(100px);animation:drift 28s ease-in-out infinite alternate}
+@keyframes drift{0%{transform:translate3d(0,0,0) scale(1)}100%{transform:translate3d(0,-40px,0) scale(1.1)}}
+.grid-bg{position:absolute;inset:0;background:
+ linear-gradient(0deg,rgba(34,211,238,.03) 1px,transparent 1px),
+ linear-gradient(90deg,rgba(34,211,238,.03) 1px,transparent 1px);
+ background-size:50px 50px;opacity:.3;animation:gridDrift 60s linear infinite}
+@keyframes gridDrift{to{transform:translate(50px,50px)}}
 .wrap{position:relative;z-index:2}
-/* glass primitives */
-.glass{background:var(--glass);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);border:1px solid var(--stroke);box-shadow:0 10px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.12)}
-/* nav */
-nav{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:10;width:min(1080px,92vw);display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-radius:18px}
-.brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.5px}
-.brand img{width:32px;height:32px;border-radius:9px;box-shadow:0 0 22px rgba(16,185,129,.5)}
-.brand span{font-size:17px;background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
-.navcta{padding:9px 16px;border-radius:12px;font-weight:700;font-size:13.5px;background:linear-gradient(90deg,var(--em),var(--cy));color:#03110c;transition:transform .2s}
-.navcta:active{transform:scale(.96)}
-/* hero */
-.hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 20px 70px}
-.pill{display:inline-flex;align-items:center;gap:9px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#bfeee2;padding:8px 16px;border-radius:999px;margin-bottom:28px;opacity:0;animation:rise .8s .1s forwards}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--em);box-shadow:0 0 12px var(--em);animation:pulse 1.6s infinite}
-h1{font-size:clamp(42px,8.5vw,104px);line-height:.98;font-weight:900;letter-spacing:-2.5px;opacity:0;animation:rise .9s .22s forwards;text-shadow:0 0 60px rgba(34,211,238,.18)}
-h1 .g{background:linear-gradient(100deg,var(--em),var(--cy) 55%,var(--pu));-webkit-background-clip:text;background-clip:text;color:transparent}
-.sub{max-width:660px;margin:24px auto 0;font-size:clamp(16px,2.4vw,21px);color:var(--mut);line-height:1.55;opacity:0;animation:rise .9s .42s forwards}
-.row{display:flex;gap:13px;flex-wrap:wrap;justify-content:center;margin-top:36px;opacity:0;animation:rise .9s .58s forwards}
-.btn{padding:15px 30px;border-radius:14px;font-weight:800;font-size:16px;transition:transform .2s,box-shadow .3s}
-.btn.p{background:linear-gradient(90deg,var(--em),var(--cy));color:#03110c;box-shadow:0 14px 44px rgba(34,211,238,.35)}
-.btn.p:hover{transform:translateY(-3px);box-shadow:0 18px 54px rgba(34,211,238,.5)}
-.btn.s{color:var(--ink)}
-.chips{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;margin-top:30px;opacity:0;animation:rise 1s .74s forwards}
-.chip{font-size:12px;color:#bcd;padding:7px 13px;border-radius:999px;border:1px solid var(--stroke);background:rgba(255,255,255,.04)}
-.scrollcue{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:2px;color:var(--mut);text-transform:uppercase;opacity:.7;animation:bob 2s infinite}
-/* sections */
-section{max-width:1100px;margin:0 auto;padding:clamp(54px,9vw,110px) 20px}
-.eyebrow{text-align:center;color:var(--cy);font-size:12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:13px}
-.h2{text-align:center;font-size:clamp(28px,5vw,46px);font-weight:900;letter-spacing:-1px;margin-bottom:14px}
-.lead{text-align:center;color:var(--mut);max-width:640px;margin:0 auto 50px;font-size:clamp(15px,2vw,18px);line-height:1.6}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:16px}
-.card{border-radius:20px;padding:26px;transition:transform .5s cubic-bezier(.2,.7,.2,1),border-color .3s;opacity:0;transform:translateY(30px);transform-style:preserve-3d;will-change:transform}
-.card.in{opacity:1;transform:none}
-.card:hover{border-color:rgba(34,211,238,.45)}
-.ic{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;background:linear-gradient(135deg,rgba(16,185,129,.22),rgba(34,211,238,.12));border:1px solid rgba(34,211,238,.25);margin-bottom:15px}
-.card h3{font-size:18.5px;margin-bottom:7px}
-.card p{color:var(--mut);font-size:14.5px;line-height:1.6}
-/* score band */
-.bandin{border-radius:26px;padding:clamp(30px,6vw,60px);display:flex;gap:42px;align-items:center;flex-wrap:wrap;justify-content:center;text-align:center}
-.ring{--p:94;width:172px;height:172px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(from -90deg,var(--em),var(--cy) calc(var(--p)*1%),rgba(255,255,255,.06) 0);position:relative;flex:0 0 auto;animation:spinSlow 18s linear infinite}
-.ring::before{content:"";position:absolute;inset:13px;border-radius:50%;background:rgba(6,12,16,.92);backdrop-filter:blur(6px)}
-.ring .v{position:relative;text-align:center}
-.ring b{font-size:46px;font-weight:900;background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
-.ring small{display:block;color:var(--mut);font-size:11px;letter-spacing:2px;margin-top:2px}
-.bandtxt{max-width:470px;text-align:left}
-.bandtxt h3{font-size:clamp(22px,3.6vw,32px);font-weight:900;margin-bottom:10px}
-.bandtxt p{color:var(--mut);line-height:1.6}
-/* foot */
-.foot{text-align:center;padding:clamp(70px,11vw,130px) 20px 100px;max-width:760px;margin:0 auto}
-.footcard{border-radius:26px;padding:clamp(34px,6vw,56px)}
-.foot h2{font-size:clamp(30px,6vw,56px);font-weight:900;letter-spacing:-1px;margin-bottom:16px}
-.foot .g{background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
-.foot p{color:var(--mut);margin-bottom:30px;font-size:17px}
-.tiny{color:#56707f;font-size:12px;margin-top:46px}
-@keyframes rise{to{opacity:1;transform:none}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
-@keyframes spinSlow{to{transform:rotate(360deg)}}
-.float{animation:floaty 7s ease-in-out infinite}
-@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--stroke);background:rgba(4,6,10,.7)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:16px;letter-spacing:1px}
+.brand img{width:32px;height:32px}
+.brand span{background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
+.navcta{padding:10px 18px;border-radius:12px;font-weight:700;font-size:13px;background:linear-gradient(90deg,var(--em),var(--cy));color:#03110c;cursor:pointer;border:none;transition:all .2s;box-shadow:0 8px 24px rgba(34,211,238,.2)}
+.navcta:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(34,211,238,.3)}
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 24px 80px;gap:28px;margin-top:60px}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:#bfeee2;padding:10px 18px;border-radius:999px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.08);opacity:0;animation:fadeInUp .7s .2s forwards}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--em);box-shadow:0 0 12px var(--em);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.2)}}
+h1{font-size:clamp(44px,9vw,96px);line-height:.95;font-weight:950;letter-spacing:-2px;opacity:0;animation:fadeInUp .8s .3s forwards;background:linear-gradient(110deg,var(--ink),var(--ink) 40%,var(--cy) 60%,var(--em) 80%,var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{max-width:680px;margin:0 auto;font-size:clamp(16px,2.5vw,20px);color:var(--mut);line-height:1.6;opacity:0;animation:fadeInUp .8s .5s forwards}
+.ctas{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:32px;opacity:0;animation:fadeInUp .8s .65s forwards}
+.btn{padding:14px 32px;border-radius:12px;font-weight:800;font-size:15px;border:none;cursor:pointer;transition:all .25s;font-family:inherit}
+.btn.primary{background:linear-gradient(90deg,var(--em),var(--cy));color:#03110c;box-shadow:0 12px 36px rgba(34,211,238,.35)}
+.btn.primary:hover{transform:translateY(-3px);box-shadow:0 16px 48px rgba(34,211,238,.5)}
+.btn.secondary{border:2px solid var(--stroke);color:var(--ink);background:transparent}
+.btn.secondary:hover{border-color:var(--cy);background:rgba(34,211,238,.1)}
+.scroll-hint{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;opacity:.6;animation:bob 2.5s infinite}
+@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-8px)}}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+section{max-width:1200px;margin:0 auto;padding:clamp(80px,12vw,140px) 24px}
+.sec-title{font-size:clamp(32px,6vw,52px);font-weight:900;text-align:center;margin-bottom:18px;letter-spacing:-1px}
+.sec-sub{text-align:center;color:var(--mut);font-size:clamp(15px,2vw,18px);max-width:620px;margin:0 auto 60px;line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:40px}
+.feature-card{border-radius:18px;padding:32px 28px;background:linear-gradient(135deg,rgba(16,185,129,.06),rgba(34,211,238,.04));border:1px solid var(--stroke);transition:all .4s cubic-bezier(.2,.7,.2,1);opacity:0;transform:translateY(30px);animation:slideIn forwards}
+@keyframes slideIn{to{opacity:1;transform:translateY(0)}}
+.feature-card:nth-child(1){animation-delay:.1s}
+.feature-card:nth-child(2){animation-delay:.2s}
+.feature-card:nth-child(3){animation-delay:.3s}
+.feature-card:nth-child(4){animation-delay:.4s}
+.feature-card:nth-child(5){animation-delay:.5s}
+.feature-card:nth-child(6){animation-delay:.6s}
+.feature-card:nth-child(7){animation-delay:.7s}
+.feature-card:nth-child(8){animation-delay:.8s}
+.feature-card:nth-child(9){animation-delay:.9s}
+.feature-card:hover{border-color:rgba(34,211,238,.5);background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(34,211,238,.08));transform:translateY(-8px);box-shadow:0 16px 48px rgba(34,211,238,.15)}
+.feature-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;background:linear-gradient(135deg,rgba(16,185,129,.2),rgba(34,211,238,.1));margin-bottom:16px}
+.feature-card h3{font-size:18px;margin-bottom:10px;font-weight:800}
+.feature-card p{color:var(--mut);font-size:14.5px;line-height:1.55;margin-bottom:12px}
+.badge{display:inline-block;padding:4px 12px;background:rgba(16,185,129,.2);border-radius:8px;font-size:11px;font-weight:700;color:var(--em);text-transform:uppercase;letter-spacing:1px;margin-top:8px}
+.chain-bar{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid var(--stroke)}
+.chain{font-size:12px;padding:6px 11px;background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.2);border-radius:8px;color:var(--cy);font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;margin-top:50px}
+.stat{text-align:center;padding:24px}
+.stat-num{font-size:clamp(28px,5vw,42px);font-weight:900;background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:8px}
+.stat-label{color:var(--mut);font-size:14px;text-transform:uppercase;letter-spacing:1px}
+.integrations{background:linear-gradient(135deg,var(--dark-em),rgba(34,211,238,.08));border-radius:20px;padding:clamp(40px,6vw,60px);border:1px solid var(--stroke)}
+.int-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:20px;margin-top:32px}
+.int-badge{display:flex;flex-direction:column;align-items:center;gap:10px;padding:20px 16px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--stroke);transition:all .3s}
+.int-badge:hover{background:rgba(255,255,255,.08);border-color:var(--cy)}
+.int-badge-icon{font-size:32px}
+.int-badge-name{font-size:12px;font-weight:700;text-align:center}
+.cta-section{background:linear-gradient(135deg,var(--dark-em),rgba(34,211,238,.12));border-radius:20px;padding:clamp(50px,8vw,80px) 24px;text-align:center;border:1px solid var(--stroke);margin-top:60px}
+.cta-section h2{font-size:clamp(28px,5vw,42px);font-weight:900;margin-bottom:16px;background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
+.cta-section p{color:var(--mut);font-size:16px;max-width:600px;margin:0 auto 28px;line-height:1.6}
+footer{text-align:center;padding:40px 24px;border-top:1px solid var(--stroke);color:var(--mut);font-size:13px}
+.footer-links{display:flex;justify-content:center;gap:24px;margin-bottom:16px;flex-wrap:wrap}
+.footer-links a{color:var(--cy);transition:color .2s}
+.footer-links a:hover{color:var(--em)}
+@media(max-width:768px){
+nav{padding:12px 16px}
+.hero{padding:100px 16px 60px;margin-top:40px}
+h1{font-size:clamp(32px,8vw,52px)}
+.feature-card{padding:24px 20px}
+.int-grid{grid-template-columns:repeat(auto-fit,minmax(100px,1fr))}
+.ctas{flex-direction:column}
+.btn{width:100%}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
 <body>
-<canvas id="space"></canvas>
+<div id="bg">
 <div class="aurora"></div>
-<div class="wrap">
-  <nav class="glass">
-    <div class="brand"><img src="/ogscan-logo.png" alt="OG Scan"/><span>OG SCAN</span></div>
-    <a class="navcta" href="/app">Launch App →</a>
-  </nav>
-
-  <header class="hero">
-    <div class="pill glass"><span class="dot"></span> One platform. Everything crypto.</div>
-    <h1>See the chain<br/><span class="g">before it moves.</span></h1>
-    <p class="sub">OG Scan is on-chain intelligence and a Social-Fi ecosystem for Solana and 16 chains — paste a contract, get the <b style="color:#d6fff3">OG Score</b>, full token &amp; wallet analysis, early-launch detection and an AI analyst, all in seconds.</p>
-    <div class="row">
-      <a class="btn p" href="/auth?mode=signup">Start Scanning</a>
-      <a class="btn s glass" href="#features">Explore features</a>
-    </div>
-    <div class="chips">
-      <span class="chip">⚡ Instant CA lookups</span>
-      <span class="chip">🔗 16 chains</span>
-      <span class="chip">🧠 AI analyst</span>
-      <span class="chip">📄 PDF reports</span>
-      <span class="chip">🤖 Telegram bot</span>
-    </div>
-    <div class="scrollcue">scroll ↓</div>
-  </header>
-
-  <section id="features">
-    <div class="eyebrow">What OG Scan does</div>
-    <div class="h2">Discovery, due-diligence and execution — in one hub</div>
-    <p class="lead">Rebuilt from the ground up for speed. Stop juggling ten tabs; OG Scan turns raw on-chain data into decisions.</p>
-    <div class="grid" id="cards">
-      <div class="card glass"><div class="ic">🛰️</div><h3>OG Scanner &amp; OG Score</h3><p>Scan any token for a composite score from liquidity, holders, concentration, authorities and momentum. Generate full downloadable PDF reports you can share instantly.</p></div>
-      <div class="card glass"><div class="ic">📡</div><h3>Market Radar — 16 chains</h3><p>New launches, trending pairs and live market activity across Solana, Ethereum, Base, BNB and more — hundreds of active pairs refreshing continuously.</p></div>
-      <div class="card glass"><div class="ic">⚡</div><h3>Instant Token Listings</h3><p>Paste a CA and OG Scan auto-pulls names, logos, banners, metadata, market stats and trading info within seconds. No manual setup.</p></div>
-      <div class="card glass"><div class="ic">🚀</div><h3>Early Launch Detection</h3><p>Most apps show projects after they've moved. OG Scan surfaces launches early so you act on real data instead of blindly aping.</p></div>
-      <div class="card glass"><div class="ic">👤</div><h3>Wallet Intelligence</h3><p>Share any wallet and learn its full history and behavior — go deeper than basic explorers and ask the AI about specific moves.</p></div>
-      <div class="card glass"><div class="ic">🧠</div><h3>Advanced AI Analyst</h3><p>On the site and in Telegram. Drop a token, wallet or CA and get instant analysis, connected to multiple data sources and years of crypto knowledge.</p></div>
-      <div class="card glass"><div class="ic">📰</div><h3>Live Crypto News</h3><p>Bullish/bearish news, narratives and ecosystem events — understand why tokens pump or dump without five other apps.</p></div>
-      <div class="card glass"><div class="ic">🔔</div><h3>Webhook Alerts</h3><p>Create alerts for launches, price targets and custom events. Define conditions, connect a webhook, get updates automatically.</p></div>
-      <div class="card glass"><div class="ic">🤖</div><h3>Your own AI bot</h3><p>Launch a branded Telegram/Discord bot — add a token, upload knowledge files, tune its personality and deploy with no API setup. Plus X auto-posting.</p></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="bandin glass">
-      <div class="ring float"><div class="v"><b>94</b><small>OG SCORE</small></div></div>
-      <div class="bandtxt">
-        <h3>One number that cuts through the noise</h3>
-        <p>The OG Score fuses liquidity, holder distribution, authority status, LP health and momentum into a single comparable signal — the same engine behind the site, the Telegram bot and the AI. It's built for forensic origin detection: find the real OGs, flag the clones and rugs before you buy.</p>
-      </div>
-    </div>
-  </section>
-
-  <div class="foot">
-    <div class="footcard glass">
-      <div class="eyebrow">Get started</div>
-      <h2>Stop guessing. <span class="g">Start scanning.</span></h2>
-      <p>Create your account and run your first OG Scan in seconds.</p>
-      <div class="row" style="opacity:1;animation:none">
-        <a class="btn p" href="/auth?mode=signup">Create account</a>
-        <a class="btn s glass" href="/app">Launch app</a>
-      </div>
-      <div class="tiny">© OG Scan — on-chain intelligence for Solana &amp; 16 chains. One platform. Everything crypto. Not financial advice.</div>
-    </div>
-  </div>
+<div class="grid-bg"></div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-// ---- reveal cards + 3D tilt ----
-const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
-document.querySelectorAll('.card').forEach((c,i)=>{c.style.transitionDelay=(i%3*80)+'ms';io.observe(c);
-  c.addEventListener('pointermove',ev=>{const r=c.getBoundingClientRect();const px=(ev.clientX-r.left)/r.width-.5,py=(ev.clientY-r.top)/r.height-.5;c.style.transform=`perspective(700px) rotateY(${px*9}deg) rotateX(${-py*9}deg) translateY(-4px)`});
-  c.addEventListener('pointerleave',()=>{c.style.transform=''});
-});
+<nav>
+<div class="brand"><img src="/ogscan-logo.png" alt="OG Scan"/><span>OG SCAN</span></div>
+<a href="/app" class="navcta">Launch App →</a>
+</nav>
 
-// ---- spacey moving 3D background ----
-const canvas=document.getElementById('space');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x04060a,0.055);
-const cam=new THREE.PerspectiveCamera(70,1,.1,200);cam.position.z=1;
-function resize(){renderer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}
-resize();addEventListener('resize',resize);
-const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
-const mobile=innerWidth<700;
+<div class="wrap">
+<header class="hero">
+<div class="pill"><span class="dot"></span> On-Chain Intelligence</div>
+<h1>See what's<br/>happening before<br/><span style="background:linear-gradient(90deg,var(--cy),var(--em));-webkit-background-clip:text;background-clip:text;color:transparent">the chain moves.</span></h1>
+<p class="sub">Scan tokens across 16 chains. Analyze wallets in real-time. AI-powered reports. Early launch detection. Telegram bot integration. Webhooks. Custom AI bots. X automation. All in one platform.</p>
+<div class="ctas">
+<a href="/auth?mode=signup" class="btn primary">Start Scanning Free</a>
+<a href="/app" class="btn secondary">Explore Platform</a>
+</div>
+<div class="scroll-hint">Scroll to see features ↓</div>
+</header>
 
-// starfield (3 depth layers) drifting toward camera
-function starLayer(count,size,color,spread,speed){
-  const g=new THREE.BufferGeometry();const p=new Float32Array(count*3);
-  for(let i=0;i<count;i++){p[i*3]=(Math.random()-.5)*spread;p[i*3+1]=(Math.random()-.5)*spread;p[i*3+2]=-Math.random()*spread}
-  g.setAttribute('position',new THREE.BufferAttribute(p,3));
-  const m=new THREE.PointsMaterial({color,size,transparent:true,opacity:.9,depthWrite:false,blending:THREE.AdditiveBlending});
-  const pts=new THREE.Points(g,m);pts.userData={speed,spread,count};scene.add(pts);return pts;
-}
-const layers=[
-  starLayer(mobile?500:1100,.18,0xffffff,90,0.10),
-  starLayer(mobile?280:600,.30,0x22d3ee,80,0.18),
-  starLayer(mobile?160:340,.45,0x8b5cf6,70,0.28),
-];
-// soft nebula sprites (additive glow)
-function glow(color){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');const gr=x.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,color);gr.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=gr;x.fillRect(0,0,128,128);return new THREE.CanvasTexture(c)}
-const nebTex=[glow('rgba(16,185,129,.55)'),glow('rgba(34,211,238,.5)'),glow('rgba(139,92,246,.5)')];
-const nebs=[];for(let i=0;i<(mobile?4:7);i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:nebTex[i%3],transparent:true,opacity:.5,depthWrite:false,blending:THREE.AdditiveBlending}));const sc=18+Math.random()*26;s.scale.set(sc,sc,1);s.position.set((Math.random()-.5)*70,(Math.random()-.5)*50,-10-Math.random()*60);scene.add(s);nebs.push(s)}
-// rotating wireframe grid sphere (faint, depth anchor)
-const planet=new THREE.Mesh(new THREE.IcosahedronGeometry(7,2),new THREE.MeshBasicMaterial({color:0x0c5a4a,wireframe:true,transparent:true,opacity:.16}));
-planet.position.set(mobile?0:14,-4,-34);scene.add(planet);
+<section>
+<div style="text-align:center;margin-bottom:50px">
+<div style="display:inline-block;padding:8px 16px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:12px;font-size:12px;font-weight:700;color:var(--em);margin-bottom:20px;text-transform:uppercase;letter-spacing:1px">Core Features</div>
+<h2 class="sec-title">Everything You Need to Scout Tokens</h2>
+<p class="sec-sub">From early launch detection to AI analysis, market tracking to webhook alerts — unified in one platform you actually want to use.</p>
+</div>
 
-let tx=0,ty=0;
-addEventListener('pointermove',e=>{tx=(e.clientX/innerWidth-.5);ty=(e.clientY/innerHeight-.5)});
-addEventListener('deviceorientation',e=>{if(e.gamma!=null){tx=Math.max(-.5,Math.min(.5,e.gamma/45));ty=Math.max(-.5,Math.min(.5,(e.beta-45)/45))}},true);
+<div class="grid">
+<div class="feature-card">
+<div class="feature-icon">🔍</div>
+<h3>OG Scanner</h3>
+<p>Paste any contract address and get instant token analysis: holder distribution, transaction activity, risk flags, and contract forensics.</p>
+<div class="badge">Instant CA Lookup</div>
+</div>
 
-let t=0;
-(function loop(){t+=.01;
-  if(!reduce){
-    layers.forEach(L=>{const pos=L.geometry.attributes.position.array;const sp=L.userData.speed,spread=L.userData.spread;
-      for(let i=0;i<L.userData.count;i++){pos[i*3+2]+=sp;if(pos[i*3+2]>1){pos[i*3+2]=-spread;pos[i*3]=(Math.random()-.5)*spread;pos[i*3+1]=(Math.random()-.5)*spread}}
-      L.geometry.attributes.position.needsUpdate=true;});
-    nebs.forEach((n,i)=>{n.position.x+=Math.sin(t*0.3+i)*0.004;n.material.opacity=.4+Math.sin(t*0.6+i)*0.12});
-    planet.rotation.y+=0.0015;planet.rotation.x+=0.0006;
-  }
-  cam.position.x+=((tx*2)-cam.position.x)*0.03;cam.position.y+=((-ty*1.4)-cam.position.y)*0.03;cam.lookAt(0,0,-20);
-  renderer.render(scene,cam);requestAnimationFrame(loop)})();
-</script>
+<div class="feature-card">
+<div class="feature-icon">💰</div>
+<h3>Wallet Intelligence</h3>
+<p>Deep-dive into any wallet: holdings, trade history, win rate, timing patterns. Ask AI questions about behavior and motivation.</p>
+<div class="badge">Forensic Analysis</div>
+</div>
+
+<div class="feature-card">
+<div class="feature-icon">🧠</div>
+<h3>AI Analyst</h3>
+<p>Share a token, wallet, or contract. Get detailed AI-powered analysis trained on years of on-chain data and market patterns.</p>
+<div class="badge">Unlimited Chat</div>
+</div>
+
+<div class="feature-card">
+<div class="feature-icon">📊</div>
+<h3>PDF Reports</h3>
+<p>Generate downloadable reports with charts, metrics, AI insights, and custom layouts. Share with your team or community instantly.</p>
+<div class="badge">HTML + PDF Export</div>
+</div>
+
+<div class="feature-card">
+<div class="feature-icon">📈</div>
+<h3>Market Radar</h3>
+<p>Track launches, trending pairs, and market activity across 16 chains. Live feeds refresh with hundreds of active pairs daily.</p>
+<div class="chain-bar">
+<div class="chain">Solana</div><div class="chain">Ethereum</div><div class="chain">Base</div><div class="chain">+13 more</div>
+</div>
+</div>
+
+<div class="feature-card">
+<div class="feature-icon">⚡</div>
+<h3>Early Launch Detection</h3>
+<p>Catch projects before they move. Detect mint events, liquidity additions, and token creation in real-time across all chains.</p>
+<div class="badge">Pre-Pump Detection</div>
+</div>
+
+<div class="feature-card">
+<div class="feature-icon">🤖</div>
+<h3>Telegram Bot</h3>
+<p>Full OG Scan experience in Telegram. Scan tokens, generate reports, analyze wallets, and chat with AI — right from your chat.</p>
+<div class="badge">Available Now</div>
+</div>
+
+<div class="feature-card">
+<div class="feature-icon">🔔</div>
+<h3>Webhook Alerts</h3>
+<p>Real-time alerts for launches, price targets, whale activity, and custom events. Connect your systems for automated workflows.</p>
+<div class="badge">No Code Setup</div>
+</div>
+
+<div class="feature-card">
+<div class="feature-icon">🐦</div>
+<h3>X Integration</h3>
+<p>Connect your X account and auto-publish community posts directly to your profile. We handle API costs and setup.</p>
+<div class="badge">Scheduled Posts</div>
+</div>
+
+<div class="feature-card">
+<div class="feature-icon">⚙️</div>
+<h3>Custom AI Bots</h3>
+<p>Build branded bots for Telegram or Discord. Upload knowledge files, customize personality, deploy with no API setup required.</p>
+<div class="badge">5+ Bots Free</div>
+</div>
+
+<div class="feature-card">
+<div class="feature-icon">📰</div>
+<h3>Live Crypto News</h3>
+<p>Track bullish and bearish news, market narratives, ecosystem updates. Understand why tokens are pumping or dumping.</p>
+<div class="badge">Real-Time Feed</div>
+</div>
+
+<div class="feature-card">
+<div class="feature-icon">🎯</div>
+<h3>Token Listings</h3>
+<p>Paste a CA and auto-pull project names, logos, banners, metadata, and market data within seconds. No manual setup.</p>
+<div class="badge">Auto-Fetch Metadata</div>
+</div>
+</div>
+
+<div class="stats">
+<div class="stat">
+<div class="stat-num">16+</div>
+<div class="stat-label">Supported Chains</div>
+</div>
+<div class="stat">
+<div class="stat-num">∞</div>
+<div class="stat-label">AI Messages</div>
+</div>
+<div class="stat">
+<div class="stat-num">Weekly</div>
+<div class="stat-label">Platform Updates</div>
+</div>
+<div class="stat">
+<div class="stat-num">1s</div>
+<div class="stat-label">Token Analysis</div>
+</div>
+</div>
+</section>
+
+<section>
+<div style="text-align:center;margin-bottom:40px">
+<div style="display:inline-block;padding:8px 16px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:12px;font-size:12px;font-weight:700;color:var(--em);margin-bottom:20px;text-transform:uppercase;letter-spacing:1px">Integrations</div>
+<h2 class="sec-title">Works With Your Stack</h2>
+</div>
+
+<div class="integrations">
+<div class="int-grid">
+<div class="int-badge"><div class="int-badge-icon">🤖</div><div class="int-badge-name">Telegram</div></div>
+<div class="int-badge"><div class="int-badge-icon">🐦</div><div class="int-badge-name">X (Twitter)</div></div>
+<div class="int-badge"><div class="int-badge-icon">💬</div><div class="int-badge-name">Discord</div></div>
+<div class="int-badge"><div class="int-badge-icon">🔗</div><div class="int-badge-name">Webhooks</div></div>
+<div class="int-badge"><div class="int-badge-icon">📊</div><div class="int-badge-name">API</div></div>
+<div class="int-badge"><div class="int-badge-icon">🎯</div><div class="int-badge-name">Custom Bots</div></div>
+</div>
+</div>
+</section>
+
+<section>
+<div class="cta-section">
+<h2>Built for Crypto-Native People</h2>
+<p>OG Scan is the unified platform crypto communities need. Stop jumping between 5 apps. One place for token intel, wallet analysis, market tracking, automation, and AI insights.</p>
+<a href="/auth?mode=signup" class="btn primary" style="display:inline-block;margin-top:16px">Join Thousands of Traders</a>
+</div>
+</section>
+
+<footer>
+<div class="footer-links">
+<a href="/">Home</a>
+<a href="/privacy">Privacy</a>
+<a href="/terms">Terms</a>
+<a href="https://x.com/ogscanbackup" target="_blank">X / Twitter</a>
+<a href="https://t.me/ogscan_bot" target="_blank">Telegram</a>
+</div>
+<p>© 2026 OG Scan. On-chain intelligence platform. <br/>One platform. Everything crypto.</p>
+</footer>
+</div>
 </body>
 </html>
