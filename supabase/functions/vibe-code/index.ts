@@ -9,9 +9,7 @@ const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
 const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
 const VIBE_MODELS = [
   "qwen/qwen3-coder-480b-a35b-instruct", // best free coder for premium UI
-  "moonshotai/kimi-k2.6",
-  "deepseek-ai/deepseek-v4-pro",
-  "meta/llama-3.3-70b-instruct",
+  "meta/llama-3.3-70b-instruct",         // fast fallback if the coder is slow/unavailable
 ];
 
 const corsHeaders = {
@@ -75,8 +73,8 @@ async function callModel(model: string, prompt: string): Promise<string | null> 
     const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
-      body: JSON.stringify({ model, messages: [{ role: "system", content: SYS }, { role: "user", content: prompt }], temperature: 0.7, max_tokens: 16000 }),
-      signal: AbortSignal.timeout(150000),
+      body: JSON.stringify({ model, messages: [{ role: "system", content: SYS }, { role: "user", content: prompt }], temperature: 0.7, max_tokens: 8000 }),
+      signal: AbortSignal.timeout(105000),
     });
     if (!r.ok) { console.error("model err", model, r.status, (await r.text().catch(() => "")).slice(0, 200)); return null; }
     const j = await r.json();
