@@ -41,3 +41,53 @@ verify_jwt = false
 
 [functions.token-safety]
 verify_jwt = false
+
+# --- functions added from production deployment ---
+[functions.ai-reply-webhook]
+verify_jwt = false
+[functions.auth-signin]
+verify_jwt = false
+[functions.auth-signup]
+verify_jwt = false
+[functions.birdseye-analytics]
+verify_jwt = true
+[functions.catoly-webhook]
+verify_jwt = false
+[functions.discord-webhook]
+verify_jwt = true
+[functions.generate-pnl-image]
+verify_jwt = true
+[functions.jupiter-order]
+verify_jwt = true
+[functions.jupiter-price]
+verify_jwt = true
+[functions.jupiter-quote]
+verify_jwt = true
+[functions.jupiter-swap]
+verify_jwt = true
+[functions.jupiter-tokens]
+verify_jwt = true
+[functions.livekit-token]
+verify_jwt = false
+[functions.pngtest]
+verify_jwt = false
+[functions.rpc-proxy]
+verify_jwt = true
+[functions.solana-rpc-proxy]
+verify_jwt = true
+[functions.solana-tracker]
+verify_jwt = true
+[functions.telegram-bot]
+verify_jwt = false
+[functions.telegram-og-bot]
+verify_jwt = false
+[functions.token-data]
+verify_jwt = true
+[functions.voice-token]
+verify_jwt = false
+[functions.wallet-manager]
+verify_jwt = true
+[functions.x-reply-bot]
+verify_jwt = false
+[functions.x-stream-listener]
+verify_jwt = false

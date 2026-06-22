@@ -1,0 +1,406 @@
+-- 20260622000002_rls_hardening_REVIEW.sql
+-- !!! REVIEW BEFORE APPLYING !!!
+-- These changes alter access control and CAN change app behavior.
+-- Generated from Supabase security advisor. Apply section by section,
+-- testing the app (especially anon/public reads) after each.
+
+-- ============================================================
+-- 1) SECURITY DEFINER VIEWS  (advisor: ERROR, 10 views)
+--    Switch to security_invoker so the querying user's RLS applies.
+--    WARNING: if a view was intentionally definer to expose aggregated
+--    data to anon, you must add matching SELECT policies/grants or
+--    anon reads may return empty. Verify each leaderboard/public view.
+-- ============================================================
+ALTER VIEW public.active_spaces SET (security_invoker = on);
+ALTER VIEW public.launchpad_active SET (security_invoker = on);
+ALTER VIEW public.ogi_public_metrics SET (security_invoker = on);
+ALTER VIEW public.ogi_scanner_leaderboard SET (security_invoker = on);
+ALTER VIEW public.ogi_top_scanned SET (security_invoker = on);
+ALTER VIEW public.ogi_trending_scans SET (security_invoker = on);
+ALTER VIEW public.referral_leaderboard SET (security_invoker = on);
+ALTER VIEW public.team_analytics_snapshot SET (security_invoker = on);
+ALTER VIEW public.team_online_users SET (security_invoker = on);
+ALTER VIEW public.team_report_counts SET (security_invoker = on);
+
+-- ============================================================
+-- 2) PUBLIC BUCKETS ALLOW LISTING  (advisor: WARN, 19 buckets)
+--    Public buckets serve object URLs without a broad SELECT listing
+--    policy. Dropping the broad policy stops clients enumerating all
+--    files. CAUTION: if a listed policy also grants writes/downloads
+--    your app relies on, replace it with a scoped policy instead of
+--    dropping. Statements left COMMENTED -- enable per bucket after review.
+-- ============================================================
+-- bucket 'assets':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'avatars':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'banners':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'community-banners':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'community-images':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'community-images-avatars':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'community-media':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'community-media':
+-- DROP POLICY IF EXISTS "community_media_public_read" ON storage.objects;
+-- bucket 'dm-media':
+-- DROP POLICY IF EXISTS "Public can read dm media" ON storage.objects;
+-- bucket 'dm-media':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'launch-banners':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'launch-logos':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'post-images':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'post-images':
+-- DROP POLICY IF EXISTS "post_images_public_read" ON storage.objects;
+-- bucket 'profile-media':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'profile-media':
+-- DROP POLICY IF EXISTS "profile_media_public_read" ON storage.objects;
+-- bucket 'reel-media':
+-- DROP POLICY IF EXISTS "Public can read reel media" ON storage.objects;
+-- bucket 'reel-media':
+-- DROP POLICY IF EXISTS "Public can view reel media" ON storage.objects;
+-- bucket 'reel-media':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'reports':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'reports':
+-- DROP POLICY IF EXISTS "reports public read obj" ON storage.objects;
+-- bucket 'space-recordings':
+-- DROP POLICY IF EXISTS "Anyone can read space recordings" ON storage.objects;
+-- bucket 'space-recordings':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'story-media':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'story-media':
+-- DROP POLICY IF EXISTS "story-media_read" ON storage.objects;
+-- bucket 'token-images':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'voice-recordings':
+-- DROP POLICY IF EXISTS "Anyone can read voice recordings" ON storage.objects;
+-- bucket 'voice-recordings':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+-- bucket 'wallpapers':
+-- DROP POLICY IF EXISTS "auth_all" ON storage.objects;
+
+-- ============================================================
+-- 3) RLS POLICIES ALWAYS TRUE  (advisor: WARN, 77 policies)
+--    Each policy below allows unrestricted INSERT/UPDATE/DELETE/ALL.
+--    Replace 'true' with an ownership check, e.g.:
+--      USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid())
+--    Templates COMMENTED -- fill in the correct owner column per table.
+-- ============================================================
+-- public.admin_tasks  policy "open_admin_tasks"  cmd=ALL  roles=authenticated
+-- DROP POLICY IF EXISTS "open_admin_tasks" ON public.admin_tasks;
+-- CREATE POLICY "open_admin_tasks" ON public.admin_tasks FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.agent_chat_messages  policy "allow all anon"  cmd=ALL  roles=anon
+-- DROP POLICY IF EXISTS "allow all anon" ON public.agent_chat_messages;
+-- CREATE POLICY "allow all anon" ON public.agent_chat_messages FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.alpha_discussions  policy "alpha_discussions_delete"  cmd=DELETE  roles=-
+-- DROP POLICY IF EXISTS "alpha_discussions_delete" ON public.alpha_discussions;
+-- CREATE POLICY "alpha_discussions_delete" ON public.alpha_discussions FOR DELETE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.alpha_discussions  policy "alpha_discussions_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "alpha_discussions_insert" ON public.alpha_discussions;
+-- CREATE POLICY "alpha_discussions_insert" ON public.alpha_discussions FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.alpha_discussions  policy "alpha_discussions_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "alpha_discussions_update" ON public.alpha_discussions;
+-- CREATE POLICY "alpha_discussions_update" ON public.alpha_discussions FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.auth_events  policy "ae_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "ae_insert" ON public.auth_events;
+-- CREATE POLICY "ae_insert" ON public.auth_events FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.badges  policy "badges_delete"  cmd=DELETE  roles=-
+-- DROP POLICY IF EXISTS "badges_delete" ON public.badges;
+-- CREATE POLICY "badges_delete" ON public.badges FOR DELETE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.badges  policy "badges_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "badges_insert" ON public.badges;
+-- CREATE POLICY "badges_insert" ON public.badges FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.badges  policy "badges_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "badges_update" ON public.badges;
+-- CREATE POLICY "badges_update" ON public.badges FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.catoly_config  policy "catoly_config_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "catoly_config_all" ON public.catoly_config;
+-- CREATE POLICY "catoly_config_all" ON public.catoly_config FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.catoly_stats  policy "catoly_stats_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "catoly_stats_all" ON public.catoly_stats;
+-- CREATE POLICY "catoly_stats_all" ON public.catoly_stats FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.catoly_tweet_queue  policy "catoly_tweet_queue_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "catoly_tweet_queue_all" ON public.catoly_tweet_queue;
+-- CREATE POLICY "catoly_tweet_queue_all" ON public.catoly_tweet_queue FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.catoly_webhook_events  policy "catoly_webhook_events_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "catoly_webhook_events_all" ON public.catoly_webhook_events;
+-- CREATE POLICY "catoly_webhook_events_all" ON public.catoly_webhook_events FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.clip_likes  policy "clip_likes_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "clip_likes_all" ON public.clip_likes;
+-- CREATE POLICY "clip_likes_all" ON public.clip_likes FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.communities  policy "communities_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "communities_all" ON public.communities;
+-- CREATE POLICY "communities_all" ON public.communities FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_banner_metadata  policy "community_banner_metadata_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "community_banner_metadata_insert" ON public.community_banner_metadata;
+-- CREATE POLICY "community_banner_metadata_insert" ON public.community_banner_metadata FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_banner_metadata  policy "community_banner_metadata_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "community_banner_metadata_update" ON public.community_banner_metadata;
+-- CREATE POLICY "community_banner_metadata_update" ON public.community_banner_metadata FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_bookmarks  policy "bookmarks_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "bookmarks_all" ON public.community_bookmarks;
+-- CREATE POLICY "bookmarks_all" ON public.community_bookmarks FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_holder_verification_log  policy "community_holder_verification_log_insert"  cmd=INSERT  roles=authenticated
+-- DROP POLICY IF EXISTS "community_holder_verification_log_insert" ON public.community_holder_verification_log;
+-- CREATE POLICY "community_holder_verification_log_insert" ON public.community_holder_verification_log FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_image_metadata  policy "community_image_metadata_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "community_image_metadata_insert" ON public.community_image_metadata;
+-- CREATE POLICY "community_image_metadata_insert" ON public.community_image_metadata FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_image_metadata  policy "community_image_metadata_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "community_image_metadata_update" ON public.community_image_metadata;
+-- CREATE POLICY "community_image_metadata_update" ON public.community_image_metadata FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_post_likes  policy "post_likes_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "post_likes_all" ON public.community_post_likes;
+-- CREATE POLICY "post_likes_all" ON public.community_post_likes FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_post_replies  policy "replies_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "replies_all" ON public.community_post_replies;
+-- CREATE POLICY "replies_all" ON public.community_post_replies FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_posts  policy "posts_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "posts_all" ON public.community_posts;
+-- CREATE POLICY "posts_all" ON public.community_posts FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_raids  policy "community_raids_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "community_raids_update" ON public.community_raids;
+-- CREATE POLICY "community_raids_update" ON public.community_raids FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_raids  policy "raids_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "raids_insert" ON public.community_raids;
+-- CREATE POLICY "raids_insert" ON public.community_raids FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_raids  policy "raids_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "raids_update" ON public.community_raids;
+-- CREATE POLICY "raids_update" ON public.community_raids FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_reply_likes  policy "reply_likes_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "reply_likes_all" ON public.community_reply_likes;
+-- CREATE POLICY "reply_likes_all" ON public.community_reply_likes FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_reposts  policy "reposts_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "reposts_all" ON public.community_reposts;
+-- CREATE POLICY "reposts_all" ON public.community_reposts FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_room_members  policy "community_room_members_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "community_room_members_all" ON public.community_room_members;
+-- CREATE POLICY "community_room_members_all" ON public.community_room_members FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.community_token_scans  policy "community_token_scans_update_authenticated"  cmd=UPDATE  roles=authenticated
+-- DROP POLICY IF EXISTS "community_token_scans_update_authenticated" ON public.community_token_scans;
+-- CREATE POLICY "community_token_scans_update_authenticated" ON public.community_token_scans FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.fundraiser_config  policy "Anyone can update fundraiser config"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "Anyone can update fundraiser config" ON public.fundraiser_config;
+-- CREATE POLICY "Anyone can update fundraiser config" ON public.fundraiser_config FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.fundraiser_config  policy "Anyone can upsert fundraiser config"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "Anyone can upsert fundraiser config" ON public.fundraiser_config;
+-- CREATE POLICY "Anyone can upsert fundraiser config" ON public.fundraiser_config FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.news_social_items  policy "news_items_insert"  cmd=INSERT  roles=authenticated
+-- DROP POLICY IF EXISTS "news_items_insert" ON public.news_social_items;
+-- CREATE POLICY "news_items_insert" ON public.news_social_items FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.news_social_items  policy "news_items_update"  cmd=UPDATE  roles=authenticated
+-- DROP POLICY IF EXISTS "news_items_update" ON public.news_social_items;
+-- CREATE POLICY "news_items_update" ON public.news_social_items FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.notifications  policy "notifications_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "notifications_insert" ON public.notifications;
+-- CREATE POLICY "notifications_insert" ON public.notifications FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.ogi_audit_log  policy "ogi_audit_write"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "ogi_audit_write" ON public.ogi_audit_log;
+-- CREATE POLICY "ogi_audit_write" ON public.ogi_audit_log FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.ogi_scan_log  policy "ogi_scan_write"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "ogi_scan_write" ON public.ogi_scan_log;
+-- CREATE POLICY "ogi_scan_write" ON public.ogi_scan_log FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.ogi_share_event  policy "ogi_share_write"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "ogi_share_write" ON public.ogi_share_event;
+-- CREATE POLICY "ogi_share_write" ON public.ogi_share_event FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.ogi_telegram_subscriber  policy "ogi_tg_self"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "ogi_tg_self" ON public.ogi_telegram_subscriber;
+-- CREATE POLICY "ogi_tg_self" ON public.ogi_telegram_subscriber FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.ogi_token_edge  policy "ogi_edge_write"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "ogi_edge_write" ON public.ogi_token_edge;
+-- CREATE POLICY "ogi_edge_write" ON public.ogi_token_edge FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.ogi_token_node  policy "ogi_node_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "ogi_node_update" ON public.ogi_token_node;
+-- CREATE POLICY "ogi_node_update" ON public.ogi_token_node FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.ogi_token_node  policy "ogi_node_write"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "ogi_node_write" ON public.ogi_token_node;
+-- CREATE POLICY "ogi_node_write" ON public.ogi_token_node FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.ogi_trend_snapshot  policy "ogi_trend_write"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "ogi_trend_write" ON public.ogi_trend_snapshot;
+-- CREATE POLICY "ogi_trend_write" ON public.ogi_trend_snapshot FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.profile_badges  policy "profile_badges_delete"  cmd=DELETE  roles=-
+-- DROP POLICY IF EXISTS "profile_badges_delete" ON public.profile_badges;
+-- CREATE POLICY "profile_badges_delete" ON public.profile_badges FOR DELETE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.profile_badges  policy "profile_badges_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "profile_badges_insert" ON public.profile_badges;
+-- CREATE POLICY "profile_badges_insert" ON public.profile_badges FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.profile_badges  policy "profile_badges_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "profile_badges_update" ON public.profile_badges;
+-- CREATE POLICY "profile_badges_update" ON public.profile_badges FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.pumpfun_tokens  policy "pumpfun_tokens_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "pumpfun_tokens_insert" ON public.pumpfun_tokens;
+-- CREATE POLICY "pumpfun_tokens_insert" ON public.pumpfun_tokens FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.quest_players  policy "public_insert_players"  cmd=INSERT  roles=anon+authenticated
+-- DROP POLICY IF EXISTS "public_insert_players" ON public.quest_players;
+-- CREATE POLICY "public_insert_players" ON public.quest_players FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.quest_players  policy "public_update_players"  cmd=UPDATE  roles=anon+authenticated
+-- DROP POLICY IF EXISTS "public_update_players" ON public.quest_players;
+-- CREATE POLICY "public_update_players" ON public.quest_players FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.quest_players  policy "qp_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "qp_insert" ON public.quest_players;
+-- CREATE POLICY "qp_insert" ON public.quest_players FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.quest_players  policy "qp_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "qp_update" ON public.quest_players;
+-- CREATE POLICY "qp_update" ON public.quest_players FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.quest_scores  policy "qs_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "qs_insert" ON public.quest_scores;
+-- CREATE POLICY "qs_insert" ON public.quest_scores FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.show_follows  policy "show_follows_all"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "show_follows_all" ON public.show_follows;
+-- CREATE POLICY "show_follows_all" ON public.show_follows FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.smart_wallet_activity  policy "smart_activity_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "smart_activity_insert" ON public.smart_wallet_activity;
+-- CREATE POLICY "smart_activity_insert" ON public.smart_wallet_activity FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.social_messages  policy "Users can update social_messages"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "Users can update social_messages" ON public.social_messages;
+-- CREATE POLICY "Users can update social_messages" ON public.social_messages FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.space_highlights  policy "delete_space_highlights"  cmd=DELETE  roles=-
+-- DROP POLICY IF EXISTS "delete_space_highlights" ON public.space_highlights;
+-- CREATE POLICY "delete_space_highlights" ON public.space_highlights FOR DELETE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.space_highlights  policy "hl_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "hl_insert" ON public.space_highlights;
+-- CREATE POLICY "hl_insert" ON public.space_highlights FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.space_messages  policy "Authenticated can send messages"  cmd=INSERT  roles=authenticated
+-- DROP POLICY IF EXISTS "Authenticated can send messages" ON public.space_messages;
+-- CREATE POLICY "Authenticated can send messages" ON public.space_messages FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.space_messages  policy "delete_space_messages"  cmd=DELETE  roles=-
+-- DROP POLICY IF EXISTS "delete_space_messages" ON public.space_messages;
+-- CREATE POLICY "delete_space_messages" ON public.space_messages FOR DELETE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.space_polls  policy "delete_space_polls"  cmd=DELETE  roles=-
+-- DROP POLICY IF EXISTS "delete_space_polls" ON public.space_polls;
+-- CREATE POLICY "delete_space_polls" ON public.space_polls FOR DELETE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.space_polls  policy "space_polls_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "space_polls_insert" ON public.space_polls;
+-- CREATE POLICY "space_polls_insert" ON public.space_polls FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.space_polls  policy "space_polls_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "space_polls_update" ON public.space_polls;
+-- CREATE POLICY "space_polls_update" ON public.space_polls FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.space_qa_questions  policy "delete_space_qa"  cmd=DELETE  roles=-
+-- DROP POLICY IF EXISTS "delete_space_qa" ON public.space_qa_questions;
+-- CREATE POLICY "delete_space_qa" ON public.space_qa_questions FOR DELETE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.space_qa_questions  policy "qa_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "qa_insert" ON public.space_qa_questions;
+-- CREATE POLICY "qa_insert" ON public.space_qa_questions FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.space_qa_questions  policy "qa_update"  cmd=UPDATE  roles=-
+-- DROP POLICY IF EXISTS "qa_update" ON public.space_qa_questions;
+-- CREATE POLICY "qa_update" ON public.space_qa_questions FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.spaces  policy "Authenticated can update spaces"  cmd=UPDATE  roles=authenticated
+-- DROP POLICY IF EXISTS "Authenticated can update spaces" ON public.spaces;
+-- CREATE POLICY "Authenticated can update spaces" ON public.spaces FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.spaces  policy "Authenticated users can create spaces"  cmd=INSERT  roles=authenticated
+-- DROP POLICY IF EXISTS "Authenticated users can create spaces" ON public.spaces;
+-- CREATE POLICY "Authenticated users can create spaces" ON public.spaces FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.speaker_requests  policy "Authenticated can create requests"  cmd=INSERT  roles=authenticated
+-- DROP POLICY IF EXISTS "Authenticated can create requests" ON public.speaker_requests;
+-- CREATE POLICY "Authenticated can create requests" ON public.speaker_requests FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.speaker_requests  policy "Authenticated can update requests"  cmd=UPDATE  roles=authenticated
+-- DROP POLICY IF EXISTS "Authenticated can update requests" ON public.speaker_requests;
+-- CREATE POLICY "Authenticated can update requests" ON public.speaker_requests FOR UPDATE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.speaker_requests  policy "delete_speaker_requests"  cmd=DELETE  roles=-
+-- DROP POLICY IF EXISTS "delete_speaker_requests" ON public.speaker_requests;
+-- CREATE POLICY "delete_speaker_requests" ON public.speaker_requests FOR DELETE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.user_badges  policy "user_badges_delete"  cmd=DELETE  roles=-
+-- DROP POLICY IF EXISTS "user_badges_delete" ON public.user_badges;
+-- CREATE POLICY "user_badges_delete" ON public.user_badges FOR DELETE TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.user_badges  policy "user_badges_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "user_badges_insert" ON public.user_badges;
+-- CREATE POLICY "user_badges_insert" ON public.user_badges FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.user_blocks  policy "user_blocks_insert_via_rpc"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "user_blocks_insert_via_rpc" ON public.user_blocks;
+-- CREATE POLICY "user_blocks_insert_via_rpc" ON public.user_blocks FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.user_devices  policy "ud_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "ud_insert" ON public.user_devices;
+-- CREATE POLICY "ud_insert" ON public.user_devices FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.wallet_alert_events  policy "wallet_alert_events_insert"  cmd=INSERT  roles=-
+-- DROP POLICY IF EXISTS "wallet_alert_events_insert" ON public.wallet_alert_events;
+-- CREATE POLICY "wallet_alert_events_insert" ON public.wallet_alert_events FOR INSERT TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+-- public.x_replies  policy "Enable public access"  cmd=ALL  roles=-
+-- DROP POLICY IF EXISTS "Enable public access" ON public.x_replies;
+-- CREATE POLICY "Enable public access" ON public.x_replies FOR ALL TO authenticated USING (/* owner check */) WITH CHECK (/* owner check */);
+
+-- ============================================================
+-- 4) RLS ENABLED, NO POLICY  (advisor: INFO, 70 tables)
+--    These tables currently DENY all client access (safe default).
+--    Only add policies if clients need direct access; otherwise leave
+--    as-is (access via service-role edge functions still works).
+-- ============================================================
+-- public.abuse_flags
+-- public.achievements
+-- public.ai_feed_summaries
+-- public.api_rate_limit_log
+-- public.app_state
+-- public.audio_room_participants
+-- public.audio_rooms
+-- public.audit_logs
+-- public.bookmark_collections
+-- public.bookmarks
+-- public.cached_wallet_balance
+-- public.catoly_memory
+-- public.catoly_posts
+-- public.catoly_state
+-- public.community_categories
+-- public.community_room_bans
+-- public.community_room_moderation_actions
+-- public.community_room_mutes
+-- public.community_room_reports
+-- public.community_room_roles
+-- public.community_room_warnings
+-- public.community_tasks
+-- public.content_takedowns
+-- public.discord_bot_channels
+-- public.dm_conversation_settings
+-- public.dm_rate_limits
+-- public.dm_screenshot_events
+-- public.dm_smart_reply_cache
+-- public.email_verifications
+-- public.feed_position
+-- public.feed_signals
+-- public.fyp_cache
+-- public.handle_listings
+-- public.handle_transfers
+-- public.handles
+-- public.hashtags
+-- public.interest_topics
+-- public.link_unfurls
+-- public.live_presence
+-- public.moderation_reports
+-- public.notification_digest
+-- public.notification_dispatch_queue
+-- public.ogscan_user_state
+-- public.ogscan_watched_devs
+-- public.ogscan_watched_mints
+-- public.password_reset_tokens
+-- public.poll_options
+-- public.post_drafts
+-- public.post_hashtags
+-- public.quests
+-- public.reactivation_campaigns
+-- public.read_later
+-- public.reel_views
+-- public.reward_pools
+-- public.search_index
+-- public.security_audit_log
+-- public.share_link_clicks
+-- public.story_replies
+-- public.streak_rewards_claimed
+-- public.suggested_follows
+-- public.tasks
+-- public.telegram_watchlist
+-- public.user_interests
+-- public.user_moderation_state
+-- public.user_streaks
+-- public.voice_lobby_clips
+-- public.voice_lobby_events
+-- public.voice_lobby_invites
+-- public.voice_speaker_queue
+-- public.weekly_recaps

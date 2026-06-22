@@ -26,3 +26,8 @@ build
 # logs
 *-debug.log*
 npm-debug.log*
+
+# supabase local state / build artifacts (do not commit)
+supabase/.temp
+supabase/.branches
+*.tgz
