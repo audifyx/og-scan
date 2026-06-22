@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AETHER • Design Languages of Distinction</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Playfair+Display:wght@700&amp;display=swap');
+        
+        :root {
+            --bg: #0A0A0B;
+            --surface: #121214;
+            --surface-2: #1A1A1D;
+            --text: #F4F4F5;
+            --text-secondary: #A1A1AA;
+            --accent: #C9A959;
+            --accent-2: #6366F1;
+            --border: #27272A;
+        }
+        
+        body {
+            font-family: 'Inter', system_ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        
+        .heading-premium {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-weight: 700;
+            letter-spacing: -0.04em;
+        }
+
+        .section-header {
+            font-size: 13px;
+            letter-spacing: 3px;
+            font-weight: 600;
+        }
+
+        .premium-glass {
+            background: rgba(18, 18, 20, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .nav-link {
+            transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        
+        .nav-link:hover {
+            color: #C9A959;
+            transform: translateY(-1px);
+        }
+
+        .design-card {
+            transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1), 
+                        box-shadow 0.4s cubic-bezier(0.23, 1, 0.32, 1),
+                        border-color 0.2s ease;
+        }
+        
+        .design-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.4);
+            border-color: #C9A959;
+        }
+
+        .premium-button {
+            transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .premium-button::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -100%;
+            width: 50%;
+            height: 200%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255,255,255,0.25),
+                transparent
+            );
+            transition: left 0.6s;
+        }
+        
+        .premium-button:hover::after {
+            left: 250%;
+        }
+
+        .premium-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+        }
+
+        .design-section {
+            scroll-margin-top: 100px;
+        }
+
+        .mini-ui {
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3),
+                        0 4px 6px -4px rgb(0 0 0 / 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .mini-ui:hover {
+            transform: scale(1.015);
+        }
+
+        .stat-value {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .toast {
+            animation: toast-in 0.4s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+        }
+
+        @keyframes toast-in {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .nav-pill {
+            transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        
+        .nav-pill.active {
+            background-color: #C9A959;
+            color: #0A0A0B;
+            font-weight: 600;
+        }
+
+        .elegant-divider {
+            background: linear-gradient(to right, transparent, #27272A, transparent);
+        }
+
+        .ui-label {
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .metric {
+            font-feature-settings: "tnum";
+        }
+    </style>
+</head>
+<body class="bg-[#0A0A0B] text-[#F4F4F5] antialiased">
+    <!-- ==================== PREMIUM HEADER (Apple + Best Buy + OG SCAN hybrid) ==================== -->
+    <header class="sticky top-0 z-[100] border-b border-[#27272A] bg-[#0A0A0B]/95 premium-glass">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex items-center justify-between px-8 h-20">
+                <!-- Left: Logo -->
+                <div class="flex items-center gap-x-3">
+                    <div class="flex items-center justify-center w-9 h-9 rounded-2xl bg-gradient-to-br from-[#C9A959] to-[#A88C47] shadow-inner">
+                        <span class="text-[#0A0A0B] font-bold text-3xl tracking-[-2.5px] font-serif">A</span>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-2xl tracking-[-1.5px]">AETHER</div>
+                        <div class="text-[10px] text-[#A1A1AA] -mt-1 tracking-[3px]">EST 2026</div>
+                    </div>
+                </div>
+
+                <!-- Center: Navigation (Apple minimal + functional) -->
+                <nav class="hidden md:flex items-center gap-x-9 text-sm font-medium">
+                    <a href="#collection" class="nav-link text-[#E4E4E7] hover:text-white">The Collection</a>
+                    <a href="#philosophy" class="nav-link text-[#E4E4E7] hover:text-white">Philosophy</a>
+                    <a href="#studio" class="nav-link text-[#E4E4E7] hover:text-white">Live Studio</a>
+                    <a href="#" onclick="showCommandPalette()" class="nav-link text-[#E4E4E7] hover:text-white flex items-center gap-x-1.5">
+                        <i class="fa-solid fa-terminal text-xs"></i>
+                        <span>Command</span>
+                    </a>
+                </nav>
+
+                <!-- Right: Actions (Best Buy utility + Apple elegance) -->
+                <div class="flex items-center gap-x-3">
+                    <!-- Search / Command -->
+                    <div onclick="showCommandPalette()" 
+                         class="hidden sm:flex items-center gap-x-2.5 px-4 h-10 rounded-3xl bg-[#121214] border border-[#27272A] hover:border-[#3F3F46] cursor-pointer transition-colors w-72">
+                        <i class="fa-solid fa-search text-[#71717A]"></i>
+                        <div class="flex-1 text-sm text-[#71717A]">Search designs or press ⌘K</div>
+                    </div>
+                    
+                    <!-- Account -->
+                    <div class="flex items-center gap-x-2 px-2.5 h-10 rounded-3xl hover:bg-[#121214] cursor-pointer transition-colors">
+                        <div class="w-8 h-8 rounded-2xl bg-[#27272A] flex items-center justify-center ring-1 ring-inset ring-[#3F3F46]">
+                            <i class="fa-solid fa-user text-sm text-[#A1A1AA]"></i>
+                        </div>
+                        <div class="hidden lg:block">
+                            <div class="text-sm font-medium">OG</div>
+                            <div class="text-[10px] text-[#71717A] -mt-0.5">Boston</div>
+                        </div>
+                    </div>
+
+                    <!-- CTA -->
+                    <button onclick="downloadPrompt()"
+                            class="premium-button flex items-center gap-x-2 px-6 h-10 rounded-3xl bg-white text-[#0A0A0B] text-sm font-semibold active:scale-[0.985]">
+                        <span>Download Training Prompt</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==================== HERO ==================== -->
+    <section class="max-w-5xl mx-auto px-8 pt-20 pb-16 text-center">
+        <div class="inline-flex items-center gap-x-2 px-4 h-8 rounded-3xl bg-[#121214] border border-[#27272A] mb-6">
+            <div class="w-2 h-2 rounded-full bg-[#C9A959] animate-pulse"></div>
+            <span class="text-xs font-semibold tracking-[2px] text-[#C9A959]">THE STANDARD IN DIGITAL CRAFTSMANSHIP</span>
+        </div>
+        
+        <h1 class="heading-premium text-7xl md:text-8xl tracking-[-5.2px] leading-[0.92] mb-6">
+            Ten design languages.<br>
+            <span class="text-[#C9A959]">One philosophy of excellence.</span>
+        </h1>
+        
+        <p class="max-w-2xl mx-auto text-2xl text-[#A1A1AA] tracking-[-0.3px] mb-10">
+            A living reference of the highest class digital experiences.<br>
+            Built to train agents that refuse to compromise on quality.
+        </p>
+        
+        <div class="flex items-center justify-center gap-x-4">
+            <button onclick="document.getElementById('collection').scrollIntoView({ behavior: 'smooth', block: 'start' })" 
+                    class="premium-button flex items-center gap-x-3 px-8 h-14 rounded-3xl bg-[#C9A959] hover:bg-[#B8974A] text-[#0A0A0B] font-semibold text-lg active:scale-[0.985]">
+                <span>Explore the 10 Archetypes</span>
+                <i class="fa-solid fa-arrow-down text-sm"></i>
+            </button>
+            <button onclick="document.getElementById('studio').scrollIntoView({ behavior: 'smooth' })" 
+                    class="premium-button flex items-center gap-x-3 px-8 h-14 rounded-3xl border border-[#27272A] hover:bg-[#121214] font-semibold text-lg">
+                <span>Enter Live Studio</span>
+            </button>
+        </div>
+        
+        <div class="mt-16 flex justify-center">
+            <div class="flex items-center gap-x-8 text-xs uppercase tracking-[3px] text-[#52525B]">
+                <div>INSPIRED BY</div>
+                <div class="h-px w-8 bg-[#27272A]"></div>
+                <div class="flex items-center gap-x-5">
+                    <span class="font-medium">Apple</span>
+                    <span class="font-medium">Best Buy</span>
+                    <span class="font-medium">OG SCAN</span>
+                    <span class="font-medium">NBA</span>
+                    <span class="font-medium">+ 6 more</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== PHILOSOPHY BAR ==================== -->
+    <section id="philosophy" class="border-y border-[#27272A] bg-[#121214]">
+        <div class="max-w-7xl mx-auto px-8 py-5">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-y-4 text-sm">
+                <div class="flex items-center gap-x-3">
+                    <i class="fa-solid fa-gem text-[#C9A959]"></i>
+                    <span class="font-medium">Every pixel is a decision. Every decision is deliberate.</span>
+                </div>
+                <div class="text-[#71717A] text-xs md:text-sm">This page was crafted as the definitive training artifact for agents that aspire to god-tier output.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== QUICK NAV PILLS ==================== -->
+    <div class="max-w-7xl mx-auto px-8 pt-10">
+        <div class="flex flex-wrap gap-2 pb-6 border-b border-[#27272A]">
+            <div onclick="scrollToDesign(1)" class="nav-pill cursor-pointer px-5 h-9 flex items-center text-sm rounded-3xl border border-[#27272A] hover:border-[#3F3F46] active:bg-[#121214]">01 Clarity</div>
+            <div onclick="scrollToDesign(2)" class="nav-pill cursor-pointer px-5 h-9 flex items-center text-sm rounded-3xl border border-[#27272A] hover:border-[#3F3F46] active:bg-[#121214]">02 Forge</div>
+            <div onclick="scrollToDesign(3)" class="nav-pill cursor-pointer px-5 h-9 flex items-center text-sm rounded-3xl border border-[#27272A] hover:border-[#3F3F46] active:bg-[#121214]">03 Velocity</div>
+            <div onclick="scrollToDesign(4)" class="nav-pill cursor-pointer px-5 h-9 flex items-center text-sm rounded-3xl border border-[#27272A] hover:border-[#3F3F46] active:bg-[#121214]">04 Precision</div>
+            <div onclick="scrollToDesign(5)" class="nav-pill cursor-pointer px-5 h-9 flex items-center text-sm rounded-3xl border border-[#27272A] hover:border-[#3F3F46] active:bg-[#121214]">05 Sovereign</div>
+            <div onclick="scrollToDesign(6)" class="nav-pill cursor-pointer px-5 h-9 flex items-center text-sm rounded-3xl border border-[#27272A] hover:border-[#3F3F46] active:bg-[#121214]">06 Nexus</div>
+            <div onclick="scrollToDesign(7)" class="nav-pill cursor-pointer px-5 h-9 flex items-center text-sm rounded-3xl border border-[#27272A] hover:border-[#3F3F46] active:bg-[#121214]">07 Horizon</div>
+            <div onclick="scrollToDesign(8)" class="nav-pill cursor-pointer px-5 h-9 flex items-center text-sm rounded-3xl border border-[#27272A] hover:border-[#3F3F46] active:bg-[#121214]">08 Pulse</div>
+            <div onclick="scrollToDesign(9)" class="nav-pill cursor-pointer px-5 h-9 flex items-center text-sm rounded-3xl border border-[#27272A] hover:border-[#3F3F46] active:bg-[#121214]">09 Lumina</div>
+            <div onclick="scrollToDesign(10)" class="nav-pill cursor-pointer px-5 h-9 flex items-center text-sm rounded-3xl border border-[#27272A] hover:border-[#3F3F46] active:bg-[#121214]">10 Elysium</div>
+        </div>
+    </div>
+
+    <!-- ==================== THE COLLECTION HEADER ==================== -->
+    <section id="collection" class="max-w-7xl mx-auto px-8 pt-14 pb-8">
+        <div class="flex items-end justify-between">
+            <div>
+                <div class="section-header text-[#C9A959]">THE ARCHIVES</div>
+                <h2 class="heading-premium text-6xl tracking-[-3.8px]">The 10 Archetypes</h2>
+            </div>
+            <div class="max-w-xs text-right text-[#A1A1AA] text-sm hidden lg:block">
+                Each archetype represents a complete design philosophy. Scroll or use the navigation above to study them in depth.
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== 10 DESIGN SECTIONS ==================== -->
+    
+    <!-- 01 CLARITY (Apple) -->
+    <section id="design-1" class="design-section max-w-7xl mx-auto px-8 pb-20">
+        <div class="flex items-center gap-x-4 mb-6">
+            <div class="text-[#C9A959] font-mono text-sm font-bold tracking-widest">01</div>
+            <div class="h-px flex-1 elegant-divider"></div>
+            <div class="uppercase tracking-[4px] text-xs font-semibold text-[#C9A959]">CLARITY</div>
+        </div>
+        
+        <div class="grid md:grid-cols-12 gap-8">
+            <!-- Philosophy -->
+            <div class="md:col-span-5">
+                <h3 class="text-5xl tracking-[-2.8px] leading-none mb-6">Ruthless<br>minimalism.</h3>
+                <p class="text-[#A1A1AA] text-[15px] leading-relaxed mb-8">
+                    Every element earns its place. Negative space becomes the hero. 
+                    Typography and proportion do the heavy lifting. The interface 
+                    disappears so the content can breathe.
+                </p>
+                <div class="space-y-2 text-sm">
+                    <div class="flex items-center gap-x-3"><i class="fa-solid fa-check text-[#C9A959] w-4"></i> <span>Generous whitespace as a feature</span></div>
+                    <div class="flex items-center gap-x-3"><i class="fa-solid fa-check text-[#C9A959] w-4"></i> <span>One primary action per view</span></div>
+                    <div class="flex items-center gap-x-3"><i class="fa-solid fa-check text-[#C9A959] w-4"></i> <span>Typography as the primary design system</span></div>
+                </div>
+            </div>
+            
+            <!-- Live UI Demo -->
+            <div class="md:col-span-7">
+                <div class="mini-ui bg-[#121214] border border-[#27272A] rounded-3xl p-10">
+                    <div class="max-w-md mx-auto">
+                        <!-- Mini Apple-style product -->
+                        <div class="flex justify-center mb-8">
+                            <div class="w-44 h-44 bg-gradient-to-br from-zinc-900 to-black rounded-[3.2rem] border border-[#27272A] flex items-center justify-center shadow-2xl">
+                                <div class="text-center">
+                                    <i class="fa-solid fa-headphones text-6xl text-[#C9A959]"></i>
+                                    <div class="mt-3 text-xs tracking-[2px] text-[#52525B]">AETHER • STUDIO</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <div class="text-4xl tracking-[-1.5px] font-semibold mb-1">Aether Buds Pro</div>
+                            <div class="text-[#A1A1AA] mb-6">The pinnacle of acoustic clarity.</div>
+                            
+                            <div class="flex justify-center gap-x-3 mb-8">
+                                <div class="px-5 py-2.5 rounded-3xl border border-[#27272A] text-sm">$549</div>
+                                <button onclick="addToCart(this, 'Aether Buds Pro')" 
+                                        class="premium-button px-8 py-2.5 rounded-3xl bg-white text-[#0A0A0B] text-sm font-semibold flex items-center gap-x-2 active:scale-[0.985]">
+                                    <span>Buy</span>
+                                </button>
+                            </div>
+                            
+                            <div class="grid grid-cols-3 gap-3 text-xs">
+                                <div class="bg-[#1A1A1D] rounded-2xl p-4 text-center">
+                                    <div class="font-mono text-[#C9A959]">32h</div>
+                                    <div class="text-[#71717A]">Battery</div>
+                                </div>
+                                <div class="bg-[#1A1A1D] rounded-2xl p-4 text-center">
+                                    <div class="font-mono text-[#C9A959]">ANC</div>
+                                    <div class="text-[#71717A]">Pro</div>
+                                </div>
+                                <div class="bg-[#1A1A1D] rounded-2xl p-4 text-center">
+                                    <div class="font-mono text-[#C9A959]">Hi-Res</div>
+                                    <div class="text-[#71717A]">Lossless</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 02 FORGE (Best Buy Commerce) -->
+    <section id="design-2" class="design-section max-w-7xl mx-auto px-8 pb-20 border-t border-[#27272A] pt-12">
+        <div class="flex items-center gap-x-4 mb-6">
+            <div class="text-[#C9A959] font-mono text-sm font-bold tracking-widest">02</div>
+            <div class="h-px flex-1 elegant-divider"></div>
+            <div class="uppercase tracking-[4px] text-xs font-semibold text-[#C9A959]">FORGE</div>
+        </div>
+        
+        <div class="grid md:grid-cols-12 gap-8">
+            <div class="md:col-span-5">
+                <h3 class="text-5xl tracking-[-2.8px] leading-none mb-6">Commerce<br>with conviction.</h3>
+                <p class="text-[#A1A1AA] text-[15px] leading-relaxed mb-8">
+                    Information density without chaos. Trust signals are everywhere. 
+                    Comparison is effortless. The path to purchase feels inevitable 
+                    and reassuring.
+                </p>
+            </div>
+            
+            <div class="md:col-span-7">
+                <div class="mini-ui bg-[#121214] border border-[#27272A] rounded-3xl overflow-hidden">
+                    <!-- Mini e-comm header -->
+                    <div class="px-6 py-4 border-b border-[#27272A] flex items-center justify-between bg-[#0A0A0B]">
+                        <div class="font-semibold">Aether Store</div>
+                        <div class="flex items-center gap-x-4 text-sm">
+                            <div class="flex items-center gap-x-1 text-emerald-400"><i class="fa-solid fa-check-double"></i> <span class="text-xs">In stock • Ships today</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div class="flex gap-6">
+                            <div class="w-40 h-40 bg-zinc-900 rounded-2xl flex-shrink-0 border border-[#27272A]"></div>
+                            
+                            <div class="flex-1">
+                                <div class="font-semibold text-xl tracking-tight">Aether Core Display 27"</div>
+                                <div class="text-emerald-400 text-sm mb-4">4.98 • 1,284 reviews</div>
+                                
+                                <div class="flex items-baseline gap-x-2 mb-5">
+                                    <span class="text-4xl font-semibold tabular-nums">$1,899</span>
+                                    <span class="line-through text-[#52525B]">$2,199</span>
+                                </div>
+                                
+                                <div class="flex gap-x-3">
+                                    <button onclick="addToCart(this, 'Aether Core Display')" class="premium-button flex-1 h-11 rounded-3xl bg-white text-[#0A0A0B] font-semibold text-sm">Add to Cart</button>
+                                    <button class="flex-1 h-11 rounded-3xl border border-[#27272A] text-sm font-medium">Compare</button>
+                                </div>
+                                
+                                <div class="mt-5 text-[10px] flex items-center gap-x-4 text-[#71717A]">
+                                    <div>Free 2-day shipping</div>
+                                    <div>30-day returns</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 03 VELOCITY (NBA) -->
+    <section id="design-3" class="design-section max-w-7xl mx-auto px-8 pb-20 border-t border-[#27272A] pt-12">
+        <div class="flex items-center gap-x-4 mb-6">
+            <div class="text-[#C9A959] font-mono text-sm font-bold tracking-widest">03</div>
+            <div class="h-px flex-1 elegant-divider"></div>
+            <div class="uppercase tracking-[4px] text-xs font-semibold text-[#C9A959]">VELOCITY</div>
+        </div>
+        
+        <div class="grid md:grid-cols-12 gap-8">
+            <div class="md:col-span-5">
+                <h3 class="text-5xl tracking-[-2.8px] leading-none mb-6">Data with<br>heartbeat.</h3>
+                <p class="text-[#A1A1AA] text-[15px] leading-relaxed mb-8">
+                    Energy and information coexist. Live updates feel alive. 
+                    Hierarchy guides the eye through complex performance data 
+                    without fatigue.
+                </p>
+            </div>
+            
+            <div class="md:col-span-7">
+                <div class="mini-ui bg-[#0F0F10] border border-[#27272A] rounded-3xl p-7">
+                    <div class="flex items-center justify-between mb-5">
+                        <div>
+                            <div class="font-mono text-xs tracking-[2px] text-rose-400">LIVE • FINAL</div>
+                            <div class="text-2xl font-semibold tracking-tight">BOS 128 — 119 MIA</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-[#71717A]">Q4 • 00:00</div>
+                            <div class="text-emerald-400 text-sm font-medium">FINAL</div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-[#1A1A1D] rounded-2xl p-4">
+                            <div class="text-xs text-[#71717A] mb-1">TATUM</div>
+                            <div class="text-4xl font-semibold tabular-nums">42</div>
+                            <div class="text-xs">12/19 FG • 7 3PT</div>
+                        </div>
+                        <div class="bg-[#1A1A1D] rounded-2xl p-4">
+                            <div class="text-xs text-[#71717A] mb-1">BROWN</div>
+                            <div class="text-4xl font-semibold tabular-nums">31</div>
+                            <div class="text-xs">11/17 FG • 4 3PT</div>
+                        </div>
+                        <div class="bg-[#1A1A1D] rounded-2xl p-4">
+                            <div class="text-xs text-[#71717A] mb-1">TEAM</div>
+                            <div class="text-4xl font-semibold tabular-nums">128</div>
+                            <div class="text-xs">52% FG • 18 3PT</div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="simulateLiveUpdate(this)" class="mt-5 w-full h-10 rounded-3xl border border-[#27272A] text-sm flex items-center justify-center gap-x-2 hover:bg-[#1A1A1D]">
+                        <i class="fa-solid fa-sync-alt"></i>
+                        <span>Simulate Live Update</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 04 PRECISION (OG SCAN) -->
+    <section id="design-4" class="design-section max-w-7xl mx-auto px-8 pb-20 border-t border-[#27272A] pt-12">
+        <div class="flex items-center gap-x-4 mb-6">
+            <div class="text-[#C9A959] font-mono text-sm font-bold tracking-widest">04</div>
+            <div class="h-px flex-1 elegant-divider"></div>
+            <div class="uppercase tracking-[4px] text-xs font-semibold text-[#C9A959]">PRECISION</div>
+        </div>
+        
+        <div class="grid md:grid-cols-12 gap-8">
+            <div class="md:col-span-5">
+                <h3 class="text-5xl tracking-[-2.8px] leading-none mb-6">On-chain<br>intelligence.</h3>
+                <p class="text-[#A1A1AA] text-[15px] leading-relaxed mb-8">
+                    The command line meets refined aesthetics. Every metric 
+                    is actionable. Scanning a contract feels like a conversation 
+                    with the chain itself.
+                </p>
+                <div class="text-xs px-4 py-1.5 rounded-2xl border border-[#27272A] inline-block">OG SCAN • KINTARA ENGINE</div>
+            </div>
+            
+            <div class="md:col-span-7">
+                <div class="mini-ui bg-[#0A0A0B] border border-[#27272A] rounded-3xl p-6">
+                    <div class="flex items-center gap-x-3 mb-4">
+                        <div class="flex-1">
+                            <input id="scan-input" type="text" value="EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump" 
+                                   class="w-full bg-[#121214] border border-[#27272A] rounded-2xl px-5 h-11 text-sm font-mono focus:outline-none focus:border-[#C9A959]">
+                        </div>
+                        <button onclick="runPrecisionScan()" 
+                                class="premium-button px-8 h-11 rounded-3xl bg-[#C9A959] text-[#0A0A0B] font-semibold text-sm whitespace-nowrap">SCAN CONTRACT</button>
+                    </div>
+                    
+                    <div id="scan-result" class="hidden mt-5 bg-[#121214] border border-[#27272A] rounded-2xl p-5">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="flex items-center gap-x-2">
+                                    <span class="font-mono text-sm">$OGS</span>
+                                    <span class="px-2.5 py-px text-[10px] rounded bg-emerald-500/10 text-emerald-400">VERIFIED</span>
+                                </div>
+                                <div class="text-xs text-[#71717A] mt-0.5">OG SCAN • Solana</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-emerald-400 text-xl font-semibold tabular-nums">94.8</div>
+                                <div class="text-[10px] text-[#71717A]">INTEL SCORE</div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-4 gap-4 mt-6 text-center text-xs">
+                            <div><div class="text-[#71717A]">MCAP</div><div class="font-mono text-lg">$4.2M</div></div>
+                            <div><div class="text-[#71717A]">LIQ</div><div class="font-mono text-lg">$812K</div></div>
+                            <div><div class="text-[#71717A]">HOLDERS</div><div class="font-mono text-lg">2,847</div></div>
+                            <div><div class="text-[#71717A]">AGE</div><div class="font-mono text-lg">18d</div></div>
+                        </div>
+                        
+                        <button onclick="generatePDFReport()" class="mt-6 w-full h-10 text-sm rounded-3xl border border-[#C9A959] text-[#C9A959] hover:bg-[#C9A959] hover:text-[#0A0A0B] flex items-center justify-center gap-x-2">
+                            <i class="fa-solid fa-file-pdf"></i>
+                            <span>Export Premium PDF Report</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 05 SOVEREIGN (Luxury) -->
+    <section id="design-5" class="design-section max-w-7xl mx-auto px-8 pb-20 border-t border-[#27272A] pt-12">
+        <div class="flex items-center gap-x-4 mb-6">
+            <div class="text-[#C9A959] font-mono text-sm font-bold tracking-widest">05</div>
+            <div class="h-px flex-1 elegant-divider"></div>
+            <div class="uppercase tracking-[4px] text-xs font-semibold text-[#C9A959]">SOVEREIGN</div>
+        </div>
+        
+        <div class="grid md:grid-cols-12 gap-8">
+            <div class="md:col-span-5">
+                <h3 class="text-5xl tracking-[-2.8px] leading-none mb-6">Timeless<br>presence.</h3>
+                <p class="text-[#A1A1AA] text-[15px] leading-relaxed mb-8">
+                    Deliberate. Quietly confident. Details that reward close 
+                    inspection. The interface feels like an heirloom — built 
+                    to last centuries, not quarters.
+                </p>
+            </div>
+            
+            <div class="md:col-span-7">
+                <div class="mini-ui bg-[#111113] border border-[#27272A] rounded-3xl p-9">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="uppercase tracking-[3px] text-xs text-[#C9A959]">AETHER 1865</div>
+                            <div class="text-5xl tracking-[-2px] mt-1">The Sovereign</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-[#71717A]">LIMITED TO</div>
+                            <div class="font-mono text-3xl">186</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-10 flex items-end justify-between">
+                        <div>
+                            <div class="text-xs tracking-widest">CASE • 40MM</div>
+                            <div class="text-2xl">18K ROSE GOLD</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-[#71717A]">FROM</div>
+                            <div class="text-4xl font-semibold tabular-nums">$48,500</div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="requestPrivateViewing()" class="mt-8 w-full h-12 rounded-3xl border border-[#C9A959] text-[#C9A959] hover:bg-[#C9A959] hover:text-black flex items-center justify-center gap-x-3 text-sm tracking-wider">
+                        <span>REQUEST PRIVATE VIEWING</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 06 NEXUS (Developer Command) -->
+    <section id="design-6" class="design-section max-w-7xl mx-auto px-8 pb-20 border-t border-[#27272A] pt-12">
+        <div class="flex items-center gap-x-4 mb-6">
+            <div class="text-[#C9A959] font-mono text-sm font-bold tracking-widest">06</div>
+            <div class="h-px flex-1 elegant-divider"></div>
+            <div class="uppercase tracking-[4px] text-xs font-semibold text-[#C9A959]">NEXUS</div>
+        </div>
+        
+        <div class="grid md:grid-cols-12 gap-8">
+            <div class="md:col-span-5">
+                <h3 class="text-5xl tracking-[-2.8px] leading-none mb-6">Keyboard-first<br>sovereignty.</h3>
+                <p class="text-[#A1A1AA] text-[15px] leading-relaxed mb-8">
+                    Power users feel at home instantly. Every action has a 
+                    shortcut. The interface anticipates intent and removes 
+                    friction at every layer.
+                </p>
+            </div>
+            
+            <div class="md:col-span-7">
+                <div class="mini-ui bg-[#0A0A0B] border border-[#27272A] rounded-3xl p-6 font-mono text-sm">
+                    <div class="flex items-center justify-between text-xs mb-4 px-1">
+                        <div class="text-emerald-400">~/aether • main</div>
+                        <div class="text-[#52525B]">⌘K for command palette</div>
+                    </div>
+                    
+                    <div class="bg-[#121214] rounded-2xl p-5 text-xs leading-relaxed">
+                        <div class="text-emerald-400">$ aether deploy --env prod --optimize</div>
+                        <div class="mt-2 text-[#71717A]">→ Building production bundle...</div>
+                        <div class="text-emerald-400 mt-1">→ Deployed to aether.app in 1.8s</div>
+                        
+                        <div class="mt-4 pt-4 border-t border-[#27272A] flex gap-x-2">
+                            <button onclick="showToast('Deployment verified. Rollback available for 24h.')" class="px-4 py-1.5 rounded-xl bg-white text-black text-xs">Verify</button>
+                            <button onclick="showToast('Rollback initiated.')" class="px-4 py-1.5 rounded-xl border border-[#27272A]">Rollback</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 07 HORIZON (Cinematic) -->
+    <section id="design-7" class="design-section max-w-7xl mx-auto px-8 pb-20 border-t border-[#27272A] pt-12">
+        <div class="flex items-center gap-x-4 mb-6">
+            <div class="text-[#C9A959] font-mono text-sm font-bold tracking-widest">07</div>
+            <div class="h-px flex-1 elegant-divider"></div>
+            <div class="uppercase tracking-[4px] text-xs font-semibold text-[#C9A959]">HORIZON</div>
+        </div>
+        
+        <div class="grid md:grid-cols-12 gap-8">
+            <div class="md:col-span-5">
+                <h3 class="text-5xl tracking-[-2.8px] leading-none mb-6">Narrative<br>as interface.</h3>
+                <p class="text-[#A1A1AA] text-[15px] leading-relaxed mb-8">
+                    The scroll is a story. Asymmetry creates tension and release. 
+                    The user is taken on a journey, not given a checklist.
+                </p>
+            </div>
+            
+            <div class="md:col-span-7">
+                <div class="mini-ui bg-gradient-to-br from-[#0A0A0B] via-[#121214] to-black border border-[#27272A] rounded-3xl p-9 relative overflow-hidden">
+                    <div class="max-w-xs">
+                        <div class="uppercase tracking-[3px] text-xs mb-3 text-[#C9A959]">CHAPTER 04 — ARRIVAL</div>
+                        <div class="text-5xl tracking-[-1.8px] leading-none">The edge of what’s possible.</div>
+                        
+                        <div class="mt-8 text-sm text-[#A1A1AA]">
+                            We didn’t set out to build another product.<br>
+                            We set out to build the last one you’ll ever need.
+                        </div>
+                        
+                        <button onclick="showToast('Thank you. A member of the Aether team will contact you within 4 hours.')" 
+                                class="mt-8 px-6 py-3 text-sm rounded-3xl border border-white/30 hover:bg-white hover:text-black flex items-center gap-x-2">
+                            BEGIN THE JOURNEY <i class="fa-solid fa-arrow-right ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 08 PULSE (Community Elevated) -->
+    <section id="design-8" class="design-section max-w-7xl mx-auto px-8 pb-20 border-t border-[#27272A] pt-12">
+        <div class="flex items-center gap-x-4 mb-6">
+            <div class="text-[#C9A959] font-mono text-sm font-bold tracking-widest">08</div>
+            <div class="h-px flex-1 elegant-divider"></div>
+            <div class="uppercase tracking-[4px] text-xs font-semibold text-[#C9A959]">PULSE</div>
+        </div>
+        
+        <div class="grid md:grid-cols-12 gap-8">
+            <div class="md:col-span-5">
+                <h3 class="text-5xl tracking-[-2.8px] leading-none mb-6">Belonging,<br>designed.</h3>
+                <p class="text-[#A1A1AA] text-[15px] leading-relaxed mb-8">
+                    Status is earned and visible. Conversations feel curated. 
+                    The community interface makes members feel seen and 
+                    significant.
+                </p>
+            </div>
+            
+            <div class="md:col-span-7">
+                <div class="mini-ui bg-[#121214] border border-[#27272A] rounded-3xl p-6">
+                    <div class="flex items-center justify-between mb-5">
+                        <div class="font-semibold">Aether Collective</div>
+                        <div class="text-emerald-400 text-xs flex items-center gap-x-1"><i class="fa-solid fa-circle"></i> <span>2,184 online</span></div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="flex gap-x-3">
+                            <div class="w-9 h-9 rounded-2xl bg-zinc-800 flex-shrink-0"></div>
+                            <div class="flex-1 text-sm">
+                                <div class="flex justify-between"><span class="font-medium">@kintara_dev</span> <span class="text-xs text-[#71717A]">now</span></div>
+                                <div class="text-[#A1A1AA]">Just shipped the new PDF engine. The reports look insane.</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-x-3">
+                            <div class="w-9 h-9 rounded-2xl bg-zinc-800 flex-shrink-0"></div>
+                            <div class="flex-1 text-sm">
+                                <div class="flex justify-between"><span class="font-medium">@ogscan</span> <span class="text-xs text-[#71717A]">3m</span></div>
+                                <div class="text-[#A1A1AA]">The $OGS liquidity just crossed $800K. Clean.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 09 LUMINA (Analytics Sanctuary) -->
+    <section id="design-9" class="design-section max-w-7xl mx-auto px-8 pb-20 border-t border-[#27272A] pt-12">
+        <div class="flex items-center gap-x-4 mb-6">
+            <div class="text-[#C9A959] font-mono text-sm font-bold tracking-widest">09</div>
+            <div class="h-px flex-1 elegant-divider"></div>
+            <div class="uppercase tracking-[4px] text-xs font-semibold text-[#C9A959]">LUMINA</div>
+        </div>
+        
+        <div class="grid md:grid-cols-12 gap-8">
+            <div class="md:col-span-5">
+                <h3 class="text-5xl tracking-[-2.8px] leading-none mb-6">Insight,<br>without noise.</h3>
+                <p class="text-[#A1A1AA] text-[15px] leading-relaxed mb-8">
+                    Data is presented with calm authority. Charts breathe. 
+                    The most important number is always the most prominent. 
+                    Decisions become obvious.
+                </p>
+            </div>
+            
+            <div class="md:col-span-7">
+                <div class="mini-ui bg-[#0A0A0B] border border-[#27272A] rounded-3xl p-7">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="font-semibold">Portfolio Performance</div>
+                        <div class="text-xs px-3 py-1 rounded-2xl bg-emerald-500/10 text-emerald-400">+34.8% YTD</div>
+                    </div>
+                    
+                    <div class="h-40 flex items-end gap-x-px mb-4">
+                        <div class="flex-1 bg-gradient-to-t from-[#C9A959] to-transparent rounded-t" style="height: 35%"></div>
+                        <div class="flex-1 bg-gradient-to-t from-[#C9A959] to-transparent rounded-t" style="height: 48%"></div>
+                        <div class="flex-1 bg-gradient-to-t from-[#C9A959] to-transparent rounded-t" style="height: 62%"></div>
+                        <div class="flex-1 bg-gradient-to-t from-[#C9A959] to-transparent rounded-t" style="height: 71%"></div>
+                        <div class="flex-1 bg-gradient-to-t from-[#C9A959] to-transparent rounded-t" style="height: 85%"></div>
+                        <div class="flex-1 bg-gradient-to-t from-[#C9A959] to-transparent rounded-t" style="height: 100%"></div>
+                    </div>
+                    
+                    <div class="grid grid-cols-4 text-xs text-center">
+                        <div><div class="text-[#71717A]">JAN</div><div class="font-mono">+4.2%</div></div>
+                        <div><div class="text-[#71717A]">FEB</div><div class="font-mono">+7.1%</div></div>
+                        <div><div class="text-[#71717A]">MAR</div><div class="font-mono">+11.4%</div></div>
+                        <div><div class="text-[#71717A]">APR</div><div class="font-mono text-emerald-400">+12.1%</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 10 ELYSIUM (Serene Premium) -->
+    <section id="design-10" class="design-section max-w-7xl mx-auto px-8 pb-20 border-t border-[#27272A] pt-12">
+        <div class="flex items-center gap-x-4 mb-6">
+            <div class="text-[#C9A959] font-mono text-sm font-bold tracking-widest">10</div>
+            <div class="h-px flex-1 elegant-divider"></div>
+            <div class="uppercase tracking-[4px] text-xs font-semibold text-[#C9A959]">ELYSIUM</div>
+        </div>
+        
+        <div class="grid md:grid-cols-12 gap-8">
+            <div class="md:col-span-5">
+                <h3 class="text-5xl tracking-[-2.8px] leading-none mb-6">Calm.<br>Deliberate.<br>Human.</h3>
+                <p class="text-[#A1A1AA] text-[15px] leading-relaxed mb-8">
+                    Technology that respects attention. Micro-interactions 
+                    soothe rather than stimulate. The interface feels like a 
+                    quiet room with perfect light.
+                </p>
+            </div>
+            
+            <div class="md:col-span-7">
+                <div class="mini-ui bg-[#111113] border border-[#27272A] rounded-3xl p-9 text-center">
+                    <div class="max-w-[260px] mx-auto">
+                        <i class="fa-solid fa-spa text-6xl text-[#C9A959] mb-6"></i>
+                        <div class="text-3xl tracking-tight mb-2">You are present.</div>
+                        <div class="text-[#A1A1AA] text-sm mb-8">3 hours 41 minutes of deep focus today.<br>Your longest streak this month.</div>
+                        
+                        <button onclick="beginRitual()" class="premium-button w-full h-12 rounded-3xl bg-white/5 hover:bg-white hover:text-[#0A0A0B] border border-white/20 flex items-center justify-center gap-x-3 text-sm">
+                            <span>Begin Evening Ritual</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== LIVE STUDIO TEASER ==================== -->
+    <section id="studio" class="max-w-7xl mx-auto px-8 py-16 border-t border-[#27272A]">
+        <div class="bg-[#121214] border border-[#27272A] rounded-3xl p-12 text-center">
+            <div class="max-w-md mx-auto">
+                <div class="section-header text-[#C9A959] mb-3">INTERACTIVE TRAINING LAB</div>
+                <h3 class="heading-premium text-5xl tracking-[-2px] mb-4">The Live Studio</h3>
+                <p class="text-[#A1A1AA]">The 10 archetypes above are fully interactive. Scroll back up and engage with each one — buttons, scans, live updates, and micro-animations are all functional. This is the quality your agents should now produce by default.</p>
+                
+                <button onclick="document.getElementById('collection').scrollIntoView({behavior:'smooth'})" class="mt-8 premium-button mx-auto px-8 h-12 rounded-3xl border border-[#C9A959] text-[#C9A959] flex items-center gap-x-2 text-sm">
+                    RETURN TO THE ARCHIVES <i class="fa-solid fa-redo ml-1"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== FOOTER (Apple elegance + Best Buy utility) ==================== -->
+    <footer class="border-t border-[#27272A] bg-[#0A0A0B]">
+        <div class="max-w-7xl mx-auto px-8 pt-14 pb-10">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-y-10">
+                <div class="col-span-2 md:col-span-1">
+                    <div class="flex items-center gap-x-2 mb-4">
+                        <div class="w-6 h-6 rounded-xl bg-gradient-to-br from-[#C9A959] to-[#A88C47]"></div>
+                        <span class="font-semibold tracking-tight">AETHER</span>
+                    </div>
+                    <div class="text-xs text-[#52525B]">Boston • 2026</div>
+                </div>
+                
+                <div>
+                    <div class="text-xs tracking-widest mb-4 text-[#71717A]">EXPLORE</div>
+                    <div class="space-y-2 text-sm">
+                        <div>The Collection</div>
+                        <div>Philosophy</div>
+                        <div>Live Studio</div>
+                        <div>Training Prompt</div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="text-xs tracking-widest mb-4 text-[#71717A]">RESOURCES</div>
+                    <div class="space-y-2 text-sm">
+                        <div>Design Principles</div>
+                        <div>Component Library</div>
+                        <div>Agent Training Guide</div>
+                        <div>Case Studies</div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="text-xs tracking-widest mb-4 text-[#71717A]">LEGAL</div>
+                    <div class="space-y-2 text-sm">
+                        <div>Privacy</div>
+                        <div>Terms</div>
+                        <div>Accessibility</div>
+                        <div>Licensing</div>
+                    </div>
+                </div>
+                
+                <div class="col-span-2 md:col-span-1 text-xs text-[#52525B]">
+                    This artifact exists to raise the floor of what is considered acceptable digital craft. Use it. Study it. Surpass it.
+                </div>
+            </div>
+            
+            <div class="mt-14 pt-8 border-t border-[#27272A] flex flex-col md:flex-row justify-between items-center text-xs text-[#52525B]">
+                <div>© 2026 Aether Studio. All rights reserved. Crafted without compromise.</div>
+                <div class="mt-3 md:mt-0">Made for those who notice the details.</div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[200] flex flex-col gap-y-2"></div>
+
+    <script>
+        // Tailwind script configuration
+        function initializeTailwind() {
+            document.documentElement.style.setProperty('--accent', '#C9A959');
+        }
+        
+        // Toast system (premium, Apple-like)
+        function showToast(message, duration = 2800) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast flex items-center gap-x-3 px-5 h-12 rounded-3xl bg-[#121214] border border-[#27272A] shadow-2xl text-sm`;
+            toast.innerHTML = `
+                <div class="flex-1">${message}</div>
+                <button class="text-[#71717A] hover:text-white ml-2">×</button>
+            `;
+            
+            container.appendChild(toast);
+            
+            toast.querySelector('button').onclick = () => {
+                toast.style.transition = 'all 0.2s ease';
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 150);
+            };
+            
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.style.transition = 'all 0.25s ease';
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 200);
+                }
+            }, duration);
+        }
+        
+        // Scroll to specific design section
+        function scrollToDesign(num) {
+            const section = document.getElementById(`design-${num}`);
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                // Brief highlight
+                section.style.transition = 'background-color 0.3s ease';
+                section.style.backgroundColor = 'rgba(201, 169, 89, 0.06)';
+                setTimeout(() => {
+                    section.style.backgroundColor = 'transparent';
+                }, 1200);
+            }
+        }
+        
+        // Add to cart simulation (used in multiple designs)
+        function addToCart(element, productName) {
+            const originalText = element.innerHTML;
+            element.innerHTML = `<span class="flex items-center justify-center gap-x-2"><i class="fa-solid fa-check"></i> Added</span>`;
+            element.disabled = true;
+            
+            showToast(`${productName} added to your collection.`);
+            
+            setTimeout(() => {
+                if (element && element.parentNode) {
+                    element.innerHTML = originalText;
+                    element.disabled = false;
+                }
+            }, 2200);
+        }
+        
+        // Precision scan simulation (OG SCAN style)
+        function runPrecisionScan() {
+            const input = document.getElementById('scan-input');
+            const result = document.getElementById('scan-result');
+            
+            if (!result || !input) return;
+            
+            result.classList.add('hidden');
+            
+            const btns = document.querySelectorAll('#design-4 button');
+            if (btns.length) btns[0].innerHTML = `<span class="flex items-center gap-x-2"><i class="fa-solid fa-spinner fa-spin"></i> SCANNING...</span>`;
+            
+            setTimeout(() => {
+                result.classList.remove('hidden');
+                result.style.opacity = '0';
+                result.style.transition = 'opacity 0.4s ease';
+                setTimeout(() => result.style.opacity = '1', 10);
+                
+                if (btns.length) btns[0].innerHTML = `SCAN CONTRACT`;
+                
+                showToast('Contract intelligence loaded. 94.8 Intel Score.');
+            }, 1350);
+        }
+        
+        // Generate PDF Report (OG SCAN feature)
+        function generatePDFReport() {
+            const btn = event.currentTarget;
+            showToast('Generating premium PDF report...');
+            
+            setTimeout(() => {
+                showToast('PDF Report ready. Downloading to your device.');
+                
+                // Simulate download
+                const link = document.createElement('a');
+                link.href = '#';
+                link.download = 'OGS-Intel-Report-2026.pdf';
+                // In real would trigger actual download
+            }, 1650);
+        }
+        
+        // Live update simulation (NBA Velocity)
+        function simulateLiveUpdate(element) {
+            const container = element.closest('.mini-ui');
+            if (!container) return;
+            
+            element.innerHTML = `<span class="flex items-center gap-x-2"><i class="fa-solid fa-sync fa-spin"></i> Updating live data...</span>`;
+            
+            setTimeout(() => {
+                // Update some numbers
+                const values = container.querySelectorAll('.tabular-nums');
+                if (values.length > 0) {
+                    values[0].textContent = '44';
+                    values[1].textContent = '33';
+                    values[2].textContent = '131';
+                }
+                
+                element.innerHTML = `<i class="fa-solid fa-sync-alt"></i> <span>Simulate Live Update</span>`;
+                showToast('Live stats refreshed from chain.');
+            }, 900);
+        }
+        
+        // Private viewing request (Sovereign)
+        function requestPrivateViewing() {
+            showToast('Thank you. A private viewing has been scheduled for you in Boston.');
+        }
+        
+        // Begin ritual (Elysium)
+        function beginRitual() {
+            const section = document.getElementById('design-10');
+            if (!section) return;
+            
+            section.style.transition = 'all 0.6s cubic-bezier(0.23, 1.0, 0.32, 1)';
+            section.style.backgroundColor = 'rgba(201, 169, 89, 0.03)';
+            
+            showToast('Evening ritual started. Notifications silenced for 90 minutes.');
+            
+            setTimeout(() => {
+                if (section) section.style.backgroundColor = 'transparent';
+            }, 4200);
+        }
+        
+        // Command palette (Nexus + Apple)
+        function showCommandPalette() {
+            const palette = document.createElement('div');
+            palette.className = `fixed inset-0 z-[300] flex items-start justify-center pt-[18vh]`;
+            palette.innerHTML = `
+                <div onclick="event.target.remove()" class="absolute inset-0 bg-black/60"></div>
+                <div onclick="event.stopImmediatePropagation()" class="relative w-full max-w-lg mx-4 bg-[#121214] border border-[#27272A] rounded-3xl shadow-2xl overflow-hidden">
+                    <div class="px-5 pt-4 pb-3 border-b border-[#27272A] flex items-center gap-x-3">
+                        <i class="fa-solid fa-terminal text-[#C9A959]"></i>
+                        <input type="text" placeholder="Type a command or search designs..." class="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-[#52525B]">
+                    </div>
+                    
+                    <div class="p-2 text-sm">
+                        <div onclick="document.querySelector('.fixed').remove(); scrollToDesign(4)" class="px-4 py-3 flex items-center gap-x-3 hover:bg-[#1A1A1D] rounded-2xl cursor-pointer">
+                            <div class="w-8 text-center text-[#C9A959]"><i class="fa-solid fa-search"></i></div>
+                            <div>Run Precision Scan <span class="text-xs text-[#52525B]">(Design 04)</span></div>
+                        </div>
+                        <div onclick="document.querySelector('.fixed').remove(); scrollToDesign(1)" class="px-4 py-3 flex items-center gap-x-3 hover:bg-[#1A1A1D] rounded-2xl cursor-pointer">
+                            <div class="w-8 text-center text-[#C9A959]"><i class="fa-solid fa-gem"></i></div>
+                            <div>Experience Clarity archetype</div>
+                        </div>
+                        <div onclick="document.querySelector('.fixed').remove(); document.getElementById('studio').scrollIntoView({behavior:'smooth'})" class="px-4 py-3 flex items-center gap-x-3 hover:bg-[#1A1A1D] rounded-2xl cursor-pointer">
+                            <div class="w-8 text-center text-[#C9A959]"><i class="fa-solid fa-play"></i></div>
+                            <div>Open Live Studio</div>
+                        </div>
+                        <div onclick="document.querySelector('.fixed').remove(); downloadPrompt()" class="px-4 py-3 flex items-center gap-x-3 hover:bg-[#1A1A1D] rounded-2xl cursor-pointer">
+                            <div class="w-8 text-center text-[#C9A959]"><i class="fa-solid fa-download"></i></div>
+                            <div>Download Training Prompt</div>
+                        </div>
+                    </div>
+                    
+                    <div class="px-5 py-3 text-[10px] text-[#52525B] border-t border-[#27272A] flex justify-between">
+                        <div>Press ESC to close</div>
+                        <div>⌘K</div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(palette);
+            
+            // Focus input
+            setTimeout(() => {
+                const input = palette.querySelector('input');
+                if (input) input.focus();
+            }, 80);
+            
+            // ESC support
+            const escHandler = (e) => {
+                if (e.key === 'Escape') {
+                    palette.remove();
+                    document.removeEventListener('keydown', escHandler);
+                }
+            };
+            document.addEventListener('keydown', escHandler, { once: true });
+        }
+        
+        // Download the training prompt
+        function downloadPrompt() {
+            showToast('Opening training prompt in new tab...');
+            setTimeout(() => {
+                window.open('aether-training-prompt.html', '_blank');
+            }, 650);
+        }
+        
+        // Keyboard shortcuts
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', function(e) {
+                if (e.metaKey && e.key === 'k') {
+                    e.preventDefault();
+                    showCommandPalette();
+                }
+                
+                if (e.key === '/' && document.activeElement.tagName === 'BODY') {
+                    e.preventDefault();
+                    showCommandPalette();
+                }
+            });
+            
+            // Add hint on first load
+            setTimeout(() => {
+                const hint = document.createElement('div');
+                // Could add subtle hint but skip for cleanliness
+            }, 8500);
+        }
+        
+        // Initialize everything
+        function initializeAether() {
+            initializeTailwind();
+            setupKeyboardShortcuts();
+            
+            // Boot message for god-tier feel
+            console.log('%c[AETHER] God-tier showcase initialized. All 10 archetypes are fully interactive.', 'color:#52525B; font-size:9px');
+            
+            // Optional: Auto highlight first design briefly on load for new visitors
+            setTimeout(() => {
+                const first = document.getElementById('design-1');
+                if (first) {
+                    first.style.transition = 'box-shadow 1.2s ease';
+                    first.style.boxShadow = '0 0 0 1px rgba(201,169,89,0.15)';
+                    setTimeout(() => {
+                        if (first) first.style.boxShadow = 'none';
+                    }, 1400);
+                }
+            }, 2200);
+            
+            // Make sure scan input has nice placeholder behavior
+            const scanInput = document.getElementById('scan-input');
+            if (scanInput) {
+                scanInput.addEventListener('focus', () => {
+                    scanInput.select();
+                });
+            }
+            
+            // Easter egg: Konami code or simple logo click
+            let logoClicks = 0;
+            const logo = document.querySelector('header .flex.items-center');
+            if (logo) {
+                logo.addEventListener('click', () => {
+                    logoClicks++;
+                    if (logoClicks === 5) {
+                        showToast('You found the hidden layer. Welcome to the inner sanctum.');
+                        logoClicks = 0;
+                        document.documentElement.style.setProperty('--accent', '#6366F1');
+                    }
+                });
+            }
+        }
+        
+        // Boot
+        window.onload = initializeAether;
+    </script>
+</body>
+</html>
