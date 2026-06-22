@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.vibe-code]
 verify_jwt = false
+
+[functions.vibe-view]
+verify_jwt = false

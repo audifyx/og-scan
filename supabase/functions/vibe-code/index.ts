@@ -7,7 +7,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
 const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
-const VIBE_MODEL = "deepseek-ai/deepseek-v4-pro"; // best free coder; falls back to llama-3.3-70b
+const VIBE_MODEL = "meta/llama-3.3-70b-instruct"; // fast + strong; falls back to Llama 4 Maverick
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,7 +43,7 @@ async function callModel(model: string, prompt: string): Promise<string | null> 
 
 async function generate(prompt: string): Promise<{ html: string; url: string } | null> {
   let raw = await callModel(VIBE_MODEL, prompt);
-  if (!raw) raw = await callModel("meta/llama-3.3-70b-instruct", prompt);
+  if (!raw) raw = await callModel("meta/llama-4-maverick-17b-128e-instruct", prompt);
   if (!raw) return null;
   let html = raw.replace(/^```[a-zA-Z]*\s*/, "").replace(/\s*```$/, "").trim();
   const dt = html.search(/<!DOCTYPE html>/i);
@@ -62,7 +62,7 @@ async function generate(prompt: string): Promise<{ html: string; url: string } |
       headers: { Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE, "Content-Type": "text/html", "x-upsert": "true" },
       body: html,
     });
-    if (up.ok) url = `${SUPABASE_URL}/storage/v1/object/public/reports/${path}`;
+    if (up.ok) url = `${SUPABASE_URL}/functions/v1/vibe-view?id=${id}`;
     else console.error("host err", up.status, (await up.text().catch(() => "")).slice(0, 200));
   } catch (e) { console.error("host throw", String(e)); }
   return { html, url };
