@@ -757,7 +757,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "memes") return <ArtFeed inline />;
   if (tab === "spaces") return <SpacesPage />;
   if (tab === "social") return <SocialHub />;
-  if (tab === "tools") return <ToolsHub onNavigate={onNavigate || (() => {})} />;
+  if (tab === "tools") return <ToolsTabbed mint={mint} onSelectMint={updateMint} />;
   if (tab === "listings") return <TokenListings initialMint={listingMint} />;
   if (tab === "profile") return <UserProfile viewUserId={profileViewUserId} />;
   if (tab === "live-trading") return <LiveTradingPage />;
@@ -1115,6 +1115,44 @@ const TokenDetailPopupWrapper = ({ token, onClose, onOpenScanner }: { token: Jup
 };
 
 /* ─── Overview / Dashboard ─── */
+const TOOL_TABS: { id: TabId; label: string }[] = [
+  { id: "scanner", label: "Scanner" },
+  { id: "snipe-feed", label: "Launch Radar" },
+  { id: "feed", label: "Market Feed" },
+  { id: "market-pulse", label: "Token Intel" },
+  { id: "swap", label: "Swap" },
+  { id: "listings", label: "Listings" },
+  { id: "token-manager", label: "Token Manager" },
+];
+
+/* Tools — one page, top tab bar, every tool suite in one place. */
+const ToolsTabbed = ({ mint, onSelectMint }: { mint: string; onSelectMint: (m: string) => void }) => {
+  const [active, setActive] = useState<TabId>("scanner");
+  const fallback = <div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading…</div>;
+  return (
+    <div className="flex flex-col">
+      <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {TOOL_TABS.map((tt) => (
+          <button key={tt.id} type="button" onClick={() => setActive(tt.id)}
+            className={cn("shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-bold transition",
+              active === tt.id ? "bg-primary text-primary-foreground" : "border border-white/10 bg-white/[0.03] text-white/55 hover:text-white/85")}>
+            {tt.label}
+          </button>
+        ))}
+      </div>
+      <Suspense fallback={fallback}>
+        {active === "scanner" && <TruthScanSuite onSelect={onSelectMint} />}
+        {active === "snipe-feed" && <LaunchRadarSuite onSelect={onSelectMint} />}
+        {active === "feed" && <MarketFeedSuite mint={mint} onSelect={onSelectMint} />}
+        {active === "market-pulse" && <TokenIntel mint={mint} onSelect={onSelectMint} initialTab="vitals" />}
+        {active === "swap" && <SwapPanel ogMint={mint} onSelectMint={onSelectMint} />}
+        {active === "listings" && <TokenListings />}
+        {active === "token-manager" && <TokenManagerPage />}
+      </Suspense>
+    </div>
+  );
+};
+
 const OverviewPage = ({
   mint,
   onSwitchTab,

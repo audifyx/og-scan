@@ -42,7 +42,6 @@ const tradingItems: NavItem[] = [
   { to: "/live-trading",  icon: Wallet,     label: "Phantom Terminal", eyebrow: "Phantom Trade" },
   { to: "/trading-hub",   icon: TrendingUp, label: "Trading Hub",  eyebrow: "Launch · Lobbies · Callouts" },
   { to: "/messages",      icon: Mail,       label: "Messages",     eyebrow: "Direct messages" },
-  { to: "/token-manager", icon: Pencil,     label: "Token Manager", eyebrow: "Free metadata update" },
 ];
 
 // ── NavRow ────────────────────────────────────────────────────────────────
