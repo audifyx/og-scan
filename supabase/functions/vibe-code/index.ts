@@ -8,8 +8,9 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
 const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
 const VIBE_MODELS = [
-  "qwen/qwen3-coder-480b-a35b-instruct", // best free coder for premium UI
-  "meta/llama-3.3-70b-instruct",         // fast fallback if the coder is slow/unavailable
+  "moonshotai/kimi-k2.6",                 // dense, detailed premium frontend
+  "qwen/qwen3-coder-480b-a35b-instruct",  // strong coder fallback
+  "meta/llama-3.3-70b-instruct",          // fast last resort
 ];
 
 const corsHeaders = {
@@ -82,11 +83,12 @@ async function callModel(model: string, prompt: string): Promise<string | null> 
   } catch (e) { console.error("model throw", model, String(e)); return null; }
 }
 
-async function generate(prompt: string): Promise<{ html: string; url: string } | null> {
+async function generate(prompt: string): Promise<{ html: string; url: string; model: string } | null> {
   let raw: string | null = null;
+  let usedModel = "";
   for (const m of VIBE_MODELS) {
     raw = await callModel(m, prompt);
-    if (raw && raw.length > 1500) break; // accept only a substantial build
+    if (raw && raw.length > 1500) { usedModel = m; break; } // accept only a substantial build
   }
   if (!raw) return null;
   let html = raw.replace(/^```[a-zA-Z]*\s*/, "").replace(/\s*```$/, "").trim();
@@ -109,7 +111,7 @@ async function generate(prompt: string): Promise<{ html: string; url: string } |
     if (up.ok) url = `${SUPABASE_URL}/functions/v1/vibe-view?id=${id}`;
     else console.error("host err", up.status, (await up.text().catch(() => "")).slice(0, 200));
   } catch (e) { console.error("host throw", String(e)); }
-  return { html, url };
+  return { html, url, model: usedModel };
 }
 
 async function tgMessage(botToken: string, chatId: number, text: string, replyTo?: number | null) {
@@ -142,7 +144,7 @@ Deno.serve(async (req) => {
   // Dry-run (no bot_token): just generate + host, return metadata. Used for testing.
   if (!body.bot_token) {
     const g = await generate(prompt);
-    return json({ ok: !!g, url: g?.url || "", length: g?.html.length || 0 });
+    return json({ ok: !!g, url: g?.url || "", length: g?.html.length || 0, model: g?.model || "" });
   }
 
   // Full path: generate, then deliver to Telegram. Done synchronously so the work
