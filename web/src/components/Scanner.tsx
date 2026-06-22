@@ -252,19 +252,6 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
   return (
     <section id="scanner" className="relative scroll-mt-36">
       <div>
-        <div className="mb-8">
-          <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.4em] text-og-cyan">
-            <span className="h-px w-10 bg-og-cyan" /> SCANNER.EXE
-          </div>
-          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-5xl">
-            <span className="text-foreground">SCAN ANY</span>{" "}
-            <span className="text-og-cyan text-glow">MINT</span>
-          </h2>
-          <p className="mt-3 max-w-4xl text-sm leading-relaxed text-muted-foreground">
-            Search any ticker, meme, brand, narrative, or CA across 16+ chains. The scanner layers OG proof, dominance, holder concentration, liquidity authenticity, authority status, DEX paid signals, and quick investigation tools into one triage board.
-          </p>
-        </div>
-
         <div className="relative w-full">
           <div className="og-search-box px-3 w-full">
             <Search className="h-4 w-4 text-og-cyan" />
@@ -293,25 +280,22 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
         {/* Animated scan progress — shown while fetching, hidden once results load */}
         <ScanProgress active={isFetching} query={debounced} className="mt-4" />
 
-        <div className={`mt-3 border border-og-grid bg-og-ink/70 p-3 shadow-[0_24px_80px_-60px_hsl(var(--og-cyan))] transition-opacity duration-300 ${isFetching ? "pointer-events-none opacity-40" : "opacity-100"}`}>
+        <div className={`mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl transition-opacity duration-300 ${isFetching ? "pointer-events-none opacity-40" : "opacity-100"}`}>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setShowFilters((v) => !v)}
-              className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan lg:hidden"
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/12 px-3 py-1.5 text-[11px] font-bold text-white/70 transition hover:text-white"
             >
-              <Filter className="h-3 w-3" /> {showFilters ? "Hide" : "Filters"}
+              <Filter className="h-3.5 w-3.5" /> {showFilters ? "Hide filters" : "Filters"}
             </button>
-            <div className="hidden items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan lg:flex">
-              <Filter className="h-3 w-3" /> scanner filters
-            </div>
             <div className="ml-auto flex flex-wrap gap-1.5">
               {PRESET_FILTERS.map((preset) => (
                 <button
                   key={preset.label}
                   type="button"
                   onClick={() => setFilters(preset.filters)}
-                  className="border border-og-grid px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-foreground/60 transition hover:border-og-lime hover:text-og-lime"
+                  className="rounded-full border border-white/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white/55 transition hover:border-og-lime/50 hover:text-og-lime"
                 >
                   {preset.label}
                 </button>
@@ -319,13 +303,13 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
               <button
                 type="button"
                 onClick={() => setFilters(DEFAULT_FILTERS)}
-                className="border border-og-grid px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-foreground/60 transition hover:border-og-cyan hover:text-og-cyan"
+                className="rounded-full border border-white/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white/55 transition hover:border-og-cyan/50 hover:text-og-cyan"
               >
                 RESET
               </button>
             </div>
           </div>
-          <div className={cn("grid gap-2 sm:grid-cols-2 lg:grid-cols-4", !showFilters && "hidden lg:grid")}>
+          <div className={cn("grid gap-2 sm:grid-cols-2 lg:grid-cols-4", !showFilters && "hidden")}>
             <FilterNum label="MIN LIQ" value={filters.minLiq} step={1000} min={0} onChange={(v) => setFilters({ ...filters, minLiq: Math.max(0, v) })} />
             <FilterNum label="MIN MCAP" value={filters.minMcap} step={10_000} min={0} onChange={(v) => setFilters({ ...filters, minMcap: v })} />
             <FilterNum label="MIN HOLDERS" value={filters.minHolders} step={100} min={0} onChange={(v) => setFilters({ ...filters, minHolders: v })} />
@@ -343,7 +327,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <FilterToggle label="GREEN 24H" value={filters.greenOnly} onChange={(v) => setFilters({ ...filters, greenOnly: v })} />
             <FilterToggle label="DEX PAID" value={filters.dexPaidOnly} onChange={(v) => setFilters({ ...filters, dexPaidOnly: v })} />
           </div>
-          <div className={cn("mt-3 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground", !showFilters && "hidden lg:flex")}>
+          <div className={cn("mt-3 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground", !showFilters && "hidden")}>
             <span><span className="text-og-lime">{filteredResults.length}</span> shown</span>
             <span>·</span>
             <span><span className="text-og-blood">{dropped}</span> filtered</span>
@@ -354,7 +338,7 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
 
         {report && rawResults.length > 0 && (
           <>
-            <div className="mt-4 grid gap-2 border border-og-cyan/35 bg-og-cyan/5 p-3 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="mt-4 grid gap-2.5 rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl sm:grid-cols-2 xl:grid-cols-6">
               <ForensicStat icon={Fingerprint} label="Narrative ID" value={report.narrativeFingerprintId} accent="text-og-cyan" />
               <ForensicStat icon={GitBranch} label="Cluster" value={`${report.summary.candidateCount} tokens · ${report.summary.chainCount} chain${report.summary.chainCount !== 1 ? "s" : ""}`} accent="text-og-gold" />
               <ForensicStat icon={ShieldCheck} label="Primary" value={primaryToken ? `$${primaryToken.symbol}` : "Unknown"} accent="text-og-lime" />
@@ -374,17 +358,17 @@ export const Scanner = ({ onSelect, initialQuery = "" }: Props) => {
             <ResultRow key={forensicKey(t)} t={t} score={tokenScore(report, t)} report={report} onSelect={() => onSelect(t.id)} />
           ))}
           {debounced.length >= 2 && !isFetching && rawResults.length === 0 && (
-            <div className="col-span-full border border-og-grid bg-og-ink/70 p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
+            <div className="col-span-full rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center text-xs uppercase tracking-widest text-muted-foreground">
               NO MATCHES // EOF
             </div>
           )}
           {debounced.length >= 2 && !isFetching && rawResults.length > 0 && filteredResults.length === 0 && (
-            <div className="col-span-full border border-dashed border-og-grid p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
+            <div className="col-span-full rounded-2xl border border-dashed border-white/12 p-8 text-center text-xs uppercase tracking-widest text-muted-foreground">
               NO RESULTS PASS FILTERS · RESET OR LOWER THE BAR
             </div>
           )}
           {debounced.length < 2 && (
-            <div className="col-span-full border border-dashed border-og-grid p-6 text-center text-xs uppercase tracking-widest text-muted-foreground">
+            <div className="col-span-full rounded-2xl border border-dashed border-white/12 p-8 text-center text-xs uppercase tracking-widest text-muted-foreground">
               › type 2+ chars to engage
             </div>
           )}
@@ -409,7 +393,7 @@ const FilterNum = ({
   min?: number;
   max?: number;
 }) => (
-  <label className="flex items-center justify-between gap-2 border border-og-grid bg-og-ink px-2 py-1.5 font-mono text-[10px] uppercase tracking-widest">
+  <label className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 font-mono text-[10px] uppercase tracking-widest">
     <span className="text-muted-foreground">{label}</span>
     <input
       type="number"
@@ -424,7 +408,7 @@ const FilterNum = ({
 );
 
 const FilterSelect = ({ label, value, onChange }: { label: string; value: ScanSortMode; onChange: (v: ScanSortMode) => void }) => (
-  <label className="flex items-center justify-between gap-2 border border-og-grid bg-og-ink px-2 py-1.5 font-mono text-[10px] uppercase tracking-widest">
+  <label className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 font-mono text-[10px] uppercase tracking-widest">
     <span className="text-muted-foreground">{label}</span>
     <select
       value={value}
@@ -455,10 +439,10 @@ const FilterToggle = ({
   <button
     type="button"
     onClick={() => onChange(!value)}
-    className={`border px-2 py-1.5 text-left font-mono text-[10px] uppercase tracking-widest transition ${
+    className={`rounded-xl border px-2.5 py-2 text-left font-mono text-[10px] uppercase tracking-widest transition ${
       value
         ? "border-og-lime bg-og-lime/10 text-og-lime"
-        : "border-og-grid text-foreground/60 hover:border-og-cyan hover:text-og-cyan"
+        : "border-white/10 text-foreground/55 hover:border-og-cyan/50 hover:text-og-cyan"
     }`}
   >
     {label} · {value ? "ON" : "OFF"}
@@ -550,7 +534,7 @@ const ResultRow = ({ t, score, report, onSelect }: { t: JupTokenInfo; score?: To
 
       {/* Score chips row */}
       <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2 font-mono text-[9px] uppercase tracking-widest">
-        <span className={`rounded-full border px-2 py-0.5 ${dominanceScore >= 70 ? "border-og-lime/40 text-og-lime" : dominanceScore >= 45 ? "border-og-cyan/40 text-og-cyan" : "border-og-grid text-muted-foreground"}`}>
+        <span className={`rounded-full border px-2 py-0.5 ${dominanceScore >= 70 ? "border-og-lime/40 text-og-lime" : dominanceScore >= 45 ? "border-og-cyan/40 text-og-cyan" : "border-white/12 text-muted-foreground"}`}>
           DOM {dominanceScore}%
         </span>
         <span className={`rounded-full border px-2 py-0.5 ${scoreTextClass("origin", originScore)} border-current/30`}>
