@@ -1350,27 +1350,27 @@ const CommunityRooms: React.FC = () => {
   return (
     <div className="flex h-full overflow-hidden bg-background text-white">
       <aside className="flex w-[310px] shrink-0 flex-col border-r border-white/[0.06] bg-card max-md:w-[92px]">
-        <div className="flex items-center gap-2 border-b border-white/[0.06] p-3">
-          <button onClick={() => navigate(-1)} className="rounded-lg p-2 text-white/35 hover:bg-white/[0.05] hover:text-white">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <div className="min-w-0 flex-1 max-md:hidden">
-            <h1 className="text-sm font-black uppercase tracking-widest">Community Chats</h1>
-            <p className="text-[10px] text-white/25">{rooms.length} backend channels</p>
+        <div className="flex items-center gap-2.5 border-b border-white/[0.06] p-3">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 text-white shadow-lg shadow-emerald-500/30 max-md:mx-auto">
+            <MessageSquare className="h-4 w-4" />
           </div>
-          <button onClick={() => setShowCreateModal(true)} className="rounded-xl border border-og-cyan/20 bg-og-cyan/10 p-2 text-og-cyan hover:bg-og-cyan/20" title="Create chat">
+          <div className="min-w-0 flex-1 max-md:hidden">
+            <h1 className="text-sm font-black tracking-tight text-white">Rooms</h1>
+            <p className="text-[10px] text-white/30">{rooms.length} active</p>
+          </div>
+          <button onClick={() => setShowCreateModal(true)} className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-2 text-emerald-300 transition hover:bg-emerald-500/20 max-md:hidden" title="Create room">
             <Plus className="h-4 w-4" />
           </button>
         </div>
 
         <div className="space-y-2 p-3 max-md:hidden">
-          <div className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.035] px-3 py-2">
-            <Search className="h-4 w-4 text-white/25" />
+          <div className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.035] px-3 py-2 focus-within:border-emerald-400/40">
+            <Search className="h-4 w-4 text-emerald-300/70" />
             <input value={searchQuery} onChange={event => setSearchQuery(event.target.value)} placeholder="Search chats, topics, rules..." className="min-w-0 flex-1 bg-transparent text-xs text-white/70 outline-none placeholder:text-white/20" />
           </div>
           <div className="grid grid-cols-3 gap-1">
             {(["active", "discover", "archived"] as const).map(filter => (
-              <button key={filter} onClick={() => setRoomFilter(filter)} className={cn("rounded-lg px-2 py-1.5 text-[10px] font-black uppercase tracking-widest", roomFilter === filter ? "bg-og-lime/10 text-og-lime" : "bg-white/[0.03] text-white/30")}>
+              <button key={filter} onClick={() => setRoomFilter(filter)} className={cn("rounded-lg px-2 py-1.5 text-[10px] font-black uppercase tracking-widest", roomFilter === filter ? "bg-emerald-500/10 text-emerald-300" : "bg-white/[0.03] text-white/35")}>
                 {filter}
               </button>
             ))}
@@ -1388,7 +1388,7 @@ const CommunityRooms: React.FC = () => {
           ) : (
             filteredRooms.map(room => (
               <button key={room.id} onClick={() => setActiveRoom(room)} className={cn("mb-1 flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left transition-all",
-                activeRoom?.id === room.id ? "border-og-cyan/25 bg-og-cyan/[0.08]" : "border-transparent hover:bg-white/[0.035]"
+                activeRoom?.id === room.id ? "border-emerald-400/30 bg-emerald-500/[0.08]" : "border-transparent hover:bg-white/[0.04]"
               )}>
                 <RoomIcon room={room} />
                 <div className="min-w-0 flex-1 max-md:hidden">
@@ -1450,7 +1450,7 @@ const CommunityRooms: React.FC = () => {
                     className={cn(
                       "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all",
                       roomView === tab.id
-                        ? tab.id === "raid" ? "bg-og-gold/10 text-og-gold" : "bg-og-cyan/10 text-og-cyan"
+                        ? tab.id === "raid" ? "bg-og-gold/10 text-og-gold" : "bg-emerald-500/10 text-emerald-300"
                         : "text-white/30 hover:bg-white/[0.04] hover:text-white/50"
                     )}
                   >
@@ -1565,7 +1565,7 @@ const CommunityRooms: React.FC = () => {
                       placeholder={isMuted ? "Muted members cannot send messages" : activeRoom.is_read_only && !canModerate ? "Announcements channel is read-only" : `Message #${activeRoom.name}`}
                       className="min-w-0 flex-1 bg-transparent text-sm text-white/80 outline-none placeholder:text-white/22 disabled:cursor-not-allowed"
                     />
-                    <button onClick={sendMessage} disabled={!input.trim() || sending} className={cn("rounded-xl p-2 transition-all", input.trim() ? "bg-og-cyan text-background hover:bg-white" : "bg-white/[0.04] text-white/20")}>
+                    <button onClick={sendMessage} disabled={!input.trim() || sending} className={cn("rounded-xl p-2 transition-all", input.trim() ? "bg-emerald-500 text-white hover:bg-emerald-400" : "bg-white/[0.04] text-white/20")}>
                       {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </button>
                   </div>
@@ -1596,10 +1596,11 @@ const CommunityRooms: React.FC = () => {
             )}
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-center">
+          <div className="flex flex-1 items-center justify-center px-6 text-center">
             <div>
-              <Hash className="mx-auto h-12 w-12 text-white/10" />
-              <p className="mt-3 text-sm font-bold text-white/35">Select a chat room</p>
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-emerald-400/20 bg-emerald-500/10 text-emerald-300"><MessageSquare className="h-6 w-6" /></div>
+              <p className="mt-3 text-sm font-bold text-white/55">Pick a room to start chatting</p>
+              <p className="mt-1 text-xs text-white/30">Choose a room on the left, or create a new one.</p>
             </div>
           </div>
         )}
@@ -1620,7 +1621,7 @@ const CommunityRooms: React.FC = () => {
               <input value={newRoom.description} onChange={event => setNewRoom(prev => ({ ...prev, description: event.target.value }))} placeholder="Description" className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/20" />
               <div className="grid grid-cols-3 gap-2">
                 {ROOM_TYPES.map(type => (
-                  <button key={type.value} onClick={() => setNewRoom(prev => ({ ...prev, room_type: type.value }))} className={cn("rounded-xl border p-2 text-left", newRoom.room_type === type.value ? "border-og-cyan/30 bg-og-cyan/10 text-og-cyan" : "border-white/[0.06] bg-white/[0.025] text-white/45")}>
+                  <button key={type.value} onClick={() => setNewRoom(prev => ({ ...prev, room_type: type.value }))} className={cn("rounded-xl border p-2 text-left", newRoom.room_type === type.value ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-300" : "border-white/[0.06] bg-white/[0.025] text-white/45")}>
                     <type.Icon className="mb-1 h-4 w-4" />
                     <p className="text-[10px] font-black uppercase tracking-wider">{type.label}</p>
                   </button>
@@ -1637,7 +1638,7 @@ const CommunityRooms: React.FC = () => {
                   ))}
                 </div>
               </div>
-              <button onClick={createRoom} disabled={!newRoom.name.trim()} className="w-full rounded-xl bg-og-cyan px-4 py-2.5 text-sm font-black text-background transition-colors hover:bg-white disabled:opacity-40">
+              <button onClick={createRoom} disabled={!newRoom.name.trim()} className="w-full rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-500/30 transition hover:brightness-110 disabled:opacity-40">
                 Create Chat
               </button>
             </div>
@@ -1668,7 +1669,7 @@ const CommunityRooms: React.FC = () => {
                 placeholder="Optional caption"
                 className="h-24 w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/20"
               />
-              <button onClick={sendAttachment} className="w-full rounded-xl bg-og-cyan px-4 py-2.5 text-sm font-black text-background transition-colors hover:bg-white">
+              <button onClick={sendAttachment} className="w-full rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-500/30 transition hover:brightness-110">
                 Send attachment
               </button>
             </div>
