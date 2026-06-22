@@ -491,7 +491,10 @@ const ResultRow = ({ t, score, report, onSelect }: { t: JupTokenInfo; score?: To
       : "collector-token-card--copy";
 
   return (
-    <article className={`collector-token-card ${cardTone} group relative overflow-hidden text-left transition duration-200`}>
+    <article className={cn(
+      "group relative overflow-hidden rounded-2xl border bg-white/[0.03] backdrop-blur-xl text-left transition duration-200 hover:bg-white/[0.05] hover:-translate-y-0.5",
+      lpPulled || riskScore >= 70 ? "border-og-blood/45" : score?.isPrimaryToken ? "border-og-gold/45" : "border-white/10",
+    )}>
       {/* Top row: avatar + name + price + label + actions */}
       <div className="flex items-center gap-3 px-3 pt-3 pb-2">
         {/* Avatar */}
@@ -610,7 +613,7 @@ const ForensicStat = ({
   value: string;
   accent?: string;
 }) => (
-  <div className="min-w-0 border border-og-grid/70 bg-og-ink/70 p-2 font-mono uppercase tracking-widest">
+  <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.04] p-2.5 font-mono uppercase tracking-widest">
     <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
       <Icon className="h-3 w-3" /> <HelpLabel label={label} />
     </div>

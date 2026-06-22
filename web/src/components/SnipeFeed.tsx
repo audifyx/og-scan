@@ -686,7 +686,7 @@ export const SnipeFeed = ({ onSelect }: Props) => {
             <button
               type="button"
               onClick={() => void refetch()}
-              className="inline-flex items-center gap-1.5 border border-og-grid px-2.5 py-1.5 text-foreground/70 transition hover:border-og-cyan hover:text-og-cyan"
+              className="inline-flex items-center gap-1.5 border border-white/10 px-2.5 py-1.5 text-foreground/70 transition hover:border-og-cyan hover:text-og-cyan"
             >
               {isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
               Refresh
@@ -708,8 +708,8 @@ export const SnipeFeed = ({ onSelect }: Props) => {
         ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
-          <div className="overflow-hidden border border-og-grid bg-og-ink/82 shadow-[0_0_0_1px_hsl(var(--og-cyan)/0.18),0_34px_120px_-70px_hsl(var(--og-cyan))]">
-            <div className="flex flex-col gap-3 border-b border-og-grid bg-og-ink/95 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl">
+            <div className="flex flex-col gap-3 border-b border-white/10 bg-white/[0.04] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.32em] text-og-cyan">
                 <Crosshair className="h-3.5 w-3.5" /> Snipe feed · newest heat first
               </div>
@@ -720,7 +720,7 @@ export const SnipeFeed = ({ onSelect }: Props) => {
 
             <div className="grid gap-2 p-3">
               {isFetching && launches.length === 0 ? (
-                <div className="grid min-h-[280px] place-items-center border border-dashed border-og-grid text-og-cyan">
+                <div className="grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-white/12 text-og-cyan">
                   <div className="text-center font-mono text-[10px] uppercase tracking-[0.3em]">
                     <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin" /> Loading launch radar
                   </div>
@@ -762,7 +762,7 @@ export const SnipeFeed = ({ onSelect }: Props) => {
 const SummaryCard = ({ Icon, label, value, detail, tone }: { Icon: LucideIcon; label: string; value: string; detail: string; tone: "cyan" | "lime" | "gold" | "blood" }) => {
   const toneClass = tone === "lime" ? "text-og-lime border-og-lime/45 bg-og-lime/10" : tone === "gold" ? "text-og-gold border-og-gold/45 bg-og-gold/10" : tone === "blood" ? "text-og-blood border-og-blood/45 bg-og-blood/10" : "text-og-cyan border-og-cyan/45 bg-og-cyan/10";
   return (
-    <div className={cn("border bg-og-ink/78 p-4", toneClass)}>
+    <div className={cn("rounded-2xl border bg-white/[0.04] p-4 backdrop-blur-xl", toneClass)}>
       <div className="flex items-center justify-between gap-2">
         <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{label}</div>
         <Icon className="h-4 w-4" />
@@ -804,8 +804,8 @@ const LaunchRow = ({
   return (
     <article
       className={cn(
-        "group relative overflow-hidden border bg-background/35 p-3 transition hover:border-og-cyan/70 hover:bg-og-cyan/5",
-        selected ? "border-og-cyan/80 shadow-[inset_4px_0_0_hsl(var(--og-cyan))]" : "border-og-grid"
+        "group relative overflow-hidden rounded-2xl border bg-white/[0.03] p-3.5 backdrop-blur-xl transition hover:border-og-cyan/50 hover:bg-white/[0.05]",
+        selected ? "border-og-cyan/70 shadow-[inset_4px_0_0_hsl(var(--og-cyan))]" : "border-white/10"
       )}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-og-cyan/70 to-transparent opacity-0 transition group-hover:opacity-100" />
@@ -813,7 +813,7 @@ const LaunchRow = ({
       <div className="pointer-events-none relative z-10 grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden border border-og-grid bg-og-ink text-og-cyan">
+            <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.05] text-og-cyan">
               {launch.icon ? <img src={launch.icon} alt="" className="h-full w-full object-cover" /> : <Sparkles className="h-5 w-5" />}
             </div>
             <div className="min-w-0">
@@ -848,9 +848,9 @@ const LaunchRow = ({
         </div>
       </div>
 
-      <div className="pointer-events-none relative z-10 mt-3 flex flex-wrap items-center gap-2 border-t border-og-grid/80 pt-3">
+      <div className="pointer-events-none relative z-10 mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
         {launch.riskFlags.slice(0, 4).map((flag) => (
-          <span key={flag} className="border border-og-grid bg-og-ink/75 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+          <span key={flag} className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
             {flag}
           </span>
         ))}
@@ -858,17 +858,17 @@ const LaunchRow = ({
           <button type="button" onClick={(event) => { event.stopPropagation(); onCopy(); }} className="inline-flex min-h-9 items-center gap-1.5 border border-og-gold/55 bg-og-gold/10 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-og-gold transition hover:bg-og-gold hover:text-og-ink">
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {copied ? "copied" : "copy CA"}
           </button>
-          <button type="button" onClick={(event) => { event.stopPropagation(); onWatchDev(); }} disabled={!launch.devWallet} className="inline-flex min-h-9 items-center gap-1 border border-og-grid px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-foreground/70 transition enabled:hover:border-og-lime enabled:hover:text-og-lime disabled:opacity-40">
+          <button type="button" onClick={(event) => { event.stopPropagation(); onWatchDev(); }} disabled={!launch.devWallet} className="inline-flex min-h-9 items-center gap-1 border border-white/10 px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-foreground/70 transition enabled:hover:border-og-lime enabled:hover:text-og-lime disabled:opacity-40">
             <UserSearch className="h-3 w-3" /> {watchedDev ? "unwatch dev" : "watch dev"}
           </button>
-          <button type="button" onClick={(event) => { event.stopPropagation(); onWatchMint(); }} className="inline-flex min-h-9 items-center gap-1 border border-og-grid px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-foreground/70 transition hover:border-og-lime hover:text-og-lime">
+          <button type="button" onClick={(event) => { event.stopPropagation(); onWatchMint(); }} className="inline-flex min-h-9 items-center gap-1 border border-white/10 px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-foreground/70 transition hover:border-og-lime hover:text-og-lime">
             <Bell className="h-3 w-3" /> {watchedMint ? "unwatch" : "watch"}
           </button>
           <CoinDetailDialog token={detailToken} onOpenScanner={() => onScan()} actionLabel="Scan" className="min-h-9 px-3 py-2" />
           <button type="button" onClick={(event) => { event.stopPropagation(); onScan(); }} className="inline-flex min-h-9 items-center gap-1 border border-og-cyan/60 px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-og-cyan transition hover:bg-og-cyan hover:text-og-ink">
             <Target className="h-3 w-3" /> scan
           </button>
-          <a href={launch.dexUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex min-h-9 items-center gap-1 border border-og-grid px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-foreground/70 transition hover:border-og-cyan hover:text-og-cyan">
+          <a href={launch.dexUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex min-h-9 items-center gap-1 border border-white/10 px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-foreground/70 transition hover:border-og-cyan hover:text-og-cyan">
             chart <ExternalLink className="h-3 w-3" />
           </a>
         </div>
@@ -878,7 +878,7 @@ const LaunchRow = ({
 };
 
 const Metric = ({ label, value, className }: { label: string; value: string; className?: string }) => (
-  <div className="border border-og-grid bg-og-ink/80 px-2 py-1.5">
+  <div className="border border-white/10 bg-og-ink/80 px-2 py-1.5">
     <div className="font-mono text-[8px] uppercase tracking-[0.24em] text-muted-foreground">{label}</div>
     <div className={cn("mt-1 truncate font-mono text-[11px] font-bold", className)}>{value}</div>
   </div>
@@ -886,7 +886,7 @@ const Metric = ({ label, value, className }: { label: string; value: string; cla
 
 const LaunchAnalyzer = ({ launch, watched, onCopy, onScan, onWatchMint }: { launch: SnipeLaunch | null; watched: boolean; onCopy: (mint: string) => void; onScan: (mint: string) => void; onWatchMint: (mint: string) => void }) => {
   if (!launch) {
-    return <div className="border border-og-grid bg-og-ink/78 p-4 text-sm text-muted-foreground">Waiting for launch data…</div>;
+    return <div className="border border-white/10 bg-og-ink/78 p-4 text-sm text-muted-foreground">Waiting for launch data…</div>;
   }
   const risk = riskStyles(launch.riskLevel);
   const RiskIcon = risk.Icon;
@@ -903,7 +903,7 @@ const LaunchAnalyzer = ({ launch, watched, onCopy, onScan, onWatchMint }: { laun
       </div>
 
       <div className="flex items-start gap-3">
-        <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden border border-og-grid bg-background text-og-cyan">
+        <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden border border-white/10 bg-background text-og-cyan">
           {launch.icon ? <img src={launch.icon} alt="" className="h-full w-full object-cover" /> : <Zap className="h-5 w-5" />}
         </div>
         <div className="min-w-0">
@@ -940,7 +940,7 @@ const LaunchAnalyzer = ({ launch, watched, onCopy, onScan, onWatchMint }: { laun
           <Target className="h-3.5 w-3.5" /> scan token
         </button>
         <CoinDetailDialog token={detailToken} onOpenScanner={() => onScan(launch.mint)} actionLabel="Scan" className="px-3 py-2" />
-        <button type="button" onClick={() => onWatchMint(launch.mint)} className="inline-flex items-center justify-center gap-1 border border-og-grid px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-foreground/70 transition hover:border-og-lime hover:text-og-lime">
+        <button type="button" onClick={() => onWatchMint(launch.mint)} className="inline-flex items-center justify-center gap-1 border border-white/10 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-foreground/70 transition hover:border-og-lime hover:text-og-lime">
           <Bell className="h-3.5 w-3.5" /> {watched ? "watching" : "watch"}
         </button>
         <button type="button" onClick={() => onCopy(launch.mint)} className="inline-flex items-center justify-center gap-1 border border-og-gold/55 bg-og-gold/10 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-og-gold transition hover:bg-og-gold hover:text-og-ink">
@@ -952,7 +952,7 @@ const LaunchAnalyzer = ({ launch, watched, onCopy, onScan, onWatchMint }: { laun
 };
 
 const SignalLine = ({ label, ok, good, bad }: { label: string; ok: boolean; good: string; bad: string }) => (
-  <div className="flex items-center justify-between border border-og-grid bg-background/35 px-3 py-2 font-mono text-[10px] uppercase tracking-widest">
+  <div className="flex items-center justify-between border border-white/10 bg-background/35 px-3 py-2 font-mono text-[10px] uppercase tracking-widest">
     <span className="text-muted-foreground">{label}</span>
     <span className={ok ? "text-og-lime" : "text-og-blood"}>{ok ? good : bad}</span>
   </div>
@@ -966,14 +966,14 @@ const DevIntelPanel = ({ dev, launches, watched, onWatch, onSelectDev }: { dev: 
         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.28em] text-og-lime">
           <UserSearch className="h-3.5 w-3.5" /> Dev wallet intel
         </div>
-        <button type="button" onClick={() => onWatch(dev?.wallet ?? null)} disabled={!dev?.wallet} className="inline-flex items-center gap-1 border border-og-grid px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-foreground/70 transition enabled:hover:border-og-lime enabled:hover:text-og-lime disabled:opacity-40">
+        <button type="button" onClick={() => onWatch(dev?.wallet ?? null)} disabled={!dev?.wallet} className="inline-flex items-center gap-1 border border-white/10 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-foreground/70 transition enabled:hover:border-og-lime enabled:hover:text-og-lime disabled:opacity-40">
           <Star className="h-3 w-3" /> {watched ? "tracked" : "track"}
         </button>
       </div>
 
       {dev?.wallet ? (
         <>
-          <div className="border border-og-grid bg-background/35 p-3">
+          <div className="border border-white/10 bg-background/35 p-3">
             <div className="flex items-center gap-2 text-og-lime">
               <Wallet className="h-4 w-4" />
               <span className="font-mono text-xs font-bold">{shortAddr(dev.wallet, 7)}</span>
@@ -991,7 +991,7 @@ const DevIntelPanel = ({ dev, launches, watched, onWatch, onSelectDev }: { dev: 
 
           <div className="mt-3 grid gap-2">
             {devLaunches.map((launch) => (
-              <button key={launch.mint} type="button" onClick={() => onSelectDev(launch.devWallet)} className="flex items-center justify-between gap-2 border border-og-grid bg-background/35 px-3 py-2 text-left transition hover:border-og-lime/60">
+              <button key={launch.mint} type="button" onClick={() => onSelectDev(launch.devWallet)} className="flex items-center justify-between gap-2 border border-white/10 bg-background/35 px-3 py-2 text-left transition hover:border-og-lime/60">
                 <span className="min-w-0">
                   <span className="block truncate font-mono text-[11px] font-bold text-foreground">${launch.symbol}</span>
                   <span className="block font-mono text-[9px] uppercase tracking-widest text-muted-foreground">{fmtUsd(launch.liquidity)} · MIGR {shortDate(launch.migrationCreatedAt)} · DEX {tokenDexPaidLabel(launch)}</span>
@@ -1002,7 +1002,7 @@ const DevIntelPanel = ({ dev, launches, watched, onWatch, onSelectDev }: { dev: 
           </div>
         </>
       ) : (
-        <div className="border border-dashed border-og-grid p-4 text-xs leading-relaxed text-muted-foreground">
+        <div className="border border-dashed border-white/10 p-4 text-xs leading-relaxed text-muted-foreground">
           Select a launch with creator data. The app estimates the creator wallet from early mint / pool transactions and groups repeat launches.
         </div>
       )}
@@ -1023,7 +1023,7 @@ const AlertsPanel = ({ alerts, watchedDevs, watchedMints, onSelect }: { alerts: 
       {alerts.length ? alerts.map((launch) => {
         const isDanger = launch.riskLevel === "danger";
         return (
-          <button key={`${launch.mint}-alert`} type="button" onClick={() => onSelect(launch)} className="flex items-center gap-2 border border-og-grid bg-background/35 px-3 py-2 text-left transition hover:border-og-gold/70">
+          <button key={`${launch.mint}-alert`} type="button" onClick={() => onSelect(launch)} className="flex items-center gap-2 border border-white/10 bg-background/35 px-3 py-2 text-left transition hover:border-og-gold/70">
             {isDanger ? <AlertTriangle className="h-4 w-4 shrink-0 text-og-blood" /> : <TrendingUp className="h-4 w-4 shrink-0 text-og-lime" />}
             <span className="min-w-0 flex-1">
               <span className="block truncate font-mono text-[11px] font-bold uppercase text-foreground">${launch.symbol} · {isDanger ? "risk warning" : "hot launch"}</span>
@@ -1032,7 +1032,7 @@ const AlertsPanel = ({ alerts, watchedDevs, watchedMints, onSelect }: { alerts: 
           </button>
         );
       }) : (
-        <div className="border border-dashed border-og-grid p-4 text-xs leading-relaxed text-muted-foreground">
+        <div className="border border-dashed border-white/10 p-4 text-xs leading-relaxed text-muted-foreground">
           Track dev wallets or coins to create a return-worthy alert center. Hot 78+ scores and danger launches also surface here automatically.
         </div>
       )}

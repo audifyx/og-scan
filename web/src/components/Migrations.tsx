@@ -259,7 +259,7 @@ export const Migrations = ({ onSelect }: Props) => {
           {isFetching && <Loader2 className="h-4 w-4 animate-spin text-og-lime" />}
           <button
             onClick={() => refetch()}
-            className="border border-og-grid bg-og-ink px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-foreground/70 hover:border-og-lime hover:text-og-lime"
+            className="rounded-full border border-white/12 bg-white/[0.04] px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-foreground/70 hover:border-og-lime hover:text-og-lime"
           >
             REFRESH
           </button>
@@ -277,7 +277,7 @@ export const Migrations = ({ onSelect }: Props) => {
               className={`group relative overflow-hidden border p-3 text-left transition ${
                 active
                   ? "border-og-lime bg-og-lime/10"
-                  : "border-og-grid bg-og-ink/70 hover:border-og-lime/60"
+                  : "border-white/10 bg-white/[0.04] hover:border-og-lime/60"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -298,7 +298,7 @@ export const Migrations = ({ onSelect }: Props) => {
       </div>
 
       {/* Stats strip */}
-      <div className="mb-4 grid grid-cols-2 gap-2 border border-og-grid bg-og-ink/70 p-3 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl sm:grid-cols-4">
         <Stat label="MATCHES" value={String(stats.total)} icon={<Activity className="h-3 w-3" />} />
         <Stat
           label="NEWEST"
@@ -310,7 +310,7 @@ export const Migrations = ({ onSelect }: Props) => {
       </div>
 
       {/* Filters */}
-      <div className="mb-4 border border-og-grid bg-og-ink/70 p-3">
+      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.3em] text-og-lime">
             <Filter className="h-3 w-3" /> filters
@@ -323,7 +323,7 @@ export const Migrations = ({ onSelect }: Props) => {
           </div>
           <button
             onClick={() => setQ(DEFAULT_Q)}
-            className="ml-auto border border-og-grid px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-foreground/60 transition hover:border-og-lime hover:text-og-lime"
+            className="ml-auto border border-white/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-foreground/60 transition hover:border-og-lime hover:text-og-lime"
           >
             RESET
           </button>
@@ -344,8 +344,8 @@ export const Migrations = ({ onSelect }: Props) => {
       </div>
 
       {/* List */}
-      <div className="overflow-hidden border border-og-grid bg-og-ink/70">
-        <div className="hidden grid-cols-12 gap-2 border-b border-og-grid px-3 py-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground md:grid">
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl">
+        <div className="hidden grid-cols-12 gap-2 border-b border-white/10 px-3 py-2 text-[10px] uppercase tracking-[0.3em] text-muted-foreground md:grid">
           <div className="col-span-4">PAIR</div>
           <div className="col-span-1 text-right">PRICE</div>
           <div className="col-span-1 text-right">24H Δ</div>
@@ -384,7 +384,7 @@ const PresetButton = ({
     className={`border px-2 py-1 font-mono text-[10px] uppercase tracking-widest transition ${
       active
         ? "border-og-lime bg-og-lime/10 text-og-lime"
-        : "border-og-grid text-foreground/60 hover:border-og-lime hover:text-og-lime"
+        : "border-white/10 text-foreground/60 hover:border-og-lime hover:text-og-lime"
     }`}
   >
     {label}
@@ -400,7 +400,7 @@ const Stat = ({
   value: string;
   icon: React.ReactNode;
 }) => (
-  <div className="flex items-center gap-2 border border-og-grid/60 bg-og-ink/40 px-2 py-1.5">
+  <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
     <span className="text-og-lime">{icon}</span>
     <div className="min-w-0">
       <div className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground">{label}</div>
@@ -424,7 +424,7 @@ const Range = ({
   max?: number;
   suffix?: string;
 }) => (
-  <label className="flex items-center justify-between gap-1.5 border border-og-grid bg-og-ink px-2 py-1.5 font-mono text-[10px] uppercase tracking-widest">
+  <label className="flex items-center justify-between gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 font-mono text-[10px] uppercase tracking-widest">
     <span className="text-muted-foreground">{label}</span>
     <input
       type="number"
@@ -454,9 +454,9 @@ const PairRow = ({ p, token, onSelect }: { p: DSPair; token?: JupTokenInfo; onSe
   const dexPaid = token ? tokenDexPaidLabel(token) : "—";
 
   return (
-    <div className="border-b border-og-grid/50 p-3 transition hover:bg-og-lime/5 last:border-b-0 md:grid md:grid-cols-12 md:items-center md:gap-2 md:px-3 md:py-2.5">
+    <div className="border-b border-white/10/50 p-3 transition hover:bg-og-lime/5 last:border-b-0 md:grid md:grid-cols-12 md:items-center md:gap-2 md:px-3 md:py-2.5">
       <button onClick={onSelect} className="flex min-w-0 items-center gap-3 text-left md:col-span-4 md:gap-2">
-        <div className="relative h-11 w-11 shrink-0 overflow-hidden border border-og-grid bg-og-ink md:h-8 md:w-8">
+        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.05] md:h-8 md:w-8">
           {p.info?.imageUrl ? (
             <img src={p.info.imageUrl} alt={p.baseToken.symbol} className="h-full w-full object-cover" loading="lazy" />
           ) : (
@@ -485,31 +485,31 @@ const PairRow = ({ p, token, onSelect }: { p: DSPair; token?: JupTokenInfo; onSe
       </button>
 
       <div className="mt-3 grid grid-cols-2 gap-2 md:contents">
-        <div className="border border-og-grid/60 bg-og-ink/55 p-2 text-left font-mono md:col-span-1 md:border-0 md:bg-transparent md:p-0 md:text-right">
+        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2 text-left font-mono md:col-span-1 md:border-0 md:bg-transparent md:p-0 md:text-right">
           <div className="mb-1 text-[8px] uppercase tracking-[0.22em] text-muted-foreground md:hidden">Price</div>
           <div className="whitespace-nowrap text-xs text-foreground">{p.priceUsd ? fmtUsd(Number(p.priceUsd)) : "—"}</div>
         </div>
-        <div className="border border-og-grid/60 bg-og-ink/55 p-2 text-left font-mono md:col-span-1 md:border-0 md:bg-transparent md:p-0 md:text-right">
+        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2 text-left font-mono md:col-span-1 md:border-0 md:bg-transparent md:p-0 md:text-right">
           <div className="mb-1 text-[8px] uppercase tracking-[0.22em] text-muted-foreground md:hidden">24H Δ</div>
           <div className={`whitespace-nowrap text-xs ${up ? "text-og-lime" : "text-og-blood"}`}>{fmtPct(ch)}</div>
         </div>
-        <div className="border border-og-grid/60 bg-og-ink/55 p-2 text-left font-mono text-[10px] uppercase tracking-widest text-muted-foreground md:col-span-2 md:border-0 md:bg-transparent md:p-0 md:text-right">
+        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2 text-left font-mono text-[10px] uppercase tracking-widest text-muted-foreground md:col-span-2 md:border-0 md:bg-transparent md:p-0 md:text-right">
           <div className="mb-1 text-[8px] tracking-[0.22em] md:hidden">Liq / Vol</div>
           <div className="whitespace-nowrap text-og-cyan">L {fmtUsd(p.liquidity?.usd)}</div>
           <div className="whitespace-nowrap">V {fmtUsd(p.volume?.h24)}</div>
         </div>
-        <div className="border border-og-grid/60 bg-og-ink/55 p-2 text-left md:col-span-2 md:border-0 md:bg-transparent md:p-0 md:text-right">
+        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2 text-left md:col-span-2 md:border-0 md:bg-transparent md:p-0 md:text-right">
           <div className="mb-1 font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground md:hidden">Buys / Sells</div>
           <div className="font-mono text-[10px]">
             <span className="text-og-lime">{fmtNum(buys)}</span>
             <span className="text-muted-foreground"> / </span>
             <span className="text-og-blood">{fmtNum(sells)}</span>
           </div>
-          <div className="mt-1 h-1 w-full overflow-hidden border border-og-grid md:ml-auto md:w-20">
+          <div className="mt-1 h-1 w-full overflow-hidden border border-white/10 md:ml-auto md:w-20">
             <div className="h-full bg-og-lime" style={meterWidth} />
           </div>
         </div>
-        <div className="col-span-2 flex items-center justify-between gap-2 border border-og-grid/60 bg-og-ink/55 p-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground md:col-span-2 md:justify-end md:border-0 md:bg-transparent md:p-0">
+        <div className="col-span-2 flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground md:col-span-2 md:justify-end md:border-0 md:bg-transparent md:p-0">
           <div className="text-left md:text-right">
             <div className="text-foreground">{created ? timeAgo(created) : "—"}</div>
             <div className="max-w-[180px] truncate text-og-lime md:max-w-[120px]">{p.dexId}</div>
@@ -523,7 +523,7 @@ const PairRow = ({ p, token, onSelect }: { p: DSPair; token?: JupTokenInfo; onSe
             href={p.url}
             target="_blank"
             rel="noreferrer"
-            className="shrink-0 border border-og-grid p-2 hover:border-og-lime hover:text-og-lime md:p-1"
+            className="shrink-0 border border-white/10 p-2 hover:border-og-lime hover:text-og-lime md:p-1"
             title="Open on DexScreener"
           >
             <ExternalLink className="h-3.5 w-3.5 md:h-3 md:w-3" />
