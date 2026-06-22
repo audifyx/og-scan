@@ -3,171 +3,210 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>OG Scan — On-chain intelligence for Solana</title>
-<meta name="description" content="OG Scan reads the Solana chain in real time: token scanners with the OG Score, whale and migration tracking, AI analysis, and trading — so you find the OGs and avoid the rugs."/>
-<meta property="og:title" content="OG Scan — Read the chain. Find the OGs."/>
-<meta property="og:description" content="Real-time Solana token intelligence: OG Score scanner, whale + pump.fun migration tracking, and an AI analyst."/>
+<title>OG Scan — One platform. Everything crypto.</title>
+<meta name="description" content="OG Scan is on-chain intelligence and a Social-Fi ecosystem for Solana and 16 chains: OG Score token scanner, wallet intelligence, early-launch detection, live news, AI analyst, PDF reports, webhook alerts and custom bots."/>
+<meta property="og:title" content="OG Scan — One platform. Everything crypto."/>
+<meta property="og:description" content="Scan tokens, analyze wallets, detect launches early, and let AI dissect any contract — across 16 chains."/>
 <style>
-:root{--bg:#05080a;--em:#10b981;--cy:#06b6d4;--ink:#e7fff6;--mut:#8ea7a0}
+:root{--bg:#04060a;--em:#10b981;--cy:#22d3ee;--pu:#8b5cf6;--ink:#eafff8;--mut:#93a7b6;--glass:rgba(255,255,255,.055);--stroke:rgba(255,255,255,.12)}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+html{scroll-behavior:smooth}
+body{background:#04060a;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
-#bg{position:fixed;inset:0;z-index:0}
-.wrap{position:relative;z-index:1}
-.veil{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(110% 80% at 50% -10%,rgba(6,182,212,.10),transparent 60%),radial-gradient(90% 70% at 50% 110%,rgba(16,185,129,.12),transparent 60%)}
+#space{position:fixed;inset:0;z-index:0}
+.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;background:
+ radial-gradient(60% 50% at 18% 12%,rgba(139,92,246,.22),transparent 60%),
+ radial-gradient(55% 45% at 85% 18%,rgba(34,211,238,.18),transparent 60%),
+ radial-gradient(70% 60% at 50% 108%,rgba(16,185,129,.20),transparent 60%);
+ filter:blur(10px);animation:drift 22s ease-in-out infinite alternate}
+@keyframes drift{0%{transform:translate3d(0,0,0) scale(1)}100%{transform:translate3d(0,-24px,0) scale(1.06)}}
+.wrap{position:relative;z-index:2}
+/* glass primitives */
+.glass{background:var(--glass);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);border:1px solid var(--stroke);box-shadow:0 10px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.12)}
 /* nav */
-nav{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:18px clamp(16px,4vw,48px);backdrop-filter:blur(8px)}
-.brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:.5px}
-.brand img{width:34px;height:34px;border-radius:9px;box-shadow:0 0 24px rgba(16,185,129,.45)}
-.brand span{font-size:18px;background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
-.cta{padding:10px 18px;border-radius:999px;font-weight:700;font-size:14px;background:linear-gradient(90deg,var(--em),var(--cy));color:#03110c;box-shadow:0 8px 30px rgba(16,185,129,.35);transition:transform .2s}
-.cta:hover{transform:translateY(-2px)}
+nav{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:10;width:min(1080px,92vw);display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-radius:18px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.5px}
+.brand img{width:32px;height:32px;border-radius:9px;box-shadow:0 0 22px rgba(16,185,129,.5)}
+.brand span{font-size:17px;background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
+.navcta{padding:9px 16px;border-radius:12px;font-weight:700;font-size:13.5px;background:linear-gradient(90deg,var(--em),var(--cy));color:#03110c;transition:transform .2s}
+.navcta:active{transform:scale(.96)}
 /* hero */
-.hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:100px 20px 60px}
-.badge{display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--em);border:1px solid rgba(16,185,129,.3);padding:7px 14px;border-radius:999px;background:rgba(16,185,129,.06);margin-bottom:26px;opacity:0;transform:translateY(14px);animation:rise .8s .1s forwards}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--em);box-shadow:0 0 10px var(--em);animation:pulse 1.6s infinite}
-h1{font-size:clamp(40px,8vw,92px);line-height:1.02;font-weight:900;letter-spacing:-2px;opacity:0;transform:translateY(20px);animation:rise .9s .25s forwards}
-h1 .g{background:linear-gradient(90deg,var(--em),var(--cy) 70%);-webkit-background-clip:text;background-clip:text;color:transparent}
-.sub{max-width:680px;margin:24px auto 0;font-size:clamp(16px,2.4vw,21px);color:var(--mut);line-height:1.55;opacity:0;transform:translateY(20px);animation:rise .9s .45s forwards}
-.row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:38px;opacity:0;transform:translateY(20px);animation:rise .9s .6s forwards}
-.btn{padding:15px 30px;border-radius:14px;font-weight:800;font-size:16px}
-.btn.p{background:linear-gradient(90deg,var(--em),var(--cy));color:#03110c;box-shadow:0 12px 40px rgba(6,182,212,.35)}
-.btn.s{border:1px solid rgba(255,255,255,.16);color:var(--ink);background:rgba(255,255,255,.03)}
-.stats{display:flex;gap:clamp(20px,5vw,64px);margin-top:60px;flex-wrap:wrap;justify-content:center;opacity:0;animation:rise 1s .8s forwards}
-.stat .n{font-size:clamp(22px,4vw,34px);font-weight:900;background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
-.stat .l{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--mut);margin-top:4px}
-.scroll{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:2px;color:var(--mut);text-transform:uppercase;opacity:.7;animation:bob 2s infinite}
+.hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 20px 70px}
+.pill{display:inline-flex;align-items:center;gap:9px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#bfeee2;padding:8px 16px;border-radius:999px;margin-bottom:28px;opacity:0;animation:rise .8s .1s forwards}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--em);box-shadow:0 0 12px var(--em);animation:pulse 1.6s infinite}
+h1{font-size:clamp(42px,8.5vw,104px);line-height:.98;font-weight:900;letter-spacing:-2.5px;opacity:0;animation:rise .9s .22s forwards;text-shadow:0 0 60px rgba(34,211,238,.18)}
+h1 .g{background:linear-gradient(100deg,var(--em),var(--cy) 55%,var(--pu));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{max-width:660px;margin:24px auto 0;font-size:clamp(16px,2.4vw,21px);color:var(--mut);line-height:1.55;opacity:0;animation:rise .9s .42s forwards}
+.row{display:flex;gap:13px;flex-wrap:wrap;justify-content:center;margin-top:36px;opacity:0;animation:rise .9s .58s forwards}
+.btn{padding:15px 30px;border-radius:14px;font-weight:800;font-size:16px;transition:transform .2s,box-shadow .3s}
+.btn.p{background:linear-gradient(90deg,var(--em),var(--cy));color:#03110c;box-shadow:0 14px 44px rgba(34,211,238,.35)}
+.btn.p:hover{transform:translateY(-3px);box-shadow:0 18px 54px rgba(34,211,238,.5)}
+.btn.s{color:var(--ink)}
+.chips{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;margin-top:30px;opacity:0;animation:rise 1s .74s forwards}
+.chip{font-size:12px;color:#bcd;padding:7px 13px;border-radius:999px;border:1px solid var(--stroke);background:rgba(255,255,255,.04)}
+.scrollcue{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:2px;color:var(--mut);text-transform:uppercase;opacity:.7;animation:bob 2s infinite}
 /* sections */
-section.feat{max-width:1140px;margin:0 auto;padding:clamp(60px,10vw,120px) 20px}
-.eyebrow{text-align:center;color:var(--cy);font-size:12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:14px}
+section{max-width:1100px;margin:0 auto;padding:clamp(54px,9vw,110px) 20px}
+.eyebrow{text-align:center;color:var(--cy);font-size:12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:13px}
 .h2{text-align:center;font-size:clamp(28px,5vw,46px);font-weight:900;letter-spacing:-1px;margin-bottom:14px}
-.lead{text-align:center;color:var(--mut);max-width:640px;margin:0 auto 56px;font-size:clamp(15px,2vw,18px);line-height:1.6}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
-.card{border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));border-radius:18px;padding:26px;transition:transform .3s,border-color .3s;opacity:0;transform:translateY(28px)}
+.lead{text-align:center;color:var(--mut);max-width:640px;margin:0 auto 50px;font-size:clamp(15px,2vw,18px);line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:16px}
+.card{border-radius:20px;padding:26px;transition:transform .5s cubic-bezier(.2,.7,.2,1),border-color .3s;opacity:0;transform:translateY(30px);transform-style:preserve-3d;will-change:transform}
 .card.in{opacity:1;transform:none}
-.card:hover{transform:translateY(-6px);border-color:rgba(16,185,129,.4)}
-.ic{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.25);margin-bottom:16px}
-.card h3{font-size:19px;margin-bottom:8px}
+.card:hover{border-color:rgba(34,211,238,.45)}
+.ic{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;background:linear-gradient(135deg,rgba(16,185,129,.22),rgba(34,211,238,.12));border:1px solid rgba(34,211,238,.25);margin-bottom:15px}
+.card h3{font-size:18.5px;margin-bottom:7px}
 .card p{color:var(--mut);font-size:14.5px;line-height:1.6}
 /* score band */
-.band{max-width:1140px;margin:0 auto;padding:0 20px}
-.bandin{border:1px solid rgba(6,182,212,.25);background:linear-gradient(120deg,rgba(16,185,129,.08),rgba(6,182,212,.05));border-radius:26px;padding:clamp(32px,6vw,64px);display:flex;gap:40px;align-items:center;flex-wrap:wrap;justify-content:center;text-align:center}
-.ring{--p:92;width:170px;height:170px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--em) calc(var(--p)*1%),rgba(255,255,255,.07) 0);position:relative;flex:0 0 auto}
-.ring::before{content:"";position:absolute;inset:14px;border-radius:50%;background:#06100d}
-.ring b{position:relative;font-size:44px;font-weight:900;background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
-.ring small{position:relative;display:block;text-align:center;color:var(--mut);font-size:11px;letter-spacing:2px;margin-top:2px}
-.bandtxt{max-width:480px;text-align:left}
+.bandin{border-radius:26px;padding:clamp(30px,6vw,60px);display:flex;gap:42px;align-items:center;flex-wrap:wrap;justify-content:center;text-align:center}
+.ring{--p:94;width:172px;height:172px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(from -90deg,var(--em),var(--cy) calc(var(--p)*1%),rgba(255,255,255,.06) 0);position:relative;flex:0 0 auto;animation:spinSlow 18s linear infinite}
+.ring::before{content:"";position:absolute;inset:13px;border-radius:50%;background:rgba(6,12,16,.92);backdrop-filter:blur(6px)}
+.ring .v{position:relative;text-align:center}
+.ring b{font-size:46px;font-weight:900;background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
+.ring small{display:block;color:var(--mut);font-size:11px;letter-spacing:2px;margin-top:2px}
+.bandtxt{max-width:470px;text-align:left}
 .bandtxt h3{font-size:clamp(22px,3.6vw,32px);font-weight:900;margin-bottom:10px}
 .bandtxt p{color:var(--mut);line-height:1.6}
-/* cta footer */
-.foot{text-align:center;padding:clamp(70px,11vw,130px) 20px 90px}
-.foot h2{font-size:clamp(30px,6vw,58px);font-weight:900;letter-spacing:-1px;margin-bottom:18px}
+/* foot */
+.foot{text-align:center;padding:clamp(70px,11vw,130px) 20px 100px;max-width:760px;margin:0 auto}
+.footcard{border-radius:26px;padding:clamp(34px,6vw,56px)}
+.foot h2{font-size:clamp(30px,6vw,56px);font-weight:900;letter-spacing:-1px;margin-bottom:16px}
 .foot .g{background:linear-gradient(90deg,var(--em),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
-.foot p{color:var(--mut);margin-bottom:32px;font-size:17px}
-.tiny{color:#52635e;font-size:12px;margin-top:60px}
+.foot p{color:var(--mut);margin-bottom:30px;font-size:17px}
+.tiny{color:#56707f;font-size:12px;margin-top:46px}
 @keyframes rise{to{opacity:1;transform:none}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
+@keyframes spinSlow{to{transform:rotate(360deg)}}
+.float{animation:floaty 7s ease-in-out infinite}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
 <body>
-<canvas id="bg"></canvas>
-<div class="veil"></div>
+<canvas id="space"></canvas>
+<div class="aurora"></div>
 <div class="wrap">
-  <nav>
+  <nav class="glass">
     <div class="brand"><img src="/ogscan-logo.png" alt="OG Scan"/><span>OG SCAN</span></div>
-    <a class="cta" href="/app">Launch App →</a>
+    <a class="navcta" href="/app">Launch App →</a>
   </nav>
 
   <header class="hero">
-    <div class="badge"><span class="dot"></span> Live on Solana</div>
-    <h1>Read the chain.<br/><span class="g">Find the OGs.</span></h1>
-    <p class="sub">OG Scan is real-time on-chain intelligence for Solana — a token scanner with the <b style="color:#cfeee6">OG Score</b>, whale &amp; pump.fun migration tracking, and an AI analyst that dissects any token before you ape.</p>
+    <div class="pill glass"><span class="dot"></span> One platform. Everything crypto.</div>
+    <h1>See the chain<br/><span class="g">before it moves.</span></h1>
+    <p class="sub">OG Scan is on-chain intelligence and a Social-Fi ecosystem for Solana and 16 chains — paste a contract, get the <b style="color:#d6fff3">OG Score</b>, full token &amp; wallet analysis, early-launch detection and an AI analyst, all in seconds.</p>
     <div class="row">
-      <a class="btn p" href="/app">Start Scanning</a>
-      <a class="btn s" href="#how">See how it works</a>
+      <a class="btn p" href="/auth?mode=signup">Start Scanning</a>
+      <a class="btn s glass" href="#features">Explore features</a>
     </div>
-    <div class="stats">
-      <div class="stat"><div class="n">&lt;2s</div><div class="l">Token scan</div></div>
-      <div class="stat"><div class="n">100</div><div class="l">OG Score scale</div></div>
-      <div class="stat"><div class="n">24/7</div><div class="l">Whale + migration feed</div></div>
-      <div class="stat"><div class="n">AI</div><div class="l">On-chain analyst</div></div>
+    <div class="chips">
+      <span class="chip">⚡ Instant CA lookups</span>
+      <span class="chip">🔗 16 chains</span>
+      <span class="chip">🧠 AI analyst</span>
+      <span class="chip">📄 PDF reports</span>
+      <span class="chip">🤖 Telegram bot</span>
     </div>
-    <div class="scroll">scroll ↓</div>
+    <div class="scrollcue">scroll ↓</div>
   </header>
 
-  <section class="feat" id="how">
+  <section id="features">
     <div class="eyebrow">What OG Scan does</div>
-    <div class="h2">Everything you need to trade Solana with an edge</div>
-    <p class="lead">One suite for discovery, due-diligence and execution — built for degens who want signal, not noise.</p>
-    <div class="grid">
-      <div class="card"><div class="ic">🛰️</div><h3>OG Score Scanner</h3><p>Paste any mint or ticker and get a 0–100 composite score from liquidity, holders, concentration, mint authority and momentum — instantly.</p></div>
-      <div class="card"><div class="ic">🐋</div><h3>Whale &amp; Wallet Intel</h3><p>Track smart-money wallets, holder concentration and live buy/sell pressure so you see the moves before the candle.</p></div>
-      <div class="card"><div class="ic">🚀</div><h3>Migration Radar</h3><p>Real-time pump.fun graduations and new pools the moment they bond — catch fresh runners early.</p></div>
-      <div class="card"><div class="ic">🧠</div><h3>Grim — AI Analyst</h3><p>The Chain Reaper reads the data and tells you straight: risks, red flags and the verdict, in plain language.</p></div>
-      <div class="card"><div class="ic">🛡️</div><h3>Rug &amp; Safety Checks</h3><p>Mint/freeze authority, LP burn, metadata mutability and concentration risk flagged automatically on every scan.</p></div>
-      <div class="card"><div class="ic">👥</div><h3>Communities &amp; Spaces</h3><p>Live token communities, audio spaces and feeds — plus your own Telegram/Discord/X bot, built right on the platform.</p></div>
+    <div class="h2">Discovery, due-diligence and execution — in one hub</div>
+    <p class="lead">Rebuilt from the ground up for speed. Stop juggling ten tabs; OG Scan turns raw on-chain data into decisions.</p>
+    <div class="grid" id="cards">
+      <div class="card glass"><div class="ic">🛰️</div><h3>OG Scanner &amp; OG Score</h3><p>Scan any token for a composite score from liquidity, holders, concentration, authorities and momentum. Generate full downloadable PDF reports you can share instantly.</p></div>
+      <div class="card glass"><div class="ic">📡</div><h3>Market Radar — 16 chains</h3><p>New launches, trending pairs and live market activity across Solana, Ethereum, Base, BNB and more — hundreds of active pairs refreshing continuously.</p></div>
+      <div class="card glass"><div class="ic">⚡</div><h3>Instant Token Listings</h3><p>Paste a CA and OG Scan auto-pulls names, logos, banners, metadata, market stats and trading info within seconds. No manual setup.</p></div>
+      <div class="card glass"><div class="ic">🚀</div><h3>Early Launch Detection</h3><p>Most apps show projects after they've moved. OG Scan surfaces launches early so you act on real data instead of blindly aping.</p></div>
+      <div class="card glass"><div class="ic">👤</div><h3>Wallet Intelligence</h3><p>Share any wallet and learn its full history and behavior — go deeper than basic explorers and ask the AI about specific moves.</p></div>
+      <div class="card glass"><div class="ic">🧠</div><h3>Advanced AI Analyst</h3><p>On the site and in Telegram. Drop a token, wallet or CA and get instant analysis, connected to multiple data sources and years of crypto knowledge.</p></div>
+      <div class="card glass"><div class="ic">📰</div><h3>Live Crypto News</h3><p>Bullish/bearish news, narratives and ecosystem events — understand why tokens pump or dump without five other apps.</p></div>
+      <div class="card glass"><div class="ic">🔔</div><h3>Webhook Alerts</h3><p>Create alerts for launches, price targets and custom events. Define conditions, connect a webhook, get updates automatically.</p></div>
+      <div class="card glass"><div class="ic">🤖</div><h3>Your own AI bot</h3><p>Launch a branded Telegram/Discord bot — add a token, upload knowledge files, tune its personality and deploy with no API setup. Plus X auto-posting.</p></div>
     </div>
   </section>
 
-  <section class="band">
-    <div class="bandin">
-      <div class="ring"><div><b>92</b><small>OG SCORE</small></div></div>
+  <section>
+    <div class="bandin glass">
+      <div class="ring float"><div class="v"><b>94</b><small>OG SCORE</small></div></div>
       <div class="bandtxt">
         <h3>One number that cuts through the noise</h3>
-        <p>The OG Score fuses liquidity depth, holder distribution, authority status, LP health and momentum into a single, comparable signal — the same logic that powers the site, the bots and Grim. Higher is safer; low scores get flagged before you lose money.</p>
+        <p>The OG Score fuses liquidity, holder distribution, authority status, LP health and momentum into a single comparable signal — the same engine behind the site, the Telegram bot and the AI. It's built for forensic origin detection: find the real OGs, flag the clones and rugs before you buy.</p>
       </div>
     </div>
   </section>
 
-  <section class="foot">
-    <div class="eyebrow">Get started</div>
-    <h2>Stop guessing. <span class="g">Start scanning.</span></h2>
-    <p>Create your account and run your first OG Scan in seconds.</p>
-    <div class="row" style="opacity:1;animation:none">
-      <a class="btn p" href="/auth?mode=signup">Create account</a>
-      <a class="btn s" href="/app">Launch app</a>
+  <div class="foot">
+    <div class="footcard glass">
+      <div class="eyebrow">Get started</div>
+      <h2>Stop guessing. <span class="g">Start scanning.</span></h2>
+      <p>Create your account and run your first OG Scan in seconds.</p>
+      <div class="row" style="opacity:1;animation:none">
+        <a class="btn p" href="/auth?mode=signup">Create account</a>
+        <a class="btn s glass" href="/app">Launch app</a>
+      </div>
+      <div class="tiny">© OG Scan — on-chain intelligence for Solana &amp; 16 chains. One platform. Everything crypto. Not financial advice.</div>
     </div>
-    <div class="tiny">© OG Scan — on-chain intelligence for Solana. Not financial advice.</div>
-  </section>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-// reveal-on-scroll
-const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.15});
-document.querySelectorAll('.card').forEach((c,i)=>{c.style.transitionDelay=(i%3*90)+'ms';io.observe(c)});
+// ---- reveal cards + 3D tilt ----
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll('.card').forEach((c,i)=>{c.style.transitionDelay=(i%3*80)+'ms';io.observe(c);
+  c.addEventListener('pointermove',ev=>{const r=c.getBoundingClientRect();const px=(ev.clientX-r.left)/r.width-.5,py=(ev.clientY-r.top)/r.height-.5;c.style.transform=`perspective(700px) rotateY(${px*9}deg) rotateX(${-py*9}deg) translateY(-4px)`});
+  c.addEventListener('pointerleave',()=>{c.style.transform=''});
+});
 
-// 3D scanner background: rotating wireframe globe + particle field + scan ring
-const canvas=document.getElementById('bg');
+// ---- spacey moving 3D background ----
+const canvas=document.getElementById('space');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-const scene=new THREE.Scene();
-const cam=new THREE.PerspectiveCamera(60,1,.1,100);cam.position.z=5.2;
-function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix()}
+const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x04060a,0.055);
+const cam=new THREE.PerspectiveCamera(70,1,.1,200);cam.position.z=1;
+function resize(){renderer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}
 resize();addEventListener('resize',resize);
-const grp=new THREE.Group();scene.add(grp);
-// globe
-const geo=new THREE.IcosahedronGeometry(1.7,2);
-const mesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x0a3,wireframe:true,transparent:true,opacity:.28}));
-grp.add(mesh);
-// inner glow sphere
-grp.add(new THREE.Mesh(new THREE.SphereGeometry(1.62,32,32),new THREE.MeshBasicMaterial({color:0x06222a,transparent:true,opacity:.45})));
-// particles
-const N=900,pos=new Float32Array(N*3);
-for(let i=0;i<N;i++){const r=2.4+Math.random()*4.6,t=Math.random()*Math.PI*2,p=Math.acos(2*Math.random()-1);pos[i*3]=r*Math.sin(p)*Math.cos(t);pos[i*3+1]=r*Math.sin(p)*Math.sin(t);pos[i*3+2]=r*Math.cos(p)}
-const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
-const pts=new THREE.Points(pg,new THREE.PointsMaterial({color:0x10b981,size:.03,transparent:true,opacity:.7}));
-scene.add(pts);
-// scan rings
-const rings=[];for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.RingGeometry(1.75,1.78,64),new THREE.MeshBasicMaterial({color:0x06b6d4,transparent:true,opacity:.4,side:THREE.DoubleSide}));r.rotation.x=Math.PI/2;grp.add(r);rings.push(r)}
-let mx=0,my=0;addEventListener('pointermove',e=>{mx=(e.clientX/innerWidth-.5);my=(e.clientY/innerHeight-.5)});
+const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const mobile=innerWidth<700;
+
+// starfield (3 depth layers) drifting toward camera
+function starLayer(count,size,color,spread,speed){
+  const g=new THREE.BufferGeometry();const p=new Float32Array(count*3);
+  for(let i=0;i<count;i++){p[i*3]=(Math.random()-.5)*spread;p[i*3+1]=(Math.random()-.5)*spread;p[i*3+2]=-Math.random()*spread}
+  g.setAttribute('position',new THREE.BufferAttribute(p,3));
+  const m=new THREE.PointsMaterial({color,size,transparent:true,opacity:.9,depthWrite:false,blending:THREE.AdditiveBlending});
+  const pts=new THREE.Points(g,m);pts.userData={speed,spread,count};scene.add(pts);return pts;
+}
+const layers=[
+  starLayer(mobile?500:1100,.18,0xffffff,90,0.10),
+  starLayer(mobile?280:600,.30,0x22d3ee,80,0.18),
+  starLayer(mobile?160:340,.45,0x8b5cf6,70,0.28),
+];
+// soft nebula sprites (additive glow)
+function glow(color){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');const gr=x.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,color);gr.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=gr;x.fillRect(0,0,128,128);return new THREE.CanvasTexture(c)}
+const nebTex=[glow('rgba(16,185,129,.55)'),glow('rgba(34,211,238,.5)'),glow('rgba(139,92,246,.5)')];
+const nebs=[];for(let i=0;i<(mobile?4:7);i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:nebTex[i%3],transparent:true,opacity:.5,depthWrite:false,blending:THREE.AdditiveBlending}));const sc=18+Math.random()*26;s.scale.set(sc,sc,1);s.position.set((Math.random()-.5)*70,(Math.random()-.5)*50,-10-Math.random()*60);scene.add(s);nebs.push(s)}
+// rotating wireframe grid sphere (faint, depth anchor)
+const planet=new THREE.Mesh(new THREE.IcosahedronGeometry(7,2),new THREE.MeshBasicMaterial({color:0x0c5a4a,wireframe:true,transparent:true,opacity:.16}));
+planet.position.set(mobile?0:14,-4,-34);scene.add(planet);
+
+let tx=0,ty=0;
+addEventListener('pointermove',e=>{tx=(e.clientX/innerWidth-.5);ty=(e.clientY/innerHeight-.5)});
+addEventListener('deviceorientation',e=>{if(e.gamma!=null){tx=Math.max(-.5,Math.min(.5,e.gamma/45));ty=Math.max(-.5,Math.min(.5,(e.beta-45)/45))}},true);
+
 let t=0;
-(function loop(){t+=.005;grp.rotation.y+=.0016;grp.rotation.x+=.0006;pts.rotation.y-=.0008;
- grp.rotation.y+=(mx*.5-grp.rotation.y%6.28*0)*0; cam.position.x+=((mx*1.2)-cam.position.x)*.04;cam.position.y+=((-my*1.0)-cam.position.y)*.04;cam.lookAt(0,0,0);
- rings.forEach((r,i)=>{const s=1+((t*0.5+i*0.33)%1)*1.7;r.scale.set(s,s,s);r.material.opacity=.45*(1-((t*0.5+i*0.33)%1))});
- renderer.render(scene,cam);requestAnimationFrame(loop)})();
+(function loop(){t+=.01;
+  if(!reduce){
+    layers.forEach(L=>{const pos=L.geometry.attributes.position.array;const sp=L.userData.speed,spread=L.userData.spread;
+      for(let i=0;i<L.userData.count;i++){pos[i*3+2]+=sp;if(pos[i*3+2]>1){pos[i*3+2]=-spread;pos[i*3]=(Math.random()-.5)*spread;pos[i*3+1]=(Math.random()-.5)*spread}}
+      L.geometry.attributes.position.needsUpdate=true;});
+    nebs.forEach((n,i)=>{n.position.x+=Math.sin(t*0.3+i)*0.004;n.material.opacity=.4+Math.sin(t*0.6+i)*0.12});
+    planet.rotation.y+=0.0015;planet.rotation.x+=0.0006;
+  }
+  cam.position.x+=((tx*2)-cam.position.x)*0.03;cam.position.y+=((-ty*1.4)-cam.position.y)*0.03;cam.lookAt(0,0,-20);
+  renderer.render(scene,cam);requestAnimationFrame(loop)})();
 </script>
 </body>
 </html>
