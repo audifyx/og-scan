@@ -7,7 +7,12 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
 const NVIDIA_BASE = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
-const VIBE_MODEL = "meta/llama-3.3-70b-instruct"; // fast + strong; falls back to Llama 4 Maverick
+const VIBE_MODELS = [
+  "qwen/qwen3-coder-480b-a35b-instruct", // best free coder for premium UI
+  "moonshotai/kimi-k2.6",
+  "deepseek-ai/deepseek-v4-pro",
+  "meta/llama-3.3-70b-instruct",
+];
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,6 +54,15 @@ TECH (one self-contained file):
 - Font Awesome 6 via CDN for icons. Chart.js via CDN only when the build genuinely needs charts.
 - Custom CSS in <style>, all logic in vanilla JS in <script>. No build step, no broken links.
 
+DEPTH & COMPLETENESS (this is what separates premium from amateur — do NOT skip):
+- Build a COMPLETE, production-grade page, not a skeleton. A premium page is typically 400-900 lines of HTML. Never stop early or output a thin draft.
+- Rich, full sections with real, specific copy (no "lorem ipsum", no one-liners). Every section should feel custom-designed, never generic boilerplate Tailwind.
+- A striking hero: layered backgrounds (CSS gradients/mesh/subtle patterns or an inline SVG), strong headline hierarchy, and a clear primary CTA. Do NOT use a flat single-color band.
+- Use modern technique: scroll-reveal animations via IntersectionObserver, staggered entrance transitions, parallax or subtle motion, tasteful glassmorphism, gradient text/borders, depth via shadows and layering.
+- Polished, real components: styled cards with hover lift + glow, custom-styled form inputs (never raw browser defaults), buttons with gradient/hover/active states, an elegant multi-column footer.
+- Cohesive spacing rhythm and a real responsive grid (mobile-first). Test mentally on mobile and desktop.
+- Forbidden: plain unstyled <input>/<button>, a flat hero, sparse pages, default Tailwind gray cards with no personality, broken/empty sections.
+
 OUTPUT RULES (critical):
 - Output ONLY the raw HTML document. NO markdown, NO code fences, NO commentary before or after.
 - Start with <!DOCTYPE html> and end with </html>.
@@ -61,8 +75,8 @@ async function callModel(model: string, prompt: string): Promise<string | null> 
     const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${NVIDIA_API_KEY}` },
-      body: JSON.stringify({ model, messages: [{ role: "system", content: SYS }, { role: "user", content: prompt }], temperature: 0.7, max_tokens: 6000 }),
-      signal: AbortSignal.timeout(110000),
+      body: JSON.stringify({ model, messages: [{ role: "system", content: SYS }, { role: "user", content: prompt }], temperature: 0.7, max_tokens: 16000 }),
+      signal: AbortSignal.timeout(150000),
     });
     if (!r.ok) { console.error("model err", model, r.status, (await r.text().catch(() => "")).slice(0, 200)); return null; }
     const j = await r.json();
@@ -71,8 +85,11 @@ async function callModel(model: string, prompt: string): Promise<string | null> 
 }
 
 async function generate(prompt: string): Promise<{ html: string; url: string } | null> {
-  let raw = await callModel(VIBE_MODEL, prompt);
-  if (!raw) raw = await callModel("meta/llama-4-maverick-17b-128e-instruct", prompt);
+  let raw: string | null = null;
+  for (const m of VIBE_MODELS) {
+    raw = await callModel(m, prompt);
+    if (raw && raw.length > 1500) break; // accept only a substantial build
+  }
   if (!raw) return null;
   let html = raw.replace(/^```[a-zA-Z]*\s*/, "").replace(/\s*```$/, "").trim();
   const dt = html.search(/<!DOCTYPE html>/i);
