@@ -127,10 +127,10 @@ Deno.serve(async (req) => {
     if (!pending || !pending.length) return json({ ok: true, new: 0 });
 
     // All enabled alert chats across all bots that have migration alerts on.
-    const { data: bots } = await admin.from("telegram_bots").select("id, bot_token, alerts_migrations, min_marketcap").eq("alerts_migrations", true);
+    const { data: bots } = await admin.from("telegram_bots").select("id, user_id, bot_token, alerts_migrations, min_marketcap").eq("alerts_migrations", true);
     const botMap: Record<string, any> = {};
     for (const b of bots || []) botMap[b.id] = b;
-    const { data: chats } = await admin.from("telegram_alert_chats").select("bot_id, chat_id, enabled").eq("enabled", true);
+    const { data: chats } = await admin.from("telegram_alert_chats").select("bot_id, chat_id, chat_title, enabled").eq("enabled", true);
 
     // Discord webhooks subscribed to migration alerts.
     const { data: discords } = await admin.from("discord_integrations").select("webhook_url, alerts_migrations, min_marketcap").eq("alerts_migrations", true);
@@ -157,10 +157,28 @@ Deno.serve(async (req) => {
         const b = botMap[c.bot_id];
         if (!b) continue;
         if ((m.market_cap || 0) < (Number(b.min_marketcap) || 0)) continue;
-        await fetch(`https://api.telegram.org/bot${b.bot_token}/sendMessage`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: c.chat_id, text: alertText(mapped), parse_mode: "HTML", disable_web_page_preview: true }),
-        }).catch(() => {});
+        try {
+          const tgRes = await fetch(`https://api.telegram.org/bot${b.bot_token}/sendMessage`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: c.chat_id, text: alertText(mapped), parse_mode: "HTML", disable_web_page_preview: true }),
+          }).then((r) => r.json());
+          // Log so the bot owner can see & delete this alert from the dashboard.
+          if (tgRes?.ok && tgRes.result?.message_id && b.user_id) {
+            await admin.from("telegram_bot_messages").upsert(
+              {
+                user_id: b.user_id,
+                bot_id: b.id,
+                chat_id: String(c.chat_id),
+                chat_title: c.chat_title || null,
+                message_id: tgRes.result.message_id,
+                text_preview: `Migration alert: ${m.symbol || m.mint}`.slice(0, 200),
+                message_type: "outbound",
+                sent_at: new Date().toISOString(),
+              },
+              { onConflict: "bot_id,chat_id,message_id", ignoreDuplicates: true },
+            ).then(() => {}, () => {});
+          }
+        } catch (_e) { /* alert send is best-effort */ }
         sent++;
       }
       // Discord

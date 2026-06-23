@@ -11,6 +11,41 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+// Maps a bot token -> { botRowId, userId } so tg() can log outbound messages
+// without threading context through every call site. Keyed by token (concurrency-safe).
+const botCtxCache = new Map<string, { botRowId: string; userId: string }>();
+
+// Best-effort log of an outbound message so the owner can see & delete it later.
+async function logOutbound(botToken: string, result: any, body: any) {
+  try {
+    const r = result?.result;
+    if (!result?.ok || !r?.message_id) return;
+    const ctx = botCtxCache.get(botToken);
+    if (!ctx) return;
+    const chatId = String(r.chat?.id ?? (body as any)?.chat_id ?? "");
+    if (!chatId) return;
+    const chatTitle =
+      r.chat?.title ||
+      r.chat?.username ||
+      [r.chat?.first_name, r.chat?.last_name].filter(Boolean).join(" ") ||
+      null;
+    const text = String((body as any)?.text ?? "");
+    await admin.from("telegram_bot_messages").upsert(
+      {
+        user_id: ctx.userId,
+        bot_id: ctx.botRowId,
+        chat_id: chatId,
+        chat_title: chatTitle,
+        message_id: r.message_id,
+        text_preview: text ? text.slice(0, 200) : null,
+        message_type: "outbound",
+        sent_at: new Date().toISOString(),
+      },
+      { onConflict: "bot_id,chat_id,message_id", ignoreDuplicates: true },
+    );
+  } catch (_e) { /* logging must never break sending */ }
+}
+
 const ok = () => new Response("ok", { status: 200 });
 
 async function tg(botToken: string, method: string, body: object) {
@@ -18,7 +53,9 @@ async function tg(botToken: string, method: string, body: object) {
     const r = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     });
-    return await r.json();
+    const j = await r.json();
+    if (method === "sendMessage") void logOutbound(botToken, j, body);
+    return j;
   } catch (e) { console.error("tg err", method, e); return null; }
 }
 
@@ -762,6 +799,7 @@ Deno.serve(async (req) => {
     if (!botRowId) return ok();
 
     const { data: bot } = await admin.from("telegram_bots").select("*").eq("id", botRowId).maybeSingle();
+    if (bot?.bot_token && bot?.user_id) botCtxCache.set(bot.bot_token, { botRowId: bot.id, userId: bot.user_id });
     if (!bot) return ok();
 
     const secret = req.headers.get("X-Telegram-Bot-Api-Secret-Token");

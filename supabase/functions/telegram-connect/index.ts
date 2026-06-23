@@ -14,6 +14,7 @@
 //   { action: "list_messages", chat_id? } -> recent bot messages
 //   { action: "delete_message", chat_id, message_id } -> delete one message
 //   { action: "bulk_delete", chat_id, message_ids[] } -> delete many messages
+//   { action: "clear_all", chat_id? } -> delete every logged message (all chats, or one chat)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { BOT_MODELS, resolveModel } from "../_shared/models.ts";
@@ -327,6 +328,60 @@ Deno.serve(async (req) => {
           .catch(() => {});
       }
       return json({ ok: true, deleted, failed });
+    }
+
+    if (action === "clear_all") {
+      const { data: botRow } = await admin.from("telegram_bots").select("bot_token").eq("user_id", user.id).maybeSingle();
+      if (!botRow) return json({ error: "No bot connected." }, 400);
+      const scopeChat = body.chat_id != null ? String(body.chat_id) : null;
+
+      // Pull every still-live (not-yet-deleted) logged message for this user.
+      let q = (admin.from("telegram_bot_messages") as any)
+        .select("id, chat_id, message_id")
+        .eq("user_id", user.id)
+        .is("deleted_at", null)
+        .order("sent_at", { ascending: false })
+        .limit(2000);
+      if (scopeChat) q = q.eq("chat_id", scopeChat);
+      const { data: rows } = await q;
+      const msgs = (rows || []) as { id: string; chat_id: string; message_id: string | number }[];
+      if (!msgs.length) return json({ ok: true, deleted: 0, failed: 0 });
+
+      // Delete from Telegram in small concurrent batches to respect rate limits.
+      const deletedIds: string[] = [];
+      let failed = 0;
+      const BATCH = 20;
+      for (let i = 0; i < msgs.length; i += BATCH) {
+        const batch = msgs.slice(i, i + BATCH);
+        const results = await Promise.allSettled(
+          batch.map((mm) =>
+            fetch(`https://api.telegram.org/bot${botRow.bot_token}/deleteMessage`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: mm.chat_id, message_id: Number(mm.message_id) }),
+            }).then((r) => r.json())
+          )
+        );
+        results.forEach((r, idx) => {
+          const v: any = r.status === "fulfilled" ? r.value : null;
+          // Treat "message can't be deleted / already gone" as success so the log clears.
+          if (v?.ok || /message to delete not found|message can't be deleted/i.test(v?.description || "")) {
+            deletedIds.push(batch[idx].id);
+          } else {
+            failed++;
+          }
+        });
+      }
+
+      if (deletedIds.length) {
+        // Mark cleared rows deleted in chunks (avoid oversized IN clauses).
+        for (let i = 0; i < deletedIds.length; i += 200) {
+          await admin.from("telegram_bot_messages")
+            .update({ deleted_at: new Date().toISOString() })
+            .in("id", deletedIds.slice(i, i + 200))
+            .catch(() => {});
+        }
+      }
+      return json({ ok: true, deleted: deletedIds.length, failed, scope: scopeChat || "all" });
     }
 
     return json({ error: "Unknown action" }, 400);
