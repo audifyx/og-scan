@@ -38,7 +38,7 @@ import {
   Wallet, Star, Copy, Flame, Trophy, Zap, Clock, ChevronRight, Users, Gift, Share2,
   Code2, Radio, Maximize2, ExternalLink, Plug, AlertTriangle, Trash2,
   Rocket, RefreshCw, Bot, Send, Upload, FileText, MessageCircle, Power,
-  Sparkles, Save, Pencil, Plus,
+  Sparkles, Save, Pencil, Plus, BarChart3,
 } from "lucide-react";
 import {
   ccGetStoredUser,
@@ -381,6 +381,7 @@ const Settings = () => {
   const settingsNav = [
     { value: "profile",       icon: User,         label: "Profile",           mobileLabel: "Profile"   },
     { value: "connections",   icon: Plug,         label: "Connections",       mobileLabel: "Connect"   },
+    { value: "analytics",     icon: BarChart3,    label: "Bot Analytics",     mobileLabel: "Stats"     },
     { value: "account",       icon: Shield,       label: "Account",           mobileLabel: "Account"   },
     { value: "themes",        icon: Palette,      label: "Themes",            mobileLabel: "Themes"    },
     { value: "invite",        icon: Gift,         label: "Invite & Referrals",mobileLabel: "Invite"    },
@@ -636,6 +637,10 @@ const Settings = () => {
           {/* ── Account Tab ── */}
           {activeTab === "connections" && (
             <ConnectionsTab />
+          )}
+
+          {activeTab === "analytics" && (
+            <BotAnalyticsTab />
           )}
 
           {activeTab === "account" && (<div className="tab-content">
@@ -1176,6 +1181,171 @@ function EmbedSettingsTab({ username }: { username?: string }) {
           </a>
         </div>
       </Card>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Bot Analytics Tab — full stats for the connected Telegram bot
+   ───────────────────────────────────────────────────────────── */
+function BotAnalyticsTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-connect", { body: { action: "analytics" } });
+      if (error) throw error;
+      setData(data);
+    } catch { setData({ connected: false }); } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const fmtUsd = (n: any) => {
+    const v = Number(n);
+    if (!isFinite(v) || !v) return "—";
+    if (v >= 1e9) return "$" + (v / 1e9).toFixed(2) + "B";
+    if (v >= 1e6) return "$" + (v / 1e6).toFixed(2) + "M";
+    if (v >= 1e3) return "$" + (v / 1e3).toFixed(1) + "K";
+    return "$" + v.toFixed(0);
+  };
+  const fmtDay = (s: string) => { const d = new Date(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20 text-white/40 text-sm gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading analytics…</div>
+  );
+  if (!data?.connected) return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 text-center">
+      <Bot className="h-8 w-8 text-white/20 mx-auto mb-3" />
+      <p className="text-white/60 text-sm">Connect your Telegram bot first.</p>
+      <p className="text-white/30 text-xs mt-1">Go to the Connections tab to link your bot — analytics will appear here.</p>
+    </div>
+  );
+
+  const t = data.totals || {};
+  const groups = (t.supergroups || 0) + (t.groups || 0);
+  const msgDays: any[] = data.messages_by_day || [];
+  const scanDays: any[] = data.scans_by_day || [];
+  const maxMsg = Math.max(1, ...msgDays.map((d) => d.n));
+  const maxScan = Math.max(1, ...scanDays.map((d) => d.n));
+
+  const Stat = ({ icon: Icon, label, value, sub, color = "text-og-lime" }: any) => (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+      <div className="flex items-center gap-1.5 text-white/40 text-[10px] font-semibold uppercase tracking-wide">
+        <Icon className={`h-3.5 w-3.5 ${color}`} /> {label}
+      </div>
+      <div className="text-white text-[26px] font-extrabold mt-1.5 leading-none">{value}</div>
+      {sub && <div className="text-white/35 text-[11px] mt-1">{sub}</div>}
+    </div>
+  );
+
+  const Bars = ({ days, max, color }: { days: any[]; max: number; color: string }) => (
+    <div className="flex items-end gap-1 h-24 mt-3">
+      {days.map((d, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+          <div className="w-full rounded-t relative transition-all" style={{ height: `${Math.max(3, (d.n / max) * 100)}%`, backgroundColor: color, opacity: d.n ? 1 : 0.25 }}>
+            <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-white/60 opacity-0 group-hover:opacity-100 whitespace-nowrap">{d.n}</span>
+          </div>
+          <span className="text-[8px] text-white/25">{fmtDay(d.day)}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <BarChart3 className="h-5 w-5 text-white/40" />
+          <div>
+            <h2 className="text-[20px] font-bold leading-tight">Bot Analytics</h2>
+            <p className="text-white/35 text-[12px]">@{data.bot?.username} · since {data.bot?.created_at ? new Date(data.bot.created_at).toLocaleDateString() : "—"}</p>
+          </div>
+        </div>
+        <button onClick={load} className="rounded-lg p-2 text-white/40 hover:text-white border border-white/10 transition"><RefreshCw className="h-4 w-4" /></button>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Stat icon={Users} label="Groups" value={groups} sub={`${t.supergroups || 0} supergroups · ${t.groups || 0} basic`} />
+        <Stat icon={Send} label="Direct chats" value={t.dms || 0} sub={`${t.chats || 0} total connected`} color="text-[#229ED9]" />
+        <Stat icon={MessageCircle} label="Messages sent" value={t.messages_live || 0} sub={`${t.messages || 0} logged all-time`} color="text-cyan-400" />
+        <Stat icon={Sparkles} label="Scans run" value={t.scans || 0} sub={`${t.scan_users || 0} active users`} color="text-purple-400" />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Stat icon={Users} label="Active users" value={t.scan_users || 0} sub="people who used the bot" />
+        <Stat icon={Rocket} label="Watchlist" value={t.watch || 0} sub="tokens being watched" color="text-orange-400" />
+        <Stat icon={Zap} label="Custom commands" value={t.commands || 0} sub="bot commands defined" color="text-yellow-400" />
+        <Stat icon={Bot} label="Active chats" value={t.active_chats || 0} sub="alerts/AI enabled" color="text-[#229ED9]" />
+      </div>
+
+      {/* Charts */}
+      <div className="grid md:grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <div className="text-white/70 text-[13px] font-semibold flex items-center gap-1.5"><MessageCircle className="h-3.5 w-3.5 text-cyan-400" /> Messages sent · 14 days</div>
+          <Bars days={msgDays} max={maxMsg} color="#22d3ee" />
+        </div>
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <div className="text-white/70 text-[13px] font-semibold flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-purple-400" /> Scans run · 14 days</div>
+          <Bars days={scanDays} max={maxScan} color="#a78bfa" />
+        </div>
+      </div>
+
+      {/* Top chats */}
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <div className="text-white/70 text-[13px] font-semibold mb-2.5 flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-og-lime" /> Most active chats</div>
+        <div className="space-y-1.5">
+          {(data.top_chats || []).filter((c: any) => c.messages || c.scans).slice(0, 10).map((c: any) => (
+            <div key={c.chat_id} className="flex items-center gap-3 text-[12px]">
+              <span className="flex-1 truncate text-white/70">{c.chat_title || c.chat_id}</span>
+              <span className="text-white/40 shrink-0">{c.scans} scans</span>
+              <span className="text-cyan-400/70 shrink-0 w-16 text-right">{c.messages} msgs</span>
+            </div>
+          ))}
+          {!(data.top_chats || []).some((c: any) => c.messages || c.scans) && (
+            <p className="text-white/25 text-[12px] py-2 text-center">No chat activity logged yet.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Top tokens */}
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <div className="text-white/70 text-[13px] font-semibold mb-2.5 flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5 text-yellow-400" /> Top scanned tokens</div>
+        {(data.top_tokens || []).length ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-3 text-[10px] uppercase tracking-wide text-white/30 pb-1 border-b border-white/[0.05]">
+              <span className="flex-1">Token</span><span className="w-12 text-right">Scans</span><span className="w-16 text-right">Best x</span><span className="w-14 text-right">Avg OG</span>
+            </div>
+            {data.top_tokens.map((tk: any, i: number) => (
+              <div key={i} className="flex items-center gap-3 text-[12px]">
+                <span className="flex-1 truncate text-white/70 font-semibold">${tk.symbol}</span>
+                <span className="w-12 text-right text-white/50">{tk.scans}</span>
+                <span className="w-16 text-right text-og-lime">{tk.best_multiple ? `${tk.best_multiple}x` : "—"}</span>
+                <span className="w-14 text-right text-white/50">{tk.avg_score ?? "—"}</span>
+              </div>
+            ))}
+          </div>
+        ) : <p className="text-white/25 text-[12px] py-2 text-center">No scans yet.</p>}
+      </div>
+
+      {/* Recent scans */}
+      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+        <div className="text-white/70 text-[13px] font-semibold mb-2.5 flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-white/40" /> Recent scans</div>
+        {(data.recent_scans || []).length ? (
+          <div className="space-y-1.5">
+            {data.recent_scans.map((r: any, i: number) => (
+              <div key={i} className="flex items-center gap-3 text-[12px]">
+                <span className="flex-1 truncate text-white/70 font-semibold">${r.symbol || "?"}</span>
+                <span className="text-white/40 shrink-0">OG {r.og_score ?? "—"}</span>
+                <span className="text-white/40 shrink-0 w-16 text-right">{fmtUsd(r.market_cap)}</span>
+                <span className="text-white/25 shrink-0 w-20 text-right">{r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}</span>
+              </div>
+            ))}
+          </div>
+        ) : <p className="text-white/25 text-[12px] py-2 text-center">No scans yet.</p>}
+      </div>
+
+      <p className="text-white/25 text-[11px] text-center">Message stats accrue from when logging was enabled. Scan + chat data is historical.</p>
     </div>
   );
 }

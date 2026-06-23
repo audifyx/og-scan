@@ -18,6 +18,7 @@
 //   { action: "sweep_range", chat_id, from_id, to_id } -> delete a contiguous range of message IDs (the bot only removes its own)
 //   { action: "list_chats" } -> chats the bot is in (for the picker)
 //   { action: "auto_clean_chat", chat, depth? } -> resolve a chat (id / public link / picked), probe latest msg id, sweep & delete the bot's own recent messages
+//   { action: "analytics" } -> aggregated stats for the connected bot (groups, messages, scans, users, top tokens)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { BOT_MODELS, resolveModel } from "../_shared/models.ts";
@@ -530,6 +531,12 @@ Deno.serve(async (req) => {
         }
       }
       return json({ ok: true, chat_id: chatId, chat_title: chatTitle, deleted: deleted.length, scanned: ids.length, rateLimited });
+    }
+
+    if (action === "analytics") {
+      const { data, error } = await admin.rpc("telegram_bot_analytics", { p_user: user.id });
+      if (error) return json({ error: error.message }, 400);
+      return json(data || { connected: false });
     }
 
     return json({ error: "Unknown action" }, 400);
