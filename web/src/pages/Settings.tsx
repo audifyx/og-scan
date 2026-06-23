@@ -1820,7 +1820,7 @@ function BotTraining() {
 }
 
 
-/* BotMessageManager — delete bot messages from a GC directly from the dashboard */
+/* BotMessageManager — see & delete every message your bot sent, per-chat or all at once */
 function BotMessageManager({ bot }: { bot: any }) {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1828,6 +1828,11 @@ function BotMessageManager({ bot }: { bot: any }) {
   const [msgId, setMsgId] = useState("");
   const [bulkIds, setBulkIds] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [clearing, setClearing] = useState<string | null>(null); // chat_id being cleared, or "all"
+  const [fromId, setFromId] = useState("");
+  const [toId, setToId] = useState("");
+  const [sweeping, setSweeping] = useState(false);
+  const [confirmScope, setConfirmScope] = useState<{ chatId: string | null; label: string } | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<"logged" | "manual">("manual");
 
@@ -1874,7 +1879,48 @@ function BotMessageManager({ bot }: { bot: any }) {
     } catch (e: any) { toast.error(e.message || "Bulk delete failed"); } finally { setDeleting(null); }
   };
 
-  useEffect(() => { if (expanded && mode === "logged") loadMessages(); }, [expanded, mode]);
+  // Clear every logged message — for one chat (chatId) or all chats (chatId = null).
+  const clearAll = async (scopeChatId: string | null) => {
+    setClearing(scopeChatId || "all");
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-connect", {
+        body: { action: "clear_all", ...(scopeChatId ? { chat_id: scopeChatId } : {}) },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      const failedNote = data.failed ? ` (${data.failed} couldn't be removed)` : "";
+      toast.success(`Cleared ${data.deleted || 0} message${data.deleted === 1 ? "" : "s"}${failedNote}`);
+      if (scopeChatId) setMessages(prev => prev.filter(m => String(m.chat_id) !== String(scopeChatId)));
+      else setMessages([]);
+    } catch (e: any) { toast.error(e.message || "Clear failed"); } finally { setClearing(null); setConfirmScope(null); }
+  };
+
+  // Sweep a contiguous span of message IDs in a chat — the bot removes only its own.
+  const sweepRange = async () => {
+    const f = Number(fromId), t = Number(toId);
+    if (!chatId || !f || !t) return;
+    setSweeping(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-connect", {
+        body: { action: "sweep_range", chat_id: chatId, from_id: f, to_id: t },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      toast.success(`Removed ${data.deleted || 0} of your bot's messages (scanned ${data.scanned} IDs)`);
+      setFromId(""); setToId("");
+    } catch (e: any) { toast.error(e.message || "Sweep failed"); } finally { setSweeping(false); }
+  };
+
+    useEffect(() => { if (expanded && mode === "logged") loadMessages(); }, [expanded, mode]);
+
+  // Group logged messages by chat so each group can be cleared on its own.
+  const groups = (() => {
+    const map = new Map<string, { chat_id: string; chat_title: string | null; items: any[] }>();
+    for (const m of messages) {
+      const k = String(m.chat_id);
+      if (!map.has(k)) map.set(k, { chat_id: k, chat_title: m.chat_title || null, items: [] });
+      map.get(k)!.items.push(m);
+    }
+    return Array.from(map.values());
+  })();
 
   return (
     <div className="mt-4 rounded-xl border border-red-500/10 bg-red-500/[0.03]">
@@ -1890,7 +1936,7 @@ function BotMessageManager({ bot }: { bot: any }) {
       {expanded && (
         <div className="px-3 pb-3 space-y-3">
           <p className="text-white/35 text-[11px] leading-relaxed">
-            Delete messages your bot sent in any group or chat. For spam cleanup, use Manual Delete — enter your group's chat ID and the message IDs to nuke.
+            See and delete messages your bot sent in any group or chat. Use <span className="text-white/55">Logged Messages</span> to browse what your bot sent and wipe a whole chat (or everything) in one click. Use <span className="text-white/55">Manual Delete</span> for spam cleanup by chat ID + message IDs.
           </p>
           <p className="text-white/25 text-[10px]">
             💡 Get your group's chat ID: add <span className="font-mono text-white/40">@userinfobot</span> to your group and send any message — it'll reply with the chat ID (starts with -100…)
@@ -1936,13 +1982,42 @@ function BotMessageManager({ bot }: { bot: any }) {
                   Bulk Delete
                 </Button>
               </div>
+              {/* Clear an entire chat by ID (uses the logged history for that chat) */}
+              <Button size="sm" variant="outline" disabled={!chatId || !!clearing}
+                onClick={() => setConfirmScope({ chatId, label: `chat ${chatId}` })}
+                className="w-full rounded-xl border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10 text-[12px]">
+                {clearing === chatId ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                Clear every logged message in this chat
+              </Button>
+
+              {/* Sweep a range of message IDs — best for old spam bursts the bot sent before logging existed */}
+              <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-2.5 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Zap className="h-3.5 w-3.5 text-og-lime" />
+                  <span className="text-white/70 text-[12px] font-semibold">Sweep range</span>
+                </div>
+                <p className="text-white/30 text-[10px] leading-relaxed">
+                  Deletes every message ID from first to last in this chat. Your bot only removes its OWN messages — others are skipped. Best for old spam your bot sent before logging existed. Long-press the first &amp; last spam message → Copy Link; the number after the last <span className="font-mono">/</span> is the message ID.
+                </p>
+                <div className="flex gap-2">
+                  <Input value={fromId} onChange={e => setFromId(e.target.value)} placeholder="From message ID"
+                    className="bg-white/5 border-white/10 text-[12px] font-mono" />
+                  <Input value={toId} onChange={e => setToId(e.target.value)} placeholder="To message ID"
+                    className="bg-white/5 border-white/10 text-[12px] font-mono" />
+                </div>
+                <Button size="sm" disabled={!chatId || !fromId || !toId || sweeping} onClick={sweepRange}
+                  className="w-full rounded-xl bg-red-500/80 hover:bg-red-500 text-white text-[12px]">
+                  {sweeping ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
+                  Sweep & delete range
+                </Button>
+              </div>
             </div>
           )}
 
           {mode === "logged" && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-white/30 text-[11px]">Recent messages sent by your bot (logged from now on)</p>
+                <p className="text-white/30 text-[11px]">Messages sent by your bot, grouped by chat</p>
                 <button onClick={loadMessages} disabled={loading} className="text-white/40 hover:text-white transition">
                   <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
                 </button>
@@ -1952,36 +2027,82 @@ function BotMessageManager({ bot }: { bot: any }) {
               ) : !messages.length ? (
                 <p className="text-white/25 text-[12px] py-4 text-center">No logged messages yet — messages sent by your bot will appear here.</p>
               ) : (
-                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                  {messages.map(m => {
-                    const key = `${m.chat_id}:${m.message_id}`;
-                    return (
-                      <div key={m.id} className="flex items-start gap-2 rounded-lg px-2.5 py-2 bg-white/[0.02] border border-white/[0.04]">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-white/40 text-[10px] font-mono truncate max-w-[120px]">{m.chat_title || m.chat_id}</span>
-                            <span className="text-white/20 text-[10px]">·</span>
-                            <span className="text-white/25 text-[10px] font-mono">#{m.message_id}</span>
-                          </div>
-                          <p className="text-white/60 text-[12px] truncate mt-0.5">{m.text_preview || "(no text preview)"}</p>
-                          <p className="text-white/25 text-[10px] mt-0.5">{new Date(m.sent_at).toLocaleString()}</p>
-                        </div>
+                <div className="space-y-3">
+                  {groups.map(g => (
+                    <div key={g.chat_id} className="rounded-lg border border-white/[0.05] bg-white/[0.02]">
+                      <div className="flex items-center gap-2 px-2.5 py-1.5 border-b border-white/[0.05]">
+                        <Users className="h-3 w-3 text-white/30 shrink-0" />
+                        <span className="text-white/60 text-[11px] font-semibold truncate">{g.chat_title || g.chat_id}</span>
+                        <span className="text-white/25 text-[10px] font-mono shrink-0">{g.items.length} msg</span>
                         <button
-                          onClick={() => deleteOne(m.chat_id, m.message_id)}
-                          disabled={deleting === key}
-                          className="shrink-0 rounded-lg p-1.5 text-red-400/50 hover:text-red-400 hover:bg-red-400/10 transition"
-                        >
-                          {deleting === key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          onClick={() => setConfirmScope({ chatId: g.chat_id, label: g.chat_title || `chat ${g.chat_id}` })}
+                          disabled={!!clearing}
+                          className="ml-auto shrink-0 text-[10px] font-semibold text-red-400/70 hover:text-red-400 flex items-center gap-1">
+                          {clearing === g.chat_id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                          Clear chat
                         </button>
                       </div>
-                    );
-                  })}
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto p-1.5">
+                        {g.items.map(m => {
+                          const key = `${m.chat_id}:${m.message_id}`;
+                          return (
+                            <div key={m.id} className="flex items-start gap-2 rounded-lg px-2.5 py-2 bg-white/[0.02] border border-white/[0.04]">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-white/25 text-[10px] font-mono">#{m.message_id}</span>
+                                  <span className="text-white/20 text-[10px]">·</span>
+                                  <span className="text-white/25 text-[10px]">{new Date(m.sent_at).toLocaleString()}</span>
+                                </div>
+                                <p className="text-white/60 text-[12px] truncate mt-0.5">{m.text_preview || "(no text preview)"}</p>
+                              </div>
+                              <button
+                                onClick={() => deleteOne(m.chat_id, m.message_id)}
+                                disabled={deleting === key}
+                                className="shrink-0 rounded-lg p-1.5 text-red-400/50 hover:text-red-400 hover:bg-red-400/10 transition"
+                              >
+                                {deleting === key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           )}
+
+          {/* Nuke everything across every chat */}
+          <Button size="sm" variant="outline" disabled={!!clearing}
+            onClick={() => setConfirmScope({ chatId: null, label: "every chat" })}
+            className="w-full rounded-xl border-red-500/40 bg-red-500/[0.06] text-red-400 hover:bg-red-500/15 text-[12px] font-semibold">
+            {clearing === "all" ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+            Clear ALL sent messages (every chat)
+          </Button>
         </div>
       )}
+
+      <AlertDialog open={!!confirmScope} onOpenChange={(o) => { if (!o) setConfirmScope(null); }}>
+        <AlertDialogContent className="bg-[#0e0e12] border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-400" /> Delete bot messages?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-white/50">
+              This permanently deletes every logged message your bot sent in <span className="text-white/80 font-semibold">{confirmScope?.label}</span> from Telegram. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2 mt-2">
+            <AlertDialogCancel className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmScope && clearAll(confirmScope.chatId)}
+              className="bg-red-500/80 hover:bg-red-500 text-white">
+              Delete them
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
