@@ -26,4 +26,13 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     include: ["buffer"],
   },
+  build: {
+    rollupOptions: {
+      // Multi-page: static marketing splash (index.html) + the React SPA (app.html).
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        app: path.resolve(__dirname, "app.html"),
+      },
+    },
+  },
 }));

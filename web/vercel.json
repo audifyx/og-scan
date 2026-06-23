@@ -13,16 +13,12 @@
       "destination": "/api/share?mint=:mint"
     },
     {
-      "source": "/app",
-      "destination": "/app.html"
-    },
-    {
-      "source": "/app/(.*)",
-      "destination": "/app.html"
+      "source": "/",
+      "destination": "/index.html"
     },
     {
       "source": "/(.*)",
-      "destination": "/"
+      "destination": "/app.html"
     }
   ],
   "headers": [
