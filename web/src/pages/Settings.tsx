@@ -1655,6 +1655,8 @@ function TelegramBotCard() {
 
               <BotTraining />
 
+              <BotMessageManager bot={bot} />
+
               <div className="flex items-center gap-2 mt-4">
                 <Button variant="outline" size="sm" onClick={disconnect} disabled={busy}
                   className="text-red-400 border-red-400/20 hover:bg-red-400/10 hover:text-red-300 rounded-xl">
@@ -1811,6 +1813,173 @@ function BotTraining() {
               <button onClick={() => del(f.filename)} className="text-red-400/70 hover:text-red-400 shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* BotMessageManager — delete bot messages from a GC directly from the dashboard */
+function BotMessageManager({ bot }: { bot: any }) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [chatId, setChatId] = useState("");
+  const [msgId, setMsgId] = useState("");
+  const [bulkIds, setBulkIds] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [mode, setMode] = useState<"logged" | "manual">("manual");
+
+  const loadMessages = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase.functions.invoke("telegram-connect", { body: { action: "list_messages" } });
+      setMessages(data?.messages || []);
+    } catch { toast.error("Failed to load messages"); } finally { setLoading(false); }
+  };
+
+  const deleteOne = async (cid: string | number, mid: string | number) => {
+    const key = `${cid}:${mid}`;
+    setDeleting(key);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-connect", {
+        body: { action: "delete_message", chat_id: cid, message_id: Number(mid) },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      setMessages(prev => prev.filter(m => !(String(m.chat_id) === String(cid) && String(m.message_id) === String(mid))));
+      toast.success("Message deleted");
+    } catch (e: any) { toast.error(e.message || "Delete failed"); } finally { setDeleting(null); }
+  };
+
+  const deleteManual = async () => {
+    if (!chatId || !msgId) return;
+    await deleteOne(chatId, msgId);
+    setMsgId("");
+  };
+
+  const bulkDelete = async () => {
+    if (!chatId || !bulkIds.trim()) return;
+    const ids = bulkIds.split(/[\s,]+/).map(s => Number(s.trim())).filter(n => !isNaN(n) && n > 0);
+    if (!ids.length) return void toast.error("Enter valid message IDs");
+    setDeleting("bulk");
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-connect", {
+        body: { action: "bulk_delete", chat_id: chatId, message_ids: ids },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      toast.success(`Deleted ${data.deleted?.length || 0} / ${ids.length} messages`);
+      setBulkIds("");
+      if (mode === "logged") loadMessages();
+    } catch (e: any) { toast.error(e.message || "Bulk delete failed"); } finally { setDeleting(null); }
+  };
+
+  useEffect(() => { if (expanded && mode === "logged") loadMessages(); }, [expanded, mode]);
+
+  return (
+    <div className="mt-4 rounded-xl border border-red-500/10 bg-red-500/[0.03]">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 w-full px-3 py-2.5 text-white/60 hover:text-white/85 transition text-[13px] font-semibold"
+      >
+        <Trash2 className="h-3.5 w-3.5 text-red-400/70" />
+        <span>Message Manager</span>
+        <span className="ml-auto text-white/25 text-[11px]">{expanded ? "▲" : "▼"}</span>
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-3 space-y-3">
+          <p className="text-white/35 text-[11px] leading-relaxed">
+            Delete messages your bot sent in any group or chat. For spam cleanup, use Manual Delete — enter your group's chat ID and the message IDs to nuke.
+          </p>
+          <p className="text-white/25 text-[10px]">
+            💡 Get your group's chat ID: add <span className="font-mono text-white/40">@userinfobot</span> to your group and send any message — it'll reply with the chat ID (starts with -100…)
+          </p>
+
+          {/* Mode tabs */}
+          <div className="flex rounded-lg border border-white/[0.07] bg-white/[0.03] p-0.5 w-fit">
+            {(["manual", "logged"] as const).map(m => (
+              <button key={m} onClick={() => setMode(m)}
+                className={`px-3 py-1 rounded-md text-[11px] font-semibold transition capitalize ${mode === m ? "bg-red-500/20 text-red-400" : "text-white/40 hover:text-white/60"}`}>
+                {m === "manual" ? "Manual Delete" : "Logged Messages"}
+              </button>
+            ))}
+          </div>
+
+          {mode === "manual" && (
+            <div className="space-y-2">
+              <Input
+                value={chatId} onChange={e => setChatId(e.target.value)}
+                placeholder="Group chat ID (e.g. -1001234567890)"
+                className="bg-white/5 border-white/10 text-[12px] font-mono"
+              />
+              <div className="flex gap-2">
+                <Input
+                  value={msgId} onChange={e => setMsgId(e.target.value)}
+                  placeholder="Message ID to delete"
+                  className="bg-white/5 border-white/10 text-[12px] font-mono"
+                />
+                <Button size="sm" disabled={!chatId || !msgId || !!deleting} onClick={deleteManual}
+                  className="rounded-xl bg-red-500/80 hover:bg-red-500 text-white shrink-0">
+                  {deleting && deleting !== "bulk" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                </Button>
+              </div>
+              <div className="space-y-1.5">
+                <textarea
+                  value={bulkIds} onChange={e => setBulkIds(e.target.value)}
+                  placeholder="Bulk delete — paste multiple message IDs, comma or space separated&#10;e.g. 1234 1235 1236 1237"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl text-[12px] font-mono text-white/70 px-3 py-2 outline-none focus:border-red-500/30 resize-none h-16 placeholder:text-white/20"
+                />
+                <Button size="sm" disabled={!chatId || !bulkIds.trim() || deleting === "bulk"} onClick={bulkDelete}
+                  className="rounded-xl bg-red-500/80 hover:bg-red-500 text-white text-[12px]">
+                  {deleting === "bulk" ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                  Bulk Delete
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {mode === "logged" && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-white/30 text-[11px]">Recent messages sent by your bot (logged from now on)</p>
+                <button onClick={loadMessages} disabled={loading} className="text-white/40 hover:text-white transition">
+                  <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                </button>
+              </div>
+              {loading ? (
+                <div className="flex items-center gap-2 text-white/40 text-[12px] py-4 justify-center"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</div>
+              ) : !messages.length ? (
+                <p className="text-white/25 text-[12px] py-4 text-center">No logged messages yet — messages sent by your bot will appear here.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  {messages.map(m => {
+                    const key = `${m.chat_id}:${m.message_id}`;
+                    return (
+                      <div key={m.id} className="flex items-start gap-2 rounded-lg px-2.5 py-2 bg-white/[0.02] border border-white/[0.04]">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-white/40 text-[10px] font-mono truncate max-w-[120px]">{m.chat_title || m.chat_id}</span>
+                            <span className="text-white/20 text-[10px]">·</span>
+                            <span className="text-white/25 text-[10px] font-mono">#{m.message_id}</span>
+                          </div>
+                          <p className="text-white/60 text-[12px] truncate mt-0.5">{m.text_preview || "(no text preview)"}</p>
+                          <p className="text-white/25 text-[10px] mt-0.5">{new Date(m.sent_at).toLocaleString()}</p>
+                        </div>
+                        <button
+                          onClick={() => deleteOne(m.chat_id, m.message_id)}
+                          disabled={deleting === key}
+                          className="shrink-0 rounded-lg p-1.5 text-red-400/50 hover:text-red-400 hover:bg-red-400/10 transition"
+                        >
+                          {deleting === key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
