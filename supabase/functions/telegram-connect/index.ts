@@ -11,6 +11,9 @@
 //   { action: "commands_list" }
 //   { action: "command_upsert", command, description?, response_type?, content }
 //   { action: "command_delete", command }
+//   { action: "list_messages", chat_id? } -> recent bot messages
+//   { action: "delete_message", chat_id, message_id } -> delete one message
+//   { action: "bulk_delete", chat_id, message_ids[] } -> delete many messages
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { BOT_MODELS, resolveModel } from "../_shared/models.ts";
@@ -259,6 +262,71 @@ Deno.serve(async (req) => {
       await admin.from("telegram_custom_commands").delete().eq("bot_id", existing.id).eq("command", command);
       await refreshCommandMenu(admin, existing.bot_token, existing.id);
       return json({ ok: true });
+    }
+
+    // ── Message management ────────────────────────────────────────────────────
+
+    if (action === "list_messages") {
+      const { data: botRow } = await admin.from("telegram_bots").select("id").eq("user_id", user.id).maybeSingle();
+      if (!botRow) return json({ messages: [] });
+      let q = (admin.from("telegram_bot_messages") as any)
+        .select("id, chat_id, chat_title, message_id, text_preview, sent_at")
+        .eq("user_id", user.id)
+        .is("deleted_at", null)
+        .order("sent_at", { ascending: false })
+        .limit(60);
+      if (body.chat_id) q = q.eq("chat_id", String(body.chat_id));
+      const { data } = await q;
+      return json({ messages: data || [] });
+    }
+
+    if (action === "delete_message") {
+      const { data: botRow } = await admin.from("telegram_bots").select("bot_token").eq("user_id", user.id).maybeSingle();
+      if (!botRow) return json({ error: "No bot connected." }, 400);
+      const { chat_id, message_id } = body;
+      if (!chat_id || !message_id) return json({ error: "chat_id and message_id are required." }, 400);
+      const tg = await fetch(`https://api.telegram.org/bot${botRow.bot_token}/deleteMessage`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id, message_id: Number(message_id) }),
+      }).then(r => r.json());
+      await admin.from("telegram_bot_messages")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("user_id", user.id)
+        .eq("chat_id", String(chat_id))
+        .eq("message_id", String(message_id))
+        .catch(() => {});
+      if (!tg.ok) return json({ error: tg.description || "Telegram refused to delete." }, 400);
+      return json({ ok: true });
+    }
+
+    if (action === "bulk_delete") {
+      const { data: botRow } = await admin.from("telegram_bots").select("bot_token").eq("user_id", user.id).maybeSingle();
+      if (!botRow) return json({ error: "No bot connected." }, 400);
+      const { chat_id, message_ids } = body;
+      if (!chat_id || !Array.isArray(message_ids) || !message_ids.length)
+        return json({ error: "chat_id and message_ids[] are required." }, 400);
+      const results = await Promise.allSettled(
+        message_ids.map((mid: number) =>
+          fetch(`https://api.telegram.org/bot${botRow.bot_token}/deleteMessage`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id, message_id: Number(mid) }),
+          }).then(r => r.json())
+        )
+      );
+      const deleted: number[] = [], failed: number[] = [];
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled" && (r.value as any).ok) deleted.push(message_ids[i]);
+        else failed.push(message_ids[i]);
+      });
+      if (deleted.length) {
+        await admin.from("telegram_bot_messages")
+          .update({ deleted_at: new Date().toISOString() })
+          .eq("user_id", user.id)
+          .eq("chat_id", String(chat_id))
+          .in("message_id", deleted.map(String))
+          .catch(() => {});
+      }
+      return json({ ok: true, deleted, failed });
     }
 
     return json({ error: "Unknown action" }, 400);
