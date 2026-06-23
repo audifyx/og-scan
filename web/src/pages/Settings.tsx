@@ -1832,9 +1832,15 @@ function BotMessageManager({ bot }: { bot: any }) {
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [sweeping, setSweeping] = useState(false);
-  const [confirmScope, setConfirmScope] = useState<{ chatId: string | null; label: string } | null>(null);
+  const [chats, setChats] = useState<{ chat_id: string; chat_title: string }[]>([]);
+  const [chatsLoading, setChatsLoading] = useState(false);
+  const [pickedChat, setPickedChat] = useState("");
+  const [autoLink, setAutoLink] = useState("");
+  const [depth, setDepth] = useState(1000);
+  const [scanning, setScanning] = useState(false);
+  const [confirmScope, setConfirmScope] = useState<{ chatId: string | null; label: string; kind?: "clear" | "auto"; depth?: number } | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [mode, setMode] = useState<"logged" | "manual">("manual");
+  const [mode, setMode] = useState<"logged" | "manual" | "auto">("manual");
 
   const loadMessages = async () => {
     setLoading(true);
@@ -1909,6 +1915,31 @@ function BotMessageManager({ bot }: { bot: any }) {
     } catch (e: any) { toast.error(e.message || "Sweep failed"); } finally { setSweeping(false); }
   };
 
+  const loadChats = async () => {
+    setChatsLoading(true);
+    try {
+      const { data } = await supabase.functions.invoke("telegram-connect", { body: { action: "list_chats" } });
+      setChats(data?.chats || []);
+    } catch { /* ignore */ } finally { setChatsLoading(false); }
+  };
+
+  // Resolve a chat (dropdown id / public link / id), probe the latest message, and delete the bot's own recent messages.
+  const autoClean = async (chat: string, d = 1000) => {
+    if (!chat) return;
+    setScanning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-connect", {
+        body: { action: "auto_clean_chat", chat, depth: d },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      const note = data.rateLimited ? " Telegram throttled the rest — run it again to continue." : "";
+      toast.success(`Deleted ${data.deleted || 0} of your bot's messages (scanned last ${data.scanned}).${note}`);
+      if (data.chat_id) setMessages(prev => prev.filter(m => String(m.chat_id) !== String(data.chat_id)));
+    } catch (e: any) { toast.error(e.message || "Scan & delete failed"); } finally { setScanning(false); setConfirmScope(null); }
+  };
+
+  useEffect(() => { if (expanded && mode === "auto" && !chats.length) loadChats(); }, [expanded, mode]);
+
     useEffect(() => { if (expanded && mode === "logged") loadMessages(); }, [expanded, mode]);
 
   // Group logged messages by chat so each group can be cleared on its own.
@@ -1944,10 +1975,10 @@ function BotMessageManager({ bot }: { bot: any }) {
 
           {/* Mode tabs */}
           <div className="flex rounded-lg border border-white/[0.07] bg-white/[0.03] p-0.5 w-fit">
-            {(["manual", "logged"] as const).map(m => (
+            {(["manual", "auto", "logged"] as const).map(m => (
               <button key={m} onClick={() => setMode(m)}
                 className={`px-3 py-1 rounded-md text-[11px] font-semibold transition capitalize ${mode === m ? "bg-red-500/20 text-red-400" : "text-white/40 hover:text-white/60"}`}>
-                {m === "manual" ? "Manual Delete" : "Logged Messages"}
+                {m === "manual" ? "Manual Delete" : m === "auto" ? "Auto-clean" : "Logged Messages"}
               </button>
             ))}
           </div>
@@ -2011,6 +2042,52 @@ function BotMessageManager({ bot }: { bot: any }) {
                   Sweep & delete range
                 </Button>
               </div>
+            </div>
+          )}
+
+          {mode === "auto" && (
+            <div className="space-y-2.5">
+              <p className="text-white/35 text-[11px] leading-relaxed">
+                Pick a group your bot is in — it auto-detects recent messages and deletes the ones your bot sent. No IDs needed. Telegram can't resolve private invite links, so use the dropdown for private groups.
+              </p>
+              <div>
+                <label className="text-white/40 text-[10px]">Your bot's chats</label>
+                <div className="flex gap-2 mt-1">
+                  <select value={pickedChat} onChange={e => { setPickedChat(e.target.value); setAutoLink(""); }}
+                    className="flex-1 rounded-lg bg-white/5 border border-white/10 text-white/80 text-[12px] px-2 py-2 outline-none focus:border-red-500/40">
+                    <option value="" className="bg-[#0b0b0f]">{chatsLoading ? "Loading chats…" : "Select a group…"}</option>
+                    {chats.map(c => (
+                      <option key={c.chat_id} value={c.chat_id} className="bg-[#0b0b0f]">{c.chat_title}</option>
+                    ))}
+                  </select>
+                  <button onClick={loadChats} disabled={chatsLoading}
+                    className="shrink-0 rounded-lg px-2 text-white/40 hover:text-white transition border border-white/10">
+                    <RefreshCw className={`h-3.5 w-3.5 ${chatsLoading ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-white/10" /><span className="text-white/25 text-[10px]">or paste a public link / chat ID</span><div className="h-px flex-1 bg-white/10" />
+              </div>
+              <Input value={autoLink} onChange={e => { setAutoLink(e.target.value); setPickedChat(""); }}
+                placeholder="t.me/publicgroup  or  -1001234567890"
+                className="bg-white/5 border-white/10 text-[12px] font-mono" />
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-white/40 text-[11px]">Scan depth</span>
+                <select value={depth} onChange={e => setDepth(Number(e.target.value))}
+                  className="rounded-lg bg-white/5 border border-white/10 text-white/80 text-[12px] px-2 py-1.5 outline-none focus:border-red-500/40">
+                  <option value={500} className="bg-[#0b0b0f]">Last 500 messages</option>
+                  <option value={1000} className="bg-[#0b0b0f]">Last 1000 messages</option>
+                  <option value={2000} className="bg-[#0b0b0f]">Last 2000 messages</option>
+                  <option value={3000} className="bg-[#0b0b0f]">Last 3000 messages</option>
+                </select>
+              </div>
+              <Button size="sm" disabled={(!pickedChat && !autoLink.trim()) || scanning}
+                onClick={() => { const chat = autoLink.trim() || pickedChat; const label = autoLink.trim() ? autoLink.trim() : (chats.find(c => c.chat_id === pickedChat)?.chat_title || pickedChat); setConfirmScope({ chatId: chat, label, kind: "auto", depth }); }}
+                className="w-full rounded-xl bg-red-500/80 hover:bg-red-500 text-white text-[12px] font-semibold">
+                {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
+                Scan & delete my bot's messages
+              </Button>
             </div>
           )}
 
@@ -2090,13 +2167,15 @@ function BotMessageManager({ bot }: { bot: any }) {
               <AlertTriangle className="h-4 w-4 text-red-400" /> Delete bot messages?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-white/50">
-              This permanently deletes every logged message your bot sent in <span className="text-white/80 font-semibold">{confirmScope?.label}</span> from Telegram. This can't be undone.
+              {confirmScope?.kind === "auto"
+                ? <>This scans the last {confirmScope?.depth} messages in <span className="text-white/80 font-semibold">{confirmScope?.label}</span> and deletes the ones your bot sent. This can't be undone.</>
+                : <>This permanently deletes every logged message your bot sent in <span className="text-white/80 font-semibold">{confirmScope?.label}</span> from Telegram. This can't be undone.</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-end gap-2 mt-2">
             <AlertDialogCancel className="bg-white/5 border-white/10 text-white/70 hover:bg-white/10">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => confirmScope && clearAll(confirmScope.chatId)}
+              onClick={() => { if (!confirmScope) return; if (confirmScope.kind === "auto") autoClean(confirmScope.chatId || "", confirmScope.depth || 1000); else clearAll(confirmScope.chatId); }}
               className="bg-red-500/80 hover:bg-red-500 text-white">
               Delete them
             </AlertDialogAction>

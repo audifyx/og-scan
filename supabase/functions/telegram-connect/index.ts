@@ -16,6 +16,8 @@
 //   { action: "bulk_delete", chat_id, message_ids[] } -> delete many messages
 //   { action: "clear_all", chat_id? } -> delete every logged message (all chats, or one chat)
 //   { action: "sweep_range", chat_id, from_id, to_id } -> delete a contiguous range of message IDs (the bot only removes its own)
+//   { action: "list_chats" } -> chats the bot is in (for the picker)
+//   { action: "auto_clean_chat", chat, depth? } -> resolve a chat (id / public link / picked), probe latest msg id, sweep & delete the bot's own recent messages
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { BOT_MODELS, resolveModel } from "../_shared/models.ts";
@@ -434,6 +436,100 @@ Deno.serve(async (req) => {
         }
       }
       return json({ ok: true, deleted: deleted.length, scanned: ids.length, removedIds: deleted });
+    }
+
+    if (action === "list_chats") {
+      const { data: botRow } = await admin.from("telegram_bots").select("id").eq("user_id", user.id).maybeSingle();
+      if (!botRow) return json({ chats: [] });
+      const { data } = await admin.from("telegram_alert_chats")
+        .select("chat_id, chat_title")
+        .eq("bot_id", botRow.id)
+        .order("chat_title", { ascending: true });
+      const chats = (data || []).map((c: any) => ({ chat_id: String(c.chat_id), chat_title: c.chat_title || String(c.chat_id) }));
+      return json({ chats });
+    }
+
+    if (action === "auto_clean_chat") {
+      const { data: botRow } = await admin.from("telegram_bots").select("id, user_id, bot_token").eq("user_id", user.id).maybeSingle();
+      if (!botRow) return json({ error: "No bot connected." }, 400);
+
+      const raw = String(body.chat || "").trim();
+      if (!raw) return json({ error: "Pick a chat or paste a public link / chat ID." }, 400);
+      let depth = Math.floor(Number(body.depth) || 1000);
+      if (!Number.isFinite(depth) || depth <= 0) depth = 1000;
+      depth = Math.min(depth, 3000);
+
+      // ── Resolve chat_id from a numeric id, a public t.me/<username>, or @username ──
+      let chatId: string | null = null;
+      if (/^-?\d+$/.test(raw)) {
+        chatId = raw;
+      } else if (/\/\+|joinchat/i.test(raw)) {
+        return json({ error: "Private invite links can't be resolved by Telegram's bot API. Pick the group from the dropdown instead — your bot already knows the chats it's in." }, 400);
+      } else {
+        const m = raw.match(/(?:https?:\/\/)?t\.me\/([^/?\s]+)/i) || raw.match(/^@?([A-Za-z0-9_]{4,})$/);
+        const handle = m ? m[1].replace(/^@/, "") : "";
+        if (handle) {
+          const gc = await fetch(`https://api.telegram.org/bot${botRow.bot_token}/getChat`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: `@${handle}` }),
+          }).then((r) => r.json());
+          if (gc?.ok && gc.result?.id) chatId = String(gc.result.id);
+          else return json({ error: "Couldn't resolve that link (private or not found). Pick the group from the dropdown, or paste a numeric chat ID." }, 400);
+        }
+      }
+      if (!chatId) return json({ error: "Couldn't parse that chat. Use the dropdown or a numeric chat ID." }, 400);
+
+      // ── Probe the latest message id by sending then deleting a tiny message ──
+      const probe = await fetch(`https://api.telegram.org/bot${botRow.bot_token}/sendMessage`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: "\uD83E\uDDF9", disable_notification: true }),
+      }).then((r) => r.json());
+      if (!probe?.ok || !probe.result?.message_id) {
+        return json({ error: probe?.description || "The bot can't post in that chat (is it still a member?)." }, 400);
+      }
+      const latest: number = probe.result.message_id;
+      const chatTitle = probe.result.chat?.title || null;
+      await fetch(`https://api.telegram.org/bot${botRow.bot_token}/deleteMessage`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, message_id: latest }),
+      }).catch(() => {});
+
+      // ── Sweep from newest down; Telegram only lets us delete the bot's OWN messages ──
+      const from = Math.max(1, latest - depth);
+      const ids: number[] = [];
+      for (let i = latest - 1; i >= from; i--) ids.push(i);
+
+      const deleted: number[] = [];
+      let rateLimited = false;
+      const BATCH = 15;
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const batch = ids.slice(i, i + BATCH);
+        const results = await Promise.allSettled(
+          batch.map((mid) =>
+            fetch(`https://api.telegram.org/bot${botRow.bot_token}/deleteMessage`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: chatId, message_id: mid }),
+            }).then((r) => r.json())
+          )
+        );
+        let batch429 = 0;
+        results.forEach((r, idx) => {
+          const v: any = r.status === "fulfilled" ? r.value : null;
+          if (v?.ok) deleted.push(batch[idx]);
+          else if (v?.error_code === 429) batch429++;
+        });
+        if (batch429 >= BATCH) { rateLimited = true; break; } // hard throttle — stop, let them re-run
+      }
+
+      // Reflect in the logged table.
+      if (deleted.length) {
+        for (let i = 0; i < deleted.length; i += 200) {
+          await admin.from("telegram_bot_messages").update({ deleted_at: new Date().toISOString() })
+            .eq("user_id", botRow.user_id).eq("chat_id", chatId)
+            .in("message_id", deleted.slice(i, i + 200).map(String)).catch(() => {});
+        }
+      }
+      return json({ ok: true, chat_id: chatId, chat_title: chatTitle, deleted: deleted.length, scanned: ids.length, rateLimited });
     }
 
     return json({ error: "Unknown action" }, 400);
