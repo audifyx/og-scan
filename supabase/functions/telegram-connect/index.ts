@@ -15,6 +15,7 @@
 //   { action: "delete_message", chat_id, message_id } -> delete one message
 //   { action: "bulk_delete", chat_id, message_ids[] } -> delete many messages
 //   { action: "clear_all", chat_id? } -> delete every logged message (all chats, or one chat)
+//   { action: "sweep_range", chat_id, from_id, to_id } -> delete a contiguous range of message IDs (the bot only removes its own)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { BOT_MODELS, resolveModel } from "../_shared/models.ts";
@@ -382,6 +383,57 @@ Deno.serve(async (req) => {
         }
       }
       return json({ ok: true, deleted: deletedIds.length, failed, scope: scopeChat || "all" });
+    }
+
+    if (action === "sweep_range") {
+      const { data: botRow } = await admin.from("telegram_bots").select("id, user_id, bot_token").eq("user_id", user.id).maybeSingle();
+      if (!botRow) return json({ error: "No bot connected." }, 400);
+      const chat_id = body.chat_id != null ? String(body.chat_id) : "";
+      let from = Math.floor(Number(body.from_id));
+      let to = Math.floor(Number(body.to_id));
+      if (!chat_id || !Number.isFinite(from) || !Number.isFinite(to) || from <= 0 || to <= 0)
+        return json({ error: "chat_id, from_id and to_id are required." }, 400);
+      if (from > to) { const t = from; from = to; to = t; }
+      const MAX_SPAN = 2000;
+      if (to - from + 1 > MAX_SPAN) return json({ error: `Range too large — max ${MAX_SPAN} message IDs at a time.` }, 400);
+
+      const ids: number[] = [];
+      for (let i = from; i <= to; i++) ids.push(i);
+
+      // Try to delete each ID. Telegram silently fails for IDs the bot didn't send
+      // (or that don't exist), so only the bot's own messages actually get removed.
+      const deleted: number[] = [];
+      let failed = 0;
+      const BATCH = 20;
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const batch = ids.slice(i, i + BATCH);
+        const results = await Promise.allSettled(
+          batch.map((mid) =>
+            fetch(`https://api.telegram.org/bot${botRow.bot_token}/deleteMessage`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id, message_id: mid }),
+            }).then((r) => r.json())
+          )
+        );
+        results.forEach((r, idx) => {
+          const v: any = r.status === "fulfilled" ? r.value : null;
+          if (v?.ok) deleted.push(batch[idx]);
+          else failed++;
+        });
+      }
+
+      // Reflect any deletions in the logged table too.
+      if (deleted.length) {
+        for (let i = 0; i < deleted.length; i += 200) {
+          await admin.from("telegram_bot_messages")
+            .update({ deleted_at: new Date().toISOString() })
+            .eq("user_id", botRow.user_id)
+            .eq("chat_id", chat_id)
+            .in("message_id", deleted.slice(i, i + 200).map(String))
+            .catch(() => {});
+        }
+      }
+      return json({ ok: true, deleted: deleted.length, scanned: ids.length, removedIds: deleted });
     }
 
     return json({ error: "Unknown action" }, 400);

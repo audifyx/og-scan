@@ -1829,6 +1829,9 @@ function BotMessageManager({ bot }: { bot: any }) {
   const [bulkIds, setBulkIds] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
   const [clearing, setClearing] = useState<string | null>(null); // chat_id being cleared, or "all"
+  const [fromId, setFromId] = useState("");
+  const [toId, setToId] = useState("");
+  const [sweeping, setSweeping] = useState(false);
   const [confirmScope, setConfirmScope] = useState<{ chatId: string | null; label: string } | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<"logged" | "manual">("manual");
@@ -1891,7 +1894,22 @@ function BotMessageManager({ bot }: { bot: any }) {
     } catch (e: any) { toast.error(e.message || "Clear failed"); } finally { setClearing(null); setConfirmScope(null); }
   };
 
-  useEffect(() => { if (expanded && mode === "logged") loadMessages(); }, [expanded, mode]);
+  // Sweep a contiguous span of message IDs in a chat — the bot removes only its own.
+  const sweepRange = async () => {
+    const f = Number(fromId), t = Number(toId);
+    if (!chatId || !f || !t) return;
+    setSweeping(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-connect", {
+        body: { action: "sweep_range", chat_id: chatId, from_id: f, to_id: t },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+      toast.success(`Removed ${data.deleted || 0} of your bot's messages (scanned ${data.scanned} IDs)`);
+      setFromId(""); setToId("");
+    } catch (e: any) { toast.error(e.message || "Sweep failed"); } finally { setSweeping(false); }
+  };
+
+    useEffect(() => { if (expanded && mode === "logged") loadMessages(); }, [expanded, mode]);
 
   // Group logged messages by chat so each group can be cleared on its own.
   const groups = (() => {
@@ -1971,6 +1989,28 @@ function BotMessageManager({ bot }: { bot: any }) {
                 {clearing === chatId ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
                 Clear every logged message in this chat
               </Button>
+
+              {/* Sweep a range of message IDs — best for old spam bursts the bot sent before logging existed */}
+              <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-2.5 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Zap className="h-3.5 w-3.5 text-og-lime" />
+                  <span className="text-white/70 text-[12px] font-semibold">Sweep range</span>
+                </div>
+                <p className="text-white/30 text-[10px] leading-relaxed">
+                  Deletes every message ID from first to last in this chat. Your bot only removes its OWN messages — others are skipped. Best for old spam your bot sent before logging existed. Long-press the first &amp; last spam message → Copy Link; the number after the last <span className="font-mono">/</span> is the message ID.
+                </p>
+                <div className="flex gap-2">
+                  <Input value={fromId} onChange={e => setFromId(e.target.value)} placeholder="From message ID"
+                    className="bg-white/5 border-white/10 text-[12px] font-mono" />
+                  <Input value={toId} onChange={e => setToId(e.target.value)} placeholder="To message ID"
+                    className="bg-white/5 border-white/10 text-[12px] font-mono" />
+                </div>
+                <Button size="sm" disabled={!chatId || !fromId || !toId || sweeping} onClick={sweepRange}
+                  className="w-full rounded-xl bg-red-500/80 hover:bg-red-500 text-white text-[12px]">
+                  {sweeping ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Zap className="h-3.5 w-3.5 mr-1.5" />}
+                  Sweep & delete range
+                </Button>
+              </div>
             </div>
           )}
 
