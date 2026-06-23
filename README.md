@@ -1,62 +1,60 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=venom&height=280&text=%E2%AC%A1%20OG%20SCAN&fontSize=70&color=gradient&customColorList=6,11,20&animation=twinkling&fontColor=ffffff&desc=On-chain%20Intelligence%20Suite%20%E2%80%94%20Solana&descSize=19&descAlignY=78&stroke=7B2FBE&strokeWidth=1" width="100%" alt="OG Scan"/>
+<img src="https://raw.githubusercontent.com/audifyx/og-scan/main/assets/banner.jpg" width="100%" alt="OG Scan — Advanced On-Chain Intelligence"/>
+
+<br/><br/>
+
+[![Launch App](https://img.shields.io/badge/%F0%9F%8C%90%20Launch%20App-ogscan.fun-7B2FBE?style=for-the-badge)](https://ogscan.fun)
+[![Telegram](https://img.shields.io/badge/%F0%9F%92%AC%20Telegram-Join%20Community-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/ogscan)
+[![X / Twitter](https://img.shields.io/badge/%F0%9F%90%A6%20Follow-%40ogscan-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/ogscan)
 
 <br/>
 
-[![Platform Users](https://img.shields.io/badge/🟢_Platform_Users-55-7B2FBE?style=for-the-badge)](https://ogscan.fun)
-[![Telegram](https://img.shields.io/badge/📡_Telegram-185_Members-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/ogscan)
-[![X / Twitter](https://img.shields.io/badge/🐦_X_%2F_Twitter-182_Followers-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/ogscan)
-[![Live Since](https://img.shields.io/badge/🚀_Live_Since-May_2026-00FF88?style=for-the-badge)](https://ogscan.fun)
-[![Solana](https://img.shields.io/badge/⛓_Network-Solana_Mainnet-9945FF?style=for-the-badge&logo=solana&logoColor=white)](https://solana.com)
-
-<br/>
-
-<a href="https://ogscan.fun"><img src="https://img.shields.io/badge/🌐_Launch_App-ogscan.fun-7B2FBE?style=for-the-badge" alt="Launch App"/></a>
-&nbsp;
-<a href="https://t.me/ogscan"><img src="https://img.shields.io/badge/💬_Telegram-Join_Community-2CA5E0?style=for-the-badge&logo=telegram" alt="Telegram"/></a>
-&nbsp;
-<a href="https://x.com/ogscan"><img src="https://img.shields.io/badge/🐦_Follow-@ogscan-000000?style=for-the-badge&logo=x" alt="X / Twitter"/></a>
+![Platform Users](https://img.shields.io/badge/Platform%20Users-55-7B2FBE?style=flat-square)
+![Telegram](https://img.shields.io/badge/Telegram-185%20Members-2CA5E0?style=flat-square&logo=telegram&logoColor=white)
+![X Followers](https://img.shields.io/badge/X%20Followers-182-000000?style=flat-square&logo=x&logoColor=white)
+![Live Since](https://img.shields.io/badge/Live%20Since-May%202026-00FF88?style=flat-square)
+![Chains](https://img.shields.io/badge/Chains-16-9945FF?style=flat-square)
 
 </div>
 
 ---
 
-## 🌌 What is OG Scan?
+## What is OG Scan?
 
-**OG Scan** is a real-time **Solana on-chain intelligence platform** — combining token scanners, whale tracking, migration alerts, live community feeds, and **Grim**, an AI analysis agent, into one unified suite.
+**OG Scan** is a unified on-chain intelligence platform covering **16 blockchains** — scan tokens, analyze wallets, generate AI reports, detect early launches, track markets, and automate alerts, all in one place.
 
-Whether you're hunting early plays, tracking whale wallets, or vetting a token before aping — OG Scan gives you the edge.
+> Token scanning · Wallet forensics · AI analyst · PDF reports · Market radar · Early launch detection · Telegram bot · Webhook alerts · X integration · Custom AI bots · Live crypto news · Instant listings
 
-> *Live since May 7, 2026 · 46 days running · Growing daily*
+**→ [ogscan.fun](https://ogscan.fun)**
 
 ---
 
-## 📊 Live Platform Stats
+## Live Stats
 
 <div align="center">
 
 <table>
 <tr>
-<td align="center" width="180">
-<h3>55</h3>
-<b>Platform Users</b><br/>
-<sub>Active accounts on ogscan.fun</sub>
+<td align="center" width="160">
+<h2>55</h2>
+<b>Platform Users</b>
 </td>
-<td align="center" width="180">
-<h3>185</h3>
-<b>Telegram Members</b><br/>
-<sub>Community channel</sub>
+<td align="center" width="160">
+<h2>185</h2>
+<b>Telegram Members</b>
 </td>
-<td align="center" width="180">
-<h3>182</h3>
-<b>X Followers</b><br/>
-<sub>@ogscan on X</sub>
+<td align="center" width="160">
+<h2>182</h2>
+<b>X Followers</b>
 </td>
-<td align="center" width="180">
-<h3>46</h3>
-<b>Days Live</b><br/>
-<sub>Since May 7, 2026</sub>
+<td align="center" width="160">
+<h2>16</h2>
+<b>Chains Supported</b>
+</td>
+<td align="center" width="160">
+<h2>May '26</h2>
+<b>Live Since</b>
 </td>
 </tr>
 </table>
@@ -65,76 +63,108 @@ Whether you're hunting early plays, tracking whale wallets, or vetting a token b
 
 ---
 
-## 🔮 Token
+## Token
 
 <div align="center">
 
-**Contract Address (CA)**
+**Contract Address**
 
 ```
 HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump
 ```
 
-[![Trade on Jupiter](https://img.shields.io/badge/Trade%20on-Jupiter-FF6B35?style=for-the-badge)](https://jup.ag/swap/HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump)
-[![View on Solscan](https://img.shields.io/badge/View%20on-Solscan-9945FF?style=for-the-badge)](https://solscan.io/token/HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump)
-[![Dexscreener](https://img.shields.io/badge/Chart%20on-Dexscreener-00FF88?style=for-the-badge)](https://dexscreener.com/solana/HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump)
+[![Trade on Jupiter](https://img.shields.io/badge/Trade-Jupiter-FF6B35?style=for-the-badge)](https://jup.ag/swap/HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump)&nbsp;
+[![View on Solscan](https://img.shields.io/badge/View-Solscan-9945FF?style=for-the-badge)](https://solscan.io/token/HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump)&nbsp;
+[![Chart on Dexscreener](https://img.shields.io/badge/Chart-Dexscreener-00FF88?style=for-the-badge)](https://dexscreener.com/solana/HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump)
 
 </div>
 
 ---
 
-## ⚡ Core Features
+## Features
 
 <table>
 <tr>
 <td valign="top" width="50%">
 
-### 🔍 Token Scanner
-Real-time scanning with **OG composite score** — same data on the web app and Telegram. Powered by Jupiter, Helius & Birdeye.
-
-`/scan <mint|$ticker>`
+### 🔍 OG Scanner
+Paste a contract address and get instant analysis — holders, activity, risk flags, contract forensics. Works across 16 chains.
 
 </td>
 <td valign="top" width="50%">
 
-### 🐋 Whale Tracker
-Live whale wallet monitoring with migration alerts. Know when big wallets are moving **before** the crowd does.
-
-`/migrations`
+### 💰 Wallet Intelligence
+Deep-dive any wallet. Holdings, trade history, win rate, timing patterns. Ask AI about behavior directly.
 
 </td>
 </tr>
 <tr>
 <td valign="top" width="50%">
 
-### 🤖 AI Agent — Grim
-Your personal on-chain analyst. Chat with Grim in Telegram or Discord DMs. Get **branded PDF reports** on any token on demand.
-
-`/report <token>` · `/chat <message>`
+### 🧠 AI Analyst
+Share a token or wallet and get detailed AI analysis trained on years of on-chain data. Unlimited chat.
 
 </td>
 <td valign="top" width="50%">
 
-### 📡 Live Feeds
-Real-time Dexscreener WebSocket feeds, trending tokens, and community-curated plays — all in one dashboard.
-
-`/trending`
+### 📊 PDF Reports
+Generate downloadable reports with charts, metrics, and AI insights. `/report <token>` in Telegram or web.
 
 </td>
 </tr>
 <tr>
 <td valign="top" width="50%">
 
-### 📱 Telegram Bot
-Connect your own BotFather bot. Full command parity with the web app. Custom slash commands + **AI persona** you name and define.
-
-`/scan` · `/trending` · `/alerts on|off` · `/chat`
+### 📈 Market Radar
+Track launches, trending pairs, and market activity across 16 chains. Live feeds refresh every minute.
 
 </td>
 <td valign="top" width="50%">
 
-### 🎮 Discord Bot
-Slash commands `/chat` and `/migrations`. Alert webhooks delivered direct to your server channels. Full setup in `discord-interactions/README.md`.
+### ⚡ Early Launch Detection
+Catch projects before they move. Detect mint events, liquidity adds, and token creation in real-time.
+
+</td>
+</tr>
+<tr>
+<td valign="top" width="50%">
+
+### 🤖 Telegram Bot
+Full platform experience in Telegram. Scan tokens, generate reports, analyze wallets, chat with AI. `/scan` `/report` `/chat`
+
+</td>
+<td valign="top" width="50%">
+
+### 🔔 Webhook Alerts
+Real-time alerts for launches, price targets, and whale activity. No-code setup — connect any system.
+
+</td>
+</tr>
+<tr>
+<td valign="top" width="50%">
+
+### 🐦 X Integration
+Connect your X account. Auto-publish community posts to your profile. We handle API costs.
+
+</td>
+<td valign="top" width="50%">
+
+### ⚙️ Custom AI Bots
+Build branded bots for Telegram or Discord. Upload knowledge files, customize, and deploy instantly. 5+ free.
+
+</td>
+</tr>
+<tr>
+<td valign="top" width="50%">
+
+### 📰 Live Crypto News
+Track bullish and bearish news, market narratives, and ecosystem updates in real-time.
+
+</td>
+<td valign="top" width="50%">
+
+### 🎯 Instant Listings
+Paste a CA and auto-pull project names, logos, banners, metadata, and market data in seconds.
 
 </td>
 </tr>
@@ -142,7 +172,7 @@ Slash commands `/chat` and `/migrations`. Alert webhooks delivered direct to you
 
 ---
 
-## 🛸 Tech Stack
+## Tech Stack
 
 <div align="center">
 
@@ -151,26 +181,25 @@ Slash commands `/chat` and `/migrations`. Alert webhooks delivered direct to you
 [![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
 [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
-[![Solana](https://img.shields.io/badge/Solana-9945FF?style=for-the-badge&logo=solana&logoColor=white)](https://solana.com)
 
 </div>
 
 ---
 
-## 🧩 Repo Structure
+## Repo Structure
 
 ```
 og-scan/
-├── web/                ← Vite + React app (ogscan.fun)
+├── web/              ← Vite + React app (ogscan.fun)
 ├── supabase/
-│   └── functions/      ← Edge Functions (AI agent, APIs, data sync)
-├── api/                ← Vercel serverless functions
-└── docs/               ← Internal guides and specs
+│   └── functions/    ← Edge Functions (AI agent, APIs, data sync)
+├── api/              ← Vercel serverless functions
+└── docs/             ← Internal guides and specs
 ```
 
 ---
 
-## ⚙️ Local Setup
+## Local Setup
 
 ```bash
 git clone https://github.com/audifyx/og-scan
@@ -182,24 +211,14 @@ npm run dev
 
 ---
 
-## 🌐 Community
-
 <div align="center">
 
-| Platform | Link | Size |
-|----------|------|------|
-| 🌐 App | [ogscan.fun](https://ogscan.fun) | 55 users |
-| 📱 Telegram | [t.me/ogscan](https://t.me/ogscan) | 185 members |
-| 🐦 X / Twitter | [@ogscan](https://x.com/ogscan) | 182 followers |
+[![Telegram](https://img.shields.io/badge/t.me%2Fogscan-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/ogscan)
+[![X](https://img.shields.io/badge/%40ogscan-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/ogscan)
+[![Website](https://img.shields.io/badge/ogscan.fun-7B2FBE?style=for-the-badge)](https://ogscan.fun)
 
-</div>
+<br/>
 
----
-
-<div align="center">
-
-**Proprietary — © OG Scan. All rights reserved.**
-
-<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=120&section=footer" width="100%"/>
+*Proprietary — © OG Scan. All rights reserved.*
 
 </div>
