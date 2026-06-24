@@ -56,7 +56,10 @@ export interface ChartData { ok: boolean; candles: Candle[]; pool?: string | nul
 export const getChart = (mint: string, interval = "1h", limit = 200, chain = "solana") =>
  j(`/api/ogdex/chart?mint=${mint}&interval=${interval}&limit=${limit}&chain=${chain}`);
 export interface WalletHolding { mint: string; uiAmount: number; decimals: number; priceUsd: number | null; usdValue: number; change24h?: number | null; name?: string | null; symbol?: string | null; image?: string | null; mcap?: number | null; }
-export interface WalletPortfolio { ok: boolean; address: string; sol: number; solPrice: number; solUsd: number; totalUsd: number; tokenCount: number; holdings: WalletHolding[]; pnl?: { realizedPnlUsd: number; realizedPnlSol: number; winRate: number | null; closedTrades: number; totalSwaps: number } | null; error?: string; }
+export interface PnlPosition { mint: string; tokens: number; costSol: number; costUsd: number; avgCostUsd: number | null; curPriceUsd: number | null; curValueUsd: number | null; unrealizedUsd: number | null; symbol?: string | null; name?: string | null; image?: string | null; }
+export interface PnlPerToken { mint: string; realizedUsd: number; realizedSol: number; unrealizedUsd: number | null; totalUsd: number; closedTrades: number; winRate: number | null; open: boolean; tokens: number; avgCostUsd: number | null; curPriceUsd: number | null; curValueUsd: number | null; symbol?: string | null; name?: string | null; image?: string | null; }
+export interface WalletPnl { realizedPnlUsd: number; realizedPnlSol: number; unrealizedPnlUsd: number | null; unrealizedPnlSol: number | null; totalPnlUsd: number | null; winRate: number | null; closedTrades: number; openPositions: number; totalSwaps: number; positions: PnlPosition[]; perToken: PnlPerToken[]; solPrice: number; }
+export interface WalletPortfolio { ok: boolean; address: string; sol: number; solPrice: number; solUsd: number; totalUsd: number; tokenCount: number; holdings: WalletHolding[]; pnl?: WalletPnl | null; error?: string; }
 export const getWallet = (address: string) => j(`/api/ogdex/wallet?address=${address}`);
 export const getConfig = () => j(`/api/ogdex/config`);
 export const getListings = (featuredOnly = false) =>

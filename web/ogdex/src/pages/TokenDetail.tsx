@@ -11,6 +11,7 @@ import WalletLink from "../components/WalletLink";
 import KolBadge from "../components/KolBadge";
 import KolWhaleActivity from "../components/KolWhaleActivity";
 import { getKolDirectory, KolDirEntry } from "../lib/kol";
+import { buildHolderIntel } from "../lib/holderIntel";
 import PriceChart from "../components/PriceChart";
 import TradePanel from "../components/TradePanel";
 import TrustPanel from "../components/TrustPanel";
@@ -185,8 +186,8 @@ export default function TokenDetail() {
       {tab === "predictive" && <PredictiveIntel d={d} />}
       {tab === "smartmoney" && <CapitalFlow d={d} />}
       {tab === "kolwhale" && <KolWhaleActivity d={d} dir={dir} />}
-      {tab === "holders" && <HoldersTable holders={holders} price={price} dir={dir} />}
-      {tab === "trades" && <TradesTable trades={trades} mint={mint} onRefresh={() => getToken(mint).then(setD)} />}
+      {tab === "holders" && <><HolderIntel holders={holders} safety={safety} dir={dir} /><HoldersTable holders={holders} price={price} dir={dir} /></>}
+      {tab === "trades" && <TradesTable trades={trades} mint={mint} dir={dir} onRefresh={() => getToken(mint).then(setD)} />}
       {tab === "forensics" && <Forensics d={d} meta={meta} safety={safety} />}
     </div>
   );
@@ -257,6 +258,35 @@ function Overview({ d, t, meta, safety, trades }: any) {
 }
 
 /* ---------- Holders ---------- */
+function HolderIntel({ holders, safety, dir }: { holders: any[]; safety: any; dir: Record<string, KolDirEntry> }) {
+  if (!holders?.length) return null;
+  const r = buildHolderIntel(holders, safety, dir);
+  const toneCls = r.tone === "good" ? "text-up border-up/30 bg-up/10" : r.tone === "bad" ? "text-down border-down/30 bg-down/10" : "text-yellow-300 border-yellow-400/30 bg-yellow-400/10";
+  const dot = (t: string) => t === "good" ? "bg-up" : t === "bad" ? "bg-down" : "bg-yellow-400";
+  return (
+    <div className={`card mb-3 border ${toneCls.split(" ").slice(1).join(" ")}`}>
+      <div className="flex items-center gap-2 px-4 py-3">
+        <ShieldCheck className={`w-4 h-4 ${toneCls.split(" ")[0]}`} />
+        <span className="text-sm font-bold text-white">Holder Intel</span>
+        <span className={`pill text-[10px] ${toneCls}`}>{r.verdict}</span>
+        <div className="ml-auto flex gap-3 text-[11px] text-muted">
+          {r.top10Pct != null && <span>Top10 <b className="text-white">{r.top10Pct.toFixed(0)}%</b></span>}
+          <span>Whales <b className="text-white">{r.whaleCount}</b></span>
+          {r.bundleWallets >= 4 && <span>Bundle <b className="text-white">{r.bundleWallets}</b></span>}
+        </div>
+      </div>
+      <div className="grid gap-1.5 border-t border-line p-3 sm:grid-cols-2">
+        {r.flags.map((f, i) => (
+          <div key={i} className="flex items-start gap-2 text-[12.5px] text-white/80">
+            <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${dot(f.tone)}`} />
+            <span>{f.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function HoldersTable({ holders, price, dir = {} }: { holders: any[]; price?: number; dir?: Record<string, KolDirEntry> }) {
   if (!holders.length) return <Empty text="Holder data unavailable for this token." />;
   const maxPct = Math.max(...holders.map((h) => h.pct || 0), 1);
@@ -300,18 +330,21 @@ function HoldersTable({ holders, price, dir = {} }: { holders: any[]; price?: nu
 }
 
 /* ---------- Trades ---------- */
-function TradesTable({ trades, mint, onRefresh }: { trades: any[]; mint: string; onRefresh: () => void }) {
+function TradesTable({ trades, mint, dir = {}, onRefresh }: { trades: any[]; mint: string; dir?: Record<string, KolDirEntry>; onRefresh: () => void }) {
+  const [auto, setAuto] = useState(true);
+  useEffect(() => { if (!auto) return; const id = setInterval(onRefresh, 15000); return () => clearInterval(id); }, [auto, onRefresh]);
   if (!trades.length) return <Empty text="No recent trades available." />;
   return (
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-line text-sm font-semibold flex items-center gap-2"><Activity className="w-4 h-4 text-accent" /> Live Trades <span className="pill bg-up/10 text-up text-[10px] inline-flex items-center gap-1"><Radio className="w-3 h-3 animate-pulse" /> LIVE</span>
-        <button onClick={onRefresh} className="ml-auto btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1 text-xs"><RefreshCw className="w-3 h-3" /> Refresh</button>
+        <button onClick={() => setAuto((a) => !a)} className={`ml-auto btn inline-flex items-center gap-1 text-xs ${auto ? "bg-up/15 text-up" : "bg-panel2 text-muted hover:text-white"}`}><Radio className={`w-3 h-3 ${auto ? "animate-pulse" : ""}`} /> {auto ? "Auto" : "Paused"}</button>
+        <button onClick={onRefresh} className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1 text-xs"><RefreshCw className="w-3 h-3" /> Refresh</button>
       </div>
       <div className="overflow-x-auto max-h-[640px] overflow-y-auto">
         <table className="w-full text-sm min-w-[640px]">
           <thead className="sticky top-0 bg-panel"><tr className="text-muted text-xs border-b border-line">
             <th className="text-left px-4 py-2">Time</th><th className="text-left px-2 py-2">Side</th><th className="text-right px-2 py-2">Price</th>
-            <th className="text-right px-2 py-2">Amount</th><th className="text-right px-2 py-2">USD</th><th className="text-left px-2 py-2">Trader</th><th className="text-left px-4 py-2">DEX</th>
+            <th className="text-right px-2 py-2">Amount</th><th className="text-right px-2 py-2">USD</th><th className="text-left px-2 py-2">Trader</th><th className="text-left px-2 py-2">Tag</th><th className="text-left px-4 py-2">DEX</th>
           </tr></thead>
           <tbody>
             {trades.map((t, i) => (
@@ -322,6 +355,7 @@ function TradesTable({ trades, mint, onRefresh }: { trades: any[]; mint: string;
                 <td className="px-2 py-2 text-right">{compact(t.tokenAmount)}</td>
                 <td className="px-2 py-2 text-right">{fmtUsd(t.volumeUsd, { compact: true })}</td>
                 <td className="px-2 py-2">{t.owner ? <WalletLink address={t.owner} icon={false} /> : "—"}</td>
+                <td className="px-2 py-2">{dir[t.owner] ? <span className="pill bg-accent/15 text-accent text-[9px]">{dir[t.owner].name}</span> : (t.volumeUsd >= 1000 ? <span className="pill bg-yellow-400/15 text-yellow-300 text-[9px]">whale</span> : <span className="text-muted/40 text-xs">—</span>)}</td>
                 <td className="px-4 py-2 text-muted">{t.dex || "—"}{t.txHash && <a href={`https://solscan.io/tx/${t.txHash}`} target="_blank" rel="noreferrer" className="ml-1.5 text-accent/70 hover:text-accent"><ExternalLink className="w-3 h-3 inline" /></a>}</td>
               </tr>
             ))}

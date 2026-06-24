@@ -73,8 +73,9 @@ export default async function handler(req, res) {
     }
     const mints = Object.keys(byMint);
 
-    // prices (incl SOL)
-    const prices = await jupPrices([SOL_MINT, ...mints]);
+    // prices (incl SOL + any open-position mints from swap history)
+    const posMints = (pnl?.positions || []).map((p) => p.mint);
+    const prices = await jupPrices([...new Set([SOL_MINT, ...mints, ...posMints])]);
     const solPrice = Number(prices[SOL_MINT]?.usdPrice) || 0;
 
     let holdings = mints.map((m) => {
@@ -95,6 +96,42 @@ export default async function handler(req, res) {
         mcap: md.mcap ?? null,
       };
     });
+
+    // Value open positions (unrealized) against live prices.
+    if (pnl && pnl.positions) {
+      const metaByMint = {};
+      for (const h of holdings) metaByMint[h.mint] = { symbol: h.symbol, name: h.name, image: h.image };
+      const enrich = (x) => { const m = metaByMint[x.mint]; if (m) { x.symbol = m.symbol; x.name = m.name; x.image = m.image; } };
+      (pnl.positions || []).forEach(enrich);
+      (pnl.perToken || []).forEach(enrich);
+      let unrealUsd = 0, unrealSol = 0;
+      const sp = pnl.solPrice || solPrice;
+      const px = (m) => Number(prices[m]?.usdPrice) || 0;
+      for (const p of pnl.positions) {
+        const cur = px(p.mint);
+        if (cur > 0) {
+          p.curPriceUsd = cur;
+          p.curValueUsd = p.tokens * cur;
+          p.unrealizedUsd = p.curValueUsd - (p.costUsd || 0);
+          unrealUsd += p.unrealizedUsd;
+          if (sp > 0) unrealSol += p.curValueUsd / sp - (p.costSol || 0);
+        }
+      }
+      for (const t of (pnl.perToken || [])) {
+        if (!t.open) continue;
+        const cur = px(t.mint);
+        if (cur > 0) {
+          t.curPriceUsd = cur;
+          t.curValueUsd = t.tokens * cur;
+          t.unrealizedUsd = t.curValueUsd - ((t.avgCostUsd || 0) * t.tokens);
+          t.totalUsd = (t.realizedUsd || 0) + (t.unrealizedUsd || 0);
+        }
+      }
+      pnl.perToken && pnl.perToken.sort((a, b) => (b.totalUsd || 0) - (a.totalUsd || 0));
+      pnl.unrealizedPnlUsd = unrealUsd;
+      pnl.unrealizedPnlSol = unrealSol;
+      pnl.totalPnlUsd = (pnl.realizedPnlUsd || 0) + unrealUsd;
+    }
 
     const tokenUsd = holdings.reduce((s, h) => s + (h.usdValue || 0), 0);
     const solUsd = sol * solPrice;

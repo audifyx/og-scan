@@ -4,7 +4,7 @@ import { getWallet, WalletPortfolio, WalletHolding, fmtUsd, compact, short, isWa
 import TokenLogo from "../components/TokenLogo";
 import Copyable from "../components/Copyable";
 import Change from "../components/Change";
-import { ArrowLeft, Loader2, Wallet as WalletIcon, ExternalLink, Star, RefreshCw, Eye, EyeOff, Coins } from "lucide-react";
+import { ArrowLeft, Loader2, Wallet as WalletIcon, ExternalLink, Star, RefreshCw, Eye, EyeOff, Coins, TrendingUp } from "lucide-react";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
@@ -46,11 +46,17 @@ export default function Wallet() {
             <div className="mt-0.5"><Copyable text={address} display={short(address)} className="text-sm" /></div>
             <div className="text-4xl font-bold mt-2">{fmtUsd(total)}</div>
             <div className="text-xs text-muted mt-1">{d?.tokenCount ?? 0} tokens · {d?.sol?.toLocaleString(undefined, { maximumFractionDigits: 3 })} SOL</div>
-            {d?.pnl && (d.pnl.closedTrades || 0) > 0 && (
+            {d?.pnl && ((d.pnl.closedTrades || 0) > 0 || (d.pnl.openPositions || 0) > 0) && (
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                <span className={`pill ${d.pnl.realizedPnlUsd >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>Realized PnL {d.pnl.realizedPnlUsd >= 0 ? "+" : ""}{fmtUsd(d.pnl.realizedPnlUsd)}</span>
+                {d.pnl.totalPnlUsd != null && (
+                  <span className={`pill ${d.pnl.totalPnlUsd >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>Total PnL {d.pnl.totalPnlUsd >= 0 ? "+" : ""}{fmtUsd(d.pnl.totalPnlUsd)}</span>
+                )}
+                <span className={`pill ${d.pnl.realizedPnlUsd >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>Realized {d.pnl.realizedPnlUsd >= 0 ? "+" : ""}{fmtUsd(d.pnl.realizedPnlUsd)}</span>
+                {d.pnl.unrealizedPnlUsd != null && (
+                  <span className={`pill ${d.pnl.unrealizedPnlUsd >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>Unrealized {d.pnl.unrealizedPnlUsd >= 0 ? "+" : ""}{fmtUsd(d.pnl.unrealizedPnlUsd)}</span>
+                )}
                 {d.pnl.winRate != null && <span className="pill bg-panel2 text-muted">Win rate {d.pnl.winRate}%</span>}
-                <span className="pill bg-panel2 text-muted">{d.pnl.closedTrades} closed trades</span>
+                <span className="pill bg-panel2 text-muted">{d.pnl.closedTrades} closed · {d.pnl.openPositions} open</span>
                 <span className="text-[10px] text-muted/60 self-center">recent activity</span>
               </div>
             )}
@@ -117,6 +123,44 @@ export default function Wallet() {
           {!rows.length && <div className="p-10 text-center text-muted text-sm">No holdings found.</div>}
         </div>
       )}
+      {d?.ok && d.pnl && (d.pnl.perToken || []).some((t) => (t.closedTrades || 0) > 0 || t.open) && (
+        <div className="card overflow-hidden mt-4">
+          <div className="px-4 py-3 border-b border-line flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-accent" /><span className="text-sm font-semibold">Per-token PnL</span>
+            <span className="text-xs text-muted">realized + unrealized from recent swaps</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead><tr className="text-muted text-xs border-b border-line">
+                <th className="text-left px-4 py-2">Token</th>
+                <th className="text-right px-2 py-2">Realized</th>
+                <th className="text-right px-2 py-2">Unrealized</th>
+                <th className="text-right px-2 py-2">Total</th>
+                <th className="text-right px-2 py-2">Win rate</th>
+                <th className="text-right px-4 py-2">Status</th>
+              </tr></thead>
+              <tbody>
+                {(d.pnl.perToken || []).filter((t) => (t.closedTrades || 0) > 0 || t.open).slice(0, 30).map((t) => (
+                  <tr key={t.mint} className="border-b border-line/50 hover:bg-panel2/40 cursor-pointer" onClick={() => (window.location.href = `/token/${t.mint}`)}>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <TokenLogo src={t.image} sym={t.symbol || ""} size={26} />
+                        <div className="min-w-0"><div className="font-semibold truncate">{t.symbol || short(t.mint)}</div><div className="text-[11px] text-muted truncate">{t.name || "Unknown"}</div></div>
+                      </div>
+                    </td>
+                    <td className={`px-2 py-2.5 text-right tabular-nums ${t.realizedUsd >= 0 ? "text-up" : "text-down"}`}>{t.closedTrades > 0 ? (t.realizedUsd >= 0 ? "+" : "") + fmtUsd(t.realizedUsd) : "—"}</td>
+                    <td className={`px-2 py-2.5 text-right tabular-nums ${(t.unrealizedUsd || 0) >= 0 ? "text-up" : "text-down"}`}>{t.unrealizedUsd != null ? (t.unrealizedUsd >= 0 ? "+" : "") + fmtUsd(t.unrealizedUsd) : "—"}</td>
+                    <td className={`px-2 py-2.5 text-right font-semibold tabular-nums ${(t.totalUsd || 0) >= 0 ? "text-up" : "text-down"}`}>{(t.totalUsd || 0) >= 0 ? "+" : ""}{fmtUsd(t.totalUsd)}</td>
+                    <td className="px-2 py-2.5 text-right text-muted tabular-nums">{t.winRate != null ? t.winRate + "%" : "—"}</td>
+                    <td className="px-4 py-2.5 text-right">{t.open ? <span className="pill bg-accent/15 text-accent text-[10px]">Open</span> : <span className="pill bg-panel2 text-muted text-[10px]">Closed</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <p className="text-[11px] text-muted text-center mt-4">Balances via on-chain RPC · prices from Jupiter · metadata from GeckoTerminal. Values are estimates.</p>
     </div>
   );
