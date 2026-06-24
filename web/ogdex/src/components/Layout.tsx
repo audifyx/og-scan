@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Radio, Send } from "lucide-react";
+import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Radio, Send, Activity } from "lucide-react";
 import { track, getWatchlist, short } from "../lib/api";
 import LiveStats from "./LiveStats";
 
@@ -55,6 +55,7 @@ export default function Layout() {
             <Link to="/" className="flex items-center"><Brand /></Link>
             <nav className="hidden md:flex items-center gap-1 text-sm">
               {navItem("/", loc.pathname === "/", Coins, "Discovery")}
+              {navItem("/pulse", loc.pathname.startsWith("/pulse"), Activity, "Pulse")}
               {navItem("/wallet", loc.pathname.startsWith("/wallet"), Wallet, "Portfolio")}
               {navItem("/kol", loc.pathname.startsWith("/kol"), Radio, "KOL")}
             </nav>
@@ -97,6 +98,7 @@ export default function Layout() {
         <nav className="flex md:hidden bg-bg/95 backdrop-blur border-b border-white/10">
           {[
             { to: "/", active: loc.pathname === "/", Icon: Coins, label: "Discovery" },
+            { to: "/pulse", active: loc.pathname.startsWith("/pulse"), Icon: Activity, label: "Pulse" },
             { to: "/wallet", active: loc.pathname.startsWith("/wallet"), Icon: Wallet, label: "Portfolio" },
             { to: "/kol", active: loc.pathname.startsWith("/kol"), Icon: Radio, label: "KOL" },
             { to: "/store", active: loc.pathname.startsWith("/store") || loc.pathname.startsWith("/submit") || loc.pathname.startsWith("/boost"), Icon: ShoppingBag, label: "Store" },
