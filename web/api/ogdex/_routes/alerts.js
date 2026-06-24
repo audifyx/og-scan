@@ -29,13 +29,18 @@ export default async function handler(req, res) {
     const a = body.alert || {};
     if (!isAddr(a.mint)) return send(res, 400, { ok: false, error: "invalid mint" });
     if (!TYPES.includes(a.type)) return send(res, 400, { ok: false, error: "invalid type" });
+    const channel = a.channel === "telegram" ? "telegram" : "webhook";
     const target = String(a.target || "").trim();
-    if (!/^https?:\/\//i.test(target)) return send(res, 400, { ok: false, error: "target must be a webhook URL (https://)" });
+    if (channel === "telegram") {
+      if (!/^(-?\d{4,}|@[A-Za-z0-9_]{4,})$/.test(target)) return send(res, 400, { ok: false, error: "Telegram target must be your numeric chat ID or @channel" });
+    } else if (!/^https?:\/\//i.test(target)) {
+      return send(res, 400, { ok: false, error: "target must be a webhook URL (https://)" });
+    }
     const refPrice = await priceOf(a.mint);
     const alert = {
       id: Math.random().toString(36).slice(2, 10),
       mint: a.mint, symbol: a.symbol || null, type: a.type,
-      value: Number(a.value) || 0, channel: "webhook", target,
+      value: Number(a.value) || 0, channel, target,
       refPrice, enabled: true, createdAt: Date.now(), lastFired: 0,
     };
     if (cur.length >= 25) return send(res, 200, { ok: false, error: "max 25 alerts per wallet" });

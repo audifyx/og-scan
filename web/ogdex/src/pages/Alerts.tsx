@@ -21,6 +21,7 @@ export default function Alerts() {
   const [mint, setMint] = useState(params.get("mint") || "");
   const [type, setType] = useState("price_above");
   const [value, setValue] = useState("");
+  const [channel, setChannel] = useState<"telegram" | "webhook">("telegram");
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -39,11 +40,13 @@ export default function Alerts() {
     if (!address) { await connect(); return; }
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint.trim())) { setErr("Enter a valid token mint"); return; }
     if (!value || Number(value) <= 0) { setErr("Enter a target value"); return; }
-    if (!/^https?:\/\//i.test(target.trim())) { setErr("Enter a webhook URL (Discord/Slack/custom)"); return; }
+    if (channel === "telegram") {
+      if (!/^(-?\d{4,}|@[A-Za-z0-9_]{4,})$/.test(target.trim())) { setErr("Enter your Telegram chat ID (numeric) or @channel"); return; }
+    } else if (!/^https?:\/\//i.test(target.trim())) { setErr("Enter a webhook URL (Discord/Slack/custom)"); return; }
     setBusy(true);
     try {
       const r = await fetch("/api/ogdex/alerts", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: address, alert: { mint: mint.trim(), type, value: Number(value), target: target.trim() } }) });
+        body: JSON.stringify({ wallet: address, alert: { mint: mint.trim(), type, value: Number(value), channel, target: target.trim() } }) });
       const d = await r.json();
       if (!d.ok) throw new Error(d.error || "Could not create alert");
       setAlerts(d.alerts); setOk("Alert created"); setValue("");
@@ -80,14 +83,20 @@ export default function Alerts() {
               </select>
               <input value={value} onChange={(e) => setValue(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={type.startsWith("pct") ? "%" : "$ price"} className="inp" />
             </div>
-            <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder="Webhook URL (https://discord.com/api/webhooks/… or your endpoint)" className="inp" />
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-panel2/60 p-1">
+              <button onClick={() => setChannel("telegram")} className={`rounded-lg py-1.5 text-xs font-bold transition ${channel === "telegram" ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>Telegram</button>
+              <button onClick={() => setChannel("webhook")} className={`rounded-lg py-1.5 text-xs font-bold transition ${channel === "webhook" ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>Webhook</button>
+            </div>
+            <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder={channel === "telegram" ? "Your Telegram chat ID (e.g. 123456789)" : "Webhook URL (Discord/Slack/custom)"} className="inp" />
             <button onClick={add} disabled={busy} className="btn w-full bg-accent text-black font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-60">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Create alert
             </button>
           </div>
           {err && <div className="mt-2 flex items-center gap-1.5 text-xs text-down"><AlertTriangle className="h-3.5 w-3.5" /> {err}</div>}
           {ok && <div className="mt-2 flex items-center gap-1.5 text-xs text-up"><CheckCircle2 className="h-3.5 w-3.5" /> {ok}</div>}
-          <p className="mt-2 text-[10px] text-muted/60">Tip: in Discord, Server Settings → Integrations → Webhooks → New Webhook → Copy URL. Checks run automatically.</p>
+          <p className="mt-2 text-[10px] text-muted/60">{channel === "telegram"
+            ? "Telegram: open @Theogsupportbot and tap Start so it can DM you, then message @userinfobot to get your numeric chat ID and paste it above."
+            : "Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy URL."} Alerts are checked every minute.</p>
         </div>
       )}
 

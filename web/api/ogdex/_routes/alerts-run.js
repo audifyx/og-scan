@@ -17,7 +17,20 @@ function triggered(a, price) {
   if (a.type === "pct_down" && a.refPrice) return ((price - a.refPrice) / a.refPrice) * 100 <= -Math.abs(a.value);
   return false;
 }
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 async function deliver(a, price) {
+  const human = `\u{1F514} OGDEX: ${a.symbol || a.mint.slice(0,6)} hit ${a.type.replace("_"," ")} ${a.value}${a.type.startsWith("pct")?"%":""} \u2014 now $${price}\nhttps://ogscan.fun/OGDEX/token/${a.mint}`;
+  if (a.channel === "telegram") {
+    if (!TG_TOKEN) return false;
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: a.target, text: human, disable_web_page_preview: false }),
+      });
+      const d = await r.json().catch(() => ({}));
+      return !!d.ok;
+    } catch { return false; }
+  }
   const msg = {
     source: "OGDEX Alerts", mint: a.mint, symbol: a.symbol, type: a.type, target: a.value,
     price, url: `https://ogscan.fun/OGDEX/token/${a.mint}`,
