@@ -40,6 +40,7 @@ export default function Launch() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [copied, setCopied] = useState("");
+  const [solPrice, setSolPrice] = useState<number | null>(null);
 
   useEffect(() => {
     getLaunchConfig().then(setCfg).catch(() => {});
@@ -47,10 +48,31 @@ export default function Launch() {
     if (p?.publicKey) setWallet(p.publicKey.toString());
   }, []);
 
+  // SOL price is fetched client-side (browser CORS works with Jupiter) so the
+  // pay-in-SOL option always has a quote, regardless of server egress.
+  useEffect(() => {
+    const SOL = "So11111111111111111111111111111111111111112";
+    (async () => {
+      try {
+        const r = await fetch(`https://lite-api.jup.ag/price/v3?ids=${SOL}`);
+        const d = await r.json();
+        const p = Number(d?.[SOL]?.usdPrice);
+        if (p > 0) { setSolPrice(p); return; }
+      } catch {}
+      try {
+        const r = await fetch(`https://lite-api.jup.ag/price/v2?ids=${SOL}`);
+        const d = await r.json();
+        const p = Number(d?.data?.[SOL]?.price);
+        if (p > 0) setSolPrice(p);
+      } catch {}
+    })();
+  }, []);
+
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const feeUsd = cfg?.feeUsd ?? 5;
-  const feeSol = cfg?.solPrice ? feeUsd / cfg.solPrice : null;
+  const effSolPrice = solPrice ?? cfg?.solPrice ?? null;
+  const feeSol = effSolPrice ? feeUsd / effSolPrice : null;
   const feeDisplay = currency === "sol"
     ? (feeSol ? `${feeSol.toFixed(4)} SOL` : `$${feeUsd} in SOL`)
     : `${feeUsd} ${currency.toUpperCase()}`;
@@ -81,7 +103,7 @@ export default function Launch() {
     if (!form.name.trim()) return "Token name is required";
     if (!form.symbol.trim()) return "Token symbol is required";
     if (!imageFile) return "Upload a token image";
-    if (currency === "sol" && !cfg?.solPrice) return "Could not load SOL price — try again";
+    if (currency === "sol" && !effSolPrice) return "Could not load SOL price — try again";
     return "";
   };
 
