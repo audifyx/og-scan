@@ -53,7 +53,7 @@ function FeaturedCard({ f, onClick }: { f: Listing; onClick: () => void }) {
 
       {/* Featured star badge */}
       <div className="absolute top-2.5 right-2.5 z-10">
-        <span className="pill bg-yellow-500/25 text-yellow-400 text-[9px] font-bold backdrop-blur-sm">\u2605</span>
+        <span className="pill bg-yellow-500/25 text-yellow-400 text-[9px] font-bold backdrop-blur-sm">★</span>
       </div>
 
       {/* Bottom info */}
