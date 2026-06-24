@@ -35,12 +35,20 @@ async function rpc(method, params) {
 }
 
 async function solPriceUsd() {
+  // Jupiter price v3 (primary), then v2, then CoinGecko as a final fallback.
+  try {
+    const r = await fetch(`https://lite-api.jup.ag/price/v3?ids=${SOL_MINT}`);
+    if (r.ok) { const d = await r.json(); const p = Number(d?.[SOL_MINT]?.usdPrice); if (p > 0) return p; }
+  } catch {}
   try {
     const r = await fetch(`https://lite-api.jup.ag/price/v2?ids=${SOL_MINT}`);
-    const d = await r.json();
-    const p = Number(d?.data?.[SOL_MINT]?.price);
-    return p > 0 ? p : null;
-  } catch { return null; }
+    if (r.ok) { const d = await r.json(); const p = Number(d?.data?.[SOL_MINT]?.price); if (p > 0) return p; }
+  } catch {}
+  try {
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+    if (r.ok) { const d = await r.json(); const p = Number(d?.solana?.usd); if (p > 0) return p; }
+  } catch {}
+  return null;
 }
 
 export default async function handler(req, res) {
