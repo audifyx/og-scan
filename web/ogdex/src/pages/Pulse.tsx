@@ -55,9 +55,9 @@ function SignalCard({ s }: { s: Signal }) {
           ? <img src={logo} loading="lazy" referrerPolicy="no-referrer" className="h-10 w-10 shrink-0 rounded-full border border-line object-cover bg-panel2" />
           : <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line bg-panel2 text-xs font-bold text-muted">{(s.symbol || "?").slice(0, 2)}</div>}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="truncate font-bold text-white">{s.symbol || short(s.mint)}</span>
-            <span className={`pill inline-flex items-center gap-1 ${tone.bg} ${tone.text} text-[10px] !py-0.5`}>
+            <span className={`pill inline-flex shrink-0 items-center gap-1 whitespace-nowrap ${tone.bg} ${tone.text} text-[10px] !px-1.5 !py-0.5`}>
               <Icon className="h-3 w-3" /> {meta.label}
             </span>
           </div>
