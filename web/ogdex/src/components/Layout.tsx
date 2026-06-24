@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Radio, Rocket, Sparkles } from "lucide-react";
+import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Radio } from "lucide-react";
 import { track, getWatchlist, short } from "../lib/api";
 import LiveStats from "./LiveStats";
 
@@ -40,8 +40,6 @@ export default function Layout() {
               <Link to="/" className={`btn inline-flex items-center gap-1.5 ${loc.pathname === "/" ? "text-white" : "text-muted hover:text-white"}`}><Coins className="w-3.5 h-3.5" /> Discovery</Link>
               <Link to="/wallet" className={`btn inline-flex items-center gap-1.5 ${loc.pathname.startsWith("/wallet") ? "text-white" : "text-muted hover:text-white"}`}><Wallet className="w-3.5 h-3.5" /> Portfolio</Link>
               <Link to="/kol" className={`btn inline-flex items-center gap-1.5 ${loc.pathname.startsWith("/kol") ? "text-white" : "text-muted hover:text-white"}`}><Radio className="w-3.5 h-3.5" /> KOL</Link>
-              <Link to="/new" className={`btn inline-flex items-center gap-1.5 ${loc.pathname.startsWith("/new") ? "text-white" : "text-muted hover:text-white"}`}><Sparkles className="w-3.5 h-3.5" /> New</Link>
-              <Link to="/launch" className={`btn inline-flex items-center gap-1.5 ${loc.pathname.startsWith("/launch") ? "text-accent" : "text-accent/80 hover:text-accent"}`}><Rocket className="w-3.5 h-3.5" /> Launch</Link>
             </nav>
 
             <form onSubmit={go} className="flex-1 max-w-xl relative">
@@ -94,11 +92,6 @@ export default function Layout() {
             loc.pathname.startsWith("/kol") ? "text-accent border-b-2 border-accent" : "text-muted"
           }`}>
             <Radio className="w-3.5 h-3.5" /> KOL
-          </Link>
-          <Link to="/launch" className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
-            loc.pathname.startsWith("/launch") || loc.pathname.startsWith("/new") ? "text-accent border-b-2 border-accent" : "text-muted"
-          }`}>
-            <Rocket className="w-3.5 h-3.5" /> Launch
           </Link>
           <Link to="/store" className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
             loc.pathname.startsWith("/store") || loc.pathname.startsWith("/submit") || loc.pathname.startsWith("/boost") ? "text-accent border-b-2 border-accent" : "text-muted"

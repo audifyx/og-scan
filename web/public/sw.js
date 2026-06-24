@@ -3,7 +3,7 @@
  * Provides offline caching, background sync, rich Web Push notifications, and PWA install support.
  */
 
-const CACHE_NAME = "ogscan-v4";
+const CACHE_NAME = "ogscan-v5";
 const STATIC_ASSETS = [
   "/",
   "/app",
@@ -138,6 +138,12 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
 
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
+
+  // OGDEX is a separate sub-app mounted at /OGDEX with its own hashed assets.
+  // Never let OG Scan's SW cache or intercept it — always go to network.
+  if (url.pathname === "/OGDEX" || url.pathname.startsWith("/OGDEX/") || url.pathname.startsWith("/api/ogdex")) {
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith(
