@@ -13,6 +13,14 @@
       "destination": "/api/share?mint=:mint"
     },
     {
+      "source": "/OGDEX",
+      "destination": "/OGDEX/index.html"
+    },
+    {
+      "source": "/OGDEX/(.*)",
+      "destination": "/OGDEX/index.html"
+    },
+    {
       "source": "/",
       "destination": "/index.html"
     },
@@ -89,5 +97,6 @@
         }
       ]
     }
-  ]
+  ],
+  "buildCommand": "npm run build && npm --prefix ogdex install --no-audit --no-fund && npm --prefix ogdex run build"
 }
