@@ -30,6 +30,14 @@ export default function Layout() {
   const { address, connecting, connect, disconnect } = useWallet();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { track("page_view", { path: loc.pathname }); setWatch(getWatchlist()); setWatchOpen(false); }, [loc.pathname]);
+  // Throttled, fire-and-forget alert evaluation — keeps alerts ticking from real
+  // traffic without a paid cron (external cron can also hit /api/ogdex/alerts-run).
+  useEffect(() => {
+    try {
+      const last = Number(localStorage.getItem("ogdex_alerts_run") || 0);
+      if (Date.now() - last > 60000) { localStorage.setItem("ogdex_alerts_run", String(Date.now())); fetch("/api/ogdex/alerts-run").catch(() => {}); }
+    } catch { /* noop */ }
+  }, []);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setWatchOpen(false); };
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);

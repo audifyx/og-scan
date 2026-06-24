@@ -129,11 +129,5 @@
       ]
     }
   ],
-  "buildCommand": "npm run build && npm --prefix ogdex install --no-audit --no-fund && npm --prefix ogdex run build",
-  "crons": [
-    {
-      "path": "/api/ogdex/alerts-run",
-      "schedule": "0 * * * *"
-    }
-  ]
+  "buildCommand": "npm run build && npm --prefix ogdex install --no-audit --no-fund && npm --prefix ogdex run build"
 }
