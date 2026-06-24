@@ -44,16 +44,8 @@ export default function FeaturedBanner() {
   const hasFeatured = featured.length > 0;
   if (!hasBoosts && !hasFeatured) return null;
 
-  // Cap display at 4 featured tokens
-  const slots = featured.slice(0, 4);
-  const count = slots.length;
-
-  // Grid cols: 1→1, 2→2, 3→3, 4→4 (always fills row evenly)
-  const gridCols =
-    count === 1 ? "grid-cols-1" :
-    count === 2 ? "grid-cols-2" :
-    count === 3 ? "grid-cols-3" :
-                  "grid-cols-4";
+  // Show up to 8 featured tokens as a compact horizontal strip.
+  const slots = featured.slice(0, 8);
 
   const handleToken = (f: Listing) => {
     if (f.chain === "solana") nav(`/token/${f.contract_address}`);
@@ -109,13 +101,14 @@ export default function FeaturedBanner() {
             </Link>
           </div>
 
-          {/* Square grid — 1 full width, 2–4 side by side */}
-          <div className={`grid ${gridCols} gap-2 px-3 pb-3`}>
+          {/* Compact horizontal strip — consistent card size, no giant squares */}
+          <div className="flex gap-2 px-3 pb-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {slots.map((f) => (
               <button
                 key={f.id}
                 onClick={() => handleToken(f)}
-                className="group relative aspect-square rounded-xl overflow-hidden border border-line hover:border-yellow-500/40 transition-all hover:scale-[1.02]"
+                style={{ scrollSnapAlign: "start" }}
+                className="group relative w-52 h-28 shrink-0 rounded-xl overflow-hidden border border-line hover:border-yellow-500/40 transition-all hover:scale-[1.02]"
               >
                 {/* Background: if banner exists use it, else blow up the token logo blurred to fill */}
                 {(f.banner_url || f.logo_url) ? (
@@ -155,14 +148,9 @@ export default function FeaturedBanner() {
                   <div className="font-bold text-white text-sm truncate leading-tight">
                     {f.symbol || f.project_name}
                   </div>
-                  {count <= 2 && (
-                    <div className="text-[10px] text-white/60 truncate leading-tight">
-                      {f.project_name || short(f.contract_address)}
-                    </div>
-                  )}
-                  {count === 1 && f.description && (
-                    <p className="text-[10px] text-white/50 line-clamp-2 mt-0.5">{f.description}</p>
-                  )}
+                  <div className="text-[10px] text-white/60 truncate leading-tight">
+                    {f.project_name || short(f.contract_address)}
+                  </div>
                 </div>
               </button>
             ))}

@@ -190,7 +190,7 @@ export default function Screener() {
         <div className="mb-4 space-y-2 mt-3">
 
           {/* ── Category row ── */}
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
             {CATEGORIES.map((cat) => {
               const Icon = cat.icon;
               const active = cat.id === category;
@@ -198,7 +198,7 @@ export default function Screener() {
                 <button
                   key={cat.id}
                   onClick={() => switchCategory(cat.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border shrink-0 whitespace-nowrap
                     ${active
                       ? "bg-accent/15 text-accent border-accent/40"
                       : "text-muted border-line hover:text-white hover:border-white/20 bg-panel"}`}
@@ -211,7 +211,7 @@ export default function Screener() {
           </div>
 
           {/* ── Sub-tab row ── */}
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="flex items-center gap-1 flex-wrap md:flex-nowrap">
             {subTabs.map((t) => {
               const Icon = t.icon;
               const active = t.id === tab;
