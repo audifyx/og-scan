@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Rocket, Zap, ArrowRight, ShoppingBag, Tag, Gift, Sparkles, Pencil } from "lucide-react";
+import { Rocket, Zap, ArrowRight, ShoppingBag, Tag, Gift, Sparkles, Pencil, Bell } from "lucide-react";
 
 // First 25 listing slots discount (35% off)
 const TOTAL_DISCOUNT_SLOTS = 25;
@@ -66,6 +66,15 @@ export default function Store() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2"><span className="font-bold">Edit Token Metadata</span><span className="pill bg-accent/15 text-accent text-[10px]">Free · self-serve</span></div>
           <p className="text-sm text-muted">Change your token's name, symbol, image &amp; socials from your dev wallet — no $300 fee. Standard SPL tokens (not pump.fun).</p>
+        </div>
+        <ArrowRight className="h-4 w-4 shrink-0 text-muted group-hover:text-accent" />
+      </button>
+
+      <button onClick={() => nav("/alerts")} className="card group mb-4 flex w-full items-center gap-4 p-5 text-left transition-all hover:border-accent/50 hover:bg-accent/5">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent group-hover:bg-accent/20"><Bell className="h-5 w-5" /></div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2"><span className="font-bold">Smart Alerts</span><span className="pill bg-accent/15 text-accent text-[10px]">Free</span></div>
+          <p className="text-sm text-muted">Get pinged when any token hits your price or % target — delivered to Discord, Slack or any webhook.</p>
         </div>
         <ArrowRight className="h-4 w-4 shrink-0 text-muted group-hover:text-accent" />
       </button>

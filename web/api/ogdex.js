@@ -27,11 +27,15 @@ import token from "./ogdex/_routes/token.js";
 import trade from "./ogdex/_routes/trade.js";
 import track from "./ogdex/_routes/track.js";
 import wallet from "./ogdex/_routes/wallet.js";
+import alertsRun from "./ogdex/_routes/alerts-run.js";
+import alerts from "./ogdex/_routes/alerts.js";
+import watchlist from "./ogdex/_routes/watchlist.js";
 import rpc from "./ogdex/_routes/rpc.js";
 
 const ROUTES = {
   admin, boosts, chart, config, kols, launch, launches,
-  listings, metadata, report, screener, signals, search, token, trade, track, wallet, rpc,
+  listings, metadata, report, screener, signals, search, token, trade, track, wallet, watchlist, alerts, rpc,
+  "alerts-run": alertsRun,
 };
 
 export default async function handler(req, res) {

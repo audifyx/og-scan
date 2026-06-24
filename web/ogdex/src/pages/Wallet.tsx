@@ -46,6 +46,14 @@ export default function Wallet() {
             <div className="mt-0.5"><Copyable text={address} display={short(address)} className="text-sm" /></div>
             <div className="text-4xl font-bold mt-2">{fmtUsd(total)}</div>
             <div className="text-xs text-muted mt-1">{d?.tokenCount ?? 0} tokens · {d?.sol?.toLocaleString(undefined, { maximumFractionDigits: 3 })} SOL</div>
+            {d?.pnl && (d.pnl.closedTrades || 0) > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                <span className={`pill ${d.pnl.realizedPnlUsd >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>Realized PnL {d.pnl.realizedPnlUsd >= 0 ? "+" : ""}{fmtUsd(d.pnl.realizedPnlUsd)}</span>
+                {d.pnl.winRate != null && <span className="pill bg-panel2 text-muted">Win rate {d.pnl.winRate}%</span>}
+                <span className="pill bg-panel2 text-muted">{d.pnl.closedTrades} closed trades</span>
+                <span className="text-[10px] text-muted/60 self-center">recent activity</span>
+              </div>
+            )}
           </div>
           <div className="sm:ml-auto flex flex-wrap gap-2">
             <button onClick={() => setWatched(toggleWatch(address))} className={`btn inline-flex items-center gap-1.5 ${watched ? "bg-accent text-black font-semibold" : "bg-panel2 text-muted hover:text-white"}`}>

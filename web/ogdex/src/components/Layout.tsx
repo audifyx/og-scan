@@ -152,6 +152,8 @@ export default function Layout() {
                 <Link to="/wallet" className="block text-muted hover:text-accent">Portfolio</Link>
                 <Link to="/kol" className="block text-muted hover:text-accent">KOL Scanner</Link>
                 <Link to="/store" className="block text-muted hover:text-accent">Store — List &amp; Boost</Link>
+                <Link to="/alerts" className="block text-muted hover:text-accent">Smart Alerts</Link>
+                <Link to="/api" className="block text-muted hover:text-accent">Public API</Link>
               </div>
               <div className="space-y-2">
                 <div className="text-[11px] uppercase tracking-wide text-muted/70">Community</div>

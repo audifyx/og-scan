@@ -1,4 +1,5 @@
 import { callFn, send, cache } from "../_lib.js";
+import { computePnl } from "../_pnl.js";
 
 // Phantom-style wallet portfolio: SOL + SPL holdings with live USD values + metadata.
 // Sources: rpc-proxy (Alchemy) for balances, Jupiter price v3 for prices,
@@ -51,10 +52,11 @@ export default async function handler(req, res) {
   if (!isAddr(address)) return send(res, 400, { ok: false, error: "valid wallet address required" });
   cache(res, 15, 45);
   try {
-    const [lamports, accs1, accs2] = await Promise.all([
+    const [lamports, accs1, accs2, pnl] = await Promise.all([
       rpc("getBalance", [address, { commitment: "confirmed" }]).catch(() => null),
       rpc("getTokenAccountsByOwner", [address, { programId: TOKEN_PROGRAM }, { encoding: "jsonParsed" }]).catch(() => null),
       rpc("getTokenAccountsByOwner", [address, { programId: TOKEN_2022 }, { encoding: "jsonParsed" }]).catch(() => null),
+      computePnl(address).catch(() => null),
     ]);
     const sol = lamports == null ? 0 : (typeof lamports === "number" ? lamports : lamports.value || 0) / 1e9;
     const raw = [...((accs1?.value) || []), ...((accs2?.value) || [])];
@@ -103,6 +105,7 @@ export default async function handler(req, res) {
       totalUsd: tokenUsd + solUsd,
       tokenCount: holdings.length,
       holdings,
+      pnl,
     });
   } catch (e) {
     return send(res, 200, { ok: false, error: String(e?.message || e) });

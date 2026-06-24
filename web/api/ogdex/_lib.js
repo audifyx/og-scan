@@ -77,3 +77,50 @@ export function readBody(req) {
   });
 }
 function safe(s) { try { return JSON.parse(s); } catch { return {}; } }
+
+// ── Supabase Storage KV (no DDL needed — service role over REST) ──────────────
+// Stores small JSON blobs as objects in a private bucket. Used for wallet-keyed
+// watchlists and alerts where creating SQL tables isn't available.
+const KV_BUCKET = "ogdex-kv";
+let _kvReady = false;
+async function kvEnsure() {
+  if (_kvReady) return;
+  try {
+    await fetch(`${SUPA_URL}/storage/v1/bucket`, {
+      method: "POST",
+      headers: { apikey: SRK, Authorization: `Bearer ${SRK}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: KV_BUCKET, name: KV_BUCKET, public: false }),
+    });
+  } catch { /* already exists */ }
+  _kvReady = true;
+}
+export async function kvGet(path) {
+  try {
+    const r = await fetch(`${SUPA_URL}/storage/v1/object/${KV_BUCKET}/${path}`, {
+      headers: { apikey: SRK, Authorization: `Bearer ${SRK}` },
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+export async function kvPut(path, obj) {
+  await kvEnsure();
+  const r = await fetch(`${SUPA_URL}/storage/v1/object/${KV_BUCKET}/${path}`, {
+    method: "POST",
+    headers: { apikey: SRK, Authorization: `Bearer ${SRK}`, "Content-Type": "application/json", "x-upsert": "true" },
+    body: JSON.stringify(obj),
+  });
+  if (!r.ok) throw new Error(`kv put ${r.status}: ${(await r.text()).slice(0, 120)}`);
+  return true;
+}
+export async function kvList(prefix = "") {
+  try {
+    const r = await fetch(`${SUPA_URL}/storage/v1/object/list/${KV_BUCKET}`, {
+      method: "POST",
+      headers: { apikey: SRK, Authorization: `Bearer ${SRK}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix, limit: 1000, sortBy: { column: "name", order: "asc" } }),
+    });
+    if (!r.ok) return [];
+    return await r.json();
+  } catch { return []; }
+}

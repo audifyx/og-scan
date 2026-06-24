@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { setWatchlistWallet } from "./api";
 // Phantom provider access — intentionally has NO @solana/web3.js dependency so
 // the wallet context stays out of the heavy web3 bundle (loaded lazily at trade time).
 export function getPhantom(): any {
@@ -43,6 +44,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       (p as any).removeListener?.("disconnect", onDisc);
     };
   }, []);
+
+  useEffect(() => { setWatchlistWallet(address); }, [address]);
 
   const connect = async () => {
     const p = getPhantom();

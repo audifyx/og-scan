@@ -56,7 +56,7 @@ export interface ChartData { ok: boolean; candles: Candle[]; pool?: string | nul
 export const getChart = (mint: string, interval = "1h", limit = 200, chain = "solana") =>
  j(`/api/ogdex/chart?mint=${mint}&interval=${interval}&limit=${limit}&chain=${chain}`);
 export interface WalletHolding { mint: string; uiAmount: number; decimals: number; priceUsd: number | null; usdValue: number; change24h?: number | null; name?: string | null; symbol?: string | null; image?: string | null; mcap?: number | null; }
-export interface WalletPortfolio { ok: boolean; address: string; sol: number; solPrice: number; solUsd: number; totalUsd: number; tokenCount: number; holdings: WalletHolding[]; error?: string; }
+export interface WalletPortfolio { ok: boolean; address: string; sol: number; solPrice: number; solUsd: number; totalUsd: number; tokenCount: number; holdings: WalletHolding[]; pnl?: { realizedPnlUsd: number; realizedPnlSol: number; winRate: number | null; closedTrades: number; totalSwaps: number } | null; error?: string; }
 export const getWallet = (address: string) => j(`/api/ogdex/wallet?address=${address}`);
 export const getConfig = () => j(`/api/ogdex/config`);
 export const getListings = (featuredOnly = false) =>
@@ -120,7 +120,30 @@ export function toggleWatch(addr: string): boolean {
  const i = list.indexOf(addr);
  if (i >= 0) list.splice(i, 1); else list.unshift(addr);
  localStorage.setItem(WL_KEY, JSON.stringify(list.slice(0, 50)));
+ pushWatchlist();
  return list.includes(addr);
+}
+
+// ── Cross-device watchlist sync (keyed by connected Phantom wallet) ──
+let _syncWallet: string | null = null;
+function setLocalWatchlist(items: string[]) { localStorage.setItem(WL_KEY, JSON.stringify(items.slice(0, 50))); }
+async function pushWatchlist() {
+ if (!_syncWallet) return;
+ try { await fetch("/api/ogdex/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet: _syncWallet, items: getWatchlist() }) }); } catch { /* offline */ }
+}
+export async function pullWatchlist(wallet: string): Promise<string[]> {
+ try {
+  const r = await fetch(`/api/ogdex/watchlist?wallet=${wallet}`);
+  const d = await r.json();
+  const server: string[] = d.items || [];
+  const merged = Array.from(new Set([...getWatchlist(), ...server]));
+  setLocalWatchlist(merged);
+  return merged;
+ } catch { return getWatchlist(); }
+}
+export function setWatchlistWallet(wallet: string | null) {
+ _syncWallet = wallet;
+ if (wallet) { pullWatchlist(wallet).then(() => pushWatchlist()); }
 }
 /* ---- Token Launcher ---- */
 export interface LaunchConfig {
