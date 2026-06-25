@@ -4,7 +4,7 @@ import { CELEB_MINTS, fetchMints } from "../_curated.js";
 
 const CHAINS = ["solana","ethereum","bsc","base","polygon","arbitrum","avalanche","sui","ton"];
 const GT_HDR = { Accept: "application/json;version=20230302" };
-const STABLES = new Set(["USDC","USDT","SOL","WSOL","JLP","JITOSOL","MSOL","BSOL","JUPSOL","INF","USDS","USDE","PYUSD","EURC","CBBTC","WBTC","HSOL","JUP","ISC","USDH","DAI","BUSD"]);
+const STABLES = new Set(["USDC","USDT","SOL","WSOL","JLP","JITOSOL","MSOL","BSOL","JUPSOL","INF","USDS","USDE","PYUSD","EURC","CBBTC","WBTC","HSOL","JUP","ISC","USDH","DAI","BUSD","WETH","ETH","WBNB","BNB","WMATIC","MATIC","POL","WPOL","WAVAX","AVAX","WTON","STETH","WSTETH","FDUSD","TUSD","USDD"]);
 
 // ── Deduplication by mint ─────────────────────────────────────────────────────
 function dedup(rows) {
@@ -109,12 +109,18 @@ async function fetchPump(sortBy, limit = 200, filterFn = null) {
 }
 
 // ── GeckoTerminal trending pages ─────────────────────────────────────────────
+async function gtGet(url) {
+  for (let i = 0; i < 2; i++) {
+    try { const r = await fetch(url, { headers: GT_HDR }); if (r.ok) return await r.json(); } catch { /* retry */ }
+    await new Promise((res) => setTimeout(res, 500));
+  }
+  return null;
+}
 async function fetchGeckoTrending(network, pages = 2) {
   const allData = [];
   const tokenMap = {};
   const fetches = Array.from({ length: pages }, (_, i) =>
-    fetch(`https://api.geckoterminal.com/api/v2/networks/${network}/trending_pools?page=${i + 1}&include=base_token`, { headers: GT_HDR })
-      .then(r => r.ok ? r.json() : null).catch(() => null)
+    gtGet(`https://api.geckoterminal.com/api/v2/networks/${network}/trending_pools?page=${i + 1}&include=base_token`)
   );
   const results = await Promise.all(fetches);
   for (const gt of results) {
@@ -128,7 +134,7 @@ async function fetchGeckoTrending(network, pages = 2) {
 // ── GeckoTerminal new pools ───────────────────────────────────────────────────
 async function fetchGeckoNew(network) {
   const tokenMap = {};
-  const r = await fetch(`https://api.geckoterminal.com/api/v2/networks/${network}/new_pools?page=1&include=base_token`, { headers: GT_HDR }).then(r => r.ok ? r.json() : null).catch(() => null);
+  const r = await gtGet(`https://api.geckoterminal.com/api/v2/networks/${network}/new_pools?page=1&include=base_token`);
   if (!r) return { data: [], tokenMap };
   for (const inc of (r.included || [])) if (inc.type === "token") tokenMap[inc.id] = inc.attributes;
   return { data: r.data || [], tokenMap };
@@ -187,9 +193,9 @@ export default async function handler(req, res) {
         arbitrum: "arbitrum", avalanche: "avax", sui: "sui-network", ton: "ton",
       };
       const net = netMap[chain] || chain;
-      // Fetch 4 pages of trending + 2 pages of new pools for volume variety
+      cache(res, 60, 300); // cache hard — GeckoTerminal rate-limits shared IPs
       const [trend, newP] = await Promise.all([
-        fetchGeckoTrending(net, 4),
+        fetchGeckoTrending(net, 3),
         fetchGeckoNew(net),
       ]);
       const tokenMap = { ...trend.tokenMap, ...newP.tokenMap };
@@ -197,6 +203,7 @@ export default async function handler(req, res) {
         [...trend.data, ...newP.data]
           .map(p => normGecko(p, tokenMap))
           .filter(Boolean)
+          .filter(r => !STABLES.has(String(r.symbol || "").toUpperCase()))
           .filter(r => (r.volume ?? 0) >= 100)
           .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
       ).slice(0, limit);
