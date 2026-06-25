@@ -90,7 +90,7 @@ export default function Layout() {
                 <Star className="w-3.5 h-3.5" /><span className="hidden sm:inline">Watching</span>{watch.length > 0 && <span className="pill bg-accent/15 text-accent text-[10px] !px-1.5 !py-0">{watch.length}</span>}<ChevronDown className="w-3 h-3" />
               </button>
               {watchOpen && (
-                <div className="absolute right-0 mt-2 w-64 card p-1.5 z-40 shadow-xl">
+                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-white/10 p-1.5 z-50 shadow-2xl" style={{ backgroundColor: "#0b0b10" }}>
                   <div className="text-[11px] uppercase tracking-wide text-muted px-2 py-1">Watched wallets</div>
                   {watch.length ? watch.map((w) => (
                     <Link key={w} to={`/wallet/${w}`} onClick={() => setWatchOpen(false)} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-panel2 text-sm font-mono"><Wallet className="w-3.5 h-3.5 text-accent" /> {short(w)}</Link>
