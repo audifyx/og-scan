@@ -100,3 +100,6 @@ verify_jwt = false
 
 [functions.ogdex-intel-v2]
 verify_jwt = false
+
+[functions.ogdex-firstbuyer]
+verify_jwt = false

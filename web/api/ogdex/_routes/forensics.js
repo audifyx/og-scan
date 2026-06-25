@@ -106,11 +106,14 @@ export default async function handler(req, res) {
       else { devHolding = { pct: 0, uiAmount: 0 }; devSold = true; } // not in top holders => effectively exited
     }
 
-    // First buyer trace (best-effort, capped).
+    // First buyer — always-resolves edge function (Helius genesis walk + creator
+    // launch fallback). Pass the known creator so big tokens still get an answer.
     let first = null;
     if (wantFirst) {
-      first = await firstBuyer(mint);
-      if (first?.traced && dev) first.isDev = first.wallet === dev;
+      const fr = await callFn("ogdex-firstbuyer", { mint, creator: dev }).catch(() => null);
+      first = fr?.firstBuyer || null;
+      if (first?.traced && dev && first.wallet) first.isDev = first.wallet === dev || !!first.isDev;
+      if (!first) first = await firstBuyer(mint); // last-resort local trace
     }
 
     // Concentration snapshot.

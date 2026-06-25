@@ -3,6 +3,11 @@ import { timeAgo } from "../lib/format";
 import WalletLink from "./WalletLink";
 import { Wallet, Crown, BadgeCheck, ShieldCheck, ShieldAlert, ExternalLink, Loader2, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 
+function Solscan({ kind, id, label }: { kind: "account" | "tx" | "token"; id: string; label?: string }) {
+  return <a href={`https://solscan.io/${kind === "tx" ? "tx" : kind === "token" ? "token" : "account"}/${id}`} target="_blank" rel="noreferrer" className="text-[11px] text-accent/80 hover:text-accent inline-flex items-center gap-1">{label || "Solscan"} <ExternalLink className="w-3 h-3" /></a>;
+}
+const KIND_LABEL: Record<string, string> = { first_buy: "First market buy", first_transfer: "First transfer", creator_launch: "Creator launch buy" };
+
 function YesNo({ v, goodWhen = true, yes = "Yes", no = "No" }: { v: boolean | null | undefined; goodWhen?: boolean; yes?: string; no?: string }) {
   if (v == null) return <span className="text-muted">—</span>;
   const good = v === goodWhen;
@@ -23,7 +28,7 @@ export default function DevOrigin({ f, loading }: { f: Forensics | null; loading
         <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Wallet className="w-4 h-4 text-accent" /> Developer / Creator</div>
         {f.dev ? (
           <>
-            <Row label="Dev wallet">{f.dev.wallet ? <WalletLink address={f.dev.wallet} /> : "—"}</Row>
+            <Row label="Dev wallet">{f.dev.wallet ? <span className="inline-flex items-center gap-2"><WalletLink address={f.dev.wallet} /><Solscan kind="account" id={f.dev.wallet} /></span> : "—"}</Row>
             <Row label="Dev still holds">
               {f.dev.holding?.pct != null
                 ? <span className={f.dev.sold ? "text-down font-medium" : "text-up font-medium"}>{f.dev.sold ? "Sold / exited" : `${f.dev.holding.pct.toFixed(2)}% held`}</span>
@@ -41,18 +46,26 @@ export default function DevOrigin({ f, loading }: { f: Forensics | null; loading
         <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Crown className="w-4 h-4 text-accent" /> Origin & Listing</div>
         <div className="mb-3">
           <div className="text-muted text-sm mb-1.5">First buyer</div>
-          {fb?.traced ? (
-            <div className="rounded-lg bg-panel2 p-3 space-y-1.5">
+          {fb?.traced && fb.wallet ? (
+            <div className="rounded-lg bg-panel2 p-3 space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <WalletLink address={fb.wallet!} />
+                <WalletLink address={fb.wallet} />
                 {fb.isDev && <span className="pill bg-yellow-400/15 text-yellow-300 text-[9px] inline-flex items-center gap-1"><BadgeCheck className="w-3 h-3" /> Dev</span>}
+                {fb.kind && <span className="pill bg-accent/10 text-accent text-[9px]">{KIND_LABEL[fb.kind] || fb.kind}</span>}
               </div>
-              <div className="text-xs text-muted flex flex-wrap gap-x-3 gap-y-0.5">
-                <span>Bought <span className="text-white">{compact(fb.tokenAmount)}</span> tokens</span>
-                {fb.solSpent ? <span>for <span className="text-white">{fb.solSpent.toFixed(3)} SOL</span></span> : null}
-                {fb.time ? <span>{timeAgo(fb.time)} ago</span> : null}
+              {(fb.tokenAmount || fb.solSpent || fb.usd || fb.time) && (
+                <div className="text-xs text-muted flex flex-wrap gap-x-3 gap-y-0.5">
+                  {fb.tokenAmount ? <span>Bought <span className="text-white">{compact(fb.tokenAmount)}</span> tokens</span> : null}
+                  {fb.solSpent ? <span>for <span className="text-white">{fb.solSpent.toFixed(3)} SOL</span></span> : null}
+                  {fb.usd ? <span>(<span className="text-white">{fmtUsd(fb.usd, { compact: true })}</span>)</span> : null}
+                  {fb.time ? <span>{timeAgo(fb.time)} ago</span> : null}
+                </div>
+              )}
+              {fb.approximate && fb.note && <div className="text-[11px] text-muted/80">{fb.note}</div>}
+              <div className="flex items-center gap-3 flex-wrap pt-0.5">
+                <Solscan kind="account" id={fb.wallet} label="Wallet on Solscan" />
+                {fb.txHash && <Solscan kind="tx" id={fb.txHash} label="View transaction" />}
               </div>
-              {fb.txHash && <a href={`https://solscan.io/tx/${fb.txHash}`} target="_blank" rel="noreferrer" className="text-[11px] text-accent/80 hover:text-accent inline-flex items-center gap-1">View transaction <ExternalLink className="w-3 h-3" /></a>}
             </div>
           ) : <div className="text-xs text-muted">{fb?.note || "Not traced."}</div>}
         </div>

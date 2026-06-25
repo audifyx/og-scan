@@ -168,7 +168,7 @@ export const getLaunches = (limit = 50) =>
 
 /* ---- Per-coin AI chat + token forensics ---- */
 export interface DexPaid { paid: boolean; services: { type: string; status: string; at?: number | null }[]; }
-export interface FirstBuyer { traced: boolean; wallet?: string; tokenAmount?: number; solSpent?: number; txHash?: string | null; time?: number; isDev?: boolean; note?: string; }
+export interface FirstBuyer { traced: boolean; wallet?: string; tokenAmount?: number; solSpent?: number; usd?: number; txHash?: string | null; time?: number; isDev?: boolean; note?: string; source?: string; kind?: string; approximate?: boolean; dex?: string; }
 export interface DevInfo { wallet: string; tokensCreated: number | null; holding: { pct: number | null; uiAmount: number | null } | null; rank: number | null; sold: boolean | null; serial: boolean; }
 export interface Forensics {
   ok: boolean; mint: string; dev: DevInfo | null; firstBuyer: FirstBuyer | null; dexPaid: DexPaid;
