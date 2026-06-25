@@ -175,9 +175,17 @@ export default function Layout() {
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-muted/60">
+          {/* Legal / not-financial-advice */}
+          <div className="mt-6 pt-4 border-t border-white/5 text-[11px] text-muted/70 leading-relaxed">
+            <p><b className="text-muted">Not financial advice.</b> OG DEX is an informational analytics tool. Token scores, risk flags, AI summaries, signals and all data are provided "as is" from third-party sources, may be inaccurate or delayed, and are not investment, financial, legal or tax advice. Crypto is high-risk — do your own research and never invest more than you can afford to lose. OG DEX is non-custodial and never holds your funds or keys.</p>
+          </div>
+          <div className="mt-3 pt-3 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-muted/60">
             <span>© {new Date().getFullYear()} OG DEX. All rights reserved.</span>
-            <span>OG DEX • Advanced token discovery • Portfolio analytics • Multi-chain intelligence</span>
+            <div className="flex items-center gap-3">
+              <Link to="/terms" className="hover:text-accent">Terms</Link>
+              <Link to="/privacy" className="hover:text-accent">Privacy</Link>
+              <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="hover:text-accent">Support</a>
+            </div>
           </div>
         </div>
       </footer>

@@ -47,7 +47,7 @@ export default function TokenDetail() {
 
   useEffect(() => {
     let on = true; setLoading(true);
-    getToken(mint).then((x) => { if (on) { setD(x); setLoading(false); try { track("token_view", { token_ref: x?.token?.symbol || mint, meta: { mint } }); } catch {} } });
+    getToken(mint).then((x) => { if (on) { setD(x); setLoading(false); try { track("token_view", { token_ref: x?.token?.symbol || mint, meta: { mint } }); } catch {} } }).catch(() => { if (on) setLoading(false); });
     return () => { on = false; };
   }, [mint]);
 

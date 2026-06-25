@@ -1,15 +1,12 @@
 // ogdex-firstbuyer — finds the FIRST on-chain buyer of any Solana token.
 // Strategy (no Birdeye, no paid indexer):
-//   1) Bitquery indexed earliest DEX buy (used only if quota available).
-//   2) Helius: walk the mint's signature history to genesis and parse the first
+//   1) Helius: walk the mint's signature history to genesis and parse the first
 //      transaction where a wallet acquires the token while spending SOL.
-//   3) Creator's launch buy — for fair launches (pump.fun etc.) the creator is
+//   2) Creator's launch buy — for fair launches (pump.fun etc.) the creator is
 //      the genuine first acquirer; returned so we ALWAYS have a real answer.
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const HELIUS_API_KEY = Deno.env.get("HELIUS_API_KEY") || "";
-const CLIENT_ID = Deno.env.get("BITQUERY_CLIENT_ID") || "";
-const CLIENT_SECRET = Deno.env.get("BITQUERY_CLIENT_SECRET") || "";
 const RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SRK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -23,7 +20,6 @@ async function kvPut(path: string, obj: unknown) {
     await fetch(`${SUPABASE_URL}/storage/v1/object/${KV_BUCKET}/${path}`, { method: "POST", headers: { apikey: SRK, Authorization: `Bearer ${SRK}`, "Content-Type": "application/json", "x-upsert": "true" }, body: JSON.stringify(obj) });
   } catch { /* best effort */ }
 }
-const EAP = "https://streaming.bitquery.io/eap";
 const SOLMINTS = new Set(["So11111111111111111111111111111111111111112", "11111111111111111111111111111111"]);
 
 const cors = {
@@ -41,35 +37,6 @@ async function rpc(method: string, params: unknown[]) {
   const r = await fetch(RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
   const j = await r.json();
   return j?.result ?? null;
-}
-
-// --- Bitquery (best effort; skipped silently if quota exhausted) ---
-let _tok: { token: string; exp: number } | null = null;
-async function bqToken() {
-  if (_tok && _tok.exp > Date.now() + 30000) return _tok.token;
-  const body = new URLSearchParams({ grant_type: "client_credentials", client_id: CLIENT_ID, client_secret: CLIENT_SECRET, scope: "api" });
-  const r = await fetch("https://oauth2.bitquery.io/oauth2/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
-  const j = await r.json(); if (!j.access_token) throw new Error("no token");
-  _tok = { token: j.access_token, exp: Date.now() + Number(j.expires_in || 3600) * 1000 };
-  return _tok.token;
-}
-async function bitqueryFirst(mint: string) {
-  try {
-    if (!CLIENT_ID) return null;
-    const t = await bqToken();
-    const q = `query($mint:String!){Solana{DEXTrades(limit:{count:1},orderBy:{ascending:Block_Time},where:{Trade:{Buy:{Currency:{MintAddress:{is:$mint}}}}}){Block{Time}Transaction{Signature Signer}Trade{Buy{Amount AmountInUSD Account{Address Owner}}Sell{Amount Currency{MintAddress}}Dex{ProtocolName}}}}}`;
-    const r = await fetch(EAP, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` }, body: JSON.stringify({ query: q, variables: { mint } }) });
-    const txt = await r.text(); let j: any; try { j = JSON.parse(txt); } catch { _dbg.bq = "non-json:" + txt.slice(0, 60); return null; }
-    if (j.errors) { _dbg.bq = "err"; return null; }
-    const tr = j?.data?.Solana?.DEXTrades?.[0]; if (!tr) return null;
-    const buy = tr.Trade?.Buy || {}, sell = tr.Trade?.Sell || {};
-    return {
-      traced: true, source: "bitquery", wallet: buy.Account?.Owner || buy.Account?.Address || tr.Transaction?.Signer || null,
-      tokenAmount: num(buy.Amount), solSpent: SOLMINTS.has(sell.Currency?.MintAddress || "") ? num(sell.Amount) : undefined,
-      usd: num(buy.AmountInUSD), txHash: tr.Transaction?.Signature || null,
-      time: tr.Block?.Time ? new Date(tr.Block.Time).getTime() : null, dex: tr.Trade?.Dex?.ProtocolName || null, kind: "first_buy",
-    };
-  } catch (e) { _dbg.bq = String((e as Error)?.message || e).slice(0, 60); return null; }
 }
 
 // --- Helius genesis walk ---
@@ -131,8 +98,7 @@ serve(async (req) => {
       if (cached && cached.firstBuyer?.traced) return json({ ok: true, mint, firstBuyer: cached.firstBuyer, cached: true });
     }
 
-    let fb = await bitqueryFirst(mint);
-    if (!fb) fb = await heliusFirst(mint);
+    let fb = await heliusFirst(mint);
     if (!fb) {
       // Always-an-answer fallback: the creator is the genesis acquirer.
       const pump = await pumpCoin(mint);

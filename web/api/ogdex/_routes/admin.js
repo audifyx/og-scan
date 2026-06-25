@@ -9,11 +9,14 @@ export default async function handler(req, res) {
   const pass = url.searchParams.get("pass");
   if (!auth(pass)) return send(res, 401, { ok: false, error: "unauthorized" });
   try {
-    const [pending, approved, rejected, events] = await Promise.all([
+    const [pending, approved, rejected, events, kols, boosts, launches] = await Promise.all([
       dbSelect("ogdex_listings", "status=eq.pending&order=created_at.desc&limit=200"),
       dbSelect("ogdex_listings", "status=eq.approved&order=approved_at.desc&limit=200"),
       dbSelect("ogdex_listings", "status=eq.rejected&order=updated_at.desc&limit=100"),
       dbSelect("ogdex_events", "order=created_at.desc&limit=5000"),
+      dbSelect("ogdex_kol_directory", "select=kol_id,address,name,x_handle,tags,status&order=name.asc&limit=1000").catch(() => []),
+      dbSelect("ogdex_boosts", "order=created_at.desc&limit=200").catch(() => []),
+      dbSelect("ogdex_launches", "order=created_at.desc&limit=200").catch(() => []),
     ]);
     const now = Date.now();
     const since = (days) => now - days * 864e5;
@@ -42,15 +45,21 @@ export default async function handler(req, res) {
     const revenue = approved.reduce((a, l) => a + (l.tier === "express" ? 60 : 40), 0);
     const now2 = Date.now();
     const subs24 = all.filter((l) => new Date(l.created_at).getTime() >= now2 - 864e5).length;
+    const now3 = Date.now();
+    const activeBoosts = boosts.filter((b) => !b.expires_at || new Date(b.expires_at).getTime() > now3);
+    const boostRevenue = boosts.reduce((a, b) => a + (Number(b.usd_paid) || 0), 0);
     return send(res, 200, {
       ok: true,
       stats: {
         totalEvents: events.length, views24, views7,
         pending: pending.length, approved: approved.length, rejected: rejected.length,
         totalListings: all.length, featured: featured.length, revenue, subs24,
+        kols: kols.length, activeKols: kols.filter((k) => k.status !== "disputed").length,
+        boosts: boosts.length, activeBoosts: activeBoosts.length, boostRevenue,
+        launches: launches.length,
         byType, series, topTokens, topPaths, byChain, byTier,
       },
-      pending, approved, rejected,
+      pending, approved, rejected, kols, boosts, launches,
     });
   } catch (e) {
     return send(res, 200, { ok: false, error: String(e?.message || e) });
@@ -62,7 +71,7 @@ async function action(req, res) {
     const b = await readBody(req);
     if (!auth(b.pass)) return send(res, 401, { ok: false, error: "unauthorized" });
     const id = b.id;
-    if (!id && !(["ping", "add_featured"].includes(b.action))) return send(res, 400, { ok: false, error: "id required" });
+    if (!id && !(["ping", "add_featured", "add_kol", "remove_kol"].includes(b.action))) return send(res, 400, { ok: false, error: "id required" });
     const q = `id=eq.${id}`;
     switch (b.action) {
       case "ping": return send(res, 200, { ok: true });
@@ -93,6 +102,22 @@ async function action(req, res) {
         await dbInsert("ogdex_listings", row);
         break;
       }
+      case "add_kol": {
+        const address = String(b.address || "").trim();
+        if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) return send(res, 400, { ok: false, error: "valid Solana address required" });
+        const tw = b.twitter ? String(b.twitter).replace(/^@/, "") : null;
+        const row = { name: b.name || address.slice(0, 6), x_handle: tw, x_url: tw ? `https://x.com/${tw}` : null, wallet_address: address, blockchain: "solana", tags: Array.isArray(b.tags) ? b.tags : ["KOL"], status: b.status || "active", is_active: b.status !== "disputed", source: "admin" };
+        const ins = await dbInsert("kol_profiles", row); const kol = ins[0] || row;
+        if (kol.id) { try { await dbInsert("kol_wallets", { kol_id: kol.id, wallet_address: address, blockchain: "solana", label: "Primary", is_primary: true }); } catch {} }
+        return send(res, 200, { ok: true });
+      }
+      case "remove_kol": {
+        if (b.kol_id) { try { await dbDelete("kol_wallets", `kol_id=eq.${b.kol_id}`); } catch {} try { await dbDelete("kol_profiles", `id=eq.${b.kol_id}`); } catch {} }
+        if (b.address) { try { await dbDelete("ogdex_kol_directory", `address=eq.${b.address}`); } catch {} }
+        return send(res, 200, { ok: true });
+      }
+      case "delete_boost": await dbDelete("ogdex_boosts", q); return send(res, 200, { ok: true });
+      case "delete_launch": await dbDelete("ogdex_launches", q); return send(res, 200, { ok: true });
       default: return send(res, 400, { ok: false, error: "unknown action" });
     }
     return send(res, 200, { ok: true });

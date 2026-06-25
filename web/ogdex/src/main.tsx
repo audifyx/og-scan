@@ -23,6 +23,8 @@ const KolProfile = lazy(() => import("./pages/KolProfile"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Launch = lazy(() => import("./pages/Launch"));
 const NewlyListed = lazy(() => import("./pages/NewlyListed"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Privacy = lazy(() => import("./pages/Privacy"));
 
 function PageFallback() {
   return <div className="grid place-items-center py-24 text-muted"><Loader2 className="w-5 h-5 animate-spin" /></div>;
@@ -49,7 +51,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="wallet/:address" element={<Suspense fallback={<PageFallback />}><Wallet /></Suspense>} />
           <Route path="kol" element={<Suspense fallback={<PageFallback />}><KolScanner /></Suspense>} />
           <Route path="kol/:address" element={<Suspense fallback={<PageFallback />}><KolProfile /></Suspense>} />
-          <Route path="admin" element={<Suspense fallback={<PageFallback />}><Admin /></Suspense>} />
+          <Route path="thispageisfordev" element={<Suspense fallback={<PageFallback />}><Admin /></Suspense>} />
+          <Route path="terms" element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
+          <Route path="privacy" element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>

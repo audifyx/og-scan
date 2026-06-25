@@ -5,8 +5,6 @@
 // is tried first; otherwise we feed DuckDuckGo results to NVIDIA Llama.
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") || "";
-const GEMINI_MODEL = Deno.env.get("GEMINI_CHAT_MODEL") || "gemini-2.0-flash";
 const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") || "";
 const NVIDIA_BASE_URL = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
 const NVIDIA_MODEL = Deno.env.get("NVIDIA_MODEL") || "meta/llama-3.3-70b-instruct";
@@ -90,32 +88,6 @@ function systemPrompt(sym: string, name: string, mint: string, ctx: any, web: We
   ].join("\n");
 }
 
-async function callGemini(sys: string, messages: Msg[]) {
-  if (!GEMINI_API_KEY) throw new Error("no gemini key");
-  const contents = messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content || "") }] }));
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: sys }] },
-        contents,
-        tools: [{ google_search: {} }],
-        generationConfig: { temperature: 0.6, maxOutputTokens: 1200 },
-      }),
-    },
-  );
-  const j = await r.json();
-  if (!r.ok) throw new Error(`gemini ${r.status}`);
-  const cand = j?.candidates?.[0];
-  const text = (cand?.content?.parts || []).map((p: any) => p.text || "").join("").trim();
-  if (!text) throw new Error("gemini empty");
-  const chunks = cand?.groundingMetadata?.groundingChunks || [];
-  const sources = chunks.map((c: any) => ({ title: c?.web?.title || null, url: c?.web?.uri || null })).filter((s: any) => s.url).slice(0, 6);
-  return { answer: text, sources, provider: "gemini" };
-}
-
 async function callNvidia(sys: string, messages: Msg[], web: WebResult[]) {
   if (!NVIDIA_API_KEY) throw new Error("no nvidia key");
   const r = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
@@ -161,20 +133,11 @@ serve(async (req) => {
     const web = [...wA, ...wB].filter((w) => w.url && !seen.has(w.url) && seen.add(w.url)).slice(0, 8);
 
     const sys = systemPrompt(sym, name, mint, ctx, web);
-    let gemErr: string | null = null;
     try {
-      const out = await callGemini(sys, messages);
-      // Prefer DDG sources if Gemini returned none.
-      if (!out.sources.length && web.length) out.sources = web.map((w) => ({ title: w.title, url: w.url })).slice(0, 6);
+      const out = await callNvidia(sys, messages, web);
       return json({ ok: true, ...out });
     } catch (e) {
-      gemErr = String((e as Error)?.message || e);
-      try {
-        const out = await callNvidia(sys, messages, web);
-        return json({ ok: true, ...out });
-      } catch (e2) {
-        return json({ ok: false, error: `AI unavailable: ${String((e2 as Error)?.message || e2)}`, _geminiError: gemErr });
-      }
+      return json({ ok: false, error: `AI unavailable: ${String((e as Error)?.message || e)}` });
     }
   } catch (e) {
     return json({ ok: false, error: String((e as Error)?.message || e) });
