@@ -6,11 +6,12 @@ import { Bell, Wallet2, Loader2, Trash2, Plus, CheckCircle2, AlertTriangle, Exte
 
 interface Alert {
   id: string; mint: string; symbol?: string; type: string; value: number;
-  channel: string; target: string; refPrice?: number | null; enabled: boolean; createdAt: number;
+  channel: string; target: string; refPrice?: number | null; enabled: boolean; createdAt: number; watch?: string; label?: string;
 }
 const TYPE_LABEL: Record<string, string> = {
   price_above: "Price rises above", price_below: "Price drops below",
   pct_up: "Pumps % from now", pct_down: "Dumps % from now",
+  wallet_trade: "Wallet makes a trade",
 };
 
 export default function Alerts() {
@@ -21,6 +22,7 @@ export default function Alerts() {
   const [mint, setMint] = useState(params.get("mint") || "");
   const [type, setType] = useState(params.get("type") || "price_above");
   const [value, setValue] = useState(params.get("value") || "");
+  const [watch, setWatch] = useState("");
   const [channel, setChannel] = useState<"telegram" | "webhook">("telegram");
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,18 +40,26 @@ export default function Alerts() {
   const add = async () => {
     setErr(""); setOk("");
     if (!address) { await connect(); return; }
-    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint.trim())) { setErr("Enter a valid token mint"); return; }
-    if (!value || Number(value) <= 0) { setErr("Enter a target value"); return; }
+    const isWalletTrade = type === "wallet_trade";
+    if (isWalletTrade) {
+      if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(watch.trim())) { setErr("Enter a valid wallet address to watch"); return; }
+    } else {
+      if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint.trim())) { setErr("Enter a valid token mint"); return; }
+      if (!value || Number(value) <= 0) { setErr("Enter a target value"); return; }
+    }
     if (channel === "telegram") {
       if (!/^(-?\d{4,}|@[A-Za-z0-9_]{4,})$/.test(target.trim())) { setErr("Enter your Telegram chat ID (numeric) or @channel"); return; }
     } else if (!/^https?:\/\//i.test(target.trim())) { setErr("Enter a webhook URL (Discord/Slack/custom)"); return; }
     setBusy(true);
     try {
+      const alert = isWalletTrade
+        ? { type, watch: watch.trim(), label: watch.trim().slice(0, 6), channel, target: target.trim() }
+        : { mint: mint.trim(), type, value: Number(value), channel, target: target.trim() };
       const r = await fetch("/api/ogdex/alerts", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: address, alert: { mint: mint.trim(), type, value: Number(value), channel, target: target.trim() } }) });
+        body: JSON.stringify({ wallet: address, alert }) });
       const d = await r.json();
       if (!d.ok) throw new Error(d.error || "Could not create alert");
-      setAlerts(d.alerts); setOk("Alert created"); setValue("");
+      setAlerts(d.alerts); setOk("Alert created"); setValue(""); setWatch("");
     } catch (e: any) { setErr(e?.message || "Failed"); } finally { setBusy(false); }
   };
 
@@ -76,13 +86,17 @@ export default function Alerts() {
         <div className="card mb-4 p-4">
           <div className="mb-3 text-sm font-bold">New alert</div>
           <div className="space-y-2">
-            <input value={mint} onChange={(e) => setMint(e.target.value)} placeholder="Token mint address" className="inp" />
-            <div className="grid grid-cols-2 gap-2">
-              <select value={type} onChange={(e) => setType(e.target.value)} className="inp">
-                {Object.entries(TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-              <input value={value} onChange={(e) => setValue(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={type.startsWith("pct") ? "%" : "$ price"} className="inp" />
-            </div>
+            <select value={type} onChange={(e) => setType(e.target.value)} className="inp">
+              {Object.entries(TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            {type === "wallet_trade" ? (
+              <input value={watch} onChange={(e) => setWatch(e.target.value)} placeholder="Wallet address to watch" className="inp" />
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <input value={mint} onChange={(e) => setMint(e.target.value)} placeholder="Token mint address" className="inp" />
+                <input value={value} onChange={(e) => setValue(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={type.startsWith("pct") ? "%" : "$ price"} className="inp" />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-1 rounded-xl bg-panel2/60 p-1">
               <button onClick={() => setChannel("telegram")} className={`rounded-lg py-1.5 text-xs font-bold transition ${channel === "telegram" ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>Telegram</button>
               <button onClick={() => setChannel("webhook")} className={`rounded-lg py-1.5 text-xs font-bold transition ${channel === "webhook" ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>Webhook</button>
@@ -109,7 +123,9 @@ export default function Alerts() {
                 <div key={a.id} className="card flex items-center gap-3 p-3">
                   <Bell className={`h-4 w-4 shrink-0 ${a.enabled ? "text-accent" : "text-muted"}`} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-white">{a.symbol || short(a.mint)} <span className="text-muted font-normal">— {TYPE_LABEL[a.type]} {a.value}{a.type.startsWith("pct") ? "%" : ""}</span></div>
+                    <div className="text-sm font-semibold text-white">{a.type === "wallet_trade"
+                      ? <>{a.label || short(a.watch || "")} <span className="text-muted font-normal">— notify on any trade</span></>
+                      : <>{a.symbol || short(a.mint)} <span className="text-muted font-normal">— {TYPE_LABEL[a.type]} {a.value}{a.type.startsWith("pct") ? "%" : ""}</span></>}</div>
                     <div className="truncate text-[11px] text-muted">{a.enabled ? "active" : "fired/disabled"} · → {a.target.replace(/^https?:\/\//, "").slice(0, 32)}…</div>
                   </div>
                   <button onClick={() => remove(a.id)} className="text-muted hover:text-down"><Trash2 className="h-4 w-4" /></button>

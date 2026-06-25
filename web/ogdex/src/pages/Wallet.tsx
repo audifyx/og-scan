@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useWallet } from "../lib/wallet";
 import { getWallet, getSwaps, WalletPortfolio, WalletHolding, WalletTrade, fmtUsd, compact, short, isWatched, toggleWatch } from "../lib/api";
 import { timeAgo } from "../lib/format";
 import TokenLogo from "../components/TokenLogo";
 import Copyable from "../components/Copyable";
 import WalletShareButton from "../components/WalletShareButton";
 import Change from "../components/Change";
-import { ArrowLeft, Loader2, Wallet as WalletIcon, ExternalLink, Star, RefreshCw, Eye, EyeOff, Coins, TrendingUp, Zap, History } from "lucide-react";
+import { ArrowLeft, Loader2, Wallet as WalletIcon, ExternalLink, Star, RefreshCw, Eye, EyeOff, Coins, TrendingUp, Zap, History, Bell, BellPlus, CheckCircle2, AlertTriangle } from "lucide-react";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
@@ -18,6 +19,29 @@ export default function Wallet() {
   const [hideDust, setHideDust] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [trades, setTrades] = useState<WalletTrade[] | null>(null);
+  const { address: owner, connect, connecting } = useWallet();
+  const [showNotify, setShowNotify] = useState(false);
+  const [nChan, setNChan] = useState<"telegram" | "webhook">(() => (typeof localStorage !== "undefined" && (localStorage.getItem("ogdex.alertChan") as any)) || "telegram");
+  const [nTarget, setNTarget] = useState<string>(() => (typeof localStorage !== "undefined" && localStorage.getItem("ogdex.alertTarget")) || "");
+  const [nBusy, setNBusy] = useState(false);
+  const [nMsg, setNMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const createWalletAlert = async () => {
+    setNMsg(null);
+    if (!owner) { await connect(); return; }
+    const tgt = nTarget.trim();
+    if (nChan === "telegram" ? !/^(-?\d{4,}|@[A-Za-z0-9_]{4,})$/.test(tgt) : !/^https?:\/\//i.test(tgt)) {
+      setNMsg({ ok: false, text: nChan === "telegram" ? "Enter your Telegram chat ID or @channel" : "Enter a webhook URL" }); return;
+    }
+    setNBusy(true);
+    try {
+      localStorage.setItem("ogdex.alertChan", nChan); localStorage.setItem("ogdex.alertTarget", tgt);
+      const r = await fetch("/api/ogdex/alerts", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: owner, alert: { type: "wallet_trade", watch: address, label: short(address), channel: nChan, target: tgt } }) });
+      const dd = await r.json();
+      if (!dd.ok) throw new Error(dd.error || "Could not create alert");
+      setNMsg({ ok: true, text: "You will be notified when this wallet trades" });
+    } catch (e: any) { setNMsg({ ok: false, text: e?.message || "Failed" }); } finally { setNBusy(false); }
+  };
 
   const load = () => { setRefreshing(true); getWallet(address).then((x) => { setD(x); setLoading(false); setRefreshing(false); }); };
   useEffect(() => { setLoading(true); load(); setWatched(isWatched(address)); /* eslint-disable-next-line */ }, [address]);
@@ -70,9 +94,25 @@ export default function Wallet() {
             <button onClick={() => setWatched(toggleWatch(address))} className={`btn inline-flex items-center gap-1.5 ${watched ? "bg-accent text-black font-semibold" : "bg-panel2 text-muted hover:text-white"}`}>
               <Star className={`w-3.5 h-3.5 ${watched ? "fill-black" : ""}`} /> {watched ? "Watching" : "Watch wallet"}
             </button>
+            <button onClick={() => setShowNotify((v) => !v)} className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1.5"><Bell className="w-3.5 h-3.5" /> Notify on trades</button>
             <a href={`https://solscan.io/account/${address}`} target="_blank" rel="noreferrer" className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1.5">Solscan <ExternalLink className="w-3 h-3" /></a>
           </div>
         </div>
+        {showNotify && (
+          <div className="mt-4 rounded-xl border border-line bg-panel2/30 p-3 text-xs">
+            <div className="mb-2 flex items-center gap-1.5 font-semibold text-white"><Bell className="h-3.5 w-3.5 text-accent" /> Get notified when this wallet trades</div>
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-panel2/60 p-1 mb-2 max-w-xs">
+              <button onClick={() => setNChan("telegram")} className={`rounded-md py-1.5 text-[11px] font-semibold transition ${nChan === "telegram" ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>Telegram</button>
+              <button onClick={() => setNChan("webhook")} className={`rounded-md py-1.5 text-[11px] font-semibold transition ${nChan === "webhook" ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>Webhook</button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input value={nTarget} onChange={(e) => setNTarget(e.target.value)} placeholder={nChan === "telegram" ? "Telegram chat ID or @channel" : "Discord/Slack/webhook URL"} className="inp flex-1 min-w-[220px]" />
+              <button onClick={createWalletAlert} disabled={nBusy || connecting} className="btn bg-accent text-black font-semibold inline-flex items-center gap-1.5">{nBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellPlus className="h-4 w-4" />}{owner ? "Create alert" : "Connect & create"}</button>
+            </div>
+            {nMsg && <div className={`mt-2 flex items-center gap-1.5 ${nMsg.ok ? "text-up" : "text-down"}`}>{nMsg.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}{nMsg.text}</div>}
+            <p className="mt-2 text-[10px] text-muted/70">Notify-only — OGDEX never copies or auto-executes trades. Manage alerts on the Alerts page.</p>
+          </div>
+        )}
       </div>
 
       {!d?.ok && <div className="card p-10 text-center text-muted">Could not load this wallet. {d?.error}</div>}
