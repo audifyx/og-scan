@@ -1,6 +1,6 @@
 // OGDEX PWA service worker — scope: /OGDEX/. Separate from OG Scan root sw.js
 // (which intentionally bypasses /OGDEX). Must never cache /api/ responses long.
-const VERSION = "ogdex-v1";
+const VERSION = "ogdex-v2";
 const SHELL = "ogdex-shell-" + VERSION;
 const RUNTIME = "ogdex-rt-" + VERSION;
 const SHELL_URLS = ["/OGDEX/", "/OGDEX/index.html", "/OGDEX/manifest.webmanifest", "/OGDEX/ogdex-logo.png", "/OGDEX/pwa-192.png"];

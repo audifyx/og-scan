@@ -125,47 +125,50 @@ export default function Screener() {
   };
 
   // Fetch — race-safe (request-id guard) with retry-on-empty/error so a single
-  // transient upstream hiccup (429/blank) never leaves a category stuck empty
-  // until a manual page refresh.
+  // transient upstream hiccup never leaves a category stuck empty until a manual
+  // page refresh.
   const reqId = useRef(0);
   const MAX_RETRY = 3;
   useEffect(() => {
     const myId = ++reqId.current;
     const alive = () => reqId.current === myId;
     setLoading(true);
-    const retry = (attempt: number) => window.setTimeout(() => { if (alive()) run(attempt + 1); }, 800 * (attempt + 1));
-    const run = async (attempt = 0) => {
-      try {
-        if (q) {
-          const d = await search(q);
+    const load = async () => {
+      for (let attempt = 0; attempt <= MAX_RETRY; attempt++) {
+        const last = attempt === MAX_RETRY;
+        try {
+          if (q) {
+            const d = await search(q);
+            if (!alive()) return;
+            const r = d.rows || [];
+            if (r.length || last) { setRows(r); break; }
+          } else if (tab === "listed") {
+            const d = await getListings();
+            if (!alive()) return;
+            setListings(d.rows || []); break;
+          } else if (category === "social" || tab === "social") {
+            const d = await getTrendingSocial();
+            if (!alive()) return;
+            const items = d.items || [];
+            if (items.length || last) { setSocialItems(items); break; }
+          } else {
+            const d = isMultichain ? await getScreener("trending", interval, 100, chain) : await getScreener(tab, interval, 100);
+            if (!alive()) return;
+            const r = d.rows || [];
+            if (r.length || last) { setRows(r); break; }
+          }
+        } catch {
           if (!alive()) return;
-          if (!(d.rows || []).length && attempt < MAX_RETRY) return retry(attempt);
-          setRows(d.rows || []);
-        } else if (tab === "listed") {
-          const d = await getListings();
-          if (alive()) setListings(d.rows || []); // listings may be legitimately empty
-        } else if (category === "social" || tab === "social") {
-          const d = await getTrendingSocial();
-          const items = d.items || [];
-          if (!alive()) return;
-          if (!items.length && attempt < MAX_RETRY) return retry(attempt);
-          setSocialItems(items);
-        } else {
-          const d = isMultichain ? await getScreener("trending", interval, 100, chain) : await getScreener(tab, interval, 100);
-          const rows2 = d.rows || [];
-          if (!alive()) return;
-          if (!rows2.length && attempt < MAX_RETRY) return retry(attempt);
-          setRows(rows2);
+          if (last) break;
         }
-        if (alive()) setLoading(false);
-      } catch {
-        if (alive() && attempt < MAX_RETRY) return retry(attempt);
-        if (alive()) setLoading(false);
+        await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
+        if (!alive()) return;
       }
+      if (alive()) setLoading(false);
     };
-    run();
+    load();
     const skip = q || tab === "listed" || cur?.noInterval || isMultichain || isSocial;
-    const auto = skip ? null : window.setInterval(() => run(0), 25000);
+    const auto = skip ? null : window.setInterval(() => { if (alive()) load(); }, 25000);
     return () => { if (auto) clearInterval(auto); };
   }, [tab, interval, q, chain, category]);
 
