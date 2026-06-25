@@ -25,6 +25,8 @@ const Launch = lazy(() => import("./pages/Launch"));
 const NewlyListed = lazy(() => import("./pages/NewlyListed"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
+const Whitepaper = lazy(() => import("./pages/Whitepaper"));
+const Roadmap = lazy(() => import("./pages/Roadmap"));
 
 function PageFallback() {
   return <div className="grid place-items-center py-24 text-muted"><Loader2 className="w-5 h-5 animate-spin" /></div>;
@@ -54,6 +56,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="thispageisfordev" element={<Suspense fallback={<PageFallback />}><Admin /></Suspense>} />
           <Route path="terms" element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
           <Route path="privacy" element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
+          <Route path="whitepaper" element={<Suspense fallback={<PageFallback />}><Whitepaper /></Suspense>} />
+          <Route path="roadmap" element={<Suspense fallback={<PageFallback />}><Roadmap /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>
