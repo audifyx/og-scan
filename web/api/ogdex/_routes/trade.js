@@ -27,6 +27,7 @@ async function simulate(txB64) {
   } catch { return { ok: true, unknown: true }; }
 }
 
+
 async function tokenBalance(owner, mint) {
   try {
     const res = await rpc("getTokenAccountsByOwner", [owner, { mint }, { encoding: "jsonParsed" }]);
@@ -112,29 +113,29 @@ export default async function handler(req, res) {
   }
 
   let lastErr = "Could not build a working trade";
-  let firstBuilt = null; // fallback if simulation RPC is unavailable for all
+  let firstUnknown = null;   // built but simulation couldn't run (RPC) -> last resort
+  let sawSimFail = false;    // at least one candidate definitively failed simulation
 
-  // Candidate builders in priority order: PumpPortal venues, then Jupiter.
+  // Candidate builders: PumpPortal venues (best for bonding-curve buys), then Jupiter.
   const pools = [...new Set([reqPool, "auto", "pump", "pump-amm", "raydium", "bonk", "raydium-cpmm", "launchlab"])];
   const builders = pools.map((pl) => ({ via: "pumpportal", pool: pl, run: () => pumpPortalTx({ publicKey, action, mint, amt, denominatedInSol, slippage, priorityFee, pool: pl }) }));
   builders.push({ via: "jupiter", run: () => jupiterTx({ publicKey, action, mint, amt, slippage }) });
 
   for (const b of builders) {
     const out = await b.run();
-    if (out.error) {
-      lastErr = out.error;
-      if (/insufficient|not enough|no balance|invalid amount|no route/i.test(out.error)) { /* keep trying other venues */ }
-      continue;
-    }
+    if (out.error) { lastErr = out.error; continue; }
     if (!out.tx) continue;
-    if (!firstBuilt) firstBuilt = { ok: true, tx: out.tx, via: b.via, pool: b.pool };
     const sim = await simulate(out.tx);
-    if (sim.ok) return send(res, 200, { ok: true, tx: out.tx, via: b.via, pool: b.pool, simulated: !sim.unknown });
-    lastErr = "transaction would fail (no liquidity on this route or insufficient funds)";
+    if (sim.ok && !sim.unknown) {
+      // Definitive pass — safe to hand to Phantom.
+      return send(res, 200, { ok: true, tx: out.tx, via: b.via, pool: b.pool, simulated: true });
+    }
+    if (sim.unknown) { if (!firstUnknown) firstUnknown = { ok: true, tx: out.tx, via: b.via, pool: b.pool, simulated: false }; }
+    else { sawSimFail = true; lastErr = "transaction would fail (no liquidity on this route or insufficient SOL for amount + fees)"; }
   }
 
-  // Nothing simulated cleanly. If we at least built one and sim RPC was flaky,
-  // return it so the user can still try; otherwise surface the error.
-  if (firstBuilt) return send(res, 200, { ...firstBuilt, simulated: false });
+  // No candidate passed simulation. Only fall back to an unverified tx when the
+  // simulation RPC itself never worked (so we don't hand Phantom a known-bad tx).
+  if (firstUnknown && !sawSimFail) return send(res, 200, firstUnknown);
   return send(res, 200, { ok: false, error: lastErr });
 }
