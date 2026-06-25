@@ -3,12 +3,18 @@ import { Code2, Copy, Check, Terminal, Link2, ExternalLink, ChevronDown, Sparkle
 
 const BASE = "https://ogscan.fun/api/ogdex";
 const OPENAPI = "https://ogscan.fun/api/ogdex/openapi.json";
+const LLMS = "https://ogscan.fun/api/ogdex/llms.txt";
 
 const ENDPOINTS = [
   { m: "GET", path: "/screener?type=trending&chain=solana&limit=100", desc: "Token screener. type: trending|runners|new|fomo|jupiter|unbonded|migrated|moonshot|newpairs|og|kols|celebrity|organic|listed|multichain|social." },
   { m: "GET", path: "/signals", desc: "Live Pulse signals — volume/velocity/buyer surges, momentum, fresh runners, pump.fun graduating + just-migrated." },
   { m: "GET", path: "/token?mint=<MINT>", desc: "Full token intel: price, mcap, liquidity, OG Score, verdict, flags, safety, holders, trades, KOL/whale labels." },
   { m: "GET", path: "/forensics?mint=<MINT>", desc: "Dev & origin: creator wallet, dev sold?, first buyer (wallet + tx), DexScreener-paid status, concentration." },
+  { m: "GET", path: "/xray?mint=<MINT>", desc: "Risk X-ray: snipers, same-block bundlers, early buyers, concentration, dev + safety merged into a green/yellow/red verdict." },
+  { m: "GET", path: "/safety?mint=<MINT>", desc: "Honeypot / tradeability — Jupiter round-trip: canBuy, canSell, round-trip loss %, verdict." },
+  { m: "GET", path: "/swaps?address=<ADDR>&limit=25", desc: "A wallet's recent buy/sell swaps with token metadata + USD." },
+  { m: "GET", path: "/balance?owner=<ADDR>&mint=<MINT>", desc: "SOL + a single token balance for a wallet." },
+  { m: "POST", path: "/alerts", desc: "Create a price alert (notify-only). Body: { wallet, alert:{ mint, type, value, channel, target } }. GET ?wallet=<ADDR> to list." },
   { m: "GET", path: "/ath?mint=<MINT>", desc: "True all-time high — ATH price, ATH market cap, date, % from ATH." },
   { m: "GET", path: "/chart?mint=<MINT>", desc: "OHLC candles for charting." },
   { m: "GET", path: "/wallet?address=<ADDR>", desc: "Wallet portfolio: SOL + SPL holdings, USD values, realized + unrealized PnL, win rate." },
@@ -49,6 +55,24 @@ export default function ApiDocs() {
           <div className="rounded-lg bg-panel2/40 p-2.5"><div className="font-semibold text-white">Postman / Insomnia</div><div className="text-muted mt-0.5">Import → Link → paste. Every request is generated for you.</div></div>
           <div className="rounded-lg bg-panel2/40 p-2.5"><div className="font-semibold text-white">Codegen / SDK</div><div className="text-muted mt-0.5">Feed the link to openapi-generator for a typed client in any language.</div></div>
         </div>
+      </div>
+
+      {/* Agents & MCP */}
+      <div className="card mb-4 p-5">
+        <div className="mb-2 flex items-center gap-2 text-sm font-bold"><Bot className="h-4 w-4 text-accent" /> AI agents &amp; MCP</div>
+        <p className="text-[12.5px] text-muted mb-3">Building an LLM agent or an MCP server? Give your model the <code className="font-mono text-white">llms.txt</code> guide, then wire tools from the OpenAPI spec — most MCP/codegen frameworks turn it into callable tools automatically.</p>
+        <div className="flex items-center justify-between gap-2 rounded-lg bg-panel2/60 px-3 py-2.5 font-mono text-xs">
+          <span className="truncate">{LLMS}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <a href={LLMS} target="_blank" rel="noreferrer" className="text-muted hover:text-white" title="Open llms.txt"><ExternalLink className="h-3.5 w-3.5" /></a>
+            <button onClick={() => copy(LLMS)} className="text-muted hover:text-white" title="Copy">{copied === LLMS ? <Check className="h-3.5 w-3.5 text-up" /> : <Copy className="h-3.5 w-3.5" />}</button>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 text-[11.5px]">
+          <div className="rounded-lg bg-panel2/40 p-2.5"><div className="font-semibold text-white">Custom GPT / Claude</div><div className="text-muted mt-0.5">Add the <span className="font-mono">llms.txt</span> to the system prompt or knowledge, and import <span className="font-mono">openapi.json</span> as an Action.</div></div>
+          <div className="rounded-lg bg-panel2/40 p-2.5"><div className="font-semibold text-white">MCP server</div><div className="text-muted mt-0.5">Point an OpenAPI→MCP bridge (e.g. openapi-mcp) at the spec to expose every endpoint as a tool. No key needed.</div></div>
+        </div>
+        <p className="mt-2 text-[11px] text-muted/70">Suggested tools: <span className="font-mono">/token</span> overview, <span className="font-mono">/xray</span> risk, <span className="font-mono">/forensics</span> dev origin, <span className="font-mono">/wallet</span>+<span className="font-mono">/swaps</span> traders, <span className="font-mono">/screener</span>+<span className="font-mono">/signals</span> discovery, <span className="font-mono">/chat</span> Q&amp;A.</p>
       </div>
 
       {/* Base URL */}

@@ -33,15 +33,16 @@ import balance from "./ogdex/_routes/balance.js";
 import safety from "./ogdex/_routes/safety.js";
 import xray from "./ogdex/_routes/xray.js";
 import swaps from "./ogdex/_routes/swaps.js";
+import llms from "./ogdex/_routes/llms.js";
 
 const ROUTES = {
   admin, boosts, chart, kols, launch, launches,
   config: configRoute, listings, metadata, report, screener, signals, search, token, trade, track, wallet, watchlist, alerts, rpc, forensics, chat, ath, openapi,
-  "openapi.json": openapi, health, balance, safety, xray, swaps,
+  "openapi.json": openapi, health, balance, safety, xray, swaps, llms, "llms.txt": llms,
   "alerts-run": alertsRun,
 };
 
-const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "track", "admin", "alerts-run"]);
+const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "track", "admin", "alerts-run", "llms", "llms.txt"]);
 const LIMITS = { chat: 12, forensics: 20, report: 10 };
 const DEFAULT_LIMIT = 60;
 const WINDOW_MS = 10_000;
