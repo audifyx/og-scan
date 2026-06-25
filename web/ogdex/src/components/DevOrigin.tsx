@@ -71,13 +71,13 @@ export default function DevOrigin({ f, loading }: { f: Forensics | null; loading
         </div>
         <Row label="DexScreener paid">
           {f.dexPaid?.paid
-            ? <span className="inline-flex items-center gap-1 text-up font-medium"><CheckCircle2 className="w-3.5 h-3.5" /> Paid {f.dexPaid.services.filter(s => s.status === "approved").map(s => s.type).slice(0,3).join(", ")}</span>
+            ? <span className="inline-flex items-center gap-1 text-up font-medium"><CheckCircle2 className="w-3.5 h-3.5" /> Paid {((f.dexPaid?.services) || []).filter((s:any) => s.status === "approved").map((s:any) => s.type).slice(0,3).join(", ")}</span>
             : <span className="inline-flex items-center gap-1 text-muted"><XCircle className="w-3.5 h-3.5" /> Not paid</span>}
         </Row>
         <Row label="Launchpad">{f.launchpad || "—"}</Row>
-        <Row label="Top 10 holders">{f.concentration.top10Pct != null ? <span className={f.concentration.top10Pct < 25 ? "text-up" : f.concentration.top10Pct < 40 ? "text-yellow-300" : "text-down"}>{f.concentration.top10Pct.toFixed(1)}%</span> : "—"}</Row>
-        <Row label="Whales (≥1%)">{f.concentration.whales}</Row>
-        <Row label="Rugged"><YesNo v={f.safetyFlags.rugged} goodWhen={false} /></Row>
+        <Row label="Top 10 holders">{f.concentration?.top10Pct != null ? <span className={f.concentration.top10Pct < 25 ? "text-up" : f.concentration.top10Pct < 40 ? "text-yellow-300" : "text-down"}>{f.concentration.top10Pct.toFixed(1)}%</span> : "—"}</Row>
+        <Row label="Whales (≥1%)">{f.concentration?.whales ?? "—"}</Row>
+        <Row label="Rugged"><YesNo v={f.safetyFlags?.rugged} goodWhen={false} /></Row>
       </div>
     </div>
   );

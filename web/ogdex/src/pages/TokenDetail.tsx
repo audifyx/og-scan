@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getToken, getForensics, Forensics, getAth, AthData, track, TokenDetailData, fmtUsd, compact, fmtNum, fmtPct, short } from "../lib/api";
+import { getToken, getForensics, Forensics as ForensicsData, getAth, AthData, track, TokenDetailData, fmtUsd, compact, fmtNum, fmtPct, short } from "../lib/api";
 import { timeAgo } from "../lib/format";
 import TokenLogo from "../components/TokenLogo";
 import Change from "../components/Change";
@@ -21,6 +21,7 @@ import ShareButton from "../components/ShareButton";
 import CoinChat from "../components/CoinChat";
 import DevOrigin from "../components/DevOrigin";
 import Collapsible from "../components/Collapsible";
+import ErrorBoundary from "../components/ErrorBoundary";
 import CapitalFlow from "../components/CapitalFlow";
 import {
   ArrowLeft, Copy, Check, ShieldCheck, ShieldAlert, ExternalLink, Loader2, Lock, Flame,
@@ -33,7 +34,7 @@ export default function TokenDetail() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<"overview" | "chat" | "predictive" | "smartmoney" | "kolwhale" | "holders" | "trades" | "forensics">("overview");
-  const [forensics, setForensics] = useState<Forensics | null>(null);
+  const [forensics, setForensics] = useState<ForensicsData | null>(null);
   const [forLoading, setForLoading] = useState(true);
   const [ath, setAth] = useState<AthData | null>(null);
   const [dir, setDir] = useState<Record<string, KolDirEntry>>({});
@@ -222,6 +223,7 @@ export default function TokenDetail() {
         </div>
       </div>
 
+      <ErrorBoundary key={tab} label="this tab">
       {tab === "overview" && <Overview d={d} t={t} meta={meta} safety={safety} trades={trades} ath={ath} />}
       {tab === "chat" && <CoinChat d={d} forensics={forensics} ath={ath} />}
       {tab === "predictive" && <PredictiveIntel d={d} />}
@@ -230,6 +232,7 @@ export default function TokenDetail() {
       {tab === "holders" && <><HolderIntel holders={holders} safety={safety} dir={dir} /><HoldersTable holders={holders} price={price} dir={dir} /></>}
       {tab === "trades" && <TradesTable trades={trades} mint={mint} dir={dir} onRefresh={() => getToken(mint).then(setD)} />}
       {tab === "forensics" && <><DevOrigin f={forensics} loading={forLoading} /><Forensics d={d} meta={meta} safety={safety} /></>}
+      </ErrorBoundary>
     </div>
   );
 }
