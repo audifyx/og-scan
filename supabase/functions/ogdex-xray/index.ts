@@ -39,6 +39,20 @@ async function rpc(method: string, params: unknown[]) {
   const j = await r.json();
   return j?.result ?? null;
 }
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Retrying RPC for the funding pass — survives the rate-limit burst after the genesis walk.
+async function rpcSafe(method: string, params: unknown[], tries = 4): Promise<any> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+      if (r.status === 429) { await sleep(300 * (i + 1)); continue; }
+      const j = await r.json();
+      if (j?.error) { await sleep(250 * (i + 1)); continue; }
+      return j?.result ?? null;
+    } catch { await sleep(250 * (i + 1)); }
+  }
+  return null;
+}
 
 // Parse a single tx for net token acquisition (a "buy") of `mint` plus SOL spent.
 function buyFromTx(tx: any, mint: string) {
@@ -63,6 +77,84 @@ function buyFromTx(tx: any, mint: string) {
       time: (tx.blockTime || 0) * 1000,
     };
   } catch { return null; }
+}
+
+// ── Funding-source tracing (insider clusters) ──────────────────────────────────
+// A wallet's "funder" is whoever sent it its first SOL. Early buyers that share
+// the same funder are likely the same operator / a coordinated insider group.
+const INFRA = new Set([
+  "11111111111111111111111111111111", // system program
+  "So11111111111111111111111111111111111111112",
+]);
+function funderFromTx(tx: any, wallet: string) {
+  try {
+    if (!tx || tx.meta?.err) return null;
+    const instrs = tx.transaction?.message?.instructions || [];
+    for (const ix of instrs) {
+      if (ix.program === "system" && ix.parsed?.type === "transfer") {
+        const info = ix.parsed.info;
+        if (info?.destination === wallet && info?.source && info.source !== wallet && !INFRA.has(info.source)) return info.source;
+      }
+    }
+    // balance-delta fallback: wallet gained SOL, biggest loser is the sender
+    const keys = (tx.transaction?.message?.accountKeys || []).map((k: any) => (typeof k === "string" ? k : k.pubkey));
+    const wi = keys.indexOf(wallet);
+    if (wi >= 0 && tx.meta?.preBalances && tx.meta?.postBalances) {
+      const gained = tx.meta.postBalances[wi] - tx.meta.preBalances[wi];
+      if (gained > 0) {
+        let sender: string | null = null, worst = 0;
+        for (let i = 0; i < keys.length; i++) {
+          if (i === wi) continue;
+          const d = tx.meta.postBalances[i] - tx.meta.preBalances[i];
+          if (d < worst) { worst = d; sender = keys[i]; }
+        }
+        if (sender && !INFRA.has(sender)) return sender;
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+async function findFunder(wallet: string) {
+  const PAGE = 1000, MAX = 2;
+  let before: string | null = null, all: any[] = [];
+  for (let i = 0; i < MAX; i++) {
+    const opts: any = { limit: PAGE }; if (before) opts.before = before;
+    const sigs = (await rpcSafe("getSignaturesForAddress", [wallet, opts])) || [];
+    if (!sigs.length) break;
+    all = all.concat(sigs);
+    before = sigs[sigs.length - 1].signature;
+    if (sigs.length < PAGE) break;
+  }
+  if (!all.length) return null;
+  const oldest = all.reverse().slice(0, 5);
+  const txs = await Promise.all(oldest.map((sg: any) => rpcSafe("getTransaction", [sg.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]).catch(() => null)));
+  for (const tx of txs) { const f = funderFromTx(tx, wallet); if (f) return f; }
+  return null;
+}
+async function traceFunding(wallets: string[]) {
+  const cap = wallets.slice(0, 12);
+  // Trace in small batches — tracing all at once overwhelms the RPC (rate limits → nulls).
+  await sleep(300); // let the post-genesis-walk rate-limit burst settle
+  const found: (readonly [string, string | null])[] = [];
+  for (let i = 0; i < cap.length; i += 2) {
+    const batch = cap.slice(i, i + 2);
+    const res = await Promise.all(batch.map(async (w) => [w, await findFunder(w).catch(() => null)] as const));
+    found.push(...res);
+    await sleep(150);
+  }
+  const funders: Record<string, string> = {};
+  const byFunder: Record<string, string[]> = {};
+  for (const [w, f] of found) {
+    if (!f) continue;
+    funders[w] = f;
+    (byFunder[f] ||= []).push(w);
+  }
+  const clusters = Object.entries(byFunder)
+    .filter(([, ws]) => ws.length >= 2)
+    .map(([funder, ws]) => ({ funder, wallets: ws, size: ws.length }))
+    .sort((a, b) => b.size - a.size);
+  _dbg.funding = { traced: cap.length, found: Object.keys(funders).length };
+  return { funders, clusters };
 }
 
 async function walkGenesis(mint: string) {
@@ -141,6 +233,18 @@ async function analyze(mint: string, limit = 50) {
   const sniperPct = firstBuys.length ? Math.round((snipers.length / firstBuys.length) * 100) : 0;
   const bundlePct = firstBuys.length ? Math.round((bundledWallets.size / firstBuys.length) * 100) : 0;
 
+  // Insider clusters: early buyers funded by the same wallet. Time-boxed so a slow
+  // RPC never blows the function budget — we ship whatever resolved in time.
+  const fundingTimeout = new Promise<{ funders: Record<string, string>; clusters: any[] }>((res) => setTimeout(() => res({ funders: {}, clusters: [] }), 22000));
+  const { funders, clusters } = await Promise.race([traceFunding(firstBuys.map((b) => b.wallet)), fundingTimeout]);
+  const insiderWallets = new Set<string>();
+  for (const c of clusters) for (const w of c.wallets) insiderWallets.add(w);
+  const insiderPct = firstBuys.length ? Math.round((insiderWallets.size / firstBuys.length) * 100) : 0;
+
+  const tag = (w: string) => ({ funder: funders[w] || null, insider: insiderWallets.has(w) });
+  const earlyBuyers2 = earlyBuyers.map((b) => ({ ...b, ...tag(b.wallet) }));
+  const snipers2 = snipers.slice(0, 30).map((b: any) => ({ ...b, ...tag(b.wallet) }));
+
   return {
     traced: true, genesis, source: "helius",
     launchSlot, launchTime, pool: poolWallet,
@@ -149,11 +253,14 @@ async function analyze(mint: string, limit = 50) {
       snipers: snipers.length,
       bundledWallets: bundledWallets.size,
       bundles: bundles.length,
-      sniperPct, bundlePct,
+      insiders: insiderWallets.size,
+      insiderClusters: clusters.length,
+      sniperPct, bundlePct, insiderPct,
     },
-    earlyBuyers,
-    snipers: snipers.slice(0, 30),
+    earlyBuyers: earlyBuyers2,
+    snipers: snipers2,
     bundles: bundles.slice(0, 15),
+    insiderClusters: clusters.slice(0, 10),
   };
 }
 

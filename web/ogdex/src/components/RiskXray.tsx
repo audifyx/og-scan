@@ -1,6 +1,7 @@
 import { XrayReport, short } from "../lib/api";
 import WalletLink from "./WalletLink";
-import { ShieldCheck, ShieldAlert, ShieldX, Crosshair, Boxes, Users, Wallet, ExternalLink, Loader2, CheckCircle2, XCircle, AlertTriangle, Target } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ShieldX, Crosshair, Boxes, Users, Wallet, ExternalLink, Loader2, CheckCircle2, XCircle, AlertTriangle, Target, Network, Share2 } from "lucide-react";
+import BubbleMap from "./BubbleMap";
 
 function Solscan({ kind, id, label }: { kind: "account" | "tx" | "token"; id: string; label?: string }) {
   return <a href={`https://solscan.io/${kind}/${id}`} target="_blank" rel="noreferrer" className="text-[11px] text-accent/80 hover:text-accent inline-flex items-center gap-1">{label || "Solscan"} <ExternalLink className="w-3 h-3" /></a>;
@@ -52,9 +53,10 @@ export default function RiskXray({ x, loading }: { x: XrayReport | null; loading
       </div>
 
       {/* Headline stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Stat icon={<Crosshair className="w-3.5 h-3.5" />} label="Snipers" value={x.snipers.pct != null ? `${x.snipers.pct}%` : "—"} tone={pctTone(x.snipers.pct)} />
         <Stat icon={<Boxes className="w-3.5 h-3.5" />} label="Bundled" value={x.bundles.pct != null ? `${x.bundles.pct}%` : "—"} tone={pctTone(x.bundles.pct, 1, 30)} />
+        <Stat icon={<Share2 className="w-3.5 h-3.5" />} label="Insiders" value={x.insiders?.pct != null ? `${x.insiders.pct}%` : "—"} tone={pctTone(x.insiders?.pct ?? null, 1, 40)} />
         <Stat icon={<Users className="w-3.5 h-3.5" />} label="Top 10 hold" value={x.concentration.top10Pct != null ? `${x.concentration.top10Pct}%` : "—"} tone={pctTone(x.concentration.top10Pct, 30, 50)} />
         <Stat icon={<Wallet className="w-3.5 h-3.5" />} label="Holders" value={x.concentration.totalHolders ?? "—"} />
       </div>
@@ -70,6 +72,8 @@ export default function RiskXray({ x, loading }: { x: XrayReport | null; loading
           </ul>
         </div>
       )}
+
+      {x.traced && x.earlyBuyers.length > 0 && <BubbleMap report={x} />}
 
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Snipers */}
@@ -117,6 +121,29 @@ export default function RiskXray({ x, loading }: { x: XrayReport | null; loading
         </div>
       </div>
 
+      {/* Insider clusters */}
+      {x.insiders?.clusters && x.insiders.clusters.length > 0 && (
+        <div className="card p-5">
+          <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Network className="w-4 h-4 text-accent" /> Insider clusters <span className="text-muted font-normal">— early buyers funded by one wallet</span></div>
+          <div className="space-y-2 max-h-80 overflow-auto pr-1">
+            {x.insiders.clusters.map((cl, i) => (
+              <div key={i} className="rounded-lg bg-panel2 p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-medium text-down">{cl.size} wallets · shared funder</span>
+                  <a href={`https://solscan.io/account/${cl.funder}`} target="_blank" rel="noreferrer" className="text-[10px] text-accent/80 hover:text-accent inline-flex items-center gap-1">{short(cl.funder)} <ExternalLink className="w-3 h-3" /></a>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {cl.wallets.map((w) => (
+                    <a key={w} href={`https://solscan.io/account/${w}`} target="_blank" rel="noreferrer" className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-panel text-muted hover:text-accent">{short(w)}</a>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 text-[10px] text-muted/70">A shared funding wallet can also be a CEX/exchange withdrawal. Treat as a signal, not proof.</div>
+        </div>
+      )}
+
       {/* Early buyers */}
       {x.earlyBuyers.length > 0 && (
         <div className="card p-5">
@@ -133,7 +160,8 @@ export default function RiskXray({ x, loading }: { x: XrayReport | null; loading
                     <td className="text-right tabular-nums text-muted">{b.secondsAfterLaunch != null ? `+${b.secondsAfterLaunch}s` : "—"}</td>
                     <td className="text-right">
                       {b.sniper && <span className="pill bg-yellow-400/15 text-yellow-300 text-[9px] mr-1">sniper</span>}
-                      {b.bundled && <span className="pill bg-down/15 text-down text-[9px]">bundle</span>}
+                      {b.bundled && <span className="pill bg-down/15 text-down text-[9px] mr-1">bundle</span>}
+                      {b.insider && <span className="pill bg-down/15 text-down text-[9px]">insider</span>}
                     </td>
                   </tr>
                 ))}

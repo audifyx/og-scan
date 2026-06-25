@@ -203,13 +203,15 @@ export const getSafety = (mint: string) => j<SafetyCheck>(`/api/ogdex/safety?min
 export interface XrayFlag { level: "red" | "yellow" | "green"; text: string; }
 export interface XraySniper { wallet: string; solSpent: number; secondsAfterLaunch: number | null; txHash: string | null; bundled: boolean; }
 export interface XrayBundle { slot: number; size: number; wallets: string[]; }
-export interface XrayEarlyBuyer { rank: number; wallet: string; tokenAmount: number; solSpent: number; txHash: string | null; secondsAfterLaunch: number | null; sniper: boolean; bundled: boolean; }
+export interface XrayEarlyBuyer { rank: number; wallet: string; tokenAmount: number; solSpent: number; txHash: string | null; secondsAfterLaunch: number | null; sniper: boolean; bundled: boolean; funder?: string | null; insider?: boolean; }
+export interface XrayInsiderCluster { funder: string; size: number; wallets: string[]; }
 export interface XrayReport {
   ok: boolean; mint: string;
   verdict: string; tone: "red" | "yellow" | "green"; score: number; summary: string;
   flags: XrayFlag[];
   snipers: { pct: number | null; count: number | null; wallets: XraySniper[] };
   bundles: { pct: number | null; count: number | null; clusters: XrayBundle[] };
+  insiders: { pct: number | null; count: number | null; clusters: XrayInsiderCluster[] };
   earlyBuyers: XrayEarlyBuyer[];
   concentration: { top10Pct: number | null; whales: number; totalHolders: number | null };
   dev: { wallet: string; pct: number | null; sold: boolean | null; serial: boolean; tokensCreated: number | null } | null;

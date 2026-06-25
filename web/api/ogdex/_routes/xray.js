@@ -44,6 +44,8 @@ export default async function handler(req, res) {
     const bundles = xray?.bundles || [];
     const earlyBuyers = xray?.earlyBuyers || [];
     const snipers = xray?.snipers || [];
+    const insiderClusters = xray?.insiderClusters || [];
+    const insiderPct = num(c.insiderPct);
 
     // ── Flags & scoring (0 = clean, higher = riskier) ──────────────
     const flags = [];
@@ -54,6 +56,9 @@ export default async function handler(req, res) {
 
     if (bundlePct != null && bundlePct >= 30) { flags.push({ level: "red", text: `${bundlePct}% of early buyers came in same-block bundles` }); score += 3; }
     else if ((c.bundles ?? 0) > 0) { flags.push({ level: "yellow", text: `${c.bundles} same-block buy bundle${c.bundles === 1 ? "" : "s"} detected` }); score += 1; }
+
+    if (insiderPct != null && insiderPct >= 40) { flags.push({ level: "red", text: `${insiderPct}% of early buyers were funded by a shared wallet (insider cluster)` }); score += 3; }
+    else if ((c.insiderClusters ?? 0) > 0) { flags.push({ level: "yellow", text: `${c.insiderClusters} insider cluster${c.insiderClusters === 1 ? "" : "s"} (early buyers sharing a funding wallet)` }); score += 1; }
 
     if (top10Pct != null && top10Pct >= 50) { flags.push({ level: "red", text: `Top 10 holders control ${pct1(top10Pct)}% of supply` }); score += 3; }
     else if (top10Pct != null && top10Pct >= 30) { flags.push({ level: "yellow", text: `Top 10 holders control ${pct1(top10Pct)}% of supply` }); score += 1; }
@@ -98,6 +103,11 @@ export default async function handler(req, res) {
         pct: bundlePct,
         count: c.bundles ?? null,
         clusters: bundles.slice(0, 10).map((b) => ({ slot: b.slot, size: b.size, wallets: b.wallets })),
+      },
+      insiders: {
+        pct: insiderPct,
+        count: c.insiders ?? null,
+        clusters: insiderClusters.slice(0, 10).map((cl) => ({ funder: cl.funder, size: cl.size, wallets: cl.wallets })),
       },
       earlyBuyers: earlyBuyers.slice(0, 30),
       concentration: { top10Pct: pct1(top10Pct), whales, totalHolders },
