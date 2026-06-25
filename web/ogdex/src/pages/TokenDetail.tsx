@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getToken, track, TokenDetailData, fmtUsd, compact, fmtNum, fmtPct, short } from "../lib/api";
+import { getToken, getForensics, Forensics, track, TokenDetailData, fmtUsd, compact, fmtNum, fmtPct, short } from "../lib/api";
 import { timeAgo } from "../lib/format";
 import TokenLogo from "../components/TokenLogo";
 import Change from "../components/Change";
@@ -17,6 +17,9 @@ import PriceChart from "../components/PriceChart";
 import TradePanel from "../components/TradePanel";
 import TrustPanel from "../components/TrustPanel";
 import PredictiveIntel from "../components/PredictiveIntel";
+import CoinChat from "../components/CoinChat";
+import DevOrigin from "../components/DevOrigin";
+import Collapsible from "../components/Collapsible";
 import CapitalFlow from "../components/CapitalFlow";
 import {
   ArrowLeft, Copy, Check, ShieldCheck, ShieldAlert, ExternalLink, Loader2, Lock, Flame,
@@ -28,12 +31,16 @@ export default function TokenDetail() {
   const [d, setD] = useState<TokenDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [tab, setTab] = useState<"overview" | "predictive" | "smartmoney" | "kolwhale" | "holders" | "trades" | "forensics">("overview");
+  const [tab, setTab] = useState<"overview" | "chat" | "predictive" | "smartmoney" | "kolwhale" | "holders" | "trades" | "forensics">("overview");
+  const [forensics, setForensics] = useState<Forensics | null>(null);
+  const [forLoading, setForLoading] = useState(true);
   const [dir, setDir] = useState<Record<string, KolDirEntry>>({});
 
   useEffect(() => { getKolDirectory().then(setDir); }, []);
 
   useEffect(() => { getKolDirectory().then(setDir).catch(() => {}); }, []);
+
+  useEffect(() => { let on = true; setForLoading(true); setForensics(null); getForensics(mint).then((x) => { if (on) { setForensics(x); setForLoading(false); } }).catch(() => { if (on) setForLoading(false); }); return () => { on = false; }; }, [mint]);
 
   useEffect(() => {
     let on = true; setLoading(true);
@@ -137,28 +144,47 @@ export default function TokenDetail() {
         )}
       </div>
 
-      {/* Key metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+      {/* Key metrics — compact strip + collapsible deep-dive sections */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-3">
         <Stat label="Market Cap" value={fmtUsd(t.mcap ?? meta.mcap, { compact: true })} />
-        <Stat label="FDV" value={fmtUsd(t.fdv ?? meta.fdv, { compact: true })} />
         <Stat label="Liquidity" value={t.liquidity != null ? "$" + compact(t.liquidity) : "—"} />
         <Stat label="24h Volume" value={t.volume != null ? "$" + compact(t.volume) : "—"} />
         <Stat label="Holders" value={fmtNum(meta.holderCount ?? t.holderCount ?? safety?.totalHolders)} />
         <Stat label="ATH MCap" value={athMcap != null ? fmtUsd(athMcap, { compact: true }) : "—"} />
-        <Stat label="ATH Price" value={athPrice != null ? fmtUsd(athPrice) : "—"} />
         <Stat label="From ATH" value={fromAthPct != null ? (fromAthPct >= 0 ? "+" : "") + fromAthPct.toFixed(0) + "%" : "—"} good={fromAthPct != null ? fromAthPct >= -50 : undefined} />
-        <Stat label="Whales" value={String(whales)} sub={whales === 0 ? "healthy" : "concentration"} />
-        <Stat label="Organic Score" value={t.organicScore != null ? Math.round(t.organicScore) + "/100" : "—"} sub={meta.organicScoreLabel} />
-        <Stat label="Token Age" value={meta.ageDays != null ? meta.ageDays + "d" : "—"} />
-        <Stat label="Mint Auth" value={d.flags?.mintAuthorityDisabled ? "Renounced" : "Active"} good={d.flags?.mintAuthorityDisabled} />
-        <Stat label="Freeze Auth" value={d.flags?.freezeAuthorityDisabled ? "Renounced" : "Active"} good={d.flags?.freezeAuthorityDisabled} />
-        <Stat label="Risk Score" value={safety?.riskScore != null ? String(safety.riskScore) : "—"} good={(safety?.riskScore ?? 99) <= 20} />
-        <Stat label="Holders 24h" value={t.holderChange24h != null ? fmtPct(t.holderChange24h) : "—"} good={(t.holderChange24h ?? 0) > 0} />
-        <Stat label="Liquidity 24h" value={t.liquidityChange24h != null ? fmtPct(t.liquidityChange24h) : "—"} good={(t.liquidityChange24h ?? 0) >= 0} />
-        <Stat label="Volume 24h" value={t.volumeChange24h != null ? fmtPct(t.volumeChange24h) : "—"} good={(t.volumeChange24h ?? 0) >= 0} />
-        <Stat label="Traders 24h" value={fmtNum(t.numTraders ?? meta.numTraders24h)} />
-        <Stat label="Top 10 Holders" value={t.audit?.topHoldersPercentage != null ? t.audit.topHoldersPercentage.toFixed(1) + "%" : "—"} good={(t.audit?.topHoldersPercentage ?? 100) < 25} />
-        <Stat label="Dev Mints" value={t.audit?.devMints != null ? String(t.audit.devMints) : "—"} good={(t.audit?.devMints ?? 0) <= 1} />
+      </div>
+
+      <div className="space-y-3 mb-4">
+        <Collapsible title="Market & Valuation" icon={<TrendingUp className="w-4 h-4 text-accent" />} defaultOpen>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <Stat label="Price" value={fmtUsd(price)} />
+            <Stat label="FDV" value={fmtUsd(t.fdv ?? meta.fdv, { compact: true })} />
+            <Stat label="ATH Price" value={athPrice != null ? fmtUsd(athPrice) : "—"} />
+            <Stat label="Organic Score" value={t.organicScore != null ? Math.round(t.organicScore) + "/100" : "—"} sub={meta.organicScoreLabel} />
+            <Stat label="Token Age" value={meta.ageDays != null ? meta.ageDays + "d" : "—"} />
+          </div>
+        </Collapsible>
+
+        <Collapsible title="Activity & Momentum" icon={<Activity className="w-4 h-4 text-accent" />} defaultOpen={false}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <Stat label="Volume 24h Δ" value={t.volumeChange24h != null ? fmtPct(t.volumeChange24h) : "—"} good={(t.volumeChange24h ?? 0) >= 0} />
+            <Stat label="Liquidity 24h Δ" value={t.liquidityChange24h != null ? fmtPct(t.liquidityChange24h) : "—"} good={(t.liquidityChange24h ?? 0) >= 0} />
+            <Stat label="Holders 24h Δ" value={t.holderChange24h != null ? fmtPct(t.holderChange24h) : "—"} good={(t.holderChange24h ?? 0) > 0} />
+            <Stat label="Traders 24h" value={fmtNum(t.numTraders ?? meta.numTraders24h)} />
+            <Stat label="Whales" value={String(whales)} sub={whales === 0 ? "healthy" : "concentration"} />
+          </div>
+        </Collapsible>
+
+        <Collapsible title="Distribution & Security" icon={<ShieldCheck className="w-4 h-4 text-accent" />} defaultOpen={false}
+          right={<span className={`pill text-[10px] ${(safety?.riskScore ?? 99) <= 20 ? "bg-up/10 text-up" : (safety?.riskScore ?? 99) <= 50 ? "bg-yellow-400/10 text-yellow-300" : "bg-down/10 text-down"}`}>Risk {safety?.riskScore != null ? safety.riskScore : "—"}</span>}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <Stat label="Top 10 Holders" value={t.audit?.topHoldersPercentage != null ? t.audit.topHoldersPercentage.toFixed(1) + "%" : "—"} good={(t.audit?.topHoldersPercentage ?? 100) < 25} />
+            <Stat label="Dev Mints" value={t.audit?.devMints != null ? String(t.audit.devMints) : "—"} good={(t.audit?.devMints ?? 0) <= 1} />
+            <Stat label="Mint Auth" value={d.flags?.mintAuthorityDisabled ? "Renounced" : "Active"} good={d.flags?.mintAuthorityDisabled} />
+            <Stat label="Freeze Auth" value={d.flags?.freezeAuthorityDisabled ? "Renounced" : "Active"} good={d.flags?.freezeAuthorityDisabled} />
+            <Stat label="Risk Score" value={safety?.riskScore != null ? String(safety.riskScore) : "—"} good={(safety?.riskScore ?? 99) <= 20} />
+          </div>
+        </Collapsible>
       </div>
 
       {/* OG score + verdict + scores */}
@@ -191,19 +217,20 @@ export default function TokenDetail() {
       {/* Tabs — centered slider that scrolls instead of breaking the frame */}
       <div className="mb-4 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
         <div className="flex gap-1 bg-panel border border-line rounded-xl p-1 w-max max-w-full mx-auto">
-          {[["overview", "Overview"], ["predictive", "Predictive"], ["smartmoney", "Smart Money"], ["kolwhale", "KOL & Whale"], ["holders", `Holders ${holders.length ? `(${holders.length})` : ""}`], ["trades", `Live Trades ${trades.length ? `(${trades.length})` : ""}`], ["forensics", "Forensics"]].map(([id, label]) => (
+          {[["overview", "Overview"], ["chat", "✨ Ask AI"], ["predictive", "Predictive"], ["smartmoney", "Smart Money"], ["kolwhale", "KOL & Whale"], ["holders", `Holders ${holders.length ? `(${holders.length})` : ""}`], ["trades", `Live Trades ${trades.length ? `(${trades.length})` : ""}`], ["forensics", "Forensics"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id as any)} className={`btn shrink-0 whitespace-nowrap ${tab === id ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>{label}</button>
           ))}
         </div>
       </div>
 
       {tab === "overview" && <Overview d={d} t={t} meta={meta} safety={safety} trades={trades} />}
+      {tab === "chat" && <CoinChat d={d} forensics={forensics} />}
       {tab === "predictive" && <PredictiveIntel d={d} />}
       {tab === "smartmoney" && <CapitalFlow d={d} />}
       {tab === "kolwhale" && <KolWhaleActivity d={d} dir={dir} />}
       {tab === "holders" && <><HolderIntel holders={holders} safety={safety} dir={dir} /><HoldersTable holders={holders} price={price} dir={dir} /></>}
       {tab === "trades" && <TradesTable trades={trades} mint={mint} dir={dir} onRefresh={() => getToken(mint).then(setD)} />}
-      {tab === "forensics" && <Forensics d={d} meta={meta} safety={safety} />}
+      {tab === "forensics" && <><DevOrigin f={forensics} loading={forLoading} /><Forensics d={d} meta={meta} safety={safety} /></>}
     </div>
   );
 }

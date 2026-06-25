@@ -94,3 +94,6 @@ verify_jwt = false
 
 [functions.signup-guard]
 verify_jwt = false
+
+[functions.ogdex-chat]
+verify_jwt = false

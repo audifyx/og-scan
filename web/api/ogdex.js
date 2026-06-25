@@ -31,10 +31,12 @@ import alertsRun from "./ogdex/_routes/alerts-run.js";
 import alerts from "./ogdex/_routes/alerts.js";
 import watchlist from "./ogdex/_routes/watchlist.js";
 import rpc from "./ogdex/_routes/rpc.js";
+import forensics from "./ogdex/_routes/forensics.js";
+import chat from "./ogdex/_routes/chat.js";
 
 const ROUTES = {
   admin, boosts, chart, config, kols, launch, launches,
-  listings, metadata, report, screener, signals, search, token, trade, track, wallet, watchlist, alerts, rpc,
+  listings, metadata, report, screener, signals, search, token, trade, track, wallet, watchlist, alerts, rpc, forensics, chat,
   "alerts-run": alertsRun,
 };
 

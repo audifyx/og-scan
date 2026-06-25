@@ -25,18 +25,7 @@ function dexLinks(best) {
 
 // Compute ATH price/mcap from the *canonical* (deepest-liquidity) GeckoTerminal
 // pool for this token, then derive ATH mcap from real circulating supply.
-async function computeAth(network, mint, token, fallbackPool) {
-  let pool = fallbackPool || null;
-  try {
-    const pr = await fetch(`${GT}/networks/${network}/tokens/${mint}/pools`, { headers: GT_HDR })
-      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const pools = (pr?.data || [])
-      .map((p) => ({ addr: p.attributes?.address, liq: Number(p.attributes?.reserve_in_usd) || 0 }))
-      .filter((p) => p.addr)
-      .sort((a, b) => b.liq - a.liq);
-    if (pools[0]) pool = pools[0].addr;
-  } catch {}
-  if (!pool) return { athPrice: null, athMcap: null };
+async function poolHigh(network, pool) {
   try {
     const gt = await fetch(
       `${GT}/networks/${network}/pools/${pool}/ohlcv/day?limit=1000&currency=usd&aggregate=1`,
@@ -44,17 +33,36 @@ async function computeAth(network, mint, token, fallbackPool) {
     ).then((r) => (r.ok ? r.json() : null));
     const candles = gt?.data?.attributes?.ohlcv_list || [];
     const highs = candles.map((c) => num(c[2])).filter((h) => h && h > 0);
+    return highs.length ? Math.max(...highs) : null;
+  } catch { return null; }
+}
+
+// ATH is computed across the token's *top pools*, not just the deepest current
+// one — older pools often hold the true peak that a newer deep pool has never
+// seen. We take the global max daily high, then derive ATH mcap from real supply.
+async function computeAth(network, mint, token, fallbackPool) {
+  let pools = [];
+  try {
+    const pr = await fetch(`${GT}/networks/${network}/tokens/${mint}/pools`, { headers: GT_HDR })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    pools = (pr?.data || [])
+      .map((p) => ({ addr: p.attributes?.address, liq: Number(p.attributes?.reserve_in_usd) || 0 }))
+      .filter((p) => p.addr)
+      .sort((a, b) => b.liq - a.liq);
+  } catch {}
+  const addrs = [...new Set([...pools.slice(0, 4).map((p) => p.addr), fallbackPool].filter(Boolean))].slice(0, 4);
+  if (!addrs.length) return { athPrice: null, athMcap: null };
+  try {
+    const highs = (await Promise.all(addrs.map((a) => poolHigh(network, a)))).filter((h) => h && h > 0);
     if (!highs.length) return { athPrice: null, athMcap: null };
     let athPrice = Math.max(...highs);
     const price = num(token?.priceUsd);
-    // Guard against a single corrupt candle wick: ignore ATH that is absurdly
-    // far above current price unless the rest of the data agrees.
+    // Guard against a single corrupt candle wick.
     if (price && athPrice > price * 5000) athPrice = price;
     const supply = num(token?.totalSupply) || num(token?.circSupply);
     let athMcap = null;
     if (athPrice && supply) athMcap = athPrice * supply;
     else if (athPrice && price && token?.mcap) athMcap = (athPrice / price) * token.mcap;
-    // ATH can never be below the current mcap.
     if (athMcap != null && token?.mcap) athMcap = Math.max(athMcap, token.mcap);
     return { athPrice, athMcap };
   } catch { return { athPrice: null, athMcap: null }; }

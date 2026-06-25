@@ -165,3 +165,23 @@ export const launchStep = (body: any) =>
   postJson(`/api/ogdex/launch`, body) as Promise<any>;
 export const getLaunches = (limit = 50) =>
   j<{ ok: boolean; count: number; rows: LaunchedToken[]; error?: string }>(`/api/ogdex/launches?limit=${limit}`);
+
+/* ---- Per-coin AI chat + token forensics ---- */
+export interface DexPaid { paid: boolean; services: { type: string; status: string; at?: number | null }[]; }
+export interface FirstBuyer { traced: boolean; wallet?: string; tokenAmount?: number; solSpent?: number; txHash?: string | null; time?: number; isDev?: boolean; note?: string; }
+export interface DevInfo { wallet: string; tokensCreated: number | null; holding: { pct: number | null; uiAmount: number | null } | null; rank: number | null; sold: boolean | null; serial: boolean; }
+export interface Forensics {
+  ok: boolean; mint: string; dev: DevInfo | null; firstBuyer: FirstBuyer | null; dexPaid: DexPaid;
+  launchpad: string | null; isPumpFun: boolean; bondingComplete: boolean | null;
+  concentration: { top10Pct: number | null; whales: number; totalHolders: number | null };
+  safetyFlags: { mintRenounced: boolean | null; freezeRenounced: boolean | null; lpLockedPct: number | null; rugged: boolean | null; riskScore: number | null };
+  error?: string;
+}
+export const getForensics = (mint: string, withFirst = true) =>
+  j<Forensics>(`/api/ogdex/forensics?mint=${mint}${withFirst ? "" : "&first=0"}`);
+
+export interface ChatMsg { role: "user" | "assistant"; content: string; }
+export interface ChatSource { title: string | null; url: string | null; }
+export interface ChatReply { ok: boolean; answer: string | null; sources?: ChatSource[]; provider?: string | null; error?: string; }
+export const askCoin = (mint: string, messages: ChatMsg[], context: any) =>
+  postJson(`/api/ogdex/chat`, { mint, messages, context }) as Promise<ChatReply>;
