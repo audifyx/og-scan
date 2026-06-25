@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getWallet, WalletPortfolio, WalletHolding, fmtUsd, compact, short, isWatched, toggleWatch } from "../lib/api";
+import { getWallet, getSwaps, WalletPortfolio, WalletHolding, WalletTrade, fmtUsd, compact, short, isWatched, toggleWatch } from "../lib/api";
+import { timeAgo } from "../lib/format";
 import TokenLogo from "../components/TokenLogo";
 import Copyable from "../components/Copyable";
 import WalletShareButton from "../components/WalletShareButton";
 import Change from "../components/Change";
-import { ArrowLeft, Loader2, Wallet as WalletIcon, ExternalLink, Star, RefreshCw, Eye, EyeOff, Coins, TrendingUp } from "lucide-react";
+import { ArrowLeft, Loader2, Wallet as WalletIcon, ExternalLink, Star, RefreshCw, Eye, EyeOff, Coins, TrendingUp, Zap, History } from "lucide-react";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
@@ -16,9 +17,11 @@ export default function Wallet() {
   const [watched, setWatched] = useState(false);
   const [hideDust, setHideDust] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [trades, setTrades] = useState<WalletTrade[] | null>(null);
 
   const load = () => { setRefreshing(true); getWallet(address).then((x) => { setD(x); setLoading(false); setRefreshing(false); }); };
   useEffect(() => { setLoading(true); load(); setWatched(isWatched(address)); /* eslint-disable-next-line */ }, [address]);
+  useEffect(() => { let on = true; setTrades(null); getSwaps(address, 25).then((x) => { if (on) setTrades(x.ok ? x.trades : []); }).catch(() => { if (on) setTrades([]); }); return () => { on = false; }; }, [address]);
 
   const rows: (WalletHolding & { isSol?: boolean })[] = useMemo(() => {
     if (!d?.ok) return [];
@@ -160,6 +163,50 @@ export default function Wallet() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {d?.ok && trades && trades.length > 0 && (
+        <div className="card overflow-hidden mt-4">
+          <div className="px-4 py-3 border-b border-line flex items-center gap-2">
+            <History className="w-4 h-4 text-accent" /><span className="text-sm font-semibold">Recent trades</span>
+            <span className="text-xs text-muted">last {trades.length} swaps · tap Ape to mirror</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[620px]">
+              <thead><tr className="text-muted text-xs border-b border-line">
+                <th className="text-left px-4 py-2">Token</th>
+                <th className="text-left px-2 py-2">Side</th>
+                <th className="text-right px-2 py-2">Amount</th>
+                <th className="text-right px-2 py-2">Value</th>
+                <th className="text-right px-2 py-2">When</th>
+                <th className="text-right px-4 py-2">Action</th>
+              </tr></thead>
+              <tbody>
+                {trades.map((t, i) => (
+                  <tr key={(t.txHash || "") + i} className="border-b border-line/50 hover:bg-panel2/40">
+                    <td className="px-4 py-2.5">
+                      <Link to={`/token/${t.mint}`} className="flex items-center gap-2.5 min-w-0">
+                        <TokenLogo src={t.image} sym={t.symbol || ""} size={26} />
+                        <div className="min-w-0"><div className="font-semibold truncate">{t.symbol || short(t.mint)}</div><div className="text-[11px] text-muted truncate">{t.name || "Unknown"}</div></div>
+                      </Link>
+                    </td>
+                    <td className="px-2 py-2.5"><span className={`pill text-[10px] ${t.side === "buy" ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>{t.side.toUpperCase()}</span></td>
+                    <td className="px-2 py-2.5 text-right tabular-nums">{t.solAmount.toFixed(3)} SOL</td>
+                    <td className="px-2 py-2.5 text-right tabular-nums text-muted">{t.usd != null ? fmtUsd(t.usd, { compact: true }) : "—"}</td>
+                    <td className="px-2 py-2.5 text-right text-muted tabular-nums whitespace-nowrap">{t.time ? timeAgo(t.time) : "—"}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="inline-flex items-center gap-2 justify-end">
+                        <Link to={`/token/${t.mint}`} className="inline-flex items-center gap-1 rounded-lg bg-accent/15 px-2.5 py-1 text-[11px] font-bold text-accent hover:bg-accent/25"><Zap className="w-3 h-3" /> Ape</Link>
+                        {t.txHash && <a href={`https://solscan.io/tx/${t.txHash}`} target="_blank" rel="noreferrer" className="text-muted hover:text-white" title="View tx"><ExternalLink className="w-3.5 h-3.5" /></a>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-2 text-[10px] text-muted border-t border-line/50">Ape opens the token trade panel — you review, size and sign every trade yourself. Mirroring is manual and non-custodial.</div>
         </div>
       )}
 

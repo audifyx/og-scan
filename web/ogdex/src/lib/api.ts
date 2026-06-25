@@ -217,3 +217,8 @@ export interface XrayReport {
   traced: boolean; note: string | null; error?: string;
 }
 export const getXray = (mint: string) => j<XrayReport>(`/api/ogdex/xray?mint=${mint}`);
+
+/* ---- Wallet recent trades feed (for the 1-tap Ape / mirror UI) ---- */
+export interface WalletTrade { txHash: string | null; side: "buy" | "sell"; mint: string; tokenAmount: number; solAmount: number; time: number; usd: number | null; name: string | null; symbol: string | null; image: string | null; }
+export interface WalletTrades { ok: boolean; address: string; solPrice: number; count: number; trades: WalletTrade[]; error?: string; }
+export const getSwaps = (address: string, limit = 25) => j<WalletTrades>(`/api/ogdex/swaps?address=${address}&limit=${limit}`);

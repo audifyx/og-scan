@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useWallet, getPhantom } from "../lib/wallet";
 import { getBalance, getSafety, SafetyCheck, fmtUsd, compact } from "../lib/api";
-import { Wallet2, Loader2, ArrowDownUp, ExternalLink, CheckCircle2, AlertTriangle, ShieldCheck, ShieldAlert, X, RefreshCw } from "lucide-react";
+import { Wallet2, Loader2, ArrowDownUp, ExternalLink, CheckCircle2, AlertTriangle, ShieldCheck, ShieldAlert, X, RefreshCw, Lock, Info } from "lucide-react";
 
 const BUY_PRESETS = [0.1, 0.25, 0.5, 1];
 const SELL_PRESETS = [25, 50, 100];
@@ -210,7 +210,25 @@ export default function TradePanel({ mint, symbol, price, icon }: { mint: string
           {sig && <a href={`https://solscan.io/tx/${sig}`} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 font-semibold hover:underline">Inspect tx <ExternalLink className="h-3 w-3" /></a>}
         </div>
       )}
-      <p className="mt-2 text-center text-[10px] text-muted/70">OGDEX never holds your funds. You approve &amp; send every trade in Phantom.</p>
+      {/* Transparent fees + non-custodial trust */}
+      <details className="group mt-3 rounded-xl border border-line bg-panel2/40 px-3 py-2 text-[11px]">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-muted hover:text-white">
+          <Lock className="h-3 w-3 text-up" />
+          <span className="font-semibold text-white">No OGDEX fee</span>
+          <span className="opacity-70">· non-custodial</span>
+          <Info className="ml-auto h-3 w-3 opacity-60 transition group-open:rotate-180" />
+        </summary>
+        <div className="mt-2 space-y-1.5 text-muted">
+          <div className="flex items-center justify-between"><span>OGDEX platform fee</span><span className="font-semibold text-up">0% · none</span></div>
+          <div className="flex items-center justify-between"><span>Network priority fee</span><span className="text-white">~0.0003 SOL</span></div>
+          <div className="flex items-center justify-between"><span>Routing fee</span><span className="text-white">pump.fun 0.5% · or DEX swap fee</span></div>
+          <div className="flex items-center justify-between"><span>Slippage cap</span><span className="text-white">{slippage}%</span></div>
+          <p className="pt-1 text-[10px] leading-relaxed text-muted/80">
+            OGDEX adds no markup, no referral cut and no hidden spread. We route to PumpPortal / Jupiter at cost.
+            Your keys and funds never touch our servers — you review and sign every transaction in Phantom.
+          </p>
+        </div>
+      </details>
     </div>
   );
 }

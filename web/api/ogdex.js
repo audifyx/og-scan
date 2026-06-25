@@ -32,11 +32,12 @@ import health from "./ogdex/_routes/health.js";
 import balance from "./ogdex/_routes/balance.js";
 import safety from "./ogdex/_routes/safety.js";
 import xray from "./ogdex/_routes/xray.js";
+import swaps from "./ogdex/_routes/swaps.js";
 
 const ROUTES = {
   admin, boosts, chart, kols, launch, launches,
   config: configRoute, listings, metadata, report, screener, signals, search, token, trade, track, wallet, watchlist, alerts, rpc, forensics, chat, ath, openapi,
-  "openapi.json": openapi, health, balance, safety, xray,
+  "openapi.json": openapi, health, balance, safety, xray, swaps,
   "alerts-run": alertsRun,
 };
 
