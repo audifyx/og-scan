@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { KolDirEntry } from "../lib/kol";
 import KolBadge from "./KolBadge";
 import WalletLink from "./WalletLink";
-import { fmtUsd, compact, TokenDetailData } from "../lib/api";
+import { fmtUsd, compact, short, TokenDetailData } from "../lib/api";
+import { getWalletLabel, labelKindClass } from "../lib/labels";
 import { timeAgo } from "../lib/format";
 import { ArrowUpRight, ArrowDownRight, ExternalLink, Crown, Radio, BadgeCheck, Loader2, RefreshCw } from "lucide-react";
 
@@ -12,6 +13,9 @@ export default function KolWhaleActivity({ d, dir }: { d: TokenDetailData; dir: 
   const intel: any = (d as any).intel || {};
   const holders: any[] = intel.holders || [];
   const intelTrades: any[] = intel.trades || [];
+  const price: number | null = (d as any).token?.priceUsd ?? (d as any).meta?.priceUsd ?? null;
+  const whaleHolders: any[] = (holders.filter((h) => h.label === "whale")
+    .sort((a, b) => (b.pct || 0) - (a.pct || 0)));
 
   const [feedRows, setFeedRows] = useState<any[]>([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
@@ -64,8 +68,38 @@ export default function KolWhaleActivity({ d, dir }: { d: TokenDetailData; dir: 
       <div className="grid grid-cols-3 gap-3">
         <Summary label="KOLs active" value={String(kolCount)} sub={`${kolBuys} buys`} />
         <Summary label="KOLs holding" value={String(kolHolders.length)} sub={kolHolders.length ? "see holders tab" : "none detected"} />
-        <Summary label="Whale trades" value={String(allRows.filter((r) => r.whale).length)} sub="from feed" />
+        <Summary label="Whale holders" value={String(whaleHolders.length)} sub="≥1% of supply" />
       </div>
+
+      {/* Whale holders — who is actually holding */}
+      {whaleHolders.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-4 py-3 border-b border-line text-sm font-semibold flex items-center gap-2">
+            <Crown className="w-4 h-4 text-accent" /> Top Holders ({whaleHolders.length} whales ≥1%)
+            <span className="text-muted font-normal text-xs ml-1">named wallets labeled · click to view</span>
+          </div>
+          <div className="divide-y divide-line/60">
+            {whaleHolders.slice(0, 20).map((h) => {
+              const lbl = h.publicLabel || getWalletLabel(h.owner);
+              const k = h.kol || dir[h.owner];
+              return (
+                <div key={h.owner} className="flex items-center gap-3 px-4 py-2.5 hover:bg-panel2/30">
+                  <span className="text-muted text-xs w-6 shrink-0">#{h.rank}</span>
+                  <div className="min-w-0 flex-1">
+                    {k ? <Link to={`/kol/${h.owner}`} className="inline-flex items-center gap-1.5"><BadgeCheck className="w-3.5 h-3.5 text-accent" /><span className="text-white text-sm font-medium">{k.name}</span></Link>
+                       : lbl ? <span className="inline-flex items-center gap-1.5"><span className={`pill text-[10px] ${labelKindClass(lbl.kind)}`}>{lbl.name}</span><WalletLink address={h.owner} icon={false} className="text-xs text-muted" /></span>
+                       : <WalletLink address={h.owner} icon={false} className="text-sm" />}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-semibold">{h.pct != null ? h.pct.toFixed(2) + "%" : "—"}</div>
+                    {price && h.uiAmount ? <div className="text-[11px] text-muted">{fmtUsd(h.uiAmount * price, { compact: true })}</div> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* KOLs holding this token */}
       {kolHolders.length > 0 && (

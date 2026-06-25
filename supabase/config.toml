@@ -97,3 +97,6 @@ verify_jwt = false
 
 [functions.ogdex-chat]
 verify_jwt = false
+
+[functions.ogdex-intel-v2]
+verify_jwt = false

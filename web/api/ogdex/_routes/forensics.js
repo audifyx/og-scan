@@ -1,4 +1,4 @@
-import { callFn, send, cache } from "../_lib.js";
+import { callFn, send, cache, INTEL_FN } from "../_lib.js";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
@@ -91,7 +91,7 @@ export default async function handler(req, res) {
     const [paid, pump, intel] = await Promise.all([
       dexPaid(mint),
       pumpCoin(mint),
-      callFn("ogdex-intel", { mint }).catch(() => null),
+      callFn(INTEL_FN, { mint }).catch(() => null),
     ]);
 
     const safety = intel?.safety || {};

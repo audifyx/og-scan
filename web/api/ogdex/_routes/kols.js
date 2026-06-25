@@ -155,7 +155,7 @@ function fmtFeed(r, tokenMeta = {}) {
     time: r.tx_timestamp ? new Date(r.tx_timestamp).getTime() : null, txHash: r.tx_hash };
 }
 async function ingestBatch(sp) {
-  const BATCH = 5;
+  const BATCH = 8;
   const offset = Number(sp.get("offset")) || Math.floor(Date.now() / 60000) % 10;
   const wallets = await dbSelect("ogdex_kol_directory", "select=address,kol_id,kol_wallet_id,is_active&is_active=is.true&kol_wallet_id=not.is.null&limit=500");
   if (!wallets.length) return;
@@ -164,11 +164,11 @@ async function ingestBatch(sp) {
   const swapsAll = [];
   for (const w of slice) {
     try {
-      const sigs = (await rpc("getSignaturesForAddress", [w.address, { limit: 4 }])) || [];
+      const sigs = (await rpc("getSignaturesForAddress", [w.address, { limit: 6 }])) || [];
       const hashes = sigs.map((s) => s.signature); if (!hashes.length) continue;
       const existing = await dbSelect("kol_transactions", `select=tx_hash&tx_hash=in.(${hashes.join(",")})`).catch(() => []);
       const seen = new Set(existing.map((e) => e.tx_hash));
-      const fresh = hashes.filter((h) => !seen.has(h)).slice(0, 2);
+      const fresh = hashes.filter((h) => !seen.has(h)).slice(0, 3);
       for (const h of fresh) {
         const tx = await rpc("getTransaction", [h, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]).catch(() => null);
         const sw = parseSwap(tx, w.address);

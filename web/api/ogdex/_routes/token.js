@@ -1,4 +1,4 @@
-import { jup, callFn, send, cache } from "../_lib.js";
+import { jup, callFn, send, cache, INTEL_FN } from "../_lib.js";
 import { normToken, num } from "../_normalize.js";
 
 const GT_HDR = { Accept: "application/json;version=20230302" };
@@ -153,7 +153,7 @@ export default async function handler(req, res) {
       fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { headers: { Accept: "application/json" } })
         .then((r) => (r.ok ? r.json() : null)).catch(() => null),
       callFn("og-scan-token", { query: mint }).catch(() => null),
-      callFn("ogdex-intel", { mint }).catch(() => null),
+      callFn(INTEL_FN, { mint }).catch(() => null),
     ]);
 
     const jupRaw = Array.isArray(jupArr) ? (jupArr.find((t) => (t.id || t.mint) === mint) || null) : null;
