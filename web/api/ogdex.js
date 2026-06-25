@@ -34,10 +34,12 @@ import rpc from "./ogdex/_routes/rpc.js";
 import forensics from "./ogdex/_routes/forensics.js";
 import chat from "./ogdex/_routes/chat.js";
 import ath from "./ogdex/_routes/ath.js";
+import openapi from "./ogdex/_routes/openapi.js";
 
 const ROUTES = {
   admin, boosts, chart, config, kols, launch, launches,
-  listings, metadata, report, screener, signals, search, token, trade, track, wallet, watchlist, alerts, rpc, forensics, chat, ath,
+  listings, metadata, report, screener, signals, search, token, trade, track, wallet, watchlist, alerts, rpc, forensics, chat, ath, openapi,
+  "openapi.json": openapi,
   "alerts-run": alertsRun,
 };
 

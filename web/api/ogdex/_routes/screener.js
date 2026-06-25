@@ -220,8 +220,8 @@ export default async function handler(req, res) {
       const dexRows = await fetchDexMigrated(100);
       // Supplement: GeckoTerminal Solana trending (more variety)
       const { data: gtData, tokenMap } = await fetchGeckoTrending("solana", 3);
-      const gtRows = gtData.map(p => normGecko(p, tokenMap)).filter(Boolean).filter(r => (r.volume ?? 0) >= 500);
-      rows = dedup([...dexRows, ...gtRows]).sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0)).slice(0, limit);
+      const gtRows = gtData.map(p => normGecko(p, tokenMap)).filter(Boolean).filter(r => (r.volume ?? 0) >= 500 && (r.liquidity ?? 0) >= 2000);
+      rows = dedup([...dexRows, ...gtRows]).filter(r => (r.liquidity ?? 0) >= 1500).sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0)).slice(0, limit);
       // Last fallback: pump.fun complete coins
       if (rows.length < 20) {
         const pumpCoins = await fetchPump("last_trade_timestamp", 200, c => c.complete === true);
@@ -281,7 +281,7 @@ export default async function handler(req, res) {
           change24h: dx.change24h ?? c.change24h,
           liquidity: dx.liquidity ?? c.liquidity,
         };
-      }).filter(c => (c.volume ?? 0) >= 10_000 && (c.mcap ?? 0) >= 10_000);
+      }).filter(c => (c.volume ?? 0) >= 5_000 && (c.mcap ?? 0) >= 8_000);
 
       rows = dedupBySymbol(dedup(enriched))
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
@@ -328,8 +328,14 @@ export default async function handler(req, res) {
 
     // ── New (recently listed on Jupiter) ─────────────────────────────────────
     } else if (type === "new") {
-      const data = await jup(`/tokens/v2/recent?limit=${limit}`);
-      rows = dedup((Array.isArray(data) ? data : []).map(t => normToken(t, interval)).filter(Boolean));
+      const data = await jup(`/tokens/v2/recent?limit=300`);
+      rows = dedup((Array.isArray(data) ? data : [])
+        .filter(t => !STABLES.has(String(t.symbol || "").toUpperCase()))
+        .map(t => normToken(t, interval)).filter(Boolean)
+        // liveness: real price + tradable liquidity (no empty/dead shells)
+        .filter(r => (r.priceUsd ?? 0) > 0 && (r.liquidity ?? 0) >= 1500))
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+        .slice(0, limit);
 
     // ── OG: established verified Solana tokens ────────────────────────────────
     } else if (type === "og") {
