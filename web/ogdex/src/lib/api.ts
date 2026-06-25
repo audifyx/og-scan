@@ -194,3 +194,7 @@ export const getAth = (mint: string) => j<AthData>(`/api/ogdex/ath?mint=${mint}`
 export interface TradeBalance { ok: boolean; owner?: string; sol: number; token: { uiAmount: number; decimals: number; raw: string }; error?: string; }
 export const getBalance = (owner: string, mint: string) =>
   j<TradeBalance>(`/api/ogdex/balance?owner=${owner}&mint=${mint}`);
+
+/* ---- Tradeability / honeypot + tax check (Jupiter round-trip) ---- */
+export interface SafetyCheck { ok: boolean; mint?: string; canBuy: boolean; canSell: boolean; roundTripLossPct: number | null; buyImpactPct: number | null; sellImpactPct: number | null; verdict: string; tone: "good" | "warn" | "bad"; note?: string; error?: string; }
+export const getSafety = (mint: string) => j<SafetyCheck>(`/api/ogdex/safety?mint=${mint}`);

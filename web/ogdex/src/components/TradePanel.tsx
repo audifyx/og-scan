@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useWallet, getPhantom } from "../lib/wallet";
-import { getBalance, fmtUsd, compact } from "../lib/api";
-import { Wallet2, Loader2, ArrowDownUp, ExternalLink, CheckCircle2, AlertTriangle, ShieldCheck, X, RefreshCw } from "lucide-react";
+import { getBalance, getSafety, SafetyCheck, fmtUsd, compact } from "../lib/api";
+import { Wallet2, Loader2, ArrowDownUp, ExternalLink, CheckCircle2, AlertTriangle, ShieldCheck, ShieldAlert, X, RefreshCw } from "lucide-react";
 
 const BUY_PRESETS = [0.1, 0.25, 0.5, 1];
 const SELL_PRESETS = [25, 50, 100];
@@ -36,6 +36,7 @@ export default function TradePanel({ mint, symbol, price, icon }: { mint: string
   const [reviewing, setReviewing] = useState(false);
   const [bal, setBal] = useState<{ sol: number; uiAmount: number; decimals: number } | null>(null);
   const [loadingBal, setLoadingBal] = useState(false);
+  const [safety, setSafety] = useState<SafetyCheck | null>(null);
 
   const sym = symbol || "token";
 
@@ -49,6 +50,7 @@ export default function TradePanel({ mint, symbol, price, icon }: { mint: string
   }, [address, mint]);
 
   useEffect(() => { loadBal(); }, [loadBal]);
+  useEffect(() => { let on = true; setSafety(null); getSafety(mint).then((x) => { if (on && x.ok) setSafety(x); }).catch(() => {}); return () => { on = false; }; }, [mint]);
 
   const reset = () => { setReviewing(false); setErr(""); };
   const tokenHeld = bal?.uiAmount || 0;
@@ -106,6 +108,17 @@ export default function TradePanel({ mint, symbol, price, icon }: { mint: string
         <div className="flex items-center gap-2 text-sm font-bold text-white"><ArrowDownUp className="h-4 w-4 text-accent" /> Trade {sym}</div>
         <span className="text-[10px] text-muted">Non-custodial · Phantom</span>
       </div>
+
+      {safety && (
+        <div className={`mb-3 rounded-xl border px-3 py-2 text-xs ${safety.tone === "good" ? "border-up/25 bg-up/10 text-up" : safety.tone === "warn" ? "border-yellow-400/25 bg-yellow-400/10 text-yellow-300" : "border-down/25 bg-down/10 text-down"}`}>
+          <div className="flex items-center gap-1.5 font-semibold">
+            {safety.tone === "good" ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}
+            {safety.canSell ? `Tradeable · ${safety.verdict}` : "Cannot sell — " + safety.verdict}
+            {safety.roundTripLossPct != null && safety.canSell ? <span className="ml-auto font-normal opacity-80">round trip ~{safety.roundTripLossPct.toFixed(1)}%</span> : null}
+          </div>
+          {!safety.canSell && <div className="mt-1 text-[11px] font-normal">{safety.note}</div>}
+        </div>
+      )}
 
       {/* Holdings */}
       {address && (
