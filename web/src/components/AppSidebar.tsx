@@ -18,6 +18,7 @@ import {
   Radar,
   FileText,
   MessageSquare,
+  Search,
   Radio,
   Shield,
   TrendingUp,
