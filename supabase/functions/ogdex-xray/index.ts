@@ -117,9 +117,9 @@ function funderFromTx(tx: any, wallet: string) {
   return null;
 }
 async function findFunder(wallet: string) {
-  // Walk up to 5 pages (5000 sigs) back — professional sniper wallets have
-  // months of history so 2000 sigs (2 pages) often doesn't reach genesis.
-  const PAGE = 1000, MAX = 5;
+  // Walk up to 3 pages (3000 sigs) — must fit within the 10s funding timeout.
+  // Professional sniper wallets have deep history; 3000 sigs covers most cases.
+  const PAGE = 1000, MAX = 3;
   let before: string | null = null, all: any[] = [];
   for (let i = 0; i < MAX; i++) {
     const opts: any = { limit: PAGE }; if (before) opts.before = before;
@@ -138,8 +138,8 @@ async function findFunder(wallet: string) {
   return null;
 }
 async function traceFunding(wallets: string[]) {
-  // Trace up to 20 wallets — broader coverage improves cluster detection.
-  const cap = wallets.slice(0, 20);
+  // Trace up to 15 wallets within the timeout budget.
+  const cap = wallets.slice(0, 15);
   // Trace in small batches — tracing all at once overwhelms the RPC.
   await sleep(300); // let the post-genesis-walk rate-limit burst settle
   const found: (readonly [string, string | null])[] = [];
@@ -201,10 +201,10 @@ async function birdeyeEarlyTrades(mint: string): Promise<any[] | null> {
 }
 
 async function walkGenesis(mint: string) {
-  // Increase ceiling — covers tokens up to ~60k total transactions.
-  // Tokens with millions of txs (TRUMP etc.) won't reach genesis here;
-  // analyze() falls back to Birdeye for those.
-  const MAX_PAGES = 60, PAGE = 1000;
+  // 18 pages × 1000 sigs = up to 18k signatures, ~5s max on Helius.
+  // Tokens with more history (TRUMP etc.) won't reach genesis — analyze()
+  // falls back to Birdeye (already running in parallel) for those.
+  const MAX_PAGES = 18, PAGE = 1000;
   let before: string | null = null, all: any[] = [], genesis = false;
   for (let i = 0; i < MAX_PAGES; i++) {
     const opts: any = { limit: PAGE }; if (before) opts.before = before;
@@ -219,13 +219,21 @@ async function walkGenesis(mint: string) {
 }
 
 async function analyze(mint: string, limit = 50) {
-  const { all, genesis } = await walkGenesis(mint);
-  let usedBirdeye = false;
+  // ── Phase 1: Parallel genesis walk + Birdeye early trades ─────────────────
+  // Run both at once. Genesis walk (Helius) is authoritative for small/mid tokens
+  // that reach genesis within ~5s. Birdeye ascending-sort gives the true first
+  // trades for large tokens (TRUMP etc.) where genesis is unreachable.
+  // Running in parallel means we don't pay Birdeye latency on top of the walk.
+  const [{ all, genesis }, beItemsRaw] = await Promise.all([
+    walkGenesis(mint),
+    birdeyeEarlyTrades(mint),
+  ]);
 
+  let usedBirdeye = false;
   const buysAll: any[] = [];
 
   if (all.length) {
-    // Resolve the oldest on-chain signatures to full transactions.
+    // Resolve the oldest on-chain sigs to full transactions.
     const oldest = all.slice(0, Math.min(80, all.length));
     const txs: any[] = [];
     for (let i = 0; i < oldest.length; i += 10) {
@@ -237,19 +245,15 @@ async function analyze(mint: string, limit = 50) {
     buysAll.sort((a, b) => (a.slot - b.slot) || (a.time - b.time));
   }
 
-  // ── Birdeye fallback for large tokens where genesis is unreachable ────────
-  // When genesis = false the helius walk stopped before reaching the launch.
-  // The "oldest" sigs we walked are mid-history, NOT the launch window — so
-  // we discard them entirely and replace with Birdeye's asc-sorted earliest
-  // trades, which gives the true first buyers regardless of token size.
   if (!genesis) {
-    const beItems = await birdeyeEarlyTrades(mint);
-    if (beItems?.length) {
-      buysAll.length = 0;                    // discard mid-history helius data
-      buysAll.push(...beItems);
+    // Helius didn't reach the launch — the buysAll data is mid-history garbage.
+    // Replace entirely with Birdeye's asc-sorted earliest trades (already resolved).
+    if (beItemsRaw?.length) {
+      buysAll.length = 0;
+      buysAll.push(...beItemsRaw);
       buysAll.sort((a, b) => (a.time - b.time));
       usedBirdeye = true;
-      _dbg.birdeye = { items: beItems.length, replaced: true };
+      _dbg.birdeye = { items: beItemsRaw.length, replaced: true };
     }
   }
 
@@ -300,7 +304,8 @@ async function analyze(mint: string, limit = 50) {
 
   // Insider clusters: early buyers funded by the same wallet. Time-boxed so a slow
   // RPC never blows the function budget — we ship whatever resolved in time.
-  const fundingTimeout = new Promise<{ funders: Record<string, string>; clusters: any[] }>((res) => setTimeout(() => res({ funders: {}, clusters: [] }), 22000));
+  // 10s cap — keeps total edge-fn time under 18s (walk 5s + resolve 2s + trace 10s).
+  const fundingTimeout = new Promise<{ funders: Record<string, string>; clusters: any[] }>((res) => setTimeout(() => res({ funders: {}, clusters: [] }), 10000));
   const { funders, clusters } = await Promise.race([traceFunding(firstBuys.map((b) => b.wallet)), fundingTimeout]);
   const insiderWallets = new Set<string>();
   for (const c of clusters) for (const w of c.wallets) insiderWallets.add(w);
