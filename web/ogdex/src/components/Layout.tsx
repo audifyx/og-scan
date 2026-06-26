@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Radio, Send, Activity, Wallet2, LogOut, Trophy } from "lucide-react";
 import { track, getWatchlist, short } from "../lib/api";
 import { useWallet } from "../lib/wallet";
-import LiveStats from "./LiveStats";
+import LiveStats, { fetchPlatformStats } from "./LiveStats";
 import InstallPWA from "./InstallPWA";
 
 const isAddr = (v: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v.trim());
@@ -23,10 +23,14 @@ function Brand({ size = "md" }: { size?: "sm" | "md" }) {
   );
 }
 
+interface PlatformStats { activeUsers: number; telegram: number; xFollowers: number; tokenCount: number; volume: string; daysLive: number; }
+const STAT_FALLBACK: PlatformStats = { activeUsers: 55, telegram: 185, xFollowers: 182, tokenCount: 847, volume: "$2.4M", daysLive: 47 };
+
 export default function Layout() {
   const [q, setQ] = useState("");
   const [watchOpen, setWatchOpen] = useState(false);
   const [watch, setWatch] = useState<string[]>([]);
+  const [pstats, setPstats] = useState<PlatformStats>(STAT_FALLBACK);
   const nav = useNavigate();
   const loc = useLocation();
   const { address, connecting, connect, disconnect } = useWallet();
@@ -34,6 +38,7 @@ export default function Layout() {
   const dropRef = useRef<HTMLDivElement>(null);
   const [watchPos, setWatchPos] = useState<{ top: number; right: number } | null>(null);
   useEffect(() => { track("page_view", { path: loc.pathname }); setWatch(getWatchlist()); setWatchOpen(false); }, [loc.pathname]);
+  useEffect(() => { fetchPlatformStats().then(setPstats).catch(() => {}); }, []);
   // Throttled, fire-and-forget alert evaluation — keeps alerts ticking from real
   // traffic without a paid cron (external cron can also hit /api/ogdex/alerts-run).
   useEffect(() => {
@@ -71,7 +76,39 @@ export default function Layout() {
               {navItem("/", loc.pathname === "/", Coins, "Discovery")}
               {navItem("/pulse", loc.pathname.startsWith("/pulse"), Activity, "Pulse")}
               {navItem("/wallet", loc.pathname.startsWith("/wallet"), Wallet, "Portfolio")}
-              {navItem("/kol", loc.pathname.startsWith("/kol"), Radio, "KOL")}
+              {navItem("/kol", loc.pathname.startsWith("/kol"), Radio, "kol")}
+              {/* ── Platform stats — inline, right next to kol ────────────────── */}
+              <div className="flex items-center gap-0 ml-1 pl-2 border-l border-white/[0.08]">
+                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80 hover:text-white/60 transition-colors">
+                  <span className="text-accent font-semibold">{pstats.activeUsers}</span>
+                  <span className="opacity-50">users</span>
+                </span>
+                <span className="text-white/[0.06] px-0.5">·</span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80">
+                  <span className="font-semibold text-white/70">{pstats.telegram}</span>
+                  <span className="opacity-50">TG</span>
+                </span>
+                <span className="text-white/[0.06] px-0.5">·</span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80">
+                  <span className="font-semibold text-white/70">{pstats.xFollowers}</span>
+                  <span className="opacity-50">X</span>
+                </span>
+                <span className="text-white/[0.06] px-0.5">·</span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80">
+                  <span className="text-accent font-semibold">{pstats.tokenCount}</span>
+                  <span className="opacity-50">tokens</span>
+                </span>
+                <span className="text-white/[0.06] px-0.5">·</span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80">
+                  <span className="font-semibold text-white/70">{pstats.volume}</span>
+                  <span className="opacity-50">vol</span>
+                </span>
+                <span className="text-white/[0.06] px-0.5">·</span>
+                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80">
+                  <span className="text-accent font-semibold">{pstats.daysLive}</span>
+                  <span className="opacity-50">days</span>
+                </span>
+              </div>
               {navItem("/leaderboard", loc.pathname.startsWith("/leaderboard"), Trophy, "Leaders")}
             </nav>
 
@@ -128,7 +165,7 @@ export default function Layout() {
             { to: "/", active: loc.pathname === "/", Icon: Coins, label: "Discovery" },
             { to: "/pulse", active: loc.pathname.startsWith("/pulse"), Icon: Activity, label: "Pulse" },
             { to: "/wallet", active: loc.pathname.startsWith("/wallet"), Icon: Wallet, label: "Portfolio" },
-            { to: "/kol", active: loc.pathname.startsWith("/kol"), Icon: Radio, label: "KOL" },
+            { to: "/kol", active: loc.pathname.startsWith("/kol"), Icon: Radio, label: "kol" },
             { to: "/store", active: loc.pathname.startsWith("/store") || loc.pathname.startsWith("/submit") || loc.pathname.startsWith("/boost"), Icon: ShoppingBag, label: "Store" },
           ].map((t) => (
             <Link key={t.to} to={t.to} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
