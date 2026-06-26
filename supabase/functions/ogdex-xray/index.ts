@@ -117,7 +117,9 @@ function funderFromTx(tx: any, wallet: string) {
   return null;
 }
 async function findFunder(wallet: string) {
-  const PAGE = 1000, MAX = 2;
+  // Walk up to 5 pages (5000 sigs) back — professional sniper wallets have
+  // months of history so 2000 sigs (2 pages) often doesn't reach genesis.
+  const PAGE = 1000, MAX = 5;
   let before: string | null = null, all: any[] = [];
   for (let i = 0; i < MAX; i++) {
     const opts: any = { limit: PAGE }; if (before) opts.before = before;
@@ -128,14 +130,17 @@ async function findFunder(wallet: string) {
     if (sigs.length < PAGE) break;
   }
   if (!all.length) return null;
-  const oldest = all.reverse().slice(0, 5);
+  // Look at the oldest 10 txs — the wallet's very first SOL receipt
+  // may not be in the first few if it was funded across multiple txs.
+  const oldest = all.reverse().slice(0, 10);
   const txs = await Promise.all(oldest.map((sg: any) => rpcSafe("getTransaction", [sg.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]).catch(() => null)));
   for (const tx of txs) { const f = funderFromTx(tx, wallet); if (f) return f; }
   return null;
 }
 async function traceFunding(wallets: string[]) {
-  const cap = wallets.slice(0, 12);
-  // Trace in small batches — tracing all at once overwhelms the RPC (rate limits → nulls).
+  // Trace up to 20 wallets — broader coverage improves cluster detection.
+  const cap = wallets.slice(0, 20);
+  // Trace in small batches — tracing all at once overwhelms the RPC.
   await sleep(300); // let the post-genesis-walk rate-limit burst settle
   const found: (readonly [string, string | null])[] = [];
   for (let i = 0; i < cap.length; i += 2) {
@@ -233,17 +238,18 @@ async function analyze(mint: string, limit = 50) {
   }
 
   // ── Birdeye fallback for large tokens where genesis is unreachable ────────
-  // When genesis = false AND we have few/no buys, the helius walk didn't reach
-  // the launch. Use Birdeye's ascending-sorted trade history to get the actual
-  // earliest buyers instead of a random mid-history slice.
-  if (!genesis && buysAll.length < 10) {
+  // When genesis = false the helius walk stopped before reaching the launch.
+  // The "oldest" sigs we walked are mid-history, NOT the launch window — so
+  // we discard them entirely and replace with Birdeye's asc-sorted earliest
+  // trades, which gives the true first buyers regardless of token size.
+  if (!genesis) {
     const beItems = await birdeyeEarlyTrades(mint);
     if (beItems?.length) {
-      const seen = new Set(buysAll.map((b) => b.wallet));
-      for (const b of beItems) if (!seen.has(b.wallet)) { seen.add(b.wallet); buysAll.push(b); }
-      buysAll.sort((a, b) => (a.slot - b.slot) || (a.time - b.time));
+      buysAll.length = 0;                    // discard mid-history helius data
+      buysAll.push(...beItems);
+      buysAll.sort((a, b) => (a.time - b.time));
       usedBirdeye = true;
-      _dbg.birdeye = { items: beItems.length };
+      _dbg.birdeye = { items: beItems.length, replaced: true };
     }
   }
 
