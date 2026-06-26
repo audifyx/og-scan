@@ -34,7 +34,7 @@ function pctTone(p: number | null, warn = 30, bad = 60) {
 }
 
 export default function RiskXray({ x, loading }: { x: XrayReport | null; loading: boolean }) {
-  if (!x) return null;
+  if (!x?.ok) return null;
   const t = TONE[x.tone] || TONE.yellow;
 
   return (
