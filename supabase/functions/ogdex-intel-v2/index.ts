@@ -129,27 +129,58 @@ async function rugcheck(mint: string) {
     if (!r.ok) return null;
     const d = await r.json();
 
-    // ── LP lock: search ALL markets (not just markets[0]) ──────────────────
-    // Many tokens have multiple pools; the locked one may not be first.
-    // Also handle: boolean lpLocked with no numeric pct, burned LP, and
-    // pump.fun graduation (LP burned on migration → effectively 100% locked).
-    let lpLockedPct = 0;
+    // ── LP lock: USD-weighted total across ALL markets ─────────────────────
+    // Correct representation: sum(locked_USD) / sum(total_LP_USD) * 100.
+    // Falls back to supply-weighted, then simple average when USD is missing.
+    // Taking the MAX was wrong — one tiny 100%-locked pool + one massive
+    // 0%-locked pool does NOT equal "100% locked".
+    let totalLpUsd      = 0, totalLockedUsd      = 0;
+    let totalLpSupply   = 0, totalLockedSupply   = 0;
+    let simpleSum       = 0, marketCount         = 0;
+    let hasUsd          = false;
+
     for (const m of (d.markets || [])) {
-      const lp = m?.lp || {};
-      const pct = num(lp.lpLockedPct);
-      if (pct != null && pct > lpLockedPct) lpLockedPct = pct;
-      // Boolean locked without a numeric field → treat as 100%
-      if ((lp.lpLocked === true || lp.locked === true) && !pct) lpLockedPct = Math.max(lpLockedPct, 100);
-      // Burned LP amounts to permanent lock
-      if (lp.lpBurned === true) lpLockedPct = 100;
-      const burnedPct = num(lp.burnedPct) ?? num(lp.lpBurnedPct);
-      if (burnedPct != null && burnedPct > lpLockedPct) lpLockedPct = burnedPct;
+      const lp = m?.lp;
+      if (!lp || typeof lp !== "object") continue;
+      marketCount++;
+
+      // Determine effective lock % for this pool
+      const rawPct      = num(lp.lpLockedPct);
+      const burnedPct   = num(lp.burnedPct) ?? num(lp.lpBurnedPct) ?? (lp.lpBurned === true ? 100 : 0);
+      const boolPct     = (lp.lpLocked === true || lp.locked === true) ? 100 : 0;
+      const effectivePct = Math.min(100, Math.max(rawPct ?? 0, burnedPct ?? 0, boolPct));
+
+      simpleSum += effectivePct;
+
+      // USD weighting (most accurate)
+      const lpUsd = num(lp.lpTotalUSD) ?? num(lp.lpUSD) ?? num(lp.totalUSD);
+      if (lpUsd != null && lpUsd > 0) {
+        hasUsd = true;
+        totalLpUsd     += lpUsd;
+        totalLockedUsd += lpUsd * (effectivePct / 100);
+      }
+
+      // LP token supply weighting (second best — not cross-comparable, but
+      // each pool's supply tracks its share of that pool's liquidity)
+      const lpSup = num(lp.lpCurrentSupply) ?? num(lp.lpTotalSupply);
+      if (lpSup != null && lpSup > 0) {
+        totalLpSupply     += lpSup;
+        totalLockedSupply += lpSup * (effectivePct / 100);
+      }
     }
-    // Fallback to top-level field (some rugcheck versions hoist it)
+
+    let lpLockedPct =
+      hasUsd && totalLpUsd > 0     ? (totalLockedUsd    / totalLpUsd)    * 100 :
+      totalLpSupply > 0            ? (totalLockedSupply / totalLpSupply) * 100 :
+      marketCount > 0              ? simpleSum / marketCount                   :
+      0;
+
+    // Top-level fallback (some rugcheck versions hoist it)
     if (!lpLockedPct) lpLockedPct = num(d.lpLockedPct) ?? 0;
-    // pump.fun graduated tokens have their LP burned → fully locked
+    // pump.fun graduated tokens burn their LP → 100% locked
     const launchpad: string = d.launchpad || "";
     if (!lpLockedPct && /pump/i.test(launchpad) && !d.rugged) lpLockedPct = 100;
+    lpLockedPct = Math.min(100, Math.max(0, Math.round(lpLockedPct * 10) / 10)); // clamp + 1 dp
 
     // ── creatorTokensCount — rugcheck does return this in some responses ─
     const creatorTokensCount =
@@ -158,12 +189,33 @@ async function rugcheck(mint: string) {
       num((d as any).creator?.totalTokens) ??
       null;
 
+    // Build per-market LP summary for transparency in the UI
+    const lpMarkets = (d.markets || [])
+      .filter((m: any) => m?.lp && typeof m.lp === "object")
+      .map((m: any) => {
+        const lp = m.lp;
+        const rawPct    = num(lp.lpLockedPct);
+        const burnedPct = num(lp.burnedPct) ?? num(lp.lpBurnedPct) ?? (lp.lpBurned === true ? 100 : 0);
+        const boolPct   = (lp.lpLocked === true || lp.locked === true) ? 100 : 0;
+        return {
+          marketType:   m.marketType || m.dex || null,
+          lpLockedPct:  Math.min(100, Math.max(rawPct ?? 0, burnedPct ?? 0, boolPct)),
+          lpBurned:     lp.lpBurned === true,
+          lpTotalUSD:   num(lp.lpTotalUSD) ?? num(lp.lpUSD) ?? null,
+          lpLockedUSD:  num(lp.lpLockedUSD) ?? null,
+          lpSupply:     num(lp.lpCurrentSupply) ?? num(lp.lpTotalSupply) ?? null,
+        };
+      });
+
     return {
       riskScore: num(d.score_normalised) ?? num(d.score),
       rugged: !!d.rugged,
       mintAuthorityRenounced: d.mintAuthority == null ? true : !d.mintAuthority,
       freezeAuthorityRenounced: d.freezeAuthority == null ? true : !d.freezeAuthority,
       lpLockedPct,
+      lpTotalUSD:   hasUsd ? Math.round(totalLpUsd)    : null,
+      lpLockedUSD:  hasUsd ? Math.round(totalLockedUsd) : null,
+      lpMarkets,                // per-pool breakdown for UI
       launchpad: launchpad || null,
       isPumpFun: /pump$/i.test(mint) || /pump/i.test(d.tokenProgram || "") || /pump/i.test(launchpad),
       creator: d.creator || null,
