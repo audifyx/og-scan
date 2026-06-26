@@ -128,16 +128,13 @@ export default async function handler(req, res) {
       flags.push({ level: "yellow", text: `Top 10 wallets control ${pct1(top10Pct)}% of supply (LP excluded)` }); score += 1;
     }
 
-    // LP info — report locked LP as a positive signal.
-    // pump.fun graduation burns LP → always effectively 100% locked even if
-    // rugcheck reports 0 (it doesn't always detect the burn).
-    let effectiveLpPct = num(safety.lpLockedPct);
-    if (!effectiveLpPct && safety.isPumpFun && !safety.rugged) effectiveLpPct = 100;
+    // LP info — report locked LP as a positive signal
     if (lpSupplyPct != null && lpSupplyPct > 0) {
-      if (effectiveLpPct != null && effectiveLpPct >= 90) {
-        flags.push({ level: "green", text: `LP holds ${lpSupplyPct}% of supply — ${pct1(effectiveLpPct)}% locked/burned` });
-      } else if (effectiveLpPct != null && effectiveLpPct > 0) {
-        flags.push({ level: "yellow", text: `LP holds ${lpSupplyPct}% of supply — only ${pct1(effectiveLpPct)}% locked` }); score += 1;
+      const lpLocked = num(safety.lpLockedPct);
+      if (lpLocked != null && lpLocked >= 90) {
+        flags.push({ level: "green", text: `LP holds ${lpSupplyPct}% of supply — ${pct1(lpLocked)}% locked` });
+      } else if (lpLocked != null && lpLocked > 0) {
+        flags.push({ level: "yellow", text: `LP holds ${lpSupplyPct}% of supply — only ${pct1(lpLocked)}% locked` }); score += 1;
       }
     }
 
@@ -195,8 +192,7 @@ export default async function handler(req, res) {
       },
       insiders: {
         pct:      insiderPct,
-        count:    c.insiderClusters ?? null,    // clusters, not wallets
-        wallets:  c.insiders ?? null,           // keep raw wallet count too
+        count:    c.insiders ?? null,
         clusters: insiderClusters.slice(0, 10).map(cl => ({ funder: cl.funder, size: cl.size, wallets: cl.wallets })),
       },
       earlyBuyers: earlyBuyers.slice(0, 30),
@@ -216,15 +212,9 @@ export default async function handler(req, res) {
       safety: {
         mintRenounced:   safety.mintAuthorityRenounced   ?? null,
         freezeRenounced: safety.freezeAuthorityRenounced ?? null,
-        lpLockedPct:     effectiveLpPct                  ?? null,   // pump.fun burn inferred; USD-weighted total
-        lpTotalUSD:      safety.lpTotalUSD               ?? null,   // total LP liquidity in USD
-        lpLockedUSD:     safety.lpLockedUSD              ?? null,   // locked LP USD
-        lpMarkets:       safety.lpMarkets                ?? [],     // per-pool breakdown
+        lpLockedPct:     safety.lpLockedPct              ?? null,
         rugged:          safety.rugged                   ?? null,
         riskScore:       num(safety.riskScore),
-        isPumpFun:       safety.isPumpFun                ?? null,
-        launchpad:       safety.launchpad                ?? null,
-        risks:           safety.risks                    ?? [],
       },
       traced: !!xray?.traced,
       note:   xray?.traced ? null : "Early-buyer trace unavailable for this token (non-pump.fun or history too large); verdict uses holder + safety data only.",
