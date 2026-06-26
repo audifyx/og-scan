@@ -61,7 +61,8 @@ type TabId =
   | "token-manager"
   | "live-trading"
   | "live-feed-page"
-  | "trading-hub";
+  | "trading-hub"
+  | "research";
 
 export type NavItem = {
   id?: TabId;
@@ -176,6 +177,7 @@ export const AppSidebar = ({
     { id: "overview", icon: Home, label: "Home", eyebrow: "Command hub" },
     { id: "discover", icon: LineChart, label: "Markets", eyebrow: "Coins · Launchpads · Trending · New" },
     { id: "tools", icon: Wrench, label: "Tools", eyebrow: "Scanner · Market Radar · Listings" },
+    { id: "research", icon: Search, label: "Research", eyebrow: "Social · On-Chain · Clones" },
     { id: "community", icon: Hash, label: "Community", eyebrow: "Chat · Rooms · Spaces" },
   ];
 
