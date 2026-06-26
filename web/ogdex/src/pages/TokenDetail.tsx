@@ -43,11 +43,9 @@ export default function TokenDetail() {
   const [ath, setAth] = useState<AthData | null>(null);
   const [dir, setDir] = useState<Record<string, KolDirEntry>>({});
 
-  useEffect(() => { getKolDirectory().then(setDir); }, []);
-
   useEffect(() => { getKolDirectory().then(setDir).catch(() => {}); }, []);
 
-  // Improved X-ray fetch with retry logic
+  // Lazy-load X-ray only when tab is opened
   useEffect(() => {
     if (tab !== "xray" || xray || xrayLoading) return;
     
@@ -87,9 +85,25 @@ export default function TokenDetail() {
   }, [tab, mint, xray, xrayLoading]);
   
   useEffect(() => { setXray(null); setXrayError(null); }, [mint]);
-  useEffect(() => { let on = true; setForLoading(true); setForensics(null); getForensics(mint).then((x) => { if (on) { setForensics(x); setForLoading(false); } }).catch(() => { if (on) setForLoading(false); }); return () => { on = false; }; }, [mint]);
+  
+  // Lazy-load Forensics only when forensics tab is opened
+  useEffect(() => {
+    if (tab !== "forensics") return;
+    if (forLoading || forensics) return;
+    let on = true;
+    setForLoading(true);
+    getForensics(mint).then((x) => { if (on) { setForensics(x); setForLoading(false); } }).catch(() => { if (on) setForLoading(false); });
+    return () => { on = false; };
+  }, [tab, mint, forLoading, forensics]);
 
-  useEffect(() => { let on = true; setAth(null); getAth(mint).then((x) => { if (on && x?.ok) setAth(x); }).catch(() => {}); return () => { on = false; }; }, [mint]);
+  // Lazy-load ATH data only when overview is active
+  useEffect(() => {
+    if (tab !== "overview") return;
+    if (ath) return;
+    let on = true;
+    getAth(mint).then((x) => { if (on && x?.ok) setAth(x); }).catch(() => {});
+    return () => { on = false; };
+  }, [tab, mint, ath]);
 
   useEffect(() => {
     let on = true; setLoading(true);
