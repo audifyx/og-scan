@@ -433,7 +433,7 @@ function Forensics({ d, meta, safety }: any) {
         <Row label="Mint authority" value={d.flags?.mintAuthorityDisabled ? "Renounced" : "Active"} good={d.flags?.mintAuthorityDisabled} />
         <Row label="Freeze authority" value={d.flags?.freezeAuthorityDisabled ? "Renounced" : "Active"} good={d.flags?.freezeAuthorityDisabled} />
         <Row label="Unsafe authority" value={d.flags?.unsafeAuthority ? "Yes" : "No"} good={!d.flags?.unsafeAuthority} />
-        <Row label="Launchpad" value={safety?.launchpad || (meta.isPumpFun ? "pump.fun" : "—")} />
+        <Row label="Launchpad" value={(safety?.launchpad && typeof safety.launchpad === "object" ? safety.launchpad.name : safety?.launchpad) || (meta.isPumpFun ? "pump.fun" : "—")} />
         <Row label="Migrated from pump.fun" value={d.flags?.migratedFromPumpFun ? "Yes" : "No"} />
         <Row label="Deployer exit risk" value={d.flags?.mintAuthorityDisabled && d.flags?.freezeAuthorityDisabled ? "Very Low" : "Elevated"} good={d.flags?.mintAuthorityDisabled && d.flags?.freezeAuthorityDisabled} />
       </div>

@@ -53,7 +53,7 @@ function buildContext(d: TokenDetailData, forensics: Forensics | null, ath?: Ath
     },
     origin: {
       createdAt: meta.createdAt ?? t.createdAt, ageDays: meta.ageDays ?? t.ageDays,
-      launchpad: forensics?.launchpad ?? safety.launchpad, isPumpFun: forensics?.isPumpFun ?? meta.isPumpFun,
+      launchpad: (() => { const lp = forensics?.launchpad ?? safety.launchpad; return lp && typeof lp === "object" ? (lp as any).name : lp; })(), isPumpFun: forensics?.isPumpFun ?? meta.isPumpFun,
       bondingComplete: forensics?.bondingComplete ?? null,
     },
     forensics: forensics ? {

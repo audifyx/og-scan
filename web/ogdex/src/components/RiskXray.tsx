@@ -62,26 +62,26 @@ export default function RiskXray({ x, loading }: { x: XrayReport | null; loading
       </div>
 
       {/* Flags */}
-      {x.flags.length > 0 && (
+      {(x.flags?.length ?? 0) > 0 && (
         <div className="card p-5">
           <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Target className="w-4 h-4 text-accent" /> Signals</div>
           <ul className="space-y-2">
-            {x.flags.map((f, i) => (
+            {(x.flags || []).map((f, i) => (
               <li key={i} className="flex items-start gap-2 text-sm"><FlagIcon level={f.level} /><span className={f.level === "red" ? "text-white" : "text-muted"}>{f.text}</span></li>
             ))}
           </ul>
         </div>
       )}
 
-      {x.traced && x.earlyBuyers.length > 0 && <BubbleMap report={x} />}
+      {x.traced && (x.earlyBuyers?.length ?? 0) > 0 && <BubbleMap report={x} />}
 
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Snipers */}
         <div className="card p-5">
           <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Crosshair className="w-4 h-4 text-accent" /> Snipers <span className="text-muted font-normal">— bought at launch or within 20s</span></div>
-          {x.snipers.wallets.length ? (
+          {(x.snipers?.wallets?.length ?? 0) ? (
             <div className="space-y-1.5 max-h-80 overflow-auto pr-1">
-              {x.snipers.wallets.map((s, i) => (
+              {(x.snipers?.wallets || []).map((s, i) => (
                 <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-panel2 px-3 py-2 text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <WalletLink address={s.wallet} />
@@ -101,9 +101,9 @@ export default function RiskXray({ x, loading }: { x: XrayReport | null; loading
         {/* Bundles */}
         <div className="card p-5">
           <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Boxes className="w-4 h-4 text-accent" /> Same-block bundles <span className="text-muted font-normal">— ≥3 wallets in one slot</span></div>
-          {x.bundles.clusters.length ? (
+          {(x.bundles?.clusters?.length ?? 0) ? (
             <div className="space-y-2 max-h-80 overflow-auto pr-1">
-              {x.bundles.clusters.map((b, i) => (
+              {(x.bundles?.clusters || []).map((b, i) => (
                 <div key={i} className="rounded-lg bg-panel2 p-3">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs font-medium text-down">{b.size} wallets bundled</span>
@@ -145,14 +145,14 @@ export default function RiskXray({ x, loading }: { x: XrayReport | null; loading
       )}
 
       {/* Early buyers */}
-      {x.earlyBuyers.length > 0 && (
+      {(x.earlyBuyers?.length ?? 0) > 0 && (
         <div className="card p-5">
           <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Users className="w-4 h-4 text-accent" /> Early buyers</div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[420px]">
               <thead><tr className="text-muted text-xs border-b border-line/40"><th className="text-left py-1.5">#</th><th className="text-left">Wallet</th><th className="text-right">SOL</th><th className="text-right">When</th><th className="text-right">Tag</th></tr></thead>
               <tbody>
-                {x.earlyBuyers.map((b) => (
+                {(x.earlyBuyers || []).map((b) => (
                   <tr key={b.rank} className="border-b border-line/20 last:border-0">
                     <td className="py-1.5 text-muted tabular-nums">{b.rank}</td>
                     <td><WalletLink address={b.wallet} /></td>
