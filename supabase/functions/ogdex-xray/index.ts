@@ -274,13 +274,36 @@ serve(async (req) => {
     if (!mint) return json({ ok: false, error: "mint required" }, 400);
 
     const cacheKey = `xray/${mint}.json`;
+    
+    // Fast path: return cached result instantly
     if (!body.debug && !body.refresh) {
       const cached = await kvGet(cacheKey);
-      if (cached && cached.xray?.traced) return json({ ok: true, mint, xray: cached.xray, cached: true });
+      if (cached) return json({ ok: true, mint, xray: cached.xray, cached: true });
     }
 
-    const xray = await analyze(mint, Number(body.limit) || 50);
-    if (xray.traced) kvPut(cacheKey, { xray, at: Date.now() });
+    // Timeout-constrained analysis: abort after 5s for instant response
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    let xray;
+    try {
+      xray = await Promise.race([
+        analyze(mint, Number(body.limit) || 50),
+        new Promise((_, reject) => controller.signal.addEventListener("abort", () => reject(new Error("analysis timeout"))))
+      ]) as any;
+      clearTimeout(timeoutId);
+    } catch (timeoutErr) {
+      clearTimeout(timeoutId);
+      // On timeout, return any stale cache or "unavailable"
+      const staleCache = await kvGet(cacheKey).catch(() => null);
+      if (staleCache) {
+        return json({ ok: true, mint, xray: staleCache.xray, cached: true, note: "cached (analysis timeout)" });
+      }
+      // No prior cache, tell client analysis is unavailable
+      return json({ ok: false, mint, error: "analysis timeout — try again in a moment", unavailable: true });
+    }
+
+    if (xray.traced) kvPut(cacheKey, { xray, at: Date.now() }).catch(() => {});
 
     return json({ ok: true, mint, xray, _debug: body.debug ? _dbg : undefined });
   } catch (e) {
