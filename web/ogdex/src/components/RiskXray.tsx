@@ -33,47 +33,9 @@ function pctTone(p: number | null, warn = 30, bad = 60) {
   return p >= bad ? "text-down" : p >= warn ? "text-yellow-300" : "text-up";
 }
 
-export default function RiskXray({ x, loading, error }: { x: XrayReport | null; loading: boolean; error?: string | null }) {
-  if (loading) {
-    return (
-      <div className="card p-10 grid place-items-center text-muted space-y-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <div className="text-xs text-muted">Analyzing token safety...</div>
-      </div>
-    );
-  }
-  
-  if (error) {
-    return (
-      <div className="card p-8 text-center text-muted text-sm space-y-2">
-        <AlertTriangle className="w-5 h-5 mx-auto text-yellow-400" />
-        <p>Risk analysis error.</p>
-        <p className="text-xs text-muted/70">{error}</p>
-      </div>
-    );
-  }
-  
-  if (!x) {
-    return (
-      <div className="card p-8 text-center text-muted text-sm space-y-2">
-        <AlertTriangle className="w-5 h-5 mx-auto text-yellow-400" />
-        <p>Risk X-ray data unavailable.</p>
-        <p className="text-xs text-muted/70">This may happen for newly launched tokens or when trace data is still indexing.</p>
-      </div>
-    );
-  }
-  
-  if (!x.ok) {
-    return (
-      <div className="card p-8 text-center text-muted text-sm space-y-2">
-        <XCircle className="w-5 h-5 mx-auto text-down" />
-        <p>Unable to analyze this token.</p>
-        {x.error && <p className="text-xs text-muted/70">{x.error}</p>}
-      </div>
-    );
-  }
-  
-  const t = TONE[x.tone] || TONE.yellow;
+export default function RiskXray({ x, loading }: { x: XrayReport | null; loading: boolean }) {
+  if (loading) return <div className="card p-10 grid place-items-center text-muted"><Loader2 className="w-5 h-5 animate-spin" /></div>;
+  if (!x || !x.ok) return <div className="card p-8 text-center text-muted text-sm">Risk X-ray unavailable</div>;
 
   return (
     <div className="space-y-4">

@@ -39,71 +39,16 @@ export default function TokenDetail() {
   const [forLoading, setForLoading] = useState(true);
   const [xray, setXray] = useState<XrayReport | null>(null);
   const [xrayLoading, setXrayLoading] = useState(false);
-  const [xrayError, setXrayError] = useState<string | null>(null);
   const [ath, setAth] = useState<AthData | null>(null);
   const [dir, setDir] = useState<Record<string, KolDirEntry>>({});
 
   useEffect(() => { getKolDirectory().then(setDir).catch(() => {}); }, []);
 
-  // Lazy-load X-ray only when tab is opened
-  useEffect(() => {
-    if (tab !== "xray" || xray || xrayLoading) return;
-    
-    let on = true;
-    let retries = 0;
-    const maxRetries = 2;
-    
-    const fetchXray = async () => {
-      try {
-        setXrayLoading(true);
-        setXrayError(null);
-        const result = await getXray(mint);
-        if (on) {
-          if (!result?.ok && retries < maxRetries) {
-            retries++;
-            await new Promise(r => setTimeout(r, 500 * retries));
-            return fetchXray();
-          }
-          setXray(result);
-          setXrayLoading(false);
-        }
-      } catch (err) {
-        if (on) {
-          if (retries < maxRetries) {
-            retries++;
-            await new Promise(r => setTimeout(r, 500 * retries));
-            return fetchXray();
-          }
-          setXrayError((err as Error)?.message || "Failed to fetch risk analysis");
-          setXrayLoading(false);
-        }
-      }
-    };
-    
-    fetchXray();
-    return () => { on = false; };
-  }, [tab, mint, xray, xrayLoading]);
-  
-  useEffect(() => { setXray(null); setXrayError(null); }, [mint]);
-  
-  // Lazy-load Forensics only when forensics tab is opened
-  useEffect(() => {
-    if (tab !== "forensics") return;
-    if (forLoading || forensics) return;
-    let on = true;
-    setForLoading(true);
-    getForensics(mint).then((x) => { if (on) { setForensics(x); setForLoading(false); } }).catch(() => { if (on) setForLoading(false); });
-    return () => { on = false; };
-  }, [tab, mint, forLoading, forensics]);
+  useEffect(() => { let on = true; setForLoading(true); getForensics(mint).then((x) => { if (on) { setForensics(x); setForLoading(false); } }).catch(() => { if (on) setForLoading(false); }); return () => { on = false; }; }, [mint]);
 
-  // Lazy-load ATH data only when overview is active
-  useEffect(() => {
-    if (tab !== "overview") return;
-    if (ath) return;
-    let on = true;
-    getAth(mint).then((x) => { if (on && x?.ok) setAth(x); }).catch(() => {});
-    return () => { on = false; };
-  }, [tab, mint, ath]);
+  useEffect(() => { let on = true; getAth(mint).then((x) => { if (on && x?.ok) setAth(x); }).catch(() => {}); return () => { on = false; }; }, [mint]);
+
+  useEffect(() => { let on = true; setXrayLoading(true); getXray(mint).then((x) => { if (on) { setXray(x); setXrayLoading(false); } }).catch(() => { if (on) setXrayLoading(false); }); return () => { on = false; }; }, [mint]);
 
   useEffect(() => {
     let on = true; setLoading(true);
@@ -289,7 +234,7 @@ export default function TokenDetail() {
       {tab === "kolwhale" && <KolWhaleActivity d={d} dir={dir} />}
       {tab === "holders" && <><HolderIntel holders={holders} safety={safety} dir={dir} /><HoldersTable holders={holders} price={price} dir={dir} /></>}
       {tab === "trades" && <TradesTable trades={trades} mint={mint} dir={dir} onRefresh={() => getToken(mint).then(setD)} />}
-      {tab === "xray" && <RiskXray x={xray} loading={xrayLoading} error={xrayError} />}
+      {tab === "xray" && <RiskXray x={xray} loading={xrayLoading} />}
       {tab === "forensics" && <><DevOrigin f={forensics} loading={forLoading} /><Forensics d={d} meta={meta} safety={safety} /></>}
       </ErrorBoundary>
     </div>
