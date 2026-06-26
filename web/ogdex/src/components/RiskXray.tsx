@@ -284,8 +284,16 @@ function OverviewSection({ x, buyers }: { x:XrayReport; buyers:RichBuyer[] }) {
         <Stat icon={<Crosshair className="w-3 h-3"/>} label="Snipers"     value={x.snipers.pct!=null?`${x.snipers.pct}%`:"—"} tone={pctTone(x.snipers.pct)} sub={`${x.snipers.count??0} wallets`} />
         <Stat icon={<Boxes     className="w-3 h-3"/>} label="Bundled"     value={x.bundles.pct!=null?`${x.bundles.pct}%`:"—"} tone={pctTone(x.bundles.pct,1,30)} sub={`${x.bundles.count??0} clusters`} />
         <Stat icon={<Share2    className="w-3 h-3"/>} label="Insiders"    value={x.insiders?.pct!=null?`${x.insiders.pct}%`:"—"} tone={pctTone(x.insiders?.pct??null,1,40)} sub={`${x.insiders?.count??0} clusters`} />
-        <Stat icon={<Users     className="w-3 h-3"/>} label="Top-10 hold" value={x.concentration.top10Pct!=null?`${x.concentration.top10Pct}%`:"—"} tone={pctTone(x.concentration.top10Pct,30,50)} sub={`${x.concentration.whales} whales`} />
-        <Stat icon={<Wallet    className="w-3 h-3"/>} label="Holders"     value={x.concentration.totalHolders||"—"} tone="cyan" />
+        <Stat icon={<Users className="w-3 h-3"/>} label="Top-10 wallets"
+          value={x.concentration.top10Pct!=null?`${x.concentration.top10Pct}%`:"—"}
+          tone={pctTone(x.concentration.top10Pct,30,50)}
+          sub={(x.concentration as any).lpSupplyPct!=null
+            ? `excl. LP (${(x.concentration as any).lpSupplyPct}% in pool)`
+            : `${x.concentration.whales} whales`}
+        />
+        <Stat icon={<Wallet className="w-3 h-3"/>} label="Holders" value={x.concentration.totalHolders||"—"} tone="cyan"
+          sub={(x.concentration as any).lpSupplyPct!=null ? "LP excluded" : undefined}
+        />
       </div>
 
       {/* Flags */}
