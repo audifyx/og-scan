@@ -1,7 +1,7 @@
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Radio, Send, Activity, Wallet2, LogOut, Trophy } from "lucide-react";
+import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Radio, Send, Activity, Wallet2, LogOut, Trophy, Flame, Users } from "lucide-react";
 import { track, getWatchlist, short } from "../lib/api";
 import { useWallet } from "../lib/wallet";
 import LiveStats, { fetchPlatformStats } from "./LiveStats";
@@ -9,15 +9,17 @@ import InstallPWA from "./InstallPWA";
 
 const isAddr = (v: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v.trim());
 
-function Brand({ size = "md" }: { size?: "sm" | "md" }) {
-  const dim = size === "sm" ? "w-7 h-7" : "w-8 h-8";
+function Brand() {
   return (
-    <span className="flex items-center gap-2 shrink-0">
-      <span className={`${dim} rounded-lg overflow-hidden ring-brand`}>
-        <img src="/OGDEX/ogdex-logo.png" alt="OG DEX" className="w-full h-full object-cover" width={32} height={32} />
+    <span className="flex items-center gap-3 shrink-0">
+      <span className="w-9 h-9 rounded-xl overflow-hidden ring-brand flex-shrink-0">
+        <img src="/OGDEX/ogdex-logo.png" alt="OG SCAN" className="w-full h-full object-cover" width={36} height={36} />
       </span>
-      <span className="font-extrabold tracking-tight text-[15px] hidden sm:block">
-        OG<span className="text-brand-gradient">DEX</span>
+      <span className="hidden sm:flex flex-col leading-none">
+        <span className="font-black text-[17px] tracking-tight" style={{ fontFamily: "'Space Grotesk', Inter, sans-serif" }}>
+          OG<span className="text-brand-gradient">SCAN</span>
+        </span>
+        <span className="text-[9px] font-bold tracking-[0.18em] uppercase" style={{ color: "#14F195" }}>DEX Intelligence</span>
       </span>
     </span>
   );
@@ -25,6 +27,15 @@ function Brand({ size = "md" }: { size?: "sm" | "md" }) {
 
 interface PlatformStats { activeUsers: number; telegram: number; xFollowers: number; tokenCount: number; volume: string; daysLive: number; }
 const STAT_FALLBACK: PlatformStats = { activeUsers: 55, telegram: 185, xFollowers: 182, tokenCount: 847, volume: "$2.4M", daysLive: 47 };
+
+const NAV_LINKS = [
+  { to: "/",            label: "Discovery",   Icon: Coins,       exact: true },
+  { to: "/pulse",       label: "Pulse",       Icon: Flame,       exact: false },
+  { to: "/wallet",      label: "Portfolio",   Icon: Wallet2,     exact: false },
+  { to: "/kol",         label: "KOL",         Icon: Users,       exact: false },
+  { to: "/leaderboard", label: "Leaders",     Icon: Trophy,      exact: false },
+  { to: "/store",       label: "Store",       Icon: ShoppingBag, exact: false },
+];
 
 export default function Layout() {
   const [q, setQ] = useState("");
@@ -37,10 +48,9 @@ export default function Layout() {
   const ref = useRef<HTMLDivElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
   const [watchPos, setWatchPos] = useState<{ top: number; right: number } | null>(null);
+
   useEffect(() => { track("page_view", { path: loc.pathname }); setWatch(getWatchlist()); setWatchOpen(false); }, [loc.pathname]);
   useEffect(() => { fetchPlatformStats().then(setPstats).catch(() => {}); }, []);
-  // Throttled, fire-and-forget alert evaluation — keeps alerts ticking from real
-  // traffic without a paid cron (external cron can also hit /api/ogdex/alerts-run).
   useEffect(() => {
     try {
       const last = Number(localStorage.getItem("ogdex_alerts_run") || 0);
@@ -59,180 +69,223 @@ export default function Layout() {
     if (addr) nav(`/token/${v}`); else nav(`/?q=${encodeURIComponent(v)}`);
   };
 
-  const navItem = (to: string, active: boolean, Icon: any, label: string) => (
-    <Link to={to} className={`btn inline-flex items-center gap-1.5 ${active ? "text-white bg-white/5" : "text-muted hover:text-white"}`}>
-      <Icon className="w-3.5 h-3.5" /> {label}
-    </Link>
-  );
+  const isActive = (to: string, exact: boolean) => exact ? loc.pathname === to : loc.pathname.startsWith(to);
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Sticky wrapper: main header + mobile tab strip */}
+
+      {/* ── Sticky Header ── */}
       <div className="sticky top-0 z-30">
-        <header className="border-b border-white/10 bg-bg/80 backdrop-blur-xl header-sheen">
-          <div className="max-w-[1500px] mx-auto px-4 py-2 md:py-0 md:h-12 flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-2">
-            <Link to="/" className="flex items-center"><Brand /></Link>
-            <nav className="hidden md:flex items-center gap-1 text-sm">
-              {navItem("/", loc.pathname === "/", Coins, "Discovery")}
-              {navItem("/pulse", loc.pathname.startsWith("/pulse"), Activity, "Pulse")}
-              {navItem("/wallet", loc.pathname.startsWith("/wallet"), Wallet, "Portfolio")}
-              {navItem("/kol", loc.pathname.startsWith("/kol"), Radio, "kol")}
-              {/* ── Platform stats — inline, right next to kol ────────────────── */}
-              <div className="flex items-center gap-0 ml-1 pl-2 border-l border-white/[0.08]">
-                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80 hover:text-white/60 transition-colors">
-                  <span className="text-accent font-semibold">{pstats.activeUsers}</span>
-                  <span className="opacity-50">users</span>
-                </span>
-                <span className="text-white/[0.06] px-0.5">·</span>
-                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80">
-                  <span className="font-semibold text-white/70">{pstats.telegram}</span>
-                  <span className="opacity-50">TG</span>
-                </span>
-                <span className="text-white/[0.06] px-0.5">·</span>
-                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80">
-                  <span className="font-semibold text-white/70">{pstats.xFollowers}</span>
-                  <span className="opacity-50">X</span>
-                </span>
-                <span className="text-white/[0.06] px-0.5">·</span>
-                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80">
-                  <span className="text-accent font-semibold">{pstats.tokenCount}</span>
-                  <span className="opacity-50">tokens</span>
-                </span>
-                <span className="text-white/[0.06] px-0.5">·</span>
-                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80">
-                  <span className="font-semibold text-white/70">{pstats.volume}</span>
-                  <span className="opacity-50">vol</span>
-                </span>
-                <span className="text-white/[0.06] px-0.5">·</span>
-                <span className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] text-muted/80">
-                  <span className="text-accent font-semibold">{pstats.daysLive}</span>
-                  <span className="opacity-50">days</span>
-                </span>
-              </div>
-              {navItem("/leaderboard", loc.pathname.startsWith("/leaderboard"), Trophy, "Leaders")}
+        <header className="border-b header-sheen backdrop-blur-2xl" style={{ backgroundColor: "rgba(6,8,24,0.85)", borderColor: "rgba(20,241,149,0.15)" }}>
+          <div className="max-w-[1600px] mx-auto px-5 h-14 flex items-center gap-4">
+
+            {/* Logo */}
+            <Link to="/"><Brand /></Link>
+
+            {/* Desktop nav */}
+            <nav className="hidden md:flex items-center gap-1 ml-4">
+              {NAV_LINKS.map(({ to, label, Icon, exact }) => {
+                const active = isActive(to, exact);
+                return (
+                  <Link key={to} to={to} className={`
+                    relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200
+                    ${active
+                      ? "text-[#14F195] bg-[#14F195]/10"
+                      : "text-[#8896aa] hover:text-white hover:bg-white/5"}
+                  `}>
+                    <Icon className="w-3.5 h-3.5" />
+                    {label}
+                    {active && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-[#14F195]" />}
+                  </Link>
+                );
+              })}
             </nav>
 
-            <form onSubmit={go} className="order-last w-full md:order-none md:flex-1 md:max-w-xl relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input value={q} onChange={(e) => setQ(e.target.value)}
-                placeholder="Search name, ticker, mint, or wallet…"
-                className="w-full bg-panel/70 border border-white/10 rounded-lg pl-9 pr-24 py-2 text-sm outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30 transition" />
+            {/* Live stats pill */}
+            <div className="hidden lg:flex items-center gap-3 ml-2 pl-4 border-l" style={{ borderColor: "rgba(20,241,149,0.12)" }}>
+              <span className="text-[11px] text-[#8896aa]"><span className="text-[#14F195] font-bold">{pstats.activeUsers}</span> users</span>
+              <span className="text-[11px] text-[#8896aa]"><span className="text-white/70 font-semibold">{pstats.tokenCount}</span> tokens</span>
+              <span className="text-[11px] text-[#8896aa]"><span className="text-[#14F195] font-bold">{pstats.volume}</span> vol</span>
+              <span className="text-[11px] text-[#8896aa]"><span className="text-[#FFD700] font-bold">{pstats.daysLive}d</span> live</span>
+            </div>
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Search */}
+            <form onSubmit={go} className="hidden md:flex relative w-56 lg:w-72">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#8896aa] pointer-events-none" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search tokens, wallets…"
+                className="w-full pl-9 pr-3 py-2 rounded-xl text-sm text-white placeholder-[#8896aa] outline-none transition-all"
+                style={{
+                  background: "rgba(20,241,149,0.06)",
+                  border: "1.5px solid rgba(20,241,149,0.18)",
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = "rgba(20,241,149,0.6)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(20,241,149,0.2)"; }}
+                onBlur={e => { e.currentTarget.style.borderColor = "rgba(20,241,149,0.18)"; e.currentTarget.style.boxShadow = "none"; }}
+              />
               {addr && (
                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex gap-1">
-                  <button type="submit" className="px-2 py-1 rounded-md text-xs bg-accent/15 text-accent font-semibold">Token</button>
-                  <button type="button" onClick={() => nav(`/wallet/${q.trim()}`)} className="px-2 py-1 rounded-md text-xs bg-panel2 text-muted hover:text-white inline-flex items-center gap-1"><Wallet className="w-3 h-3" /> Wallet</button>
+                  <button type="submit" className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: "rgba(20,241,149,0.15)", color: "#14F195" }}>Token</button>
+                  <button type="button" onClick={() => nav(`/wallet/${q.trim()}`)} className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#8896aa" }}>Wallet</button>
                 </div>
               )}
             </form>
 
-            {/* Watching dropdown */}
-            <div className="relative ml-auto md:ml-0" ref={ref}>
-              <button onClick={(e) => { setWatch(getWatchlist()); const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setWatchPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }); setWatchOpen((o) => !o); }} className="btn bg-white/5 border border-white/10 text-muted hover:text-white inline-flex items-center gap-1.5 shrink-0">
-                <Star className="w-3.5 h-3.5" /><span className="hidden sm:inline">Watching</span>{watch.length > 0 && <span className="pill bg-accent/15 text-accent text-[10px] !px-1.5 !py-0">{watch.length}</span>}<ChevronDown className="w-3 h-3" />
+            {/* Watching */}
+            <div className="relative" ref={ref}>
+              <button
+                onClick={(e) => { setWatch(getWatchlist()); const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setWatchPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }); setWatchOpen(o => !o); }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#8896aa] hover:text-white transition-all"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                <Star className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Watching</span>
+                {watch.length > 0 && <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold" style={{ background: "rgba(20,241,149,0.15)", color: "#14F195" }}>{watch.length}</span>}
+                <ChevronDown className="w-3 h-3" />
               </button>
               {watchOpen && watchPos && createPortal(
-                <div ref={dropRef} style={{ position: "fixed", top: watchPos.top, right: watchPos.right, zIndex: 1000, backgroundColor: "#0b0b10" }} className="w-64 rounded-xl border border-white/10 p-1.5 shadow-2xl">
-                  <div className="text-[11px] uppercase tracking-wide text-muted px-2 py-1">Watched wallets</div>
+                <div ref={dropRef} style={{ position: "fixed", top: watchPos.top, right: watchPos.right, zIndex: 1000, background: "#0a0f28", border: "1px solid rgba(20,241,149,0.18)", borderRadius: "0.75rem", width: "260px", padding: "6px", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+                  <div className="text-[10px] uppercase tracking-widest text-[#8896aa] px-2 py-1.5 font-bold">Watched Wallets</div>
                   {watch.length ? watch.map((w) => (
-                    <Link key={w} to={`/wallet/${w}`} onClick={() => setWatchOpen(false)} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-panel2 text-sm font-mono"><Wallet className="w-3.5 h-3.5 text-accent" /> {short(w)}</Link>
-                  )) : <div className="px-2 py-3 text-xs text-muted">No watched wallets yet. Open any wallet and tap <span className="text-white">Watch</span>.</div>}
+                    <Link key={w} to={`/wallet/${w}`} onClick={() => setWatchOpen(false)} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/5 text-sm font-mono text-white transition-colors">
+                      <Wallet className="w-3.5 h-3.5 text-[#14F195]" /> {short(w)}
+                    </Link>
+                  )) : <div className="px-2 py-3 text-xs text-[#8896aa]">No watched wallets yet. Open any wallet and tap <span className="text-white font-semibold">Watch</span>.</div>}
                 </div>,
                 document.body
               )}
             </div>
 
+            {/* Wallet connect */}
             {address ? (
-              <button onClick={disconnect} title={address} className="btn bg-accent/12 border border-accent/30 text-accent hover:bg-accent/20 inline-flex items-center gap-1.5 shrink-0 font-mono text-[12px]">
-                <Wallet2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{short(address)}</span><LogOut className="w-3 h-3 opacity-70" />
+              <button onClick={disconnect} title={address} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold font-mono transition-all" style={{ background: "rgba(20,241,149,0.1)", border: "1px solid rgba(20,241,149,0.3)", color: "#14F195" }}>
+                <Wallet2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{short(address)}</span>
+                <LogOut className="w-3 h-3 opacity-70" />
               </button>
             ) : (
-              <button onClick={connect} disabled={connecting} className="btn bg-white/5 border border-white/10 text-white hover:bg-white/10 inline-flex items-center gap-1.5 shrink-0 disabled:opacity-60">
-                <Wallet2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{connecting ? "Connecting…" : "Connect"}</span>
+              <button onClick={connect} disabled={connecting} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-[#060818] transition-all disabled:opacity-60" style={{ background: "linear-gradient(135deg,#14F195,#0ea672)" }}>
+                <Wallet2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{connecting ? "Connecting…" : "Connect"}</span>
               </button>
             )}
 
             <InstallPWA />
 
-            <Link to="/store" className="btn brand-gradient text-black font-bold hover:opacity-90 inline-flex items-center gap-1.5 shrink-0 shadow-lg shadow-accent/20">
-              <ShoppingBag className="w-3.5 h-3.5" /> <span>Store</span>
+            {/* Store button */}
+            <Link to="/store" className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-[#060818] transition-all hover:opacity-90" style={{ background: "linear-gradient(110deg,#9945FF,#14F195,#FFD700)" }}>
+              <ShoppingBag className="w-3.5 h-3.5" />
+              Store
             </Link>
+
           </div>
         </header>
 
-        {/* Mobile tab strip — visible only on small screens */}
-        <nav className="flex md:hidden bg-bg/95 backdrop-blur border-b border-white/10">
-          {[
-            { to: "/", active: loc.pathname === "/", Icon: Coins, label: "Discovery" },
-            { to: "/pulse", active: loc.pathname.startsWith("/pulse"), Icon: Activity, label: "Pulse" },
-            { to: "/wallet", active: loc.pathname.startsWith("/wallet"), Icon: Wallet, label: "Portfolio" },
-            { to: "/kol", active: loc.pathname.startsWith("/kol"), Icon: Radio, label: "kol" },
-            { to: "/store", active: loc.pathname.startsWith("/store") || loc.pathname.startsWith("/submit") || loc.pathname.startsWith("/boost"), Icon: ShoppingBag, label: "Store" },
-          ].map((t) => (
-            <Link key={t.to} to={t.to} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
-              t.active ? "text-accent border-b-2 border-accent" : "text-muted"
-            }`}>
-              <t.Icon className="w-3.5 h-3.5" /> {t.label}
-            </Link>
-          ))}
+        {/* Mobile bottom nav */}
+        <nav className="flex md:hidden backdrop-blur-xl border-b" style={{ backgroundColor: "rgba(6,8,24,0.95)", borderColor: "rgba(20,241,149,0.12)" }}>
+          {NAV_LINKS.slice(0, 5).map(({ to, label, Icon, exact }) => {
+            const active = isActive(to, exact);
+            return (
+              <Link key={to} to={to} className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] font-semibold transition-colors ${active ? "text-[#14F195]" : "text-[#8896aa]"}`}>
+                <Icon className="w-4 h-4" />
+                {label}
+                {active && <span className="w-4 h-[2px] rounded-full bg-[#14F195]" />}
+              </Link>
+            );
+          })}
         </nav>
       </div>
 
-      {/* LiveStats — scrolls with the page */}
       <LiveStats />
 
-      <main className="flex-1 max-w-[1500px] w-full mx-auto px-4 py-5"><Outlet /></main>
+      <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 py-5">
+        <Outlet />
+      </main>
 
-      <footer className="relative mt-8 border-t border-white/10 overflow-hidden">
-        <div className="absolute inset-0 bg-cover bg-center opacity-[0.07]" style={{ backgroundImage: "url(/OGDEX/ogdex-banner.jpg)" }} />
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/85 to-bg/70" />
-        <div className="relative max-w-[1500px] mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-            <div className="max-w-sm">
+      {/* ── Footer ── */}
+      <footer className="relative mt-12 overflow-hidden" style={{ borderTop: "1px solid rgba(20,241,149,0.15)" }}>
+        {/* bg image */}
+        <div className="absolute inset-0 bg-cover bg-center opacity-[0.06]" style={{ backgroundImage: "url(/OGDEX/ogdex-banner.jpg)" }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(to top, #060818 0%, rgba(6,8,24,0.92) 60%, rgba(6,8,24,0.7) 100%)" }} />
+
+        <div className="relative max-w-[1600px] mx-auto px-5 py-12">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10">
+
+            {/* Brand block */}
+            <div className="max-w-xs">
               <Brand />
-              <p className="mt-3 text-xs text-muted leading-relaxed">
-                OG DEX is purely a data &amp; analytics platform. We surface already-public on-chain data in a higher-quality design — our tools show you what most tools hide. Built on the recommendations of the crypto space online, it's something this space has needed for a long while.
+              <p className="mt-4 text-[13px] leading-relaxed" style={{ color: "#8896aa" }}>
+                OG SCAN surfaces already-public on-chain data in a higher-quality design — our tools show you what most tools hide. Built for the crypto community.
               </p>
-              <p className="mt-2 text-xs text-muted leading-relaxed">
-                OG DEX is updated weekly — read our <a href="https://t.me/ogupdates" target="_blank" rel="noreferrer" className="text-accent hover:underline">Updates channel</a> for changes, and message our <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="text-accent hover:underline">Support team</a> with any questions.
+              <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "#8896aa" }}>
+                Updated weekly — read our{" "}
+                <a href="https://t.me/ogupdates" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "#14F195" }}>Updates channel</a>
+                {" "}for changes.
               </p>
-              <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-muted">
-                <Zap className="w-3 h-3 text-accent" /> Advanced &amp; Designed by{" "}
-                <a href="https://x.com/ogscanbackup" target="_blank" rel="noreferrer" className="text-brand-gradient font-bold hover:underline">@ogscanbackup</a>
+              <div className="mt-4 flex items-center gap-1.5 text-[12px]" style={{ color: "#8896aa" }}>
+                <Zap className="w-3.5 h-3.5" style={{ color: "#14F195" }} />
+                Built &amp; designed by{" "}
+                <a href="https://x.com/ogscanbackup" target="_blank" rel="noreferrer" className="font-bold hover:underline text-brand-gradient">@ogscanbackup</a>
+              </div>
+
+              {/* Social buttons */}
+              <div className="mt-4 flex gap-2">
+                <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80" style={{ background: "rgba(20,241,149,0.1)", border: "1px solid rgba(20,241,149,0.2)", color: "#14F195" }}>
+                  <Send className="w-3 h-3" /> Telegram
+                </a>
+                <a href="https://x.com/ogscanbackup" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80" style={{ background: "rgba(153,69,255,0.1)", border: "1px solid rgba(153,69,255,0.2)", color: "#9945FF" }}>
+                  <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                  @ogscanbackup
+                </a>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-10 gap-y-2 text-sm">
-              <div className="space-y-2">
-                <div className="text-[11px] uppercase tracking-wide text-muted/70">Product</div>
-                <Link to="/" className="block text-muted hover:text-accent">Discovery</Link>
-                <Link to="/wallet" className="block text-muted hover:text-accent">Portfolio</Link>
-                <Link to="/kol" className="block text-muted hover:text-accent">KOL Scanner</Link>
-                <Link to="/leaderboard" className="block text-muted hover:text-accent">Trader Leaderboard</Link>
-                <Link to="/store" className="block text-muted hover:text-accent">Store — List &amp; Boost</Link>
-                <Link to="/alerts" className="block text-muted hover:text-accent">Smart Alerts</Link>
-                <Link to="/api" className="block text-muted hover:text-accent">Public API</Link>
-                <Link to="/whitepaper" className="block text-muted hover:text-accent">Whitepaper</Link>
-                <Link to="/roadmap" className="block text-muted hover:text-accent">Roadmap</Link>
+            {/* Links grid */}
+            <div className="grid grid-cols-2 gap-x-16 gap-y-3 text-sm">
+              <div className="space-y-3">
+                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#14F195" }}>Product</div>
+                {[
+                  { to: "/", label: "Discovery" },
+                  { to: "/wallet", label: "Portfolio" },
+                  { to: "/kol", label: "KOL Scanner" },
+                  { to: "/leaderboard", label: "Leaderboard" },
+                  { to: "/store", label: "List & Boost" },
+                  { to: "/alerts", label: "Smart Alerts" },
+                  { to: "/roadmap", label: "Roadmap" },
+                ].map(({ to, label }) => (
+                  <Link key={to} to={to} className="block text-[13px] transition-colors hover:text-[#14F195]" style={{ color: "#8896aa" }}>{label}</Link>
+                ))}
               </div>
-              <div className="space-y-2">
-                <div className="text-[11px] uppercase tracking-wide text-muted/70">Community</div>
-                <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-muted hover:text-accent"><Send className="w-3 h-3" /> Telegram @ogscanner</a>
-                <a href="https://t.me/ogupdates" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-muted hover:text-accent"><Send className="w-3 h-3" /> Updates @ogupdates</a>
-                <a href="https://x.com/ogscanbackup" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-muted hover:text-accent"><svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> X @ogscanbackup</a>
+              <div className="space-y-3">
+                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#9945FF" }}>Community</div>
+                <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#14F195]" style={{ color: "#8896aa" }}>
+                  <Send className="w-3 h-3" /> @ogscanner
+                </a>
+                <a href="https://t.me/ogupdates" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#14F195]" style={{ color: "#8896aa" }}>
+                  <Send className="w-3 h-3" /> @ogupdates
+                </a>
+                <a href="https://x.com/ogscanbackup" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#9945FF]" style={{ color: "#8896aa" }}>
+                  <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                  @ogscanbackup
+                </a>
               </div>
             </div>
           </div>
 
-          {/* Legal / not-financial-advice */}
-          <div className="mt-6 pt-4 border-t border-white/5 text-[11px] text-muted/70 leading-relaxed">
-            <p><b className="text-muted">Not financial advice.</b> OG DEX is purely a data &amp; analytics platform — we are not responsible for what you buy or sell. We only provide access to already-public on-chain data, presented in higher quality. Token scores, risk flags, AI summaries and signals are provided "as is" from third-party sources, may be inaccurate or delayed, and are not investment, financial, legal or tax advice. Crypto is high-risk — do your own research and never invest more than you can afford to lose. OG DEX is non-custodial and never holds your funds or keys.</p>
+          {/* Disclaimer */}
+          <div className="mt-10 pt-6 text-[11px] leading-relaxed" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", color: "rgba(136,150,170,0.7)" }}>
+            <p><span className="text-[#8896aa] font-semibold">Not financial advice.</span> OG SCAN is purely a data &amp; analytics platform. Token scores, risk flags, AI summaries and signals are provided "as is" and are not investment, financial, legal or tax advice. Crypto is high-risk — do your own research. OG SCAN is non-custodial and never holds your funds or keys.</p>
           </div>
-          <div className="mt-3 pt-3 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-muted/60">
-            <span>© {new Date().getFullYear()} OG DEX. All rights reserved.</span>
-            <div className="flex items-center gap-3">
-              <Link to="/terms" className="hover:text-accent">Terms</Link>
-              <Link to="/privacy" className="hover:text-accent">Privacy</Link>
-              <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="hover:text-accent">Support</a>
+          <div className="mt-4 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]" style={{ borderTop: "1px solid rgba(255,255,255,0.05)", color: "rgba(136,150,170,0.55)" }}>
+            <span>© {new Date().getFullYear()} OG SCAN. All rights reserved.</span>
+            <div className="flex items-center gap-4">
+              <Link to="/terms" className="hover:text-[#14F195] transition-colors">Terms</Link>
+              <Link to="/privacy" className="hover:text-[#14F195] transition-colors">Privacy</Link>
+              <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="hover:text-[#14F195] transition-colors">Support</a>
             </div>
           </div>
         </div>
