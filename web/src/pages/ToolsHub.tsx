@@ -27,6 +27,7 @@ const TOOLS: ToolItem[] = [
   { id: "market-pulse", label: "Token Intel", tooltip: "Open any token for vitals", Icon: Activity, colorIndex: 3, category: "Analytics" },
   { id: "swap", label: "Swap", tooltip: "Fast Jupiter-routed swaps", Icon: Zap, colorIndex: 0, category: "Trade" },
   { id: "listings", label: "Token Listings", tooltip: "List & promote tokens", Icon: Star, colorIndex: 2, category: "Discovery" },
+  { id: "research", label: "Research", tooltip: "Full social + on-chain intel", Icon: Search, colorIndex: 2, category: "Forensics" },
   { id: "our-coin", label: "About OGScan", tooltip: "Official token & roadmap", Icon: Coins, colorIndex: 1, category: "Info" },
 ];
 
