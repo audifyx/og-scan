@@ -216,10 +216,15 @@ export default async function handler(req, res) {
       safety: {
         mintRenounced:   safety.mintAuthorityRenounced   ?? null,
         freezeRenounced: safety.freezeAuthorityRenounced ?? null,
-        lpLockedPct:     effectiveLpPct                  ?? null,   // pump.fun burn inferred
+        lpLockedPct:     effectiveLpPct                  ?? null,   // pump.fun burn inferred; USD-weighted total
+        lpTotalUSD:      safety.lpTotalUSD               ?? null,   // total LP liquidity in USD
+        lpLockedUSD:     safety.lpLockedUSD              ?? null,   // locked LP USD
+        lpMarkets:       safety.lpMarkets                ?? [],     // per-pool breakdown
         rugged:          safety.rugged                   ?? null,
         riskScore:       num(safety.riskScore),
         isPumpFun:       safety.isPumpFun                ?? null,
+        launchpad:       safety.launchpad                ?? null,
+        risks:           safety.risks                    ?? [],
       },
       traced: !!xray?.traced,
       note:   xray?.traced ? null : "Early-buyer trace unavailable for this token (non-pump.fun or history too large); verdict uses holder + safety data only.",
