@@ -79,6 +79,8 @@ const importAboutOgScan = () => import("@/components/AboutOgScan");
 const importTokenIntel = () => import("@/components/TokenIntel");
 const AboutOgScan = lazy(() => importAboutOgScan().then(m => ({ default: m.AboutOgScan })));
 const TokenIntel = lazy(() => importTokenIntel().then(m => ({ default: m.TokenIntel })));
+const importTokenResearch = () => import("@/components/TokenResearch");
+const TokenResearch = lazy(() => importTokenResearch().then(m => ({ default: m.TokenResearch })));
 
 /* ─── Page imports ─── */
 const importCommunitiesPage = () => import("./Communities");
@@ -242,7 +244,8 @@ type TabId =
   | "live-feed-page"
   | "listings"
   | "token-manager"
-  | "trading-hub";
+  | "trading-hub"
+  | "research";
 
 type TabAccent = "blue" | "white" | "cyan" | "gold" | "lime";
 type TabGroup = "Main" | "Forensics" | "Market" | "Project";
@@ -646,6 +649,17 @@ const TABS: TabConfig[] = [
     mergedInto: "community",
     group: "Market",
   },
+  {
+    id: "research",
+    label: "Research",
+    slug: "research",
+    pageNumber: 32,
+    eyebrow: "Social · On-Chain · Clones",
+    description: "Full token intelligence: X/Twitter mentions, Reddit, on-chain top traders, holders, and clone detection.",
+    Icon: Search,
+    accent: "lime",
+    group: "Forensics",
+  },
 ];
 
 const NAV_TABS: TabConfig[] = TABS.filter((t: TabConfig) => t.showInNav !== false);
@@ -757,6 +771,7 @@ const renderTool = (tab: TabId, mint: string, updateMint: (m: string) => void, o
   if (tab === "spaces") return <SpacesPage />;
   if (tab === "social") return <SocialHub />;
   if (tab === "tools") return <ToolsTabbed mint={mint} onSelectMint={updateMint} />;
+  if (tab === "research") return <TokenResearch />;
   if (tab === "listings") return <TokenListings initialMint={listingMint} />;
   if (tab === "profile") return <UserProfile viewUserId={profileViewUserId} />;
   if (tab === "live-trading") return <LiveTradingPage />;
