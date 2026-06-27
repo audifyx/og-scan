@@ -28,6 +28,10 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 const Whitepaper = lazy(() => import("./pages/Whitepaper"));
 const Roadmap = lazy(() => import("./pages/Roadmap"));
 const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+// Phase 2+
+const Status = lazy(() => import("./pages/Status"));
+// Phase 3
+const CopyTracking = lazy(() => import("./pages/CopyTracking"));
 
 function PageFallback() {
   return <div className="grid place-items-center py-24 text-muted"><Loader2 className="w-5 h-5 animate-spin" /></div>;
@@ -61,13 +65,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="whitepaper" element={<Suspense fallback={<PageFallback />}><Whitepaper /></Suspense>} />
           <Route path="roadmap" element={<Suspense fallback={<PageFallback />}><Roadmap /></Suspense>} />
           <Route path="leaderboard" element={<Suspense fallback={<PageFallback />}><Leaderboard /></Suspense>} />
+          {/* Phase 2: Status page */}
+          <Route path="status" element={<Suspense fallback={<PageFallback />}><Status /></Suspense>} />
+          {/* Phase 3: Copy tracking */}
+          <Route path="copy-trade" element={<Suspense fallback={<PageFallback />}><CopyTracking /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>
     </WalletProvider>
   </React.StrictMode>
 );
-
 
 // Register the OGDEX PWA service worker (scope /OGDEX/). Kept separate from the
 // OG Scan root service worker, which intentionally bypasses /OGDEX.

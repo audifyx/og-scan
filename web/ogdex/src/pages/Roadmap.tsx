@@ -27,31 +27,31 @@ const PHASES: { phase: string; title: string; items: { t: string; s: Status }[] 
     ],
   },
   {
-    phase: "Phase 2", title: "Depth & Reliability — In Progress",
+    phase: "Phase 2", title: "Depth & Reliability — Shipped",
     items: [
-      { t: "Deeper KOL/whale feed coverage and faster ingestion", s: "progress" },
-      { t: "Richer charting (candles + volume) directly on the token page", s: "progress" },
-      { t: "Bundle & sniper detection surfaced more prominently", s: "progress" },
-      { t: "Pinpoint first-buy tx for mega-cap tokens via a dedicated indexer", s: "planned" },
-      { t: "Uptime alerting + status page from the health endpoint", s: "planned" },
+      { t: "Deeper KOL/whale feed coverage and faster ingestion", s: "done" },
+      { t: "Native candlestick + volume chart directly on the token page (no DexScreener dependency)", s: "done" },
+      { t: "Bundle & sniper detection surfaced prominently on every token page", s: "done" },
+      { t: "Pinpoint first-buy tx for mega-cap tokens via a dedicated indexer", s: "done" },
+      { t: "Uptime alerting + live status page at /status", s: "done" },
     ],
   },
   {
-    phase: "Phase 3", title: "Pro & Automation — Planned",
+    phase: "Phase 3", title: "Pro & Automation — Shipped",
     items: [
-      { t: "Alerts v2: price, whale, migration and dev-sell alerts from any token page", s: "planned" },
-      { t: "Wallet copy-tracking with real-time trade notifications", s: "planned" },
-      { t: "Pro tier: advanced analytics + higher API limits gated by the OG token", s: "planned" },
-      { t: "Saved filters, watchlist sync, and shareable scan cards for any token", s: "planned" },
-      { t: "More chains and deeper EVM forensics parity with Solana", s: "planned" },
+      { t: "Alerts v2: price, whale, migration and dev-sell alerts from any token page", s: "done" },
+      { t: "Wallet copy-tracking with real-time trade notifications at /copy-trade", s: "done" },
+      { t: "Pro tier: advanced analytics + higher API limits gated by the OG token", s: "done" },
+      { t: "Saved filters, watchlist sync, and shareable scan cards for any token", s: "done" },
+      { t: "More chains and deeper EVM forensics parity with Solana", s: "progress" },
     ],
   },
   {
-    phase: "Phase 4", title: "Ecosystem — Vision",
+    phase: "Phase 4", title: "Ecosystem — In Progress",
     items: [
-      { t: "Public AI agent / MCP so any assistant can use OG DEX live", s: "planned" },
-      { t: "Native mobile apps", s: "planned" },
-      { t: "Community-curated KOL lists and reputation scoring", s: "planned" },
+      { t: "Public AI agent / MCP so any AI assistant can query OG DEX live via /api/ogdex/mcp", s: "done" },
+      { t: "Native mobile apps", s: "progress" },
+      { t: "Community-curated KOL lists and reputation scoring", s: "progress" },
       { t: "Open analytics dashboards and embeddable widgets for projects", s: "planned" },
     ],
   },
@@ -89,8 +89,11 @@ export default function Roadmap() {
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3 text-sm">
-        <Link to="/whitepaper" className="btn bg-accent/15 text-accent inline-flex items-center gap-1.5"><FileText className="w-4 h-4" /> Read the Whitepaper</Link>
-        <a href="https://ogscan.fun" className="btn bg-panel2 text-muted hover:text-white">Open the App</a>
+        <Link to="/whitepaper" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-all">
+          <FileText className="w-3.5 h-3.5" /> Read the Whitepaper
+        </Link>
+        <a href="https://ogscan.fun" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-panel2 text-muted border border-line hover:text-white transition-all">Open the App</a>
+        <Link to="/status" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-panel2 text-muted border border-line hover:text-white transition-all">System Status</Link>
       </div>
       <p className="text-[11px] text-muted/60 mt-4">Roadmap items are directional, not guarantees, and may change. Not financial advice.</p>
     </div>
