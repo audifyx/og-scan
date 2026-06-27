@@ -358,7 +358,38 @@
       </div>
 
       <!-- CTA -->
-      <div class="changes-title">Stay Updated</div>
+      <div class="changes-title">Join the Waitlist</div>
+      <form id="waitlist-form" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
+        <input 
+          type="email" 
+          id="email" 
+          placeholder="your@email.com" 
+          required 
+          style="
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(153,69,255,0.2);
+            color: #fff;
+            font-family: 'Sora', sans-serif;
+            font-size: 14px;
+            transition: border-color 0.2s;
+          "
+        />
+        <button 
+          type="submit"
+          class="tg-btn"
+          style="margin-top: 0;"
+        >
+          ✦ Get Early Access
+        </button>
+        <div id="waitlist-msg" style="display: none; text-align: center; padding: 12px; border-radius: 10px; font-size: 13px; margin-top: 8px;"></div>
+      </form>
+
+      <div class="divider" style="margin-bottom: 20px;"></div>
+
+      <div class="changes-title">Stay Updated on Telegram</div>
       <a class="tg-btn" href="https://t.me/ogupdates" target="_blank" rel="noopener">
         <!-- Telegram SVG icon -->
         <svg class="tg-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -457,6 +488,43 @@
     }
     tick();
     setInterval(tick, 1000);
+
+    // ── Waitlist form handler ──
+    document.getElementById('waitlist-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const msgDiv = document.getElementById('waitlist-msg');
+      
+      try {
+        const res = await fetch('/api/ogdex/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        
+        const data = await res.json();
+        msgDiv.style.display = 'block';
+        
+        if (res.ok) {
+          msgDiv.style.background = 'rgba(20,241,149,0.1)';
+          msgDiv.style.color = '#14F195';
+          msgDiv.style.borderLeft = '3px solid #14F195';
+          msgDiv.textContent = '✓ Added to waitlist! Check your email.';
+          document.getElementById('email').value = '';
+        } else {
+          msgDiv.style.background = 'rgba(255,68,68,0.1)';
+          msgDiv.style.color = '#FF4444';
+          msgDiv.style.borderLeft = '3px solid #FF4444';
+          msgDiv.textContent = data.error || 'Error. Please try again.';
+        }
+      } catch (err) {
+        msgDiv.style.display = 'block';
+        msgDiv.style.background = 'rgba(255,68,68,0.1)';
+        msgDiv.style.color = '#FF4444';
+        msgDiv.style.borderLeft = '3px solid #FF4444';
+        msgDiv.textContent = 'Network error. Try again.';
+      }
+    });
   </script>
 </body>
 </html>
