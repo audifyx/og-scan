@@ -20,7 +20,6 @@ import ShareButton from "../components/ShareButton";
 import CoinChat from "../components/CoinChat";
 import DevOrigin from "../components/DevOrigin";
 import RiskXray from "../components/RiskXray";
-import Collapsible from "../components/Collapsible";
 import ErrorBoundary from "../components/ErrorBoundary";
 import CapitalFlow from "../components/CapitalFlow";
 import {
@@ -33,7 +32,6 @@ import {
    Shared micro-components
 ───────────────────────────────────────────── */
 
-/* ── Derive a unique RGB string from a token symbol for the banner fallback ── */
 function symbolToRgb(sym: string, offset: number): string {
   let h = 0;
   for (let i = 0; i < sym.length; i++) h = (h * 31 + sym.charCodeAt(i)) >>> 0;
@@ -53,7 +51,7 @@ function symbolToRgb(sym: string, offset: number): string {
 function SocialPill({ href, icon, label, accent }: { href: string; icon: React.ReactNode; label: string; accent?: boolean }) {
   return (
     <a href={href} target="_blank" rel="noreferrer"
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all border ${
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border ${
         accent
           ? "bg-accent/15 text-accent border-accent/30 hover:bg-accent/25"
           : "bg-panel2 text-muted border-line hover:text-white hover:border-accent/30"
@@ -65,7 +63,7 @@ function SocialPill({ href, icon, label, accent }: { href: string; icon: React.R
 
 function StatPill({ label, value, sub, accent }: { label: string; value?: string; sub?: string; accent?: boolean }) {
   return (
-    <div className={`flex-shrink-0 flex flex-col justify-center px-4 py-2.5 rounded-xl border min-w-[88px] ${accent ? "bg-accent/10 border-accent/30" : "bg-panel border-line"}`}>
+    <div className={`flex-shrink-0 flex flex-col justify-center px-3.5 py-2 rounded-xl border min-w-[80px] ${accent ? "bg-accent/10 border-accent/30" : "bg-panel border-line"}`}>
       <div className="text-[9px] uppercase tracking-widest text-muted mb-0.5">{label}</div>
       <div className={`text-sm font-bold ${accent ? "text-accent" : "text-white"}`}>{value ?? "—"}</div>
       {sub && <div className="text-[9px] text-muted mt-0.5">{sub}</div>}
@@ -115,13 +113,19 @@ export default function TokenDetail() {
     return () => clearInterval(id);
   }, [tab, mint]);
 
-  if (loading) return <div className="grid place-items-center py-24 text-muted"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+  if (loading) return (
+    <div className="grid place-items-center py-24 text-muted">
+      <Loader2 className="w-6 h-6 animate-spin" />
+    </div>
+  );
   if (!d || (!d.token && !d.meta)) return (
-    <div className="text-center py-24">
-      <p className="text-muted">No token found for this address.</p>
-      <div className="flex items-center justify-center gap-3 mt-3">
-        <Link to={`/wallet/${mint}`} className="btn bg-accent/15 text-accent inline-flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" /> View as wallet</Link>
-        <Link to="/" className="text-accent text-sm">← Back to screener</Link>
+    <div className="text-center py-24 max-w-sm mx-auto">
+      <p className="text-muted mb-4">No token found for this address.</p>
+      <div className="flex items-center justify-center gap-3">
+        <Link to={`/wallet/${mint}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-all">
+          <Wallet className="w-3.5 h-3.5" /> View as wallet
+        </Link>
+        <Link to="/" className="text-accent text-sm hover:underline">← Screener</Link>
       </div>
     </div>
   );
@@ -159,90 +163,79 @@ export default function TokenDetail() {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-5xl mx-auto space-y-3">
+
+      {/* Back link */}
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white transition-colors">
         <ArrowLeft className="w-4 h-4" /> Screener
       </Link>
 
-      {/* ═══════════════════════════════════════
-          X-PROFILE STYLE HEADER
-          ═══════════════════════════════════════ */}
+      {/* ══════════════════════════════════════
+          HEADER CARD
+          ══════════════════════════════════════ */}
       <div className="card overflow-hidden">
-        {/* Banner — real banner > blurred logo fill > color-coded gradient */}
-        <div className="relative h-40 sm:h-52 overflow-hidden bg-black">
+
+        {/* Banner */}
+        <div className="relative h-36 sm:h-44 overflow-hidden bg-black">
           {banner ? (
             <img src={banner} alt={`${name} banner`} className="w-full h-full object-cover object-center" />
           ) : icon ? (
-            /* Blurred logo fills the banner — unique per coin */
             <>
-              <img
-                src={icon}
-                alt=""
-                aria-hidden
+              <img src={icon} alt="" aria-hidden
                 className="absolute inset-0 w-full h-full object-cover"
                 style={{ filter: "blur(32px) saturate(2) brightness(0.55)", transform: "scale(1.18)", transformOrigin: "center" }}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-              />
-              {/* Subtle tiled logo repeat at low opacity for texture */}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               <div className="absolute inset-0 opacity-[0.07]"
                 style={{ backgroundImage: `url(${icon})`, backgroundSize: "80px 80px", backgroundRepeat: "repeat" }} />
             </>
           ) : (
-            /* Pure fallback: unique gradient seeded from symbol */
-            <div className="absolute inset-0" style={{
-              background: `linear-gradient(135deg,
-                rgba(${symbolToRgb(symbol, 0)},0.6) 0%,
-                rgba(${symbolToRgb(symbol, 1)},0.5) 50%,
-                rgba(0,0,0,0.95) 100%)`
-            }} />
+            <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, rgba(${symbolToRgb(symbol,0)},0.6) 0%, rgba(${symbolToRgb(symbol,1)},0.5) 50%, rgba(0,0,0,0.95) 100%)` }} />
           )}
-          {/* Vignette — always present to keep text readable */}
-          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.4) 100%)" }} />
-          {/* Left vignette so avatar area is darkest */}
-          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to right, rgba(0,0,0,0.60) 0%, transparent 50%)" }} />
-          {/* Top-right quick actions */}
-          <div className="absolute top-3 right-3 flex items-center gap-2">
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.2) 60%, rgba(0,0,0,0.35) 100%)" }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to right, rgba(0,0,0,0.55) 0%, transparent 50%)" }} />
+          {/* Top-right: share + alert */}
+          <div className="absolute top-3 right-3 flex items-center gap-1.5">
             <ShareButton mint={mint} symbol={symbol} score={score} mcap={t.mcap ?? meta.mcap} verdict={d.verdict} />
             <Link to={`/alerts?mint=${mint}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-black/50 backdrop-blur-sm border border-white/15 text-white hover:bg-black/70 transition-all">
-              <Bell className="w-3.5 h-3.5" /> Alert
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-black/50 backdrop-blur-sm border border-white/15 text-white hover:bg-black/70 transition-all">
+              <Bell className="w-3 h-3" /> Alert
             </Link>
           </div>
         </div>
 
-        {/* Profile info row */}
+        {/* Profile row */}
         <div className="px-4 sm:px-6 pb-5">
-          <div className="flex items-end justify-between -mt-11 mb-4">
-            {/* Avatar */}
+
+          {/* Avatar row */}
+          <div className="flex items-end justify-between -mt-9 mb-3">
             <div className="relative z-10">
-              <div className="w-[72px] h-[72px] rounded-2xl ring-4 ring-[#000] overflow-hidden bg-panel2 shadow-2xl">
-                <TokenLogo src={icon} sym={symbol} size={72} />
+              <div className="w-[64px] h-[64px] rounded-2xl ring-4 ring-black overflow-hidden bg-panel2 shadow-2xl">
+                <TokenLogo src={icon} sym={symbol} size={64} />
               </div>
               {verified && (
                 <div className="absolute -bottom-1 -right-1 bg-accent rounded-full p-0.5 shadow-glow-blue">
-                  <BadgeCheck className="w-3.5 h-3.5 text-white" />
+                  <BadgeCheck className="w-3 h-3 text-white" />
                 </div>
               )}
             </div>
-            {/* Price top-right */}
+            {/* Price */}
             <div className="text-right pb-1">
-              <div className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              <div className="font-display text-xl sm:text-2xl font-extrabold text-white tracking-tight">
                 {fmtUsd(price)}
               </div>
-              <div className="flex flex-wrap justify-end gap-1.5 mt-1.5">
+              <div className="flex flex-wrap justify-end gap-1 mt-1">
                 <ChangePill label="5m"  v={t.change5m} />
                 <ChangePill label="1h"  v={t.change1h} />
-                <ChangePill label="6h"  v={t.change6h} />
                 <ChangePill label="24h" v={t.change24h ?? meta.priceChange24h} />
               </div>
             </div>
           </div>
 
           {/* Name + badges */}
-          <div className="flex flex-wrap items-center gap-2 mb-1.5">
-            <h1 className="font-display text-xl font-extrabold text-white">{symbol}</h1>
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            <h1 className="font-display text-lg font-extrabold text-white">{symbol}</h1>
             <span className="text-muted text-sm">{name}</span>
-            {verified && <Verified size={15} />}
+            {verified && <Verified size={14} />}
             {d.verdict && <span className="pill bg-accent/15 text-accent text-[10px] font-bold">{d.verdict}</span>}
             {meta.isPumpFun && <span className="pill text-[10px]" style={{ background: "rgba(153,69,255,0.15)", color: "#c084fc" }}>pump.fun</span>}
             {(t.tags || []).slice(0, 3).map((tg: string) => (
@@ -255,81 +248,67 @@ export default function TokenDetail() {
             )}
           </div>
 
-          {/* Bio / description */}
+          {/* Bio */}
           {(meta.description || meta.bio) && (
-            <p className="text-sm text-muted/90 leading-relaxed mt-1.5 mb-3 max-w-2xl">
+            <p className="text-[12px] text-muted/85 leading-relaxed mt-1 mb-2.5 max-w-2xl">
               {meta.description || meta.bio}
             </p>
           )}
 
-          {/* Social links + contract address */}
-          <div className="flex flex-wrap items-center gap-2 mt-3 mb-4">
-            {meta.socials?.website && (
-              <SocialPill href={meta.socials.website} icon={<Globe className="w-3.5 h-3.5" />} label="Website" />
-            )}
-            {meta.socials?.twitter && (
-              <SocialPill href={meta.socials.twitter} icon={
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-              } label="X" accent />
-            )}
-            {meta.socials?.telegram && (
-              <SocialPill href={meta.socials.telegram} icon={<Send className="w-3.5 h-3.5" />} label="Telegram" />
-            )}
-            {meta.socials?.discord && (
-              <SocialPill href={meta.socials.discord} icon={<MessageCircle className="w-3.5 h-3.5" />} label="Discord" />
-            )}
-            <SocialPill href={`https://solscan.io/token/${mint}`} icon={<ExternalLink className="w-3.5 h-3.5" />} label="Solscan" />
-            <SocialPill href={`https://dexscreener.com/solana/${mint}`} icon={<ExternalLink className="w-3.5 h-3.5" />} label="DexScreener" />
+          {/* Social links + CA */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-2 mb-3">
+            {meta.socials?.website  && <SocialPill href={meta.socials.website}  icon={<Globe       className="w-3 h-3" />} label="Website" />}
+            {meta.socials?.twitter  && <SocialPill href={meta.socials.twitter}  icon={<svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>} label="X" accent />}
+            {meta.socials?.telegram && <SocialPill href={meta.socials.telegram} icon={<Send        className="w-3 h-3" />} label="Telegram" />}
+            {meta.socials?.discord  && <SocialPill href={meta.socials.discord}  icon={<MessageCircle className="w-3 h-3" />} label="Discord" />}
+            <SocialPill href={`https://solscan.io/token/${mint}`}       icon={<ExternalLink className="w-3 h-3" />} label="Solscan" />
+            <SocialPill href={`https://dexscreener.com/solana/${mint}`} icon={<ExternalLink className="w-3 h-3" />} label="DexScreener" />
             {/* CA copy */}
             <button onClick={copy}
-              className="ml-auto inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] font-mono bg-panel2 border border-line text-muted hover:text-white hover:border-accent/40 transition-all group">
+              className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono bg-panel2 border border-line text-muted hover:text-white hover:border-accent/40 transition-all group">
               <span>{short(mint)}</span>
-              {copied ? <Check className="w-3 h-3 text-up flex-shrink-0" /> : <Copy className="w-3 h-3 flex-shrink-0 group-hover:text-accent" />}
+              {copied ? <Check className="w-3 h-3 text-up shrink-0" /> : <Copy className="w-3 h-3 shrink-0 group-hover:text-accent" />}
             </button>
           </div>
 
-          {/* Primary CTAs */}
+          {/* CTA buttons — slim */}
           <div className="flex flex-wrap gap-2">
             <a href="#trade"
-              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-bold text-white hover:opacity-90 transition-opacity shadow-glow-blue"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white hover:opacity-90 transition-opacity shadow-glow-blue"
               style={{ background: "linear-gradient(135deg, #2F80FF, #9945FF)" }}>
               <Zap className="w-3.5 h-3.5" /> Buy / Sell
             </a>
             <a href={`/api/ogdex/report?mint=${mint}`} target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-panel2 border border-line text-muted hover:text-white hover:border-accent/40 transition-all">
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-panel2 border border-line text-muted hover:text-white hover:border-accent/40 transition-all">
               <FileDown className="w-3.5 h-3.5" /> Report
             </a>
-            <Link to={`/alerts?mint=${mint}`}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-panel2 border border-line text-muted hover:text-white hover:border-accent/40 transition-all">
-              <Bell className="w-3.5 h-3.5" /> Alert
-            </Link>
           </div>
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════
-          STATS STRIP
-          ═══════════════════════════════════════ */}
-      <div className="overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+      {/* ══════════════════════════════════════
+          STATS STRIP (single source of truth)
+          ══════════════════════════════════════ */}
+      <div className="overflow-x-auto pb-1 no-scrollbar">
         <div className="flex gap-2 w-max">
           <StatPill label="Market Cap"  value={fmtUsd(t.mcap ?? meta.mcap, { compact: true })} />
           <StatPill label="Volume 24h"  value={t.volume != null ? "$" + compact(t.volume) : "—"} />
           <StatPill label="Liquidity"   value={t.liquidity != null ? "$" + compact(t.liquidity) : "—"} />
           <StatPill label="Holders"     value={fmtNum(meta.holderCount ?? t.holderCount ?? safety?.totalHolders)} />
           <StatPill label="FDV"         value={fmtUsd(t.fdv ?? meta.fdv, { compact: true })} />
-          {athMcap != null && <StatPill label="ATH MCap" value={fmtUsd(athMcap, { compact: true })} sub={fromAthPct != null ? (fromAthPct >= 0 ? "+" : "") + fromAthPct.toFixed(0) + "% from ATH" : undefined} />}
+          {athMcap != null && <StatPill label="ATH MCap" value={fmtUsd(athMcap, { compact: true })} sub={fromAthPct != null ? (fromAthPct >= 0 ? "+" : "") + fromAthPct.toFixed(0) + "% ATH" : undefined} />}
           <StatPill label="OG Score"    value={score != null ? Math.round(score) + "/100" : "—"} accent={score != null && score >= 60} />
           <StatPill label="Token Age"   value={meta.ageDays != null ? meta.ageDays + "d" : "—"} />
           <StatPill label="Whales"      value={String(whales)} sub={whales === 0 ? "healthy" : "concentrated"} />
-          <StatPill label="Risk Score"  value={safety?.riskScore != null ? String(safety.riskScore) : "—"} />
+          <StatPill label="Risk"        value={safety?.riskScore != null ? String(safety.riskScore) : "—"} />
         </div>
       </div>
 
       {/* Trust verdict */}
       <TrustPanel d={d} />
 
-      {/* Chart + Trade panel */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Chart + Trade */}
+      <div className="grid gap-3 lg:grid-cols-3">
         <div className={(meta.chain || "solana") === "solana" ? "lg:col-span-2" : "lg:col-span-3"}>
           <PriceChart mint={mint} symbol={symbol} chain={(meta.chain || "solana")} />
         </div>
@@ -340,94 +319,16 @@ export default function TokenDetail() {
         )}
       </div>
 
-      {/* Compact metric cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-        <Stat label="Market Cap" value={fmtUsd(t.mcap ?? meta.mcap, { compact: true })} />
-        <Stat label="Liquidity"  value={t.liquidity != null ? "$" + compact(t.liquidity) : "—"} />
-        <Stat label="24h Volume" value={t.volume != null ? "$" + compact(t.volume) : "—"} />
-        <Stat label="Holders"    value={fmtNum(meta.holderCount ?? t.holderCount ?? safety?.totalHolders)} />
-        <Stat label="FDV"        value={fmtUsd(t.fdv ?? meta.fdv, { compact: true })} />
-        {athMcap != null
-          ? <Stat label="ATH MCap" value={fmtUsd(athMcap, { compact: true })} sub={fromAthPct != null ? (fromAthPct >= 0 ? "+" : "") + fromAthPct.toFixed(0) + "% from ATH" : undefined} />
-          : <Stat label="ATH" soon />}
-      </div>
-
-      <div className="space-y-2.5">
-        <Collapsible title="Market & Valuation" icon={<TrendingUp className="w-4 h-4 text-accent" />} defaultOpen>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-            <Stat label="Price"         value={fmtUsd(price)} />
-            <Stat label="FDV"           value={fmtUsd(t.fdv ?? meta.fdv, { compact: true })} />
-            {athPrice != null ? <Stat label="ATH Price" value={fmtUsd(athPrice)} sub={ath?.source || undefined} /> : <Stat label="All-Time High" soon />}
-            <Stat label="Organic Score" value={t.organicScore != null ? Math.round(t.organicScore) + "/100" : "—"} sub={meta.organicScoreLabel} />
-            <Stat label="Token Age"     value={meta.ageDays != null ? meta.ageDays + "d" : "—"} />
-          </div>
-        </Collapsible>
-        <Collapsible title="Activity & Momentum" icon={<Activity className="w-4 h-4 text-accent" />} defaultOpen={false}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-            <Stat label="Volume 24h Δ"    value={t.volumeChange24h != null ? fmtPct(t.volumeChange24h) : "—"} good={(t.volumeChange24h ?? 0) >= 0} />
-            <Stat label="Liquidity 24h Δ" value={t.liquidityChange24h != null ? fmtPct(t.liquidityChange24h) : "—"} good={(t.liquidityChange24h ?? 0) >= 0} />
-            <Stat label="Holders 24h Δ"   value={t.holderChange24h != null ? fmtPct(t.holderChange24h) : "—"} good={(t.holderChange24h ?? 0) > 0} />
-            <Stat label="Traders 24h"     value={fmtNum(t.numTraders ?? meta.numTraders24h)} />
-            <Stat label="Whales"          value={String(whales)} sub={whales === 0 ? "healthy" : "concentration"} />
-          </div>
-        </Collapsible>
-        <Collapsible
-          title="Distribution & Security"
-          icon={<ShieldCheck className="w-4 h-4 text-accent" />}
-          defaultOpen={false}
-          right={<span className={`pill text-[10px] ${(safety?.riskScore ?? 99) <= 20 ? "bg-up/10 text-up" : (safety?.riskScore ?? 99) <= 50 ? "bg-yellow-400/10 text-yellow-300" : "bg-down/10 text-down"}`}>Risk {safety?.riskScore != null ? safety.riskScore : "—"}</span>}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-            <Stat label="Top 10 Holders" value={t.audit?.topHoldersPercentage != null ? t.audit.topHoldersPercentage.toFixed(1) + "%" : "—"} good={(t.audit?.topHoldersPercentage ?? 100) < 25} />
-            <Stat label="Dev Mints"      value={t.audit?.devMints != null ? String(t.audit.devMints) : "—"} good={(t.audit?.devMints ?? 0) <= 1} />
-            <Stat label="Mint Auth"      value={d.flags?.mintAuthorityDisabled ? "Renounced" : "Active"} good={d.flags?.mintAuthorityDisabled} />
-            <Stat label="Freeze Auth"    value={d.flags?.freezeAuthorityDisabled ? "Renounced" : "Active"} good={d.flags?.freezeAuthorityDisabled} />
-            <Stat label="Risk Score"     value={safety?.riskScore != null ? String(safety.riskScore) : "—"} good={(safety?.riskScore ?? 99) <= 20} />
-          </div>
-        </Collapsible>
-      </div>
-
-      {/* OG Score + Forensic Scores */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="card p-5 text-center glow grid place-items-center">
-          <div className="text-[10px] uppercase tracking-widest text-muted mb-3">OG Score</div>
-          <ScoreRing value={score} label="/ 100" size={130} />
-          {(d.momentumLabel || meta.momentumLabel) && (
-            <div className="mt-3 inline-flex pill bg-panel2 text-muted capitalize">
-              Momentum: {(d.momentumLabel || meta.momentumLabel)?.replace(/[^\w\s]/g, "")}
-            </div>
-          )}
-        </div>
-        <div className="card p-5 lg:col-span-2">
-          <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-accent" /> Forensic Scores</div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
-            {d.score?.signals && Object.entries(d.score.signals).map(([k, v]: any) => <MiniScore key={k} label={k} value={v} />)}
-            <MiniScore label="organic"  value={Math.round(t.organicScore ?? 0)} />
-            <MiniScore label="momentum" value={d.momentum ?? meta.momentum} />
-            <MiniScore label="risk"     value={safety?.riskScore} invert />
-          </div>
-          <div className="mt-4 pt-4 border-t border-line space-y-2 text-xs">
-            <Signal ok={d.flags?.mintAuthorityDisabled}   text="Mint authority renounced — fixed supply integrity" />
-            <Signal ok={d.flags?.freezeAuthorityDisabled} text="Freeze authority renounced — no blacklist/freeze risk" />
-            <Signal ok={!d.flags?.lpPulled}               text="Liquidity intact — no LP pull detected" />
-            <Signal ok={d.flags?.minLiquidity}            text="Sufficient liquidity depth" />
-            <Signal ok={!d.score?.isPumpFunClone}         text="Original deployment — not a detected clone" />
-            <Signal ok={whales === 0}                     text={whales === 0 ? "Broad distribution — no >5% whale concentration" : `${whales} whale wallet(s) hold >5%`} />
-          </div>
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════
+      {/* ══════════════════════════════════════
           PREMIUM TAB WHEEL
-          ═══════════════════════════════════════ */}
-      <div className="overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+          ══════════════════════════════════════ */}
+      <div className="overflow-x-auto pb-1 no-scrollbar">
         <div className="flex gap-1 w-max">
           {TABS.map(([id, label]) => {
             const active = tab === id;
             return (
-              <button
-                key={id}
-                onClick={() => setTab(id as any)}
-                className={`relative flex-shrink-0 whitespace-nowrap px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+              <button key={id} onClick={() => setTab(id as any)}
+                className={`relative flex-shrink-0 whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                   active ? "text-accent" : "text-muted hover:text-white hover:bg-panel2/60"
                 }`}
                 style={active ? {
@@ -445,7 +346,7 @@ export default function TokenDetail() {
 
       {/* Tab content */}
       <ErrorBoundary key={tab} label="this tab">
-        {tab === "overview"   && <Overview d={d} t={t} meta={meta} safety={safety} trades={trades} ath={ath} />}
+        {tab === "overview"   && <Overview d={d} t={t} meta={meta} safety={safety} trades={trades} ath={ath} score={score} whales={whales} />}
         {tab === "chat"       && <CoinChat d={d} forensics={forensics} ath={ath} />}
         {tab === "predictive" && <PredictiveIntel d={d} />}
         {tab === "smartmoney" && <CapitalFlow d={d} />}
@@ -460,9 +361,9 @@ export default function TokenDetail() {
 }
 
 /* ─────────────────────────────────────────────
-   Overview tab
+   Overview tab  (includes OG Score + Forensic Scores, no duplicates)
 ───────────────────────────────────────────── */
-function Overview({ d, t, meta, safety, trades, ath }: any) {
+function Overview({ d, t, meta, safety, trades, ath, score, whales }: any) {
   const buyVol  = meta.buyVolume24h ?? t.buyVolume ?? 0;
   const sellVol = meta.sellVolume24h ?? t.sellVolume ?? 0;
   const total   = buyVol + sellVol || 1;
@@ -473,49 +374,83 @@ function Overview({ d, t, meta, safety, trades, ath }: any) {
   const windows: [string, string][] = [["5m","5m"],["1h","1H"],["6h","6H"],["24h","24H"]];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+
+      {/* OG Score + Forensic Scores */}
+      <div className="grid lg:grid-cols-3 gap-3">
+        <div className="card p-5 flex flex-col items-center justify-center text-center">
+          <div className="text-[10px] uppercase tracking-widest text-muted mb-3">OG Score</div>
+          <ScoreRing value={score} label="/ 100" size={120} />
+          {(d.momentumLabel || meta.momentumLabel) && (
+            <div className="mt-3 inline-flex pill bg-panel2 text-muted capitalize">
+              Momentum: {(d.momentumLabel || meta.momentumLabel)?.replace(/[^\w\s]/g, "")}
+            </div>
+          )}
+        </div>
+        <div className="card p-5 lg:col-span-2">
+          <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-accent" /> Forensic Scores</div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {d.score?.signals && Object.entries(d.score.signals).map(([k, v]: any) => <MiniScore key={k} label={k} value={v} />)}
+            <MiniScore label="organic"  value={Math.round(t.organicScore ?? 0)} />
+            <MiniScore label="momentum" value={d.momentum ?? meta.momentum} />
+            <MiniScore label="risk"     value={safety?.riskScore} invert />
+          </div>
+          <div className="mt-4 pt-3 border-t border-line space-y-1.5 text-xs">
+            <Signal ok={d.flags?.mintAuthorityDisabled}   text="Mint authority renounced" />
+            <Signal ok={d.flags?.freezeAuthorityDisabled} text="Freeze authority renounced" />
+            <Signal ok={!d.flags?.lpPulled}               text="Liquidity intact — no LP pull detected" />
+            <Signal ok={d.flags?.minLiquidity}            text="Sufficient liquidity depth" />
+            <Signal ok={!d.score?.isPumpFunClone}         text="Original deployment — not a detected clone" />
+            <Signal ok={whales === 0}                     text={whales === 0 ? "No >5% whale concentration" : `${whales} whale wallet(s) hold >5%`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Performance by Timeframe */}
       <div className="card p-5">
         <div className="text-sm font-semibold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-accent" /> Performance by Timeframe</div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[560px]">
+          <table className="w-full text-sm min-w-[540px]">
             <thead><tr className="text-muted text-xs border-b border-line">
-              <th className="text-left py-2.5">Window</th>
-              <th className="text-right py-2.5">Price Δ</th>
-              <th className="text-right py-2.5">Volume</th>
-              <th className="text-right py-2.5">Buys</th>
-              <th className="text-right py-2.5">Sells</th>
-              <th className="text-right py-2.5">Traders</th>
-              <th className="text-right py-2.5">Net buyers</th>
+              <th className="text-left py-2">Window</th>
+              <th className="text-right py-2">Price Δ</th>
+              <th className="text-right py-2">Volume</th>
+              <th className="text-right py-2">Buys</th>
+              <th className="text-right py-2">Sells</th>
+              <th className="text-right py-2">Traders</th>
+              <th className="text-right py-2">Net buyers</th>
             </tr></thead>
             <tbody>
               {windows.map(([k, label]) => { const w = tf[k] || {}; return (
                 <tr key={k} className="border-b border-line/30 last:border-0 hover:bg-panel2/30 transition-colors">
-                  <td className="py-2.5 font-bold">{label}</td>
-                  <td className="py-2.5 text-right"><Change v={w.priceChange} /></td>
-                  <td className="py-2.5 text-right tabular-nums">{w.volume != null ? "$" + compact(w.volume) : "—"}</td>
-                  <td className="py-2.5 text-right tabular-nums text-up font-medium">{fmtNum(w.numBuys)}</td>
-                  <td className="py-2.5 text-right tabular-nums text-down font-medium">{fmtNum(w.numSells)}</td>
-                  <td className="py-2.5 text-right tabular-nums">{fmtNum(w.numTraders)}</td>
-                  <td className={`py-2.5 text-right tabular-nums font-medium ${(w.numNetBuyers ?? 0) >= 0 ? "text-up" : "text-down"}`}>{fmtNum(w.numNetBuyers)}</td>
+                  <td className="py-2 font-bold">{label}</td>
+                  <td className="py-2 text-right"><Change v={w.priceChange} /></td>
+                  <td className="py-2 text-right tabular-nums">{w.volume != null ? "$" + compact(w.volume) : "—"}</td>
+                  <td className="py-2 text-right tabular-nums text-up font-medium">{fmtNum(w.numBuys)}</td>
+                  <td className="py-2 text-right tabular-nums text-down font-medium">{fmtNum(w.numSells)}</td>
+                  <td className="py-2 text-right tabular-nums">{fmtNum(w.numTraders)}</td>
+                  <td className={`py-2 text-right tabular-nums font-medium ${(w.numNetBuyers ?? 0) >= 0 ? "text-up" : "text-down"}`}>{fmtNum(w.numNetBuyers)}</td>
                 </tr>
               ); })}
             </tbody>
           </table>
         </div>
       </div>
-      <div className="grid lg:grid-cols-2 gap-4">
+
+      {/* Market data + Microstructure */}
+      <div className="grid lg:grid-cols-2 gap-3">
         <div className="card p-5">
           <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Flame className="w-4 h-4 text-accent" /> Market Microstructure</div>
           <div className="text-[11px] text-muted mb-1 flex justify-between">
-            <span>Buy pressure (24h)</span><span className="font-semibold text-white">{bp.toFixed(0)}% buys</span>
+            <span>Buy pressure 24h</span><span className="font-semibold text-white">{bp.toFixed(0)}% buys</span>
           </div>
-          <div className="h-2.5 rounded-full overflow-hidden flex bg-panel2 mb-4">
+          <div className="h-2 rounded-full overflow-hidden flex bg-panel2 mb-4">
             <div className="bg-up h-full rounded-l-full" style={{ width: `${bp}%` }} />
             <div className="bg-down h-full rounded-r-full" style={{ width: `${100 - bp}%` }} />
           </div>
           <Row label="Buy volume 24h"      value={"$" + compact(buyVol)} />
           <Row label="Sell volume 24h"     value={"$" + compact(sellVol)} />
-          <Row label="Buys / Sells (24h)"  value={`${fmtNum(meta.numBuys24h)} / ${fmtNum(meta.numSells24h)}`} />
+          <Row label="Buys / Sells 24h"    value={`${fmtNum(meta.numBuys24h)} / ${fmtNum(meta.numSells24h)}`} />
           <Row label="Total txns 24h"      value={fmtNum(meta.txns24h)} />
           <Row label="Active traders 24h"  value={fmtNum(meta.numTraders24h)} />
           <Row label="Net buyers 24h"      value={fmtNum(meta.netBuyers24h)} />
@@ -524,17 +459,16 @@ function Overview({ d, t, meta, safety, trades, ath }: any) {
         </div>
         <div className="card p-5">
           <div className="text-sm font-semibold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-accent" /> Market Intelligence</div>
-          <Row label="Price"        value={fmtUsd(t.priceUsd ?? meta.priceUsd)} />
-          <Row label="Market cap"   value={fmtUsd(t.mcap ?? meta.mcap, { compact: true })} />
-          <Row label="FDV"          value={fmtUsd(t.fdv ?? meta.fdv, { compact: true })} />
-          <Row label="Liquidity"    value={t.liquidity ? "$" + compact(t.liquidity) : "—"} />
+          <Row label="Price"         value={fmtUsd(t.priceUsd ?? meta.priceUsd)} />
+          <Row label="Market cap"    value={fmtUsd(t.mcap ?? meta.mcap, { compact: true })} />
+          <Row label="FDV"           value={fmtUsd(t.fdv ?? meta.fdv, { compact: true })} />
+          <Row label="Liquidity"     value={t.liquidity ? "$" + compact(t.liquidity) : "—"} />
           <Row label="All-time high" value={ath?.athMcap != null ? fmtUsd(ath.athMcap, { compact: true }) + (ath.fromAthPct != null ? ` (${ath.fromAthPct >= 0 ? "+" : ""}${ath.fromAthPct.toFixed(0)}%)` : "") : <span className="pill bg-panel2 text-muted text-[10px]">Coming soon</span>} />
-          <Row label="ATH price"    value={ath?.athPrice != null ? fmtUsd(ath.athPrice) : <span className="pill bg-panel2 text-muted text-[10px]">Coming soon</span>} />
-          <Row label="Total supply" value={compact(t.totalSupply ?? meta.totalSupply)} />
-          <Row label="Circulating"  value={compact(t.circSupply ?? meta.circSupply)} />
-          <Row label="Created"      value={meta.createdAt ? new Date(meta.createdAt).toLocaleDateString() + (meta.ageDays != null ? ` (${meta.ageDays}d)` : "") : "—"} />
-          <Row label="Pool age"     value={meta.poolAgeDays != null ? meta.poolAgeDays + "d" : "—"} />
-          <Row label="DEX / pair"   value={meta.pairDexId || "—"} />
+          <Row label="ATH price"     value={ath?.athPrice != null ? fmtUsd(ath.athPrice) : <span className="pill bg-panel2 text-muted text-[10px]">Coming soon</span>} />
+          <Row label="Total supply"  value={compact(t.totalSupply ?? meta.totalSupply)} />
+          <Row label="Circulating"   value={compact(t.circSupply ?? meta.circSupply)} />
+          <Row label="Created"       value={meta.createdAt ? new Date(meta.createdAt).toLocaleDateString() + (meta.ageDays != null ? ` (${meta.ageDays}d)` : "") : "—"} />
+          <Row label="DEX / pair"    value={meta.pairDexId || "—"} />
         </div>
       </div>
     </div>
@@ -563,7 +497,7 @@ function HolderIntel({ holders, safety, dir }: { holders: any[]; safety: any; di
       </div>
       <div className="grid gap-1.5 border-t border-line p-3 sm:grid-cols-2">
         {r.flags.map((f, i) => (
-          <div key={i} className="flex items-start gap-2 text-[12.5px] text-white/80">
+          <div key={i} className="flex items-start gap-2 text-[12px] text-white/80">
             <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${dot(f.tone)}`} />
             <span>{f.text}</span>
           </div>
@@ -584,23 +518,22 @@ function HoldersTable({ holders, price, dir = {} }: { holders: any[]; price?: nu
         <div className="card p-3 px-4 flex items-center gap-2 flex-wrap text-sm">
           <BadgeCheck className="w-4 h-4 text-accent" />
           <span className="font-semibold">{kolHolders.length} KOL{kolHolders.length > 1 ? "s" : ""} holding {kolPct.toFixed(2)}% of supply</span>
-          <span className="text-muted text-xs">·</span>
           <div className="flex gap-1.5 flex-wrap">{kolHolders.slice(0, 8).map((h) => <span key={h.owner} className="pill bg-accent/10 text-accent text-[10px]">{dir[h.owner].name}</span>)}</div>
         </div>
       )}
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-line text-sm font-semibold flex items-center gap-2">
           <Users className="w-4 h-4 text-accent" /> Top {holders.length} Holders
-          <span className="text-muted font-normal text-xs ml-1">KOLs, exchanges & pools labeled · click wallet to view</span>
+          <span className="text-muted font-normal text-xs ml-1">KOLs & exchanges labeled · click wallet to view</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[600px]">
             <thead><tr className="text-muted text-xs border-b border-line bg-panel2/30">
               <th className="text-left px-4 py-2.5 w-8">#</th>
               <th className="text-left px-2 py-2.5">Wallet</th>
               <th className="text-left px-2 py-2.5">Type</th>
               <th className="text-right px-2 py-2.5">Amount</th>
-              <th className="text-left px-2 py-2.5 w-40">Supply %</th>
+              <th className="text-left px-2 py-2.5 w-36">Supply %</th>
               <th className="text-right px-4 py-2.5">USD Value</th>
             </tr></thead>
             <tbody>
@@ -648,26 +581,28 @@ function TradesTable({ trades, mint, dir = {}, onRefresh }: { trades: any[]; min
       <div className="px-4 py-3 border-b border-line text-sm font-semibold flex items-center gap-2">
         <Activity className="w-4 h-4 text-accent" /> Live Trades
         <span className="pill bg-up/10 text-up text-[10px] inline-flex items-center gap-1"><Radio className="w-3 h-3 animate-pulse" /> LIVE</span>
-        <div className="ml-auto flex gap-2">
-          <button onClick={() => setAuto((a) => !a)} className={`btn inline-flex items-center gap-1 text-xs ${auto ? "bg-up/15 text-up" : "bg-panel2 text-muted hover:text-white"}`}>
+        <div className="ml-auto flex gap-1.5">
+          <button onClick={() => setAuto((a) => !a)}
+            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${auto ? "bg-up/15 text-up border-up/30" : "bg-panel2 text-muted border-line hover:text-white"}`}>
             <Radio className={`w-3 h-3 ${auto ? "animate-pulse" : ""}`} /> {auto ? "Auto" : "Paused"}
           </button>
-          <button onClick={onRefresh} className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1 text-xs">
+          <button onClick={onRefresh}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-panel2 border border-line text-muted hover:text-white transition-all">
             <RefreshCw className="w-3 h-3" /> Refresh
           </button>
         </div>
       </div>
-      <div className="overflow-x-auto max-h-[640px] overflow-y-auto">
-        <table className="w-full text-sm min-w-[640px]">
+      <div className="overflow-x-auto max-h-[560px] overflow-y-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead className="sticky top-0 bg-panel"><tr className="text-muted text-xs border-b border-line">
-            <th className="text-left px-4 py-2.5">Time</th>
-            <th className="text-left px-2 py-2.5">Side</th>
-            <th className="text-right px-2 py-2.5">Price</th>
-            <th className="text-right px-2 py-2.5">Amount</th>
-            <th className="text-right px-2 py-2.5">USD</th>
-            <th className="text-left px-2 py-2.5">Trader</th>
-            <th className="text-left px-2 py-2.5">Tag</th>
-            <th className="text-left px-4 py-2.5">DEX</th>
+            <th className="text-left px-4 py-2">Time</th>
+            <th className="text-left px-2 py-2">Side</th>
+            <th className="text-right px-2 py-2">Price</th>
+            <th className="text-right px-2 py-2">Amount</th>
+            <th className="text-right px-2 py-2">USD</th>
+            <th className="text-left px-2 py-2">Trader</th>
+            <th className="text-left px-2 py-2">Tag</th>
+            <th className="text-left px-4 py-2">DEX</th>
           </tr></thead>
           <tbody>
             {trades.map((tr, i) => (
@@ -701,16 +636,16 @@ function TradesTable({ trades, mint, dir = {}, onRefresh }: { trades: any[]; min
 ───────────────────────────────────────────── */
 function Forensics({ d, meta, safety }: any) {
   return (
-    <div className="grid lg:grid-cols-2 gap-4">
+    <div className="grid lg:grid-cols-2 gap-3">
       <div className="card p-5">
-        <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Wallet className="w-4 h-4 text-accent" /> Developer / Creator Intelligence</div>
+        <div className="text-sm font-semibold mb-3 flex items-center gap-2"><Wallet className="w-4 h-4 text-accent" /> Developer Intelligence</div>
         <Row label="Creator wallet"      value={safety?.creator ? <WalletLink address={safety.creator} /> : "—"} />
         <Row label="Tokens created"      value={safety?.creatorTokensCount != null ? String(safety.creatorTokensCount) : "—"} />
         <Row label="Mint authority"      value={d.flags?.mintAuthorityDisabled ? "Renounced" : "Active"} good={d.flags?.mintAuthorityDisabled} />
         <Row label="Freeze authority"    value={d.flags?.freezeAuthorityDisabled ? "Renounced" : "Active"} good={d.flags?.freezeAuthorityDisabled} />
         <Row label="Unsafe authority"    value={d.flags?.unsafeAuthority ? "Yes" : "No"} good={!d.flags?.unsafeAuthority} />
         <Row label="Launchpad"           value={(safety?.launchpad && typeof safety.launchpad === "object" ? safety.launchpad.name : safety?.launchpad) || (meta.isPumpFun ? "pump.fun" : "—")} />
-        <Row label="Migrated from pump.fun" value={d.flags?.migratedFromPumpFun ? "Yes" : "No"} />
+        <Row label="Migrated pump.fun"   value={d.flags?.migratedFromPumpFun ? "Yes" : "No"} />
         <Row label="Deployer exit risk"  value={d.flags?.mintAuthorityDisabled && d.flags?.freezeAuthorityDisabled ? "Very Low" : "Elevated"} good={d.flags?.mintAuthorityDisabled && d.flags?.freezeAuthorityDisabled} />
       </div>
       <div className="card p-5">
@@ -720,7 +655,7 @@ function Forensics({ d, meta, safety }: any) {
         <Row label="Risk score"   value={safety?.riskScore != null ? String(safety.riskScore) : "—"} good={(safety?.riskScore ?? 99) <= 20} />
         <Row label="Rugged"       value={safety?.rugged ? "Yes" : "No"} good={!safety?.rugged} />
         <Row label="LP locked"    value={safety?.lpLockedPct != null ? safety.lpLockedPct.toFixed(0) + "%" : "—"} good={(safety?.lpLockedPct ?? 0) > 50} />
-        <Row label="Min liquidity met" value={d.flags?.minLiquidity ? "Yes" : "No"} good={d.flags?.minLiquidity} />
+        <Row label="Min liquidity" value={d.flags?.minLiquidity ? "Yes" : "No"} good={d.flags?.minLiquidity} />
         <Row label="LP pulled"    value={d.flags?.lpPulled ? "Yes" : "No"} good={!d.flags?.lpPulled} />
         {Array.isArray(safety?.risks) && safety.risks.length > 0 && (
           <div className="mt-3 pt-3 border-t border-line space-y-1.5">
@@ -741,19 +676,6 @@ function Forensics({ d, meta, safety }: any) {
 /* ─────────────────────────────────────────────
    Shared primitives
 ───────────────────────────────────────────── */
-function Stat({ label, value, sub, good, soon }: { label: string; value?: string; sub?: string; good?: boolean; soon?: boolean }) {
-  return (
-    <div className="card p-3">
-      <div className="text-[10px] uppercase tracking-wide text-muted">{label}</div>
-      {soon
-        ? <div className="mt-1 inline-flex items-center gap-1 pill bg-accent/10 text-accent text-[10px]">Coming soon</div>
-        : <div className={`text-base font-semibold mt-0.5 ${good === true ? "text-up" : good === false ? "text-down" : ""}`}>{value}</div>
-      }
-      {sub && !soon && <div className="text-[10px] text-muted capitalize">{sub}</div>}
-    </div>
-  );
-}
-
 function MiniScore({ label, value, invert }: { label: string; value?: number | null; invert?: boolean }) {
   const v = value ?? null;
   const good  = v == null ? false : invert ? v <= 30 : v >= 60;
@@ -770,7 +692,7 @@ function MiniScore({ label, value, invert }: { label: string; value?: number | n
 function Signal({ ok, text }: { ok?: boolean; text: string }) {
   return (
     <div className="flex items-start gap-2">
-      <span className={`mt-0.5 ${ok ? "text-up" : "text-down"}`}>
+      <span className={`mt-0.5 shrink-0 ${ok ? "text-up" : "text-down"}`}>
         {ok ? <Check className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
       </span>
       <span className="text-muted">{text}</span>
@@ -781,8 +703,8 @@ function Signal({ ok, text }: { ok?: boolean; text: string }) {
 function Row({ label, value, good }: { label: string; value: any; good?: boolean }) {
   return (
     <div className="flex items-center justify-between py-1.5 border-b border-line/40 last:border-0 text-sm">
-      <span className="text-muted">{label}</span>
-      <span className={`font-medium ${good === true ? "text-up" : good === false ? "text-down" : ""}`}>{value}</span>
+      <span className="text-muted shrink-0">{label}</span>
+      <span className={`font-medium text-right ${good === true ? "text-up" : good === false ? "text-down" : ""}`}>{value}</span>
     </div>
   );
 }
@@ -792,9 +714,9 @@ function Empty({ text }: { text: string }) {
 }
 
 function labelCls(l: string) {
-  if (l === "whale")        return "bg-down/15 text-down";
-  if (l === "large holder") return "bg-yellow-500/15 text-yellow-400";
+  if (l === "whale")          return "bg-down/15 text-down";
+  if (l === "large holder")   return "bg-yellow-500/15 text-yellow-400";
   if (l === "liquidity pool") return "bg-accent2/15 text-accent2";
-  if (l === "burn")         return "bg-panel2 text-muted";
+  if (l === "burn")           return "bg-panel2 text-muted";
   return "bg-up/10 text-up";
 }
