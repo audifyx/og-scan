@@ -410,11 +410,14 @@ function Overview({ d, t, meta, safety, trades, ath, score, whales }: any) {
       <div className="card p-5">
         <div className="text-sm font-semibold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-accent" /> Performance by Timeframe</div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[540px]">
+          <table className="w-full text-sm min-w-[680px]">
             <thead><tr className="text-muted text-xs border-b border-line">
               <th className="text-left py-2">Window</th>
               <th className="text-right py-2">Price Δ</th>
               <th className="text-right py-2">Volume</th>
+              <th className="text-right py-2">Vol Δ</th>
+              <th className="text-right py-2">Liq Δ</th>
+              <th className="text-right py-2">Holders Δ</th>
               <th className="text-right py-2">Buys</th>
               <th className="text-right py-2">Sells</th>
               <th className="text-right py-2">Traders</th>
@@ -426,6 +429,9 @@ function Overview({ d, t, meta, safety, trades, ath, score, whales }: any) {
                   <td className="py-2 font-bold">{label}</td>
                   <td className="py-2 text-right"><Change v={w.priceChange} /></td>
                   <td className="py-2 text-right tabular-nums">{w.volume != null ? "$" + compact(w.volume) : "—"}</td>
+                  <td className="py-2 text-right"><Change v={w.volumeChange ?? w.volumeChange24h} /></td>
+                  <td className="py-2 text-right"><Change v={w.liquidityChange} /></td>
+                  <td className="py-2 text-right"><Change v={w.holdersChange} /></td>
                   <td className="py-2 text-right tabular-nums text-up font-medium">{fmtNum(w.numBuys)}</td>
                   <td className="py-2 text-right tabular-nums text-down font-medium">{fmtNum(w.numSells)}</td>
                   <td className="py-2 text-right tabular-nums">{fmtNum(w.numTraders)}</td>
@@ -463,8 +469,9 @@ function Overview({ d, t, meta, safety, trades, ath, score, whales }: any) {
           <Row label="Market cap"    value={fmtUsd(t.mcap ?? meta.mcap, { compact: true })} />
           <Row label="FDV"           value={fmtUsd(t.fdv ?? meta.fdv, { compact: true })} />
           <Row label="Liquidity"     value={t.liquidity ? "$" + compact(t.liquidity) : "—"} />
-          <Row label="All-time high" value={ath?.athMcap != null ? fmtUsd(ath.athMcap, { compact: true }) + (ath.fromAthPct != null ? ` (${ath.fromAthPct >= 0 ? "+" : ""}${ath.fromAthPct.toFixed(0)}%)` : "") : <span className="pill bg-panel2 text-muted text-[10px]">Coming soon</span>} />
-          <Row label="ATH price"     value={ath?.athPrice != null ? fmtUsd(ath.athPrice) : <span className="pill bg-panel2 text-muted text-[10px]">Coming soon</span>} />
+          <Row label="All-time high" value={ath?.athMcap != null ? fmtUsd(ath.athMcap, { compact: true }) + (ath.fromAthPct != null ? ` (${ath.fromAthPct >= 0 ? "+" : ""}${ath.fromAthPct.toFixed(0)}%)` : "") : "—"} />
+          <Row label="ATH price"     value={ath?.athPrice != null ? fmtUsd(ath.athPrice) : "—"} />
+          {ath?.source && <Row label="ATH source" value={<span className="text-muted/70 text-xs capitalize">{ath.source.replace("_", " ")}</span>} />}
           <Row label="Total supply"  value={compact(t.totalSupply ?? meta.totalSupply)} />
           <Row label="Circulating"   value={compact(t.circSupply ?? meta.circSupply)} />
           <Row label="Created"       value={meta.createdAt ? new Date(meta.createdAt).toLocaleDateString() + (meta.ageDays != null ? ` (${meta.ageDays}d)` : "") : "—"} />
