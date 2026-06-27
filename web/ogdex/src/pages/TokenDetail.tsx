@@ -33,6 +33,23 @@ import {
    Shared micro-components
 ───────────────────────────────────────────── */
 
+/* ── Derive a unique RGB string from a token symbol for the banner fallback ── */
+function symbolToRgb(sym: string, offset: number): string {
+  let h = 0;
+  for (let i = 0; i < sym.length; i++) h = (h * 31 + sym.charCodeAt(i)) >>> 0;
+  const palettes: number[][][] = [
+    [[47, 128, 255], [153, 69, 255]],
+    [[0, 200, 180],  [47, 128, 255]],
+    [[255, 197, 61], [153, 69, 255]],
+    [[255, 77, 109], [47, 128, 255]],
+    [[0, 200, 130],  [47, 128, 255]],
+    [[255, 128, 0],  [200, 50, 200]],
+  ];
+  const pair = palettes[h % palettes.length];
+  const [r, g, b] = pair[offset % 2];
+  return `${r},${g},${b}`;
+}
+
 function SocialPill({ href, icon, label, accent }: { href: string; icon: React.ReactNode; label: string; accent?: boolean }) {
   return (
     <a href={href} target="_blank" rel="noreferrer"
@@ -151,13 +168,38 @@ export default function TokenDetail() {
           X-PROFILE STYLE HEADER
           ═══════════════════════════════════════ */}
       <div className="card overflow-hidden">
-        {/* Banner */}
-        <div className="relative h-40 sm:h-52 overflow-hidden">
-          {banner
-            ? <img src={banner} alt={`${name} banner`} className="w-full h-full object-cover object-center" />
-            : <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(47,128,255,0.35) 0%, rgba(153,69,255,0.28) 55%, rgba(0,0,0,0.9) 100%)" }} />
-          }
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)" }} />
+        {/* Banner — real banner > blurred logo fill > color-coded gradient */}
+        <div className="relative h-40 sm:h-52 overflow-hidden bg-black">
+          {banner ? (
+            <img src={banner} alt={`${name} banner`} className="w-full h-full object-cover object-center" />
+          ) : icon ? (
+            /* Blurred logo fills the banner — unique per coin */
+            <>
+              <img
+                src={icon}
+                alt=""
+                aria-hidden
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: "blur(32px) saturate(2) brightness(0.55)", transform: "scale(1.18)", transformOrigin: "center" }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+              {/* Subtle tiled logo repeat at low opacity for texture */}
+              <div className="absolute inset-0 opacity-[0.07]"
+                style={{ backgroundImage: `url(${icon})`, backgroundSize: "80px 80px", backgroundRepeat: "repeat" }} />
+            </>
+          ) : (
+            /* Pure fallback: unique gradient seeded from symbol */
+            <div className="absolute inset-0" style={{
+              background: `linear-gradient(135deg,
+                rgba(${symbolToRgb(symbol, 0)},0.6) 0%,
+                rgba(${symbolToRgb(symbol, 1)},0.5) 50%,
+                rgba(0,0,0,0.95) 100%)`
+            }} />
+          )}
+          {/* Vignette — always present to keep text readable */}
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.4) 100%)" }} />
+          {/* Left vignette so avatar area is darkest */}
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to right, rgba(0,0,0,0.60) 0%, transparent 50%)" }} />
           {/* Top-right quick actions */}
           <div className="absolute top-3 right-3 flex items-center gap-2">
             <ShareButton mint={mint} symbol={symbol} score={score} mcap={t.mcap ?? meta.mcap} verdict={d.verdict} />
