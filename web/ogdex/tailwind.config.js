@@ -6,9 +6,9 @@ export default {
       colors: {
         // ── OG SCAN · Solana black/blue/white/gold theme ──
         bg:      "#000000",  // pure black
-        panel:   "#050A18",  // near-black blue
-        panel2:  "#0A1228",  // dark blue
-        line:    "#152040",  // blue-steel borders
+        panel:   "#03060F",  // near-pure black with blue tint
+        panel2:  "#060C1E",  // dark blue-black
+        line:    "#0F1E3A",  // blue border lines
         accent:  "#2F80FF",  // electric blue (primary brand)
         accent2: "#9945FF",  // Solana purple (secondary)
         gold:    "#FFC53D",  // premium gold (highlight)

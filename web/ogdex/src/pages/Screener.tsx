@@ -260,7 +260,7 @@ export default function Screener() {
             {isMultichain && (
               <div className="flex gap-1 flex-wrap ml-1">
                 {CHAINS.map((c) => (
-                  <button key={c.id} onClick={() => setChain(c.id)}
+                  <button key={c.id} onClick={() => { setRows([]); setChain(c.id); }}
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
                       ${chain === c.id
                         ? `border-accent/50 bg-accent/10 ${c.color}`

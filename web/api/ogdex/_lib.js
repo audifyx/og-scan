@@ -12,7 +12,8 @@ export const INTEL_FN = process.env.OGDEX_INTEL_FN || "ogdex-intel-v2";
 
 export function send(res, status, data) {
   res.setHeader("Content-Type", "application/json");
-  res.setHeader("Cache-Control", "no-store");
+  // Preserve any Cache-Control set by cache() — only default to no-store when unset
+  if (!res.getHeader("Cache-Control")) res.setHeader("Cache-Control", "no-store");
   res.setHeader("Access-Control-Allow-Origin", "*");
   const payload = JSON.stringify(data);
   if (typeof res.status === "function") res.status(status).send(payload);

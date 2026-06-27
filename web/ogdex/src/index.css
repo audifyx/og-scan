@@ -21,11 +21,10 @@ body {
   text-rendering: optimizeLegibility;
   letter-spacing: -0.01em;
   background-image:
-    radial-gradient(ellipse 900px 620px at 12% -5%,  rgba(47,128,255,0.30) 0%, transparent 56%),
-    radial-gradient(ellipse 820px 600px at 88% 6%,   rgba(153,69,255,0.22) 0%, transparent 54%),
-    radial-gradient(ellipse 700px 500px at 70% 40%,  rgba(255,197,61,0.05) 0%, transparent 50%),
-    radial-gradient(ellipse 1100px 760px at 50% 118%, rgba(47,128,255,0.18) 0%, transparent 56%),
-    linear-gradient(165deg, #000000 0%, #030818 48%, #000510 100%);
+    radial-gradient(ellipse 900px 620px at 12% -5%,  rgba(47,128,255,0.14) 0%, transparent 56%),
+    radial-gradient(ellipse 820px 600px at 88% 6%,   rgba(153,69,255,0.10) 0%, transparent 54%),
+    radial-gradient(ellipse 1100px 760px at 50% 118%, rgba(47,128,255,0.08) 0%, transparent 56%),
+    linear-gradient(180deg, #000000 0%, #010308 100%);
   background-attachment: fixed;
 }
 
@@ -41,17 +40,16 @@ h1, h2, h3, .font-display { font-family: 'Sora', 'Plus Jakarta Sans', sans-serif
 @layer components {
   .card {
     @apply rounded-2xl border;
-    background: linear-gradient(150deg, rgba(47,128,255,0.08) 0%, rgba(153,69,255,0.045) 55%, rgba(255,197,61,0.03) 100%);
-    background-color: rgba(5,10,24,0.82);
-    border-color: rgba(47,128,255,0.18);
-    backdrop-filter: blur(22px) saturate(140%);
-    -webkit-backdrop-filter: blur(22px) saturate(140%);
-    box-shadow: 0 10px 40px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.06) inset;
+    background: rgba(2,4,12,0.92);
+    border-color: rgba(47,128,255,0.16);
+    backdrop-filter: blur(22px) saturate(130%);
+    -webkit-backdrop-filter: blur(22px) saturate(130%);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(47,128,255,0.06) inset;
     transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
   }
   .card:hover {
-    border-color: rgba(47,128,255,0.4);
-    box-shadow: 0 16px 56px rgba(47,128,255,0.16), 0 0 0 1px rgba(47,128,255,0.1) inset;
+    border-color: rgba(47,128,255,0.38);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.7), 0 0 20px rgba(47,128,255,0.10) inset;
   }
   .btn { @apply px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200; }
   .pill { @apply px-2.5 py-1 rounded-full text-xs font-bold; }

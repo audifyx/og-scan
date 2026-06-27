@@ -34,13 +34,14 @@ function FeaturedCard({ f, onClick }: { f: Listing; onClick: () => void }) {
       {/* Always-on dark base so text stays readable even if art is blank/transparent */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#15151c] via-[#0d0d12] to-[#15151c]" />
 
-      {/* Art layer: banner if present, else the token logo blurred to fill */}
+      {/* Art layer: banner if present, else logo shown clean centered — never blurred */}
       {bannerUrl ? (
         <img src={bannerUrl} loading="lazy" referrerPolicy="no-referrer" onError={() => setBannerErr(true)}
           className="absolute inset-0 w-full h-full object-cover" />
       ) : logoBig ? (
+        /* No blur — show the logo sharp, centered, contained */
         <img src={logoBig} loading="lazy" referrerPolicy="no-referrer" onError={() => setLogoErr(true)}
-          aria-hidden className="absolute inset-0 w-full h-full object-cover scale-150 blur-xl opacity-70" />
+          aria-hidden className="absolute inset-0 w-full h-full object-contain p-4 opacity-30" />
       ) : null}
 
       {/* Readability overlay */}
