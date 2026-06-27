@@ -12,7 +12,8 @@ import KolWhaleActivity from "../components/KolWhaleActivity";
 import { getKolDirectory, KolDirEntry } from "../lib/kol";
 import { buildHolderIntel } from "../lib/holderIntel";
 import { getWalletLabel, labelKindClass } from "../lib/labels";
-import PriceChart from "../components/PriceChart";
+import CandleChart from "../components/CandleChart";
+import BundleSniper from "../components/BundleSniper";
 import TradePanel from "../components/TradePanel";
 import TrustPanel from "../components/TrustPanel";
 import PredictiveIntel from "../components/PredictiveIntel";
@@ -90,7 +91,7 @@ export default function TokenDetail() {
   const [d, setD] = useState<TokenDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [tab, setTab] = useState<"overview" | "chat" | "predictive" | "smartmoney" | "kolwhale" | "holders" | "trades" | "xray" | "forensics">("overview");
+  const [tab, setTab] = useState<"overview" | "chat" | "predictive" | "smartmoney" | "kolwhale" | "bundles" | "holders" | "trades" | "xray" | "forensics">("overview");
   const [forensics, setForensics] = useState<ForensicsData | null>(null);
   const [forLoading, setForLoading] = useState(true);
   const [xray, setXray] = useState<XrayReport | null>(null);
@@ -156,6 +157,7 @@ export default function TokenDetail() {
     ["predictive", "Predictive"],
     ["smartmoney", "Smart Money"],
     ["kolwhale",   "KOL & Whale"],
+    ["bundles",    "⚡ Bundles"],
     ["holders",    `Holders${holders.length ? ` (${holders.length})` : ""}`],
     ["trades",     `Live Trades${trades.length ? ` (${trades.length})` : ""}`],
     ["xray",       "🩻 Risk X-ray"],
@@ -310,7 +312,7 @@ export default function TokenDetail() {
       {/* Chart + Trade */}
       <div className="grid gap-3 lg:grid-cols-3">
         <div className={(meta.chain || "solana") === "solana" ? "lg:col-span-2" : "lg:col-span-3"}>
-          <PriceChart mint={mint} symbol={symbol} chain={(meta.chain || "solana")} />
+          <CandleChart mint={mint} symbol={symbol} chain={(meta.chain || "solana")} />
         </div>
         {(meta.chain || "solana") === "solana" && (
           <div id="trade" className="lg:col-span-1 scroll-mt-20">
@@ -351,6 +353,7 @@ export default function TokenDetail() {
         {tab === "predictive" && <PredictiveIntel d={d} />}
         {tab === "smartmoney" && <CapitalFlow d={d} />}
         {tab === "kolwhale"   && <KolWhaleActivity d={d} dir={dir} />}
+        {tab === "bundles"    && <BundleSniper forensics={forensics} holders={holders} trades={trades} />}
         {tab === "holders"    && <><HolderIntel holders={holders} safety={safety} dir={dir} /><HoldersTable holders={holders} price={price} dir={dir} /></>}
         {tab === "trades"     && <TradesTable trades={trades} mint={mint} dir={dir} onRefresh={() => getToken(mint).then(setD)} />}
         {tab === "xray"       && <RiskXray x={xray} loading={xrayLoading} />}
