@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useWallet } from "../lib/wallet";
 import { getWallet, getSwaps, WalletPortfolio, WalletHolding, WalletTrade, fmtUsd, compact, short, isWatched, toggleWatch } from "../lib/api";
 import { timeAgo } from "../lib/format";
@@ -13,6 +13,7 @@ const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export default function Wallet() {
   const { address = "" } = useParams();
+  const nav = useNavigate();
   const [d, setD] = useState<WalletPortfolio | null>(null);
   const [loading, setLoading] = useState(true);
   const [watched, setWatched] = useState(false);
@@ -160,7 +161,7 @@ export default function Wallet() {
                   );
                   return (h as any).isSol
                     ? <tr key={h.mint} className="border-b border-line/50">{inner}</tr>
-                    : <tr key={h.mint} className="border-b border-line/50 hover:bg-panel2/40 cursor-pointer" onClick={() => (window.location.href = `/token/${h.mint}`)}>{inner}</tr>;
+                    : <tr key={h.mint} className="border-b border-line/50 hover:bg-panel2/40 cursor-pointer" onClick={() => nav(`/token/${h.mint}`)}>{inner}</tr>;
                 })}
               </tbody>
             </table>
@@ -186,7 +187,7 @@ export default function Wallet() {
               </tr></thead>
               <tbody>
                 {(d.pnl.perToken || []).filter((t) => (t.closedTrades || 0) > 0 || t.open).slice(0, 30).map((t) => (
-                  <tr key={t.mint} className="border-b border-line/50 hover:bg-panel2/40 cursor-pointer" onClick={() => (window.location.href = `/token/${t.mint}`)}>
+                  <tr key={t.mint} className="border-b border-line/50 hover:bg-panel2/40 cursor-pointer" onClick={() => nav(`/token/${t.mint}`)}>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <TokenLogo src={t.image} sym={t.symbol || ""} size={26} />
