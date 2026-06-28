@@ -1,8 +1,136 @@
 {
-  "buildCommand": "npm run build && npm --prefix ogdex install --no-audit --no-fund && npm --prefix ogdex run build",
-  "functions": {
-    "api/**/*.js": {
-      "maxDuration": 30
+  "rewrites": [
+    {
+      "source": "/ai-fn/(.*)",
+      "destination": "https://ffjipnkhcebjvttliptb.supabase.co/functions/v1/$1"
+    },
+    {
+      "source": "/api/ogdex/(.*)",
+      "destination": "/api/ogdex?path=$1"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/share/:mint",
+      "destination": "/api/share?mint=:mint"
+    },
+    {
+      "source": "/sharew/:address",
+      "destination": "/api/share-wallet?address=:address"
+    },
+    {
+      "source": "/ORBITX_DEX",
+      "destination": "/ORBITX_DEX/index.html"
+    },
+    {
+      "source": "/ORBITX_DEX/(.*)",
+      "destination": "/ORBITX_DEX/index.html"
+    },
+    {
+      "source": "/",
+      "destination": "/app.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/app.html"
     }
-  }
+  ],
+  "headers": [
+    {
+      "source": "/ORBITX_DEX/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/ORBITX_DEX",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/ORBITX_DEX/((?!assets/).*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/embed/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "ALLOWALL"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors *"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type"
+        }
+      ]
+    },
+    {
+      "source": "/u/:username/widget",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "ALLOWALL"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors *"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        }
+      ]
+    }
+  ]
 }
