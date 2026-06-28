@@ -425,12 +425,12 @@ const css = `
 }
 
 .desktop-body {
-  position: relative; z-index: 10; flex: 1; padding: 40px;
-  display: flex; flex-direction: column; align-items: flex-end;
+  position: relative; z-index: 10; flex: 1; padding: 32px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 .app-grid {
-  display: flex; flex-direction: column; gap: 28px;
-  align-items: center; width: 80px;
+  display: flex; flex-direction: row; flex-wrap: wrap; gap: 28px;
+  align-items: flex-end; justify-content: center; max-width: 900px;
 }
 .desktop-icon-wrapper {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
