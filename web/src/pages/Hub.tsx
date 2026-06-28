@@ -102,18 +102,22 @@ export default function Hub() {
   const { signOut } = useAuth();
   const logout = async () => { try { await signOut(); } finally { window.location.assign("/auth"); } };
 
-  // boot sequence
+  // boot sequence - skip animation if already booted
   useEffect(() => {
-    if (sessionStorage.getItem("ogos_booted")) { setBooted(true); return; }
+    if (sessionStorage.getItem("ogos_booted")) { 
+      setBooted(true); 
+      setBootStep(BOOT_LINES.length);
+      return; 
+    }
     let i = 0;
     const tick = setInterval(() => {
       i += 1;
       setBootStep(i);
       if (i >= BOOT_LINES.length) {
         clearInterval(tick);
-        setTimeout(() => { sessionStorage.setItem("ogos_booted", "1"); setBooted(true); }, 600);
+        setTimeout(() => { sessionStorage.setItem("ogos_booted", "1"); setBooted(true); }, 300);
       }
-    }, 360);
+    }, 80); // Faster boot sequence to reduce lag
     return () => clearInterval(tick);
   }, []);
 
