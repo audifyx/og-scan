@@ -1,85 +1,70 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import logo from "@/assets/logo.png";
 
-// Brand name — OrbitX for now (rename later).
-const BRAND = "OrbitX";
+const HERO_SLIDES = [
+  { src: "/ogscan-splash-banner.jpg", label: "Platform", accent: "#2F80FF" },
+  { src: "/ogscan-shot-screener.jpg", label: "Screener", accent: "#14E0C8" },
+  { src: "/ogscan-shot-scanner.jpg", label: "Scanner", accent: "#9945FF" },
+  { src: "/ogscan-shot-track.jpg", label: "Tracking", accent: "#FFC53D" },
+];
 
+const SHOWCASE_ITEMS = [
+  { src: "/ogscan-shot-deck.jpg", label: "Dashboard", caption: "Command center", accent: "#2F80FF" },
+  { src: "/ogscan-shot-screener.jpg", label: "Screener", caption: "Live pairs", accent: "#14E0C8" },
+  { src: "/ogscan-shot-mobile.jpg", label: "Mobile", caption: "On the go", accent: "#9945FF" },
+  { src: "/ogscan-shot-track.jpg", label: "Tracker", caption: "Smart money", accent: "#FFC53D" },
+];
+
+const BRAND = "OG Scan";
 const LINKS = {
   app: "/ORBITX_DEX",
-  auth: "/auth",
   signin: "/auth?mode=signin",
   signup: "/auth?mode=signup",
   telegram: "https://t.me/ogscan",
-  x: "https://x.com/orbitx_wrldbackup",
-  xOrbitXPredictionMarket: "https://x.com/orbitx-predictionbet",
-  ogdex: "/ORBITX_DEX",
-  orbitxPrediction: "https://orbitx-prediction.fun",
-  degen: "https://degen-tower.vercel.app",
+  x: "https://x.com/ogscan",
   privacy: "/privacy",
   terms: "/terms",
 };
 
-type Feature = { tag: string; title: string; copy: string; tone: string };
-const FEATURES: Feature[] = [
-  { tag: "Discovery", title: "Intelligent token discovery", tone: "f1",
-    copy: "Real-time multi-chain scanner with a proprietary OG Score — on-chain metrics, holder quality, momentum and AI signals. Trending, hidden gems and about-to-explode, powered by live data." },
-  { tag: "Wallet forensics", title: "Track smart money like a pro", tone: "f2",
-    copy: "Any wallet's full history, win rate, hold time and PnL. Smart-money and KOL labels (Ansem, blknoiz06 + 37 more mapped), whale alerts and full holder lists with one-click actions." },
-  { tag: "OG DEX", title: "Blazing-fast trading & execution", tone: "f3",
-    copy: "Live orderbook-style screener, one-click trading with Phantom, real-time buy/sell feeds, advanced charts with on-chain overlays and portfolio across every wallet." },
-  { tag: "Launch", title: "Fair-launch & token tools", tone: "f4",
-    copy: "Simple, powerful token creation with anti-rug safeguards, auto-listing on our DEX + aggregators, and post-launch monitoring with community tools baked in from minute one." },
-  { tag: "OrbitX Prediction Market", title: "Prediction markets & 1v1 games", tone: "f5",
-    copy: "Native prediction markets plus Coinflip, Dice, Crash and Plinko with provably-fair, on-chain settlement — wired into your OrbitX insights, with leaderboards and achievements." },
-  { tag: "Social", title: "Community & social layer", tone: "f6",
-    copy: "Host Twitter Spaces with token context, voice lobbies, per-token chat and updates, creator tools, and a cross-platform identity that follows you across trading, gaming and social." },
-  { tag: "AI", title: "AI-powered intelligence", tone: "f7",
-    copy: "Ask: 'which wallets bought $TOKEN in the last 30 min?' or 'top smart-money accumulating now?' Natural-language queries across all on-chain data, with automated reports and alerts." },
-  { tag: "Gaming", title: "Degen Tower & entertainment", tone: "f8",
-    copy: "Tap-to-earn with real USDC payouts, combos, upgrades and leaderboards — plus future games where in-game actions have on-chain consequences and rewards." },
-  { tag: "Developers", title: "Creator & developer tools", tone: "f9",
-    copy: "Webhooks and a bot framework, API access for power users, white-label community builds and monetization for projects — featured listings, premium analytics, promoted Spaces." },
-];
-
-const PHASES = [
-  { k: "Phase 1", t: "Now", d: "Core intelligence + trading + social/gaming primitives." },
-  { k: "Phase 2", t: "Near-term", d: "Deep KOL/smart-money tools, AI analyst, voice lobbies, Spaces, expanded predictions, creator monetization." },
-  { k: "Phase 3", t: "Coming", d: "Full social graph, on-chain identity, cross-platform reputation, copy-trading automation, multi-chain, mobile." },
-  { k: "Phase 4", t: "Vision", d: "The default operating system for anyone serious about on-chain crypto." },
-];
-
-const FOR = [
-  "Degens who want better tools than everyone else",
-  "Serious traders tired of fragmented data",
-  "KOLs & creators who want to own their community",
-  "New projects that want a real home base",
-  "Power users who want APIs, webhooks & bots",
-  "Casual users who want one clean place to trade, play & hang out",
+const FEATURES = [
+  { title: "Multi-chain scanner", desc: "Forensic scanning across 16 blockchains with OG Score, holder quality, and risk flags.", img: "/ogscan-shot-scanner.jpg", tag: "Scan", accent: "#2F80FF" },
+  { title: "Live screener", desc: "Orderbook-style screener with trending pairs, launches, and advanced filters.", img: "/ogscan-shot-screener.jpg", tag: "Trade", accent: "#14E0C8" },
+  { title: "Smart money tracker", desc: "Top wallet PnL, win rate, timing patterns. KOL labels mapped in real-time.", img: "/ogscan-shot-track.jpg", tag: "Alpha", accent: "#9945FF" },
+  { title: "Portfolio dashboard", desc: "Unified holdings across every wallet. See everything in one live view.", img: "/ogscan-shot-deck.jpg", tag: "Portfolio", accent: "#FFC53D" },
+  { title: "AI analyst", desc: "Natural language queries. Ask anything about any token or wallet.", img: "/ogscan-splash-banner.jpg", tag: "AI", accent: "#14a0ff" },
+  { title: "Reports & exports", desc: "Generate branded PDF reports with charts, metrics, and AI insights.", img: "/ogscan-shot-deck.jpg", tag: "Reports", accent: "#ff6bd0" },
 ];
 
 export default function Splash() {
   const heroRef = useRef<HTMLDivElement>(null);
+  const [slide, setSlide] = useState(0);
+  const [ready, setReady] = useState(false);
+  const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    const io = new IntersectionObserver(
-      (es) => es.forEach((e) => e.isIntersecting && e.target.classList.add("in")),
-      { threshold: 0.14 }
-    );
-    document.querySelectorAll<HTMLElement>(".reveal").forEach((el) => io.observe(el));
-    return () => io.disconnect();
+    const t = setTimeout(() => setReady(true), 60);
+    const cycle = setInterval(() => setSlide((s) => (s + 1) % HERO_SLIDES.length), 5000);
+    return () => { clearTimeout(t); clearInterval(cycle); };
   }, []);
 
   useEffect(() => {
     const onScroll = () => {
-      const y = window.scrollY;
-      if (heroRef.current) {
-        heroRef.current.style.setProperty("--py", `${y * 0.25}px`);
-        heroRef.current.style.setProperty("--pf", `${Math.max(0, 1 - y / 560)}`);
-      }
-      document.querySelector(".sp-nav")?.classList.toggle("scrolled", y > 24);
+      document.querySelector(".sp-nav")?.classList.toggle("scrolled", window.scrollY > 24);
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!heroRef.current) return;
+      setMouse({
+        x: (e.clientX / window.innerWidth - 0.5) * 2,
+        y: (e.clientY / window.innerHeight - 0.5) * 2,
+      });
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("mousemove", onMove);
+    };
   }, []);
 
   return (
@@ -101,26 +86,76 @@ export default function Splash() {
       </nav>
 
       {/* HERO */}
-      <header className="sp-hero" ref={heroRef}>
+      <header className={`sp-hero ${heroReady ? "sp-hero-ready" : ""}`} ref={heroRef}>
         <div className="sp-hero-bg" aria-hidden>
-          <div className="sp-hero-photo" />
+          {HERO_FRAMES.map((frame, i) => (
+            <div
+              key={frame.src}
+              className={`sp-hero-photo ${i === heroFrame ? "is-active" : ""}`}
+              style={{ backgroundImage: `url(${frame.src})` }}
+            />
+          ))}
+          <div className="sp-hero-flash" />
           <div className="orb orb-a" /><div className="orb orb-b" /><div className="orb orb-c" />
           <div className="grid-fade" />
+          <div className="sp-hero-scan" />
+          <div className="sp-hero-noise" />
         </div>
-        <div className="sp-hero-inner">
-          <p className="sp-eyebrow">{BRAND} · Reimagined</p>
-          <h1 className="sp-h1">One platform.<br/>One ecosystem.<br/><span>One place.</span></h1>
-          <p className="sp-lead">
-            Crypto tooling is a sea of clones and disconnected tabs. We&apos;re building the
-            everything app for on-chain — trading, launching, intelligence, community,
-            prediction markets and games in a single destination, powered by real on-chain
-            data and AI that understands what you&apos;re trying to do.
-          </p>
-          <div className="sp-hero-actions">
-            <a className="btn-primary" href={LINKS.signup}>Sign up</a>
-            <a className="btn-ghost" href={LINKS.signin}>Sign in →</a>
+
+        <div className="sp-hero-layout">
+          <div className="sp-hero-inner">
+            <div className="sp-hero-badge">
+              <img src={logo} alt="" width={28} height={28} className="sp-hero-logo" />
+              <p className="sp-eyebrow">{BRAND} · Reimagined</p>
+            </div>
+            <h1 className="sp-h1" data-text="One platform. One ecosystem. One place.">
+              One platform.<br/>One ecosystem.<br/><span>One place.</span>
+            </h1>
+            <p className="sp-lead">
+              Crypto tooling is a sea of clones and disconnected tabs. We&apos;re building the
+              everything app for on-chain — trading, launching, intelligence, community,
+              prediction markets and games in a single destination, powered by real on-chain
+              data and AI that understands what you&apos;re trying to do.
+            </p>
+            <div className="sp-hero-actions">
+              <a className="btn-primary" href={LINKS.signup}>Sign up</a>
+              <a className="btn-ghost" href={LINKS.signin}>Sign in →</a>
+            </div>
+          </div>
+
+          <div className="sp-showcase" aria-hidden>
+            <div className="sp-showcase-stage">
+              {HERO_FRAMES.map((frame, i) => (
+                <div
+                  key={frame.label}
+                  className={`sp-showcase-card ${i === heroFrame ? "is-active" : ""} ${i === (heroFrame + 1) % HERO_FRAMES.length ? "is-next" : ""}`}
+                  style={{ ["--accent" as string]: frame.accent }}
+                >
+                  <div className="sp-showcase-frame">
+                    <img src={frame.src} alt="" className="sp-showcase-img" />
+                    <div className="sp-showcase-ui">
+                      <span className="sp-showcase-dot" />
+                      <span className="sp-showcase-bar" />
+                      <span className="sp-showcase-bar short" />
+                    </div>
+                    <div className="sp-showcase-meta">
+                      <strong>{frame.label}</strong>
+                      <span>{frame.caption}</span>
+                    </div>
+                    <div className="sp-showcase-shine" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="sp-showcase-dots">
+              {HERO_FRAMES.map((frame, i) => (
+                <span key={frame.label} className={`sp-showcase-pip ${i === heroFrame ? "is-active" : ""}`} style={{ ["--accent" as string]: frame.accent }} />
+              ))}
+            </div>
+            <div className="sp-showcase-glow" style={{ ["--accent" as string]: HERO_FRAMES[heroFrame].accent }} />
           </div>
         </div>
+
         <div className="scroll-hint" aria-hidden><span /></div>
       </header>
 
@@ -132,6 +167,21 @@ export default function Splash() {
           ))}
         </div>
       </div>
+
+      {/* PLATFORM SHOWCASE STRIP */}
+      <section className="sp-strip reveal" aria-label="Platform preview">
+        <div className="sp-strip-track">
+          {[...HERO_FRAMES, ...HERO_FRAMES].map((frame, i) => (
+            <div key={`${frame.label}-${i}`} className="sp-strip-card" style={{ ["--accent" as string]: frame.accent }}>
+              <img src={frame.src} alt="" className="sp-strip-img" loading="lazy" />
+              <div className="sp-strip-overlay">
+                <span>{frame.label}</span>
+                <small>{frame.caption}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* PROBLEM */}
       <section id="problem" className="sp-sec reveal">
@@ -268,22 +318,68 @@ const css = `
 .sp-cta:hover{filter:brightness(1.08);transform:translateY(-1px);}
 @media(max-width:880px){.sp-links{display:none}}
 @media(max-width:520px){.btn-ghost.sm{display:none}}
-.sp-hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:130px 20px 80px;overflow:hidden;}
+.sp-hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:130px clamp(18px,5vw,52px) 80px;overflow:hidden;}
+.sp-hero-ready .sp-hero-inner,.sp-hero-ready .sp-showcase{animation:spHeroIn 1.1s cubic-bezier(.2,.7,.2,1) .15s both;}
+.sp-hero-layout{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(24px,4vw,56px);width:min(1180px,100%);align-items:center;}
+@media(max-width:980px){.sp-hero-layout{grid-template-columns:1fr;text-align:center}.sp-showcase{display:none}.sp-hero-inner{max-width:1000px;margin:0 auto}}
 .sp-hero-bg{position:absolute;inset:0;z-index:0;}
-.sp-hero-photo{position:absolute;inset:0;background:url(/bg/bg-earth.jpg) center/cover no-repeat;opacity:.6;filter:saturate(1.08);animation:heroDrift 30s ease-in-out infinite alternate;}
+.sp-hero-photo{position:absolute;inset:0;background-position:center;background-size:cover;background-repeat:no-repeat;opacity:0;transform:scale(1.08);filter:saturate(1.08);transition:opacity 1.2s ease,transform 8s ease;}
+.sp-hero-photo.is-active{opacity:.62;animation:heroDrift 24s ease-in-out infinite alternate;}
 .sp-hero-photo::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 32%,transparent 26%,rgba(5,6,8,.72) 82%),linear-gradient(180deg,rgba(5,6,8,.34),rgba(5,6,8,.62) 55%,#050608);}
-@keyframes heroDrift{from{transform:scale(1.05)}to{transform:scale(1.14) translateY(-2%)}}
-.orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;transform:translateY(var(--py,0));}
-.orb-a{width:540px;height:540px;top:-140px;left:-80px;background:radial-gradient(circle,#2F80FF,transparent 70%);}
-.orb-b{width:560px;height:560px;top:-60px;right:-120px;background:radial-gradient(circle,#9945FF,transparent 70%);}
-.orb-c{width:520px;height:520px;bottom:-180px;left:38%;background:radial-gradient(circle,#14a0ff,transparent 70%);opacity:.32;}
+.sp-hero-flash{position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,rgba(47,128,255,.35),transparent 58%);opacity:0;animation:spHeroFlash 1.4s ease-out .1s forwards;}
+.sp-hero-scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom,rgba(255,255,255,.03) 0 1px,transparent 1px 4px);mix-blend-mode:overlay;opacity:.45;animation:spHeroScan 8s linear infinite;}
+.sp-hero-noise{position:absolute;inset:0;opacity:.04;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+@keyframes heroDrift{from{transform:scale(1.05) translate3d(0,0,0)}to{transform:scale(1.16) translate3d(-1.5%,-2%,0)}}
+@keyframes spHeroFlash{0%{opacity:0}20%{opacity:.55}100%{opacity:0}}
+@keyframes spHeroScan{to{background-position:0 240px}}
+@keyframes spHeroIn{from{opacity:0;transform:translateY(36px) scale(.98)}to{opacity:1;transform:none}}
+.orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;transform:translate3d(var(--mx,0),calc(var(--py,0) + var(--my,0)),0);transition:transform .5s ease-out;}
+.orb-a{width:540px;height:540px;top:-140px;left:-80px;background:radial-gradient(circle,#2F80FF,transparent 70%);animation:spOrbDrift 18s ease-in-out infinite;}
+.orb-b{width:560px;height:560px;top:-60px;right:-120px;background:radial-gradient(circle,#9945FF,transparent 70%);animation:spOrbDrift 22s ease-in-out infinite reverse;}
+.orb-c{width:520px;height:520px;bottom:-180px;left:38%;background:radial-gradient(circle,#14a0ff,transparent 70%);opacity:.32;animation:spOrbDrift 26s ease-in-out infinite;}
+@keyframes spOrbDrift{50%{transform:translate3d(calc(var(--mx,0px) + 24px),calc(var(--py,0px) + var(--my,0px) + 18px),0) scale(1.08)}}
 .grid-fade{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:radial-gradient(circle at 50% 32%,#000,transparent 70%);mask-image:radial-gradient(circle at 50% 32%,#000,transparent 70%);}
-.sp-hero-inner{position:relative;z-index:1;max-width:1000px;opacity:var(--pf,1);}
-.sp-eyebrow{font-size:12.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:0 0 20px;}
-.sp-h1{margin:0;font-size:clamp(46px,9vw,108px);line-height:.96;letter-spacing:-.04em;font-weight:800;}
+.sp-hero-inner{position:relative;max-width:640px;opacity:var(--pf,1);text-align:left;}
+@media(max-width:980px){.sp-hero-inner{text-align:center}}
+.sp-hero-badge{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+@media(max-width:980px){.sp-hero-badge{justify-content:center}}
+.sp-hero-logo{border-radius:10px;box-shadow:0 10px 30px -12px rgba(47,128,255,.65);animation:spLogoFloat 4s ease-in-out infinite;}
+@keyframes spLogoFloat{50%{transform:translateY(-4px)}}
+.sp-eyebrow{font-size:12.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:0;}
+.sp-h1{margin:0;font-size:clamp(42px,7.5vw,92px);line-height:.96;letter-spacing:-.04em;font-weight:800;position:relative;}
 .sp-h1 span{background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
-.sp-lead{margin:28px auto 0;max-width:62ch;font-size:clamp(15.5px,1.7vw,19px);line-height:1.6;color:var(--muted);}
-.sp-hero-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:36px;}
+.sp-h1::before,.sp-h1::after{content:attr(data-text);position:absolute;inset:0;pointer-events:none;opacity:0;}
+.sp-hero-ready .sp-h1::before{color:#2F80FF;opacity:.55;animation:spGlitchR 4.5s steps(1) infinite;clip-path:inset(0 0 58% 0);}
+.sp-hero-ready .sp-h1::after{color:#9945FF;opacity:.45;animation:spGlitchB 4.5s steps(1) infinite;clip-path:inset(42% 0 0 0);}
+@keyframes spGlitchR{0%,93%,100%{transform:translate(0)}94%{transform:translate(-4px,1px)}96%{transform:translate(2px,-1px)}}
+@keyframes spGlitchB{0%,91%,100%{transform:translate(0)}92%{transform:translate(4px,-1px)}95%{transform:translate(-3px,1px)}}
+.sp-lead{margin:28px 0 0;font-size:clamp(15.5px,1.7vw,19px);line-height:1.6;color:var(--muted);max-width:62ch;}
+@media(max-width:980px){.sp-lead{margin-left:auto;margin-right:auto}}
+.sp-hero-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:36px;}
+@media(max-width:980px){.sp-hero-actions{justify-content:center}}
+.sp-showcase{position:relative;min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;perspective:1200px;}
+.sp-showcase-stage{position:relative;width:min(260px,62vw);height:min(420px,68vh);}
+.sp-showcase-card{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transform:translate3d(60px,20px,-120px) rotateY(-28deg) scale(.88);filter:blur(6px);transition:opacity .7s ease,transform .8s cubic-bezier(.2,.8,.2,1),filter .7s ease;pointer-events:none;}
+.sp-showcase-card.is-active{opacity:1;transform:translate3d(0,0,0) rotateY(-8deg) scale(1);filter:blur(0);z-index:3;}
+.sp-showcase-card.is-next{opacity:.35;transform:translate3d(40px,12px,-80px) rotateY(-18deg) scale(.92);filter:blur(2px);z-index:2;}
+.sp-showcase-frame{position:relative;width:100%;height:100%;border-radius:22px;overflow:hidden;border:1px solid rgba(255,255,255,.14);background:#0a0c14;box-shadow:0 30px 80px -30px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.06) inset,0 0 40px -10px var(--accent);animation:spCardFloat 5s ease-in-out infinite;}
+.sp-showcase-card.is-active .sp-showcase-frame{animation:spCardFloat 5s ease-in-out infinite,spCardPulse 4.2s ease-in-out infinite;}
+@keyframes spCardFloat{50%{transform:translateY(-10px)}}
+@keyframes spCardPulse{50%{box-shadow:0 34px 90px -28px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.08) inset,0 0 50px -6px var(--accent)}}
+.sp-showcase-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1.08);}
+.sp-showcase-dots{display:flex;gap:8px;margin-top:18px;}
+.sp-showcase-pip{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.18);transition:transform .3s ease,background .3s ease,box-shadow .3s ease;}
+.sp-showcase-pip.is-active{background:var(--accent);transform:scale(1.25);box-shadow:0 0 14px var(--accent);}
+.sp-showcase-ui{position:absolute;top:14px;left:14px;right:14px;display:flex;align-items:center;gap:8px;}
+.sp-showcase-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);}
+.sp-showcase-bar{flex:1;height:6px;border-radius:999px;background:rgba(255,255,255,.12);}
+.sp-showcase-bar.short{flex:0 0 28%;}
+.sp-showcase-meta{position:absolute;left:0;right:0;bottom:0;padding:16px 14px 14px;background:linear-gradient(to top,rgba(5,6,8,.92),transparent);display:flex;flex-direction:column;gap:4px;}
+.sp-showcase-meta strong{font-size:13px;letter-spacing:.08em;text-transform:uppercase;}
+.sp-showcase-meta span{font-size:11px;color:var(--muted);}
+.sp-showcase-shine{position:absolute;inset:0;background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.16) 50%,transparent 58%);transform:translateX(-120%);animation:spShine 3.2s ease-in-out infinite;}
+@keyframes spShine{0%,35%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+.sp-showcase-glow{position:absolute;inset:20% 10%;border-radius:50%;background:radial-gradient(circle,var(--accent),transparent 68%);filter:blur(60px);opacity:.35;transition:background .8s ease;}
 .btn-primary{font-weight:700;font-size:16px;color:#000;padding:14px 28px;border-radius:980px;background:linear-gradient(120deg,var(--accent),var(--accent2));box-shadow:0 16px 34px -12px rgba(47,128,255,.8);transition:transform .15s,filter .2s;}
 .btn-primary:hover{filter:brightness(1.08);transform:translateY(-2px);}
 .btn-primary.lg{font-size:18px;padding:17px 38px;}
@@ -296,6 +392,19 @@ const css = `
 .sp-marquee{border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden;padding:16px 0;background:rgba(255,255,255,.02);}
 .sp-marquee .track{display:flex;white-space:nowrap;gap:24px;animation:mq 32s linear infinite;font-size:14.5px;color:#7e879a;font-weight:600;}
 @keyframes mq{to{transform:translateX(-50%)}}
+.sp-strip{overflow:hidden;padding:28px 0;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);}
+.sp-strip-track{display:flex;gap:18px;width:max-content;animation:spStrip 38s linear infinite;padding:0 18px;}
+.sp-strip-track:hover{animation-play-state:paused;}
+@keyframes spStrip{to{transform:translateX(-50%)}}
+.sp-strip-card{position:relative;width:220px;aspect-ratio:16/10;border-radius:16px;overflow:hidden;border:1px solid var(--line);flex-shrink:0;transition:transform .35s ease,border-color .35s ease;}
+.sp-strip-card:hover{transform:translateY(-6px) scale(1.03);border-color:rgba(47,128,255,.45);}
+.sp-strip-img{width:100%;height:100%;object-fit:cover;transform:scale(1.05);transition:transform .6s ease;}
+.sp-strip-card:hover .sp-strip-img{transform:scale(1.12);}
+.sp-strip-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:14px;background:linear-gradient(to top,rgba(5,6,8,.92),rgba(5,6,8,.15));gap:4px;}
+.sp-strip-overlay span{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#fff;}
+.sp-strip-overlay small{font-size:11px;color:var(--muted);}
+.sp-strip-card::after{content:"";position:absolute;top:0;left:-120%;width:60%;height:100%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.12),transparent);animation:spStripShine 4s ease-in-out infinite;}
+@keyframes spStripShine{0%,40%{left:-120%}100%{left:140%}}
 .sp-sec{max-width:1100px;margin:0 auto;padding:clamp(64px,10vw,130px) clamp(18px,5vw,40px);}
 .sp-kicker{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);padding:6px 14px;border-radius:980px;background:rgba(47,128,255,.1);border:1px solid rgba(47,128,255,.2);}
 .sp-h2{margin:18px 0 0;font-size:clamp(30px,4.6vw,52px);line-height:1.05;letter-spacing:-.03em;font-weight:800;max-width:18ch;}
