@@ -20,7 +20,7 @@ const QUICK_PROMPTS = [
 const GREETING: Message = {
   role: "assistant",
   content:
-    "Hey, I'm OG Scan AI — your Solana trading copilot. Ask me about tokens, wallets, DeFi strategies, risk, or how to use OGScan. What are we digging into?",
+    "Hey, I'm OrbitX AI — your Solana trading copilot. Ask me about tokens, wallets, DeFi strategies, risk, or how to use OrbitX. What are we digging into?",
 };
 
 
@@ -154,7 +154,7 @@ const AlphaChat = () => {
             </div>
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-black uppercase tracking-wide text-white">OG Scan AI</h1>
+             <h1 className="truncate text-base font-black uppercase tracking-wide text-white">OrbitX AI</h1>
             <p className="flex items-center gap-1.5 text-[11px] text-white/40">
               <Zap className="h-3 w-3 text-og-lime" /> NVIDIA Llama 3.3 70B · Solana trading copilot
             </p>
@@ -217,7 +217,7 @@ const AlphaChat = () => {
 
             {!user && (
               <div className="flex items-center gap-2 rounded-xl border border-og-gold/20 bg-og-gold/5 px-4 py-2.5 text-[12px] text-og-gold/90">
-                <AlertTriangle className="h-4 w-4 shrink-0" /> Sign in to chat with OG Scan AI.
+                <AlertTriangle className="h-4 w-4 shrink-0" /> Sign in to chat with OrbitX AI.
               </div>
             )}
           </div>
@@ -245,7 +245,7 @@ const AlphaChat = () => {
             </button>
           </div>
           <p className="mx-auto mt-2 max-w-3xl text-center text-[10px] text-white/20">
-            OG Scan AI can make mistakes. Verify on-chain before trading.
+            OrbitX AI can make mistakes. Verify on-chain before trading.
           </p>
         </div>
       </div>

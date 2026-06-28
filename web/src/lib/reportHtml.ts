@@ -414,7 +414,7 @@ td.pos{color:#22c55e}td.neg{color:#ef4444}.empty{color:var(--muted);text-align:c
       ${aiSection('Holder Analysis', ai.holderAnalysis, '#3b82f6')}
       ${aiSection('Developer Assessment', ai.devAssessment, '#22c55e')}
     </div>
-    <div class="aiflag">✦ Written by OG Scan AI agent (ensemble model team) from on-chain data. Verify independently.</div>
+    <div class="aiflag">✦ Written by OrbitX AI agent (ensemble model team) from on-chain data. Verify independently.</div>
   </div>
 
   <div class="section">
