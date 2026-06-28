@@ -181,7 +181,6 @@ export const AppSidebar = ({
   ];
 
   const communityItems: NavItem[] = [
-    { to: "/games", icon: Gamepad2, label: "Partnerships", eyebrow: "Games · partner apps" },
     { id: "profile", icon: User, label: "Profile", eyebrow: "Your account" },
   ];
 

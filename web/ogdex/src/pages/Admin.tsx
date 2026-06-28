@@ -6,7 +6,7 @@ import {
   Zap, Activity, Plus, ExternalLink, Shield, Bell, Settings, Megaphone,
   ShieldOff, Download, RefreshCw, TrendingUp, AlertTriangle, ChevronRight,
   Globe, ToggleLeft, ToggleRight, Search, Filter, Copy, Flag, Ban,
-  CheckSquare, XSquare, Wallet, LayoutDashboard, List,
+  CheckSquare, XSquare, Wallet, LayoutDashboard, List, Mail,
 } from "lucide-react";
 
 const LS_KEY = "ogdex_admin_pass";
@@ -21,7 +21,8 @@ type Tab =
   | "config"
   | "banners"
   | "banned"
-  | "alerts";
+  | "alerts"
+  | "waitlist";
 
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "overview",     label: "Overview",      icon: LayoutDashboard },
@@ -33,6 +34,7 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "config",       label: "Config",         icon: Settings },
   { id: "banned",       label: "Banned",         icon: Ban },
   { id: "alerts",       label: "Alerts",         icon: Bell },
+  { id: "waitlist",     label: "Waitlist",       icon: Mail },
 ];
 
 // ─── Root ──────────────────────────────────────────────────────────────────────
@@ -137,6 +139,7 @@ export default function Admin() {
       {tab === "config"    && <ConfigTab data={data} act={act} pass={pass} />}
       {tab === "banned"    && <BannedTab data={data} act={act} pass={pass} />}
       {tab === "alerts"    && <AlertsTab data={data} act={act} pass={pass} />}
+      {tab === "waitlist"  && <WaitlistTab data={data} />}
     </div>
   );
 }
@@ -895,6 +898,50 @@ function Stat({ icon: Icon, label, value, accent }: any) {
     <div className={`card p-4 ${accent ? "border-accent/40" : ""}`}>
       <div className="text-xs text-muted flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</div>
       <div className="text-2xl font-bold mt-1">{value ?? "—"}</div>
+    </div>
+  );
+}
+
+
+function WaitlistTab({ data }: { data: any }) {
+  const rows: { id: any; email: string; created_at: string }[] = data?.waitlist || [];
+  const exportCsv = () => {
+    const csv = "email,created_at\n" + rows.map((r) => `${r.email},${r.created_at}`).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a"); a.href = url; a.download = "waitlist.csv"; a.click(); URL.revokeObjectURL(url);
+  };
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-lg font-black text-white">Waitlist</div>
+          <div className="text-xs text-muted">{rows.length} signups · {data?.stats?.waitlist24 ?? 0} in last 24h</div>
+        </div>
+        <button onClick={exportCsv} disabled={!rows.length}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-panel2 px-3 py-2 text-xs font-bold text-white hover:border-accent/40 disabled:opacity-50">
+          <Download className="h-3.5 w-3.5" /> Export CSV
+        </button>
+      </div>
+      {rows.length === 0 ? (
+        <div className="rounded-xl border border-line bg-panel2/60 p-8 text-center text-sm text-muted">No signups yet.</div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-line">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-panel2 text-left text-[11px] uppercase tracking-wider text-muted">
+              <th className="px-4 py-2.5">#</th><th className="px-4 py-2.5">Email</th><th className="px-4 py-2.5 text-right">Joined</th>
+            </tr></thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.id ?? r.email} className="border-t border-line/60">
+                  <td className="px-4 py-2.5 text-muted">{i + 1}</td>
+                  <td className="px-4 py-2.5 font-mono text-white">{r.email}</td>
+                  <td className="px-4 py-2.5 text-right text-muted">{new Date(r.created_at).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

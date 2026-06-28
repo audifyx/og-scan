@@ -69,6 +69,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="kol" element={<Suspense fallback={<PageFallback />}><KolScanner /></Suspense>} />
           <Route path="kol/:address" element={<Suspense fallback={<PageFallback />}><KolProfile /></Suspense>} />
           <Route path="thispageisfordev" element={<Suspense fallback={<PageFallback />}><Admin /></Suspense>} />
+          <Route path="admin" element={<Suspense fallback={<PageFallback />}><Admin /></Suspense>} />
           <Route path="terms" element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
           <Route path="privacy" element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
           <Route path="whitepaper" element={<Suspense fallback={<PageFallback />}><Whitepaper /></Suspense>} />

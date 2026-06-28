@@ -24,7 +24,6 @@ const primaryItems: NavItem[] = [
 ];
 
 const accountItems: NavItem[] = [
-  { to: "/games",         icon: Gamepad2, label: "Partnerships", eyebrow: "Games · partner apps" },
   { to: "/profile",       icon: User,     label: "Profile",      eyebrow: "Your account" },
 ];
 

@@ -245,7 +245,7 @@ const App = () => (
             <Route path="/launch" element={<OgdexRedirect to="/OGDEX/launch" />} />
 
             {/* ── Protected: Admin ── */}
-            <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+            <Route path="/admin" element={<OgdexRedirect to="/OGDEX/admin" />} />
             <Route path="/art" element={<ProtectedRoute><Suspense fallback={null}><ArtFeedPage /></Suspense></ProtectedRoute>} />
 
             {/* ── Public: Project/legal ── */}

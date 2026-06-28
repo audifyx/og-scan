@@ -15,7 +15,6 @@ import { SheetClose } from "@/components/ui/sheet";
 
 
 const mainNavItems = [
-  { to: "/games", icon: Gamepad2, label: "Partnerships" },
   { to: "/communities", icon: Globe2, label: "Communities" },
 ];
 
