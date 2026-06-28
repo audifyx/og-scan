@@ -142,7 +142,7 @@ export default function Splash() {
               <p className="sp-eyebrow">{BRAND} · Reimagined</p>
             </div>
             <h1 className="sp-h1" data-text="One platform. One ecosystem. One place.">
-              One platform.<br/>One ecosystem.<br/><span>One place.</span>
+              One platform.<span className="glitch-overlay">ne</span><br/>One ecosystem.<span className="glitch-overlay">ace</span><br/><span>One place.</span>
             </h1>
             <p className="sp-lead">
               Crypto tooling is a sea of clones and disconnected tabs. We&apos;re building the everything app for on-chain — trading, launching, intelligence, community, prediction markets and games in a single destination, powered by real on-chain data and AI that understands what you&apos;re trying to do.
@@ -332,6 +332,7 @@ const css = `
 .sp-h1{margin:0;font-size:clamp(42px,7.5vw,92px);line-height:.96;letter-spacing:-.04em;font-weight:800;position:relative;text-align:center;}
 @media(max-width:480px){.sp-h1{font-size:clamp(36px,6.5vw,52px);line-height:1.12;letter-spacing:-.02em;}}
 .sp-h1 span{background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
+.glitch-overlay{color:#2F80FF;opacity:.6;font-weight:800;margin-left:-8px;}
 .sp-h1::before,.sp-h1::after{content:attr(data-text);position:absolute;inset:0;pointer-events:none;opacity:0;}
 .sp-hero-ready .sp-h1::before{color:#2F80FF;opacity:.55;animation:spGlitchR 4.5s steps(1) infinite;clip-path:inset(0 0 58% 0);}
 .sp-hero-ready .sp-h1::after{color:#9945FF;opacity:.45;animation:spGlitchB 4.5s steps(1) infinite;clip-path:inset(42% 0 0 0);}
