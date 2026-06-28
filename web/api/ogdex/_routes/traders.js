@@ -1,85 +1,70 @@
-/**
- * /api/ogdex/traders?mint=<mint>
- *
- * Returns top-50 holders (by balance) + top-50 traders (by PnL, 24h window).
- * Both datasets are sourced from Birdeye and enriched with cross-references
- * so holders also show their trading stats when available.
- *
- * Response shape:
- * {
- *   ok: true,
- *   mint: string,
- *   holders: HolderRow[],      // top 50 by balance
- *   traders: TraderRow[],      // top 50 by PnL (24h)
- * }
- *
- * HolderRow: { rank, owner, uiAmount, pct, usdValue?,
- *              buyVol?, sellVol?, realizedPnl?, unrealizedPnl?, netPnl?,
- *              buys?, sells?, tradeCount? }
- *
- * TraderRow: { rank, owner, buys, sells, tradeCount,
- *              buyVol, sellVol, volume,
- *              realizedPnl, unrealizedPnl, netPnl,
- *              isHolder, holdingPct?, holdingAmount? }
- */
-import { send, cache } from "../_lib.js";
+// OG DEX — top holders + top traders for a token. NO Birdeye.
+// Holders: Helius getTokenLargestAccounts (via rpc-proxy). Traders: GeckoTerminal
+// recent pool trades aggregated by wallet (buys/sells/volume). Price: Jupiter.
+import { callFn, send, cache } from "../_lib.js";
 
-const BIRDEYE = "https://public-api.birdeye.so";
-const BIRDEYE_KEY = process.env.BIRDEYE_API_KEY || "";
 const JUP = "https://lite-api.jup.ag";
-
+const GT = "https://api.geckoterminal.com/api/v2";
+const GT_HEADERS = { Accept: "application/json;version=20230302" };
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
-function beHeaders() {
-  return { "X-API-KEY": BIRDEYE_KEY, Accept: "application/json", "x-chain": "solana" };
-}
-
-async function beGet(path) {
-  if (!BIRDEYE_KEY) return null;
+async function rpc(method, params) {
   try {
-    const r = await fetch(`${BIRDEYE}${path}`, { headers: beHeaders() });
-    if (!r.ok) return null;
-    return r.json();
+    const r = await callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params, provider: "helius" });
+    return r?.data?.result ?? r?.result ?? null;
   } catch { return null; }
 }
 
-// Fetch top 50 holders via Birdeye
+// Top holders via Helius largest token accounts, owner-resolved.
 async function fetchHolders(mint) {
-  const d = await beGet(`/defi/token/holder?address=${mint}&offset=0&limit=50&sort_type=desc&sort_by=ui_amount`);
-  // Response: { success, data: { items: [...] } }
-  const items = d?.data?.items || d?.items || [];
-  return items.map((h, i) => ({
-    rank: i + 1,
-    owner: h.owner || h.address || "",
-    uiAmount: num(h.ui_amount ?? h.uiAmount) || 0,
-    pct: num(h.percentage) != null ? num(h.percentage) * 100 : null, // Birdeye 0-1 → %
-    usdValue: null, // enriched below with live price
-  }));
+  const [largest, supply] = await Promise.all([
+    rpc("getTokenLargestAccounts", [mint]),
+    rpc("getTokenSupply", [mint]),
+  ]);
+  const accts = (largest?.value || []).slice(0, 20);
+  const total = num(supply?.value?.uiAmount) || 0;
+  let owners = {};
+  try {
+    const infos = await rpc("getMultipleAccounts", [accts.map((a) => a.address), { encoding: "jsonParsed" }]);
+    (infos?.value || []).forEach((acc, i) => {
+      const o = acc?.data?.parsed?.info?.owner;
+      if (o) owners[accts[i].address] = o;
+    });
+  } catch { /* ignore */ }
+  return accts.map((a, i) => {
+    const amt = num(a.uiAmount) || 0;
+    return { rank: i + 1, owner: owners[a.address] || a.address, uiAmount: amt, pct: total ? (amt / total) * 100 : null, usdValue: null };
+  });
 }
 
-// Fetch top 50 traders via Birdeye (sorted by 24h PnL)
+// Top traders via GeckoTerminal recent trades on the deepest pool.
 async function fetchTraders(mint) {
-  const d = await beGet(`/defi/token/top_traders?address=${mint}&time_frame=24h&sort_type=PnL&sort_by=PnL&limit=50&offset=0`);
-  const items = d?.data?.items || d?.items || [];
-  return items.map((t, i) => ({
-    rank: i + 1,
-    owner: t.address || t.owner || "",
-    buys: num(t.buys) ?? num(t.buy_count) ?? null,
-    sells: num(t.sells) ?? num(t.sell_count) ?? null,
-    tradeCount: num(t.tradeCount) ?? num(t.trade_count) ?? null,
-    buyVol: num(t.buy) ?? num(t.buy_volume) ?? null,
-    sellVol: num(t.sell) ?? num(t.sell_volume) ?? null,
-    volume: num(t.volume) ?? null,
-    realizedPnl: num(t.realizedProfit) ?? num(t.realized_profit) ?? null,
-    unrealizedPnl: num(t.unrealizedProfit) ?? num(t.unrealized_profit) ?? null,
-    netPnl: num(t.pnl) ?? null,
-    isHolder: false, // set below
-    holdingPct: null,
-    holdingAmount: null,
-  }));
+  try {
+    const pr = await fetch(`${GT}/networks/solana/tokens/${mint}/pools?page=1`, { headers: GT_HEADERS });
+    if (!pr.ok) return [];
+    const pd = await pr.json();
+    const pool = pd?.data?.[0]?.attributes?.address;
+    if (!pool) return [];
+    const tr = await fetch(`${GT}/networks/solana/pools/${pool}/trades`, { headers: GT_HEADERS });
+    if (!tr.ok) return [];
+    const td = await tr.json();
+    const agg = new Map();
+    for (const t of td?.data || []) {
+      const a = t.attributes || {};
+      const who = a.tx_from_address;
+      if (!who) continue;
+      const e = agg.get(who) || { owner: who, buys: 0, sells: 0, buyVol: 0, sellVol: 0 };
+      const usd = num(a.volume_in_usd) || 0;
+      if ((a.kind || "").toLowerCase() === "buy") { e.buys++; e.buyVol += usd; } else { e.sells++; e.sellVol += usd; }
+      agg.set(who, e);
+    }
+    return [...agg.values()]
+      .map((e) => ({ ...e, tradeCount: e.buys + e.sells, volume: e.buyVol + e.sellVol, realizedPnl: null, unrealizedPnl: null, netPnl: null, isHolder: false, holdingPct: null, holdingAmount: null }))
+      .sort((a, b) => b.volume - a.volume).slice(0, 50)
+      .map((t, i) => ({ rank: i + 1, ...t }));
+  } catch { return []; }
 }
 
-// Fetch current price from Jupiter
 async function fetchPrice(mint) {
   try {
     const r = await fetch(`${JUP}/price/v3?ids=${mint}`);
@@ -94,46 +79,19 @@ export default async function handler(req, res) {
   const mint = (url.searchParams.get("mint") || "").trim();
   if (!mint) return send(res, 400, { ok: false, error: "mint required" });
   cache(res, 60, 300);
-
   try {
-    const [holders, traders, price] = await Promise.all([
-      fetchHolders(mint),
-      fetchTraders(mint),
-      fetchPrice(mint),
-    ]);
-
-    // Enrich holders with USD value
-    if (price) {
-      for (const h of holders) h.usdValue = h.uiAmount * price;
-    }
-
-    // Cross-reference: attach trader stats to holders, mark traders who still hold
+    const [holders, traders, price] = await Promise.all([fetchHolders(mint), fetchTraders(mint), fetchPrice(mint)]);
+    if (price) for (const h of holders) h.usdValue = h.uiAmount * price;
     const holderMap = new Map(holders.map((h) => [h.owner, h]));
     const traderMap = new Map(traders.map((t) => [t.owner, t]));
-
     for (const h of holders) {
       const t = traderMap.get(h.owner);
-      if (t) {
-        h.buyVol = t.buyVol;
-        h.sellVol = t.sellVol;
-        h.realizedPnl = t.realizedPnl;
-        h.unrealizedPnl = t.unrealizedPnl;
-        h.netPnl = t.netPnl;
-        h.buys = t.buys;
-        h.sells = t.sells;
-        h.tradeCount = t.tradeCount;
-      }
+      if (t) { h.buyVol = t.buyVol; h.sellVol = t.sellVol; h.buys = t.buys; h.sells = t.sells; h.tradeCount = t.tradeCount; }
     }
     for (const t of traders) {
       const h = holderMap.get(t.owner);
-      if (h) {
-        t.isHolder = true;
-        t.holdingPct = h.pct;
-        t.holdingAmount = h.uiAmount;
-        t.holdingUsd = h.usdValue;
-      }
+      if (h) { t.isHolder = true; t.holdingPct = h.pct; t.holdingAmount = h.uiAmount; t.holdingUsd = h.usdValue; }
     }
-
     return send(res, 200, { ok: true, mint, holders, traders });
   } catch (e) {
     return send(res, 200, { ok: false, mint, error: String(e?.message || e) });

@@ -1,4 +1,4 @@
-import { Hash, User, Mail, Wrench } from "lucide-react";
+import { Hash, User, Mail, Settings } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 /** New-theme top header for the social app (replaces the side tab bar). Route-based. */
@@ -27,7 +27,7 @@ export function SocialTopBar(_props?: { activeId?: string; onNavigate?: (id: str
       </nav>
 
       <div className="stb-right">
-        <a className="stb-link" href="/OGDEX"><Wrench className="h-4 w-4" /><span>OG Dex</span></a>
+        <a className="stb-link" href="/settings"><Settings className="h-4 w-4" /><span>Settings</span></a>
         <a className="stb-cta" href="/app">Hub</a>
       </div>
     </header>

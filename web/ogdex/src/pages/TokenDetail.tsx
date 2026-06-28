@@ -643,10 +643,10 @@ function HoldersAndTraders({ holders, topData, topLoading, price, dir = {}, safe
         <div className="card overflow-hidden">
           <div className="px-4 py-3 border-b border-line text-sm font-semibold flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-accent" /> Top {traders.length} Traders
-            <span className="text-muted font-normal text-xs ml-1">24h window · sorted by PnL · Birdeye</span>
+            <span className="text-muted font-normal text-xs ml-1">recent · sorted by volume · on-chain</span>
           </div>
           {traders.length === 0 ? (
-            <div className="px-4 py-8 text-muted text-sm text-center">{topLoading ? "Loading…" : "Trader data unavailable — Birdeye API key not configured."}</div>
+            <div className="px-4 py-8 text-muted text-sm text-center">{topLoading ? "Loading…" : "No recent trader activity yet."}</div>
           ) : (
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
               <table className="w-full text-sm min-w-[1000px]">
