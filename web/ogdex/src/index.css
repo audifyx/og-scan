@@ -40,12 +40,12 @@ h1, h2, h3, .font-display { font-family: 'Sora', 'Plus Jakarta Sans', sans-serif
 @layer components {
   .card {
     @apply rounded-2xl border;
-    background: rgba(2,4,12,0.92);
-    border-color: rgba(47,128,255,0.16);
-    backdrop-filter: blur(22px) saturate(130%);
-    -webkit-backdrop-filter: blur(22px) saturate(130%);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(47,128,255,0.06) inset;
-    transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+    background: linear-gradient(165deg, rgba(14,18,30,0.74), rgba(6,9,18,0.80));
+    border-color: rgba(47,128,255,0.18);
+    backdrop-filter: blur(26px) saturate(150%);
+    -webkit-backdrop-filter: blur(26px) saturate(150%);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.05) inset, 0 0 0 1px rgba(47,128,255,0.06) inset;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
   }
   .card:hover {
     border-color: rgba(47,128,255,0.38);
@@ -119,3 +119,9 @@ h1, h2, h3, .font-display { font-family: 'Sora', 'Plus Jakarta Sans', sans-serif
   background: rgba(47,128,255,0.08);
   box-shadow: 0 0 18px rgba(47,128,255,0.25);
 }
+
+
+/* Premium route transition */
+@keyframes ogIn { from { opacity: 0; transform: translateY(10px) scale(0.995); } to { opacity: 1; transform: none; } }
+.og-fade { animation: ogIn 0.5s cubic-bezier(0.2, 0.7, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) { .og-fade { animation: none; } }

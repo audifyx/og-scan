@@ -95,7 +95,16 @@ export default function Layout() {
   const isActive = (to: string, exact: boolean) => exact ? loc.pathname === to : loc.pathname.startsWith(to);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div
+      className="min-h-screen flex flex-col"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(2,4,10,0.85), rgba(2,4,10,0.93)), url(/bg/bg-aurora.jpg)",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed",
+      }}
+    >
 
       {/* ── Sticky Header ── */}
       <div className="sticky top-0 z-30">
@@ -200,7 +209,9 @@ export default function Layout() {
       <LiveStats />
 
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 py-5">
-        <Outlet />
+        <div key={loc.pathname} className="og-fade">
+          <Outlet />
+        </div>
       </main>
 
       {/* ── Footer ── */}

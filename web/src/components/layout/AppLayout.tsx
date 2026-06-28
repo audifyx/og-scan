@@ -76,6 +76,14 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           WebkitMaskImage: "radial-gradient(circle at 50% 22%, #000, transparent 80%)",
         }}
       />
+      {/* Cosmic photo backdrop — galaxy, glass-blurred */}
+      <div
+        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url(/bg/bg-galaxy.jpg)", opacity: 0.26 }}
+      >
+        <div className="absolute inset-0 bg-background/68 backdrop-blur-[3px]" />
+      </div>
+
       {/* Theme gradient layer — subtle ambient glow from active theme */}
       {themeGradient && (
         <div

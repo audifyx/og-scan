@@ -167,6 +167,8 @@ const Auth = () => {
   return (
     <main className="min-h-screen overflow-hidden bg-black text-white" style={{ fontFamily: "'Plus Jakarta Sans', 'Sora', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap');`}</style>
+      <div className="pointer-events-none fixed inset-0 bg-cover bg-center" style={{ backgroundImage: "url(/bg/bg-nebula.jpg)", opacity: 0.34 }} />
+      <div className="pointer-events-none fixed inset-0 bg-black/55 backdrop-blur-[2px]" />
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_18%_-5%,rgba(91,91,240,0.18),transparent_38%),radial-gradient(circle_at_85%_8%,rgba(155,107,255,0.12),transparent_40%),radial-gradient(circle_at_50%_115%,rgba(47,128,255,0.10),transparent_45%)]" />
       <div className="pointer-events-none fixed inset-0 grid-bg opacity-[0.11]" />
 

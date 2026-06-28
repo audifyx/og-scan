@@ -179,6 +179,7 @@ export default function Hub() {
       <div className={`desk ${booted ? "on" : ""}`} key={glitchKey + "-d"}>
         {/* wallpaper */}
         <div className="wp" aria-hidden>
+          <span className="wp-photo" />
           <span className="wp-mesh w1" /><span className="wp-mesh w2" /><span className="wp-mesh w3" />
           <span className="wp-grid" /><span className="wp-vignette" /><span className="scan" /><span className="wp-noise" />
         </div>
@@ -297,6 +298,8 @@ const css = `
 @keyframes deskin{60%{filter:blur(0)}to{opacity:1;transform:none;filter:blur(0)}}
 
 .wp{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(120% 90% at 50% -10%,#0a1326,#040509 60%);}
+.wp-photo{position:absolute;inset:0;background:url(/bg/bg-nebula.jpg) center/cover no-repeat;opacity:.5;filter:blur(2px) saturate(1.15);transform:scale(1.08) translate(var(--mx,0),var(--my,0));transition:transform .6s ease-out;}
+.wp-photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(4,5,10,.5),rgba(4,5,10,.8));}
 .wp-mesh{position:absolute;border-radius:50%;filter:blur(110px);opacity:.5;mix-blend-mode:screen;transform:translate(var(--mx,0),var(--my,0));transition:transform .6s ease-out;}
 .w1{width:48vw;height:48vw;top:-14vw;left:-8vw;background:radial-gradient(circle,#2F80FF,transparent 68%);animation:drift 20s ease-in-out infinite;}
 .w2{width:50vw;height:50vw;top:-6vw;right:-14vw;background:radial-gradient(circle,#9945FF,transparent 68%);animation:drift 26s ease-in-out infinite reverse;}

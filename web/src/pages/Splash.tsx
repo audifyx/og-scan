@@ -103,6 +103,7 @@ export default function Splash() {
       {/* HERO */}
       <header className="sp-hero" ref={heroRef}>
         <div className="sp-hero-bg" aria-hidden>
+          <div className="sp-hero-photo" />
           <div className="orb orb-a" /><div className="orb orb-b" /><div className="orb orb-c" />
           <div className="grid-fade" />
         </div>
@@ -269,6 +270,9 @@ const css = `
 @media(max-width:520px){.btn-ghost.sm{display:none}}
 .sp-hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:130px 20px 80px;overflow:hidden;}
 .sp-hero-bg{position:absolute;inset:0;z-index:0;}
+.sp-hero-photo{position:absolute;inset:0;background:url(/bg/bg-earth.jpg) center/cover no-repeat;opacity:.6;filter:saturate(1.08);animation:heroDrift 30s ease-in-out infinite alternate;}
+.sp-hero-photo::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 32%,transparent 26%,rgba(5,6,8,.72) 82%),linear-gradient(180deg,rgba(5,6,8,.34),rgba(5,6,8,.62) 55%,#050608);}
+@keyframes heroDrift{from{transform:scale(1.05)}to{transform:scale(1.14) translateY(-2%)}}
 .orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;transform:translateY(var(--py,0));}
 .orb-a{width:540px;height:540px;top:-140px;left:-80px;background:radial-gradient(circle,#2F80FF,transparent 70%);}
 .orb-b{width:560px;height:560px;top:-60px;right:-120px;background:radial-gradient(circle,#9945FF,transparent 70%);}
