@@ -19,23 +19,11 @@ type NavItem = { to: string; icon: React.ComponentType<{ className?: string }>; 
 
 const primaryItems: NavItem[] = [
   { to: "/app",           icon: Home,     label: "Home",         eyebrow: "Command hub" },
-  { to: "/discover",      icon: LineChart, label: "Markets",     eyebrow: "Coins · Launchpads · Trending · New" },
-  { to: "/tools",         icon: Wrench,   label: "Tools",        eyebrow: "Scanner · Market Radar · Listings" },
   { to: "/community",     icon: Hash,     label: "Social",       eyebrow: "Channels · Rooms · Spaces" },
-];
-
-const signalsItems: NavItem[] = [
-  { to: "/reports",       icon: FileText, label: "Signals",      eyebrow: "Reports · Track Record · Alerts · AI" },
-];
-
-const tradingItems: NavItem[] = [
-  { to: "/live-trading",  icon: Wallet,     label: "Phantom Terminal", eyebrow: "Phantom Trade" },
-  { to: "/trading-hub",   icon: TrendingUp, label: "Trading Hub",  eyebrow: "Launch · Lobbies · Callouts" },
-  { to: "/messages",      icon: Mail,       label: "Messages",     eyebrow: "Direct messages" },
+  { to: "/messages",      icon: Mail,     label: "Messages",     eyebrow: "Direct messages" },
 ];
 
 const accountItems: NavItem[] = [
-  { to: "/our-coin",      icon: Coins,    label: "OFFICIAL OGS", eyebrow: "Official token room" },
   { to: "/games",         icon: Gamepad2, label: "Partnerships", eyebrow: "Games · partner apps" },
   { to: "/profile",       icon: User,     label: "Profile",      eyebrow: "Your account" },
 ];
@@ -161,20 +149,6 @@ export const Sidebar = () => {
             <SectionLabel label="Navigation" />
             <div className="space-y-0.5">
               {primaryItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
-            </div>
-          </div>
-
-          <div className="mb-1 mt-4">
-            <SectionLabel label="Signals" />
-            <div className="space-y-0.5">
-              {signalsItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
-            </div>
-          </div>
-
-          <div className="mb-1 mt-4">
-            <SectionLabel label="Trading" />
-            <div className="space-y-0.5">
-              {tradingItems.map((item) => <NavRow key={item.to} item={item} onClick={closeMobile} />)}
             </div>
           </div>
 

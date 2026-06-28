@@ -176,27 +176,13 @@ export const AppSidebar = ({
 
   const primaryItems: NavItem[] = [
     { id: "overview", icon: Home, label: "Home", eyebrow: "Command hub" },
-    { id: "discover", icon: LineChart, label: "Markets", eyebrow: "Coins · Launchpads · Trending · New" },
-    { id: "tools", icon: Wrench, label: "Tools", eyebrow: "Scanner · Market Radar · Listings" },
-    { id: "research", icon: Search, label: "Research", eyebrow: "Social · On-Chain · Clones" },
-    { id: "community", icon: Hash, label: "Community", eyebrow: "Chat · Rooms · Spaces" },
-  ];
-
-  const discoverItems: NavItem[] = [
-    { to: "/reports", icon: FileText, label: "Signals", eyebrow: "Reports · Track Record · Alerts · AI" },
+    { id: "community", icon: Hash, label: "Social", eyebrow: "Chat · Rooms · Spaces" },
+    { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
   ];
 
   const communityItems: NavItem[] = [
-    { id: "our-coin", icon: Coins, label: "OFFICIAL OGS", eyebrow: "Official token room" },
     { to: "/games", icon: Gamepad2, label: "Partnerships", eyebrow: "Games · partner apps" },
     { id: "profile", icon: User, label: "Profile", eyebrow: "Your account" },
-  ];
-
-  const tradingItems: NavItem[] = [
-    { id: "live-trading" as TabId, icon: Wallet, label: "Phantom Trading Terminal", eyebrow: "Phantom Trade" },
-    { id: "trading-hub" as TabId, icon: TrendingUp, label: "Trading Hub", eyebrow: "Launch · Lobbies · Callouts" },
-    { to: "/messages", icon: Mail, label: "Messages", eyebrow: "Direct messages" },
-    // { to: "/support", icon: Headset, label: "Support Chat", eyebrow: "Tickets + live help" }, // hidden
   ];
 
   const adminAppsItems: NavItem[] = [
@@ -249,45 +235,11 @@ export const AppSidebar = ({
         </div>
 
         <div className="mb-1 mt-4">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Signals</p>
-          <div className="space-y-0.5">
-            {discoverItems.map((item) => (
-              <NavRow
-                key={item.id ?? item.to}
-                item={item}
-                activeId={activeId}
-                currentPath={location.pathname}
-                onNavigate={onNavigate}
-                onClose={onClose}
-                onPrefetch={onPrefetch}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-1 mt-4">
           <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Account</p>
           <div className="space-y-0.5">
             {communityItems.map((item, i) => (
               <NavRow
                 key={`${item.id ?? item.to}-${i}`}
-                item={item}
-                activeId={activeId}
-                currentPath={location.pathname}
-                onNavigate={onNavigate}
-                onClose={onClose}
-                onPrefetch={onPrefetch}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-1 mt-4">
-          <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">Trading</p>
-          <div className="space-y-0.5">
-            {tradingItems.map((item) => (
-              <NavRow
-                key={item.to ?? item.id}
                 item={item}
                 activeId={activeId}
                 currentPath={location.pathname}

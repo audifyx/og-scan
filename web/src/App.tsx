@@ -132,7 +132,8 @@ const App = () => (
           <SupportNotificationBanner />
           <Routes>
             {/* ── Public routes (no auth required) ── */}
-            <Route path="/" element={<BetaHome />} />
+            <Route path="/" element={<Splash />} />
+            <Route path="/beta" element={<BetaHome />} />
             <Route path="/splash" element={<Splash />} />
             <Route path="/waitlist" element={<Waitlist />} />
             <Route path="/auth" element={<Auth />} />

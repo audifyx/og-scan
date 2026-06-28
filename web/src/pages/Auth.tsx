@@ -156,7 +156,7 @@ const Auth = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#050914]">
+      <div className="flex min-h-screen items-center justify-center bg-black">
         <Loader2 className="h-8 w-8 animate-spin text-og-lime" />
       </div>
     );
@@ -165,8 +165,9 @@ const Auth = () => {
   const copy = modeCopy[mode];
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#050914] text-white">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(34,211,238,0.16),transparent_30%),radial-gradient(circle_at_88%_10%,rgba(163,230,53,0.13),transparent_30%),radial-gradient(circle_at_48%_100%,rgba(244,114,182,0.12),transparent_36%)]" />
+    <main className="min-h-screen overflow-hidden bg-black text-white" style={{ fontFamily: "'Plus Jakarta Sans', 'Sora', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap');`}</style>
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_18%_-5%,rgba(91,91,240,0.18),transparent_38%),radial-gradient(circle_at_85%_8%,rgba(155,107,255,0.12),transparent_40%),radial-gradient(circle_at_50%_115%,rgba(47,128,255,0.10),transparent_45%)]" />
       <div className="pointer-events-none fixed inset-0 grid-bg opacity-[0.11]" />
 
       <section className="relative z-10 mx-auto grid min-h-screen w-full max-w-6xl gap-8 px-4 py-5 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
@@ -216,8 +217,8 @@ const Auth = () => {
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
 
-            <div className="rounded-[2rem] border border-white/12 bg-[#0b1423]/92 p-3 shadow-[0_24px_92px_-54px_rgba(34,211,238,0.95)] backdrop-blur-2xl">
-              <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.045] p-5 sm:p-6">
+            <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-3 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.04)_inset] backdrop-blur-2xl">
+              <div className="rounded-[1.6rem] border border-white/[0.08] bg-white/[0.03] p-5 sm:p-6 backdrop-blur-xl">
                 <div className="mb-6 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 overflow-hidden rounded-2xl border border-white/15 bg-white/10">

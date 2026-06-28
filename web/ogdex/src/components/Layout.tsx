@@ -1,7 +1,7 @@
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Send, Wallet2, LogOut, Flame, Users, Sparkles, Rocket, Bell, Code, FileText, Wrench } from "lucide-react";
+import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Send, Wallet2, LogOut, Flame, Users, Sparkles, Rocket, Bell, Code, FileText, Wrench, Megaphone } from "lucide-react";
 import { track, getWatchlist, short } from "../lib/api";
 import { useWallet } from "../lib/wallet";
 import LiveStats, { fetchPlatformStats } from "./LiveStats";
@@ -40,6 +40,7 @@ const NAV_LINKS = [
   { to: "/launch",  label: "Launch",    Icon: Rocket,      exact: false },
   { to: "/store",   label: "Store",     Icon: ShoppingBag, exact: false },
   { to: "/alerts",  label: "Alerts",    Icon: Bell,        exact: false },
+  { to: "/callouts",label: "Callouts",  Icon: Megaphone,   exact: false },
   { to: "/metadata",label: "Metadata",  Icon: FileText,    exact: false },
   { to: "/api",     label: "API",       Icon: Code,        exact: false },
 ];

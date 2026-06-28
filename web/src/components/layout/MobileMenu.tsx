@@ -15,28 +15,14 @@ import { SheetClose } from "@/components/ui/sheet";
 
 
 const mainNavItems = [
-  { to: "/intelligence", icon: Sparkles, label: "AI Intelligence" },
-  { to: "/wallets", icon: Wallet, label: "Phantom Trading Terminal" },
-  { to: "/games",   icon: Gamepad2, label: "Partnerships" },
-  { to: "/tokens", icon: Coins, label: "Tokens" },
-  // Charts hidden from UI (redundant with Phantom Trading Terminal)
-  // { to: "/charts", icon: LineChart, label: "Charts" },
-  { to: "/tools", icon: Wrench, label: "Tools" },
-
-  { to: "/pump-v5", icon: Sparkles, label: "PUMP V6" },
-  { to: "/official-token", icon: Zap, label: "$SOLTOOLS" },
-  { to: "/lobbies", icon: Headphones, label: "Lobbies" },
+  { to: "/games", icon: Gamepad2, label: "Partnerships" },
   { to: "/communities", icon: Globe2, label: "Communities" },
-  { to: "/live-trading", icon: ArrowLeftRight, label: "Trading" },
 ];
 
 const socialNavItems = [
   { to: "/alpha-chat", icon: MessageSquare, label: "Chat" },
-  { to: "/live-feed", icon: Radio, label: "Feed" },
-  { to: "/discover", icon: Users, label: "Discover" },
-  { to: "/callouts", icon: Bell, label: "Callouts" },
+  { to: "/messages", icon: MessageSquare, label: "Messages" },
   { to: "/support", icon: Headphones, label: "Support" },
-
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 

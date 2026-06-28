@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 // ── PLACEHOLDER BRAND NAME ── replace when rebrand is finalized
 const BRAND = "NOVA";
@@ -46,9 +47,19 @@ export default function Waitlist() {
       return;
     }
     setStatus("loading");
-    // TODO: wire to Supabase `waitlist` table insert. Simulated success for now.
-    await new Promise((r) => setTimeout(r, 900));
-    setStatus("done");
+    try {
+      const { error } = await supabase.from("waitlist").insert({ email: email.trim().toLowerCase() });
+      // 23505 = unique violation (already on the list) — treat as success
+      if (error && error.code !== "23505") {
+        console.error("waitlist insert failed", error);
+        setStatus("error");
+        return;
+      }
+      setStatus("done");
+    } catch (err) {
+      console.error(err);
+      setStatus("error");
+    }
   };
 
   return (
@@ -110,7 +121,7 @@ export default function Waitlist() {
                     {status === "loading" ? <span className="wl-spin" /> : "Notify me"}
                   </button>
                 </div>
-                {status === "error" && <p className="wl-msg">Please enter a valid email address.</p>}
+                {status === "error" && <p className="wl-msg">Please enter a valid email, or try again in a moment.</p>}
                 <p className="wl-fine">No spam. Just a single launch announcement.</p>
               </form>
             )}

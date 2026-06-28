@@ -5,13 +5,13 @@ import { cn } from "@/lib/utils";
 
 /**
  * Canonical bottom nav — used on EVERY page (Index + external pages).
- * 4 items: Home, Community, Tools, Profile.
+ * 4 items: Home, Community, Messages, Profile.
  */
 
 const navItems = [
   { to: "/app", icon: Home, label: "Home" },
   { to: "/community", icon: Users, label: "Community" },
-  { to: "/tools", icon: Wrench, label: "Tools" },
+  { to: "/messages", icon: MessageCircle, label: "Messages" },
   { to: "/profile", icon: User, label: "Profile" },
 ];
 
