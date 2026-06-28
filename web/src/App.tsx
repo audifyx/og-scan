@@ -14,6 +14,8 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import BetaHome from "./pages/BetaHome";
 import Index from "./pages/Index";
 import Splash from "./pages/Splash";
+import Hub from "./pages/Hub";
+import SocialHub from "./pages/SocialHub";
 import Waitlist from "./pages/Waitlist";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -160,7 +162,8 @@ const App = () => (
             <Route path="/install" element={<InstallApp />} />
 
             {/* ── Protected: App shell ── */}
-            <Route path="/app" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/app" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
+            <Route path="/hub" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
             <Route path="/command" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/home" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/our-coin" element={<OgdexRedirect to="/OGDEX" />} />
@@ -193,7 +196,7 @@ const App = () => (
             <Route path="/memes" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/art-feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/spaces" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/social" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/social" element={<ProtectedRoute><SocialHub /></ProtectedRoute>} />
             <Route path="/listings" element={<OgdexRedirect to="/OGDEX/store" />} />
             <Route path="/listings/:mintAddress" element={<OgdexRedirect to={(p) => `/OGDEX/token/${p.mintAddress}`} />} />
             <Route path="/token-manager" element={<OgdexRedirect to="/OGDEX/metadata" />} />
