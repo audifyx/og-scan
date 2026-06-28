@@ -8,10 +8,10 @@ import { getWalletLabel, labelKindClass } from "../lib/labels";
 import { timeAgo } from "../lib/format";
 import { ArrowUpRight, ArrowDownRight, ExternalLink, Crown, Radio, BadgeCheck, Loader2, RefreshCw } from "lucide-react";
 
-export default function KolWhaleActivity({ d, dir }: { d: TokenDetailData; dir: Record<string, KolDirEntry> }) {
+export default function KolWhaleActivity({ d, dir, holders: holdersProp }: { d: TokenDetailData; dir: Record<string, KolDirEntry>; holders?: any[] }) {
   const mint = d.mint;
   const intel: any = (d as any).intel || {};
-  const holders: any[] = intel.holders || [];
+  const holders: any[] = (holdersProp && holdersProp.length) ? holdersProp : (intel.holders || []);
   const intelTrades: any[] = intel.trades || [];
   const price: number | null = (d as any).token?.priceUsd ?? (d as any).meta?.priceUsd ?? null;
   const whaleHolders: any[] = (holders.filter((h) => h.label === "whale")

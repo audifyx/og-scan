@@ -357,7 +357,7 @@ export default function TokenDetail() {
         {tab === "chat"       && <CoinChat d={d} forensics={forensics} ath={ath} />}
         {tab === "predictive" && <PredictiveIntel d={d} />}
         {tab === "smartmoney" && <CapitalFlow d={d} />}
-        {tab === "kolwhale"   && <KolWhaleActivity d={d} dir={dir} />}
+        {tab === "kolwhale"   && <KolWhaleActivity d={d} dir={dir} holders={holders} />}
         {tab === "holders"    && <HoldersAndTraders holders={holders} topData={topData} topLoading={topLoading} price={price} dir={dir} safety={safety} />}
         {tab === "trades"     && <TradesTable trades={trades} mint={mint} dir={dir} onRefresh={() => getToken(mint).then(setD)} />}
         {tab === "xray"       && <RiskXray x={xray} loading={xrayLoading} />}
