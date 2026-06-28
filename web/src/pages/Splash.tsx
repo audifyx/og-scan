@@ -330,6 +330,7 @@ const css = `
 @keyframes spLogoFloat{50%{transform:translateY(-4px)}}
 .sp-eyebrow{font-size:12.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:0;}
 .sp-h1{margin:0;font-size:clamp(42px,7.5vw,92px);line-height:.96;letter-spacing:-.04em;font-weight:800;position:relative;}
+@media(max-width:480px){.sp-h1{font-size:clamp(36px,6.5vw,52px);line-height:1.12;letter-spacing:-.02em;}}
 .sp-h1 span{background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
 .sp-h1::before,.sp-h1::after{content:attr(data-text);position:absolute;inset:0;pointer-events:none;opacity:0;}
 .sp-hero-ready .sp-h1::before{color:#2F80FF;opacity:.55;animation:spGlitchR 4.5s steps(1) infinite;clip-path:inset(0 0 58% 0);}
