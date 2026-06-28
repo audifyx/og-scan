@@ -6,7 +6,7 @@ import {
   Zap, Activity, Plus, ExternalLink, Shield, Bell, Settings, Megaphone,
   ShieldOff, Download, RefreshCw, TrendingUp, AlertTriangle, ChevronRight,
   Globe, ToggleLeft, ToggleRight, Search, Filter, Copy, Flag, Ban,
-  CheckSquare, XSquare, Wallet, LayoutDashboard, List, Mail,
+  CheckSquare, XSquare, Wallet, LayoutDashboard, List, Mail, MessageSquare, LifeBuoy, Link2, Mic,
 } from "lucide-react";
 
 const LS_KEY = "ogdex_admin_pass";
@@ -25,7 +25,11 @@ type Tab =
   | "waitlist"
   | "users"
   | "reports"
-  | "audit";
+  | "audit"
+  | "spaces"
+  | "chat"
+  | "support"
+  | "affiliates";
 
 type Cat = "dex" | "social";
 const TABS: { id: Tab; label: string; icon: any; cat: Cat }[] = [
@@ -43,6 +47,10 @@ const TABS: { id: Tab; label: string; icon: any; cat: Cat }[] = [
   { id: "reports",      label: "Reports",        icon: Flag,           cat: "social" },
   { id: "audit",        label: "Audit Log",      icon: Activity,       cat: "social" },
   { id: "waitlist",     label: "Waitlist",       icon: Mail,           cat: "social" },
+  { id: "spaces",       label: "Spaces",         icon: Mic,            cat: "social" },
+  { id: "chat",         label: "Chat",           icon: MessageSquare,  cat: "social" },
+  { id: "support",      label: "Support",        icon: LifeBuoy,       cat: "social" },
+  { id: "affiliates",   label: "Affiliates",     icon: Link2,          cat: "social" },
 ];
 const CAT_LABEL: Record<Cat, string> = { dex: "OG Dex", social: "Social" };
 
@@ -159,6 +167,10 @@ export default function Admin() {
       {tab === "users"     && <UsersTab data={data} act={act} />}
       {tab === "reports"   && <ReportsTab data={data} act={act} />}
       {tab === "audit"     && <AuditTab data={data} />}
+      {tab === "spaces"    && <SpacesTab data={data} act={act} />}
+      {tab === "chat"      && <ChatTab data={data} act={act} />}
+      {tab === "support"   && <SupportTab data={data} act={act} />}
+      {tab === "affiliates" && <AffiliatesTab data={data} act={act} />}
     </div>
   );
 }
@@ -992,6 +1004,87 @@ function AuditTab({ data }: { data: any }) {
               <span className="text-muted">{a.created_at ? new Date(a.created_at).toLocaleString() : ""}</span>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function SpacesTab({ data, act }: { data: any; act: any }) {
+  const rows: any[] = data?.spaces || [];
+  return (
+    <div className="space-y-3">
+      <div className="text-lg font-black text-white">Spaces <span className="text-xs font-normal text-muted">· {data?.stats?.spacesLive ?? 0} live</span></div>
+      {rows.length === 0 ? <div className="rounded-xl border border-line bg-panel2/60 p-8 text-center text-sm text-muted">No spaces.</div> : rows.map((sp) => (
+        <div key={sp.id} className="flex items-center gap-3 rounded-xl border border-line bg-panel2/60 p-3 text-sm">
+          {sp.is_live ? <span className="pill bg-down/15 text-down text-[10px]">● LIVE</span> : <span className="pill bg-panel2 text-muted text-[10px]">ended</span>}
+          <div className="min-w-0 flex-1"><div className="truncate font-semibold text-white">{sp.title || "Untitled"}</div><div className="text-[11px] text-muted">@{sp.host_username || "?"} · {sp.listener_count || 0} listeners · {sp.speaker_count || 0} speakers</div></div>
+          {sp.is_private && <span className="pill bg-panel2 text-muted text-[10px]">private</span>}
+          {sp.is_live && <button onClick={() => act("end_space", sp.id)} className="rounded-lg border border-down/40 bg-down/10 px-2.5 py-1 text-[11px] font-bold text-down hover:bg-down/20">End</button>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChatTab({ data, act }: { data: any; act: any }) {
+  const rows: any[] = data?.chat || [];
+  return (
+    <div className="space-y-2">
+      <div className="text-lg font-black text-white">Community chat <span className="text-xs font-normal text-muted">· latest {rows.length}</span></div>
+      {rows.length === 0 ? <div className="rounded-xl border border-line bg-panel2/60 p-8 text-center text-sm text-muted">No messages.</div> : rows.map((m) => (
+        <div key={m.id} className="flex items-start gap-3 rounded-xl border border-line/60 bg-panel2/40 p-3 text-sm">
+          <div className="min-w-0 flex-1"><span className="font-semibold text-white">{m.username || "anon"}</span> <span className="text-[10px] text-muted">{m.created_at ? new Date(m.created_at).toLocaleString() : ""}</span><div className="break-words text-white/80">{m.content}</div></div>
+          <button onClick={() => act("delete_message", m.id)} className="shrink-0 rounded-lg border border-down/40 bg-down/10 px-2 py-1 text-[11px] font-bold text-down hover:bg-down/20"><Trash2 className="h-3 w-3" /></button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SupportTab({ data, act }: { data: any; act: any }) {
+  const rows: any[] = data?.support || [];
+  const tone = (st: string) => st === "closed" || st === "resolved" ? "bg-up/15 text-up" : st === "open" ? "bg-gold/15 text-gold" : "bg-panel2 text-muted";
+  return (
+    <div className="space-y-2">
+      <div className="text-lg font-black text-white">Support tickets <span className="text-xs font-normal text-muted">· {data?.stats?.supportOpen ?? 0} open</span></div>
+      {rows.length === 0 ? <div className="rounded-xl border border-line bg-panel2/60 p-8 text-center text-sm text-muted">No tickets.</div> : rows.map((t) => (
+        <div key={t.id} className="flex items-center gap-3 rounded-xl border border-line bg-panel2/60 p-3 text-sm">
+          <div className="min-w-0 flex-1"><div className="truncate font-semibold text-white">{t.subject || "(no subject)"}</div><div className="text-[11px] text-muted">@{t.username || "?"}{t.priority ? ` · ${t.priority}` : ""} · {t.last_message_at ? new Date(t.last_message_at).toLocaleString() : (t.created_at ? new Date(t.created_at).toLocaleDateString() : "")}</div></div>
+          <span className={`pill text-[10px] ${tone(t.status)}`}>{t.status || "open"}</span>
+          {t.status !== "closed" && <button onClick={() => act("close_ticket", t.id)} className="rounded-lg border border-up/40 bg-up/10 px-2.5 py-1 text-[11px] font-bold text-up hover:bg-up/20">Close</button>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AffiliatesTab({ data, act }: { data: any; act: any }) {
+  const rows: any[] = data?.affiliates || [];
+  return (
+    <div className="space-y-3">
+      <div className="text-lg font-black text-white">Affiliates <span className="text-xs font-normal text-muted">· {rows.length}</span></div>
+      {rows.length === 0 ? <div className="rounded-xl border border-line bg-panel2/60 p-8 text-center text-sm text-muted">No affiliates.</div> : (
+        <div className="overflow-x-auto rounded-xl border border-line">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-panel2 text-left text-[11px] uppercase tracking-wider text-muted">
+              <th className="px-3 py-2.5">Name</th><th className="px-3 py-2.5">Code</th><th className="px-3 py-2.5">Status</th><th className="px-3 py-2.5 text-right">Clicks</th><th className="px-3 py-2.5 text-right">Signups</th><th className="px-3 py-2.5 text-right">Earnings</th><th></th>
+            </tr></thead>
+            <tbody>
+              {rows.map((a) => (
+                <tr key={a.id} className="border-t border-line/60">
+                  <td className="px-3 py-2.5 font-semibold text-white">{a.name || "—"}</td>
+                  <td className="px-3 py-2.5 font-mono text-muted">{a.referral_code || "—"}</td>
+                  <td className="px-3 py-2.5"><span className={`pill text-[10px] ${a.status === "approved" ? "bg-up/15 text-up" : "bg-gold/15 text-gold"}`}>{a.status || "pending"}</span></td>
+                  <td className="px-3 py-2.5 text-right text-white">{fmtNum(a.clicks || 0)}</td>
+                  <td className="px-3 py-2.5 text-right text-white">{fmtNum(a.signups || 0)}</td>
+                  <td className="px-3 py-2.5 text-right text-white">${fmtNum(a.total_earnings || 0)}</td>
+                  <td className="px-3 py-2.5 text-right">{a.status !== "approved" && <button onClick={() => act("set_affiliate_status", a.id, { status: "approved" })} className="rounded-lg border border-up/40 bg-up/10 px-2 py-1 text-[11px] font-bold text-up hover:bg-up/20">Approve</button>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
