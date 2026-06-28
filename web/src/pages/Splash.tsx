@@ -22,7 +22,7 @@ const LINKS = {
   x: "https://x.com/orbitx_wrldbackup",
   xOrbitXPredictionMarket: "https://x.com/orbitx-predictionbet",
   ogdex: "/ORBITX_DEX",
-  orbitxPrediction: "https://orbitx-prediction.fun",
+  orbitxPrediction: "https://solno.fun",
   degen: "https://degen-tower.vercel.app",
   privacy: "/privacy",
   terms: "/terms",
@@ -507,7 +507,7 @@ export default function Splash() {
             <div className="sp-eco-icon">🎯</div>
             <h3>OrbitX Prediction Market</h3>
             <p>Prediction markets + provably-fair 1v1 games.</p>
-            <span className="sp-eco-link">orbitx-prediction.fun <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+            <span className="sp-eco-link">solno.fun <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
           </a>
           <a className="sp-eco-card stagger" href={LINKS.degen} target="_blank" rel="noreferrer" onMouseMove={handleCardMouse} style={{ transitionDelay: "200ms" }}>
             <div className="sp-eco-glow" />

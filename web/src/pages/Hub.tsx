@@ -105,9 +105,9 @@ const Glyph = {
 const ALL_APPS: App[] = [
   { key: "dex", name: "OrbitX DEX", caption: "Scanner & Trade", href: "/ORBITX_DEX", tone: "#2F80FF", iconBg: "linear-gradient(135deg, #1A6CFF, #0037A3)", glyph: Glyph.dex },
   { key: "social", name: "Social", caption: "Spaces & Chat", href: "/orbitx-social", tone: "#9945FF", iconBg: "linear-gradient(135deg, #8A2BE2, #4B0082)", glyph: Glyph.social },
-  { key: "predict", name: "Predictions", caption: "Provably fair", href: "/orbitx-prediction", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFB020, #D47900)", glyph: Glyph.predict },
+  { key: "predict", name: "Predictions", caption: "Provably fair", href: "https://solno.fun", external: true, tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFB020, #D47900)", glyph: Glyph.predict },
   { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(135deg, #00C6B8, #00766E)", glyph: Glyph.scanner },
-  { key: "gaming", name: "Gaming", caption: "Climb & Win", href: "/orbitx-gaming", tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
+  { key: "gaming", name: "Gaming", caption: "Climb & Win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
   { key: "ai", name: "AI Assistant", caption: "Help & Support", href: "/ai-chat", tone: "#14a0ff", iconBg: "linear-gradient(135deg, #14a0ff, #0077b6)", glyph: Glyph.ai },
 ];
 
