@@ -7,6 +7,7 @@ import Layout from "./components/Layout";
 import { WalletProvider } from "./lib/wallet";
 import Screener from "./pages/Screener";
 import Tools from "./pages/Tools";
+import OgScanner from "./pages/OgScanner";
 
 // Heavy / less-frequent routes are code-split so the Discovery page loads fast.
 const Pulse = lazy(() => import("./pages/Pulse"));
@@ -50,6 +51,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/" element={<Layout />}>
           <Route index element={<Screener />} />
           <Route path="tools" element={<Tools />} />
+          <Route path="scanner" element={<OgScanner />} />
           <Route path="pulse" element={<Suspense fallback={<PageFallback />}><Pulse /></Suspense>} />
           <Route path="research" element={<Suspense fallback={<PageFallback />}><Pulse /></Suspense>} />
           <Route path="token/:mint" element={<Suspense fallback={<PageFallback />}><TokenDetail /></Suspense>} />

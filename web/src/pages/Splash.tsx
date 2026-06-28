@@ -1,24 +1,57 @@
 import { useEffect, useRef } from "react";
 
-// ── PLACEHOLDER BRAND NAME ── replace when rebrand is finalized
-const BRAND = "NOVA";
-const TAGLINE = "Trade everything.";
+// Brand name — OGSCAN for now (rename later).
+const BRAND = "OGSCAN";
 
-type Pillar = { tag: string; title: string; copy: string; tone: string; img: string };
+const LINKS = {
+  app: "/OGDEX",
+  waitlist: "/waitlist",
+  telegram: "https://t.me/ogscan",
+  x: "https://x.com/ogscanbackup",
+  xSolno: "https://x.com/solnobet",
+  ogdex: "/OGDEX",
+  solno: "https://solno.fun",
+  degen: "https://degen-tower.vercel.app",
+  privacy: "/privacy",
+  terms: "/terms",
+};
 
-const PILLARS: Pillar[] = [
-  { tag: "Meme coins", title: "Catch the next move first.",
-    copy: "Discover, scan and trade meme coins across every chain. Early launch detection, live charts and one-tap swaps.",
-    tone: "t-meme", img: "Meme coins" },
-  { tag: "Social", title: "A feed that trades.",
-    copy: "A social layer built for traders, kept separate from your tools. Spaces, callouts, communities and live rooms.",
-    tone: "t-social", img: "Social" },
-  { tag: "Crypto & trading tools", title: "Pro tools, zero clutter.",
-    copy: "Wallet forensics, AI analyst, market radar, alerts and PDF reports. Institutional-grade intelligence for everyone.",
-    tone: "t-tools", img: "Trading tools" },
-  { tag: "Our DEX", title: "Our custom DEX.",
-    copy: "Swap anything with deep liquidity and the best routing. Built in-house, designed to feel instant.",
-    tone: "t-dex", img: "Custom DEX" },
+type Feature = { tag: string; title: string; copy: string; tone: string };
+const FEATURES: Feature[] = [
+  { tag: "Discovery", title: "Intelligent token discovery", tone: "f1",
+    copy: "Real-time multi-chain scanner with a proprietary OG Score — on-chain metrics, holder quality, momentum and AI signals. Trending, hidden gems and about-to-explode, powered by live data." },
+  { tag: "Wallet forensics", title: "Track smart money like a pro", tone: "f2",
+    copy: "Any wallet's full history, win rate, hold time and PnL. Smart-money and KOL labels (Ansem, blknoiz06 + 37 more mapped), whale alerts and full holder lists with one-click actions." },
+  { tag: "OG DEX", title: "Blazing-fast trading & execution", tone: "f3",
+    copy: "Live orderbook-style screener, one-click trading with Phantom, real-time buy/sell feeds, advanced charts with on-chain overlays and portfolio across every wallet." },
+  { tag: "Launch", title: "Fair-launch & token tools", tone: "f4",
+    copy: "Simple, powerful token creation with anti-rug safeguards, auto-listing on our DEX + aggregators, and post-launch monitoring with community tools baked in from minute one." },
+  { tag: "Solno", title: "Prediction markets & 1v1 games", tone: "f5",
+    copy: "Native prediction markets plus Coinflip, Dice, Crash and Plinko with provably-fair, on-chain settlement — wired into your OG Scan insights, with leaderboards and achievements." },
+  { tag: "Social", title: "Community & social layer", tone: "f6",
+    copy: "Host Twitter Spaces with token context, voice lobbies, per-token chat and updates, creator tools, and a cross-platform identity that follows you across trading, gaming and social." },
+  { tag: "AI", title: "AI-powered intelligence", tone: "f7",
+    copy: "Ask: 'which wallets bought $TOKEN in the last 30 min?' or 'top smart-money accumulating now?' Natural-language queries across all on-chain data, with automated reports and alerts." },
+  { tag: "Gaming", title: "Degen Tower & entertainment", tone: "f8",
+    copy: "Tap-to-earn with real USDC payouts, combos, upgrades and leaderboards — plus future games where in-game actions have on-chain consequences and rewards." },
+  { tag: "Developers", title: "Creator & developer tools", tone: "f9",
+    copy: "Webhooks and a bot framework, API access for power users, white-label community builds and monetization for projects — featured listings, premium analytics, promoted Spaces." },
+];
+
+const PHASES = [
+  { k: "Phase 1", t: "Now", d: "Core intelligence + trading + social/gaming primitives." },
+  { k: "Phase 2", t: "Near-term", d: "Deep KOL/smart-money tools, AI analyst, voice lobbies, Spaces, expanded predictions, creator monetization." },
+  { k: "Phase 3", t: "Coming", d: "Full social graph, on-chain identity, cross-platform reputation, copy-trading automation, multi-chain, mobile." },
+  { k: "Phase 4", t: "Vision", d: "The default operating system for anyone serious about on-chain crypto." },
+];
+
+const FOR = [
+  "Degens who want better tools than everyone else",
+  "Serious traders tired of fragmented data",
+  "KOLs & creators who want to own their community",
+  "New projects that want a real home base",
+  "Power users who want APIs, webhooks & bots",
+  "Casual users who want one clean place to trade, play & hang out",
 ];
 
 export default function Splash() {
@@ -26,8 +59,8 @@ export default function Splash() {
 
   useEffect(() => {
     const io = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add("in")),
-      { threshold: 0.18 }
+      (es) => es.forEach((e) => e.isIntersecting && e.target.classList.add("in")),
+      { threshold: 0.14 }
     );
     document.querySelectorAll<HTMLElement>(".reveal").forEach((el) => io.observe(el));
     return () => io.disconnect();
@@ -38,8 +71,7 @@ export default function Splash() {
       const y = window.scrollY;
       if (heroRef.current) {
         heroRef.current.style.setProperty("--py", `${y * 0.25}px`);
-        heroRef.current.style.setProperty("--ps", `${1 + Math.min(y, 600) * 0.0004}`);
-        heroRef.current.style.setProperty("--pf", `${Math.max(0, 1 - y / 520)}`);
+        heroRef.current.style.setProperty("--pf", `${Math.max(0, 1 - y / 560)}`);
       }
       document.querySelector(".sp-nav")?.classList.toggle("scrolled", y > 24);
     };
@@ -48,8 +80,6 @@ export default function Splash() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const ids = ["meme", "social", "tools", "dex"];
-
   return (
     <div className="sp">
       <style>{css}</style>
@@ -57,135 +87,257 @@ export default function Splash() {
       <nav className="sp-nav">
         <a className="sp-brand" href="/"><span className="sp-mark" />{BRAND}</a>
         <div className="sp-links">
-          <a href="#meme">Meme coins</a><a href="#social">Social</a>
-          <a href="#tools">Tools</a><a href="#dex">DEX</a>
+          <a href="#problem">The problem</a>
+          <a href="#build">What we build</a>
+          <a href="#roadmap">Roadmap</a>
+          <a href="#ecosystem">Ecosystem</a>
         </div>
-        <a className="sp-cta" href="/waitlist">Join waitlist</a>
+        <div className="sp-nav-cta">
+          <a className="btn-ghost sm" href={LINKS.app}>Launch app</a>
+          <a className="sp-cta" href={LINKS.waitlist}>Join waitlist</a>
+        </div>
       </nav>
 
+      {/* HERO */}
       <header className="sp-hero" ref={heroRef}>
         <div className="sp-hero-bg" aria-hidden>
           <div className="orb orb-a" /><div className="orb orb-b" /><div className="orb orb-c" />
           <div className="grid-fade" />
         </div>
         <div className="sp-hero-inner">
-          <p className="sp-eyebrow">Introducing {BRAND} <span className="ph">/ placeholder name</span></p>
-          <h1 className="sp-h1">{TAGLINE}</h1>
-          <p className="sp-lead">Meme coins, social, pro trading tools and our own DEX, finally in one place. The everything-exchange is coming.</p>
+          <p className="sp-eyebrow">{BRAND} · Reimagined</p>
+          <h1 className="sp-h1">One platform.<br/>One ecosystem.<br/><span>One place.</span></h1>
+          <p className="sp-lead">
+            Crypto tooling is a sea of clones and disconnected tabs. We&apos;re building the
+            everything app for on-chain — trading, launching, intelligence, community,
+            prediction markets and games in a single destination, powered by real on-chain
+            data and AI that understands what you&apos;re trying to do.
+          </p>
           <div className="sp-hero-actions">
-            <a className="btn-primary" href="/waitlist">Join the waitlist</a>
-            <a className="btn-ghost" href="#meme">See what&apos;s coming</a>
-          </div>
-          <div className="sp-hero-stage">
-            <div className="device"><div className="device-glare" /><span className="device-label">App preview · placeholder</span></div>
+            <a className="btn-primary" href={LINKS.waitlist}>Join the waitlist</a>
+            <a className="btn-ghost" href={LINKS.app}>Launch the app →</a>
           </div>
         </div>
         <div className="scroll-hint" aria-hidden><span /></div>
       </header>
 
+      {/* MARQUEE */}
       <div className="sp-marquee" aria-hidden>
         <div className="track">
           {Array.from({ length: 2 }).map((_, i) => (
-            <span key={i}>Meme coins · Social · Wallet intel · AI analyst · Market radar · Early launch detection · Custom DEX · Alerts · PDF reports · </span>
+            <span key={i}>Token discovery · Wallet forensics · Smart money · OG DEX · Fair launches · Prediction markets · Voice & Spaces · AI analyst · Degen Tower · APIs · </span>
           ))}
         </div>
       </div>
 
-      <section className="sp-pillars">
-        {PILLARS.map((p, i) => (
-          <article id={ids[i]} key={p.tag} className={`pillar reveal ${i % 2 ? "rev" : ""}`}>
-            <div className="pillar-copy">
-              <span className="pillar-tag">{p.tag}</span>
-              <h2>{p.title}</h2>
-              <p>{p.copy}</p>
-              <a className="pillar-link" href="/waitlist">Get early access</a>
-            </div>
-            <div className={`pillar-art ${p.tone}`}>
-              <div className="art-shine" />
-              <span className="art-label">{p.img} · image placeholder</span>
-            </div>
-          </article>
-        ))}
+      {/* PROBLEM */}
+      <section id="problem" className="sp-sec reveal">
+        <span className="sp-kicker">The problem</span>
+        <h2 className="sp-h2">You shouldn&apos;t need 12 tabs to trade.</h2>
+        <p className="sp-body">
+          The average trader juggles 8–12 disconnected tools just to have a functional
+          workflow. Nothing talks to each other. When you find a good token you can&apos;t
+          instantly see which KOLs hold it, smart-money pressure, top-holder history or
+          community sentiment. You piece it together manually like it&apos;s 2017.
+        </p>
+        <div className="sp-chips">
+          {["Pump.fun / Raydium","Dexscreener / Birdeye","Nansen / Arkham","Twitter + Telegram","Prediction sites","Random TG bots","Phantom / Solflare","Notion KOL notes","Holder checkers","Portfolio dashboards"].map((c) => (
+            <span key={c} className="sp-chip">{c}</span>
+          ))}
+        </div>
+        <p className="sp-body dim">The future isn&apos;t more single-purpose apps. It&apos;s convergence — one intelligent platform that surfaces the exact info and actions you need, instantly.</p>
       </section>
 
+      {/* WHAT WE BUILD */}
+      <section id="build" className="sp-sec reveal">
+        <span className="sp-kicker">What we&apos;re building</span>
+        <h2 className="sp-h2">A complete operating system for the on-chain economy.</h2>
+        <div className="sp-grid">
+          {FEATURES.map((f) => (
+            <article key={f.tag} className={`sp-card ${f.tone}`}>
+              <span className="sp-card-tag">{f.tag}</span>
+              <h3>{f.title}</h3>
+              <p>{f.copy}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* WHY DIFFERENT */}
+      <section className="sp-sec reveal">
+        <span className="sp-kicker">Why this is different</span>
+        <h2 className="sp-h2">Build the platform we wished existed while grinding every day.</h2>
+        <div className="sp-why">
+          {["No more tab switching","No more paying 5 services for basic alpha","No more guessing if a wallet is smart or lucky","No more launching a coin with zero tools to grow it","No more community as an afterthought","Everything connected by design"].map((w) => (
+            <div key={w} className="sp-why-item"><span className="dot" />{w}</div>
+          ))}
+        </div>
+        <p className="sp-body">Open a token and instantly see the full on-chain picture, which KOLs and smart wallets are in, jump into trading, host a Space, drop into a voice lobby, check related prediction markets and read live sentiment — without ever leaving the platform.</p>
+      </section>
+
+      {/* ROADMAP */}
+      <section id="roadmap" className="sp-sec reveal">
+        <span className="sp-kicker">Roadmap</span>
+        <h2 className="sp-h2">Shipping daily. Building in public.</h2>
+        <div className="sp-phases">
+          {PHASES.map((p) => (
+            <div key={p.k} className="sp-phase">
+              <div className="sp-phase-k">{p.k}<span>{p.t}</span></div>
+              <p>{p.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* WHO FOR */}
+      <section className="sp-sec reveal">
+        <span className="sp-kicker">Who it&apos;s for</span>
+        <h2 className="sp-h2">For people tired of the same old thing.</h2>
+        <div className="sp-for">
+          {FOR.map((f) => <div key={f} className="sp-for-item">{f}</div>)}
+        </div>
+      </section>
+
+      {/* ECOSYSTEM */}
+      <section id="ecosystem" className="sp-sec reveal">
+        <span className="sp-kicker">The ecosystem</span>
+        <h2 className="sp-h2">Already live. Already shipping.</h2>
+        <div className="sp-eco">
+          <a className="sp-eco-card" href={LINKS.ogdex}><h3>OG DEX</h3><p>Real-time Solana screener, scanner & trading.</p><span>Open →</span></a>
+          <a className="sp-eco-card" href={LINKS.solno} target="_blank" rel="noreferrer"><h3>Solno</h3><p>Prediction markets + provably-fair 1v1 games.</p><span>solno.fun →</span></a>
+          <a className="sp-eco-card" href={LINKS.degen} target="_blank" rel="noreferrer"><h3>Degen Tower</h3><p>Tap-to-earn with real USDC payouts.</p><span>Play →</span></a>
+        </div>
+      </section>
+
+      {/* FINAL CTA */}
       <section className="sp-close reveal">
-        <h2>One account.<br/>Every market.</h2>
-        <p>Be first in line when {BRAND} opens.</p>
-        <a className="btn-primary lg" href="/waitlist">Join the waitlist</a>
+        <h2>The last platform you ever open<br/>for on-chain activity.</h2>
+        <p>New name coming soon. New domain coming soon. Be first in line.</p>
+        <a className="btn-primary lg" href={LINKS.waitlist}>Join the waitlist</a>
       </section>
 
+      {/* FOOTER */}
       <footer className="sp-foot">
-        <span><span className="sp-mark" />{BRAND}</span>
-        <span className="sp-foot-note">© {new Date().getFullYear()} {BRAND} · placeholder brand, final name TBD</span>
+        <div className="sp-foot-top">
+          <a className="sp-brand" href="/"><span className="sp-mark" />{BRAND}</a>
+          <div className="sp-foot-cols">
+            <div>
+              <h4>Product</h4>
+              <a href={LINKS.app}>OG DEX</a>
+              <a href={LINKS.solno} target="_blank" rel="noreferrer">Solno</a>
+              <a href={LINKS.degen} target="_blank" rel="noreferrer">Degen Tower</a>
+              <a href={LINKS.waitlist}>Waitlist</a>
+            </div>
+            <div>
+              <h4>Community</h4>
+              <a href={LINKS.telegram} target="_blank" rel="noreferrer">Telegram</a>
+              <a href={LINKS.x} target="_blank" rel="noreferrer">X · @ogscanbackup</a>
+              <a href={LINKS.xSolno} target="_blank" rel="noreferrer">X · @solnobet</a>
+            </div>
+            <div>
+              <h4>Legal</h4>
+              <a href={LINKS.privacy}>Privacy Policy</a>
+              <a href={LINKS.terms}>Terms of Service</a>
+            </div>
+          </div>
+        </div>
+        <div className="sp-foot-bottom">
+          <span>© {new Date().getFullYear()} {BRAND}. Reimagined. Building in public, shipping daily.</span>
+        </div>
       </footer>
     </div>
   );
 }
 
 const css = `
-.sp{--ink:#0a0a0b;--muted:#86868b;--line:#e7e7ea;--accent:#5b5bf0;--accent2:#9b6bff;
-  background:#fff;color:var(--ink);overflow-x:hidden;
-  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased;}
+.sp{--bg:#050608;--ink:#ffffff;--muted:#a7adba;--line:rgba(255,255,255,0.10);--accent:#2F80FF;--accent2:#9945FF;
+  background:var(--bg);color:var(--ink);overflow-x:hidden;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Inter,'Plus Jakarta Sans',sans-serif;-webkit-font-smoothing:antialiased;}
 .sp a{text-decoration:none;color:inherit;}
-.sp-nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:14px clamp(16px,5vw,52px);transition:all .35s;}
-.sp-nav.scrolled{background:rgba(255,255,255,.72);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--line);}
-.sp-brand{display:flex;align-items:center;gap:9px;font-weight:650;letter-spacing:.14em;font-size:15px;}
-.sp-mark{width:16px;height:16px;border-radius:5px;background:conic-gradient(from 140deg,var(--accent),var(--accent2),var(--accent));box-shadow:0 4px 14px rgba(91,91,240,.4);}
-.sp-links{display:flex;gap:30px;font-size:14px;color:#3a3a40;}
-.sp-links a{transition:color .2s;}.sp-links a:hover{color:var(--accent);}
-.sp-cta{font-size:14px;font-weight:600;color:#fff;padding:9px 18px;border-radius:980px;background:linear-gradient(120deg,var(--accent),var(--accent2));box-shadow:0 8px 20px -8px rgba(91,91,240,.8);transition:transform .15s,filter .2s;}
-.sp-cta:hover{filter:brightness(1.07);transform:translateY(-1px);}
-@media(max-width:780px){.sp-links{display:none}}
-.sp-hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:120px 20px 60px;overflow:hidden;}
+.sp-nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px clamp(16px,5vw,52px);transition:all .35s;}
+.sp-nav.scrolled{background:rgba(5,6,8,.72);backdrop-filter:saturate(160%) blur(18px);border-bottom:1px solid var(--line);}
+.sp-brand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:.16em;font-size:15px;color:#fff;}
+.sp-mark{width:16px;height:16px;border-radius:5px;background:conic-gradient(from 140deg,var(--accent),var(--accent2),var(--accent));box-shadow:0 4px 16px rgba(47,128,255,.5);}
+.sp-links{display:flex;gap:26px;font-size:13.5px;color:var(--muted);}
+.sp-links a:hover{color:#fff;}
+.sp-nav-cta{display:flex;align-items:center;gap:10px;}
+.sp-cta{font-size:13.5px;font-weight:700;color:#000;padding:9px 16px;border-radius:980px;background:linear-gradient(120deg,var(--accent),var(--accent2));box-shadow:0 8px 22px -8px rgba(47,128,255,.8);transition:transform .15s,filter .2s;}
+.sp-cta:hover{filter:brightness(1.08);transform:translateY(-1px);}
+@media(max-width:880px){.sp-links{display:none}}
+@media(max-width:520px){.btn-ghost.sm{display:none}}
+.sp-hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:130px 20px 80px;overflow:hidden;}
 .sp-hero-bg{position:absolute;inset:0;z-index:0;}
-.orb{position:absolute;border-radius:50%;filter:blur(60px);opacity:.55;transform:translateY(var(--py,0)) scale(var(--ps,1));}
-.orb-a{width:520px;height:520px;top:-120px;left:-60px;background:radial-gradient(circle,#9b6bff,transparent 70%);}
-.orb-b{width:560px;height:560px;top:-40px;right:-120px;background:radial-gradient(circle,#3da5ff,transparent 70%);}
-.orb-c{width:480px;height:480px;bottom:-160px;left:40%;background:radial-gradient(circle,#ff6bd0,transparent 70%);opacity:.4;}
-.grid-fade{position:absolute;inset:0;background-image:linear-gradient(rgba(10,10,20,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(10,10,20,.05) 1px,transparent 1px);background-size:54px 54px;-webkit-mask-image:radial-gradient(circle at 50% 30%,#000,transparent 72%);mask-image:radial-gradient(circle at 50% 30%,#000,transparent 72%);}
-.sp-hero-inner{position:relative;z-index:1;max-width:980px;opacity:var(--pf,1);}
-.sp-eyebrow{font-size:13px;letter-spacing:.04em;color:var(--accent);font-weight:600;margin:0 0 18px;}
-.sp-eyebrow .ph{color:#b9bcc4;font-weight:500;}
-.sp-h1{margin:0;font-size:clamp(52px,11vw,128px);line-height:.95;letter-spacing:-.045em;font-weight:700;background:linear-gradient(180deg,#0a0a0b 30%,#3a3a55);-webkit-background-clip:text;background-clip:text;color:transparent;}
-.sp-lead{margin:26px auto 0;max-width:54ch;font-size:clamp(17px,2vw,21px);line-height:1.5;color:#54545c;}
-.sp-hero-actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:34px;}
-.btn-primary{font-weight:600;font-size:16px;color:#fff;padding:14px 28px;border-radius:980px;background:linear-gradient(120deg,var(--accent),var(--accent2));box-shadow:0 14px 30px -10px rgba(91,91,240,.75);transition:transform .15s,filter .2s;}
-.btn-primary:hover{filter:brightness(1.07);transform:translateY(-2px);}
-.btn-primary.lg{font-size:18px;padding:17px 36px;}
-.btn-ghost{font-weight:600;font-size:16px;color:var(--ink);padding:14px 22px;border-radius:980px;border:1px solid var(--line);background:rgba(255,255,255,.6);transition:all .2s;}
-.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
-.sp-hero-stage{margin-top:70px;perspective:1400px;}
-.device{position:relative;width:min(760px,90vw);aspect-ratio:16/9;margin:0 auto;border-radius:26px;background:linear-gradient(160deg,#15151c,#26263a);transform:rotateX(14deg) translateY(var(--py,0)) scale(var(--ps,1));transform-style:preserve-3d;display:grid;place-items:center;box-shadow:0 40px 80px -30px rgba(20,20,60,.55),0 0 0 1px rgba(255,255,255,.06) inset;}
-.device-glare{position:absolute;inset:0;border-radius:26px;background:linear-gradient(120deg,rgba(255,255,255,.22),transparent 40%);}
-.device-label{color:rgba(255,255,255,.5);font-size:14px;letter-spacing:.04em;}
-.scroll-hint{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);width:24px;height:38px;border:2px solid rgba(10,10,20,.25);border-radius:14px;display:flex;justify-content:center;padding-top:6px;}
-.scroll-hint span{width:4px;height:8px;border-radius:4px;background:rgba(10,10,20,.35);animation:sd 1.6s infinite;}
+.orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;transform:translateY(var(--py,0));}
+.orb-a{width:540px;height:540px;top:-140px;left:-80px;background:radial-gradient(circle,#2F80FF,transparent 70%);}
+.orb-b{width:560px;height:560px;top:-60px;right:-120px;background:radial-gradient(circle,#9945FF,transparent 70%);}
+.orb-c{width:520px;height:520px;bottom:-180px;left:38%;background:radial-gradient(circle,#14a0ff,transparent 70%);opacity:.32;}
+.grid-fade{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:radial-gradient(circle at 50% 32%,#000,transparent 70%);mask-image:radial-gradient(circle at 50% 32%,#000,transparent 70%);}
+.sp-hero-inner{position:relative;z-index:1;max-width:1000px;opacity:var(--pf,1);}
+.sp-eyebrow{font-size:12.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:0 0 20px;}
+.sp-h1{margin:0;font-size:clamp(46px,9vw,108px);line-height:.96;letter-spacing:-.04em;font-weight:800;}
+.sp-h1 span{background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
+.sp-lead{margin:28px auto 0;max-width:62ch;font-size:clamp(15.5px,1.7vw,19px);line-height:1.6;color:var(--muted);}
+.sp-hero-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:36px;}
+.btn-primary{font-weight:700;font-size:16px;color:#000;padding:14px 28px;border-radius:980px;background:linear-gradient(120deg,var(--accent),var(--accent2));box-shadow:0 16px 34px -12px rgba(47,128,255,.8);transition:transform .15s,filter .2s;}
+.btn-primary:hover{filter:brightness(1.08);transform:translateY(-2px);}
+.btn-primary.lg{font-size:18px;padding:17px 38px;}
+.btn-ghost{font-weight:700;font-size:16px;color:#fff;padding:14px 22px;border-radius:980px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .2s;}
+.btn-ghost.sm{font-size:13.5px;padding:9px 16px;}
+.btn-ghost:hover{border-color:var(--accent);color:#fff;background:rgba(47,128,255,.1);}
+.scroll-hint{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);width:24px;height:38px;border:2px solid rgba(255,255,255,.2);border-radius:14px;display:flex;justify-content:center;padding-top:6px;}
+.scroll-hint span{width:4px;height:8px;border-radius:4px;background:rgba(255,255,255,.4);animation:sd 1.6s infinite;}
 @keyframes sd{0%{opacity:0;transform:translateY(-4px)}40%{opacity:1}100%{opacity:0;transform:translateY(10px)}}
-.sp-marquee{border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden;padding:18px 0;background:#fafafb;}
-.sp-marquee .track{display:flex;white-space:nowrap;gap:24px;animation:mq 28s linear infinite;font-size:15px;color:#9a9aa2;font-weight:500;}
+.sp-marquee{border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden;padding:16px 0;background:rgba(255,255,255,.02);}
+.sp-marquee .track{display:flex;white-space:nowrap;gap:24px;animation:mq 32s linear infinite;font-size:14.5px;color:#7e879a;font-weight:600;}
 @keyframes mq{to{transform:translateX(-50%)}}
-.sp-pillars{max-width:1180px;margin:0 auto;padding:clamp(60px,10vw,140px) clamp(18px,5vw,40px);display:flex;flex-direction:column;gap:clamp(80px,12vw,180px);}
-.pillar{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,80px);align-items:center;}
-.pillar.rev .pillar-copy{order:2;}
-.pillar-tag{display:inline-block;font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--accent);padding:6px 14px;border-radius:980px;background:rgba(91,91,240,.08);margin-bottom:18px;}
-.pillar-copy h2{margin:0;font-size:clamp(30px,4.6vw,52px);line-height:1.04;letter-spacing:-.03em;font-weight:680;}
-.pillar-copy p{margin:18px 0 24px;font-size:clamp(16px,1.7vw,19px);line-height:1.55;color:#54545c;max-width:42ch;}
-.pillar-link{font-weight:600;color:var(--accent);font-size:16px;transition:opacity .2s;}
-.pillar-link:hover{opacity:.7;}
-.pillar-art{position:relative;aspect-ratio:4/3;border-radius:26px;overflow:hidden;display:grid;place-items:center;box-shadow:0 40px 80px -36px rgba(30,20,70,.5);}
-.t-meme{background:linear-gradient(140deg,#ff8a3d,#ff3d77);}
-.t-social{background:linear-gradient(140deg,#3da5ff,#7b5bff);}
-.t-tools{background:linear-gradient(140deg,#19d3a2,#1f8bff);}
-.t-dex{background:linear-gradient(140deg,#9b6bff,#5b5bf0);}
-.art-shine{position:absolute;inset:0;background:linear-gradient(120deg,rgba(255,255,255,.28),transparent 45%);}
-.art-label{position:relative;color:rgba(255,255,255,.9);font-size:14px;font-weight:500;letter-spacing:.03em;background:rgba(0,0,0,.18);padding:8px 16px;border-radius:980px;backdrop-filter:blur(6px);}
+.sp-sec{max-width:1100px;margin:0 auto;padding:clamp(64px,10vw,130px) clamp(18px,5vw,40px);}
+.sp-kicker{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);padding:6px 14px;border-radius:980px;background:rgba(47,128,255,.1);border:1px solid rgba(47,128,255,.2);}
+.sp-h2{margin:18px 0 0;font-size:clamp(30px,4.6vw,52px);line-height:1.05;letter-spacing:-.03em;font-weight:800;max-width:18ch;}
+.sp-body{margin:20px 0 0;font-size:clamp(15px,1.6vw,18px);line-height:1.65;color:var(--muted);max-width:64ch;}
+.sp-body.dim{color:#7e879a;}
+.sp-chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px;}
+.sp-chip{font-size:13px;color:#c7ccd6;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);}
+.sp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px;}
+@media(max-width:900px){.sp-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.sp-grid{grid-template-columns:1fr}}
+.sp-card{position:relative;border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border-radius:20px;padding:22px;overflow:hidden;transition:border-color .25s,transform .25s;}
+.sp-card:hover{border-color:rgba(47,128,255,.45);transform:translateY(-3px);}
+.sp-card::before{content:"";position:absolute;top:-40px;right:-40px;width:120px;height:120px;border-radius:50%;filter:blur(40px);opacity:.5;background:var(--c,#2F80FF);}
+.sp-card.f1{--c:#2F80FF}.sp-card.f2{--c:#14F195}.sp-card.f3{--c:#2F80FF}.sp-card.f4{--c:#FFC53D}.sp-card.f5{--c:#9945FF}.sp-card.f6{--c:#ff6bd0}.sp-card.f7{--c:#14a0ff}.sp-card.f8{--c:#ff8a3d}.sp-card.f9{--c:#7b5bff}
+.sp-card-tag{position:relative;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);}
+.sp-card h3{position:relative;margin:10px 0 8px;font-size:19px;font-weight:700;letter-spacing:-.01em;}
+.sp-card p{position:relative;margin:0;font-size:13.5px;line-height:1.55;color:var(--muted);}
+.sp-why{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:30px;}
+@media(max-width:600px){.sp-why{grid-template-columns:1fr}}
+.sp-why-item{display:flex;align-items:center;gap:12px;font-size:15px;color:#dfe3ea;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025);}
+.sp-why-item .dot{width:8px;height:8px;border-radius:50%;background:linear-gradient(120deg,var(--accent),var(--accent2));box-shadow:0 0 12px var(--accent);flex-shrink:0;}
+.sp-phases{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:32px;}
+@media(max-width:900px){.sp-phases{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.sp-phases{grid-template-columns:1fr}}
+.sp-phase{border:1px solid var(--line);border-radius:18px;padding:20px;background:rgba(255,255,255,.025);}
+.sp-phase-k{font-size:13px;font-weight:800;color:#fff;display:flex;flex-direction:column;gap:2px;margin-bottom:10px;}
+.sp-phase-k span{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);}
+.sp-phase p{margin:0;font-size:13.5px;line-height:1.55;color:var(--muted);}
+.sp-for{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:30px;}
+@media(max-width:600px){.sp-for{grid-template-columns:1fr}}
+.sp-for-item{font-size:15px;color:#dfe3ea;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025);}
+.sp-eco{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:32px;}
+@media(max-width:760px){.sp-eco{grid-template-columns:1fr}}
+.sp-eco-card{border:1px solid var(--line);border-radius:20px;padding:24px;background:linear-gradient(160deg,rgba(47,128,255,.08),rgba(153,69,255,.04));transition:border-color .25s,transform .25s;}
+.sp-eco-card:hover{border-color:rgba(47,128,255,.5);transform:translateY(-3px);}
+.sp-eco-card h3{margin:0;font-size:22px;font-weight:800;}
+.sp-eco-card p{margin:8px 0 16px;font-size:14px;color:var(--muted);}
+.sp-eco-card span{font-size:13.5px;font-weight:700;color:var(--accent);}
+.sp-close{text-align:center;padding:clamp(80px,14vw,170px) 20px;background:radial-gradient(circle at 50% 0%,rgba(47,128,255,.12),transparent 55%);}
+.sp-close h2{margin:0;font-size:clamp(34px,6.5vw,76px);line-height:1.02;letter-spacing:-.035em;font-weight:800;}
+.sp-close p{margin:22px 0 34px;font-size:17px;color:var(--muted);}
+.sp-foot{border-top:1px solid var(--line);padding:50px clamp(18px,5vw,52px) 30px;}
+.sp-foot-top{display:flex;justify-content:space-between;gap:40px;flex-wrap:wrap;max-width:1100px;margin:0 auto;}
+.sp-foot-cols{display:flex;gap:clamp(24px,6vw,72px);flex-wrap:wrap;}
+.sp-foot-cols h4{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#7e879a;margin:0 0 12px;}
+.sp-foot-cols a{display:block;font-size:14px;color:#c7ccd6;margin-bottom:9px;transition:color .2s;}
+.sp-foot-cols a:hover{color:var(--accent);}
+.sp-foot-bottom{max-width:1100px;margin:36px auto 0;padding-top:20px;border-top:1px solid var(--line);font-size:12.5px;color:#6b7384;}
 .reveal{opacity:0;transform:translateY(40px);transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1);}
 .reveal.in{opacity:1;transform:none;}
-@media(max-width:820px){.pillar{grid-template-columns:1fr}.pillar.rev .pillar-copy{order:0}}
-.sp-close{text-align:center;padding:clamp(80px,14vw,180px) 20px;background:linear-gradient(180deg,#fff,#f5f5f9);}
-.sp-close h2{margin:0;font-size:clamp(40px,8vw,88px);line-height:1;letter-spacing:-.04em;font-weight:700;}
-.sp-close p{margin:22px 0 34px;font-size:19px;color:#54545c;}
-.sp-foot{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:30px clamp(18px,5vw,52px);border-top:1px solid var(--line);font-size:13.5px;color:#9a9aa2;}
-.sp-foot span:first-child{display:flex;align-items:center;gap:9px;font-weight:650;letter-spacing:.14em;color:var(--ink);}
-.sp-foot-note{font-size:12.5px;}
 `;

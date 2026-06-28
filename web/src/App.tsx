@@ -172,10 +172,10 @@ const App = () => (
             <Route path="/snipe-feed" element={<OgdexRedirect to="/OGDEX" />} />
             <Route path="/dev-wallet-radar" element={<OgdexRedirect to="/OGDEX/wallet" />} />
             <Route path="/dev-wallet" element={<OgdexRedirect to="/OGDEX/wallet" />} />
-            <Route path="/scanner" element={<OgdexRedirect to="/OGDEX/tools" />} />
-            <Route path="/og-finder" element={<OgdexRedirect to="/OGDEX/tools" />} />
-            <Route path="/og-scanner" element={<OgdexRedirect to="/OGDEX/tools" />} />
-            <Route path="/ogscan-scanner" element={<OgdexRedirect to="/OGDEX/tools" />} />
+            <Route path="/scanner" element={<OgdexRedirect to="/OGDEX/scanner" />} />
+            <Route path="/og-finder" element={<OgdexRedirect to="/OGDEX/scanner" />} />
+            <Route path="/og-scanner" element={<OgdexRedirect to="/OGDEX/scanner" />} />
+            <Route path="/ogscan-scanner" element={<OgdexRedirect to="/OGDEX/scanner" />} />
             <Route path="/pairs" element={<OgdexRedirect to="/OGDEX" />} />
             <Route path="/migrations" element={<OgdexRedirect to="/OGDEX" />} />
             <Route path="/migration-tool" element={<OgdexRedirect to="/OGDEX" />} />

@@ -128,3 +128,76 @@ export async function walletProfile(addr: string): Promise<WalletProfile> {
     topTokens: accts.sort((a: any, b: any) => b.amount - a.amount).slice(0, 8),
   };
 }
+
+// ── OG Scanner — forensic origin attribution (search the chain, find the OG, expose clones) ──
+export interface OgCandidate {
+  mint: string; symbol: string; name: string; icon?: string | null;
+  price: number | null; mcap: number | null; liquidity: number | null;
+  holderCount: number | null; organicScore: number | null; isVerified: boolean;
+  launchpad: string | null; createdAt: string | null; ageDays: number | null;
+  mintDisabled: boolean | null; freezeDisabled: boolean | null; topHoldersPct: number | null;
+  riskScore: number; verdict: "OG" | "Clone" | "Risky" | "Unverified"; isOG: boolean;
+}
+export interface OgReport { query: string; og: OgCandidate | null; candidates: OgCandidate[] }
+
+function riskOf(t: any): number {
+  const a = t.audit || {};
+  let s = 50;
+  if (a.mintAuthorityDisabled) s += 15; else s -= 25;
+  if (a.freezeAuthorityDisabled) s += 15; else s -= 20;
+  const top = num(a.topHoldersPercentage);
+  if (top != null) s += top > 30 ? -20 : top > 15 ? -5 : 10;
+  const liq = num(t.liquidity);
+  if (liq != null) s += liq > 25000 ? 15 : liq > 5000 ? 5 : -5;
+  const org = num(t.organicScore);
+  if (org != null) s += Math.min(15, org / 7);
+  return Math.max(0, Math.min(100, Math.round(s)));
+}
+
+export async function ogScan(query: string): Promise<OgReport> {
+  const d = await jget(`/tokens/v2/search?query=${encodeURIComponent(query.trim())}`);
+  const arr: any[] = Array.isArray(d) ? d : (d?.tokens || d?.data || []);
+  if (!arr.length) return { query, og: null, candidates: [] };
+
+  const mapped: OgCandidate[] = arr.slice(0, 30).map((t) => {
+    const a = t.audit || {};
+    const created = t.firstPool?.createdAt || t.createdAt || null;
+    const ageDays = created ? Math.max(0, Math.floor((Date.now() - new Date(created).getTime()) / 86400000)) : null;
+    const risk = riskOf(t);
+    return {
+      mint: t.id, symbol: t.symbol || "?", name: t.name || t.symbol || "Unknown", icon: t.icon || null,
+      price: num(t.usdPrice), mcap: num(t.mcap ?? t.fdv), liquidity: num(t.liquidity),
+      holderCount: num(t.holderCount), organicScore: num(t.organicScore), isVerified: !!t.isVerified,
+      launchpad: t.launchpad || null, createdAt: created, ageDays,
+      mintDisabled: a.mintAuthorityDisabled ?? null, freezeDisabled: a.freezeAuthorityDisabled ?? null,
+      topHoldersPct: num(a.topHoldersPercentage), riskScore: risk,
+      verdict: "Unverified", isOG: false,
+    };
+  });
+
+  // OG attribution: the original is the oldest / deepest-liquidity token for the dominant symbol.
+  const topSym = mapped[0].symbol.toUpperCase();
+  const sameSym = mapped.filter((t) => t.symbol.toUpperCase() === topSym);
+  const pool = sameSym.length ? sameSym : mapped;
+  // rank: verified first, then oldest createdAt, then deepest liquidity
+  const ranked = [...pool].sort((a, b) => {
+    if (a.isVerified !== b.isVerified) return a.isVerified ? -1 : 1;
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : Infinity;
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : Infinity;
+    if (ta !== tb) return ta - tb; // older = more OG
+    return (b.liquidity || 0) - (a.liquidity || 0);
+  });
+  const og = ranked[0] || null;
+
+  for (const t of mapped) {
+    const isOg = !!og && t.mint === og.mint;
+    t.isOG = isOg;
+    if (t.riskScore < 40 || (t.mintDisabled === false || t.freezeDisabled === false)) t.verdict = "Risky";
+    else if (isOg) t.verdict = "OG";
+    else if (t.symbol.toUpperCase() === topSym) t.verdict = "Clone";
+    else t.verdict = t.isVerified ? "OG" : "Unverified";
+  }
+  // OG first, then by liquidity
+  mapped.sort((a, b) => (a.isOG === b.isOG ? (b.liquidity || 0) - (a.liquidity || 0) : a.isOG ? -1 : 1));
+  return { query, og, candidates: mapped };
+}
