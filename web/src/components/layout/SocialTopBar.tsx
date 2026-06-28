@@ -1,5 +1,6 @@
-import { Hash, User, Mail, Settings } from "lucide-react";
+import { Hash, User, Mail, Settings, LogOut } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 /** New-theme top header for the social app (replaces the side tab bar). Route-based. */
 const TABS: { id: string; label: string; route: string; Icon: typeof Hash }[] = [
@@ -11,6 +12,8 @@ const TABS: { id: string; label: string; route: string; Icon: typeof Hash }[] = 
 export function SocialTopBar(_props?: { activeId?: string; onNavigate?: (id: string) => void }) {
   const nav = useNavigate();
   const loc = useLocation();
+  const { signOut } = useAuth();
+  const logout = async () => { try { await signOut(); } finally { nav("/auth"); } };
   const active = (route: string) => loc.pathname === route || loc.pathname.startsWith(route + "/");
 
   return (
@@ -28,6 +31,7 @@ export function SocialTopBar(_props?: { activeId?: string; onNavigate?: (id: str
 
       <div className="stb-right">
         <a className="stb-link" href="/settings"><Settings className="h-4 w-4" /><span>Settings</span></a>
+        <button className="stb-link stb-logout" onClick={logout}><LogOut className="h-4 w-4" /><span>Log out</span></button>
         <a className="stb-cta" href="/app">Hub</a>
       </div>
     </header>
@@ -48,6 +52,8 @@ const css = `
 .stb-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .stb-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#a7adba;padding:8px 12px;border-radius:10px;text-decoration:none;transition:all .18s;}
 .stb-link:hover{color:#fff;background:rgba(255,255,255,.05);}
+.stb-logout{border:0;cursor:pointer;background:transparent;font-family:inherit;}
+.stb-logout:hover{color:#ff6b6b;background:rgba(255,107,107,.1);}
 .stb-cta{font-size:13px;font-weight:700;color:#000;padding:9px 18px;border-radius:980px;text-decoration:none;background:linear-gradient(120deg,#2F80FF,#9945FF);box-shadow:0 8px 20px -8px rgba(47,128,255,.8);transition:transform .15s,filter .2s;}
 .stb-cta:hover{filter:brightness(1.08);transform:translateY(-1px);}
 @media(max-width:760px){.stb-tab span,.stb-link span{display:none}.stb-link{padding:8px}}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const BRAND = "OGSCAN";
 const OS = "OGSCAN OS";
@@ -98,6 +99,8 @@ export default function Hub() {
   const [glitchKey, setGlitchKey] = useState(0);
   const deskRef = useRef<HTMLDivElement>(null);
   const now = useClock();
+  const { signOut } = useAuth();
+  const logout = async () => { try { await signOut(); } finally { window.location.assign("/auth"); } };
 
   // boot sequence
   useEffect(() => {
@@ -194,6 +197,7 @@ export default function Hub() {
             <span className="mb-sig" aria-hidden><i /><i /><i /><i /></span>
             <span className="mb-clock">{date}<b>{time}</b></span>
             <a className="mb-acct" href="/settings"><span className="mb-acct-dot" />Account</a>
+            <button className="mb-logout" onClick={logout} title="Log out">Log out</button>
           </div>
         </header>
 
@@ -323,6 +327,8 @@ const css = `
 .mb-clock b{font-size:12.5px;color:#fff;letter-spacing:.04em;}
 .mb-acct{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:980px;border:1px solid var(--line);background:rgba(255,255,255,.04);font-size:11.5px;color:#fff;transition:all .2s;}
 .mb-acct:hover{border-color:#2F80FF;background:rgba(47,128,255,.16);}
+.mb-logout{font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;padding:5px 12px;border-radius:980px;border:1px solid var(--line);background:rgba(255,255,255,.04);font-size:11.5px;color:#cfd6e2;transition:all .2s;}
+.mb-logout:hover{border-color:#ff5b6b;color:#fff;background:rgba(255,91,107,.16);}
 .mb-acct-dot{width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#2F80FF,#9945FF);}
 @media(max-width:680px){.mb-menu,.mb-sig,.mb-stat{display:none}}
 
