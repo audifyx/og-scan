@@ -18,7 +18,7 @@
     },
     {
       "source": "/(.*)",
-      "destination": "/"
+      "destination": "/app.html"
     }
   ],
   "redirects": [
@@ -101,5 +101,11 @@
         }
       ]
     }
-  ]
+  ],
+  "buildCommand": "npm run build && npm --prefix ogdex install --no-audit --no-fund && npm --prefix ogdex run build",
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 30
+    }
+  }
 }
