@@ -153,45 +153,20 @@ export default function Splash() {
             </div>
           </div>
 
-          <div className="sp-showcase" aria-hidden>
-            <div className="sp-showcase-stage">
+          <div className="sp-showcase">
+            <div className="sp-data-grid">
               {[
-                { label: "OG DEX", caption: "Live screener & trade", accent: "#2F80FF" },
-                { label: "Scanner", caption: "Forensic on-chain scan", accent: "#14E0C8" },
-                { label: "Social", caption: "Spaces · voice · chat", accent: "#9945FF" },
-                { label: "Intelligence", caption: "Smart money & AI", accent: "#FFC53D" },
-              ].map((frame, i) => (
-                <div
-                  key={frame.label}
-                  className={`sp-showcase-card ${i === heroFrame ? "is-active" : ""} ${i === (heroFrame + 1) % 4 ? "is-next" : ""}`}
-                  style={{ ["--accent" as string]: frame.accent }}
-                >
-                  <div className="sp-showcase-frame">
-                    <div className="sp-showcase-ui">
-                      <span className="sp-showcase-dot" />
-                      <span className="sp-showcase-bar" />
-                      <span className="sp-showcase-bar short" />
-                    </div>
-                    <div className="sp-showcase-meta">
-                      <strong>{frame.label}</strong>
-                      <span>{frame.caption}</span>
-                    </div>
-                    <div className="sp-showcase-shine" />
-                  </div>
+                { k: "16", v: "Blockchains" },
+                { k: "500+", v: "Live pairs" },
+                { k: "2M+", v: "Wallets tracked" },
+                { k: "10ms", v: "Avg scan time" },
+              ].map((item) => (
+                <div key={item.k} className="sp-data-cell">
+                  <strong className="sp-data-num">{item.k}</strong>
+                  <span className="sp-data-label">{item.v}</span>
                 </div>
               ))}
             </div>
-            <div className="sp-showcase-dots">
-              {[
-                { label: "OG DEX", accent: "#2F80FF" },
-                { label: "Scanner", accent: "#14E0C8" },
-                { label: "Social", accent: "#9945FF" },
-                { label: "Intelligence", accent: "#FFC53D" },
-              ].map((frame, i) => (
-                <span key={frame.label} className={`sp-showcase-pip ${i === heroFrame ? "is-active" : ""}`} style={{ ["--accent" as string]: frame.accent }} />
-              ))}
-            </div>
-            <div className="sp-showcase-glow" style={{ ["--accent" as string]: ["#2F80FF","#14E0C8","#9945FF","#FFC53D"][heroFrame] }} />
           </div>
         </div>
 
@@ -332,9 +307,9 @@ const css = `
 @media(max-width:520px){.btn-ghost.sm{display:none}}
 
 .sp-hero{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:130px clamp(18px,5vw,52px) 80px;overflow:hidden;}
-.sp-hero-ready .sp-hero-inner,.sp-hero-ready .sp-showcase{animation:spHeroIn 1.1s cubic-bezier(.2,.7,.2,1) .15s both;}
+.sp-hero-ready .sp-hero-inner{animation:spHeroIn 1.1s cubic-bezier(.2,.7,.2,1) .15s both;}
 .sp-hero-layout{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(24px,4vw,56px);width:min(1180px,100%);align-items:center;}
-@media(max-width:980px){.sp-hero-layout{grid-template-columns:1fr;text-align:center}.sp-showcase{display:none}.sp-hero-inner{max-width:1000px;margin:0 auto}}
+@media(max-width:980px){.sp-hero-layout{grid-template-columns:1fr;text-align:center}.sp-hero-inner{max-width:100%;margin:0 auto}}
 .sp-hero-bg{position:absolute;inset:0;z-index:0;}
 .sp-hero-photo{position:absolute;inset:0;background-position:center;background-size:cover;background-repeat:no-repeat;opacity:0;transform:scale(1.08);transition:opacity 1.6s ease,transform 10s ease-out;filter:saturate(.85);}
 .sp-hero-photo.is-active{opacity:.55;animation:heroDrift 22s ease-in-out infinite alternate;}
@@ -365,28 +340,15 @@ const css = `
 @media(max-width:980px){.sp-lead{margin-left:auto;margin-right:auto}}
 .sp-hero-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:36px;}
 @media(max-width:980px){.sp-hero-actions{justify-content:center}}
-.sp-showcase{position:relative;min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;perspective:1200px;}
-.sp-showcase-stage{position:relative;width:min(260px,62vw);height:min(420px,68vh);}
-.sp-showcase-card{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transform:translate3d(60px,20px,-120px) rotateY(-28deg) scale(.88);filter:blur(6px);transition:opacity .7s ease,transform .8s cubic-bezier(.2,.8,.2,1),filter .7s ease;pointer-events:none;}
-.sp-showcase-card.is-active{opacity:1;transform:translate3d(0,0,0) rotateY(-8deg) scale(1);filter:blur(0);z-index:3;}
-.sp-showcase-card.is-next{opacity:.35;transform:translate3d(40px,12px,-80px) rotateY(-18deg) scale(.92);filter:blur(2px);z-index:2;}
-.sp-showcase-frame{position:relative;width:100%;height:100%;border-radius:22px;overflow:hidden;border:1px solid rgba(255,255,255,.14);background:#0a0c14;box-shadow:0 30px 80px -30px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.06) inset,0 0 40px -10px var(--accent);animation:spCardFloat 5s ease-in-out infinite;}
-.sp-showcase-card.is-active .sp-showcase-frame{animation:spCardFloat 5s ease-in-out infinite,spCardPulse 4.2s ease-in-out infinite;}
-@keyframes spCardFloat{50%{transform:translateY(-10px)}}
-@keyframes spCardPulse{50%{box-shadow:0 34px 90px -28px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.08) inset,0 0 50px -6px var(--accent)}}
-.sp-showcase-ui{position:absolute;top:14px;left:14px;right:14px;display:flex;align-items:center;gap:8px;}
-.sp-showcase-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);}
-.sp-showcase-bar{flex:1;height:6px;border-radius:999px;background:rgba(255,255,255,.12);}
-.sp-showcase-bar.short{flex:0 0 28%;}
-.sp-showcase-meta{position:absolute;left:0;right:0;bottom:0;padding:16px 14px 14px;background:linear-gradient(to top,rgba(3,5,8,.92),transparent);display:flex;flex-direction:column;gap:4px;}
-.sp-showcase-meta strong{font-size:13px;letter-spacing:.08em;text-transform:uppercase;}
-.sp-showcase-meta span{font-size:11px;color:var(--muted);}
-.sp-showcase-shine{position:absolute;inset:0;background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.16) 50%,transparent 58%);transform:translateX(-120%);animation:spShine 3.2s ease-in-out infinite;}
-@keyframes spShine{0%,35%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
-.sp-showcase-glow{position:absolute;inset:20% 10%;border-radius:50%;background:radial-gradient(circle,var(--accent),transparent 68%);filter:blur(60px);opacity:.35;transition:background .8s ease;}
-.sp-showcase-dots{display:flex;gap:8px;margin-top:18px;}
-.sp-showcase-pip{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.18);transition:transform .3s ease,background .3s ease,box-shadow .3s ease;}
-.sp-showcase-pip.is-active{background:var(--accent);transform:scale(1.25);box-shadow:0 0 14px var(--accent);}
+.sp-showcase{position:relative;min-height:360px;display:flex;align-items:center;justify-content:center;animation:showcaseIn 1.3s cubic-bezier(.2,.8,.2,1) .2s both;}
+@keyframes showcaseIn{from{opacity:0;transform:translateY(44px) scale(.94)}to{opacity:1;transform:none}}
+.sp-data-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;width:min(520px,100%);}
+.sp-data-cell{position:relative;border:1px solid var(--line);border-radius:18px;padding:22px 24px;background:linear-gradient(170deg,rgba(255,255,255,.04),rgba(255,255,255,.01));overflow:hidden;transition:border-color .3s,transform .3s;}
+.sp-data-cell:hover{border-color:rgba(47,128,255,.38);transform:translateY(-3px);}
+.sp-data-cell::before{content:"";position:absolute;top:-30px;right:-30px;width:90px;height:90px;border-radius:50%;filter:blur(30px);opacity:.35;background:var(--accent);transition:opacity .4s;}
+.sp-data-cell:hover::before{opacity:.55;}
+.sp-data-num{display:block;font-size:clamp(32px,3.6vw,42px);font-weight:800;letter-spacing:-.03em;background:linear-gradient(180deg,#fff 30%,rgba(255,255,255,.45));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1;}
+.sp-data-label{display:block;margin-top:6px;font-size:12.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-weight:700;}
 .btn-primary{font-weight:700;font-size:16px;color:#000;padding:14px 28px;border-radius:980px;background:linear-gradient(120deg,var(--accent),var(--accent2));box-shadow:0 16px 34px -12px rgba(47,128,255,.8);transition:transform .2s,filter .2s;}
 .btn-primary:hover{filter:brightness(1.08);transform:translateY(-2px);}
 .btn-ghost{font-weight:700;font-size:16px;color:#fff;padding:14px 22px;border-radius:980px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .2s;}
