@@ -9,8 +9,28 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/ORBITX_DEX",
+      "destination": "/ORBITX_DEX/index.html"
+    },
+    {
+      "source": "/ORBITX_DEX/(.*)",
+      "destination": "/ORBITX_DEX/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/OGDEX",
+      "destination": "/ORBITX_DEX",
+      "permanent": true
+    },
+    {
+      "source": "/OGDEX/(.*)",
+      "destination": "/ORBITX_DEX/$1",
+      "permanent": true
     }
   ],
   "headers": [
