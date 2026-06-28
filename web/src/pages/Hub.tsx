@@ -117,7 +117,7 @@ export default function Hub() {
         clearInterval(tick);
         setTimeout(() => { sessionStorage.setItem("ogos_booted", "1"); setBooted(true); }, 300);
       }
-    }, 80); // Faster boot sequence to reduce lag
+    }, 200); // Balanced speed - no jank
     return () => clearInterval(tick);
   }, []);
 
