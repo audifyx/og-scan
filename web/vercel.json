@@ -29,6 +29,14 @@
       "destination": "/OGDEX/index.html"
     },
     {
+      "source": "/ORBITX_DEX",
+      "destination": "/ORBITX_DEX/index.html"
+    },
+    {
+      "source": "/ORBITX_DEX/(.*)",
+      "destination": "/ORBITX_DEX/index.html"
+    },
+    {
       "source": "/",
       "destination": "/app.html"
     },

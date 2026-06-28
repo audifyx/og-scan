@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import logo from "@/assets/logo.png";
 
 /* ── Data ───────────────────────────────────────────────────────── */
@@ -178,6 +180,8 @@ function useParticles(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
 /* ── Component ──────────────────────────────────────────────────── */
 
 export default function Splash() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const heroRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [heroFrame, setHeroFrame] = useState(0);
@@ -190,6 +194,12 @@ export default function Splash() {
   const stat2 = useCounter(500, 2000, 0, "+");
   const stat3 = useCounter(2, 1800, 0, "M+");
   const stat4 = useCounter(10, 1400, 0, "ms");
+
+  useEffect(() => {
+    if (!loading && user) {
+      navigate("/app", { replace: true });
+    }
+  }, [user, loading, navigate]);
 
   useEffect(() => {
     const ready = setTimeout(() => setHeroReady(true), 120);
