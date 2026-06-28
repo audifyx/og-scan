@@ -162,11 +162,11 @@ export default function Status() {
 
       {/* Links */}
       <div className="mt-6 flex flex-wrap gap-3 text-sm">
-        <a href="https://t.me/ogupdates" target="_blank" rel="noreferrer"
+        <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-all">
           <Zap className="w-3.5 h-3.5" /> Updates Channel
         </a>
-        <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer"
+        <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-panel2 text-muted border border-line hover:text-white transition-all">
           <Globe className="w-3.5 h-3.5" /> Support
         </a>

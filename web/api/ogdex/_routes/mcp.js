@@ -103,7 +103,7 @@ export default async function mcpRoute(req) {
       schema_version: "v1",
       name: "OG DEX",
       description: "On-chain data and analytics for crypto traders. Token forensics, screener, wallet PnL, KOL tracking, and AI-powered token reads across 16 chains.",
-      contact: { url: "https://ogscan.fun", telegram: "https://t.me/ogupdates" },
+      contact: { url: "https://ogscan.fun", telegram: "https://t.me/OrbitXupdates" },
       tools: TOOLS,
     });
   }

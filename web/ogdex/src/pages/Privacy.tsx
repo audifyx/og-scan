@@ -12,7 +12,7 @@ export default function Privacy() {
       <Section title="Local storage">Preferences such as your watchlist and admin/session flags are stored in your browser's local storage, not on our servers, unless you opt into wallet-synced features.</Section>
       <Section title="Third parties">Token and market data is fetched from third-party APIs (Jupiter, GeckoTerminal, DexScreener, CoinGecko, Helius, Rugcheck, pump.fun). Their use is governed by their own policies. The AI assistant performs live web searches to answer questions; queries may be sent to those providers.</Section>
       <Section title="Cookies">We use minimal, functional storage only — no third-party advertising trackers.</Section>
-      <Section title="Contact">Questions or deletion requests? Telegram <a className="text-accent" href="https://t.me/ogscanner" target="_blank" rel="noreferrer">@ogscanner</a>.</Section>
+      <Section title="Contact">Questions or deletion requests? Telegram <a className="text-accent" href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer">@ogscanner</a>.</Section>
     </div>
   );
 }

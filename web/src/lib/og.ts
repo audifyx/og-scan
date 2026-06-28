@@ -10,7 +10,7 @@ export const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY ?? "";
 export const QUICKNODE_WSS = import.meta.env.VITE_QUICKNODE_WSS ?? "";
 
 export const OGSCAN_SITE_URL = "https://ogscan.fun";
-export const OGSCAN_X_URL = "https://x.com/ogscanbackup";
+export const OGSCAN_X_URL = "https://x.com/orbitx_wrldbackup";
 export const OGSCAN_TECH_POST_URL = "https://x.com/i/status/2052413018563084370";
 export const OGSCAN_BRAND_IMAGE = "/og-brand.jpg";
 

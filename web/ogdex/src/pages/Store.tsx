@@ -48,10 +48,10 @@ export default function Store() {
                 If we think your project is genuinely good — something we'd ape into ourselves — we'll <span className="text-white font-semibold">list it and boost it free for 2 days</span>. No payment, no catch. Drop it in our DMs and make your case.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="btn bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 inline-flex items-center gap-1.5 text-sm font-semibold">
+                <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="btn bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 inline-flex items-center gap-1.5 text-sm font-semibold">
                   Pitch us on Telegram <ArrowRight className="h-3.5 w-3.5" />
                 </a>
-                <a href="https://x.com/ogscanbackup" target="_blank" rel="noreferrer" className="btn bg-white/5 border border-white/10 text-white hover:bg-white/10 inline-flex items-center gap-1.5 text-sm font-semibold">
+                <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="btn bg-white/5 border border-white/10 text-white hover:bg-white/10 inline-flex items-center gap-1.5 text-sm font-semibold">
                   DM on X
                 </a>
               </div>
@@ -193,7 +193,7 @@ export default function Store() {
       <div className="mt-8 card p-4 text-xs text-muted space-y-2">
         <p><span className="text-white font-medium">How do I pay?</span> — Send SOL (or USDC/USDT) to our payment wallet and submit the tx hash. We verify on-chain.</p>
         <p><span className="text-white font-medium">How fast is approval?</span> — Boosts activate within 1–2 hours. Standard listings within 24h, Express within 2h.</p>
-        <p><span className="text-white font-medium">Questions?</span> — DM us on <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="text-accent hover:underline">Telegram</a>.</p>
+        <p><span className="text-white font-medium">Questions?</span> — DM us on <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="text-accent hover:underline">Telegram</a>.</p>
       </div>
     </div>
   );

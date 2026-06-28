@@ -61,10 +61,10 @@ export default async function handler(req, res) {
                 </div>
 
                 <p style="color: rgba(255,255,255,0.6); font-size: 14px; margin-bottom: 8px;">Stay in the loop:</p>
-                <a href="https://t.me/ogupdates" style="display: inline-block; background: linear-gradient(135deg, #9945FF 0%, #2F80FF 50%, #14F195 100%); color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600;">Join Telegram</a>
+                <a href="https://t.me/OrbitXupdates" style="display: inline-block; background: linear-gradient(135deg, #9945FF 0%, #2F80FF 50%, #14F195 100%); color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600;">Join Telegram</a>
 
                 <hr style="border: none; border-top: 1px solid rgba(153,69,255,0.2); margin: 32px 0;">
-                <p style="color: rgba(255,255,255,0.4); font-size: 12px; text-align: center;">OrbitX — Token Intelligence Platform<br/>© 2026 @ogscanbackup</p>
+                <p style="color: rgba(255,255,255,0.4); font-size: 12px; text-align: center;">OrbitX — Token Intelligence Platform<br/>© 2026 @orbitx_wrld</p>
               </div>
             `
           }),

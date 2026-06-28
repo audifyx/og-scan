@@ -235,23 +235,23 @@ export default function Layout() {
               </p>
               <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "#8497B8" }}>
                 Updated weekly — read our{" "}
-                <a href="https://t.me/ogupdates" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "#2F80FF" }}>Updates channel</a>
+                <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "#2F80FF" }}>Updates channel</a>
                 {" "}for changes.
               </p>
               <div className="mt-4 flex items-center gap-1.5 text-[12px]" style={{ color: "#8497B8" }}>
                 <Zap className="w-3.5 h-3.5" style={{ color: "#2F80FF" }} />
                 Built &amp; designed by{" "}
-                <a href="https://x.com/ogscanbackup" target="_blank" rel="noreferrer" className="font-bold hover:underline text-brand-gradient">@ogscanbackup</a>
+                <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="font-bold hover:underline text-brand-gradient">@orbitx_wrld</a>
               </div>
 
               {/* Social buttons */}
               <div className="mt-4 flex gap-2">
-                <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80" style={{ background: "rgba(47,128,255,0.1)", border: "1px solid rgba(47,128,255,0.2)", color: "#2F80FF" }}>
+                <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80" style={{ background: "rgba(47,128,255,0.1)", border: "1px solid rgba(47,128,255,0.2)", color: "#2F80FF" }}>
                   <Send className="w-3 h-3" /> Telegram
                 </a>
-                <a href="https://x.com/ogscanbackup" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80" style={{ background: "rgba(153,69,255,0.1)", border: "1px solid rgba(153,69,255,0.2)", color: "#9945FF" }}>
+                <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80" style={{ background: "rgba(153,69,255,0.1)", border: "1px solid rgba(153,69,255,0.2)", color: "#9945FF" }}>
                   <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                  @ogscanbackup
+                  @orbitx_wrld
                 </a>
               </div>
             </div>
@@ -272,15 +272,15 @@ export default function Layout() {
               </div>
               <div className="space-y-2.5 col-span-2 sm:col-span-1">
                 <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#9945FF" }}>Community</div>
-                <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#2F80FF]" style={{ color: "#8497B8" }}>
+                <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#2F80FF]" style={{ color: "#8497B8" }}>
                   <Send className="w-3 h-3" /> @ogscanner
                 </a>
-                <a href="https://t.me/ogupdates" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#2F80FF]" style={{ color: "#8497B8" }}>
+                <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#2F80FF]" style={{ color: "#8497B8" }}>
                   <Send className="w-3 h-3" /> @ogupdates
                 </a>
-                <a href="https://x.com/ogscanbackup" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#9945FF]" style={{ color: "#8497B8" }}>
+                <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#9945FF]" style={{ color: "#8497B8" }}>
                   <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                  @ogscanbackup
+                  @orbitx_wrld
                 </a>
               </div>
             </div>
@@ -295,7 +295,7 @@ export default function Layout() {
             <div className="flex items-center gap-4">
               <Link to="/terms" className="hover:text-[#2F80FF] transition-colors">Terms</Link>
               <Link to="/privacy" className="hover:text-[#2F80FF] transition-colors">Privacy</Link>
-              <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="hover:text-[#2F80FF] transition-colors">Support</a>
+              <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="hover:text-[#2F80FF] transition-colors">Support</a>
             </div>
           </div>
         </div>

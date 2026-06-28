@@ -165,7 +165,7 @@ export default async function handler(req) {
           manifest: `${BASE}/api/mcp`,
           execute: `${BASE}/api/mcp`,
         },
-        contact: { url: BASE, telegram: "https://t.me/ogupdates" },
+        contact: { url: BASE, telegram: "https://t.me/OrbitXupdates" },
         tools: TOOLS,
       }),
       { status: 200, headers }

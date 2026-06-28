@@ -9,7 +9,7 @@ const LINKS = {
   signin: "/auth?mode=signin",
   signup: "/auth?mode=signup",
   telegram: "https://t.me/ogscan",
-  x: "https://x.com/ogscanbackup",
+  x: "https://x.com/orbitx_wrldbackup",
   xSolno: "https://x.com/solnobet",
   ogdex: "/OGDEX",
   solno: "https://solno.fun",
@@ -234,7 +234,7 @@ export default function Splash() {
             <div>
               <h4>Community</h4>
               <a href={LINKS.telegram} target="_blank" rel="noreferrer">Telegram</a>
-              <a href={LINKS.x} target="_blank" rel="noreferrer">X · @ogscanbackup</a>
+              <a href={LINKS.x} target="_blank" rel="noreferrer">X · @orbitx_wrld</a>
               <a href={LINKS.xSolno} target="_blank" rel="noreferrer">X · @solnobet</a>
             </div>
             <div>

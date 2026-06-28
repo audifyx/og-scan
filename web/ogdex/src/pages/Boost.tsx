@@ -261,7 +261,7 @@ export default function Boost() {
         <p>3. We verify on-chain and activate your boost within 1–2 hours.</p>
         <p>4. Your token appears in the <strong className="text-white">scrolling boost reel</strong> and <strong className="text-white">Featured Daily</strong> section at the top of the screener.</p>
         <p className="pt-1 border-t border-line">
-          Questions? <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="text-accent hover:underline">Telegram @ogscanner</a>
+          Questions? <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="text-accent hover:underline">Telegram @ogscanner</a>
         </p>
       </div>
     </div>

@@ -660,7 +660,7 @@ function BannersTab({ data, act }: any) {
             ))}
           </div>
           <input value={link} onChange={e => setLink(e.target.value)}
-            placeholder="Optional link URL (e.g. https://t.me/ogupdates)" className="inp" />
+            placeholder="Optional link URL (e.g. https://t.me/OrbitXupdates)" className="inp" />
           <div className="flex gap-2">
             <button onClick={save} disabled={saving}
               className="btn bg-accent text-black font-bold text-sm inline-flex items-center gap-1.5 disabled:opacity-60">

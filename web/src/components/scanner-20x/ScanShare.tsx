@@ -55,7 +55,7 @@ export const ScanShare: React.FC<Props> = ({ scanData, compact = false }) => {
   };
 
   const shareToTwitter = () => {
-    const text = encodeURIComponent(`${scanData.rugScore <= 30 ? "🟢" : scanData.rugScore <= 60 ? "🟡" : "🔴"} $${scanData.symbol} Risk: ${scanData.rugScore}/100 | Grade ${scanData.grade}\n\nScanned on @ogscanbackup`);
+    const text = encodeURIComponent(`${scanData.rugScore <= 30 ? "🟢" : scanData.rugScore <= 60 ? "🟡" : "🔴"} $${scanData.symbol} Risk: ${scanData.rugScore}/100 | Grade ${scanData.grade}\n\nScanned on @orbitx_wrld`);
     const url = encodeURIComponent(shareUrl);
     window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
   };

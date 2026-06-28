@@ -87,8 +87,8 @@ export default function Whitepaper() {
 
       <div className="mt-6 flex flex-wrap gap-3 text-sm">
         <a href="https://ogscan.fun" className="text-accent inline-flex items-center gap-1">App <ExternalLink className="w-3 h-3" /></a>
-        <a href="https://t.me/ogupdates" target="_blank" rel="noreferrer" className="text-accent inline-flex items-center gap-1">Updates <ExternalLink className="w-3 h-3" /></a>
-        <a href="https://t.me/ogscanner" target="_blank" rel="noreferrer" className="text-accent inline-flex items-center gap-1">Support <ExternalLink className="w-3 h-3" /></a>
+        <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" className="text-accent inline-flex items-center gap-1">Updates <ExternalLink className="w-3 h-3" /></a>
+        <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="text-accent inline-flex items-center gap-1">Support <ExternalLink className="w-3 h-3" /></a>
         <Link to="/roadmap" className="text-accent">Roadmap</Link>
         <Link to="/status" className="text-accent">Status</Link>
         <a href="/api/ogdex/mcp" target="_blank" rel="noreferrer" className="text-accent inline-flex items-center gap-1">MCP <ExternalLink className="w-3 h-3" /></a>

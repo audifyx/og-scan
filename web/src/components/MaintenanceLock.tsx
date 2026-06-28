@@ -177,12 +177,12 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
           <p className="text-slate-500 text-xs">
             Follow{" "}
             <a
-              href="https://t.me/ogscanner"
+              href="https://t.me/orbitxwrld"
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-400 hover:text-blue-300 transition-colors"
             >
-              @ogscanbackup
+              @orbitx_wrld
             </a>{" "}
             for live updates.
           </p>

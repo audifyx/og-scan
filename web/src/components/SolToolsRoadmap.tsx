@@ -21,8 +21,8 @@ const communityLinks: { label: string; href: string; detail: string }[] = [
   { label: "X", href: OGSCAN_X_URL, detail: "Public updates" },
   { label: "Website", href: OGSCAN_SITE_URL, detail: "Main platform" },
   { label: "X Community", href: "https://twitter.com/i/communities/2007536315483685053", detail: "Early users" },
-  { label: "Telegram", href: "https://t.me/ogscanner", detail: "Scanner chat" },
-  { label: "Updates", href: "https://t.me/ogupdates", detail: "Announcements" },
+  { label: "Telegram", href: "https://t.me/orbitxwrld", detail: "Scanner chat" },
+  { label: "Updates", href: "https://t.me/OrbitXupdates", detail: "Announcements" },
 ];
 
 type Tone = "lime" | "cyan" | "gold" | "red";

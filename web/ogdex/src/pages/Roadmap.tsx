@@ -63,7 +63,7 @@ export default function Roadmap() {
       <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white mb-4"><ArrowLeft className="w-4 h-4" /> Back</Link>
       <PageBanner />
       <div className="flex items-center gap-2 mb-1"><Sparkles className="w-5 h-5 text-accent" /><h1 className="text-2xl font-black tracking-tight">OG DEX Roadmap</h1></div>
-      <p className="text-xs text-muted mb-6">We ship every week, driven by what the community asks for. Follow <a href="https://t.me/ogupdates" target="_blank" rel="noreferrer" className="text-accent">@ogupdates</a> for releases.</p>
+      <p className="text-xs text-muted mb-6">We ship every week, driven by what the community asks for. Follow <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" className="text-accent">@ogupdates</a> for releases.</p>
 
       <div className="space-y-5">
         {PHASES.map((ph) => (
