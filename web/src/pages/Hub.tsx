@@ -127,7 +127,10 @@ export default function Hub() {
   const [dockOrder, setDockOrder] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(DOCK_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return Array.from(new Set(parsed));
+      }
     } catch {}
     return ALL_APPS.map((a) => a.key);
   });
@@ -136,7 +139,7 @@ export default function Hub() {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   useEffect(() => {
-    localStorage.setItem(DOCK_KEY, JSON.stringify(dockOrder));
+    localStorage.setItem(DOCK_KEY, JSON.stringify(Array.from(new Set(dockOrder))));
   }, [dockOrder]);
 
   const getApps = () => dockOrder.map((key) => ALL_APPS.find((a) => a.key === key)!).filter(Boolean);
@@ -159,11 +162,9 @@ export default function Hub() {
     setDragId(null);
     if (!dragId || dragId === targetKey) return;
     setDockOrder((prev) => {
-      const next = [...prev];
-      const from = next.indexOf(dragId);
+      const next = prev.filter((k) => k !== dragId);
       const to = next.indexOf(targetKey);
-      if (from < 0 || to < 0) return prev;
-      next.splice(from, 1);
+      if (to < 0) return prev;
       next.splice(to, 0, dragId);
       return next;
     });
