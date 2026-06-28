@@ -41,7 +41,7 @@ const modeCopy = {
   reset: {
     eyebrow: "Password reset",
     title: "Get a fresh access link.",
-    body: "Enter your email and OGScan will send the reset flow.",
+    body: "Enter your email and OGSCAN will send the reset flow.",
     cta: "Send reset link",
   },
 } satisfies Record<AuthMode, { eyebrow: string; title: string; body: string; cta: string }>;
@@ -157,7 +157,7 @@ const Auth = () => {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
-        <Loader2 className="h-8 w-8 animate-spin text-og-lime" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#2F80FF]" />
       </div>
     );
   }
@@ -181,7 +181,7 @@ const Auth = () => {
           </Button>
 
           <div className="max-w-md">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-og-cyan/25 bg-og-cyan/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-og-cyan">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#9945FF]/25 bg-[#9945FF]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#9945FF]">
               <ShieldCheck className="h-3.5 w-3.5" />
               Secure access
             </div>
@@ -191,10 +191,10 @@ const Auth = () => {
 
           <div className="mt-8 grid max-w-md grid-cols-2 gap-3">
             {[
-              { label: "Scanner", Icon: Radar, text: "text-og-lime", bg: "bg-og-lime/10 border-og-lime/25" },
+              { label: "Scanner", Icon: Radar, text: "text-[#2F80FF]", bg: "bg-[#2F80FF]/10 border-[#2F80FF]/25" },
               { label: "Watchlists", Icon: Sparkles, text: "text-[#f472b6]", bg: "bg-[#f472b6]/10 border-[#f472b6]/25" },
-              { label: "Wallets", Icon: Fingerprint, text: "text-og-gold", bg: "bg-og-gold/10 border-og-gold/25" },
-              { label: "Spaces", Icon: ShieldCheck, text: "text-og-cyan", bg: "bg-og-cyan/10 border-og-cyan/25" },
+              { label: "Wallets", Icon: Fingerprint, text: "text-[#FFC53D]", bg: "bg-[#FFC53D]/10 border-[#FFC53D]/25" },
+              { label: "Spaces", Icon: ShieldCheck, text: "text-[#9945FF]", bg: "bg-[#9945FF]/10 border-[#9945FF]/25" },
             ].map((item) => (
               <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.055] p-4">
                 <div className={`mb-4 grid h-10 w-10 place-items-center rounded-2xl border ${item.bg} ${item.text}`}>
@@ -222,14 +222,14 @@ const Auth = () => {
                 <div className="mb-6 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-12 w-12 overflow-hidden rounded-2xl border border-white/15 bg-white/10">
-                      <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" />
+                      <img src="/icon.png" alt="OGSCAN" className="h-full w-full object-cover" />
                     </div>
                     <div>
-                      <p className="text-sm font-black uppercase tracking-[0.18em]">OGScan</p>
+                      <p className="text-sm font-black uppercase tracking-[0.18em]">OGSCAN</p>
                       <p className="text-[10px] font-semibold text-white/38">{copy.eyebrow}</p>
                     </div>
                   </div>
-                  <div className="grid h-11 w-11 place-items-center rounded-2xl border border-og-lime/25 bg-og-lime/10 text-og-lime">
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl border border-[#2F80FF]/25 bg-[#2F80FF]/10 text-[#2F80FF]">
                     <Lock className="h-4 w-4" />
                   </div>
                 </div>
@@ -245,7 +245,7 @@ const Auth = () => {
                   <button
                     type="button"
                     onClick={() => setMode("signup")}
-                    className={`min-h-11 rounded-[0.9rem] text-sm font-black transition ${mode === "signup" ? "bg-og-lime text-og-ink" : "text-white/45"}`}
+                    className={`min-h-11 rounded-[0.9rem] text-sm font-black transition ${mode === "signup" ? "bg-[#2F80FF] text-white" : "text-white/45"}`}
                   >
                     Sign up
                   </button>
@@ -262,7 +262,7 @@ const Auth = () => {
                       <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Username</Label>
                       <div className="relative">
                         <AtSign className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                        <Input value={username} onChange={(e) => setUsername(e.target.value)} className="h-13 min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-base text-white focus:border-og-lime" placeholder="yourname" />
+                        <Input value={username} onChange={(e) => setUsername(e.target.value)} className="h-13 min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-base text-white focus:border-[#2F80FF]" placeholder="yourname" />
                       </div>
                       {errors.username && <p className="text-xs font-semibold text-og-blood">{errors.username}</p>}
                     </div>
@@ -272,7 +272,7 @@ const Auth = () => {
                     <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-base text-white focus:border-og-lime" placeholder="you@example.com" />
+                      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-base text-white focus:border-[#2F80FF]" placeholder="you@example.com" />
                     </div>
                     {errors.email && <p className="text-xs font-semibold text-og-blood">{errors.email}</p>}
                   </div>
@@ -282,7 +282,7 @@ const Auth = () => {
                       <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                        <Input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 pr-12 text-base text-white focus:border-og-lime" placeholder="Password" />
+                        <Input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 pr-12 text-base text-white focus:border-[#2F80FF]" placeholder="Password" />
                         <button type="button" onClick={() => setShowPassword((p) => !p)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/38 transition hover:text-white" aria-label={showPassword ? "Hide password" : "Show password"}>
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
@@ -297,7 +297,7 @@ const Auth = () => {
                         <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Confirm password</Label>
                         <div className="relative">
                           <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                          <Input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-base text-white focus:border-og-lime" placeholder="Confirm password" />
+                          <Input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-base text-white focus:border-[#2F80FF]" placeholder="Confirm password" />
                         </div>
                         {errors.confirm && <p className="text-xs font-semibold text-og-blood">{errors.confirm}</p>}
                       </div>
@@ -305,7 +305,7 @@ const Auth = () => {
                       <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-4">
                         <div>
                           <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Type OGSCAN</Label>
-                          <Input value={humanCode} onChange={(e) => setHumanCode(e.target.value.toUpperCase())} className="mt-2 min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] text-base uppercase tracking-[0.18em] text-white focus:border-og-lime" placeholder="OGSCAN" />
+                          <Input value={humanCode} onChange={(e) => setHumanCode(e.target.value.toUpperCase())} className="mt-2 min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] text-base uppercase tracking-[0.18em] text-white focus:border-[#2F80FF]" placeholder="OGSCAN" />
                           {errors.humanCode && <p className="mt-1 text-xs font-semibold text-og-blood">{errors.humanCode}</p>}
                         </div>
 
@@ -325,24 +325,24 @@ const Auth = () => {
                     </>
                   )}
 
-                  <Button type="submit" disabled={isSubmitting} className="min-h-[54px] w-full rounded-2xl bg-og-lime text-sm font-black text-og-ink shadow-[0_18px_46px_-30px_hsl(var(--og-lime))] transition hover:bg-white active:scale-[0.98]">
+                  <Button type="submit" disabled={isSubmitting} className="min-h-[54px] w-full rounded-2xl bg-gradient-to-r from-[#2F80FF] to-[#9945FF] text-sm font-black text-white shadow-[0_18px_46px_-22px_rgba(47,128,255,0.9)] transition hover:brightness-110 active:scale-[0.98]">
                     {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : copy.cta}
                   </Button>
                 </form>
 
                 <div className="mt-5 text-center">
                   {mode === "signin" && (
-                    <button type="button" onClick={() => setMode("reset")} className="text-xs font-bold text-white/45 transition hover:text-og-cyan">
+                    <button type="button" onClick={() => setMode("reset")} className="text-xs font-bold text-white/45 transition hover:text-[#9945FF]">
                       Forgot password?
                     </button>
                   )}
                   {mode === "signup" && (
-                    <button type="button" onClick={() => setMode("signin")} className="text-xs font-bold text-white/45 transition hover:text-og-lime">
+                    <button type="button" onClick={() => setMode("signin")} className="text-xs font-bold text-white/45 transition hover:text-[#2F80FF]">
                       Already have an account? Sign in
                     </button>
                   )}
                   {mode === "reset" && (
-                    <button type="button" onClick={() => setMode("signin")} className="text-xs font-bold text-og-lime transition hover:text-white">
+                    <button type="button" onClick={() => setMode("signin")} className="text-xs font-bold text-[#2F80FF] transition hover:text-white">
                       Back to sign in
                     </button>
                   )}

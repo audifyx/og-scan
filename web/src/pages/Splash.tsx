@@ -5,6 +5,7 @@ const BRAND = "OGSCAN";
 
 const LINKS = {
   app: "/OGDEX",
+  auth: "/auth",
   waitlist: "/waitlist",
   telegram: "https://t.me/ogscan",
   x: "https://x.com/ogscanbackup",
@@ -93,7 +94,7 @@ export default function Splash() {
           <a href="#ecosystem">Ecosystem</a>
         </div>
         <div className="sp-nav-cta">
-          <a className="btn-ghost sm" href={LINKS.app}>Launch app</a>
+          <a className="btn-ghost sm" href={LINKS.auth}>Launch app</a>
           <a className="sp-cta" href={LINKS.waitlist}>Join waitlist</a>
         </div>
       </nav>
@@ -115,7 +116,7 @@ export default function Splash() {
           </p>
           <div className="sp-hero-actions">
             <a className="btn-primary" href={LINKS.waitlist}>Join the waitlist</a>
-            <a className="btn-ghost" href={LINKS.app}>Launch the app →</a>
+            <a className="btn-ghost" href={LINKS.auth}>Launch the app →</a>
           </div>
         </div>
         <div className="scroll-hint" aria-hidden><span /></div>
