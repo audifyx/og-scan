@@ -682,7 +682,6 @@ const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
     return acc;
   },
   {
-    app: "overview",
     home: "overview",
     market: "feed",
     "market-command": "feed",
@@ -725,7 +724,7 @@ const getTabFromSlug = (slug: string | undefined): TabId | null => {
 };
 
 const getTabPath = (id: TabId): string => {
-  if (id === "overview") return "/app";
+  if (id === "overview") return "/home";
   return `/${TAB_BY_ID[id].slug}`;
 };
 
@@ -930,7 +929,7 @@ const Index = () => {
   }, [routeTab, tab]);
 
   useEffect(() => {
-    if (routeSlug && !getTabFromSlug(routeSlug)) navigate("/app", { replace: true });
+    if (routeSlug && !getTabFromSlug(routeSlug)) navigate("/home", { replace: true });
   }, [navigate, routeSlug]);
 
   useEffect(() => {
