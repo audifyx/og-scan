@@ -64,10 +64,10 @@ const Glyph = {
 };
 
 const APPS: App[] = [
-  { key: "dex", name: "OrbitX DEX", caption: "Scanner · Trade", href: "/ORBITX_DEX", tone: "#2F80FF", glyph: Glyph.dex },
+  { key: "dex", name: "OG Dex", caption: "Scanner · Trade", href: "/OGDEX", tone: "#2F80FF", glyph: Glyph.dex },
   { key: "social", name: "Social", caption: "Spaces · Chat", href: "/social", tone: "#9945FF", glyph: Glyph.social },
-  { key: "predict", name: "Prediction Markets", caption: "Provably fair", href: "https://orbitx-prediction.fun", external: true, tone: "#FFC53D", glyph: Glyph.predict },
-  { key: "scanner", name: "OrbitX Scanner", caption: "Forensic scan", href: "/ORBITX_DEX/scanner", tone: "#14E0C8", glyph: Glyph.scanner },
+  { key: "predict", name: "Prediction Markets", caption: "Provably fair", href: "https://solno.fun", external: true, tone: "#FFC53D", glyph: Glyph.predict },
+  { key: "scanner", name: "OG Scanner", caption: "Forensic scan", href: "/OGDEX/scanner", tone: "#14E0C8", glyph: Glyph.scanner },
   { key: "tower", name: "Degen Tower", caption: "Climb · Win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", glyph: Glyph.tower },
   { key: "settings", name: "Settings", caption: "Preferences", href: "/settings", tone: "#8A93A6", glyph: Glyph.settings },
 ];
@@ -102,13 +102,9 @@ export default function Hub() {
   const { signOut } = useAuth();
   const logout = async () => { try { await signOut(); } finally { window.location.assign("/auth"); } };
 
-  // boot sequence - skip if already booted
+  // boot sequence
   useEffect(() => {
-    if (sessionStorage.getItem("ogos_booted")) { 
-      setBooted(true); 
-      setBootStep(BOOT_LINES.length);
-      return; 
-    }
+    if (sessionStorage.getItem("ogos_booted")) { setBooted(true); return; }
     let i = 0;
     const tick = setInterval(() => {
       i += 1;
@@ -282,7 +278,7 @@ const css = `
 .boot{position:fixed;inset:0;z-index:50;background:#020306;display:flex;align-items:center;justify-content:center;overflow:hidden;animation:bootout .5s ease 3.2s forwards;}
 .boot-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(47,128,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(47,128,255,.07) 1px,transparent 1px);background-size:42px 42px;-webkit-mask-image:radial-gradient(circle at 50% 50%,#000,transparent 78%);mask-image:radial-gradient(circle at 50% 50%,#000,transparent 78%);}
 .boot-inner{position:relative;z-index:1;width:min(620px,86vw);text-align:center;}
-.boot-logo{font-family:'SF Pro Display',Inter,system-ui,sans-serif;font-weight:900;font-size:clamp(46px,9vw,84px);letter-spacing:.06em;line-height:1;position:relative;color:#fff;text-shadow:0 0 30px rgba(47,128,255,.6);
+.boot-logo{font-family:'SF Pro Display',Inter,system-ui,sans-serif;font-weight:900;font-size:clamp(46px,9vw,84px);letter-spacing:.06em;line-height:1;position:relative;color:#fff;text-shadow:0 0 30px rgba(47,128,255,.6);}
 .boot-logo::before,.boot-logo::after{content:attr(data-text);position:absolute;inset:0;}
 .boot-logo::before{color:#2F80FF;animation:gl-r 2.6s steps(1) infinite;}
 .boot-logo::after{color:#FF5BBD;animation:gl-b 2.6s steps(1) infinite;}
@@ -369,10 +365,10 @@ const css = `
 .app-icon-glyph{position:absolute;inset:0;display:grid;place-items:center;}
 .app-icon-glyph svg{width:46%;height:46%;}
 .g-main{color:#fff;z-index:2;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5));}
-.g-r,.g-b{opacity:0; display:none;
-.g-r{color:#ff3b5c;}.g-b{color:#2fe0ff;}
-.app:hover .g-r{opacity:.9;
-.app:hover .g-b{opacity:.9;
+.g-r,.g-b{opacity:0;display:none;}
+.g-r{opacity:0;display:none;}
+.app:hover .g-r{opacity:0;display:none;}
+.app:hover .g-b{opacity:0;display:none;}
 @keyframes rgbR{0%,100%{transform:translate(2px,-1px)}50%{transform:translate(-2px,1px)}}
 @keyframes rgbB{0%,100%{transform:translate(-2px,1px)}50%{transform:translate(2px,-1px)}}
 .app-icon-gloss{position:absolute;top:0;left:0;right:0;height:42%;background:linear-gradient(180deg,rgba(255,255,255,.22),transparent);z-index:3;pointer-events:none;}
@@ -400,7 +396,7 @@ const css = `
 .launch-glyph{width:84px;height:84px;border-radius:22px;display:grid;place-items:center;color:#fff;background:linear-gradient(160deg,color-mix(in srgb,var(--tone) 40%,#0a0e18),#070a12);border:1px solid var(--tone);box-shadow:0 0 50px -8px var(--tone);animation:lpop .8s ease infinite alternate;}
 .launch-glyph svg{width:42px;height:42px;}
 @keyframes lpop{to{transform:scale(1.08)}}
-.launch-name{font-family:'SF Pro Display',Inter,system-ui,sans-serif;font-weight:800;font-size:22px;color:#fff;position:relative;
+.launch-name{font-family:'SF Pro Display',Inter,system-ui,sans-serif;font-weight:800;font-size:22px;color:#fff;position:relative;}
 .launch-name::before,.launch-name::after{content:attr(data-text);position:absolute;inset:0;}
 .launch-name::before{color:#2fe0ff;animation:gl-r 1.2s steps(1) infinite;}
 .launch-name::after{color:#ff3b5c;animation:gl-b 1.2s steps(1) infinite;}
