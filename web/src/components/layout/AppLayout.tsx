@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
+import { SocialTopBar } from "./SocialTopBar";
 import { BottomNav } from "./BottomNav";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
@@ -93,11 +94,9 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         </div>
       )}
 
-      {/* Sidebar handles both desktop (always visible) and mobile (hamburger + overlay) */}
-      <Sidebar />
-
       {/* Main content — offset by sidebar width on desktop, bottom padding for mobile nav */}
-      <main className="main-scroll flex-1 lg:ml-[260px] overflow-auto min-h-screen pb-[68px] lg:pb-0 relative z-10">
+      <main className="main-scroll flex-1 overflow-auto min-h-screen pb-[68px] lg:pb-0 relative z-10">
+        <SocialTopBar />
         <SectionTabBar />
         {children}
       </main>

@@ -54,6 +54,7 @@ import { CoinDetailDialog } from "@/components/CoinDetailDialog";
 import { AuthButton } from "@/components/AuthButton";
 import { AppTopBar } from "@/components/AppTopBar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { SocialTopBar } from "@/components/layout/SocialTopBar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { ToolHeader, EmeraldHeader, SegmentedTabs } from "@/components/ToolPageShell";
 
@@ -1004,36 +1005,11 @@ const Index = () => {
           <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
         </div>
       )}
-      {/* Left sidebar */}
-      <AppSidebar
-        activeId={tab}
-        mint={mint}
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onChangeMint={promptMint}
-        onNavigate={(t) => { setSidebarOpen(false); switchTab(t); }}
-        onPrefetch={(t) => preloadTab(t as TabId)}
-      />
-
-      {/* Overlay for mobile sidebar */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
 
       {/* Main content */}
-      <div className="relative z-10 flex min-w-0 flex-1 min-h-0 flex-col lg:ml-[260px]">
+      <div className="relative z-10 flex min-w-0 flex-1 min-h-0 flex-col">
         {/* Top bar + horizontal tab strip */}
-        <AppTopBar
-          tab={activeTab}
-          mint={mint}
-          activeId={tab}
-          onOpenSidebar={() => setSidebarOpen(true)}
-          onChangeMint={promptMint}
-          onNavigate={switchTab}
-        />
+        <SocialTopBar activeId={tab} onNavigate={switchTab} />
 
         {isTabPending && (
           <div className="sticky top-16 z-20 h-1 w-full overflow-hidden bg-white/[0.03]">
