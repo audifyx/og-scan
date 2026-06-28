@@ -125,7 +125,7 @@ export const Sidebar = () => {
         <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-4">
           <NavLink to="/app" onClick={closeMobile} className="flex items-center gap-3 text-left">
             <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-og-lime/50 bg-og-lime/10">
-              <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              <img src="/og-icon.svg" alt="OGScan" className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
               <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-og-lime shadow-[0_0_6px_hsl(var(--og-lime))]" />
             </div>
             <div>

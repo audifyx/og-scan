@@ -71,7 +71,7 @@ export default function InstallApp() {
         {/* Header */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-og-lime/40 bg-og-lime/10">
-            <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover rounded-2xl" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+            <img src="/og-icon.svg" alt="OGScan" className="h-full w-full object-cover rounded-2xl" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">Install OG Scan</h1>
           <p className="text-sm text-white/40 mt-1">Get the app on any device — no app store required</p>

@@ -34,7 +34,7 @@ export const SiteHeader = ({ navItems, activeId, onNavigate }: Props) => {
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <button type="button" onClick={() => onNavigate("overview")} className="group flex min-w-0 shrink-0 items-center gap-3 text-left">
           <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-og-lime bg-og-ink shadow-og">
-            <img src="/icon.png" alt="OG Scan icon" className="h-full w-full object-cover" />
+            <img src="/og-icon.svg" alt="OG Scan" className="h-full w-full object-cover" />
             <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-og-cyan shadow-og" />
           </div>
           <div className="min-w-0">

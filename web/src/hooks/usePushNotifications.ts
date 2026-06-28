@@ -262,7 +262,7 @@ export const usePushNotifications = () => {
     try {
       const notification = new Notification(title, {
         icon: "/icon-192x192.png",
-        badge: "/favicon.png",
+        badge: "/favicon.svg",
         tag: options?.tag || "group-system",
         ...options,
       });

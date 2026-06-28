@@ -198,7 +198,7 @@ export const AppSidebar = ({
       <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-4" style={{backdropFilter:'none'}}>
         <button type="button" onClick={() => onNavigate("overview")} className="flex items-center gap-3 text-left">
           <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-og-lime/50 bg-og-lime/10">
-            <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" />
+            <img src="/og-icon.svg" alt="OGScan" className="h-full w-full object-cover" />
             <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-og-lime shadow-[0_0_6px_hsl(var(--og-lime))]" />
           </div>
           <div>

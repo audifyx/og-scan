@@ -38,6 +38,12 @@ const modeCopy = {
     body: "Get instant access to the complete on-chain platform — scanning, trading, and social tools in one place.",
     cta: "Create account",
   },
+  signup: {
+    eyebrow: "Create account",
+    title: "Join the On-Chain OS.",
+    body: "Get instant access to the complete on-chain platform — scanning, trading, and social tools in one place.",
+    cta: "Create account",
+  },
   reset: {
     eyebrow: "Password reset",
     title: "Get a fresh access link.",
@@ -172,7 +178,7 @@ const Auth = () => {
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_18%_-5%,rgba(91,91,240,0.18),transparent_38%),radial-gradient(circle_at_85%_8%,rgba(155,107,255,0.12),transparent_40%),radial-gradient(circle_at_50%_115%,rgba(47,128,255,0.10),transparent_45%)]" />
       <div className="pointer-events-none fixed inset-0 grid-bg opacity-[0.11]" />
 
-      <section className="relative z-10 mx-auto grid min-h-screen w-full max-w-6xl gap-8 px-4 py-5 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+          <section className="relative z-10 mx-auto grid min-h-screen w-full max-w-6xl gap-6 px-4 py-4 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
         <div className="hidden lg:block">
           <Button
             variant="ghost"
@@ -182,14 +188,14 @@ const Auth = () => {
             <ArrowLeft className="h-4 w-4" /> Back home
           </Button>
 
-          <div className="max-w-md">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#9945FF]/25 bg-[#9945FF]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#9945FF]">
-              <Sparkles className="h-3.5 w-3.5" />
-              The On-Chain OS
+            <div className="max-w-md">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#9945FF]/25 bg-[#9945FF]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#9945FF]">
+                <Sparkles className="h-3.5 w-3.5" />
+                The On-Chain OS
+              </div>
+              <h1 className="text-5xl font-black leading-[0.92] tracking-normal">{copy.title}</h1>
+              <p className="mt-4 text-base leading-7 text-white/55">{copy.body}</p>
             </div>
-            <h1 className="text-6xl font-black leading-[0.92] tracking-normal">{copy.title}</h1>
-            <p className="mt-5 text-lg leading-8 text-white/55">{copy.body}</p>
-          </div>
 
           <div className="mt-8 grid max-w-md grid-cols-2 gap-3">
             {[
@@ -209,7 +215,7 @@ const Auth = () => {
           </div>
         </div>
 
-        <div className="flex min-h-[calc(100vh-2.5rem)] items-center justify-center lg:min-h-0">
+            <div className="flex min-h-[calc(100vh-2rem)] items-center justify-center lg:min-h-0">
           <div className="w-full max-w-[430px]">
             <Button
               variant="ghost"
@@ -219,15 +225,15 @@ const Auth = () => {
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
 
-            <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-3 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.04)_inset] backdrop-blur-2xl">
-              <div className="rounded-[1.6rem] border border-white/[0.08] bg-white/[0.03] p-5 sm:p-6 backdrop-blur-xl">
+              <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-2.5 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.04)_inset] backdrop-blur-2xl">
+                <div className="rounded-[1.6rem] border border-white/[0.08] bg-white/[0.03] p-4 sm:p-5 backdrop-blur-xl">
                 <div className="mb-6 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 overflow-hidden rounded-2xl border border-white/15 bg-white/10">
-                      <img src="/icon.png" alt="OrbitX" className="h-full w-full object-cover" />
+                    <div className="h-10 w-10 overflow-hidden rounded-xl border border-white/15 bg-white/10">
+                      <img src="/og-logo.svg" alt="OrbitX" className="h-full w-full object-cover" />
                     </div>
                     <div>
-                     <p className="text-sm font-black uppercase tracking-[0.18em]">The On-Chain OS</p>
+                     <p className="text-xs font-black uppercase tracking-[0.18em]">The On-Chain OS</p>
                        <p className="text-[10px] font-semibold text-white/38">{copy.eyebrow}</p>
                     </div>
                   </div>
@@ -236,7 +242,7 @@ const Auth = () => {
                   </div>
                 </div>
 
-                <div className="mb-5 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-black/20 p-1">
+                <div className="mb-4 grid grid-cols-2 gap-1.5 rounded-2xl border border-white/10 bg-black/20 p-1">
                   <button
                     type="button"
                     onClick={() => setMode("signin")}
@@ -253,10 +259,10 @@ const Auth = () => {
                   </button>
                 </div>
 
-                <div className="mb-6">
-                  <h2 className="text-3xl font-black leading-none tracking-normal">{mode === "reset" ? "Reset password" : copy.title}</h2>
-                  <p className="mt-3 text-sm leading-6 text-white/48">{copy.body}</p>
-                </div>
+                 <div className="mb-4">
+                   <h2 className="text-2xl font-black leading-none tracking-normal">{mode === "reset" ? "Reset password" : copy.title}</h2>
+                   <p className="mt-2 text-xs leading-5 text-white/48">{copy.body}</p>
+                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {mode === "signup" && (
@@ -299,7 +305,7 @@ const Auth = () => {
                         <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Confirm password</Label>
                         <div className="relative">
                           <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                          <Input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-base text-white focus:border-[#2F80FF]" placeholder="Confirm password" />
+                          <Input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="min-h-[48px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-base text-white focus:border-[#2F80FF]" placeholder="Confirm password" />
                         </div>
                         {errors.confirm && <p className="text-xs font-semibold text-og-blood">{errors.confirm}</p>}
                       </div>
@@ -327,12 +333,12 @@ const Auth = () => {
                     </>
                   )}
 
-                  <Button type="submit" disabled={isSubmitting} className="min-h-[54px] w-full rounded-2xl bg-gradient-to-r from-[#2F80FF] to-[#9945FF] text-sm font-black text-white shadow-[0_18px_46px_-22px_rgba(47,128,255,0.9)] transition hover:brightness-110 active:scale-[0.98]">
+                  <Button type="submit" disabled={isSubmitting} className="min-h-[50px] w-full rounded-2xl bg-gradient-to-r from-[#2F80FF] to-[#9945FF] text-sm font-black text-white shadow-[0_18px_46px_-22px_rgba(47,128,255,0.9)] transition hover:brightness-110 active:scale-[0.98]">
                     {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : copy.cta}
                   </Button>
                 </form>
 
-                <div className="mt-5 text-center">
+                <div className="mt-4 text-center">
                   {mode === "signin" && (
                     <button type="button" onClick={() => setMode("reset")} className="text-xs font-bold text-white/45 transition hover:text-[#9945FF]">
                       Forgot password?

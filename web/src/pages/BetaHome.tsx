@@ -56,7 +56,7 @@ const MobilePreview = memo(() => (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="h-10 w-10 overflow-hidden rounded-2xl border border-white/15 bg-white/10">
-                  <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" />
+                  <img src="/og-icon.svg" alt="OGScan" className="h-full w-full object-cover" />
                 </div>
                 <div>
                   <p className="text-[13px] font-black text-white">OGScan</p>
@@ -183,7 +183,7 @@ const BetaHome = memo(() => {
       <nav className="relative z-20 mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-3">
           <div className="h-10 w-10 overflow-hidden rounded-2xl border border-white/15 bg-white/10">
-            <img src="/icon.png" alt="OGScan" className="h-full w-full object-cover" />
+            <img src="/og-icon.svg" alt="OGScan" className="h-full w-full object-cover" />
           </div>
           <div>
             <p className="text-sm font-black uppercase tracking-[0.18em]">OG Scan</p>

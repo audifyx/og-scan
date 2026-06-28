@@ -226,7 +226,7 @@ Time: ${new Date(alert.triggered_at * 1000).toLocaleString()}
     if (Notification.permission === 'granted') {
       new Notification(alert.title, {
         body: alert.message,
-        icon: '/og-scan-icon.png',
+        icon: '/og-icon.svg',
         tag: alert.mint,
       });
     }

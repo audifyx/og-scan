@@ -157,7 +157,7 @@ const RadarBadge = () => {
 
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-og-gold bg-og-ink shadow-og-gold sm:h-32 sm:w-32">
-          <img src="/icon.png" alt="OG Scan radar icon" className="absolute inset-0 h-full w-full scale-125 object-cover" />
+          <img src="/og-icon.svg" alt="OG Scan" className="absolute inset-0 h-full w-full scale-125 object-cover" />
           <div className="absolute inset-2 rounded-full border border-og-gold/40" />
           <Crosshair className="absolute right-3 top-3 h-3 w-3 text-og-lime" />
           <Crosshair className="absolute bottom-3 left-3 h-3 w-3 text-og-lime" />
