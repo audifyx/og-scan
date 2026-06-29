@@ -281,7 +281,8 @@ const Settings = () => {
     if (!user) return;
     setSavingWebhook(true);
     try {
-      await supabase.from("profiles").update({ discord_handle: discordWebhook }).eq("user_id", user.id);
+      const { error } = await supabase.from("profiles").update({ discord_handle: discordWebhook }).eq("user_id", user.id);
+      if (error) throw error;
       toast.success("Webhook saved");
     } catch {
       toast.error("Failed to save webhook");
@@ -294,7 +295,8 @@ const Settings = () => {
     if (!user) return;
     setSavingNotifs(true);
     try {
-      await supabase.from("profiles").update({ notification_preferences: notifications }).eq("user_id", user.id);
+      const { error } = await supabase.from("profiles").update({ notification_preferences: notifications }).eq("user_id", user.id);
+      if (error) throw error;
       toast.success("Notification preferences saved");
     } catch {
       toast.error("Failed to save");

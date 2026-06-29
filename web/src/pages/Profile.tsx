@@ -383,10 +383,12 @@ const Profile = () => {
     if (!user) { navigate("/auth"); return; }
     try {
       if (isFollowing) {
-        await supabase.from("followers").delete().eq("follower_id", user.id).eq("followee_id", targetUserId);
+        const { error } = await supabase.from("followers").delete().eq("follower_id", user.id).eq("followee_id", targetUserId);
+        if (error) throw error;
         setIsFollowing(false); toast("Unfollowed");
       } else {
-        await supabase.from("followers").insert({ follower_id: user.id, followee_id: targetUserId });
+        const { error } = await supabase.from("followers").insert({ follower_id: user.id, followee_id: targetUserId });
+        if (error) throw error;
         setIsFollowing(true); toast.success("Following!");
       }
       fetchProfile();
@@ -437,7 +439,8 @@ const Profile = () => {
       const { error: upErr } = await supabase.storage.from("profile-media").upload(path, file, { upsert: true });
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from("profile-media").getPublicUrl(path);
-      await supabase.from("profiles").update({ banner_url: publicUrl }).eq("user_id", user.id);
+      const { error: updErr } = await supabase.from("profiles").update({ banner_url: publicUrl }).eq("user_id", user.id);
+      if (updErr) throw updErr;
       setProfile(p => p ? { ...p, banner_url: publicUrl } : p);
       toast.success("Banner updated!");
     } catch { toast.error("Upload failed"); }
@@ -528,7 +531,8 @@ const Profile = () => {
                     currentAvatar={profile.avatar_url}
                     userId={user?.id}
                     onSelect={async (url) => {
-                      await supabase.from("profiles").update({ avatar_url: url }).eq("user_id", user!.id);
+                      const { error } = await supabase.from("profiles").update({ avatar_url: url }).eq("user_id", user!.id);
+                      if (error) { toast.error("Failed to update avatar"); return; }
                       setProfile({ ...profile, avatar_url: url });
                       toast.success("Avatar updated!");
                     }}

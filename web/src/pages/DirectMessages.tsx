@@ -628,6 +628,7 @@ const DirectMessages: React.FC = () => {
           className={cn(
             "flex w-full cursor-pointer items-center gap-3.5 px-4 py-3.5 text-left transition hover:bg-muted/30 active:bg-muted/50",
             pinned && "bg-primary/[0.04]",
+            activeConvo?.id === c.id && "bg-muted/50",
           )}
         >
           <div className="relative flex-shrink-0">
