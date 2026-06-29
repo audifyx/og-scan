@@ -52,6 +52,10 @@ const MOBILE_NAV = NAV_LINKS.filter((l) => ["/", "/pulse", "/wallet", "/kol", "/
 // ── Footer: secondary / informational links ──
 const FOOTER_PRODUCT = [
   { to: "/",            label: "Discovery" },
+  { to: "/tools",       label: "Token Sniper" },
+  { to: "/scanner",     label: "Scanner" },
+  { to: "/pulse",       label: "Market Pulse" },
+  { to: "/new",         label: "New Launches" },
   { to: "/wallet",      label: "Portfolio" },
   { to: "/kol",         label: "KOL Scanner" },
   { to: "/store",       label: "List & Boost" },
