@@ -1604,14 +1604,36 @@ const LiveStream = () => {
   useEffect(() => { if (user && !autoRef.current) { autoRef.current = true; ensureConnected(); } }, [user, ensureConnected]);
   useEffect(() => () => { roomRef.current?.disconnect(); }, []);
 
+  const mediaErr = (e: any): string => {
+    const n = e?.name || ""; const m = (e?.message || "").toLowerCase();
+    if (n === "NotFoundError" || n === "OverconstrainedError" || m.includes("device not found") || m.includes("requested device"))
+      return "No camera or microphone found on this device. Use Share Screen to broadcast, or connect a camera and try again.";
+    if (n === "NotAllowedError" || m.includes("permission") || m.includes("denied"))
+      return "Camera/mic access is blocked. Allow it in your browser site settings, then try again.";
+    if (n === "NotReadableError" || m.includes("in use"))
+      return "Your camera/mic is in use by another app. Close it and try again.";
+    return e?.message || "Could not start your stream.";
+  };
   const goLive = useCallback(async (mode: "camera" | "screen") => {
     const room = await ensureConnected();
     if (!room) return;
-    try {
-      if (mode === "camera") { await room.localParticipant.setCameraEnabled(true); await room.localParticipant.setMicrophoneEnabled(true); setMicOn(true); }
-      else { await room.localParticipant.setScreenShareEnabled(true); }
-      setLiveMode(mode);
-    } catch (e: any) { setError(e?.message || "Could not start your stream — check camera/screen permissions"); }
+    setError(null);
+    if (mode === "screen") {
+      try { await room.localParticipant.setScreenShareEnabled(true); setLiveMode("screen"); }
+      catch (e: any) { if (e?.name !== "NotAllowedError") setError(mediaErr(e)); } // ignore user-cancelled picker
+      return;
+    }
+    // Camera mode: enable mic + camera independently so a missing device doesn't kill the whole stream.
+    let micOk = false, camOk = false;
+    try { await room.localParticipant.setMicrophoneEnabled(true); micOk = true; } catch { /* no mic */ }
+    try { await room.localParticipant.setCameraEnabled(true); camOk = true; }
+    catch (e: any) {
+      setError(micOk
+        ? "No camera found — you're live with audio only. Use Share Screen to add video."
+        : mediaErr(e));
+    }
+    setMicOn(micOk);
+    if (camOk || micOk) setLiveMode("camera");
   }, [ensureConnected]);
 
   const stopLive = useCallback(async () => {
