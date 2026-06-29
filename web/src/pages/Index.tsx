@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useTransition, type ComponentType, type ReactNode, lazy, Suspense } from "react";
-import { useTheme } from "@/hooks/useTheme";
+
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Activity,

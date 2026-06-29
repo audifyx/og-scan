@@ -1,9 +1,7 @@
-import { useTheme } from "@/hooks/useTheme";
 import brokenGlassBg from "@/assets/broken-glass-bg.jpg";
 
 export const BackgroundLayer = () => {
-  const { customWallpaper } = useTheme();
-  const bgImage = customWallpaper || brokenGlassBg;
+  const bgImage = brokenGlassBg;
 
   return (
     <div className="fixed inset-0 z-0 pointer-events-none">
