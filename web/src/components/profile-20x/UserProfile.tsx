@@ -411,6 +411,25 @@ function CommunityProfileImage({
   );
 }
 
+// Official OrbitX brand account(s): recognized by username so they always show
+// the gold verified badge and fall back to brand name/avatar/bio when unset.
+const OFFICIAL_USERNAMES = ["orbitx.world", "orbitxworld", "orbitx"];
+const ORBITX_BIO = "OrbitX \u2014 the on-chain OS for Solana. Trade, scan, launch, predict and connect, all in one place. orbitx.world";
+const isOfficialUsername = (u?: string | null) =>
+  OFFICIAL_USERNAMES.includes((u || "").toLowerCase().replace(/^@/, ""));
+const applyOfficialBrand = <T extends Partial<ProfileData>>(p: T): T => {
+  if (!isOfficialUsername(p.username)) return p;
+  return {
+    ...p,
+    is_official_account: true,
+    verified: true,
+    display_name: p.display_name || "OrbitX",
+    avatar_url: p.avatar_url || "/icon-192x192.png",
+    bio: p.bio || ORBITX_BIO,
+    banner_url: p.banner_url || "/orbitx-banner.jpg",
+  };
+};
+
 const isGoldVerifiedProfile = (profile: Pick<ProfileData, "is_official_account" | "affiliate_org_id"> | null | undefined, isOwnerProfile = false) => {
   return Boolean(profile?.is_official_account || profile?.affiliate_org_id || isOwnerProfile);
 };
@@ -982,8 +1001,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
           avatar_url: record?.avatar_url || null,
           bio: record?.bio || null,
           badge: record?.badge || null,
-          verified: Boolean(record?.verified),
-          is_official_account: Boolean(record?.is_official_account),
+          verified: Boolean(record?.verified) || isOfficialUsername(record?.username),
+          is_official_account: Boolean(record?.is_official_account) || isOfficialUsername(record?.username),
           affiliate_org_id: record?.affiliate_org_id || null,
         };
       };
@@ -1007,7 +1026,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
     try {
       const { data: profile, error } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url, banner_url, bio, badge, verified, is_official_account, affiliate_org_id, theme_preset, custom_wallpaper_url, referral_code, og_score, og_rank, created_at, sol_wallet, first_seen_ip, last_fingerprint").eq("user_id", targetUserId).single();
       if (error) throw error;
-      const profileRecord = profile as ProfileData;
+      const profileRecord = applyOfficialBrand(profile as ProfileData);
       setProfileData(profileRecord);
       if (isOwnProfile) hydrateEditors(profileRecord);
 
