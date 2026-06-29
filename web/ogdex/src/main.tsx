@@ -46,7 +46,7 @@ function PageFallback() {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
       <WalletProvider>
-        <BrowserRouter basename="/OGDEX">
+        <BrowserRouter basename="/ORBITX_DEX">
           <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Screener />} />

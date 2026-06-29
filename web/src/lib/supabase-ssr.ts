@@ -31,13 +31,25 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
  *  - Reads tokens from cookies (never from localStorage)
  *  - Automatically refreshes tokens server-side
  */
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+// Guard against missing env vars so a misconfigured deployment can't white-screen
+// the entire app at import time (createClient throws "supabaseUrl is required").
+const SAFE_URL = SUPABASE_URL || "https://placeholder.supabase.co";
+const SAFE_ANON = SUPABASE_ANON_KEY || "placeholder-anon-key";
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  // eslint-disable-next-line no-console
+  console.error(
+    "[supabase-ssr] Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. " +
+      "Auth is disabled. Set them in your Vercel project env."
+  );
+}
+
+export const supabase = createClient(SAFE_URL, SAFE_ANON, {
   auth: {
     // Use cookie-based storage (httpOnly safe)
     storage: new CookieAuthStorageAdapter({
       isServer: false, // browser mode
     }),
-    storageKey: `sb-${SUPABASE_URL.split("//")[1]?.split(".")[0]}-auth-token`,
+    storageKey: `sb-${SAFE_URL.split("//")[1]?.split(".")[0]}-auth-token`,
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
