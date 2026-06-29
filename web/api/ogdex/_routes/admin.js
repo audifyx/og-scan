@@ -132,6 +132,7 @@ async function action(req, res) {
       case "unfeature":await dbUpdate("ogdex_listings", q, { featured: false, featured_rank: 0, updated_at: now }); break;
       case "update":   await dbUpdate("ogdex_listings", q, { ...sanitize(b.patch), updated_at: now }); break;
       case "delete":   await dbDelete("ogdex_listings", q); break;
+      case "approve_boost": await dbUpdate("ogdex_boosts", q, { status: "active", featured_rank: Number(b.featured_rank) || 1 }); break;
       case "delete_boost":  await dbDelete("ogdex_boosts", q); break;
       case "delete_launch": await dbDelete("ogdex_launches", q); break;
 

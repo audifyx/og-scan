@@ -70,6 +70,14 @@ const FOOTER_RESOURCES = [
   { to: "/terms",       label: "Terms" },
   { to: "/privacy",     label: "Privacy" },
 ];
+// External OrbitX ecosystem products.
+const FOOTER_ECOSYSTEM = [
+  { href: "https://orbitx.world",            label: "OrbitX App" },
+  { href: "https://ogscan.fun",              label: "OG Scanner" },
+  { href: "https://solno.fun",               label: "Prediction Market" },
+  { href: "https://degen-tower.vercel.app",  label: "Degen Tower" },
+  { href: "https://twitter.com/i/communities/2007536315483685053", label: "X Community" },
+];
 
 export default function Layout() {
   const [watchOpen, setWatchOpen] = useState(false);
@@ -261,7 +269,7 @@ export default function Layout() {
             </div>
 
             {/* Links grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-12 lg:gap-x-16 gap-y-3 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 lg:gap-x-12 gap-y-6 text-sm">
               <div className="space-y-2.5">
                 <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#2F80FF" }}>Product</div>
                 {FOOTER_PRODUCT.map(({ to, label }) => (
@@ -274,13 +282,19 @@ export default function Layout() {
                   <Link key={to} to={to} className="block text-[13px] transition-colors hover:text-[#FFC53D]" style={{ color: "#8497B8" }}>{label}</Link>
                 ))}
               </div>
+              <div className="space-y-2.5">
+                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#2ED3B7" }}>Ecosystem</div>
+                {FOOTER_ECOSYSTEM.map(({ href, label }) => (
+                  <a key={href} href={href} target="_blank" rel="noreferrer" className="block text-[13px] transition-colors hover:text-[#2ED3B7]" style={{ color: "#8497B8" }}>{label}</a>
+                ))}
+              </div>
               <div className="space-y-2.5 col-span-2 sm:col-span-1">
                 <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#9945FF" }}>Community</div>
                 <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#2F80FF]" style={{ color: "#8497B8" }}>
-                  <Send className="w-3 h-3" /> @ogscanner
+                  <Send className="w-3 h-3" /> @orbitxwrld
                 </a>
                 <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#2F80FF]" style={{ color: "#8497B8" }}>
-                  <Send className="w-3 h-3" /> @ogupdates
+                  <Send className="w-3 h-3" /> @OrbitXupdates
                 </a>
                 <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#9945FF]" style={{ color: "#8497B8" }}>
                   <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>

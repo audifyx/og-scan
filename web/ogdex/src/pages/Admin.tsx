@@ -22,6 +22,8 @@ type Tab =
   | "banners"
   | "banned"
   | "alerts"
+  | "boosts"
+  | "launches"
   | "waitlist"
   | "users"
   | "reports"
@@ -44,6 +46,8 @@ const TABS: { id: Tab; label: string; icon: any; cat: Cat }[] = [
   { id: "config",       label: "Config",         icon: Settings,       cat: "dex" },
   { id: "banned",       label: "Banned",         icon: Ban,            cat: "dex" },
   { id: "alerts",       label: "Alerts",         icon: Bell,           cat: "dex" },
+  { id: "boosts",       label: "Boosts",         icon: Zap,            cat: "dex" },
+  { id: "launches",     label: "Launches",       icon: Rocket,         cat: "dex" },
   // ── Social ──
   { id: "users",        label: "Users",          icon: Users,          cat: "social" },
   { id: "reports",      label: "Reports",        icon: Flag,           cat: "social" },
@@ -167,6 +171,8 @@ export default function Admin() {
       {tab === "config"    && <ConfigTab data={data} act={act} pass={pass} />}
       {tab === "banned"    && <BannedTab data={data} act={act} pass={pass} />}
       {tab === "alerts"    && <AlertsTab data={data} act={act} pass={pass} />}
+      {tab === "boosts"    && <BoostsTab data={data} act={act} />}
+      {tab === "launches"  && <LaunchesTab data={data} act={act} />}
       {tab === "waitlist"  && <WaitlistTab data={data} />}
       {tab === "users"     && <UsersTab data={data} act={act} />}
       {tab === "reports"   && <ReportsTab data={data} act={act} />}
@@ -927,6 +933,92 @@ function QuickAddFeatured({ pass, onDone }: { pass: string; onDone: () => void }
           {msg && <span className={`text-xs ${msg.startsWith("Add") ? "text-up" : "text-down"}`}>{msg}</span>}
         </div>
       </div>
+    </Section>
+  );
+}
+
+// ─── Boosts ──────────────────────────────────────────────────────────────────
+function BoostsTab({ data, act }: any) {
+  const boosts = data?.boosts || [];
+  const now = Date.now();
+  const usd = (n: any) => "$" + (Number(n) || 0).toLocaleString();
+  return (
+    <Section title={`Boosts (${boosts.length})`}>
+      {!boosts.length ? <Empty text="No boosts yet." /> : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[820px]">
+            <thead><tr className="text-muted text-xs border-b border-line">
+              <th className="text-left px-3 py-2">Token</th>
+              <th className="text-left px-2 py-2">Mint</th>
+              <th className="text-left px-2 py-2">Tier</th>
+              <th className="text-right px-2 py-2">Paid</th>
+              <th className="text-left px-2 py-2">Status</th>
+              <th className="text-left px-2 py-2">Expires</th>
+              <th className="text-right px-3 py-2">Actions</th>
+            </tr></thead>
+            <tbody>
+              {boosts.map((b: any) => {
+                const expired = b.expires_at && new Date(b.expires_at).getTime() < now;
+                const active = b.status === "active" && !expired;
+                return (
+                  <tr key={b.id} className="border-b border-line/50 hover:bg-panel2/40">
+                    <td className="px-3 py-2 font-semibold">{b.symbol || b.name || "—"}</td>
+                    <td className="px-2 py-2"><a href={`/ORBITX_DEX/token/${b.mint}`} className="text-accent hover:underline">{short(b.mint)}</a></td>
+                    <td className="px-2 py-2 uppercase text-xs">{b.tier || "—"}</td>
+                    <td className="px-2 py-2 text-right tabular-nums">{usd(b.usd_paid)}</td>
+                    <td className="px-2 py-2"><span className={`text-xs font-semibold ${active ? "text-up" : expired ? "text-muted" : "text-yellow-400"}`}>{expired ? "expired" : (b.status || "—")}</span></td>
+                    <td className="px-2 py-2 text-xs text-muted">{b.expires_at ? new Date(b.expires_at).toLocaleString() : "—"}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {b.status !== "active" && !expired && (
+                        <button onClick={() => act("approve_boost", b.id)} className="btn bg-up/15 text-up text-xs mr-1.5">Approve</button>
+                      )}
+                      <button onClick={() => { if (confirm("Delete boost?")) act("delete_boost", b.id); }} className="btn bg-panel2 text-down hover:bg-down/10"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+// ─── Launches ────────────────────────────────────────────────────────────────
+function LaunchesTab({ data, act }: any) {
+  const launches = data?.launches || [];
+  const usd = (n: any) => "$" + (Number(n) || 0).toLocaleString();
+  return (
+    <Section title={`Token launches (${launches.length})`}>
+      {!launches.length ? <Empty text="No launches yet." /> : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[820px]">
+            <thead><tr className="text-muted text-xs border-b border-line">
+              <th className="text-left px-3 py-2">Token</th>
+              <th className="text-left px-2 py-2">Mint</th>
+              <th className="text-right px-2 py-2">Fee</th>
+              <th className="text-left px-2 py-2">Paid in</th>
+              <th className="text-left px-2 py-2">Status</th>
+              <th className="text-left px-2 py-2">Created</th>
+              <th className="text-right px-3 py-2">Actions</th>
+            </tr></thead>
+            <tbody>
+              {launches.map((l: any) => (
+                <tr key={l.id} className="border-b border-line/50 hover:bg-panel2/40">
+                  <td className="px-3 py-2 font-semibold">{l.symbol || l.name || "—"}</td>
+                  <td className="px-2 py-2"><a href={`/ORBITX_DEX/token/${l.mint}`} className="text-accent hover:underline">{short(l.mint)}</a></td>
+                  <td className="px-2 py-2 text-right tabular-nums">{usd(l.fee_usd)}</td>
+                  <td className="px-2 py-2 uppercase text-xs">{l.pay_currency || "—"}</td>
+                  <td className="px-2 py-2 text-xs">{l.status || "—"}</td>
+                  <td className="px-2 py-2 text-xs text-muted">{l.created_at ? new Date(l.created_at).toLocaleDateString() : "—"}</td>
+                  <td className="px-3 py-2 text-right"><button onClick={() => { if (confirm("Delete launch?")) act("delete_launch", l.id); }} className="btn bg-panel2 text-down hover:bg-down/10"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Section>
   );
 }

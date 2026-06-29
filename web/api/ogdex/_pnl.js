@@ -13,13 +13,38 @@ async function rpc(method, params) {
   return r?.data?.result ?? r?.result ?? null;
 }
 
+// One retry on null/throw — getTransaction is frequently rate-limited under load.
+async function rpcTx(signature) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const t = await rpc("getTransaction", [signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]);
+      if (t) return t;
+    } catch { /* retry */ }
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 250));
+  }
+  return null;
+}
+
+// Run async jobs with a hard concurrency cap so we don't flood the RPC proxy.
+// Firing 30+ getTransaction calls at once gets rate-limited and silently drops
+// transactions, which made the trader leaderboard look empty.
+async function mapPool(items, limit, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx], idx); }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 // Realized + unrealized PnL, win rate, and per-token breakdown from a wallet's
 // recent swap history (SOL legs only). `priceMap` (mint -> usdPrice) is optional;
 // when provided, open positions are valued for unrealized PnL.
 export async function computePnl(address, opts = {}) {
   const { sigLimit = 40, priceMap = null } = opts;
   const sigs = (await rpc("getSignaturesForAddress", [address, { limit: sigLimit }])) || [];
-  const txs = await Promise.all(sigs.map((s) => rpc("getTransaction", [s.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]).catch(() => null)));
+  const txs = await mapPool(sigs, 6, (s) => rpcTx(s.signature));
   const swaps = txs.map((t) => parseSwap(t, address)).filter((s) => s && s.solAmount > 0) // SOL-leg swaps only
     .sort((a, b) => a.time - b.time); // chronological
 
@@ -105,7 +130,7 @@ export async function computePnl(address, opts = {}) {
 // the second computePnl pass (or to pre-warm a price map).
 export async function swapMints(address, sigLimit = 40) {
   const sigs = (await rpc("getSignaturesForAddress", [address, { limit: sigLimit }])) || [];
-  const txs = await Promise.all(sigs.map((s) => rpc("getTransaction", [s.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]).catch(() => null)));
+  const txs = await mapPool(sigs, 6, (s) => rpcTx(s.signature));
   const set = new Set();
   for (const t of txs) { const s = parseSwap(t, address); if (s && s.mint) set.add(s.mint); }
   return [...set];

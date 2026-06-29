@@ -70,7 +70,7 @@ export default async function handler(req, res) {
 
     const computed = await mapLimit(wallets, 4, async (w) => {
       try {
-        const p = await computePnl(w, { sigLimit: 30 });
+        const p = await computePnl(w, { sigLimit: 40 });
         return {
           address: w, ...(meta[w] || {}),
           realizedPnlUsd: p.realizedPnlUsd ?? 0,
