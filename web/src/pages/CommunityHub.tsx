@@ -20,6 +20,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 /* ── Lazy-loaded page components ── */
 const SocialHub            = lazy(() => import("./SocialHub"));
@@ -93,6 +94,20 @@ const CommunityHub: React.FC = () => {
   const [active, setActive] = useState<CommTab>(loadTab);
   const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
   const [commView, setCommView] = useState<"token" | "og">("token");
+  const [stats, setStats] = useState<{ communities: number; liveSpaces: number; activity: number }>({ communities: 0, liveSpaces: 0, activity: 0 });
+
+  useEffect(() => {
+    let on = true;
+    const since = new Date(Date.now() - 86400000).toISOString();
+    Promise.all([
+      supabase.from("communities").select("id", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("spaces").select("id", { count: "exact", head: true }).eq("is_live", true),
+      supabase.from("social_messages").select("id", { count: "exact", head: true }).gte("created_at", since),
+    ]).then(([c, sp, act]) => {
+      if (on) setStats({ communities: c.count || 0, liveSpaces: sp.count || 0, activity: act.count || 0 });
+    }).catch(() => {});
+    return () => { on = false; };
+  }, []);
 
   /* Persist active tab */
   useEffect(() => {
@@ -132,6 +147,27 @@ const CommunityHub: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
+      {/* ── Hub header ── */}
+      <div className="relative shrink-0 overflow-hidden border-b border-white/[0.07] px-4 py-4 sm:px-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_0%_0%,hsl(var(--primary)/0.14),transparent_55%),radial-gradient(ellipse_at_100%_120%,hsl(var(--secondary)/0.10),transparent_55%)]" />
+        <div className="relative flex flex-wrap items-center gap-x-5 gap-y-2">
+          <div className="min-w-0">
+            <h1 className="text-[19px] font-black text-white leading-tight">OrbitX Community</h1>
+            <p className="text-[12px] text-white/40">Chat, rooms, live Spaces and token communities — all in one place.</p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            {stats.liveSpaces > 0 && (
+              <span className="flex items-center gap-1.5 rounded-full border border-red-500/25 bg-red-500/10 px-2.5 py-1 text-[11px] font-bold text-red-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" /> {stats.liveSpaces} live now
+              </span>
+            )}
+            <HubStat Icon={Globe} value={stats.communities} label="Communities" />
+            <HubStat Icon={Radio} value={stats.liveSpaces} label="Live Spaces" />
+            <HubStat Icon={TrendingUp} value={stats.activity} label="Posts 24h" />
+          </div>
+        </div>
+      </div>
+
       {/* ── Tab bar ── */}
       <div
         className="ios-scroll flex shrink-0 snap-x items-center gap-1 overflow-x-auto border-b border-white/[0.07] bg-card/80 px-3 py-2 backdrop-blur-lg"
@@ -207,5 +243,15 @@ const CommunityHub: React.FC = () => {
     </div>
   );
 };
+
+function HubStat({ Icon, value, label }: { Icon: React.ComponentType<{ className?: string }>; value: number; label: string }) {
+  const fmt = value >= 1000 ? (value / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(value);
+  return (
+    <div className="hidden sm:flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-1.5">
+      <Icon className="h-3.5 w-3.5 text-primary" />
+      <div className="leading-none"><div className="text-[13px] font-black text-white">{fmt}</div><div className="text-[9px] uppercase tracking-wider text-white/35">{label}</div></div>
+    </div>
+  );
+}
 
 export default CommunityHub;
