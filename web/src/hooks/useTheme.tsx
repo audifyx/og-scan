@@ -12,6 +12,8 @@ import { type AnimatedWallpaperPreset, ANIMATED_WALLPAPERS } from "@/data/animat
 
 export type { ThemePreset } from "./themePresets";
 
+export const THEME_PRESETS: ThemePreset[] = [...BASE_PRESETS, ...THEME_PRESETS_EXTRA];
+
 const CUSTOM_KEY = "og-custom-themes";
 const ANIMATED_WALLPAPER_KEY = "og-animated-wallpaper";
 const TAB_WALLPAPERS_KEY = "og-tab-wallpapers";
