@@ -3,9 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { SocialTopBar } from "./SocialTopBar";
 import { BottomNav } from "./BottomNav";
-import { useTheme } from "@/hooks/useTheme";
-import { AnimatedWallpaperRenderer } from "@/components/wallpapers/AnimatedWallpaperRenderer";
-import { ANIMATED_WALLPAPERS } from "@/data/animatedWallpapers";
+
 import { cn } from "@/lib/utils";
 
 interface AppLayoutProps {
@@ -81,17 +79,9 @@ const SectionTabBar = () => {
 };
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
-  const { customWallpaper, themeGradient, animatedWallpaper, tabWallpapers } = useTheme();
   const { pathname } = useLocation();
 
   const activeTab = getTabFromPath(pathname);
-
-  const animatedPreset = animatedWallpaper
-    ? ANIMATED_WALLPAPERS.find((w) => w.id === animatedWallpaper) || null
-    : null;
-
-  const tabWallpaperUrl = tabWallpapers[activeTab] || null;
-  const wallpaperUrl = tabWallpaperUrl || customWallpaper;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex relative">
@@ -123,26 +113,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         <div className="absolute inset-0 bg-background/68 backdrop-blur-[3px]" />
       </div>
 
-      {/* Theme gradient layer — subtle ambient glow from active theme */}
-      {themeGradient && (
-        <div
-          className="pointer-events-none fixed inset-0 z-0 opacity-100"
-          style={{ background: themeGradient }}
-        />
-      )}
 
-      {/* Animated wallpaper layer */}
-      {animatedPreset && <AnimatedWallpaperRenderer preset={animatedPreset} />}
-
-      {/* Wallpaper layer — per-tab if set, else global fallback */}
-      {wallpaperUrl && (
-        <div
-          className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20"
-          style={{ backgroundImage: `url(${wallpaperUrl})` }}
-        >
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
-        </div>
-      )}
 
       {/* Main content — offset by sidebar width on desktop, bottom padding for mobile nav */}
       <main className="main-scroll flex-1 overflow-auto min-h-screen pb-[68px] lg:pb-0 relative z-10">
