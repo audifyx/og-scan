@@ -84,7 +84,7 @@
         var reloading = false;
         function check() {
           if (reloading || document.hidden) return;
-          fetch(window.location.href, { cache: "no-store" })
+          fetch(window.location.pathname + "?__v=" + Date.now(), { cache: "no-store" })
             .then(function (r) { return r.ok ? r.text() : null; })
             .then(function (html) {
               if (!html) return;
