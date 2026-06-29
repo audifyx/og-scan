@@ -691,22 +691,31 @@ const DirectMessages: React.FC = () => {
   };
 
   /* ═══════════════════════════════════════════════════════════════
-     Render — Conversation List
+     Render — Two-pane Messenger (sidebar + chat)
      ═══════════════════════════════════════════════════════════════ */
-  if (!activeConvo) {
-    return (
-      <div className="flex h-full flex-col bg-background">
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between border-b border-border/60 px-4 py-4">
-          <h2 className="text-[17px] font-bold text-foreground">Messages</h2>
+  /* ─── derived active-chat values ─── */
+  const otherName = activeConvo?.otherUser?.username || "User";
+  const otherAvatar = safeAvatar(activeConvo?.otherUser?.avatar_url, otherName);
+  const isOnline = activeConvo?.otherUser?.is_online || false;
+
+  return (
+    <div className="flex h-full overflow-hidden bg-background">
+      {/* LEFT — conversation sidebar */}
+      <aside className={cn("h-full w-full flex-col border-r border-border/60 bg-background md:w-[360px] md:flex-shrink-0", activeConvo ? "hidden md:flex" : "flex")}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-4">
+          <div className="min-w-0">
+            <h2 className="text-[20px] font-black tracking-tight text-foreground">Messages</h2>
+            <p className="text-[11px] text-muted-foreground/50">{convos.length} conversation{convos.length === 1 ? "" : "s"}</p>
+          </div>
           <button
             onClick={() => setShowNewDM(!showNewDM)}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary transition hover:bg-primary/25"
+            title={showNewDM ? "Close" : "New message"}
+            className={cn("flex h-9 w-9 items-center justify-center rounded-full transition", showNewDM ? "bg-muted text-foreground" : "bg-gradient-to-br from-[#2F80FF] to-[#9945FF] text-white shadow-[0_8px_20px_-8px_rgba(47,128,255,0.8)] hover:opacity-90")}
           >
             {showNewDM ? <XIcon className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
           </button>
         </div>
-
         {/* ── Search bar ── */}
         <div className="px-4 py-2.5 border-b border-border/40">
           <div className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
@@ -864,44 +873,48 @@ const DirectMessages: React.FC = () => {
             </button>
           )}
         </div>
-      </div>
-    );
-  }
+      </aside>
 
-  /* ═══════════════════════════════════════════════════════════════
-     Render — Chat Thread (iOS style)
-     ═══════════════════════════════════════════════════════════════ */
-  const otherName = activeConvo.otherUser?.username || "User";
-  const otherAvatar = safeAvatar(activeConvo.otherUser?.avatar_url, otherName);
-  const isOnline = activeConvo.otherUser?.is_online || false;
-
-  return (
-    <div className="flex h-full flex-col bg-background">
-      {/* ── Chat Header ── */}
-      <div className="flex flex-col items-center border-b border-border/60 pt-3 pb-2 px-4 relative">
-        <button
-          onClick={() => { setActiveConvo(null); setMessages([]); }}
-          className="absolute left-4 top-4 text-primary transition hover:text-primary/70"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-
-        <div className="relative mb-1">
-          <img src={otherAvatar} alt="" className="h-12 w-12 rounded-full object-cover" />
-          <OnlineDot online={isOnline} />
-        </div>
-        <p className="text-[15px] font-bold text-foreground leading-tight">
-          {otherName}
-          {activeConvo.otherUser?.badge && (
-            <span className="ml-1.5 text-[10px] font-semibold text-primary align-middle">{activeConvo.otherUser.badge}</span>
-          )}
-        </p>
-        <p className={cn("text-[12px] font-medium", isOnline ? "text-green-400" : "text-muted-foreground/50")}>
-          {isOnline ? "Online" : lastSeen(activeConvo.otherUser?.last_active_at || null)}
-        </p>
-      </div>
-
-      {/* ── Messages ── */}
+      {/* RIGHT — chat panel */}
+      <main className={cn("h-full min-w-0 flex-1 flex-col bg-background", activeConvo ? "flex" : "hidden md:flex")}>
+        {!activeConvo ? (
+          <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-[#2F80FF]/15 to-[#9945FF]/15">
+              <Send className="h-9 w-9 text-primary/60" />
+            </div>
+            <div>
+              <p className="text-[18px] font-black text-foreground">Your messages</p>
+              <p className="mt-1 max-w-xs text-[13px] text-muted-foreground/50">Pick a conversation on the left or start a new one to begin chatting.</p>
+            </div>
+            <button onClick={() => setShowNewDM(true)} className="mt-1 rounded-full bg-gradient-to-br from-[#2F80FF] to-[#9945FF] px-5 py-2 text-[13px] font-bold text-white shadow-[0_8px_20px_-8px_rgba(47,128,255,0.8)] transition hover:opacity-90">
+              New message
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Chat header */}
+            <div className="flex items-center gap-3 border-b border-border/60 px-4 py-3">
+              <button onClick={() => { setActiveConvo(null); setMessages([]); }} className="text-primary transition hover:text-primary/70 md:hidden">
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="relative shrink-0">
+                <img src={otherAvatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                <OnlineDot online={isOnline} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-1.5 text-[15px] font-bold leading-tight text-foreground">
+                  <span className="truncate">{otherName}</span>
+                  {activeConvo.otherUser?.badge && <span className="shrink-0 text-[10px] font-semibold text-primary">{activeConvo.otherUser.badge}</span>}
+                </p>
+                <p className={cn("text-[12px] font-medium", isOnline ? "text-green-400" : "text-muted-foreground/50")}>
+                  {isOnline ? "Active now" : lastSeen(activeConvo.otherUser?.last_active_at || null)}
+                </p>
+              </div>
+              <button onClick={() => togglePin(activeConvo.id)} title={pinnedIds.has(activeConvo.id) ? "Unpin" : "Pin"} className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground/50 transition hover:bg-muted hover:text-foreground">
+                {pinnedIds.has(activeConvo.id) ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+              </button>
+            </div>
+            {/* ── Messages ── */}
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {loadingMsgs ? (
           <div className="flex items-center justify-center py-20">
@@ -1175,6 +1188,9 @@ const DirectMessages: React.FC = () => {
           </div>
         )}
       </div>
+          </>
+        )}
+      </main>
     </div>
   );
 };
