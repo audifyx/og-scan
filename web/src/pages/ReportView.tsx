@@ -97,7 +97,7 @@ export default function ReportView() {
       if (!el) { el = document.createElement("meta"); el.setAttribute(attr, key); document.head.appendChild(el); }
       el.content = val;
     };
-    const desc = `OrbitX intelligence report for ${name || sym}${live?.score != null ? ` — Grim score ${live.score}/100` : ""}. Live price, market cap, holders and AI analysis.`;
+    const desc = `OrbitX intelligence report for ${name || sym}${live?.score != null ? ` — OrbitX Score ${live.score}/100` : ""}. Live price, market cap, holders and AI analysis.`;
     setMetaTag("name", "description", desc);
     setMetaTag("property", "og:title", `${name || sym} — OrbitX report`);
     setMetaTag("property", "og:description", desc);
