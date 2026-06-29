@@ -36,14 +36,13 @@ export function useSecurityTracker() {
           body: { ...info, event_type: eventType },
         });
 
-        if (res.data) {
-          // If user is banned/suspended, sign them out
-          if (res.data.is_banned || res.data.is_suspended) {
-            const reason = res.data.ban_reason || res.data.suspension_reason || "Account restricted";
-            alert(`Your account has been ${res.data.is_banned ? "banned" : "suspended"}: ${reason}`);
-            await supabase.auth.signOut();
-            return;
-          }
+        // Device tracking is RECORD-ONLY. We intentionally do NOT sign the user
+        // out here: the heuristic device / multi-account flag was logging out
+        // legitimate users (including running more than one account on the same
+        // device) and locking them out of lobbies and other features. Real bans
+        // must be enforced server-side via RLS, not by a bypassable client alert.
+        if (res.data && (res.data.is_banned || res.data.is_suspended)) {
+          console.warn("[security] account flagged (not enforced client-side):", res.data.ban_reason || res.data.suspension_reason || "restricted");
         }
 
         localStorage.setItem(LAST_TRACK_KEY, String(Date.now()));
