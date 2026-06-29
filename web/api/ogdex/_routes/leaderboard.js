@@ -79,15 +79,30 @@ export default async function handler(req, res) {
           closedTrades: p.closedTrades ?? 0,
           openPositions: p.openPositions ?? 0,
           totalSwaps: p.totalSwaps ?? 0,
+          at: Date.now(),
         };
       } catch { return null; }
     });
+    const hasData = (e) => e && (e.closedTrades > 0 || e.totalSwaps > 0);
 
-    const entries = computed.filter((e) => e && (e.closedTrades > 0 || e.totalSwaps > 0))
+    let pool = computed.filter(hasData);
+    // Merge with last-known-good cache so a single rate-limited RPC run never
+    // shrinks the board. Fresh results override; prior entries persist up to 7d.
+    if (!walletsParam.length) {
+      const prev = await kvGet(CACHE_KEY).catch(() => null);
+      const merged = {};
+      for (const e of (prev?.entries || [])) if (hasData(e)) merged[e.address] = e;
+      for (const e of pool) merged[e.address] = { ...e, at: now };
+      const FRESH_MS = 7 * 24 * 60 * 60 * 1000;
+      pool = Object.values(merged).filter((e) => !e.at || (now - e.at) < FRESH_MS);
+    }
+
+    const entries = pool
+      .filter(hasData)
       .sort((a, b) => (b.realizedPnlUsd || 0) - (a.realizedPnlUsd || 0))
-      .map((e, i) => ({ rank: i + 1, ...e }));
+      .map((e, i) => ({ ...e, rank: i + 1 }));
 
-    const payload = { ok: true, at: Date.now(), count: entries.length, entries };
+    const payload = { ok: true, at: now, count: entries.length, entries };
     if (!walletsParam.length) await kvPut(CACHE_KEY, payload).catch(() => {});
     cache(res, 300, 1800);
     return send(res, 200, payload);
