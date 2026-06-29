@@ -3,7 +3,7 @@
  * Provides offline caching, background sync, rich Web Push notifications, and PWA install support.
  */
 
-const CACHE_NAME = "ogscan-v6";
+const CACHE_NAME = "ogscan-v7";
 self.addEventListener("message", (e) => { if (e.data === "skipWaiting") self.skipWaiting(); });
 const STATIC_ASSETS = [
   "/",

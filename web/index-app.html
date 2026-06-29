@@ -56,6 +56,48 @@
         });
       }
     </script>
+    <script>
+      /* Deploy-version watcher: reloads when a new build is published (the hashed
+         main bundle changes), even for long-open installed PWAs where sw.js is
+         byte-identical across deploys. This is the reliable auto-update path. */
+      (function () {
+        function mainHash(str) {
+          if (!str) return null;
+          var key = "/assets/main-";
+          var i = str.indexOf(key);
+          if (i < 0) return null;
+          var rest = str.slice(i + "/assets/".length);
+          var end = rest.indexOf(".js");
+          if (end < 0) return null;
+          return rest.slice(0, end + 3);
+        }
+        function currentMain() {
+          var scripts = [].slice.call(document.scripts);
+          for (var i = 0; i < scripts.length; i++) {
+            var h = mainHash(scripts[i].src || "");
+            if (h) return h;
+          }
+          return null;
+        }
+        var loaded = currentMain();
+        if (!loaded) return; /* dev mode or no hashed bundle */
+        var reloading = false;
+        function check() {
+          if (reloading || document.hidden) return;
+          fetch(window.location.href, { cache: "no-store" })
+            .then(function (r) { return r.ok ? r.text() : null; })
+            .then(function (html) {
+              if (!html) return;
+              var latest = mainHash(html);
+              if (latest && latest !== loaded) { reloading = true; window.location.reload(); }
+            })
+            .catch(function () {});
+        }
+        setInterval(check, 60000);
+        document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
+        window.addEventListener("focus", check);
+      })();
+    </script>
 
     <!-- Intercom / Fin AI Chat -->
     <script>
