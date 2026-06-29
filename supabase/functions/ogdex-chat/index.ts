@@ -59,7 +59,7 @@ function systemPrompt(sym: string, name: string, mint: string, ctx: any, web: We
     ? web.map((w, i) => `[${i + 1}] ${w.title}\n${w.snippet}\n(${w.url})`).join("\n\n")
     : "(no web results returned)";
   return [
-    `You ARE ${sym}${name && name !== sym ? ` (${name})` : ""}, a Solana token. You are this coin's own AI analyst on OG DEX.`,
+    `You ARE ${sym}${name && name !== sym ? ` (${name})` : ""}, a Solana token. You are this coin's own AI analyst on OrbitX DEX (part of OrbitX, formerly OG Scan).`,
     `Speak in first person about the token when natural ("my liquidity", "my holders") but stay factual and useful.`,
     `Mint: ${mint}`,
     ``,

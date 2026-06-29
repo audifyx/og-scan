@@ -1050,6 +1050,13 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
     setError(null);
     setActiveRoomLabel(label);
 
+    // Request mic permission up-front (within the click gesture) so the browser
+    // prompt appears when you join and you can talk the moment you unmute.
+    try {
+      const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
+      ms.getTracks().forEach((t) => t.stop());
+    } catch { /* denied — user can still listen */ }
+
     const token = await fetchToken(lkRoomName);
     if (!token) { setConnecting(false); setActiveRoomLabel(null); return; }
 
@@ -1122,15 +1129,15 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
   }, []);
 
   /* ─── Fetch voice rooms from Supabase ─── */
+  const fetchRooms = useCallback(async () => {
+    const { data, error } = await supabase.from("social_voice_rooms").select("*").order("created_at", { ascending: false }).limit(20);
+    if (!error && data) setRooms(data);
+  }, []);
   useEffect(() => {
-    const fetchRooms = async () => {
-      const { data } = await supabase.from("social_voice_rooms").select("*").order("created_at", { ascending: false }).limit(20);
-      if (data) setRooms(data);
-    };
     fetchRooms();
     const channel = supabase.channel("social-rooms-realtime").on("postgres_changes", { event: "*", schema: "public", table: "social_voice_rooms" }, () => fetchRooms()).subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [fetchRooms]);
 
   /* ─── Room CRUD ─── */
   const createRoom = async () => {
@@ -1138,12 +1145,12 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
     setCreatingRoom(true);
     const { error: err } = await supabase.from("social_voice_rooms").insert({ name: newRoomName.trim(), created_by: user.id, creator_username: profile?.username || "Anon", participant_count: 0 });
     setCreatingRoom(false);
-    if (err) toast.error("Failed to create room");
-    else { toast.success("Room created!"); setNewRoomName(""); setShowCreateRoom(false); }
+    if (err) toast.error(err.message || "Failed to create room");
+    else { toast.success("Room created!"); setNewRoomName(""); setShowCreateRoom(false); setSubTab("rooms"); fetchRooms(); }
   };
   const deleteRoom = async (roomId: string) => {
     const { error: err } = await supabase.from("social_voice_rooms").delete().eq("id", roomId);
-    if (err) toast.error("Failed to delete room"); else toast.success("Room deleted");
+    if (err) toast.error("Failed to delete room"); else { toast.success("Room deleted"); fetchRooms(); }
   };
 
   /* ─── Shortcut handlers ─── */

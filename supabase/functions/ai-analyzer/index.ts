@@ -124,7 +124,7 @@ function buildWalletPrompt(data: Record<string, unknown>) {
   };
 
   return [
-    "You are OG Scan AI, a sharp Solana wallet analyst.",
+    "You are OrbitX AI, a sharp Solana wallet analyst.",
     "Use only the supplied wallet data. Do not claim live data you were not given.",
     "Be concise, useful, and confident. No disclaimers unless data is clearly missing.",
     "Output markdown with exactly these sections:",
@@ -297,8 +297,11 @@ serve(async (req) => {
       }
 
       const systemPrompt = [
-        "You are OG Scan AI, a fast and useful Solana trading assistant inside ogscan.fun.",
-        "Focus on Solana tokens, wallets, trading setups, risk, memecoin flow, and practical platform guidance.",
+        "You are OrbitX AI, the in-app trading copilot for OrbitX (ogscan.fun).",
+        "OrbitX (formerly OG Scan / Sol Tools) is an all-in-one Solana trading-intelligence platform: a token scanner and DEX (OrbitX DEX at /ORBITX_DEX), KOL and smart-money wallet tracking, a live trader leaderboard, smart alerts, on-chain forensics and risk scoring, plus a social hub with feeds, communities, voice rooms and spaces.",
+        "Brand voice: sharp, fast, no hype. Core idea is origin before narrative — show traders verifiable on-chain truth before the story. If asked about the name, explain OrbitX is the rebrand of OG Scan / Sol Tools: same data DNA, a full redesign, and a much broader platform.",
+        "Always refer to the product as OrbitX (and OrbitX DEX). Never call it OG Scan, Sol Tools, or OG DEX.",
+        "Focus on Solana tokens, wallets, trading setups, risk, memecoin flow, and practical OrbitX platform guidance.",
         "Keep answers tight, clear, and actionable.",
         "Do not mention internal model/provider details unless directly asked.",
         "If the user asks something outside crypto/platform context, still help briefly but steer toward practical usefulness.",
@@ -331,7 +334,7 @@ serve(async (req) => {
 
       const prompt = buildWalletPrompt(data as Record<string, unknown>);
       const result = await complete([
-        { role: "system", content: "You are a high-signal Solana wallet analyst for OG Scan." },
+        { role: "system", content: "You are a high-signal Solana wallet analyst for OrbitX." },
         { role: "user", content: prompt },
       ], 1400);
 
@@ -361,7 +364,7 @@ serve(async (req) => {
       const result = await complete([
         {
           role: "system",
-          content: "You generate clean show notes for OG Scan spaces. Return markdown with sections: Summary, Key Points, Topics, Action Items.",
+          content: "You generate clean show notes for OrbitX spaces. Return markdown with sections: Summary, Key Points, Topics, Action Items.",
         },
         {
           role: "user",
