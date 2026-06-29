@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import { logAudit, shortId } from "../helpers";
 import {
-  Users, Search, Eye, Trash2, Shield, Ban, UserCheck,
+  Users, Search, Eye, Trash2, Shield, Ban, UserCheck, RotateCcw,
   Coins, Activity, Download, CheckCircle, X, Loader2,
   Edit, UserX, Crown, RefreshCw, ChevronDown, ArrowUpDown,
   Copy, Mail, Wallet, Heart, UserPlus, Settings, Zap,
@@ -435,6 +435,9 @@ export const UserManagement = () => {
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => isBanned ? unbanUser(p.user_id) : banUser(p.user_id)} title={isBanned ? "Unban" : "Ban"}>
                             {isBanned ? <UserCheck className="h-4 w-4 text-green-400" /> : <Ban className="h-4 w-4 text-yellow-400" />}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => reinstateUser(p.user_id)} title="Reinstate / Allow (clear ban + suspend)">
+                            <RotateCcw className="h-4 w-4 text-emerald-400" />
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => deleteUser(p.user_id)} title="Delete">
                             <Trash2 className="h-4 w-4 text-red-400" />
