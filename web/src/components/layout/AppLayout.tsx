@@ -4,11 +4,39 @@ import { Sidebar } from "./Sidebar";
 import { SocialTopBar } from "./SocialTopBar";
 import { BottomNav } from "./BottomNav";
 import { useTheme } from "@/hooks/useTheme";
+import { AnimatedWallpaperRenderer } from "@/components/wallpapers/AnimatedWallpaperRenderer";
+import { ANIMATED_WALLPAPERS } from "@/data/animatedWallpapers";
 import { cn } from "@/lib/utils";
 
 interface AppLayoutProps {
   children: ReactNode;
 }
+
+const TAB_ID_MAP: Record<string, string> = {
+  home: "overview",
+  scanner: "scanner",
+  feed: "feed",
+  spaces: "spaces",
+  social: "social",
+  community: "community",
+  tools: "tools",
+  profile: "profile",
+  discover: "discover",
+  charts: "charts",
+  "live-trading": "live-trading",
+  "live-feed-page": "live-feed-page",
+  research: "research",
+  "token-manager": "token-manager",
+  "trading-hub": "trading-hub",
+  communities: "communities",
+  memes: "memes",
+  listings: "listings",
+};
+
+const getTabFromPath = (pathname: string): string => {
+  const segment = pathname.replace(/^\/|\/$/g, "").split("/")[0].toLowerCase();
+  return TAB_ID_MAP[segment] || "overview";
+};
 
 /* Category tab groups — render a "tabs at the top lead to each tool" bar
    (same pattern as the Tools tab) for routed pages that belong together. */
@@ -53,7 +81,18 @@ const SectionTabBar = () => {
 };
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
-  const { customWallpaper, themeGradient } = useTheme();
+  const { customWallpaper, themeGradient, animatedWallpaper, tabWallpapers } = useTheme();
+  const { pathname } = useLocation();
+
+  const activeTab = getTabFromPath(pathname);
+
+  const animatedPreset = animatedWallpaper
+    ? ANIMATED_WALLPAPERS.find((w) => w.id === animatedWallpaper) || null
+    : null;
+
+  const tabWallpaperUrl = tabWallpapers[activeTab] || null;
+  const wallpaperUrl = tabWallpaperUrl || customWallpaper;
+
   return (
     <div className="min-h-screen bg-background text-foreground flex relative">
       {/* Premium ambient backdrop — subtle brand glows + grid, behind everything */}
@@ -92,11 +131,14 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         />
       )}
 
-      {/* Wallpaper layer — very subtle, pushed far back */}
-      {customWallpaper && (
+      {/* Animated wallpaper layer */}
+      {animatedPreset && <AnimatedWallpaperRenderer preset={animatedPreset} />}
+
+      {/* Wallpaper layer — per-tab if set, else global fallback */}
+      {wallpaperUrl && (
         <div
-          className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-15"
-          style={{ backgroundImage: `url(${customWallpaper})` }}
+          className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20"
+          style={{ backgroundImage: `url(${wallpaperUrl})` }}
         >
           <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
         </div>

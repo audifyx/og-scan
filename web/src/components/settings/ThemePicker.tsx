@@ -10,6 +10,7 @@ import { Check, Upload, Trash2, Palette, Sparkles, Image, Search } from "lucide-
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { CustomThemeCreator } from "./CustomThemeCreator";
+import { AnimatedWallpaperPicker } from "./AnimatedWallpaperPicker";
 
 export const ThemePicker = () => {
   const { currentTheme, customWallpaper, setTheme, setCustomWallpaper, uploadWallpaper, allThemes } = useTheme();
@@ -89,6 +90,9 @@ export const ThemePicker = () => {
           />
         </div>
       </Card>
+
+      {/* Animated Wallpaper */}
+      <AnimatedWallpaperPicker />
 
       {/* Custom theme creator */}
       <CustomThemeCreator />

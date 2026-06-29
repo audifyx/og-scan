@@ -8,14 +8,13 @@ import {
   type ThemePreset,
 } from "./themePresets";
 import { THEME_PRESETS_EXTRA } from "./themePresetsExtra";
+import { type AnimatedWallpaperPreset, ANIMATED_WALLPAPERS } from "@/data/animatedWallpapers";
 
 export type { ThemePreset } from "./themePresets";
 
-// Combined export — base + auto-generated extras. Custom user themes get appended at runtime
-// by the provider below so they show up in pickers without a rebuild.
-export const THEME_PRESETS: ThemePreset[] = [...BASE_PRESETS, ...THEME_PRESETS_EXTRA];
-
 const CUSTOM_KEY = "og-custom-themes";
+const ANIMATED_WALLPAPER_KEY = "og-animated-wallpaper";
+const TAB_WALLPAPERS_KEY = "og-tab-wallpapers";
 
 interface ThemeContextType {
   currentTheme: string;
@@ -23,8 +22,12 @@ interface ThemeContextType {
   themeGradient: string | null;
   customThemes: ThemePreset[];
   allThemes: ThemePreset[];
+  animatedWallpaper: string | null;
+  tabWallpapers: Record<string, string | null>;
   setTheme: (themeId: string) => void;
   setCustomWallpaper: (url: string | null) => void;
+  setAnimatedWallpaper: (id: string | null) => void;
+  setTabWallpaper: (tabId: string, url: string | null) => void;
   uploadWallpaper: (file: File) => Promise<string | null>;
   saveCustomTheme: (theme: ThemePreset) => void;
   deleteCustomTheme: (themeId: string) => void;
@@ -44,6 +47,22 @@ function loadCustomThemes(): ThemePreset[] {
   }
 }
 
+function loadAnimatedWallpaper(): string | null {
+  return localStorage.getItem(ANIMATED_WALLPAPER_KEY);
+}
+
+function loadTabWallpapers(): Record<string, string | null> {
+  try {
+    const raw = localStorage.getItem(TAB_WALLPAPERS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [currentTheme, setCurrentTheme] = useState(() => {
@@ -60,6 +79,12 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     registerCustomThemes(loaded);
     return loaded;
   });
+  const [animatedWallpaper, setAnimatedWallpaperState] = useState<string | null>(() => {
+    return loadAnimatedWallpaper();
+  });
+  const [tabWallpapers, setTabWallpapersState] = useState<Record<string, string | null>>(() => {
+    return loadTabWallpapers();
+  });
 
   // Keep applyThemeVars aware of custom themes
   useEffect(() => {
@@ -70,7 +95,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   // Load from profile on login
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("theme_preset, custom_wallpaper_url").eq("user_id", user.id).single()
+    supabase.from("profiles").select("theme_preset, custom_wallpaper_url, animated_wallpaper_url").eq("user_id", user.id).single()
       .then(({ data }) => {
         if (data?.theme_preset) {
           setCurrentTheme(data.theme_preset);
@@ -79,6 +104,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
         if (data?.custom_wallpaper_url) {
           setCustomWallpaperState(data.custom_wallpaper_url);
           localStorage.setItem("sol-wallpaper", data.custom_wallpaper_url);
+        }
+        if (data?.animated_wallpaper_url) {
+          setAnimatedWallpaperState(data.animated_wallpaper_url);
+          localStorage.setItem(ANIMATED_WALLPAPER_KEY, data.animated_wallpaper_url);
         }
       });
   }, [user]);
@@ -109,6 +138,23 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user]);
 
+  const setAnimatedWallpaper = useCallback((id: string | null) => {
+    setAnimatedWallpaperState(id);
+    if (id) localStorage.setItem(ANIMATED_WALLPAPER_KEY, id);
+    else localStorage.removeItem(ANIMATED_WALLPAPER_KEY);
+    if (user) {
+      supabase.from("profiles").update({ animated_wallpaper_url: id } as any).eq("user_id", user.id).then(() => {});
+    }
+  }, [user]);
+
+  const setTabWallpaper = useCallback((tabId: string, url: string | null) => {
+    setTabWallpapersState((prev) => {
+      const next = { ...prev, [tabId]: url };
+      localStorage.setItem(TAB_WALLPAPERS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const uploadWallpaper = useCallback(async (file: File): Promise<string | null> => {
     if (!user) return null;
     const ext = file.name.split(".").pop();
@@ -130,7 +176,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteCustomTheme = useCallback((themeId: string) => {
     setCustomThemesState((prev) => prev.filter((t) => t.id !== themeId));
-    // If the deleted theme was active, fall back to default
     if (currentTheme === themeId) {
       setTheme("og-hacker");
     }
@@ -142,7 +187,9 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     <ThemeContext.Provider value={{
       currentTheme, customWallpaper, themeGradient,
       customThemes, allThemes,
-      setTheme, setCustomWallpaper, uploadWallpaper,
+      animatedWallpaper, tabWallpapers,
+      setTheme, setCustomWallpaper, setAnimatedWallpaper, setTabWallpaper,
+      uploadWallpaper,
       saveCustomTheme, deleteCustomTheme,
     }}>
       {children}

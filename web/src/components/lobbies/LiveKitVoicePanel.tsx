@@ -534,7 +534,9 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
         setRole("listener");
         roleRef.current = "listener";
         updateLocalParticipant({ role: "listener", is_muted: true });
-        await room.localParticipant.setMicrophoneEnabled(false);
+        try {
+          await room.localParticipant.setMicrophoneEnabled(false);
+        } catch {}
         setMuted(true);
         presenceChannelRef.current?.track({
           user_id: user!.id,
@@ -546,7 +548,9 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
         });
         break;
       case "force-mute":
-        await room.localParticipant.setMicrophoneEnabled(false);
+        try {
+          await room.localParticipant.setMicrophoneEnabled(false);
+        } catch {}
         setMuted(true);
         updateLocalParticipant({ is_muted: true });
         break;
@@ -626,9 +630,16 @@ export const LiveKitVoicePanel = forwardRef<VoicePanelHandle, LiveKitVoicePanelP
     const room = roomRef.current;
     if (!room) return;
     const newMuted = forceMuted !== undefined ? forceMuted : !muted;
-    await room.localParticipant.setMicrophoneEnabled(!newMuted);
-    setMuted(newMuted);
-    updateLocalParticipant({ is_muted: newMuted });
+    try {
+      await room.localParticipant.setMicrophoneEnabled(!newMuted);
+      setMuted(newMuted);
+      updateLocalParticipant({ is_muted: newMuted });
+    } catch (err) {
+      console.error("[LiveKit] toggleMute failed:", err);
+      toast("Could not change mic state. Please allow microphone access and try again.");
+      setMuted(true);
+      updateLocalParticipant({ is_muted: true });
+    }
   }, [muted, updateLocalParticipant]);
 
   useImperativeHandle(ref, () => ({

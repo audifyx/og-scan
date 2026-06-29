@@ -1793,7 +1793,7 @@ const SpaceRoom = ({ space, onLeave }: { space: Space; onLeave: () => void }) =>
         <div className="flex items-center justify-center gap-3">
           {/* Mic toggle */}
           {myRole === "speaker" ? (
-            <button onClick={() => { const next = !muted; setMuted(next); voicePanelRef.current?.toggleMute?.(next); toast(muted ? "Unmuted 🎙️" : "Muted 🔇"); }}
+            <button onClick={() => { voicePanelRef.current?.toggleMute?.(); toast(muted ? "Unmuted 🎙️" : "Muted 🔇"); }}
               className={cn(
                 "w-14 h-14 rounded-2xl flex items-center justify-center transition-all",
                 muted
