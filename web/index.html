@@ -37,8 +37,22 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ("serviceWorker" in navigator) {
+        // Auto-update: when a new service worker takes control, reload once so the
+        // newest build is shown immediately (no manual hard-refresh needed).
+        let __refreshing = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (__refreshing) return; __refreshing = true; window.location.reload();
+        });
         window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/sw.js").catch(() => {});
+          navigator.serviceWorker.register("/sw.js").then((reg) => {
+            try { reg.update(); } catch (e) {}
+            reg.addEventListener("updatefound", () => {
+              const sw = reg.installing;
+              if (sw) sw.addEventListener("statechange", () => {
+                if (sw.state === "installed" && navigator.serviceWorker.controller) { try { sw.postMessage("skipWaiting"); } catch (e) {} }
+              });
+            });
+          }).catch(() => {});
         });
       }
     </script>
