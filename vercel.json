@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build --prefix web && npm --prefix web/ogdex install --no-audit --no-fund && npm --prefix web/ogdex run build",
+  "buildCommand": "npm run build && npm --prefix ogdex install --no-audit --no-fund && npm --prefix ogdex run build",
   "rewrites": [
     {
       "source": "/ai-fn/(.*)",
