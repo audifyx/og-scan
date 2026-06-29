@@ -38,18 +38,6 @@
       "destination": "/app.html"
     }
   ],
-  "redirects": [
-    {
-      "source": "/OGDEX",
-      "destination": "/ORBITX_DEX",
-      "permanent": true
-    },
-    {
-      "source": "/OGDEX/(.*)",
-      "destination": "/ORBITX_DEX/$1",
-      "permanent": true
-    }
-  ],
   "headers": [
     {
       "source": "/ORBITX_DEX/assets/(.*)",
