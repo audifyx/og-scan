@@ -1,5 +1,6 @@
 // Theme presets and CSS variable application — separated for build performance
 
+import { THEME_PRESETS_EXTRA } from "./themePresetsExtra";
 
 // ── OG / WOJAK / MEME / SOLANA / CRYPTO THEMES (200 total) ──
 // Each theme has optional `gradient` field for background layer (CSS gradient string)
@@ -1301,9 +1302,6 @@ export const THEME_PRESETS: ThemePreset[] = [
     "--border":"0 0% 9%","--input":"0 0% 9%","--ring":"168 100% 50%","--popover":"0 0% 4%","--popover-foreground":"0 0% 86%",
   }, gradient: "radial-gradient(circle at 50% 50%, rgba(0,255,180,0.08) 0%, transparent 40%), radial-gradient(circle at 50% 50%, rgba(200,0,255,0.06) 0%, transparent 60%)"},
 ];
-
-// ── Extra presets (auto-generated) ──
-import { THEME_PRESETS_EXTRA } from "./themePresetsExtra";
 
 // ── Custom user themes registry (in-memory, loaded from localStorage by useTheme) ──
 let CUSTOM_THEMES: ThemePreset[] = [];
