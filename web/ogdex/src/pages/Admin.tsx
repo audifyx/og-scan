@@ -945,34 +945,96 @@ function Stat({ icon: Icon, label, value, accent }: any) {
 
 function UsersTab({ data, act }: { data: any; act: any }) {
   const rows: any[] = data?.users || [];
+  const [sel, setSel] = useState<any | null>(null);
+  const [q, setQ] = useState("");
+  const filtered = q.trim()
+    ? rows.filter((u) => `${u.username || ""} ${u.display_name || ""} ${u.wallet_address || ""} ${u.user_id || ""} ${u.first_seen_ip || ""}`.toLowerCase().includes(q.toLowerCase()))
+    : rows;
+  const statusPill = (u: any) =>
+    u.is_banned ? <span className="pill bg-down/15 text-down text-[9px]">Banned</span>
+      : u.is_suspended ? <span className="pill bg-yellow-500/15 text-yellow-400 text-[9px]">Suspended</span>
+      : <span className="pill bg-up/15 text-up text-[9px]">Active</span>;
+  const run = async (action: string, u: any) => { await act(action, u.id, {}); setSel(null); };
   return (
     <div className="space-y-4">
-      <div className="text-lg font-black text-white">Users <span className="text-xs font-normal text-muted">· {rows.length}</span></div>
-      {rows.length === 0 ? <div className="rounded-xl border border-line bg-panel2/60 p-8 text-center text-sm text-muted">No users.</div> : (
+      <div className="flex items-center gap-3">
+        <div className="text-lg font-black text-white">Users <span className="text-xs font-normal text-muted">· {rows.length}</span></div>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, wallet, IP, id…"
+          className="ml-auto w-64 max-w-[60%] rounded-lg border border-line bg-panel2 px-3 py-1.5 text-sm text-white outline-none focus:border-accent/60" />
+      </div>
+      {filtered.length === 0 ? <div className="rounded-xl border border-line bg-panel2/60 p-8 text-center text-sm text-muted">No users.</div> : (
         <div className="overflow-x-auto rounded-xl border border-line">
           <table className="w-full text-sm">
             <thead><tr className="bg-panel2 text-left text-[11px] uppercase tracking-wider text-muted">
-              <th className="px-3 py-2.5">User</th><th className="px-3 py-2.5">Wallet</th><th className="px-3 py-2.5 text-right">Followers</th><th className="px-3 py-2.5 text-right">Trades</th><th className="px-3 py-2.5 text-right">Joined</th><th className="px-3 py-2.5"></th>
+              <th className="px-3 py-2.5">User</th><th className="px-3 py-2.5">Status</th><th className="px-3 py-2.5">Wallet</th><th className="px-3 py-2.5 text-right">Followers</th><th className="px-3 py-2.5 text-right">Trades</th><th className="px-3 py-2.5 text-right">Joined</th>
             </tr></thead>
             <tbody>
-              {rows.map((u) => (
-                <tr key={u.id} className="border-t border-line/60">
+              {filtered.map((u) => (
+                <tr key={u.id} onClick={() => setSel(u)} className="cursor-pointer border-t border-line/60 hover:bg-panel2/40">
                   <td className="px-3 py-2.5"><div className="flex items-center gap-2">
                     {u.avatar_url ? <img src={u.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover" /> : <div className="grid h-7 w-7 place-items-center rounded-full bg-white/10 text-[10px] text-muted">{(u.username||"?").slice(0,2)}</div>}
-                    <span className="font-semibold text-white">{u.username || "—"}</span>
+                    <span className="font-semibold text-white">{u.display_name || u.username || "\u2014"}</span>
                     {u.badge && <span className="pill bg-accent/15 text-accent text-[9px]">{u.badge}</span>}
                   </div></td>
-                  <td className="px-3 py-2.5 font-mono text-muted">{u.wallet_address ? short(u.wallet_address) : "—"}</td>
+                  <td className="px-3 py-2.5">{statusPill(u)}</td>
+                  <td className="px-3 py-2.5 font-mono text-muted">{u.wallet_address ? short(u.wallet_address) : "\u2014"}</td>
                   <td className="px-3 py-2.5 text-right text-white">{fmtNum(u.followers_count || 0)}</td>
                   <td className="px-3 py-2.5 text-right text-white">{fmtNum(u.trades_count || 0)}</td>
-                  <td className="px-3 py-2.5 text-right text-muted">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
-                  <td className="px-3 py-2.5 text-right">{u.wallet_address && <button onClick={() => act("ban_wallet", "noop", { address: u.wallet_address, reason: "admin" })} className="rounded-lg border border-down/40 bg-down/10 px-2 py-1 text-[11px] font-bold text-down hover:bg-down/20">Ban</button>}</td>
+                  <td className="px-3 py-2.5 text-right text-muted">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "\u2014"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {/* Detail modal */}
+      {sel && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setSel(null)}>
+          <div className="card w-full max-w-lg p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              {sel.avatar_url ? <img src={sel.avatar_url} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="grid h-12 w-12 place-items-center rounded-full bg-white/10 text-sm text-muted">{(sel.username||"?").slice(0,2)}</div>}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2"><span className="text-lg font-black text-white truncate">{sel.display_name || sel.username || "Unknown"}</span>{statusPill(sel)}</div>
+                <div className="text-xs text-muted">@{sel.username || "\u2014"}{sel.og_rank ? ` · ${sel.og_rank}` : ""}</div>
+              </div>
+              <button onClick={() => setSel(null)} className="ml-auto text-muted hover:text-white">✕</button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <Field label="User ID" value={sel.user_id || sel.id} mono />
+              <Field label="Role / badge" value={sel.badge || "user"} />
+              <Field label="Wallet" value={sel.wallet_address || "\u2014"} mono />
+              <Field label="Joined" value={sel.created_at ? new Date(sel.created_at).toLocaleString() : "\u2014"} />
+              <Field label="First seen IP" value={sel.first_seen_ip || "\u2014"} mono />
+              <Field label="Last fingerprint" value={sel.last_fingerprint || "\u2014"} mono />
+              <Field label="Followers" value={String(sel.followers_count ?? 0)} />
+              <Field label="Trades" value={String(sel.trades_count ?? 0)} />
+            </div>
+            {sel.bio && <div><div className="text-[10px] uppercase tracking-wider text-muted">Bio</div><div className="text-sm text-white/85">{sel.bio}</div></div>}
+
+            <div className="flex flex-wrap gap-2 border-t border-line pt-3">
+              <button onClick={() => run("reinstate_user", sel)} className="btn bg-up/15 text-up font-semibold text-xs">Reinstate (allow)</button>
+              {sel.is_suspended
+                ? <button onClick={() => run("unsuspend_user", sel)} className="btn bg-panel2 text-white text-xs">Unsuspend</button>
+                : <button onClick={() => run("suspend_user", sel)} className="btn bg-yellow-500/15 text-yellow-400 text-xs">Suspend</button>}
+              {sel.is_banned
+                ? <button onClick={() => run("unban_user", sel)} className="btn bg-panel2 text-white text-xs">Unban</button>
+                : <button onClick={() => run("ban_user", sel)} className="btn bg-down/15 text-down text-xs">Ban</button>}
+            </div>
+            <p className="text-[10px] text-muted/70">Reinstate clears both ban and suspension so the account can log in and join again.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[10px] uppercase tracking-wider text-muted">{label}</div>
+      <div className={`text-white/90 ${mono ? "font-mono text-[11px] break-all" : "text-sm"}`}>{value}</div>
     </div>
   );
 }

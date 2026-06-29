@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       dbSelect("ogdex_alerts",         "order=created_at.desc&limit=200").catch(() => []),
       dbSelect("ogdex_config",         "order=key.asc").catch(() => []),
       dbSelect("waitlist",             "select=id,email,created_at&order=created_at.desc&limit=1000").catch(() => []),
-      dbSelect("profiles",             "select=id,username,avatar_url,wallet_address,badge,followers_count,trades_count,created_at&order=created_at.desc&limit=500").catch(() => []),
+      dbSelect("profiles",             "select=id,user_id,username,display_name,avatar_url,wallet_address,badge,bio,og_rank,is_banned,is_suspended,first_seen_ip,last_fingerprint,followers_count,trades_count,created_at&order=created_at.desc&limit=500").catch(() => []),
       dbSelect("moderation_reports",   "select=id,target_type,target_id,reason,status,priority,created_at&order=created_at.desc&limit=300").catch(() => []),
       dbSelect("security_audit_log",   "select=id,action,created_at&order=created_at.desc&limit=200").catch(() => []),
       dbSelect("spaces",               "select=id,title,host_username,is_live,is_private,listener_count,speaker_count,created_at,ended_at&order=created_at.desc&limit=200").catch(() => []),
@@ -289,6 +289,13 @@ async function action(req, res) {
         await dbDelete("ogdex_banned_wallets", `address=eq.${address}`);
         return send(res, 200, { ok: true });
       }
+
+      // ── User profile status (social accounts) ──────────────────────────────
+      case "reinstate_user": { await dbUpdate("profiles", q, { is_banned: false, is_suspended: false }); break; }
+      case "ban_user":       { await dbUpdate("profiles", q, { is_banned: true }); break; }
+      case "unban_user":     { await dbUpdate("profiles", q, { is_banned: false }); break; }
+      case "suspend_user":   { await dbUpdate("profiles", q, { is_suspended: true }); break; }
+      case "unsuspend_user": { await dbUpdate("profiles", q, { is_suspended: false }); break; }
 
       default:
         return send(res, 400, { ok: false, error: "unknown action" });
