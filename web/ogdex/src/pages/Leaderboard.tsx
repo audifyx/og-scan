@@ -11,7 +11,7 @@ export default function Leaderboard() {
   useEffect(() => { let on = true; setLoading(true); getLeaderboard().then((d) => { if (on) { setEntries(d.ok ? d.entries : []); setAt(d.at || null); setLoading(false); } }).catch(() => { if (on) { setEntries([]); setLoading(false); } }); return () => { on = false; }; }, []);
 
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4">
+    <div className="max-w-5xl mx-auto py-8 px-4">
       <div className="mb-4"><Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white"><ArrowLeft className="w-4 h-4" /> Discovery</Link></div>
       <div className="mb-6 text-center">
         <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl border border-accent/20 bg-accent/10"><Trophy className="h-7 w-7 text-accent" /></div>
@@ -34,13 +34,16 @@ export default function Leaderboard() {
         : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px]">
+            <table className="w-full text-sm min-w-[760px]">
               <thead><tr className="text-muted text-xs border-b border-line">
                 <th className="text-left px-4 py-2.5">#</th>
                 <th className="text-left px-2 py-2.5">Trader</th>
                 <th className="text-right px-2 py-2.5">Realized PnL</th>
+                <th className="text-right px-2 py-2.5">SOL</th>
                 <th className="text-right px-2 py-2.5">Win rate</th>
                 <th className="text-right px-2 py-2.5">Closed</th>
+                <th className="text-right px-2 py-2.5">Open</th>
+                <th className="text-right px-2 py-2.5">Swaps</th>
                 <th className="text-right px-4 py-2.5">Wallet</th>
               </tr></thead>
               <tbody>
@@ -54,8 +57,11 @@ export default function Leaderboard() {
                       </Link>
                     </td>
                     <td className={`px-2 py-2.5 text-right font-semibold tabular-nums ${e.realizedPnlUsd >= 0 ? "text-up" : "text-down"}`}>{e.realizedPnlUsd >= 0 ? "+" : ""}{fmtUsd(e.realizedPnlUsd)}</td>
+                    <td className={`px-2 py-2.5 text-right tabular-nums ${e.realizedPnlSol >= 0 ? "text-up/80" : "text-down/80"}`}>{e.realizedPnlSol >= 0 ? "+" : ""}{e.realizedPnlSol.toFixed(2)}</td>
                     <td className="px-2 py-2.5 text-right tabular-nums text-muted">{e.winRate != null ? e.winRate + "%" : "—"}</td>
                     <td className="px-2 py-2.5 text-right tabular-nums text-muted">{e.closedTrades}</td>
+                    <td className="px-2 py-2.5 text-right tabular-nums text-muted">{e.openPositions ?? "—"}</td>
+                    <td className="px-2 py-2.5 text-right tabular-nums text-muted">{e.totalSwaps ?? "—"}</td>
                     <td className="px-4 py-2.5 text-right"><a href={`https://solscan.io/account/${e.address}`} target="_blank" rel="noreferrer" className="text-muted hover:text-white inline-flex items-center gap-1 justify-end"><ExternalLink className="h-3.5 w-3.5" /></a></td>
                   </tr>
                 ))}

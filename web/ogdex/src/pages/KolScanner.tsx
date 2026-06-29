@@ -67,8 +67,13 @@ function LiveFeed() {
         <div className="card divide-y divide-line/60">
           {rows.length ? rows.map((f) => (
             <div key={f.id} className="flex items-center gap-3 px-4 py-3 hover:bg-panel2/30">
-              <div className={`w-9 h-9 rounded-full grid place-items-center shrink-0 ${f.side === "buy" ? "bg-up/15" : "bg-down/15"}`}>
-                {f.side === "buy" ? <ArrowUpRight className="w-4 h-4 text-up" /> : <ArrowDownRight className="w-4 h-4 text-down" />}
+              <div className="relative shrink-0">
+                {f.avatar
+                  ? <img src={f.avatar} alt="" className="w-9 h-9 rounded-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
+                  : <div className="w-9 h-9 rounded-full bg-panel2 grid place-items-center text-[11px] font-bold text-muted">{(f.name || "?").slice(0, 2)}</div>}
+                <span className={`absolute -bottom-0.5 -right-0.5 grid h-4 w-4 place-items-center rounded-full ${f.side === "buy" ? "bg-up" : "bg-down"}`}>
+                  {f.side === "buy" ? <ArrowUpRight className="w-2.5 h-2.5 text-black" /> : <ArrowDownRight className="w-2.5 h-2.5 text-black" />}
+                </span>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap text-sm">

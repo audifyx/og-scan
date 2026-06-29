@@ -9,7 +9,7 @@ import {
   isMint, tokenHolders, liquidityScan, walletProfile,
   type Holder, type Pool, type WalletProfile,
 } from "../lib/scan";
-import { getScreener, fmtUsd, type Row } from "../lib/api";
+import { getScreener, fmtUsd, compact, type Row } from "../lib/api";
 
 type ToolId = "sniper" | "holders" | "liquidity" | "wallet" | "staking" | "il";
 
@@ -125,6 +125,14 @@ function timeAgo(iso?: string | null): string {
 }
 
 function TokenSniper() {
+  const LISTS: { id: string; label: string; desc: string }[] = [
+    { id: "newpairs", label: "Newest", desc: "Freshest pump.fun launches" },
+    { id: "unbonded", label: "Bonding", desc: "Live on the bonding curve" },
+    { id: "trending", label: "Trending", desc: "Top traded right now" },
+    { id: "runners", label: "Gainers", desc: "Biggest 24h movers" },
+    { id: "migrated", label: "Migrated", desc: "Graduated to a DEX" },
+  ];
+  const [list, setList] = useState("newpairs");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [updated, setUpdated] = useState<number>(0);
@@ -133,39 +141,57 @@ function TokenSniper() {
 
   const load = useCallback(async () => {
     try {
-      const d = await getScreener("newpairs", "24h", 40);
-      setRows(d.rows || []);
+      const d = await getScreener(list, "24h", 80);
+      let out = d.rows || [];
+      // On the "Newest" feed also fold in bonding-curve coins for fuller coverage.
+      if (list === "newpairs") {
+        try {
+          const d2 = await getScreener("unbonded", "24h", 40);
+          const seen = new Set(out.map((r) => r.mint));
+          out = [...out, ...((d2.rows || []).filter((r) => !seen.has(r.mint)))];
+        } catch { /* best-effort */ }
+      }
+      setRows(out);
       setUpdated(Date.now());
-    } catch {
-      /* keep prior rows on transient failure */
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    } catch { /* keep prior rows */ } finally { setLoading(false); }
+  }, [list]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setLoading(true); load(); }, [load]);
   useEffect(() => {
     if (timer.current) clearInterval(timer.current);
     if (auto) timer.current = setInterval(load, 12000);
     return () => { if (timer.current) clearInterval(timer.current); };
   }, [auto, load]);
 
+  const active = LISTS.find((l) => l.id === list)!;
+
   return (
     <div className="space-y-3">
-      {/* Sniper header */}
+      {/* Source filter */}
+      <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5 no-scrollbar">
+        {LISTS.map((l) => (
+          <button key={l.id} onClick={() => setList(l.id)}
+            className={`shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-bold transition ${list === l.id ? "border border-accent/45 bg-accent/15 text-accent" : "border border-line bg-panel2/60 text-muted hover:text-white"}`}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Live header */}
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-panel2/40 px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
             <span className={`absolute inline-flex h-full w-full rounded-full ${auto ? "animate-ping bg-up/70" : "bg-muted/40"}`} />
             <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${auto ? "bg-up" : "bg-muted"}`} />
           </span>
-          <span className="text-sm font-bold text-white">Live · Brand-new pump.fun launches</span>
-          {updated > 0 && <span className="hidden sm:inline text-[11px] text-muted">updated {timeAgo(new Date(updated).toISOString())} ago</span>}
+          <span className="text-sm font-bold text-white">Live · {active.desc}</span>
+          <span className="pill bg-panel2 text-muted text-[10px]">{rows.length} coins</span>
+          {updated > 0 && <span className="hidden md:inline text-[11px] text-muted">updated {timeAgo(new Date(updated).toISOString())} ago</span>}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setAuto((a) => !a)}
             className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${auto ? "border-up/40 bg-up/10 text-up" : "border-line bg-panel2 text-muted hover:text-white"}`}>
-            {auto ? "Auto-refresh on" : "Auto-refresh off"}
+            {auto ? "Auto on" : "Auto off"}
           </button>
           <button onClick={load} className="rounded-lg border border-line bg-panel2 p-1.5 text-muted transition hover:text-white">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -176,14 +202,15 @@ function TokenSniper() {
       {loading && rows.length === 0 ? (
         <div className="grid place-items-center py-16 text-muted"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : rows.length === 0 ? (
-        <div className="rounded-xl border border-line bg-panel2/60 p-10 text-center text-sm text-muted">No fresh launches right now. They appear here the moment they are created.</div>
+        <div className="rounded-xl border border-line bg-panel2/60 p-10 text-center text-sm text-muted">No coins right now. They appear here the moment they show up on-chain.</div>
       ) : (
         <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((r) => {
             const change = r.change5m ?? r.change1h ?? r.change24h ?? null;
             const up = (change ?? 0) >= 0;
+            const a = r.audit || {};
             return (
-              <div key={r.mint} className="space-y-2.5 rounded-2xl border border-line bg-panel2/50 p-3.5 transition hover:border-accent/40">
+              <div key={r.mint} className="space-y-2.5 rounded-2xl border border-line bg-panel2/50 p-3.5 transition hover:-translate-y-0.5 hover:border-accent/40">
                 <div className="flex items-center gap-3">
                   {r.icon
                     ? <img src={r.icon} alt={r.symbol || ""} className="h-10 w-10 rounded-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
@@ -193,32 +220,49 @@ function TokenSniper() {
                     <div className="font-mono text-[11px] text-muted">${r.symbol || "—"}</div>
                   </div>
                   {change != null && (
-                    <span className={`pill text-[10px] font-bold ${up ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>
-                      {up ? "+" : ""}{change.toFixed(0)}%
-                    </span>
+                    <span className={`pill text-[10px] font-bold ${up ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>{up ? "+" : ""}{change.toFixed(0)}%</span>
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-                  <Stat label="Price" value={r.priceUsd != null ? "$" + (r.priceUsd < 0.01 ? r.priceUsd.toExponential(1) : r.priceUsd.toFixed(4)) : "—"} />
-                  <Stat label="Liq" value={r.liquidity != null ? fmtUsd(r.liquidity, { compact: true }) : "—"} />
-                  <Stat label="MCap" value={r.mcap != null ? fmtUsd(r.mcap, { compact: true }) : "—"} />
+                {/* Safety chips */}
+                <div className="flex flex-wrap items-center gap-1">
+                  {a.mintAuthorityDisabled === true && <span className="pill bg-up/12 text-up text-[9px]">Mint ✓</span>}
+                  {a.freezeAuthorityDisabled === true && <span className="pill bg-up/12 text-up text-[9px]">Freeze ✓</span>}
+                  {a.mintAuthorityDisabled === false && <span className="pill bg-down/12 text-down text-[9px]">Mint ⚠</span>}
+                  {a.topHoldersPercentage != null && <span className="pill bg-panel2 text-muted text-[9px]">Top10 {a.topHoldersPercentage.toFixed(0)}%</span>}
+                  {r.organicScoreLabel && <span className="pill bg-accent/12 text-accent text-[9px]">{r.organicScoreLabel}</span>}
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-[11px] text-muted"><Clock className="h-3 w-3" /> {timeAgo(r.createdAt)} old</span>
-                  <div className="flex items-center gap-1.5">
-                    <Link to={`/token/${r.mint}`} className="btn bg-accent/15 text-accent text-[10.5px] inline-flex items-center gap-1 px-2 py-1">Scan</Link>
-                    <a href={`https://pump.fun/${r.mint}`} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[10.5px] inline-flex items-center gap-1 px-2 py-1">pump <ExternalLink className="h-3 w-3" /></a>
-                    <a href={`https://solscan.io/token/${r.mint}`} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[10.5px] inline-flex items-center gap-1 px-2 py-1">scan <ExternalLink className="h-3 w-3" /></a>
+                {/* Data grid */}
+                <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+                  <Stat label="Price" value={r.priceUsd != null ? "$" + (r.priceUsd < 0.01 ? r.priceUsd.toExponential(1) : r.priceUsd.toFixed(4)) : "—"} />
+                  <Stat label="MCap" value={r.mcap != null ? fmtUsd(r.mcap, { compact: true }) : "—"} />
+                  <Stat label="Liq" value={r.liquidity != null ? fmtUsd(r.liquidity, { compact: true }) : "—"} />
+                  <Stat label="Vol 24h" value={r.volume != null ? fmtUsd(r.volume, { compact: true }) : "—"} />
+                  <Stat label="Holders" value={r.holderCount != null ? compact(r.holderCount) : "—"} />
+                  <Stat label="Age" value={timeAgo(r.createdAt)} />
+                </div>
+
+                {/* Buys / sells */}
+                {(r.numBuys != null || r.numSells != null) && (
+                  <div className="flex items-center gap-3 text-[11px]">
+                    <span className="text-up">▲ {r.numBuys ?? 0} buys</span>
+                    <span className="text-down">▼ {r.numSells ?? 0} sells</span>
+                    {r.netBuyers != null && <span className="text-muted ml-auto">{r.netBuyers >= 0 ? "+" : ""}{r.netBuyers} net buyers</span>}
                   </div>
+                )}
+
+                <div className="flex items-center justify-end gap-1.5">
+                  <Link to={`/token/${r.mint}`} className="btn bg-accent/15 text-accent text-[10.5px] inline-flex items-center gap-1 px-2 py-1">Scan</Link>
+                  <a href={`https://pump.fun/${r.mint}`} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[10.5px] inline-flex items-center gap-1 px-2 py-1">pump <ExternalLink className="h-3 w-3" /></a>
+                  <a href={`https://solscan.io/token/${r.mint}`} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[10.5px] inline-flex items-center gap-1 px-2 py-1">scan <ExternalLink className="h-3 w-3" /></a>
                 </div>
               </div>
             );
           })}
         </div>
       )}
-      <p className="text-[11px] text-muted/80">Live feed of the freshest coins being created on pump.fun. Unverified and high-risk — always do your own research. OrbitX never auto-executes trades.</p>
+      <p className="text-[11px] text-muted/80">Live multi-source feed of fresh + trending coins. Unverified and high-risk — always do your own research. OrbitX never auto-executes trades.</p>
     </div>
   );
 }

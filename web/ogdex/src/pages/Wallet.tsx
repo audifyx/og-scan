@@ -116,6 +116,51 @@ export default function Wallet() {
         )}
       </div>
 
+      {/* ── Summary stats ── */}
+      {d?.ok && (
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 mb-4">
+          <SCard label="Portfolio" value={fmtUsd(total)} />
+          <SCard label="SOL balance" value={(d.sol || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} sub={fmtUsd(d.solUsd)} />
+          <SCard label="Tokens held" value={String(d.tokenCount || 0)} />
+          <SCard label="Win rate" value={d.pnl?.winRate != null ? d.pnl.winRate + "%" : "—"} sub={d.pnl ? `${d.pnl.closedTrades} closed` : undefined} />
+          {d.pnl && (
+            <>
+              <SCard label="Realized PnL" value={(d.pnl.realizedPnlUsd >= 0 ? "+" : "") + fmtUsd(d.pnl.realizedPnlUsd)} tone={d.pnl.realizedPnlUsd >= 0 ? "up" : "down"} />
+              <SCard label="Unrealized PnL" value={d.pnl.unrealizedPnlUsd != null ? (d.pnl.unrealizedPnlUsd >= 0 ? "+" : "") + fmtUsd(d.pnl.unrealizedPnlUsd) : "—"} tone={d.pnl.unrealizedPnlUsd != null ? (d.pnl.unrealizedPnlUsd >= 0 ? "up" : "down") : undefined} />
+              <SCard label="Net PnL" value={d.pnl.totalPnlUsd != null ? (d.pnl.totalPnlUsd >= 0 ? "+" : "") + fmtUsd(d.pnl.totalPnlUsd) : "—"} tone={d.pnl.totalPnlUsd != null ? (d.pnl.totalPnlUsd >= 0 ? "up" : "down") : undefined} />
+              <SCard label="Activity" value={`${d.pnl.openPositions} open`} sub={`${d.pnl.totalSwaps} swaps`} />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Allocation ── */}
+      {d?.ok && total > 0 && rows.length > 0 && (() => {
+        const COLORS = ["#2F80FF", "#9945FF", "#14E0C8", "#FFC53D", "#FF6BD0", "#19E3D0", "#FF8A3D", "#7B5BFF"];
+        const top = rows.slice(0, 8);
+        const otherVal = rows.slice(8).reduce((a, h) => a + (h.usdValue || 0), 0);
+        return (
+          <div className="card p-4 mb-4">
+            <div className="mb-2 text-xs font-semibold text-muted">Portfolio allocation</div>
+            <div className="flex h-3 w-full overflow-hidden rounded-full bg-panel2">
+              {top.map((h, i) => (
+                <div key={h.mint} title={`${h.symbol || short(h.mint)} ${(((h.usdValue || 0) / total) * 100).toFixed(1)}%`} style={{ width: `${((h.usdValue || 0) / total) * 100}%`, background: COLORS[i % COLORS.length] }} />
+              ))}
+              {otherVal > 0 && <div style={{ width: `${(otherVal / total) * 100}%`, background: "#3a4250" }} />}
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[11px]">
+              {top.map((h, i) => (
+                <span key={h.mint} className="inline-flex items-center gap-1.5 text-muted">
+                  <span className="h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+                  <span className="text-white/85 font-medium">{h.symbol || short(h.mint)}</span> {(((h.usdValue || 0) / total) * 100).toFixed(1)}%
+                </span>
+              ))}
+              {otherVal > 0 && <span className="inline-flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full" style={{ background: "#3a4250" }} /> Other {((otherVal / total) * 100).toFixed(1)}%</span>}
+            </div>
+          </div>
+        );
+      })()}
+
       {!d?.ok && <div className="card p-10 text-center text-muted">Could not load this wallet. {d?.error}</div>}
 
       {d?.ok && (
@@ -252,6 +297,16 @@ export default function Wallet() {
       )}
 
       <p className="text-[11px] text-muted text-center mt-4">Balances via on-chain RPC · prices from Jupiter · metadata from GeckoTerminal. Values are estimates.</p>
+    </div>
+  );
+}
+
+function SCard({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "up" | "down" }) {
+  return (
+    <div className="rounded-2xl border border-line bg-panel2/50 p-3.5">
+      <div className="text-[10px] uppercase tracking-wider text-muted">{label}</div>
+      <div className={`mt-1 text-lg font-black tabular-nums ${tone === "up" ? "text-up" : tone === "down" ? "text-down" : "text-white"}`}>{value}</div>
+      {sub && <div className="text-[11px] text-muted mt-0.5">{sub}</div>}
     </div>
   );
 }
