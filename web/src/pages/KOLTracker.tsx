@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Layout } from "../components/Layout";
 
 interface TrackedKOL {
   id: string;
@@ -138,8 +137,7 @@ export default function KOLTracker() {
   };
 
   return (
-    <Layout>
-      <div className="kol-tracker">
+    <div className="kol-tracker">
         <style>{`
           .kol-tracker {
             max-width: 1400px;
@@ -604,6 +602,6 @@ export default function KOLTracker() {
           </div>
         )}
       </div>
-    </Layout>
+    </div>
   );
 }
