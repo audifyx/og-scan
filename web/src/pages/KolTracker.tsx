@@ -461,3 +461,5 @@ export default function KolTracker() {
     </div>
   );
 }
+
+export default KolTracker;
