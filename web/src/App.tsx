@@ -55,6 +55,7 @@ import AdvancedIntelligence from "./pages/AdvancedIntelligence";
 import EnhancedAdvancedIntelligence from "./pages/EnhancedAdvancedIntelligence";
 import IntelligenceAdmin from "./pages/IntelligenceAdmin";
 import AlertSettings from "./pages/AlertSettings";
+import KolTracker from "./pages/KolTracker";
 import { XCallbackPage } from "./pages/XCallbackPage";
 import Admin from "./pages/Admin";
 import SpaceReplay from "./pages/SpaceReplay";
@@ -215,6 +216,7 @@ const App = () => (
             <Route path="/wallets" element={<OgdexRedirect to="/ORBITX_DEX/wallet" />} />
             <Route path="/games" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+            <Route path="/kol-tracker" element={<ProtectedRoute><KolTracker /></ProtectedRoute>} />
             {/* Credits removed */}
 
             {/* ── Protected: Tools & Features ── */}
