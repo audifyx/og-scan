@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Bot, Upload, Trash2, Plus, AlertCircle, Check, Copy } from 'lucide-react';
+import { Bell, Bot, Upload, Trash2, Plus, AlertCircle, Check, Copy, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -53,25 +52,32 @@ export default function KolTracker() {
     }
   }, [user]);
 
-  const loadBotConfig = async () => {
+  const loadBotConfig = () => {
     try {
-      const { data, error } = await supabase
-        .from('kol_tracker_bots')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
-
-      if (data) {
-        setBotConfig(data);
-        setBotToken(data.telegramBotToken || '');
-        setBotName(data.botName || '');
-        setBotBio(data.botBio || '');
-        setBotImageUrl(data.botImageUrl || null);
-        setTrackAllKols(data.trackAllKols || true);
-        setSelectedKolWallets(data.trackedKols?.map((k: TrackedKol) => k.wallet) || []);
+      const saved = localStorage.getItem('kol_tracker_config');
+      if (saved) {
+        const config = JSON.parse(saved);
+        setBotConfig(config);
+        setBotToken(config.telegramBotToken);
+        setBotName(config.botName);
+        setBotBio(config.botBio);
+        setBotImageUrl(config.botImageUrl);
+        setTrackAllKols(config.trackAllKols);
+        setSelectedKolWallets(config.trackedKols?.map((k: any) => k.wallet) || []);
       }
-    } catch (error) {
-      console.error('Error loading bot config:', error);
+    } catch (err: any) {
+      console.error('Error loading bot config:', err.message);
+    }
+  };
+
+  const loadAlerts = () => {
+    try {
+      const saved = localStorage.getItem('kol_tracker_alerts');
+      if (saved) {
+        setAlerts(JSON.parse(saved));
+      }
+    } catch (err: any) {
+      console.error('Error loading alerts:', err.message);
     }
   };
 
@@ -124,54 +130,34 @@ export default function KolTracker() {
   };
 
   const handleSaveBot = async () => {
-    if (!user) {
-      toast({ title: 'Please log in', variant: 'destructive' });
+    if (!botToken || !botName) {
+      toast({ title: 'Error', description: 'Bot token and name are required', variant: 'destructive' });
       return;
     }
 
-    // Validate token
-    const isValid = await validateBotToken();
-    if (!isValid) return;
-
     setLoading(true);
     try {
-      const trackedKols = trackAllKols
-        ? SAMPLE_KOLS.map((kol) => ({ ...kol, id: kol.wallet, isActive: true }))
-        : selectedKolWallets.map((wallet) => {
-            const kol = SAMPLE_KOLS.find((k) => k.wallet === wallet);
-            return { id: wallet, wallet, name: kol?.name || wallet, isActive: true };
-          });
-
-      const { error } = await supabase.from('kol_tracker_bots').upsert(
-        {
-          user_id: user.id,
-          telegramBotToken: botToken,
-          botName: botName || 'KOL Tracker Bot',
-          botBio: botBio || 'Tracking KOL wallet activity',
-          botImageUrl: botImageUrl,
-          trackAllKols: trackAllKols,
-          trackedKols: trackedKols,
-          status: 'active',
-        },
-        { onConflict: 'user_id' }
-      );
-
-      if (error) throw error;
-
-      toast({ title: '✅ Bot configured successfully' });
-      setBotConfig({
-        id: user.id,
+      const config: BotConfig = {
+        id: botConfig?.id || `bot_${Date.now()}`,
         telegramBotToken: botToken,
-        botName: botName || 'KOL Tracker Bot',
-        botBio: botBio || 'Tracking KOL wallet activity',
-        botImageUrl: botImageUrl,
-        trackAllKols: trackAllKols,
-        trackedKols: trackedKols as TrackedKol[],
+        botName,
+        botBio,
+        botImageUrl,
+        trackAllKols,
+        trackedKols: selectedKolWallets.map((wallet, i) => ({
+          id: `kol_${i}`,
+          wallet,
+          name: SAMPLE_KOLS.find(k => k.wallet === wallet)?.name || wallet,
+          isActive: true,
+        })),
         status: 'active',
-      });
-    } catch (error) {
-      console.error('Error saving bot:', error);
-      toast({ title: 'Failed to save bot configuration', variant: 'destructive' });
+      };
+
+      localStorage.setItem('kol_tracker_config', JSON.stringify(config));
+      setBotConfig(config);
+      toast({ title: 'Success', description: 'Bot configuration saved!' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
