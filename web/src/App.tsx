@@ -216,7 +216,7 @@ const App = () => (
             <Route path="/wallets" element={<OgdexRedirect to="/ORBITX_DEX/wallet" />} />
             <Route path="/games" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-            <Route path="/kol-tracker" element={<ProtectedRoute><KolTracker /></ProtectedRoute>} />
+            <Route path="/koltelebot" element={<ProtectedRoute><KolTracker /></ProtectedRoute>} />
             {/* Credits removed */}
 
             {/* ── Protected: Tools & Features ── */}
