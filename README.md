@@ -223,3 +223,4 @@ npm run dev
 
 </div>
 # Cache invalidate
+# Deployed
