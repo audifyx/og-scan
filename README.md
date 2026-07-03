@@ -222,3 +222,4 @@ npm run dev
 *Proprietary — © OG Scan. All rights reserved.*
 
 </div>
+# Cache invalidate
