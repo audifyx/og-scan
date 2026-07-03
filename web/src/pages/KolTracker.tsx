@@ -81,23 +81,6 @@ export default function KolTracker() {
     }
   };
 
-  const loadAlerts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('kol_tracker_alerts')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (data) {
-        setAlerts(data);
-      }
-    } catch (error) {
-      console.error('Error loading alerts:', error);
-    }
-  };
-
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -117,13 +100,22 @@ export default function KolTracker() {
     }
 
     try {
-      const response = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
-      if (!response.ok) {
-        toast({ title: 'Invalid bot token', variant: 'destructive' });
+      const response = await fetch('/api/kol-tracker-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: botToken }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        toast({ title: 'Invalid bot token', description: data.error, variant: 'destructive' });
         return false;
       }
+
+      toast({ title: 'Bot verified!', description: `@${data.username}`, });
       return true;
-    } catch {
+    } catch (error) {
       toast({ title: 'Failed to validate bot token', variant: 'destructive' });
       return false;
     }
@@ -137,6 +129,13 @@ export default function KolTracker() {
 
     setLoading(true);
     try {
+      // Validate bot token before saving
+      const isValid = await validateBotToken();
+      if (!isValid) {
+        setLoading(false);
+        return;
+      }
+
       const config: BotConfig = {
         id: botConfig?.id || `bot_${Date.now()}`,
         telegramBotToken: botToken,
@@ -155,7 +154,7 @@ export default function KolTracker() {
 
       localStorage.setItem('kol_tracker_config', JSON.stringify(config));
       setBotConfig(config);
-      toast({ title: 'Success', description: 'Bot configuration saved!' });
+      toast({ title: 'Success', description: 'Bot configuration saved and activated!' });
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
@@ -447,5 +446,3 @@ export default function KolTracker() {
     </div>
   );
 }
-
-export default KolTracker;
