@@ -1,10 +1,19 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 
 const BRAND = "OrbitX";
 const OS_NAME = "OrbitX";
 const VERSION = "v2.0";
 const DOCK_KEY = "og_dock_order";
+
+const wgTimeAgo = (iso: string) => {
+  const sec = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (sec < 60) return `${sec}s`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h`;
+  return `${Math.floor(sec / 86400)}d`;
+};
 
 type App = {
   key: string;
@@ -120,6 +129,13 @@ export default function Hub() {
   const [spotlightOpen, setSpotlightOpen] = useState(false);
   const [spotQ, setSpotQ] = useState("");
   const [solPrice, setSolPrice] = useState<number | null>(null);
+  const [solChange, setSolChange] = useState<number | null>(null);
+  const [trending, setTrending] = useState<{ mint: string; symbol: string; priceUsd: number | null; change24h: number | null }[]>([]);
+  const [latestPosts, setLatestPosts] = useState<{ id: string; username: string | null; content: string; created_at: string }[]>([]);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [dockX, setDockX] = useState<number | null>(null);
+  const starCanvasRef = useRef<HTMLCanvasElement>(null);
+  const desktopRef = useRef<HTMLDivElement>(null);
   const now = useClock();
   const { signOut, profile } = useAuth();
   const logout = async () => { try { await signOut(); } finally { window.location.assign("/auth"); } };
@@ -198,13 +214,121 @@ export default function Hub() {
   useEffect(() => {
     let on = true;
     const fetchPrice = () =>
-      fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd")
+      fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_change=true")
         .then((r) => r.json())
-        .then((j) => { if (on && j?.solana?.usd) setSolPrice(Number(j.solana.usd)); })
+        .then((j) => {
+          if (!on || !j?.solana?.usd) return;
+          setSolPrice(Number(j.solana.usd));
+          if (j.solana.usd_24h_change != null) setSolChange(Number(j.solana.usd_24h_change));
+        })
         .catch(() => {});
     fetchPrice();
     const iv = setInterval(fetchPrice, 60_000);
     return () => { on = false; clearInterval(iv); };
+  }, []);
+
+  /* Widgets: trending tokens + latest community posts (best-effort) */
+  useEffect(() => {
+    let on = true;
+    const fetchTrending = () =>
+      fetch("/api/ogdex/screener?type=trending&interval=24h&limit=6")
+        .then((r) => r.json())
+        .then((d) => { if (on && d?.rows) setTrending(d.rows.filter((x: any) => x.symbol).slice(0, 5)); })
+        .catch(() => {});
+    const fetchPosts = () =>
+      supabase.from("social_messages")
+        .select("id,username,content,created_at")
+        .eq("channel", "social-general").order("created_at", { ascending: false }).limit(3)
+        .then(({ data }) => { if (on && data) setLatestPosts(data as any); });
+    fetchTrending();
+    fetchPosts();
+    const iv = setInterval(() => { fetchTrending(); fetchPosts(); }, 60_000);
+    return () => { on = false; clearInterval(iv); };
+  }, []);
+
+  /* Animated starfield (skipped for reduced-motion users) */
+  useEffect(() => {
+    const canvas = starCanvasRef.current;
+    if (!canvas) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    let raf = 0;
+    let w = (canvas.width = window.innerWidth);
+    let h = (canvas.height = window.innerHeight);
+    const stars = Array.from({ length: 110 }, () => ({
+      x: Math.random() * w, y: Math.random() * h,
+      r: Math.random() * 1.3 + 0.25,
+      s: Math.random() * 0.14 + 0.03,
+      tw: Math.random() * Math.PI * 2,
+    }));
+    let shoot: { x: number; y: number; vx: number; vy: number; life: number } | null = null;
+    const onResize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; };
+    window.addEventListener("resize", onResize);
+    const tick = (t: number) => {
+      ctx.clearRect(0, 0, w, h);
+      for (const st of stars) {
+        st.y += st.s;
+        if (st.y > h) { st.y = -2; st.x = Math.random() * w; }
+        const a = 0.35 + 0.3 * Math.sin(t / 900 + st.tw);
+        ctx.beginPath();
+        ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        ctx.fill();
+      }
+      if (!shoot && Math.random() < 0.0035) {
+        shoot = { x: Math.random() * w * 0.7 + w * 0.15, y: Math.random() * h * 0.3, vx: 7 + Math.random() * 5, vy: 3 + Math.random() * 2, life: 1 };
+      }
+      if (shoot) {
+        shoot.x += shoot.vx; shoot.y += shoot.vy; shoot.life -= 0.02;
+        ctx.strokeStyle = `rgba(180,215,255,${Math.max(0, shoot.life) * 0.8})`;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(shoot.x, shoot.y);
+        ctx.lineTo(shoot.x - shoot.vx * 5, shoot.y - shoot.vy * 5);
+        ctx.stroke();
+        if (shoot.life <= 0 || shoot.x > w + 80) shoot = null;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", onResize); };
+  }, []);
+
+  /* Mouse parallax on the wallpaper */
+  useEffect(() => {
+    let raf = 0;
+    const onMove = (e: MouseEvent) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const el = desktopRef.current;
+        if (!el) return;
+        const nx = (e.clientX / window.innerWidth - 0.5) * 2;
+        const ny = (e.clientY / window.innerHeight - 0.5) * 2;
+        el.style.setProperty("--par-x", `${nx * -9}px`);
+        el.style.setProperty("--par-y", `${ny * -6}px`);
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    return () => { window.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
+  }, []);
+
+  /* Wallpaper picker (shared by dock + context menu) */
+  const pickWallpaper = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event: any) => {
+        localStorage.setItem("hub-wallpaper", event.target.result);
+        window.location.reload();
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
   }, []);
 
   const openApp = useCallback((app: App | typeof CENTER_TABS[0]) => {
@@ -214,22 +338,7 @@ export default function Hub() {
       if ("action" in app) {
         if (app.action === "logout") logout();
         else if (app.action === "wallpaper") {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = 'image/*';
-          input.onchange = async (e: any) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = (event: any) => {
-                localStorage.setItem('hub-wallpaper', event.target.result);
-                window.location.reload();
-              };
-              reader.readAsDataURL(file);
-            }
-            setLaunching(null);
-          };
-          input.click();
+          pickWallpaper();
           setLaunching(null);
         }
         else window.location.assign(app.href || "/settings");
@@ -242,7 +351,7 @@ export default function Hub() {
         }
       }
     }, 700);
-  }, [launching, logout]);
+  }, [launching, logout, pickWallpaper]);
 
   const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
   const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -257,11 +366,26 @@ export default function Hub() {
       <style>{css}</style>
 
       {/* ── DESKTOP ── */}
-      <div className={`desktop ${booted ? "desktop-ready" : ""}`}>
-        <div className="wallpaper" aria-hidden style={{ backgroundImage: `url('${localStorage.getItem('hub-wallpaper') || ''}')` }}>
+      <div
+        ref={desktopRef}
+        className={`desktop ${booted ? "desktop-ready" : ""}`}
+        onClick={() => setCtxMenu(null)}
+        onContextMenu={(e) => {
+          if ((e.target as HTMLElement).closest(".mac-dock-container, .menu-bar")) return;
+          e.preventDefault();
+          setCtxMenu({ x: Math.min(e.clientX, window.innerWidth - 230), y: Math.min(e.clientY, window.innerHeight - 220) });
+        }}
+      >
+        <div className="wallpaper" aria-hidden style={{ backgroundImage: `url('${localStorage.getItem('hub-wallpaper') || ''}')`, transform: "translate(var(--par-x, 0), var(--par-y, 0)) scale(1.03)" }}>
           <div className="wp-image" />
           <div className="wp-overlay" />
         </div>
+        <div className="aurora" aria-hidden>
+          <div className="aurora-blob aurora-a" />
+          <div className="aurora-blob aurora-b" />
+          <div className="aurora-blob aurora-c" />
+        </div>
+        <canvas ref={starCanvasRef} className="starfield" aria-hidden />
 
         {/* macOS Menu Bar */}
         <header className="menu-bar">
@@ -280,8 +404,13 @@ export default function Hub() {
           </div>
           <div className="mb-right">
             {solPrice != null && (
-              <span className="mb-sol" title="Solana price (live)">
+              <span className="mb-sol" title="Solana price (live, 24h change)">
                 <span className="mb-sol-dot" /> SOL ${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}
+                {solChange != null && (
+                  <b style={{ color: solChange >= 0 ? "#34d399" : "#fb7185", marginLeft: 2 }}>
+                    {solChange >= 0 ? "+" : ""}{solChange.toFixed(1)}%
+                  </b>
+                )}
               </span>
             )}
             <button className="mb-search" title="Search apps (⌘K)" onClick={() => { setSpotlightOpen(true); setSpotQ(""); }}>
@@ -303,9 +432,11 @@ export default function Hub() {
               {(() => { const h = now.getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; })()}
               {profile?.username ? `, ${profile.username}` : ""}
             </p>
-            <p className="hub-greet-sub">Press <kbd>⌘K</kbd> to search apps</p>
+            <p className="hub-greet-sub">Press <kbd>⌘K</kbd> to search · right-click for options</p>
           </div>
-          <div className="app-grid">
+
+          <div className="desktop-flex">
+            <div className="app-grid">
             {apps.map((app, i) => (
               <button
                 key={app.key}
@@ -322,6 +453,65 @@ export default function Hub() {
                 <span className="desktop-icon-label">{app.name}</span>
               </button>
             ))}
+          </div>
+
+            {/* ── Desktop widgets ── */}
+            <aside className="widgets-col">
+              <div className="wg wg-clock">
+                <div className="wg-clock-time">{time}</div>
+                <div className="wg-clock-date">{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>
+              </div>
+
+              <div className="wg">
+                <div className="wg-head">
+                  <span className="wg-title">◎ Solana</span>
+                  <span className="wg-live"><i />LIVE</span>
+                </div>
+                <div className="wg-sol-price">{solPrice != null ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : "—"}</div>
+                {solChange != null && (
+                  <div className="wg-sol-change" style={{ color: solChange >= 0 ? "#34d399" : "#fb7185" }}>
+                    {solChange >= 0 ? "▲" : "▼"} {Math.abs(solChange).toFixed(2)}% today
+                  </div>
+                )}
+              </div>
+
+              <div className="wg">
+                <div className="wg-head">
+                  <span className="wg-title">🔥 Trending</span>
+                  <a className="wg-link" href="/ORBITX_DEX">Open DEX</a>
+                </div>
+                {trending.length === 0 ? (
+                  <div className="wg-empty">Loading market…</div>
+                ) : trending.map((t, i) => {
+                  const up = (t.change24h ?? 0) >= 0;
+                  const mag = Math.min(100, Math.abs(t.change24h ?? 0));
+                  return (
+                    <a key={t.mint} className="wg-row" href="/ORBITX_DEX">
+                      <span className="wg-rank">{i + 1}</span>
+                      <span className="wg-sym">${t.symbol}</span>
+                      <span className="wg-bar"><i style={{ width: `${Math.max(8, mag)}%`, background: up ? "#34d399" : "#fb7185" }} /></span>
+                      <span className="wg-chg" style={{ color: up ? "#34d399" : "#fb7185" }}>{up ? "+" : ""}{(t.change24h ?? 0).toFixed(0)}%</span>
+                    </a>
+                  );
+                })}
+              </div>
+
+              <div className="wg">
+                <div className="wg-head">
+                  <span className="wg-title">💬 Community</span>
+                  <a className="wg-link" href="/social">Open</a>
+                </div>
+                {latestPosts.length === 0 ? (
+                  <div className="wg-empty">No posts yet — say gm</div>
+                ) : latestPosts.map((post) => (
+                  <a key={post.id} className="wg-post" href="/social">
+                    <span className="wg-post-user">@{post.username || "anon"}</span>
+                    <span className="wg-post-text">{post.content.length > 64 ? post.content.slice(0, 64) + "…" : post.content}</span>
+                    <span className="wg-post-time">{wgTimeAgo(post.created_at)}</span>
+                  </a>
+                ))}
+              </div>
+            </aside>
           </div>
         </main>
 
@@ -348,6 +538,18 @@ export default function Hub() {
           </div>
         </footer>
       </div>
+
+      {/* ── CONTEXT MENU ── */}
+      {ctxMenu && (
+        <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => { setCtxMenu(null); setSpotlightOpen(true); setSpotQ(""); }}>🔍 Search apps <span>⌘K</span></button>
+          <button onClick={() => { setCtxMenu(null); pickWallpaper(); }}>🖼️ Change wallpaper</button>
+          <button onClick={() => { setCtxMenu(null); localStorage.removeItem("hub-wallpaper"); window.location.reload(); }}>✨ Reset wallpaper</button>
+          <div className="ctx-sep" />
+          <button onClick={() => { setCtxMenu(null); localStorage.removeItem(DOCK_KEY); window.location.reload(); }}>♻️ Reset icon layout</button>
+          <button onClick={() => { setCtxMenu(null); window.location.reload(); }}>🔄 Refresh</button>
+        </div>
+      )}
 
       {/* ── SPOTLIGHT (⌘K) ── */}
       {spotlightOpen && !launching && (
@@ -687,4 +889,79 @@ const css = `
   animation: spin 1s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+
+/* ═══ 20x DESKTOP UPGRADE ═══ */
+
+/* Aurora atmosphere */
+.aurora{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
+.aurora-blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;will-change:transform}
+.aurora-a{width:52vw;height:52vw;left:-12vw;top:-18vw;background:radial-gradient(circle,rgba(47,128,255,.32),transparent 65%);animation:auraA 26s ease-in-out infinite}
+.aurora-b{width:46vw;height:46vw;right:-10vw;top:8vh;background:radial-gradient(circle,rgba(153,69,255,.28),transparent 65%);animation:auraB 32s ease-in-out infinite}
+.aurora-c{width:40vw;height:40vw;left:28vw;bottom:-16vw;background:radial-gradient(circle,rgba(20,224,200,.16),transparent 65%);animation:auraA 38s ease-in-out infinite reverse}
+@keyframes auraA{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6vw,4vh) scale(1.15)}}
+@keyframes auraB{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5vw,6vh) scale(1.12)}}
+@media (prefers-reduced-motion: reduce){.aurora-blob{animation:none}}
+
+/* Starfield canvas sits above aurora, below UI */
+.starfield{position:absolute;inset:0;z-index:2;pointer-events:none}
+
+/* Layout: icons + widgets side by side */
+.desktop-flex{display:flex;gap:26px;align-items:flex-start;justify-content:center;width:100%;max-width:1180px;margin:0 auto;padding:0 18px}
+.widgets-col{display:none;flex-direction:column;gap:14px;width:290px;flex-shrink:0;animation:fadeSlide .6s .15s ease both}
+@media(min-width:1024px){.widgets-col{display:flex}}
+
+/* Widget cards */
+.wg{border-radius:20px;border:1px solid rgba(255,255,255,.12);background:linear-gradient(160deg,rgba(30,34,44,.62),rgba(12,14,18,.72));backdrop-filter:blur(22px) saturate(150%);box-shadow:0 18px 50px -22px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.08);padding:15px 16px;transition:transform .2s ease,border-color .2s ease}
+.wg:hover{transform:translateY(-2px);border-color:rgba(47,128,255,.32)}
+.wg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.wg-title{font-size:12px;font-weight:800;letter-spacing:.04em;color:rgba(255,255,255,.85)}
+.wg-link{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#5aa2ff;text-decoration:none}
+.wg-link:hover{color:#8ec1ff}
+.wg-live{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:900;letter-spacing:.12em;color:#34d399}
+.wg-live i{width:5px;height:5px;border-radius:99px;background:#34d399;animation:pulse 2s infinite}
+.wg-empty{font-size:11px;color:rgba(255,255,255,.35);padding:8px 0}
+
+/* Clock widget */
+.wg-clock{text-align:center;padding:18px 16px}
+.wg-clock-time{font-size:34px;font-weight:900;letter-spacing:-.03em;color:#fff;text-shadow:0 2px 24px rgba(47,128,255,.35);font-variant-numeric:tabular-nums}
+.wg-clock-date{margin-top:2px;font-size:12px;font-weight:600;color:rgba(255,255,255,.5)}
+
+/* SOL widget */
+.wg-sol-price{font-size:30px;font-weight:900;letter-spacing:-.02em;color:#fff;font-variant-numeric:tabular-nums}
+.wg-sol-change{margin-top:2px;font-size:12px;font-weight:800}
+
+/* Trending rows */
+.wg-row{display:flex;align-items:center;gap:8px;padding:6px 0;text-decoration:none;border-radius:8px}
+.wg-row:hover .wg-sym{color:#8ec1ff}
+.wg-rank{width:14px;font-size:10px;font-weight:900;color:rgba(255,255,255,.3);text-align:center}
+.wg-sym{width:74px;font-size:12px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s}
+.wg-bar{flex:1;height:5px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.wg-bar i{display:block;height:100%;border-radius:99px;transition:width .6s ease}
+.wg-chg{width:46px;text-align:right;font-size:11px;font-weight:900;font-variant-numeric:tabular-nums}
+
+/* Community posts */
+.wg-post{display:block;padding:7px 0;border-top:1px solid rgba(255,255,255,.05);text-decoration:none}
+.wg-post:first-of-type{border-top:0}
+.wg-post-user{font-size:11px;font-weight:900;color:#5aa2ff;margin-right:6px}
+.wg-post-text{font-size:11.5px;color:rgba(255,255,255,.7);line-height:1.45}
+.wg-post-time{display:block;margin-top:2px;font-size:9px;font-weight:700;color:rgba(255,255,255,.28);text-transform:uppercase;letter-spacing:.08em}
+
+/* Icon hover: 3D lift + tone glow */
+.desktop-icon-wrapper .mac-icon{transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .25s ease}
+.desktop-icon-wrapper:hover .mac-icon{transform:translateY(-7px) scale(1.09) rotateX(6deg);box-shadow:0 22px 44px -14px rgba(0,0,0,.8),0 0 34px -6px rgba(47,128,255,.4)}
+.desktop-icon-wrapper:active .mac-icon{transform:translateY(-2px) scale(1.02)}
+
+/* Dock magnification (pure CSS neighbor scaling) */
+.dock-center-item{transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+.dock-center-item:hover{transform:translateY(-12px) scale(1.35);z-index:2}
+.dock-center-item:hover + .dock-center-item{transform:translateY(-5px) scale(1.14)}
+.dock-center-item:has(+ .dock-center-item:hover){transform:translateY(-5px) scale(1.14)}
+
+/* Context menu */
+.ctx-menu{position:fixed;z-index:95;min-width:210px;padding:6px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:linear-gradient(180deg,rgba(34,37,45,.97),rgba(18,20,25,.97));backdrop-filter:blur(24px);box-shadow:0 24px 60px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08);animation:fadeSlide .14s ease both}
+.ctx-menu button{display:flex;align-items:center;justify-content:flex-start;gap:8px;width:100%;padding:8px 11px;border:0;border-radius:9px;background:transparent;color:rgba(255,255,255,.85);font-size:12.5px;font-weight:700;cursor:pointer;text-align:left}
+.ctx-menu button:hover{background:rgba(47,128,255,.22);color:#fff}
+.ctx-menu button span{margin-left:auto;font-size:10px;color:rgba(255,255,255,.35)}
+.ctx-sep{height:1px;margin:5px 8px;background:rgba(255,255,255,.09)}
 `;
