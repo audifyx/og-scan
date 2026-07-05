@@ -166,6 +166,24 @@ export default function Admin() {
   const { isAdmin, loading: adminLoading } = useAdmin();
   const [section, setSection] = useState<AdminSection>("overview");
   const [badges, setBadges] = useState<Partial<Record<AdminSection, number>>>({});
+  const [pulse, setPulse] = useState<{ users: number; posts24: number; liveSpaces: number; online: number } | null>(null);
+
+  useEffect(() => {
+    let on = true;
+    (async () => {
+      try {
+        const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
+        const [u, p24, sp, onl] = await Promise.all([
+          supabase.from("profiles").select("user_id", { count: "exact", head: true }),
+          supabase.from("social_messages").select("id", { count: "exact", head: true }).gte("created_at", dayAgo),
+          supabase.from("spaces").select("id", { count: "exact", head: true }).eq("is_live", true),
+          supabase.from("profiles").select("user_id", { count: "exact", head: true }).gte("last_seen_at", new Date(Date.now() - 900_000).toISOString()),
+        ]);
+        if (on) setPulse({ users: u.count || 0, posts24: p24.count || 0, liveSpaces: sp.count || 0, online: onl.count || 0 });
+      } catch { /* stats are best-effort */ }
+    })();
+    return () => { on = false; };
+  }, []);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -360,6 +378,22 @@ export default function Admin() {
                   </div>
                 </div>
               </div>
+
+              {pulse && (
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[
+                    { label: "Total users", value: pulse.users, tone: "text-cyan-200", ring: "border-cyan-300/15 bg-cyan-300/[0.06]" },
+                    { label: "Online now", value: pulse.online, tone: "text-emerald-300", ring: "border-emerald-400/15 bg-emerald-400/[0.06]" },
+                    { label: "Posts 24h", value: pulse.posts24, tone: "text-violet-300", ring: "border-violet-400/15 bg-violet-400/[0.06]" },
+                    { label: "Live spaces", value: pulse.liveSpaces, tone: "text-rose-300", ring: "border-rose-400/15 bg-rose-400/[0.06]" },
+                  ].map((c) => (
+                    <div key={c.label} className={`rounded-2xl border px-4 py-3 ${c.ring}`}>
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">{c.label}</p>
+                      <p className={`mt-1 text-2xl font-black tabular-nums ${c.tone}`}>{c.value.toLocaleString()}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-5 flex flex-wrap gap-2">
                 {APP_CHIPS.map(({ label, icon: Icon }) => (

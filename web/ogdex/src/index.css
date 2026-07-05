@@ -125,3 +125,72 @@ h1, h2, h3, .font-display { font-family: 'Sora', 'Plus Jakarta Sans', sans-serif
 @keyframes ogIn { from { opacity: 0; transform: translateY(10px) scale(0.995); } to { opacity: 1; transform: none; } }
 .og-fade { animation: ogIn 0.5s cubic-bezier(0.2, 0.7, 0.2, 1); }
 @media (prefers-reduced-motion: reduce) { .og-fade { animation: none; } }
+
+/* ═══════════════════════════════════════════════════════════════
+   Design polish pass — additive only (no existing rules touched)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Brand text selection */
+::selection {
+  background: rgba(var(--accent-rgb), 0.35);
+  color: #fff;
+}
+
+/* Sleek scrollbars everywhere */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.35), rgba(var(--accent2-rgb), 0.25));
+  border-radius: 99px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.55), rgba(var(--accent2-rgb), 0.4));
+}
+
+/* Accessible focus rings that match the brand */
+:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.6);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Buttery interactions on interactive elements */
+a, button {
+  transition: color .16s ease, background-color .16s ease, border-color .16s ease,
+              box-shadow .2s ease, transform .12s ease, opacity .16s ease;
+}
+button:active { transform: scale(0.985); }
+
+/* Subtle lift for any card-like surface on hover */
+.card-hover-lift { transition: transform .2s ease, box-shadow .25s ease; }
+.card-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 44px -18px rgba(var(--accent-rgb), 0.35);
+}
+
+/* Shimmer utility for loading rows */
+@keyframes dex-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.dex-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.03) 63%);
+  background-size: 800px 100%;
+  animation: dex-shimmer 1.3s ease-in-out infinite;
+}
+
+/* Number tables read better tabular */
+td, .tabular { font-variant-numeric: tabular-nums; }
+
+/* Smooth page scrolling */
+html { scroll-behavior: smooth; }
+
+/* Slightly richer header sheen (layered on the existing rule) */
+.header-sheen {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.045),
+              0 12px 40px -22px rgba(var(--accent-rgb), 0.35);
+}

@@ -117,8 +117,11 @@ const CENTER_TABS: { key: string; name: string; href?: string; action: "profile"
 export default function Hub() {
   const [booted, setBooted] = useState(false);
   const [launching, setLaunching] = useState<App | null>(null);
+  const [spotlightOpen, setSpotlightOpen] = useState(false);
+  const [spotQ, setSpotQ] = useState("");
+  const [solPrice, setSolPrice] = useState<number | null>(null);
   const now = useClock();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const logout = async () => { try { await signOut(); } finally { window.location.assign("/auth"); } };
 
   const [dockOrder, setDockOrder] = useState<string[]>(() => {
@@ -179,6 +182,29 @@ export default function Hub() {
   useEffect(() => {
     const t = setTimeout(() => setBooted(true), 150);
     return () => clearTimeout(t);
+  }, []);
+
+  /* Cmd/Ctrl+K spotlight */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSpotlightOpen((v) => !v); setSpotQ(""); }
+      if (e.key === "Escape") setSpotlightOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  /* Live SOL price in the menu bar */
+  useEffect(() => {
+    let on = true;
+    const fetchPrice = () =>
+      fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd")
+        .then((r) => r.json())
+        .then((j) => { if (on && j?.solana?.usd) setSolPrice(Number(j.solana.usd)); })
+        .catch(() => {});
+    fetchPrice();
+    const iv = setInterval(fetchPrice, 60_000);
+    return () => { on = false; clearInterval(iv); };
   }, []);
 
   const openApp = useCallback((app: App | typeof CENTER_TABS[0]) => {
@@ -253,6 +279,14 @@ export default function Hub() {
             </nav>
           </div>
           <div className="mb-right">
+            {solPrice != null && (
+              <span className="mb-sol" title="Solana price (live)">
+                <span className="mb-sol-dot" /> SOL ${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}
+              </span>
+            )}
+            <button className="mb-search" title="Search apps (⌘K)" onClick={() => { setSpotlightOpen(true); setSpotQ(""); }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            </button>
             <span className="mb-version">{VERSION}</span>
             <div className="mb-status-icons">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="16" height="10" rx="2" ry="2"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
@@ -264,6 +298,13 @@ export default function Hub() {
 
         {/* Desktop Body / App Grid */}
         <main className="desktop-body">
+          <div className="hub-greeting">
+            <p className="hub-greet-line">
+              {(() => { const h = now.getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; })()}
+              {profile?.username ? `, ${profile.username}` : ""}
+            </p>
+            <p className="hub-greet-sub">Press <kbd>⌘K</kbd> to search apps</p>
+          </div>
           <div className="app-grid">
             {apps.map((app, i) => (
               <button
@@ -307,6 +348,43 @@ export default function Hub() {
           </div>
         </footer>
       </div>
+
+      {/* ── SPOTLIGHT (⌘K) ── */}
+      {spotlightOpen && !launching && (
+        <div className="spotlight-overlay" onClick={() => setSpotlightOpen(false)}>
+          <div className="spotlight" onClick={(e) => e.stopPropagation()}>
+            <div className="spotlight-input-row">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input
+                autoFocus
+                value={spotQ}
+                onChange={(e) => setSpotQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const q = spotQ.trim().toLowerCase();
+                    const hit = ALL_APPS.find((a) => !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q));
+                    if (hit) { setSpotlightOpen(false); openApp(hit); }
+                  }
+                }}
+                placeholder="Search apps…"
+              />
+              <span className="spotlight-esc">esc</span>
+            </div>
+            <div className="spotlight-results">
+              {ALL_APPS.filter((a) => {
+                const q = spotQ.trim().toLowerCase();
+                return !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q);
+              }).map((a) => (
+                <button key={a.key} className="spotlight-item" onClick={() => { setSpotlightOpen(false); openApp(a); }}>
+                  <span className="spotlight-item-icon" style={{ background: a.iconBg }}>{a.glyph}</span>
+                  <span className="spotlight-item-name">{a.name}</span>
+                  <span className="spotlight-item-cap">{a.caption}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MAC OS WINDOW LAUNCH ANIMATION ── */}
       {launching && (
@@ -373,6 +451,31 @@ function useClock() {
 }
 
 const css = `
+/* ── Hub upgrades: greeting, SOL chip, spotlight ── */
+.hub-greeting{text-align:center;margin:14px 0 4px;animation:fadeSlide .5s ease both}
+.hub-greet-line{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.02em;text-shadow:0 2px 16px rgba(0,0,0,.6)}
+.hub-greet-sub{margin-top:4px;font-size:11px;font-weight:600;color:rgba(255,255,255,.42)}
+.hub-greet-sub kbd{padding:2px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);font-size:10px}
+@keyframes fadeSlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.mb-sol{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;border:1px solid rgba(52,211,153,.25);background:rgba(52,211,153,.09);color:#6ee7b7;font-size:11px;font-weight:800;letter-spacing:.02em}
+.mb-sol-dot{width:5px;height:5px;border-radius:99px;background:#34d399;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.mb-search{display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:7px;background:transparent;color:rgba(255,255,255,.65);cursor:pointer;transition:background .15s}
+.mb-search:hover{background:rgba(255,255,255,.12)}
+.spotlight-overlay{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.45);backdrop-filter:blur(8px);display:flex;justify-content:center;padding-top:18vh;animation:fadeSlide .18s ease both}
+.spotlight{width:min(560px,92vw);height:fit-content;border-radius:18px;border:1px solid rgba(255,255,255,.14);background:linear-gradient(180deg,rgba(28,30,36,.96),rgba(16,17,21,.97));box-shadow:0 32px 90px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.08);overflow:hidden}
+.spotlight-input-row{display:flex;align-items:center;gap:11px;padding:15px 17px;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07)}
+.spotlight-input-row input{flex:1;border:0;outline:0;background:transparent;color:#fff;font-size:17px;font-weight:600}
+.spotlight-input-row input::placeholder{color:rgba(255,255,255,.3)}
+.spotlight-esc{font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.4)}
+.spotlight-results{max-height:320px;overflow-y:auto;padding:7px}
+.spotlight-item{display:flex;align-items:center;gap:12px;width:100%;padding:9px 11px;border:0;border-radius:12px;background:transparent;cursor:pointer;transition:background .12s;text-align:left}
+.spotlight-item:hover{background:rgba(47,128,255,.14)}
+.spotlight-item-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;color:#fff;flex-shrink:0}
+.spotlight-item-icon svg{width:20px;height:20px}
+.spotlight-item-name{font-size:14px;font-weight:800;color:#fff}
+.spotlight-item-cap{margin-left:auto;font-size:11px;font-weight:600;color:rgba(255,255,255,.35)}
+
 .mac-os {
   position: relative; min-height: 100vh; background: #000; color: #fff; overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;

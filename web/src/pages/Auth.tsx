@@ -23,6 +23,20 @@ const usernameSchema = z
   .max(20, "Username must be 20 characters or less")
   .regex(/^[a-zA-Z0-9_]+$/, "Only letters, numbers, and underscores");
 
+function passwordStrength(pw: string): { score: number; label: string; color: string } {
+  if (!pw) return { score: 0, label: "", color: "#334155" };
+  let score = 0;
+  if (pw.length >= 6) score++;
+  if (pw.length >= 10) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  if (score <= 1) return { score: 1, label: "Weak", color: "#f87171" };
+  if (score === 2) return { score: 2, label: "Fair", color: "#fbbf24" };
+  if (score === 3) return { score: 3, label: "Good", color: "#a3e635" };
+  return { score: 4, label: "Strong", color: "#34d399" };
+}
+
 type AuthMode = "signin" | "signup" | "reset";
 
 const modeCopy = {
@@ -61,6 +75,7 @@ const Auth = () => {
   const [honeypot, setHoneypot] = useState("");
   const [formStartedAt] = useState(() => Date.now());
   const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; username?: string; password?: string; confirm?: string; humanCode?: string; captcha?: string }>({});
 
@@ -284,12 +299,26 @@ const Auth = () => {
                       <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                        <Input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 pr-12 text-base text-white focus:border-[#2F80FF]" placeholder="Password" />
+                        <Input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => setCapsLock(e.getModifierState && e.getModifierState("CapsLock"))} onKeyUp={(e) => setCapsLock(e.getModifierState && e.getModifierState("CapsLock"))} className="min-h-[52px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 pr-12 text-base text-white transition-shadow focus:border-[#2F80FF] focus:shadow-[0_0_0_3px_rgba(47,128,255,0.15)]" placeholder="Password" />
                         <button type="button" onClick={() => setShowPassword((p) => !p)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/38 transition hover:text-white" aria-label={showPassword ? "Hide password" : "Show password"}>
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
                       {errors.password && <p className="text-xs font-semibold text-og-blood">{errors.password}</p>}
+                      {capsLock && <p className="text-xs font-semibold text-amber-400">Caps Lock is on</p>}
+                      {mode === "signup" && password.length > 0 && (() => {
+                        const st = passwordStrength(password);
+                        return (
+                          <div className="flex items-center gap-2 pt-1">
+                            <div className="flex h-1.5 flex-1 gap-1">
+                              {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="h-full flex-1 rounded-full transition-colors duration-300" style={{ background: i <= st.score ? st.color : "rgba(255,255,255,0.08)" }} />
+                              ))}
+                            </div>
+                            <span className="w-12 text-right text-[10px] font-black uppercase tracking-wider" style={{ color: st.color }}>{st.label}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 
@@ -348,6 +377,12 @@ const Auth = () => {
                       Back to sign in
                     </button>
                   )}
+                </div>
+
+                <div className="mt-5 flex items-center justify-center gap-4 border-t border-white/[0.06] pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-white/25">
+                  <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-emerald-400/60" /> Encrypted</span>
+                  <span className="inline-flex items-center gap-1.5"><Fingerprint className="h-3 w-3 text-[#2F80FF]/60" /> Bot-protected</span>
+                  <span className="inline-flex items-center gap-1.5"><Sparkles className="h-3 w-3 text-[#9945FF]/60" /> Private beta</span>
                 </div>
               </div>
             </div>
