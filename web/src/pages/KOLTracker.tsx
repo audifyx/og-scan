@@ -113,7 +113,7 @@ export default function KOLTracker() {
   const [alerts, setAlerts] = useState<AlertEntry[]>([]);
   const [kols, setKols] = useState<KolListEntry[]>([]);
   const [feed, setFeed] = useState<TradeEvent[]>([]);
-  const [launches, setLaunches] = useState<{ mint?: string; name?: string; symbol?: string; ageHours?: number }[]>([]);
+  const [launches, setLaunches] = useState<{ mint?: string; address?: string; name?: string; symbol?: string; ageHours?: number }[]>([]);
   const [webhook, setWebhook] = useState<{ url?: string; addressCount?: number } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [feedBusy, setFeedBusy] = useState(false);

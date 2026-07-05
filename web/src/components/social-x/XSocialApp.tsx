@@ -23,6 +23,7 @@ import { cn, safeAvatarUrl } from "@/lib/utils";
 const ChatHub = lazy(() => import("@/pages/SocialHub"));
 const RoomsPage = lazy(() => import("@/pages/CommunityRooms"));
 const SpacesPage = lazy(() => import("@/pages/Spaces"));
+const TradingLobbiesPage = lazy(() => import("@/pages/TradingLobbies"));
 const CoinCommunitiesPage = lazy(() => import("@/pages/CoinCommunitiesPage"));
 const CommunitiesPage = lazy(() => import("@/pages/Communities"));
 const MessagesPage = lazy(() => import("@/pages/DirectMessages"));
@@ -95,6 +96,29 @@ const NAV: { id: XTab; label: string; Icon: React.ComponentType<{ className?: st
   { id: "profile", label: "Profile", Icon: User },
 ];
 
+/* Old sidebar/CommunityHub deep-link keys -> X shell tabs (keeps every legacy entry point working) */
+const ENTRY_MAP: Record<string, XTab> = {
+  channels: "chat", social: "chat", rooms: "rooms", voice: "rooms",
+  spaces: "spaces", communities: "communities", discover: "communities",
+};
+
+function resolveInitialTab(preferred?: XTab): XTab {
+  try {
+    const entry = localStorage.getItem("og_comm_entry");
+    if (entry) {
+      localStorage.removeItem("og_comm_entry");
+      const mapped = ENTRY_MAP[entry];
+      if (mapped) return mapped;
+    }
+  } catch { /* ignore */ }
+  if (preferred) return preferred;
+  try {
+    const saved = localStorage.getItem("og_x_tab") as XTab | null;
+    if (saved && NAV.some((n) => n.id === saved)) return saved;
+  } catch { /* ignore */ }
+  return "home";
+}
+
 /** Tabs that use the classic X 600px center column + right rail. */
 const NARROW_TABS: XTab[] = ["home", "explore", "notifications"];
 
@@ -105,9 +129,9 @@ const Spinner = () => (
 );
 
 /* ═══════════ Main component ═══════════ */
-export default function XSocialApp({ onSelectMint }: { onSelectMint?: (m: string) => void }) {
+export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?: (m: string) => void; initialTab?: XTab }) {
   const { user, profile, signOut } = useAuth();
-  const [tab, setTab] = useState<XTab>("home");
+  const [tab, setTab] = useState<XTab>(() => resolveInitialTab(initialTab));
   const [feedMode, setFeedMode] = useState<"foryou" | "following">("foryou");
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,6 +147,29 @@ export default function XSocialApp({ onSelectMint }: { onSelectMint?: (m: string
   const [bookmarks, setBookmarks] = useState<Set<string>>(loadBookmarks);
   const [searchQ, setSearchQ] = useState("");
   const [commView, setCommView] = useState<"token" | "og">("token");
+  const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
+
+  /* remember the active tab + honor legacy sidebar deep links */
+  useEffect(() => {
+    try { localStorage.setItem("og_x_tab", tab); } catch { /* ignore */ }
+  }, [tab]);
+  useEffect(() => {
+    const sync = () => {
+      try {
+        const entry = localStorage.getItem("og_comm_entry");
+        if (!entry) return;
+        localStorage.removeItem("og_comm_entry");
+        const mapped = ENTRY_MAP[entry];
+        if (mapped) setTab(mapped);
+      } catch { /* ignore */ }
+    };
+    window.addEventListener("og:community-sub-tab", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("og:community-sub-tab", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const modalRef = useRef<HTMLTextAreaElement>(null);
 
@@ -536,9 +583,21 @@ export default function XSocialApp({ onSelectMint }: { onSelectMint?: (m: string
 
       case "rooms":
         return (
-          <Suspense fallback={<Spinner />}>
-            <div className="h-full min-h-0 overflow-hidden"><RoomsPage /></div>
-          </Suspense>
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/[0.08] bg-black/70 px-4 py-3 backdrop-blur-xl">
+              <span className="mr-2 text-[19px] font-black text-white">Rooms</span>
+              {([["rooms", "Community Rooms"], ["trading", "Trading Lobbies"]] as const).map(([id, label]) => (
+                <button key={id} type="button" onClick={() => setRoomsView(id)} className={cn("rounded-full px-4 py-1.5 text-[13px] font-bold transition", roomsView === id ? "bg-white text-black" : "bg-white/[0.06] text-white/50 hover:text-white")}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <Suspense fallback={<Spinner />}>
+                {roomsView === "rooms" ? <RoomsPage /> : <TradingLobbiesPage inline />}
+              </Suspense>
+            </div>
+          </div>
         );
 
       case "spaces":

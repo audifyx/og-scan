@@ -1026,7 +1026,7 @@ const Index = () => {
         {tab === "community" || tab === "social" ? (
           <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
             <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading Social...</div>}>
-              <XSocialApp onSelectMint={updateMint} />
+              <XSocialApp onSelectMint={updateMint} initialTab={tab === "community" ? "chat" : undefined} />
             </Suspense>
           </main>
         ) : tab === "discover" ? (
