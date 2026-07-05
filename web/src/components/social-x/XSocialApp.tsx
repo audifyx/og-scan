@@ -12,7 +12,7 @@ import {
   Home, Search, Bell, Mail, Hash, MessageSquare, Radio, Globe, User,
   Feather, X as XIcon, Heart, MessageCircle, Repeat2, Share, MoreHorizontal,
   Trash2, Copy, Flag, BadgeCheck, Loader2, TrendingUp, ArrowUpRight,
-  ArrowDownRight, Users, Bookmark, LogOut,
+  ArrowDownRight, Users, Bookmark, LogOut, LayoutGrid, Settings,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -96,6 +96,10 @@ const NAV: { id: XTab; label: string; Icon: React.ComponentType<{ className?: st
   { id: "profile", label: "Profile", Icon: User },
 ];
 
+/* Mobile pill: 5 core tabs; the rest live in the More sheet (each tab appears exactly once) */
+const CORE_TABS: XTab[] = ["home", "explore", "notifications", "messages", "profile"];
+const MORE_TABS: XTab[] = ["chat", "rooms", "spaces", "communities"];
+
 /* Old sidebar/CommunityHub deep-link keys -> X shell tabs (keeps every legacy entry point working) */
 const ENTRY_MAP: Record<string, XTab> = {
   channels: "chat", social: "chat", rooms: "rooms", voice: "rooms",
@@ -148,6 +152,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [searchQ, setSearchQ] = useState("");
   const [commView, setCommView] = useState<"token" | "og">("token");
   const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
+  const [moreOpen, setMoreOpen] = useState(false);
 
   /* remember the active tab + honor legacy sidebar deep links */
   useEffect(() => {
@@ -331,6 +336,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   }, [searchQ, suggestions]);
 
   const isNarrow = NARROW_TABS.includes(tab);
+  const PILL_INDEX = CORE_TABS.indexOf(tab) >= 0 ? CORE_TABS.indexOf(tab) : CORE_TABS.length; // last slot = More
   const unread = notifs.filter((n) => !n.is_read).length;
 
   /* ═══════════ Sub-renderers ═══════════ */
@@ -646,6 +652,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           <div className="mb-1 flex items-center gap-2 px-3 py-2">
             <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-[#1d9bf0] to-[#9945FF] text-[15px] font-black text-white">O</span>
             <span className="hidden text-[17px] font-black tracking-tight xl:block">OrbitX</span>
+            <a href="/app" className="ml-auto hidden rounded-full border border-white/15 px-3 py-1 text-[11px] font-bold text-white/50 transition hover:bg-white/[0.06] hover:text-white xl:block">Hub</a>
           </div>
           {NAV.map((n) => (
             <button
@@ -682,6 +689,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <div className="truncate text-[14px] font-black">{displayName}</div>
             <div className="truncate text-[12px] text-white/35">@{handle}</div>
           </div>
+          <a href="/settings" title="Settings" className="hidden rounded-full p-1.5 text-white/35 transition hover:text-white xl:block">
+            <Settings className="h-4 w-4" />
+          </a>
           <button type="button" title="Log out" onClick={() => signOut?.()} className="hidden rounded-full p-1.5 text-white/35 transition hover:text-rose-400 xl:block">
             <LogOut className="h-4 w-4" />
           </button>
@@ -693,7 +703,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         "flex h-full min-h-0 min-w-0 flex-col border-r border-white/[0.08]",
         isNarrow ? "w-full max-w-[600px]" : "w-full max-w-[900px]",
       )}>
-        <div className="min-h-0 flex-1 overflow-y-auto pb-20 sm:pb-0">{renderCenter()}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto pb-24 pt-11 sm:pb-0 sm:pt-0">{renderCenter()}</div>
       </main>
 
       {/* ── Right rail ── */}
@@ -733,27 +743,96 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         </aside>
       )}
 
-      {/* ── Mobile bottom nav ── */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t border-white/[0.08] bg-black/85 px-1 py-1.5 backdrop-blur-xl sm:hidden">
-        {NAV.slice(0, 4).map((n) => (
-          <button key={n.id} type="button" onClick={() => setTab(n.id)} className={cn("relative rounded-full p-2.5", tab === n.id ? "text-white" : "text-white/40")}>
-            <n.Icon className="h-6 w-6" />
-            {n.id === "notifications" && unread > 0 && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#1d9bf0]" />}
-          </button>
-        ))}
-        {NAV.slice(4).map((n) => (
-          <button key={n.id} type="button" onClick={() => setTab(n.id)} className={cn("rounded-full p-2.5", tab === n.id ? "text-white" : "text-white/40")}>
-            <n.Icon className="h-6 w-6" />
-          </button>
-        ))}
+      {/* ── Mobile slim top bar (brand + Hub escape; no tab duplicates) ── */}
+      <div className="fixed inset-x-0 top-0 z-30 flex items-center justify-between border-b border-white/[0.06] bg-black/80 px-4 py-2 backdrop-blur-xl sm:hidden">
+        <div className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[#1d9bf0] to-[#9945FF] text-[13px] font-black text-white">O</span>
+          <span className="text-[15px] font-black tracking-tight text-white">OrbitX</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <a href="/settings" className="rounded-full p-2 text-white/40 transition hover:text-white"><Settings className="h-4 w-4" /></a>
+          <a href="/app" className="rounded-full border border-white/15 px-3 py-1 text-[11px] font-bold text-white/60 transition hover:bg-white/[0.06] hover:text-white">Hub</a>
+        </div>
+      </div>
+
+      {/* ── Mobile bottom nav: floating centered rounded slider pill ── */}
+      <nav className="pointer-events-none fixed inset-x-0 bottom-3 z-30 flex justify-center sm:hidden">
+        <div className="pointer-events-auto relative flex items-center rounded-full border border-white/10 bg-black/85 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)] backdrop-blur-2xl">
+          {/* sliding active indicator */}
+          <span
+            className="absolute top-1.5 h-10 w-12 rounded-full bg-[#1d9bf0]/20 ring-1 ring-[#1d9bf0]/40 transition-transform duration-300 ease-out"
+            style={{ transform: `translateX(${PILL_INDEX * 48}px)` }}
+          />
+          {CORE_TABS.map((id) => {
+            const n = NAV.find((x) => x.id === id)!;
+            const on = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => { setTab(id); setMoreOpen(false); }}
+                className={cn("relative z-10 grid h-10 w-12 place-items-center rounded-full transition-colors", on ? "text-[#1d9bf0]" : "text-white/45 hover:text-white/75")}
+              >
+                <n.Icon className={cn("h-[22px] w-[22px]", on && "stroke-[2.5]")} />
+                {id === "notifications" && unread > 0 && <span className="absolute right-2.5 top-1.5 h-2 w-2 rounded-full bg-[#1d9bf0]" />}
+              </button>
+            );
+          })}
+          {/* More slot — hosts Chat / Rooms / Spaces / Communities (shown once, here only) */}
+          {(() => {
+            const activeMore = MORE_TABS.includes(tab) ? NAV.find((x) => x.id === tab)! : null;
+            const MoreIcon = activeMore ? activeMore.Icon : LayoutGrid;
+            return (
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                className={cn("relative z-10 grid h-10 w-12 place-items-center rounded-full transition-colors", activeMore ? "text-[#1d9bf0]" : "text-white/45 hover:text-white/75")}
+              >
+                <MoreIcon className={cn("h-[22px] w-[22px]", activeMore && "stroke-[2.5]")} />
+              </button>
+            );
+          })()}
+        </div>
       </nav>
+
+      {/* ── More sheet (Chat / Rooms / Spaces / Communities) ── */}
+      {moreOpen && (
+        <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setMoreOpen(false)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div
+            className="absolute inset-x-3 bottom-20 rounded-3xl border border-white/10 bg-[#0b0d10] p-3 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="grid grid-cols-4 gap-2">
+              {MORE_TABS.map((id) => {
+                const n = NAV.find((x) => x.id === id)!;
+                const on = tab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => { setTab(id); setMoreOpen(false); }}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 transition",
+                      on ? "bg-[#1d9bf0]/15 text-[#1d9bf0]" : "text-white/60 hover:bg-white/[0.05] hover:text-white",
+                    )}
+                  >
+                    <n.Icon className="h-6 w-6" />
+                    <span className="text-[11px] font-bold">{n.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Mobile compose FAB ── */}
       {tab === "home" && (
         <button
           type="button"
           onClick={() => { setComposeOpen(true); setTimeout(() => modalRef.current?.focus(), 60); }}
-          className="fixed bottom-20 right-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-[#1d9bf0] text-white shadow-2xl shadow-[#1d9bf0]/40 transition hover:bg-[#1a8cd8] sm:hidden"
+          className="fixed bottom-[4.7rem] right-4 z-30 grid h-13 w-13 h-[52px] w-[52px] place-items-center rounded-full bg-[#1d9bf0] text-white shadow-2xl shadow-[#1d9bf0]/40 transition hover:bg-[#1a8cd8] sm:hidden"
         >
           <Feather className="h-6 w-6" />
         </button>

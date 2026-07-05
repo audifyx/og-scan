@@ -1014,7 +1014,8 @@ const Index = () => {
       {/* Main content */}
       <div className="relative z-10 flex min-w-0 flex-1 min-h-0 flex-col">
         {/* Top bar + horizontal tab strip */}
-        <SocialTopBar activeId={tab} onNavigate={switchTab} />
+        {/* X shell has its own complete nav — hide the top bar there to avoid duplicate tabs */}
+        {tab !== "community" && tab !== "social" && <SocialTopBar activeId={tab} onNavigate={switchTab} />}
 
         {isTabPending && (
           <div className="sticky top-16 z-20 h-1 w-full overflow-hidden bg-white/[0.03]">
