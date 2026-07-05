@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export type WidgetType =
@@ -439,6 +440,7 @@ export function MobileWidgetGrid({ solPrice, solChange, trending, widgets, setWi
   trending: { mint: string; symbol: string; change24h: number | null }[];
   widgets: WidgetConfig[]; setWidgets: (w: WidgetConfig[]) => void; onOpenPanel: () => void;
 }) {
+  const { profile, signOut } = useAuth();
   const dragId = useRef<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const onDrop = useCallback((toId: string) => {
@@ -466,6 +468,37 @@ export function MobileWidgetGrid({ solPrice, solChange, trending, widgets, setWi
         </button>
       </div>
       <div className="mwg-grid">
+        {/* Profile + quick actions — full width */}
+        <div className="mwg-card mwg-profile-card">
+          <div className="mwg-prof-row">
+            <div className="mwg-prof-avatar">
+              {(profile?.username?.[0] ?? 'O').toUpperCase()}
+            </div>
+            <div className="mwg-prof-info">
+              <div className="mwg-prof-name">@{profile?.username ?? 'orbitx'}</div>
+              <div className="mwg-prof-sub">OrbitX Beta ✦</div>
+            </div>
+            <div className="mwg-prof-acts">
+              <a href="/profile" className="mwg-pact" title="Profile">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+              </a>
+              <a href="/settings" className="mwg-pact" title="Settings">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.22-.4.12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54A.49.49 0 0 0 12 2.4H8.16a.49.49 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L.8 8.87c-.1.21-.06.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.22.4-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.49.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41H12c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.07.47 0 .59-.22l1.92-3.32c.1-.21.06-.47-.12-.61l-2.03-1.58zM10.08 15.6A3.52 3.52 0 1 1 10.08 8.56a3.52 3.52 0 0 1 0 7.04z"/></svg>
+              </a>
+              <button className="mwg-pact mwg-pact-red" title="Log out"
+                onClick={() => signOut().finally(() => window.location.assign('/auth'))}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Fear & Greed — right half */}
+        <div className="mwg-card mwg-fg-card">
+          <div className="mwg-card-lbl">🌡 Market Mood</div>
+          <FearGreedWidget />
+        </div>
+
         <div className="mwg-card mwg-sol-card">
           <div className="mwg-card-lbl">◎ Solana</div>
           <div className="mwg-card-val">{solPrice ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : '—'}</div>
@@ -599,6 +632,17 @@ export const aiWidgetCSS = `
 .mob-nav-btn:hover{color:#5aa2ff;background:rgba(47,128,255,.1)}
 .mob-nav-plus{width:46px;height:40px;border-radius:14px;background:linear-gradient(135deg,#2F80FF,#9945FF);border:0;color:#fff;cursor:pointer;display:grid;place-items:center;box-shadow:0 4px 18px rgba(47,128,255,.45);transition:all .2s;flex-shrink:0;font-family:inherit}
 .mob-nav-plus:hover{transform:scale(1.08);box-shadow:0 6px 24px rgba(47,128,255,.6)}
+.mwg-profile-card{grid-column:span 2;background:linear-gradient(135deg,rgba(47,128,255,.1),rgba(153,69,255,.07))!important;border-color:rgba(47,128,255,.18)!important}
+.mwg-prof-row{display:flex;align-items:center;gap:12px}
+.mwg-prof-avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#2F80FF,#9945FF);display:grid;place-items:center;font-size:18px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:0 4px 14px rgba(47,128,255,.35)}
+.mwg-prof-info{flex:1;min-width:0}
+.mwg-prof-name{font-size:14px;font-weight:900;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mwg-prof-sub{font-size:9px;font-weight:700;color:rgba(255,255,255,.4);margin-top:2px;text-transform:uppercase;letter-spacing:.07em}
+.mwg-prof-acts{display:flex;gap:6px;flex-shrink:0}
+.mwg-pact{width:34px;height:34px;border-radius:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);display:grid;place-items:center;text-decoration:none;cursor:pointer;transition:all .15s;font-family:inherit;color:rgba(255,255,255,.65)}
+.mwg-pact:hover{background:rgba(47,128,255,.18);border-color:rgba(47,128,255,.4);color:#fff}
+.mwg-pact-red:hover{background:rgba(251,113,133,.18)!important;border-color:rgba(251,113,133,.4)!important;color:#fb7185!important}
+.mwg-fg-card{grid-column:span 1}
 @media(max-width:767px){
   .desktop-body{padding:8px 0 8px;justify-content:flex-start;align-items:flex-start;overflow-y:auto}
   .desktop-flex{flex-direction:column-reverse;gap:0;padding:0;width:100%}
