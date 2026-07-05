@@ -88,6 +88,13 @@ const Glyph = {
       <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   ),
+  koltracker: (
+    <svg viewBox="0 0 48 48" fill="none">
+      <path d="M24 8c-5 0-9 4-9 9v6l-3 6h24l-3-6v-6c0-5-4-9-9-9z" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M20 34a4 4 0 008 0" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
+      <circle cx="35" cy="12" r="5" fill="currentColor" />
+    </svg>
+  ),
 };
 
 const ALL_APPS: App[] = [
@@ -97,6 +104,7 @@ const ALL_APPS: App[] = [
   { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(135deg, #00C6B8, #00766E)", glyph: Glyph.scanner },
   { key: "gaming", name: "Gaming", caption: "Climb & Win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
   { key: "ai", name: "AI Assistant", caption: "Help & Support", href: "/ai-chat", tone: "#14a0ff", iconBg: "linear-gradient(135deg, #14a0ff, #0077b6)", glyph: Glyph.ai },
+  { key: "koltracker", name: "KOL Tracker", caption: "Wallet Alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
 ];
 
 const CENTER_TABS: { key: string; name: string; href?: string; action: "profile" | "settings" | "logout" | "wallpaper"; tone: string; glyph: JSX.Element }[] = [
@@ -131,7 +139,11 @@ export default function Hub() {
     localStorage.setItem(DOCK_KEY, JSON.stringify(Array.from(new Set(dockOrder))));
   }, [dockOrder]);
 
-  const getApps = () => dockOrder.map((key) => ALL_APPS.find((a) => a.key === key)!).filter(Boolean);
+  const getApps = () => {
+    const ordered = dockOrder.map((key) => ALL_APPS.find((a) => a.key === key)).filter(Boolean) as App[];
+    const missing = ALL_APPS.filter((a) => !dockOrder.includes(a.key));
+    return [...ordered, ...missing];
+  };
 
   const onDragStart = (e: React.DragEvent, key: string) => {
     setDragId(key);

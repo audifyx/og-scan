@@ -76,6 +76,9 @@ const routeToNav: Record<string, string> = {
   "/tokens": "/tools",
   "/alpha-chat": "/tools",
   "/ai-chat": "/tools",
+  "/kol-tracker": "/tools",
+  "/app/kol-tracker": "/tools",
+  "/koltelebot": "/tools",
 
   "/callouts": "/tools",
   "/listings": "/tools",

@@ -15,7 +15,7 @@ import BetaHome from "./pages/BetaHome";
 import Index from "./pages/Index";
 import Splash from "./pages/Splash";
 import Hub from "./pages/Hub";
-import KOLTelebot from "./pages/KOLTelebot";
+import KOLTracker from "./pages/KOLTracker";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Setup from "./pages/Setup";
@@ -162,7 +162,9 @@ const App = () => (
 
             {/* ── Protected: App shell ── */}
             <Route path="/app" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
-            <Route path="/koltelebot" element={<ProtectedRoute><KOLTelebot /></ProtectedRoute>} />
+            <Route path="/koltelebot" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
+            <Route path="/kol-tracker" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
+            <Route path="/app/kol-tracker" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
             <Route path="/hub" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
             <Route path="/command" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/home" element={<ProtectedRoute><Index /></ProtectedRoute>} />
