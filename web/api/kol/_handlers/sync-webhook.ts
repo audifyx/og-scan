@@ -5,7 +5,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 // POST /api/kol/sync-webhook { add?: string[], remove?: string[], replace?: string[] }
 //   Updates the webhook's accountAddresses (dedup, base58-validated).
 const HELIUS_KEY =
-  process.env.HELIUS_SECRET || process.env.HELIUS_API_KEY || process.env.REACT_APP_HELIUS_KEY || "";
+  process.env.HELIUS_SECRET || process.env.HELIUS_API_KEY || process.env.VITE_HELIUS_API_KEY || process.env.REACT_APP_HELIUS_KEY || "";
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const MAX_ADDRESSES = 25_000;
 

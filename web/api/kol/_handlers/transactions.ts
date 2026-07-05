@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 // GET /api/kol/transactions?wallet=<address>&limit=25
 // Returns parsed buy/sell trade events for a wallet via Helius enhanced txs.
 const HELIUS_KEY =
-  process.env.HELIUS_SECRET || process.env.HELIUS_API_KEY || process.env.REACT_APP_HELIUS_KEY || "";
+  process.env.HELIUS_SECRET || process.env.HELIUS_API_KEY || process.env.VITE_HELIUS_API_KEY || process.env.REACT_APP_HELIUS_KEY || "";
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
