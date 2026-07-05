@@ -1,15 +1,16 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 // Single serverless function routing all /api/kol/* endpoints
+// Rewritten from /api/kol/<action> via vercel.json (same pattern as /api/ogdex).
 // (Hobby plan caps functions per deployment; implementations live in _handlers/,
 // which Vercel ignores — same pattern as api/ogdex/_routes).
-import transactions from "./_handlers/transactions";
-import chatId from "./_handlers/chat-id";
-import sendAlert from "./_handlers/send-alert";
-import botSetup from "./_handlers/bot-setup";
-import webhook from "./_handlers/webhook";
-import syncWebhook from "./_handlers/sync-webhook";
-import newLaunches from "./_handlers/new-launches";
-import launchDigest from "./_handlers/launch-digest";
+import transactions from "./kol/_handlers/transactions.js";
+import chatId from "./kol/_handlers/chat-id.js";
+import sendAlert from "./kol/_handlers/send-alert.js";
+import botSetup from "./kol/_handlers/bot-setup.js";
+import webhook from "./kol/_handlers/webhook.js";
+import syncWebhook from "./kol/_handlers/sync-webhook.js";
+import newLaunches from "./kol/_handlers/new-launches.js";
+import launchDigest from "./kol/_handlers/launch-digest.js";
 
 type Handler = (req: VercelRequest, res: VercelResponse) => unknown | Promise<unknown>;
 

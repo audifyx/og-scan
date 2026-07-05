@@ -10,6 +10,10 @@
       "destination": "/api/ogdex?path=$1"
     },
     {
+      "source": "/api/kol/(.*)",
+      "destination": "/api/kol?action=$1"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
@@ -138,7 +142,7 @@
     "api/**/*.js": {
       "maxDuration": 30
     },
-    "api/kol/*.ts": {
+    "api/kol.ts": {
       "maxDuration": 30
     }
   },
