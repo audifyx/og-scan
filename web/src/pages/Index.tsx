@@ -94,6 +94,7 @@ const importArtFeedPage = () => import("./ArtFeed");
 const importSpacesPage = () => import("./Spaces");
 const importSocialHubPage = () => import("./SocialHub");
 const importCommunityHubPage = () => import("./CommunityHub");
+const importXSocialApp = () => import("@/components/social-x/XSocialApp");
 const importToolsHubPage = () => import("./ToolsHub");
 const importChartsPage = () => import("./Charts");
 const importLiveTradingPage = () => import("./LiveTrading");
@@ -107,6 +108,7 @@ const ArtFeed = lazy(importArtFeedPage);
 const SpacesPage = lazy(importSpacesPage);
 const SocialHub = lazy(importSocialHubPage);
 const CommunityHub = lazy(importCommunityHubPage);
+const XSocialApp = lazy(importXSocialApp);
 const ToolsHub = lazy(importToolsHubPage);
 const ChartsPage = lazy(importChartsPage);
 const LiveTradingPage = lazy(importLiveTradingPage);
@@ -819,6 +821,7 @@ const preloadTab = (tab: TabId): void => {
       return;
     case "community":
       void importCommunityHubPage();
+      void importXSocialApp();
       return;
     case "tools":
       void importToolsHubPage();
@@ -944,6 +947,7 @@ const Index = () => {
       void importSpacesPage();
       void importSocialHubPage();
       void importCommunityHubPage();
+      void importXSocialApp();
       void importToolsHubPage();
       void importChartsPage();
       void importLiveTradingPage();
@@ -1021,8 +1025,8 @@ const Index = () => {
         {/* Page content */}
         {tab === "community" || tab === "social" ? (
           <main className="min-h-0 flex-1 overflow-hidden pb-[4.5rem] lg:pb-0">
-            <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading Community...</div>}>
-              <CommunityHub />
+            <Suspense fallback={<div className="flex items-center justify-center h-48 text-white/30 text-sm">Loading Social...</div>}>
+              <XSocialApp onSelectMint={updateMint} />
             </Suspense>
           </main>
         ) : tab === "discover" ? (
