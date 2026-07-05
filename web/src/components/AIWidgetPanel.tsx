@@ -1,87 +1,192 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
-// ── Types ──────────────────────────────────────────────────────────────────
 export type WidgetType =
-  | 'sol_price'
-  | 'trending'
-  | 'social_feed'
-  | 'wallet'
-  | 'price_chart'
-  | 'kol_feed'
-  | 'fear_greed'
-  | 'volume_bar';
+  | 'sol_price' | 'trending' | 'social_feed' | 'wallet' | 'price_chart'
+  | 'kol_feed' | 'fear_greed' | 'volume_bar' | 'dex_chart' | 'token_info'
+  | 'wallet_portfolio' | 'wallet_tracker' | 'top_traders' | 'custom_code';
 
 export interface WidgetConfig {
-  id: string;
-  type: WidgetType;
-  title: string;
+  id: string; type: WidgetType; title: string;
   params: Record<string, string | number | boolean>;
-  size: 'sm' | 'md' | 'lg';
-  pos: number;
+  size: 'sm' | 'md' | 'lg'; pos: number;
 }
 
-// ── Persistence ────────────────────────────────────────────────────────────
-const WG_KEY = 'og_hub_widgets_v1';
+const WG_KEY = 'og_hub_widgets_v2';
 export const readWidgets = (): WidgetConfig[] => {
   try { return JSON.parse(localStorage.getItem(WG_KEY) ?? '[]'); } catch { return []; }
 };
-const writeWidgets = (w: WidgetConfig[]) =>
-  localStorage.setItem(WG_KEY, JSON.stringify(w));
+const writeWidgets = (w: WidgetConfig[]) => localStorage.setItem(WG_KEY, JSON.stringify(w));
 
-// ── Widget library ─────────────────────────────────────────────────────────
 const TEMPLATES: Record<string, Omit<WidgetConfig, 'id' | 'pos'>> = {
-  sol_price:   { type: 'sol_price',   title: 'SOL Price',       params: {},                                      size: 'sm' },
-  trending:    { type: 'trending',    title: 'Trending Tokens',  params: { limit: 5 },                           size: 'md' },
-  social_feed: { type: 'social_feed', title: 'Community Feed',   params: { channel: 'social-general', limit: 3 }, size: 'md' },
-  wallet:      { type: 'wallet',      title: 'Wallet Tracker',   params: { address: '' },                        size: 'sm' },
-  price_chart: { type: 'price_chart', title: 'SOL Chart',        params: { symbol: 'SOL' },                      size: 'lg' },
-  kol_feed:    { type: 'kol_feed',    title: 'KOL Activity',     params: { limit: 5 },                           size: 'md' },
-  fear_greed:  { type: 'fear_greed',  title: 'Fear & Greed',     params: {},                                      size: 'sm' },
-  volume_bar:  { type: 'volume_bar',  title: 'Volume Tracker',   params: { symbol: 'SOL' },                      size: 'md' },
+  sol_price:        { type: 'sol_price',        title: 'SOL Price',        params: {},                                       size: 'sm' },
+  trending:         { type: 'trending',          title: 'Trending Tokens',  params: { limit: 5 },                            size: 'md' },
+  social_feed:      { type: 'social_feed',       title: 'Community Feed',   params: { channel: 'social-general', limit: 3 }, size: 'md' },
+  wallet:           { type: 'wallet',            title: 'Wallet Tracker',   params: { address: '' },                        size: 'sm' },
+  price_chart:      { type: 'price_chart',       title: 'SOL Chart',        params: { symbol: 'SOL', days: 1 },              size: 'lg' },
+  dex_chart:        { type: 'dex_chart',         title: 'DEX Pair Chart',   params: { symbol: 'SOL' },                      size: 'lg' },
+  token_info:       { type: 'token_info',        title: 'Token Info',       params: { symbol: 'SOL' },                      size: 'md' },
+  wallet_portfolio: { type: 'wallet_portfolio',  title: 'Portfolio',        params: { address: '' },                        size: 'lg' },
+  wallet_tracker:   { type: 'wallet_tracker',    title: 'Wallet Tracker',   params: { address: '', view: 'all' },           size: 'lg' },
+  kol_feed:         { type: 'kol_feed',          title: 'KOL Alerts',       params: { limit: 5 },                           size: 'md' },
+  fear_greed:       { type: 'fear_greed',        title: 'Fear & Greed',     params: {},                                     size: 'sm' },
+  volume_bar:       { type: 'volume_bar',        title: 'Volume Tracker',   params: { symbol: 'SOL' },                      size: 'md' },
+  top_traders:      { type: 'top_traders',       title: 'Top Traders',      params: { limit: 5 },                           size: 'md' },
 };
 
 const LIB_ICONS: Record<string, string> = {
-  sol_price: '◎', trending: '🔥', social_feed: '💬',
-  wallet: '👛', price_chart: '📈', kol_feed: '🐋', fear_greed: '🌡', volume_bar: '📊',
+  sol_price: '◎', trending: '🔥', social_feed: '💬', wallet: '👛',
+  price_chart: '📈', dex_chart: '📊', token_info: '🔍', wallet_portfolio: '💼',
+  kol_feed: '🐋', fear_greed: '🌡', volume_bar: '📉', top_traders: '🏆',
+  custom_code: '⚡', wallet_tracker: '🔭',
 };
 
-// ── Intent matcher (fallback when no AI key) ──────────────────────────────
+// ── Slash command parser ────────────────────────────────────────────────────
+type CmdResult = { key: string; extra: Record<string, string>; reply: string };
+
+const SLASH_CMDS: Record<string, (a: string[]) => CmdResult> = {
+  chart:     a => ({ key: 'price_chart',     extra: { symbol: a[0]?.toUpperCase() ?? 'SOL', days: '1', title: `${a[0]?.toUpperCase() ?? 'SOL'} Chart` },     reply: `✅ Added ${a[0]?.toUpperCase() ?? 'SOL'} price chart!` }),
+  dex:       a => ({ key: 'dex_chart',       extra: { symbol: a[0]?.toUpperCase() ?? 'SOL', title: `${a[0]?.toUpperCase() ?? 'SOL'} DEX` },                  reply: `✅ Added ${a[0]?.toUpperCase() ?? 'SOL'} DEX pair from DexScreener!` }),
+  wallet:    a => ({ key: 'wallet_tracker',  extra: { address: a[0] ?? '', view: a[1] ?? 'all', title: a[0] ? `🔭 Wallet ${a[0].slice(0,8)}…` : 'Wallet Tracker' }, reply: '✅ Added wallet tracker — buys, sells, holdings tabs!' }),
+  portfolio: a => ({ key: 'wallet_portfolio',extra: { address: a[0] ?? '', title: a[0] ? `Portfolio ${a[0].slice(0,8)}…` : 'Portfolio' },                    reply: '✅ Added full portfolio view!' }),
+  kol:       () => ({ key: 'kol_feed',       extra: { title: 'KOL Alerts' },                                                                                   reply: '✅ Added KOL whale alerts!' }),
+  trending:  () => ({ key: 'trending',       extra: { title: 'Trending Tokens' },                                                                              reply: '✅ Added trending tokens!' }),
+  fear:      () => ({ key: 'fear_greed',     extra: { title: 'Fear & Greed' },                                                                                 reply: '✅ Added Fear & Greed index!' }),
+  sol:       () => ({ key: 'sol_price',      extra: { title: 'SOL Price' },                                                                                    reply: '✅ Added live SOL price!' }),
+  top:       () => ({ key: 'top_traders',    extra: { title: 'Top Traders' },                                                                                  reply: '✅ Added top traders leaderboard!' }),
+  volume:    a => ({ key: 'volume_bar',      extra: { symbol: a[0]?.toUpperCase() ?? 'SOL', title: `${a[0]?.toUpperCase() ?? 'SOL'} Volume` },                reply: '✅ Added volume tracker!' }),
+  social:    () => ({ key: 'social_feed',    extra: { title: 'Community Feed' },                                                                               reply: '✅ Added community feed!' }),
+  token:     a => ({ key: 'token_info',      extra: { symbol: a[0]?.toUpperCase() ?? 'SOL', title: `${a[0]?.toUpperCase() ?? 'SOL'} Info` },                  reply: `✅ Added $${a[0]?.toUpperCase() ?? 'SOL'} token info!` }),
+};
+
+const CMD_HELP = `⚡ Slash commands:
+/chart SYMBOL — price chart (e.g. /chart BONK)
+/dex SYMBOL — DEX pair from DexScreener (e.g. /dex JUP)
+/wallet ADDRESS [view] — wallet tracker (view: holdings|buys|sells|all)
+/portfolio ADDRESS — full token portfolio
+/kol — KOL whale alerts
+/trending — top trending tokens
+/sol — SOL price widget
+/fear — fear & greed index
+/top — top traders leaderboard
+/volume SYMBOL — 24h volume
+/social — community feed
+/token SYMBOL — token info card
+
+@ shortcuts:
+@SYMBOL — token chart (e.g. @BONK)
+@kol [SYMBOL] — KOL alerts, optionally for a token
+@wallet ADDRESS — full wallet tracker`;
+
+function parseCmd(input: string): CmdResult | 'help' | null {
+  const t = input.trim();
+  if (t.startsWith('/')) {
+    const [cmd, ...args] = t.slice(1).split(/\s+/);
+    if (cmd.toLowerCase() === 'help') return 'help';
+    const handler = SLASH_CMDS[cmd.toLowerCase()];
+    return handler ? handler(args) : null;
+  }
+  if (t.startsWith('@')) {
+    const rest = t.slice(1);
+    if (/^kol/i.test(rest)) {
+      const sym = rest.split(/\s+/)[1];
+      return { key: 'kol_feed', extra: sym ? { title: `KOL · $${sym.toUpperCase()}` } : { title: 'KOL Alerts' }, reply: '✅ Added KOL whale alerts!' };
+    }
+    const walletM = rest.match(/^wallet\s+([1-9A-HJ-NP-Za-km-z]{32,44})/i);
+    if (walletM) return { key: 'wallet_tracker', extra: { address: walletM[1], view: 'all', title: `🔭 Wallet ${walletM[1].slice(0,8)}…` }, reply: '✅ Added wallet tracker!' };
+    const addrM = rest.match(/^([1-9A-HJ-NP-Za-km-z]{32,44})/);
+    if (addrM) return { key: 'wallet_tracker', extra: { address: addrM[1], view: 'all', title: `🔭 Wallet ${addrM[1].slice(0,8)}…` }, reply: '✅ Added wallet tracker!' };
+    const sym = rest.match(/^([A-Za-z]{2,8})$/);
+    if (sym) return { key: 'dex_chart', extra: { symbol: sym[1].toUpperCase(), title: `${sym[1].toUpperCase()} Chart` }, reply: `✅ Added $${sym[1].toUpperCase()} chart!` };
+  }
+  return null;
+}
+
+// ── AI System Prompt ───────────────────────────────────────────────────────────
+const AI_SYSTEM = `You are an advanced AI widget builder for OGScan, a Solana DeFi platform.
+Build ANY widget the user requests. Return ONLY valid JSON:
+{
+  "type": "custom_code"|"sol_price"|"trending"|"price_chart"|"dex_chart"|"wallet"|"wallet_portfolio"|"wallet_tracker"|"token_info"|"social_feed"|"kol_feed"|"fear_greed"|"volume_bar"|"top_traders",
+  "title": "<concise title>",
+  "size": "sm"|"md"|"lg",
+  "params": {
+    "symbol": "<token symbol if relevant>",
+    "address": "<wallet/contract address if given>",
+    "view": "all"|"holdings"|"buys"|"sells",
+    "days": <1|7|30>,
+    "limit": <number>,
+    "code": "<JS arrow fn for custom_code ONLY>"
+  },
+  "reply": "<one friendly sentence>"
+}
+
+SIZES: sm=half-width compact, md=half-width normal, lg=full-width.
+
+wallet_tracker: shows holdings/buys/sells/all from Helius. Use when user says track buys, show sells, full wallet view, wallet activity. Set params.address and params.view.
+
+For custom_code, write a JS arrow function using React.createElement (NO JSX). React, useState, useEffect available.
+
+APIs available:
+- CoinGecko: https://api.coingecko.com/api/v3/simple/price?ids={id}&vs_currencies=usd&include_24hr_change=true
+- CoinGecko chart: https://api.coingecko.com/api/v3/coins/{id}/market_chart?vs_currency=usd&days={n}
+- DexScreener: https://api.dexscreener.com/latest/dex/search?q={symbol}
+- Platform screener: /api/ogdex/screener?type=trending&interval=24h&limit=10
+- Fear & Greed: https://api.alternative.me/fng/
+- Supabase: global 'supabase' - .from('social_messages'), .from('kol_alerts')`;
+
+// ── Intent matcher (fallback) ───────────────────────────────────────────────────
 function matchIntent(msg: string): { key: string; extra: Record<string, string> } {
   const m = msg.toLowerCase();
-  if (m.includes('kol') || m.includes('whale') || m.includes('alert'))      return { key: 'kol_feed',    extra: {} };
-  if (m.includes('fear') || m.includes('greed') || m.includes('sentiment')) return { key: 'fear_greed',  extra: {} };
-  if (m.includes('volume') || m.includes('vol'))                             return { key: 'volume_bar',  extra: {} };
-  if (m.includes('chart') || m.includes('candle') || m.includes('history')) {
+  if (m.includes('buy') || m.includes('sell') || (m.includes('wallet') && (m.includes('track') || m.includes('activit')))) {
+    const addr = msg.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/)?.[0] ?? '';
+    const view = m.includes('buy') ? 'buys' : m.includes('sell') ? 'sells' : m.includes('holding') ? 'holdings' : 'all';
+    return { key: 'wallet_tracker', extra: { address: addr, view, title: addr ? `🔭 Wallet ${addr.slice(0,8)}…` : 'Wallet Tracker' } };
+  }
+  if (m.includes('portfolio') || (m.includes('wallet') && m.includes('all'))) {
+    const addr = msg.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/)?.[0] ?? '';
+    return { key: 'wallet_portfolio', extra: { address: addr } };
+  }
+  if (m.includes('dex') || m.includes('pair') || m.includes('dexscreen')) {
+    const sym = msg.match(/\$?([A-Z]{2,8})/)?.[1] ?? 'SOL';
+    return { key: 'dex_chart', extra: { symbol: sym, title: `${sym} DEX Chart` } };
+  }
+  if (m.includes('token info') || m.includes('about $')) {
+    const sym = msg.match(/\$([A-Z]{2,8})/)?.[1] ?? 'SOL';
+    return { key: 'token_info', extra: { symbol: sym } };
+  }
+  if (m.includes('top trader') || m.includes('leaderboard'))  return { key: 'top_traders', extra: {} };
+  if (m.includes('kol') || m.includes('whale'))               return { key: 'kol_feed',    extra: {} };
+  if (m.includes('fear') || m.includes('greed'))              return { key: 'fear_greed',  extra: {} };
+  if (m.includes('volume'))                                    return { key: 'volume_bar',  extra: {} };
+  if (m.includes('chart') || m.includes('history')) {
     const sym = msg.match(/\$?([A-Z]{2,8})/)?.[1] ?? 'SOL';
     return { key: 'price_chart', extra: { symbol: sym, title: `${sym} Chart` } };
   }
-  if (m.includes('wallet') || m.includes('address') || m.includes('balance')) {
+  if (m.includes('wallet') || m.includes('balance')) {
     const addr = msg.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/)?.[0] ?? '';
     return { key: 'wallet', extra: { address: addr } };
   }
-  if (m.includes('social') || m.includes('community') || m.includes('post')) return { key: 'social_feed', extra: {} };
-  if (m.includes('trending') || m.includes('top') || m.includes('hot'))      return { key: 'trending',    extra: {} };
+  if (m.includes('social') || m.includes('community')) return { key: 'social_feed', extra: {} };
+  if (m.includes('trending') || m.includes('hot'))     return { key: 'trending',    extra: {} };
   return { key: 'sol_price', extra: {} };
 }
 
-// ── Widget renderers ───────────────────────────────────────────────────────
+// ── Widget Renderers ───────────────────────────────────────────────────────────
 
 function SolPriceWidget() {
   const [price, setPrice] = useState<number | null>(null);
-  const [chg, setChg]     = useState<number | null>(null);
-  const [dots, setDots]   = useState<number[]>([]);
+  const [chg, setChg] = useState<number | null>(null);
+  const [dots, setDots] = useState<number[]>([]);
   useEffect(() => {
     let live = true;
-    const go = () =>
-      fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_change=true')
-        .then(r => r.json()).then(j => {
-          if (!live || !j?.solana?.usd) return;
-          const p = Number(j.solana.usd);
-          setPrice(p); setChg(Number(j.solana.usd_24h_change ?? 0));
-          setDots(prev => [...prev.slice(-14), p]);
-        }).catch(() => {});
+    const go = () => fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_change=true')
+      .then(r => r.json()).then(j => {
+        if (!live || !j?.solana?.usd) return;
+        const p = Number(j.solana.usd);
+        setPrice(p); setChg(Number(j.solana.usd_24h_change ?? 0));
+        setDots(prev => [...prev.slice(-14), p]);
+      }).catch(() => {});
     go(); const iv = setInterval(go, 30_000);
     return () => { live = false; clearInterval(iv); };
   }, []);
@@ -99,6 +204,291 @@ function SolPriceWidget() {
           <polyline points={dots.map((d, i) => `${(i / (dots.length - 1)) * 100},${32 - norm(d) * 26}`).join(' ')}
             fill="none" stroke={up ? '#34d399' : '#fb7185'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
+      )}
+    </div>
+  );
+}
+
+function PriceChartWidget({ params }: { params: Record<string, any> }) {
+  const [data, setData] = useState<{ t: number; v: number }[]>([]);
+  const sym = (params.symbol as string) ?? 'SOL';
+  const days = Number(params.days ?? 1);
+  const cgId = sym.toLowerCase() === 'sol' ? 'solana' : sym.toLowerCase();
+  useEffect(() => {
+    let live = true;
+    fetch(`https://api.coingecko.com/api/v3/coins/${cgId}/market_chart?vs_currency=usd&days=${days}&interval=${days <= 1 ? 'hourly' : 'daily'}`)
+      .then(r => r.json()).then(d => { if (live && d?.prices) setData(d.prices.map(([t, v]: [number, number]) => ({ t, v }))); }).catch(() => {});
+    return () => { live = false; };
+  }, [cgId, days]);
+  if (data.length < 2) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', textAlign: 'center', padding: '16px 0' }}>Loading chart…</div>;
+  const min = Math.min(...data.map(d => d.v)), max = Math.max(...data.map(d => d.v));
+  const norm = (v: number) => max > min ? (v - min) / (max - min) : 0.5;
+  const up = data[data.length - 1].v >= data[0].v;
+  const pts = data.map((d, i) => `${(i / (data.length - 1)) * 100},${56 - norm(d.v) * 48}`).join(' ');
+  const pct = ((data[data.length - 1].v - data[0].v) / data[0].v) * 100;
+  const last = data[data.length - 1].v;
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        <div><span style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>${sym}</span><span style={{ fontSize: 10, color: 'rgba(255,255,255,.3)', marginLeft: 6 }}>{days}d</span></div>
+        <span style={{ fontSize: 13, fontWeight: 800, color: up ? '#34d399' : '#fb7185' }}>{up ? '+' : ''}{pct.toFixed(2)}%</span>
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', marginBottom: 8 }}>
+        ${last >= 1000 ? last.toFixed(0) : last >= 1 ? last.toFixed(2) : last.toFixed(6)}
+      </div>
+      <svg width="100%" height="56" viewBox="0 0 100 56" preserveAspectRatio="none">
+        <defs><linearGradient id={`gc_${sym}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={up ? '#34d399' : '#fb7185'} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={up ? '#34d399' : '#fb7185'} stopOpacity="0" />
+        </linearGradient></defs>
+        <polygon points={`0,56 ${pts} 100,56`} fill={`url(#gc_${sym})`} />
+        <polyline points={pts} fill="none" stroke={up ? '#34d399' : '#fb7185'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,.3)' }}>{days}d ago</span>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,.3)' }}>now</span>
+      </div>
+    </div>
+  );
+}
+
+function DexChartWidget({ params }: { params: Record<string, any> }) {
+  const [pair, setPair] = useState<any>(null);
+  const [err, setErr] = useState('');
+  const sym = (params.symbol as string) ?? 'SOL';
+  useEffect(() => {
+    let live = true;
+    fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(sym)}`)
+      .then(r => r.json()).then(d => {
+        if (!live) return;
+        const pairs = (d?.pairs ?? []).filter((p: any) => p.chainId === 'solana');
+        if (pairs.length > 0) setPair(pairs[0]); else setErr('No Solana pairs found');
+      }).catch(() => setErr('Failed to load'));
+    return () => { live = false; };
+  }, [sym]);
+  if (err)   return <div style={{ fontSize: 11, color: '#fb7185' }}>{err}</div>;
+  if (!pair) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>Loading DEX data…</div>;
+  const p24 = Number(pair.priceChange?.h24 ?? 0), up = p24 >= 0;
+  const price = Number(pair.priceUsd ?? 0);
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>{pair.baseToken?.symbol}/{pair.quoteToken?.symbol}</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase' }}>{pair.dexId}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>${price < 0.001 ? price.toFixed(8) : price < 1 ? price.toFixed(4) : price.toFixed(2)}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: up ? '#34d399' : '#fb7185' }}>{up ? '+' : ''}{p24.toFixed(2)}%</div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {[['24h Vol', pair.volume?.h24 ? `$${(Number(pair.volume.h24)/1e6).toFixed(2)}M` : '—'],
+          ['Liquidity', pair.liquidity?.usd ? `$${(Number(pair.liquidity.usd)/1e6).toFixed(2)}M` : '—'],
+          ['Mkt Cap', pair.marketCap ? `$${(Number(pair.marketCap)/1e6).toFixed(1)}M` : '—'],
+          ['Txns 24h', pair.txns?.h24 ? String((pair.txns.h24.buys??0)+(pair.txns.h24.sells??0)) : '—'],
+        ].map(([label, val]) => (
+          <div key={label} style={{ background: 'rgba(255,255,255,.04)', borderRadius: 10, padding: '7px 10px' }}>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,.35)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginTop: 2 }}>{val}</div>
+          </div>
+        ))}
+      </div>
+      <a href={pair.url} target="_blank" rel="noopener" style={{ display: 'block', marginTop: 10, textAlign: 'center', fontSize: 10, color: '#5aa2ff', textDecoration: 'none', fontWeight: 700 }}>
+        View on DexScreener →
+      </a>
+    </div>
+  );
+}
+
+function TokenInfoWidget({ params }: { params: Record<string, any> }) {
+  const [info, setInfo] = useState<any>(null);
+  const sym = (params.symbol as string) ?? 'SOL';
+  useEffect(() => {
+    let live = true;
+    fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(sym)}`)
+      .then(r => r.json()).then(d => {
+        if (!live) return;
+        const p = (d?.pairs ?? []).find((x: any) => x.chainId === 'solana' && x.baseToken?.symbol?.toUpperCase() === sym.toUpperCase());
+        if (p) setInfo(p);
+      }).catch(() => {});
+    return () => { live = false; };
+  }, [sym]);
+  if (!info) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>Loading {sym}…</div>;
+  const chg = Number(info.priceChange?.h24 ?? 0);
+  const price = Number(info.priceUsd ?? 0);
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+        <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg,#2F80FF,#9945FF)', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 900, color: '#fff', flexShrink: 0 }}>{sym[0]}</div>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>{sym}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: chg >= 0 ? '#34d399' : '#fb7185' }}>{chg >= 0 ? '+' : ''}{chg.toFixed(2)}% 24h</div>
+        </div>
+        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>${price < 0.001 ? price.toFixed(8) : price < 1 ? price.toFixed(4) : price.toFixed(2)}</div>
+        </div>
+      </div>
+      {info.baseToken?.address && <div style={{ fontSize: 9, color: 'rgba(255,255,255,.3)', fontFamily: 'monospace', marginBottom: 8, wordBreak: 'break-all' }}>{(info.baseToken.address as string).slice(0,24)}…</div>}
+      <a href={info.url} target="_blank" rel="noopener" style={{ fontSize: 10, color: '#5aa2ff', textDecoration: 'none', fontWeight: 700 }}>View on DexScreener →</a>
+    </div>
+  );
+}
+
+function WalletWidget({ params }: { params: Record<string, any> }) {
+  const [bal, setBal] = useState<number | null>(null);
+  const [err, setErr] = useState('');
+  const addr = (params.address as string) ?? '';
+  useEffect(() => {
+    if (!addr || addr.length < 32) return;
+    const key = (import.meta as any).env?.VITE_HELIUS_API_KEY ?? '';
+    if (!key) { setErr('Helius key not configured'); return; }
+    fetch(`https://api.helius.xyz/v0/addresses/${addr}/balances?api-key=${key}`)
+      .then(r => r.json()).then(d => { if (d?.nativeBalance !== undefined) setBal(d.nativeBalance / 1e9); })
+      .catch(() => setErr('Fetch failed'));
+  }, [addr]);
+  if (!addr) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>No address set — edit widget.</div>;
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', fontFamily: 'monospace', marginBottom: 4 }}>{addr.slice(0,8)}…{addr.slice(-6)}</div>
+      <div style={{ fontSize: 24, fontWeight: 900, color: '#fff' }}>{bal !== null ? `${bal.toFixed(3)} SOL` : err || 'Loading…'}</div>
+    </div>
+  );
+}
+
+function WalletPortfolioWidget({ params }: { params: Record<string, any> }) {
+  const [data, setData] = useState<any>(null);
+  const [err, setErr] = useState('');
+  const addr = (params.address as string) ?? '';
+  useEffect(() => {
+    if (!addr || addr.length < 32) return;
+    const key = (import.meta as any).env?.VITE_HELIUS_API_KEY ?? '';
+    if (!key) { setErr('Helius key not configured'); return; }
+    fetch(`https://api.helius.xyz/v0/addresses/${addr}/balances?api-key=${key}`)
+      .then(r => r.json()).then(d => { if (d?.nativeBalance !== undefined) setData(d); })
+      .catch(() => setErr('Fetch failed'));
+  }, [addr]);
+  if (!addr) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>No address set.</div>;
+  if (err)   return <div style={{ fontSize: 11, color: '#fb7185' }}>{err}</div>;
+  if (!data) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>Loading portfolio…</div>;
+  const sol = data.nativeBalance / 1e9;
+  const tokens = (data.tokens ?? []).filter((t: any) => t.amount > 0).slice(0, 8);
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }}>{addr.slice(0,8)}…{addr.slice(-4)}</span>
+        <span style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>{sol.toFixed(3)} SOL</span>
+      </div>
+      {tokens.map((t: any) => (
+        <div key={t.mint} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderTop: '1px solid rgba(255,255,255,.05)' }}>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }}>{(t.mint as string).slice(0,10)}…</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{(t.amount / Math.pow(10, t.decimals ?? 6)).toFixed(2)}</span>
+        </div>
+      ))}
+      {tokens.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>No SPL tokens found</div>}
+    </div>
+  );
+}
+
+// ── Wallet Tracker: holdings / buys / sells / all ──────────────────────────
+type WalletTab = 'holdings' | 'buys' | 'sells' | 'all';
+function WalletTrackerWidget({ params }: { params: Record<string, any> }) {
+  const [tab, setTab]         = useState<WalletTab>((params.view as WalletTab) ?? 'all');
+  const [balances, setBalances] = useState<any>(null);
+  const [txns, setTxns]       = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr]         = useState('');
+  const addr = (params.address as string) ?? '';
+
+  useEffect(() => {
+    if (!addr || addr.length < 32) return;
+    const key = (import.meta as any).env?.VITE_HELIUS_API_KEY ?? '';
+    if (!key) { setErr('Helius key not configured'); setLoading(false); return; }
+    setLoading(true);
+    Promise.all([
+      fetch(`https://api.helius.xyz/v0/addresses/${addr}/balances?api-key=${key}`).then(r => r.json()).then(setBalances).catch(() => {}),
+      fetch(`https://api.helius.xyz/v0/addresses/${addr}/transactions?api-key=${key}&limit=30`).then(r => r.json()).then(d => { if (Array.isArray(d)) setTxns(d); }).catch(() => {}),
+    ]).finally(() => setLoading(false));
+  }, [addr]);
+
+  if (!addr)   return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>No wallet address. Use /wallet ADDRESS to set one.</div>;
+  if (loading) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>Loading wallet data…</div>;
+  if (err)     return <div style={{ fontSize: 11, color: '#fb7185' }}>{err}</div>;
+
+  const sol = balances?.nativeBalance ? (balances.nativeBalance / 1e9).toFixed(3) : '0.000';
+  const tokens = (balances?.tokens ?? []).filter((t: any) => t.amount > 0);
+  const swaps = txns.filter((t: any) => t.type === 'SWAP' || t.type === 'JUPITER_SWAP');
+  const buys  = txns.filter((t: any) => (t.nativeTransfers ?? []).some((n: any) => n.fromUserAccount === addr));
+  const sells = txns.filter((t: any) => (t.nativeTransfers ?? []).some((n: any) => n.toUserAccount === addr));
+
+  const TABS: { key: WalletTab; label: string; color: string; count?: number }[] = [
+    { key: 'all',      label: 'All',      color: '#5aa2ff' },
+    { key: 'holdings', label: 'Holdings', color: '#34d399', count: tokens.length },
+    { key: 'buys',     label: 'Buys',     color: '#34d399', count: buys.length },
+    { key: 'sells',    label: 'Sells',    color: '#fb7185', count: sells.length },
+  ];
+
+  const show = (s: WalletTab) => tab === 'all' || tab === s;
+  const sectionStyle = (first: boolean): React.CSSProperties => first ? {} : { marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.06)' };
+
+  return (
+    <div>
+      <div style={{ fontSize: 9, color: 'rgba(255,255,255,.3)', fontFamily: 'monospace', marginBottom: 8 }}>{addr.slice(0,10)}…{addr.slice(-6)}</div>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        {TABS.map(({ key, label, color, count }) => (
+          <button key={key} onClick={() => setTab(key)} style={{
+            flex: 1, padding: '5px 0', border: 0, borderRadius: 8, fontSize: 9, fontWeight: 700,
+            background: tab === key ? `${color}22` : 'rgba(255,255,255,.04)',
+            color: tab === key ? color : 'rgba(255,255,255,.35)',
+            cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '.06em', fontFamily: 'inherit',
+            borderBottom: tab === key ? `2px solid ${color}` : '2px solid transparent',
+          }}>{label}{count !== undefined && count > 0 ? ` (${count})` : ''}</button>
+        ))}
+      </div>
+
+      {show('holdings') && (
+        <div style={sectionStyle(tab !== 'all')}>
+          {tab === 'all' && <div style={{ fontSize: 9, fontWeight: 900, color: '#34d399', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>◎ Holdings</div>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.7)' }}>SOL</span>
+            <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>{sol}</span>
+          </div>
+          {tokens.slice(0, 6).map((t: any) => (
+            <div key={t.mint} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderTop: '1px solid rgba(255,255,255,.04)' }}>
+              <span style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }}>{(t.mint as string).slice(0,12)}…</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{(t.amount / Math.pow(10, t.decimals ?? 6)).toFixed(2)}</span>
+            </div>
+          ))}
+          {tokens.length === 0 && <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)' }}>No SPL tokens</div>}
+        </div>
+      )}
+
+      {show('buys') && (
+        <div style={sectionStyle(tab !== 'all')}>
+          {tab === 'all' && <div style={{ fontSize: 9, fontWeight: 900, color: '#34d399', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>↗ Recent Buys</div>}
+          {buys.length === 0 ? <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)' }}>No buy txns found</div>
+            : buys.slice(0, 5).map((t: any, i: number) => (
+              <div key={t.signature} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '4px 0', borderTop: i ? '1px solid rgba(255,255,255,.04)' : 'none' }}>
+                <span style={{ fontSize: 9, fontWeight: 900, color: '#34d399', width: 24 }}>BUY</span>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', fontFamily: 'monospace', flex: 1 }}>{t.timestamp ? new Date(t.timestamp * 1000).toLocaleDateString() : '—'}</span>
+                <a href={`https://solscan.io/tx/${t.signature}`} target="_blank" rel="noopener" style={{ fontSize: 9, color: '#5aa2ff', textDecoration: 'none' }}>view →</a>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {show('sells') && (
+        <div style={sectionStyle(tab !== 'all')}>
+          {tab === 'all' && <div style={{ fontSize: 9, fontWeight: 900, color: '#fb7185', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>↘ Recent Sells</div>}
+          {sells.length === 0 ? <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)' }}>No sell txns found</div>
+            : sells.slice(0, 5).map((t: any, i: number) => (
+              <div key={t.signature} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '4px 0', borderTop: i ? '1px solid rgba(255,255,255,.04)' : 'none' }}>
+                <span style={{ fontSize: 9, fontWeight: 900, color: '#fb7185', width: 28 }}>SELL</span>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', fontFamily: 'monospace', flex: 1 }}>{t.timestamp ? new Date(t.timestamp * 1000).toLocaleDateString() : '—'}</span>
+                <a href={`https://solscan.io/tx/${t.signature}`} target="_blank" rel="noopener" style={{ fontSize: 9, color: '#5aa2ff', textDecoration: 'none' }}>view →</a>
+              </div>
+            ))}
+        </div>
       )}
     </div>
   );
@@ -151,29 +541,31 @@ function SocialFeedWidget({ params }: { params: Record<string, any> }) {
   );
 }
 
-function WalletWidget({ params }: { params: Record<string, any> }) {
-  const [bal, setBal] = useState<number | null>(null);
-  const [err, setErr] = useState('');
-  const addr = (params.address as string) ?? '';
+function KOLFeedWidget({ params }: { params: Record<string, any> }) {
+  const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
-    if (!addr || addr.length < 32) return;
-    const key = (import.meta as any).env?.VITE_HELIUS_API_KEY ?? '';
-    if (!key) { setErr('Helius key not set'); return; }
-    fetch(`https://api.helius.xyz/v0/addresses/${addr}/balances?api-key=${key}`)
-      .then(r => r.json()).then(d => { if (d?.nativeBalance !== undefined) setBal(d.nativeBalance / 1e9); })
-      .catch(() => setErr('Fetch failed'));
-  }, [addr]);
-  if (!addr) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>No address — edit widget to add one.</div>;
+    let live = true;
+    supabase.from('kol_alerts').select('id,wallet,token_symbol,action,amount_sol,created_at')
+      .order('created_at', { ascending: false }).limit(params.limit ?? 5)
+      .then(({ data }) => { if (live && data) setRows(data as any); });
+    return () => { live = false; };
+  }, []);
   return (
     <div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', fontFamily: 'monospace', marginBottom: 4 }}>{addr.slice(0, 8)}…{addr.slice(-6)}</div>
-      <div style={{ fontSize: 24, fontWeight: 900, color: '#fff' }}>{bal !== null ? `${bal.toFixed(3)} SOL` : err || 'Loading…'}</div>
+      {rows.length === 0 ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>No KOL activity yet</div>
+        : rows.map((r, i) => (
+          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
+            <span style={{ fontSize: 10, color: r.action === 'buy' ? '#34d399' : '#fb7185', fontWeight: 900, textTransform: 'uppercase', width: 28 }}>{r.action}</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', flex: 1 }}>${r.token_symbol}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>{Number(r.amount_sol).toFixed(1)} SOL</span>
+          </div>
+        ))}
     </div>
   );
 }
 
 function FearGreedWidget() {
-  const [val, setVal]     = useState<number | null>(null);
+  const [val, setVal] = useState<number | null>(null);
   const [label, setLabel] = useState('');
   useEffect(() => {
     fetch('https://api.alternative.me/fng/')
@@ -190,129 +582,124 @@ function FearGreedWidget() {
   );
 }
 
-function PriceChartWidget({ params }: { params: Record<string, any> }) {
-  const [data, setData] = useState<{ t: number; v: number }[]>([]);
-  const sym = (params.symbol as string) ?? 'SOL';
-  const cgId = sym.toLowerCase() === 'sol' ? 'solana' : sym.toLowerCase();
+function VolumeBarWidget({ params }: { params: Record<string, any> }) {
+  const [vol, setVol] = useState<number | null>(null);
   useEffect(() => {
-    let live = true;
-    fetch(`https://api.coingecko.com/api/v3/coins/${cgId}/market_chart?vs_currency=usd&days=1&interval=hourly`)
-      .then(r => r.json()).then(d => { if (live && d?.prices) setData(d.prices.map(([t, v]: [number, number]) => ({ t, v }))); })
-      .catch(() => {});
-    return () => { live = false; };
-  }, [cgId]);
-  if (data.length < 2) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>Loading chart…</div>;
-  const min = Math.min(...data.map(d => d.v)), max = Math.max(...data.map(d => d.v));
-  const norm = (v: number) => max > min ? (v - min) / (max - min) : 0.5;
-  const up = data[data.length - 1].v >= data[0].v;
-  const pts = data.map((d, i) => `${(i / (data.length - 1)) * 100},${52 - norm(d.v) * 44}`).join(' ');
-  const pct = (((data[data.length - 1].v - data[0].v) / data[0].v) * 100);
+    fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_vol=true')
+      .then(r => r.json()).then(j => { if (j?.solana) setVol(j.solana.usd_24h_vol ?? null); }).catch(() => {});
+  }, [params.symbol]);
+  const fmt = (v: number) => v > 1e9 ? `$${(v/1e9).toFixed(2)}B` : v > 1e6 ? `$${(v/1e6).toFixed(1)}M` : `$${v.toFixed(0)}`;
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, alignItems: 'baseline' }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>${sym}</span>
-        <span style={{ fontSize: 12, fontWeight: 800, color: up ? '#34d399' : '#fb7185' }}>{up ? '+' : ''}{pct.toFixed(2)}% 24h</span>
-      </div>
-      <svg width="100%" height="52" viewBox="0 0 100 52" preserveAspectRatio="none">
-        <defs><linearGradient id={`g_${sym}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={up ? '#34d399' : '#fb7185'} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={up ? '#34d399' : '#fb7185'} stopOpacity="0" />
-        </linearGradient></defs>
-        <polygon points={`0,52 ${pts} 100,52`} fill={`url(#g_${sym})`} />
-        <polyline points={pts} fill="none" stroke={up ? '#34d399' : '#fb7185'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,.3)' }}>24h ago</span>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,.3)' }}>now</span>
-      </div>
+      <div style={{ fontSize: 22, fontWeight: 900, color: '#fff' }}>{vol ? fmt(vol) : '—'}</div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', marginTop: 4 }}>24h Volume</div>
     </div>
   );
 }
 
-function KOLFeedWidget({ params }: { params: Record<string, any> }) {
+function TopTradersWidget({ params }: { params: Record<string, any> }) {
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => {
     let live = true;
-    supabase.from('kol_alerts').select('id,wallet,token_symbol,action,amount_sol,created_at')
-      .order('created_at', { ascending: false }).limit(params.limit ?? 5)
+    supabase.from('kol_alerts').select('wallet,token_symbol,amount_sol').order('amount_sol', { ascending: false }).limit(params.limit ?? 5)
       .then(({ data }) => { if (live && data) setRows(data as any); });
     return () => { live = false; };
   }, []);
+  const medals = ['🥇','🥈','🥉'];
   return (
     <div>
-      {rows.length === 0 ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>No KOL activity yet</div>
-        : rows.map((r, i) => (
-          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
-            <span style={{ fontSize: 10, color: r.action === 'buy' ? '#34d399' : '#fb7185', fontWeight: 900, textTransform: 'uppercase' }}>{r.action}</span>
-            <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', flex: 1 }}>${r.token_symbol}</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>{Number(r.amount_sol).toFixed(1)} SOL</span>
+      {rows.length === 0 ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>No trader data yet</div>
+        : rows.map((t, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderTop: i ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
+            <span style={{ fontSize: 13, width: 20 }}>{medals[i] ?? `${i+1}`}</span>
+            <span style={{ flex: 1, fontSize: 10, color: 'rgba(255,255,255,.45)', fontFamily: 'monospace' }}>{(t.wallet as string)?.slice(0,10)}…</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#34d399' }}>{Number(t.amount_sol).toFixed(1)} SOL</span>
           </div>
         ))}
     </div>
   );
 }
 
-function VolumeBarWidget({ params }: { params: Record<string, any> }) {
-  const [vol, setVol] = useState<number | null>(null);
-  const sym = (params.symbol as string) ?? 'SOL';
-  useEffect(() => {
-    fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd&include_24hr_vol=true')
-      .then(r => r.json()).then(j => { if (j?.solana) setVol(j.solana.usd_24h_vol ?? null); })
-      .catch(() => {});
-  }, [sym]);
-  const fmt = (v: number) => v > 1e9 ? `$${(v / 1e9).toFixed(2)}B` : v > 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${v.toFixed(0)}`;
-  return (
-    <div>
-      <div style={{ fontSize: 22, fontWeight: 900, color: '#fff' }}>{vol ? fmt(vol) : '—'}</div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', marginTop: 4 }}>24h Volume · {sym}</div>
-    </div>
-  );
+function CustomCodeWidget({ params }: { params: Record<string, any> }) {
+  const code = (params.code as string) ?? '';
+  const [error, setError] = useState('');
+  const Component = useMemo(() => {
+    if (!code) return null;
+    try {
+      const fn = new Function('React','useState','useEffect','useMemo','useCallback','fetch','supabase','params',
+        `"use strict"; const Component = (${code}); return Component;`);
+      return fn({ useState, useEffect, useMemo, useCallback, createElement: (t: any, p: any, ...c: any[]) => null },
+        useState, useEffect, useMemo, useCallback, window.fetch.bind(window), supabase, params);
+    } catch (e) { setError(String(e)); return null; }
+  }, [code]);
+  if (error) return <div style={{ fontSize: 11, color: '#fb7185', wordBreak: 'break-word' }}>⚠ {error}</div>;
+  if (!Component) return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>No code provided</div>;
+  try { return <Component params={params} />; } catch (e) { return <div style={{ fontSize: 11, color: '#fb7185' }}>⚠ {String(e)}</div>; }
 }
 
 function WidgetRenderer({ widget }: { widget: WidgetConfig }) {
   switch (widget.type) {
-    case 'sol_price':   return <SolPriceWidget />;
-    case 'trending':    return <TrendingWidget params={widget.params} />;
-    case 'social_feed': return <SocialFeedWidget params={widget.params} />;
-    case 'wallet':      return <WalletWidget params={widget.params} />;
-    case 'fear_greed':  return <FearGreedWidget />;
-    case 'price_chart': return <PriceChartWidget params={widget.params} />;
-    case 'kol_feed':    return <KOLFeedWidget params={widget.params} />;
-    case 'volume_bar':  return <VolumeBarWidget params={widget.params} />;
-    default:            return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Unknown widget</div>;
+    case 'sol_price':        return <SolPriceWidget />;
+    case 'trending':         return <TrendingWidget params={widget.params} />;
+    case 'social_feed':      return <SocialFeedWidget params={widget.params} />;
+    case 'wallet':           return <WalletWidget params={widget.params} />;
+    case 'fear_greed':       return <FearGreedWidget />;
+    case 'price_chart':      return <PriceChartWidget params={widget.params} />;
+    case 'dex_chart':        return <DexChartWidget params={widget.params} />;
+    case 'token_info':       return <TokenInfoWidget params={widget.params} />;
+    case 'wallet_portfolio': return <WalletPortfolioWidget params={widget.params} />;
+    case 'wallet_tracker':   return <WalletTrackerWidget params={widget.params} />;
+    case 'kol_feed':         return <KOLFeedWidget params={widget.params} />;
+    case 'volume_bar':       return <VolumeBarWidget params={widget.params} />;
+    case 'top_traders':      return <TopTradersWidget params={widget.params} />;
+    case 'custom_code':      return <CustomCodeWidget params={widget.params} />;
+    default:                 return <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Unknown widget</div>;
   }
 }
 
 // ── AI Widget Panel ────────────────────────────────────────────────────────
 interface Msg { role: 'user' | 'ai'; text: string; }
 
-const AI_REPLIES: Record<string, string> = {
-  sol_price:   '✅ Added SOL Price with live sparkline!',
-  trending:    '✅ Added Trending Tokens — top 5 movers from your DEX!',
-  social_feed: '✅ Added Community Feed with live posts!',
-  wallet:      '✅ Added Wallet Tracker — edit it to set your address.',
-  price_chart: '✅ Added the price chart with 24h history!',
-  kol_feed:    '✅ Added KOL Activity — tracking big wallet moves!',
-  fear_greed:  '✅ Added Fear & Greed Index!',
-  volume_bar:  '✅ Added Volume Tracker!',
+const FALLBACK_REPLIES: Record<string, string> = {
+  sol_price: '✅ Added live SOL price with sparkline!',
+  trending: '✅ Added trending tokens from your DEX!',
+  price_chart: '✅ Added price chart!',
+  dex_chart: '✅ Added DEX pair chart from DexScreener!',
+  token_info: '✅ Added token info card!',
+  wallet: '✅ Added wallet tracker!',
+  wallet_portfolio: '✅ Added full wallet portfolio view!',
+  wallet_tracker: '✅ Added wallet tracker — buys, sells & holdings tabs!',
+  kol_feed: '✅ Added KOL whale alerts!',
+  fear_greed: '✅ Added Fear & Greed index!',
+  volume_bar: '✅ Added volume tracker!',
+  top_traders: '✅ Added top traders leaderboard!',
+  social_feed: '✅ Added community feed!',
 };
 
 export function AIWidgetPanel({ onClose, widgets, setWidgets }: {
-  onClose: () => void;
-  widgets: WidgetConfig[];
-  setWidgets: (w: WidgetConfig[]) => void;
+  onClose: () => void; widgets: WidgetConfig[]; setWidgets: (w: WidgetConfig[]) => void;
 }) {
-  const [tab, setTab]     = useState<'chat' | 'my' | 'lib'>('chat');
-  const [msgs, setMsgs]   = useState<Msg[]>([{ role: 'ai', text: '👋 Tell me what widget you want!\n• "Live SOL price chart"\n• "Trending tokens by volume"\n• "Track wallet ABC…"\n• "Fear & greed index"\n• "KOL whale alerts"' }]);
+  const [tab, setTab] = useState<'chat' | 'my' | 'lib'>('chat');
+  const [msgs, setMsgs] = useState<Msg[]>([{ role: 'ai', text: '⚡ Widget Studio — builds anything permanently saved to your hub.
+
+Type naturally OR use commands:
+• /chart BONK — price chart
+• /wallet ADDRESS — buys/sells/holdings tracker
+• /dex JUP — DEX pair from DexScreener
+• @BONK — quick token chart
+• @kol — KOL whale alerts
+• /help — all commands
+
+Or just describe anything!' }]);
   const [input, setInput] = useState('');
-  const [busy, setBusy]   = useState(false);
-  const bottomRef         = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
 
   const makeWidget = useCallback((key: string, extra: Record<string, any> = {}): WidgetConfig => {
     const tmpl = TEMPLATES[key] ?? TEMPLATES.sol_price;
-    return { ...tmpl, id: `w_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, pos: widgets.length, params: { ...tmpl.params, ...extra }, title: extra.title ?? tmpl.title };
+    return { ...tmpl, id: `w_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, pos: widgets.length, params: { ...tmpl.params, ...extra }, title: extra.title ?? tmpl.title };
   }, [widgets.length]);
 
   const pushWidget = useCallback((w: WidgetConfig) => {
@@ -330,6 +717,21 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets }: {
     setInput('');
     setMsgs(prev => [...prev, { role: 'user', text }]);
     setBusy(true);
+
+    // Handle slash commands + @ mentions instantly (no AI needed)
+    const cmd = parseCmd(text);
+    if (cmd === 'help') {
+      setMsgs(prev => [...prev, { role: 'ai', text: CMD_HELP }]);
+      setBusy(false); return;
+    }
+    if (cmd) {
+      const w = makeWidget(cmd.key, cmd.extra);
+      pushWidget(w);
+      setMsgs(prev => [...prev, { role: 'ai', text: cmd.reply }]);
+      setBusy(false); return;
+    }
+
+    // AI generation
     try {
       const aiKey = (import.meta as any).env?.VITE_OPENAI_API_KEY ?? '';
       if (!aiKey) throw new Error('no key');
@@ -337,39 +739,48 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets }: {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${aiKey}` },
         body: JSON.stringify({
-          model: 'gpt-4o-mini', max_tokens: 250,
+          model: 'gpt-4o-mini', max_tokens: 1200, temperature: 0.2,
           messages: [
-            { role: 'system', content: 'You are an AI widget builder for OGScan (Solana crypto platform). Widget types: sol_price, trending, social_feed, wallet, price_chart, kol_feed, fear_greed, volume_bar. Sizes: sm|md|lg. Respond ONLY with JSON: {"type":"...","title":"...","params":{},"size":"sm","reply":"..."}. For price_chart add params.symbol. For wallet add params.address. For trending add params.limit.' },
+            { role: 'system', content: AI_SYSTEM },
+            ...msgs.slice(-6).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text })),
             { role: 'user', content: text }
           ]
         })
       });
       const j = await res.json();
-      const parsed = JSON.parse(j.choices[0].message.content.trim().replace(/```json|```/g, ''));
-      const w = makeWidget(parsed.type ?? 'sol_price', { ...parsed.params, title: parsed.title });
+      const raw = j.choices?.[0]?.message?.content?.trim() ?? '';
+      const parsed = JSON.parse(raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim());
+      const w: WidgetConfig = {
+        id: `w_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
+        type: (parsed.type as WidgetType) ?? 'sol_price',
+        title: parsed.title ?? 'AI Widget',
+        params: parsed.params ?? {},
+        size: (parsed.size as any) ?? 'md',
+        pos: widgets.length,
+      };
       pushWidget(w);
-      setMsgs(prev => [...prev, { role: 'ai', text: parsed.reply ?? `✅ Added "${w.title}" to your hub!` }]);
+      setMsgs(prev => [...prev, { role: 'ai', text: parsed.reply ?? `✅ Added "${w.title}" permanently to your hub!` }]);
     } catch {
       const { key, extra } = matchIntent(text);
       const w = makeWidget(key, extra);
       pushWidget(w);
-      setMsgs(prev => [...prev, { role: 'ai', text: AI_REPLIES[key] ?? '✅ Widget added to your hub!' }]);
+      setMsgs(prev => [...prev, { role: 'ai', text: FALLBACK_REPLIES[key] ?? '✅ Widget added permanently to your hub!' }]);
     }
     setBusy(false);
-  }, [input, busy, makeWidget, pushWidget]);
+  }, [input, busy, msgs, widgets, makeWidget, pushWidget]);
 
   return (
     <div className="awp-overlay" onClick={onClose}>
       <div className="awp-panel" onClick={e => e.stopPropagation()}>
         <div className="awp-handle" />
         <div className="awp-title-row">
-          <span className="awp-title-text">✦ Widget Studio</span>
+          <span className="awp-title-text">⚡ Widget Studio</span>
           <button className="awp-close" onClick={onClose}>✕</button>
         </div>
         <div className="awp-tabs">
-          {(['chat', 'my', 'lib'] as const).map(t => (
-            <button key={t} className={`awp-tab ${tab === t ? 'awp-tab-on' : ''}`} onClick={() => setTab(t)}>
-              {t === 'chat' ? '🤖 AI Chat' : t === 'my' ? `📦 My Widgets${widgets.length ? ` (${widgets.length})` : ''}` : '📚 Library'}
+          {(['chat','my','lib'] as const).map(t => (
+            <button key={t} className={`awp-tab ${tab===t?'awp-tab-on':''}`} onClick={() => setTab(t)}>
+              {t==='chat' ? '🤖 AI Builder' : t==='my' ? `📦 My Widgets${widgets.length ? ` (${widgets.length})` : ''}` : '📚 Library'}
             </button>
           ))}
         </div>
@@ -378,23 +789,23 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets }: {
             <div className="awp-msgs">
               {msgs.map((m, i) => (
                 <div key={i} className={`awp-msg awp-msg-${m.role}`}>
-                  {m.role === 'ai' && <div className="awp-avatar">⬡</div>}
+                  {m.role === 'ai' && <div className="awp-avatar">⚡</div>}
                   <div className="awp-bubble">{m.text.split('\n').map((ln, j) => <div key={j}>{ln}</div>)}</div>
                 </div>
               ))}
-              {busy && <div className="awp-msg awp-msg-ai"><div className="awp-avatar">⬡</div><div className="awp-bubble awp-dots"><span /><span /><span /></div></div>}
+              {busy && <div className="awp-msg awp-msg-ai"><div className="awp-avatar">⚡</div><div className="awp-bubble awp-dots"><span /><span /><span /></div></div>}
               <div ref={bottomRef} />
             </div>
             <div className="awp-input-row">
               <input className="awp-input" value={input} onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                placeholder="Describe a widget…" disabled={busy} />
+                onKeyDown={e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder="Describe a widget, /cmd, or @mention…" disabled={busy} />
               <button className="awp-send-btn" onClick={send} disabled={!input.trim() || busy}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z" /></svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
               </button>
             </div>
             <div className="awp-pills">
-              {['SOL price chart', 'Trending tokens', 'Fear & greed', 'KOL whale alerts', 'Community feed'].map(q => (
+              {['/help','/chart BONK','/wallet','/dex JUP','@kol','/fear'].map(q => (
                 <button key={q} className="awp-pill" onClick={() => setInput(q)}>{q}</button>
               ))}
             </div>
@@ -402,7 +813,7 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets }: {
         )}
         {tab === 'my' && (
           <div className="awp-list">
-            {widgets.length === 0 ? <div className="awp-empty">No widgets yet — ask AI or browse the library!</div>
+            {widgets.length === 0 ? <div className="awp-empty">No widgets yet — try /help to see commands!</div>
               : widgets.map(w => (
                 <div key={w.id} className="awp-list-item">
                   <div className="awp-list-icon">{LIB_ICONS[w.type] ?? '📊'}</div>
@@ -434,7 +845,6 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets }: {
   );
 }
 
-// ── Mobile Widget Grid ─────────────────────────────────────────────────────
 export function MobileWidgetGrid({ solPrice, solChange, trending, widgets, setWidgets, onOpenPanel }: {
   solPrice: number | null; solChange: number | null;
   trending: { mint: string; symbol: string; change24h: number | null }[];
@@ -450,8 +860,8 @@ export function MobileWidgetGrid({ solPrice, solChange, trending, widgets, setWi
     const fi = next.findIndex(w => w.id === fromId), ti = next.findIndex(w => w.id === toId);
     if (fi < 0 || ti < 0) return;
     const [moved] = next.splice(fi, 1); next.splice(ti, 0, moved);
-    const reindexed = next.map((w, i) => ({ ...w, pos: i }));
-    setWidgets(reindexed); writeWidgets(reindexed);
+    const r = next.map((w, i) => ({ ...w, pos: i }));
+    setWidgets(r); writeWidgets(r);
   }, [widgets, setWidgets]);
   const removeWidget = useCallback((id: string) => {
     const next = widgets.filter(w => w.id !== id).map((w, i) => ({ ...w, pos: i }));
@@ -463,17 +873,14 @@ export function MobileWidgetGrid({ solPrice, solChange, trending, widgets, setWi
       <div className="mwg-toprow">
         <span className="mwg-heading">My Hub</span>
         <button className="mwg-add-btn" onClick={onOpenPanel}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11H13V5a1 1 0 00-2 0v6H5a1 1 0 000 2h6v6a1 1 0 002 0v-6h6a1 1 0 000-2z" /></svg>
-          AI Widgets
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11H13V5a1 1 0 00-2 0v6H5a1 1 0 000 2h6v6a1 1 0 002 0v-6h6a1 1 0 000-2z"/></svg>
+          ⚡ AI Widgets
         </button>
       </div>
       <div className="mwg-grid">
-        {/* Profile + quick actions — full width */}
         <div className="mwg-card mwg-profile-card">
           <div className="mwg-prof-row">
-            <div className="mwg-prof-avatar">
-              {(profile?.username?.[0] ?? 'O').toUpperCase()}
-            </div>
+            <div className="mwg-prof-avatar">{(profile?.username?.[0] ?? 'O').toUpperCase()}</div>
             <div className="mwg-prof-info">
               <div className="mwg-prof-name">@{profile?.username ?? 'orbitx'}</div>
               <div className="mwg-prof-sub">OrbitX Beta ✦</div>
@@ -485,20 +892,13 @@ export function MobileWidgetGrid({ solPrice, solChange, trending, widgets, setWi
               <a href="/settings" className="mwg-pact" title="Settings">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.22-.4.12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54A.49.49 0 0 0 12 2.4H8.16a.49.49 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L.8 8.87c-.1.21-.06.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.22.4-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.49.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41H12c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.07.47 0 .59-.22l1.92-3.32c.1-.21.06-.47-.12-.61l-2.03-1.58zM10.08 15.6A3.52 3.52 0 1 1 10.08 8.56a3.52 3.52 0 0 1 0 7.04z"/></svg>
               </a>
-              <button className="mwg-pact mwg-pact-red" title="Log out"
-                onClick={() => signOut().finally(() => window.location.assign('/auth'))}>
+              <button className="mwg-pact mwg-pact-red" title="Log out" onClick={() => signOut().finally(() => window.location.assign('/auth'))}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               </button>
             </div>
           </div>
         </div>
-
-        {/* Fear & Greed — right half */}
-        <div className="mwg-card mwg-fg-card">
-          <div className="mwg-card-lbl">🌡 Market Mood</div>
-          <FearGreedWidget />
-        </div>
-
+        <div className="mwg-card mwg-fg-card"><div className="mwg-card-lbl">🌡 Market Mood</div><FearGreedWidget /></div>
         <div className="mwg-card mwg-sol-card">
           <div className="mwg-card-lbl">◎ Solana</div>
           <div className="mwg-card-val">{solPrice ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : '—'}</div>
@@ -514,58 +914,51 @@ export function MobileWidgetGrid({ solPrice, solChange, trending, widgets, setWi
           ))}
         </div>
         {[...widgets].sort((a, b) => a.pos - b.pos).map(widget => (
-          <div key={widget.id}
-            className={`mwg-card mwg-custom-card${dragOver === widget.id ? ' mwg-drag-over' : ''}`}
+          <div key={widget.id} className={`mwg-card mwg-custom-card${dragOver===widget.id?' mwg-drag-over':''}`}
             style={{ gridColumn: widget.size !== 'sm' ? 'span 2' : 'span 1' }}
-            draggable
-            onDragStart={() => { dragId.current = widget.id; }}
+            draggable onDragStart={() => { dragId.current = widget.id; }}
             onDragOver={e => { e.preventDefault(); setDragOver(widget.id); }}
             onDragLeave={() => setDragOver(null)}
             onDrop={() => { onDrop(widget.id); setDragOver(null); dragId.current = null; }}
             onDragEnd={() => { setDragOver(null); dragId.current = null; }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span className="mwg-card-lbl">{widget.title}</span>
+              <span className="mwg-card-lbl">{LIB_ICONS[widget.type] ?? '📊'} {widget.title}</span>
               <button className="mwg-rm-btn" onClick={() => removeWidget(widget.id)}>✕</button>
             </div>
             <WidgetRenderer widget={widget} />
           </div>
         ))}
         <button className="mwg-card mwg-add-card" onClick={onOpenPanel}>
-          <div style={{ fontSize: 22, marginBottom: 3 }}>✦</div>
+          <div style={{ fontSize: 22, marginBottom: 3 }}>⚡</div>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.6)' }}>Add Widget</div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,.3)', marginTop: 1 }}>AI-powered</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,.3)', marginTop: 1 }}>type /help for commands</div>
         </button>
       </div>
     </div>
   );
 }
 
-// ── Mobile bottom nav ──────────────────────────────────────────────────────
 export function MobileNav({ onOpenPanel }: { onOpenPanel: () => void }) {
   const items = [
-    { label: 'Hub',     href: '/app' },
-    { label: 'DEX',     href: '/ORBITX_DEX' },
-    { label: 'Social',  href: '/orbitx-social' },
-    { label: 'KOL',     href: '/app/kol-tracker' },
+    { label: 'Hub', href: '/app' }, { label: 'DEX', href: '/ORBITX_DEX' },
+    { label: 'Social', href: '/orbitx-social' }, { label: 'KOL', href: '/app/kol-tracker' },
     { label: 'Profile', href: '/profile' },
   ];
+  const icons = ['⊞','◈','◉','⬡','◎'];
   return (
     <nav className="mob-nav">
-      {items.slice(0, 2).map(it => <a key={it.label} href={it.href} className="mob-nav-btn"><span style={{ fontSize: 18 }}>{'Hub DEX Social KOL Profile'.split(' ').map((l, i) => ['⊞','◈','◉','⬡','◎'][i])[items.findIndex(x => x.label === it.label)]}</span><span>{it.label}</span></a>)}
-      <button className="mob-nav-plus" onClick={onOpenPanel}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11H13V5a1 1 0 00-2 0v6H5a1 1 0 000 2h6v6a1 1 0 002 0v-6h6a1 1 0 000-2z" /></svg>
-      </button>
-      {items.slice(2).map(it => <a key={it.label} href={it.href} className="mob-nav-btn"><span style={{ fontSize: 18 }}>{'Hub DEX Social KOL Profile'.split(' ').map((l, i) => ['⊞','◈','◉','⬡','◎'][i])[items.findIndex(x => x.label === it.label)]}</span><span>{it.label}</span></a>)}
+      {items.slice(0, 2).map((it, idx) => <a key={it.label} href={it.href} className="mob-nav-btn"><span style={{ fontSize: 18 }}>{icons[idx]}</span><span>{it.label}</span></a>)}
+      <button className="mob-nav-plus" onClick={onOpenPanel}><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19 11H13V5a1 1 0 00-2 0v6H5a1 1 0 000 2h6v6a1 1 0 002 0v-6h6a1 1 0 000-2z"/></svg></button>
+      {items.slice(2).map((it, idx) => <a key={it.label} href={it.href} className="mob-nav-btn"><span style={{ fontSize: 18 }}>{icons[idx+2]}</span><span>{it.label}</span></a>)}
     </nav>
   );
 }
 
-// ── CSS ────────────────────────────────────────────────────────────────────
 export const aiWidgetCSS = `
-.awp-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.55);backdrop-filter:blur(10px);display:flex;align-items:flex-end;justify-content:center;animation:awp-bg .2s ease both}
+.awp-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);backdrop-filter:blur(12px);display:flex;align-items:flex-end;justify-content:center;animation:awp-bg .2s ease both}
 @keyframes awp-bg{from{opacity:0}to{opacity:1}}
-.awp-panel{width:100%;max-width:540px;border-radius:26px 26px 0 0;background:linear-gradient(180deg,rgba(20,22,28,.99),rgba(10,12,16,.99));border:1px solid rgba(255,255,255,.11);border-bottom:0;box-shadow:0 -24px 70px rgba(0,0,0,.85);display:flex;flex-direction:column;max-height:88vh;overflow:hidden;animation:awp-up .32s cubic-bezier(.34,1.56,.64,1) both}
+.awp-panel{width:100%;max-width:540px;border-radius:26px 26px 0 0;background:linear-gradient(180deg,rgba(18,20,28,.99),rgba(8,10,14,.99));border:1px solid rgba(255,255,255,.12);border-bottom:0;box-shadow:0 -28px 80px rgba(0,0,0,.9);display:flex;flex-direction:column;max-height:90vh;overflow:hidden;animation:awp-up .32s cubic-bezier(.34,1.56,.64,1) both}
 @keyframes awp-up{from{transform:translateY(100%)}to{transform:none}}
 .awp-handle{width:36px;height:4px;border-radius:99px;background:rgba(255,255,255,.18);margin:12px auto 0;flex-shrink:0}
 .awp-title-row{display:flex;align-items:center;justify-content:space-between;padding:10px 18px 0;flex-shrink:0}
@@ -591,7 +984,7 @@ export const aiWidgetCSS = `
 .awp-input:focus{border-color:rgba(47,128,255,.5);background:rgba(47,128,255,.07)}
 .awp-input::placeholder{color:rgba(255,255,255,.28)}
 .awp-input:disabled{opacity:.5}
-.awp-send-btn{width:40px;height:40px;flex-shrink:0;border-radius:13px;background:linear-gradient(135deg,#2F80FF,#1a5cd4);border:0;color:#fff;cursor:pointer;display:grid;place-items:center;transition:opacity .15s}
+.awp-send-btn{width:40px;height:40px;flex-shrink:0;border-radius:13px;background:linear-gradient(135deg,#2F80FF,#1a5cd4);border:0;color:#fff;cursor:pointer;display:grid;place-items:center}
 .awp-send-btn:disabled{opacity:.35;cursor:default}
 .awp-pills{display:flex;gap:6px;padding:0 16px 14px;flex-wrap:wrap;flex-shrink:0}
 .awp-pill{padding:5px 12px;border-radius:99px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.05);color:rgba(255,255,255,.65);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}
@@ -617,7 +1010,7 @@ export const aiWidgetCSS = `
 .mwg-card-lbl{font-size:9px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:6px}
 .mwg-card-val{font-size:26px;font-weight:900;letter-spacing:-.03em;color:#fff;font-variant-numeric:tabular-nums}
 .mwg-card-sub{font-size:11px;font-weight:800;margin-top:2px}
-.mwg-sol-card,.mwg-trend-card{grid-column:span 1}
+.mwg-sol-card,.mwg-trend-card,.mwg-fg-card{grid-column:span 1}
 .mwg-custom-card{cursor:grab;position:relative}
 .mwg-custom-card:active{cursor:grabbing;opacity:.85}
 .mwg-drag-over{border-color:#2F80FF!important;box-shadow:0 0 0 2px rgba(47,128,255,.28)}
@@ -642,7 +1035,6 @@ export const aiWidgetCSS = `
 .mwg-pact{width:34px;height:34px;border-radius:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);display:grid;place-items:center;text-decoration:none;cursor:pointer;transition:all .15s;font-family:inherit;color:rgba(255,255,255,.65)}
 .mwg-pact:hover{background:rgba(47,128,255,.18);border-color:rgba(47,128,255,.4);color:#fff}
 .mwg-pact-red:hover{background:rgba(251,113,133,.18)!important;border-color:rgba(251,113,133,.4)!important;color:#fb7185!important}
-.mwg-fg-card{grid-column:span 1}
 @media(max-width:767px){
   .desktop-body{padding:8px 0 8px;justify-content:flex-start;align-items:flex-start;overflow-y:auto}
   .desktop-flex{flex-direction:column-reverse;gap:0;padding:0;width:100%}
