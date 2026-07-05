@@ -527,7 +527,7 @@ export default function Hub() {
           </div>
         </main>
 
-        {/* macOS Dock */}
+        {/* macOS Dock — desktop only, hidden on mobile via CSS */}
         <footer className="mac-dock-container">
           <div className="mac-dock">
             <div className="dock-center">
@@ -864,8 +864,8 @@ const css = `
   border-width: 5px; border-style: solid; border-color: rgba(20,20,20,0.75) transparent transparent transparent;
 }
 
-@media (max-width: 600px) {
-  .mac-dock-container { display: none; }
+@media (max-width: 767px) {
+  .mac-dock-container { display: none !important; }
 }
 
 .launch-window-overlay {
