@@ -164,9 +164,11 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       } catch { /* ignore */ }
     };
     window.addEventListener("og:community-sub-tab", sync);
+    window.addEventListener("og:comm-entry", sync);
     window.addEventListener("storage", sync);
     return () => {
       window.removeEventListener("og:community-sub-tab", sync);
+      window.removeEventListener("og:comm-entry", sync);
       window.removeEventListener("storage", sync);
     };
   }, []);

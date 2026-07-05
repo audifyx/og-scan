@@ -38,6 +38,7 @@ import Leaderboard from "./pages/Leaderboard";
 import Invite from "./pages/Invite";
 import DirectMessages from "./pages/DirectMessages";
 import Notifications from "./pages/Notifications";
+import CommunityClassic from "./pages/CommunityClassic";
 // Premium removed
 import OfficialToken from "./pages/OfficialToken";
 import PumpV5 from "./pages/PumpV5";
@@ -205,6 +206,8 @@ const App = () => (
             <Route path="/listings/:mintAddress" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mintAddress}`} />} />
             <Route path="/token-manager" element={<OgdexRedirect to="/ORBITX_DEX/metadata" />} />
             <Route path="/social-hub" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/community-classic" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
+            <Route path="/community-hub" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
             <Route path="/voice-rooms" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tech" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/page/:pageNumber" element={<ProtectedRoute><Index /></ProtectedRoute>} />
