@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { AIWidgetPanel, MobileWidgetGrid, MobileNav, aiWidgetCSS, readWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
 
 const BRAND = "OrbitX";
 const OS_NAME = "OrbitX";
@@ -134,6 +135,8 @@ export default function Hub() {
   const [latestPosts, setLatestPosts] = useState<{ id: string; username: string | null; content: string; created_at: string }[]>([]);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [dockX, setDockX] = useState<number | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [customWidgets, setCustomWidgets] = useState<WidgetConfig[]>(readWidgets);
   const starCanvasRef = useRef<HTMLCanvasElement>(null);
   const desktopRef = useRef<HTMLDivElement>(null);
   const now = useClock();
@@ -204,7 +207,7 @@ export default function Hub() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSpotlightOpen((v) => !v); setSpotQ(""); }
-      if (e.key === "Escape") setSpotlightOpen(false);
+      if (e.key === "Escape") { setSpotlightOpen(false); setPanelOpen(false); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -363,7 +366,7 @@ export default function Hub() {
 
   return (
     <div className="mac-os">
-      <style>{css}</style>
+      <style>{css + aiWidgetCSS}</style>
 
       {/* ── DESKTOP ── */}
       <div
@@ -434,6 +437,15 @@ export default function Hub() {
             </p>
             <p className="hub-greet-sub">Press <kbd>⌘K</kbd> to search · right-click for options</p>
           </div>
+
+          <MobileWidgetGrid
+            solPrice={solPrice}
+            solChange={solChange}
+            trending={trending}
+            widgets={customWidgets}
+            setWidgets={setCustomWidgets}
+            onOpenPanel={() => setPanelOpen(true)}
+          />
 
           <div className="desktop-flex">
             <div className="app-grid">
@@ -539,6 +551,14 @@ export default function Hub() {
         </footer>
       </div>
 
+      {panelOpen && (
+        <AIWidgetPanel
+          onClose={() => setPanelOpen(false)}
+          widgets={customWidgets}
+          setWidgets={setCustomWidgets}
+        />
+      )}
+
       {/* ── CONTEXT MENU ── */}
       {ctxMenu && (
         <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={(e) => e.stopPropagation()}>
@@ -546,6 +566,7 @@ export default function Hub() {
           <button onClick={() => { setCtxMenu(null); pickWallpaper(); }}>🖼️ Change wallpaper</button>
           <button onClick={() => { setCtxMenu(null); localStorage.removeItem("hub-wallpaper"); window.location.reload(); }}>✨ Reset wallpaper</button>
           <div className="ctx-sep" />
+          <button onClick={() => { setCtxMenu(null); setPanelOpen(true); }}>✦ Widget Studio</button>
           <button onClick={() => { setCtxMenu(null); localStorage.removeItem(DOCK_KEY); window.location.reload(); }}>♻️ Reset icon layout</button>
           <button onClick={() => { setCtxMenu(null); window.location.reload(); }}>🔄 Refresh</button>
         </div>
@@ -610,6 +631,7 @@ export default function Hub() {
           </div>
         </div>
       )}
+      <MobileNav onOpenPanel={() => setPanelOpen(true)} />
     </div>
   );
 }
