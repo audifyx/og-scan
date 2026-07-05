@@ -3,7 +3,7 @@
  * Provides offline caching, background sync, rich Web Push notifications, and PWA install support.
  */
 
-const CACHE_NAME = "ogscan-v7";
+const CACHE_NAME = "orbitx-v8";
 self.addEventListener("message", (e) => { if (e.data === "skipWaiting") self.skipWaiting(); });
 const STATIC_ASSETS = [
   "/",
@@ -154,7 +154,11 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return response;
         })
-        .catch(() => caches.match("/app").then((r) => r || caches.match("/")))
+        .catch(() =>
+          // Prefer the cached copy of the SAME page (e.g. /auth) before falling
+          // back to the app shell - prevents login pages breaking on reload offline.
+          caches.match(request).then((r) => r || caches.match("/app").then((r2) => r2 || caches.match("/")))
+        )
     );
     return;
   }

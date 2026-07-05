@@ -138,5 +138,11 @@
     "api/**/*.js": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/kol/launch-digest",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
