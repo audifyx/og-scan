@@ -137,6 +137,9 @@
   "functions": {
     "api/**/*.js": {
       "maxDuration": 30
+    },
+    "api/kol/*.ts": {
+      "maxDuration": 30
     }
   },
   "crons": [
