@@ -343,7 +343,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   const Composer = ({ inline, refEl }: { inline?: boolean; refEl: React.RefObject<HTMLTextAreaElement> }) => (
     <div className={cn("flex gap-3", inline && "border-b border-white/[0.08] px-4 py-3")}>
-      <img src={myAvatar} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+      <img src={myAvatar} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-white/10" />
       <div className="min-w-0 flex-1">
         <textarea
           ref={refEl}
@@ -361,8 +361,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             disabled={!text.trim() || posting}
             onClick={() => submit()}
             className={cn(
-              "rounded-full px-5 py-1.5 text-[14px] font-black transition",
-              text.trim() && !posting ? "bg-[#1d9bf0] text-white hover:bg-[#1a8cd8]" : "bg-[#1d9bf0]/50 text-white/60",
+              "rounded-full px-5 py-1.5 text-[14px] font-black transition-all duration-200 active:scale-95",
+              text.trim() && !posting
+                ? "bg-gradient-to-r from-[#1d9bf0] to-[#4a9ff5] text-white shadow-[0_4px_16px_rgba(29,155,240,0.4)] hover:shadow-[0_4px_24px_rgba(29,155,240,0.6)]"
+                : "bg-[#1d9bf0]/40 text-white/50",
             )}
           >
             {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Post"}
@@ -377,8 +379,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     const marked = bookmarks.has(p.id);
     const own = user && p.user_id === user.id;
     return (
-      <article className="relative flex gap-3 border-b border-white/[0.08] px-4 py-3 transition hover:bg-white/[0.02]">
-        <img src={avatarOf(p.avatar_url, p.user_id)} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+      <article className="x-fade-in group/post relative flex gap-3 border-b border-white/[0.06] px-4 py-3.5 transition-colors duration-200 hover:bg-white/[0.025]">
+        <img src={avatarOf(p.avatar_url, p.user_id)} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-white/10 transition group-hover/post:ring-[#1d9bf0]/40" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[14px]">
             <span className="truncate font-black text-white hover:underline">{p.username || "Anon"}</span>
@@ -391,20 +393,20 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           </div>
           <div className="whitespace-pre-wrap break-words text-[15px] leading-snug text-white/90">{renderContent(p.content, onSelectMint)}</div>
           <div className="mt-2 flex max-w-md items-center justify-between text-white/35">
-            <button type="button" onClick={() => replyTo(p)} className="group flex items-center gap-1.5 transition hover:text-[#1d9bf0]">
+            <button type="button" onClick={() => replyTo(p)} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]">
               <span className="rounded-full p-1.5 transition group-hover:bg-[#1d9bf0]/10"><MessageCircle className="h-4 w-4" /></span>
             </button>
-            <button type="button" onClick={() => repost(p)} className="group flex items-center gap-1.5 transition hover:text-emerald-400">
+            <button type="button" onClick={() => repost(p)} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-emerald-400">
               <span className="rounded-full p-1.5 transition group-hover:bg-emerald-400/10"><Repeat2 className="h-4 w-4" /></span>
             </button>
-            <button type="button" onClick={() => toggleLike(p)} className={cn("group flex items-center gap-1.5 transition hover:text-pink-500", liked && "text-pink-500")}>
+            <button type="button" onClick={() => toggleLike(p)} className={cn("group flex items-center gap-1.5 transition active:scale-90 hover:text-pink-500", liked && "text-pink-500")}>
               <span className="rounded-full p-1.5 transition group-hover:bg-pink-500/10"><Heart className={cn("h-4 w-4", liked && "fill-current")} /></span>
               {(p.likes_count ?? 0) > 0 && <span className="text-[12px] font-bold">{p.likes_count}</span>}
             </button>
-            <button type="button" onClick={() => toggleBookmark(p)} className={cn("group flex items-center gap-1.5 transition hover:text-[#1d9bf0]", marked && "text-[#1d9bf0]")}>
+            <button type="button" onClick={() => toggleBookmark(p)} className={cn("group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]", marked && "text-[#1d9bf0]")}>
               <span className="rounded-full p-1.5 transition group-hover:bg-[#1d9bf0]/10"><Bookmark className={cn("h-4 w-4", marked && "fill-current")} /></span>
             </button>
-            <button type="button" onClick={() => share(p)} className="group flex items-center gap-1.5 transition hover:text-[#1d9bf0]">
+            <button type="button" onClick={() => share(p)} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]">
               <span className="rounded-full p-1.5 transition group-hover:bg-[#1d9bf0]/10"><Share className="h-4 w-4" /></span>
             </button>
           </div>
@@ -429,8 +431,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   };
 
   const FollowCard = ({ s }: { s: Suggestion }) => (
-    <div className="flex items-center gap-3 px-4 py-3 transition hover:bg-white/[0.03]">
-      <img src={avatarOf(s.avatar_url, s.user_id)} alt="" className="h-10 w-10 rounded-full object-cover" />
+    <div className="flex items-center gap-3 px-4 py-3 transition-colors duration-200 hover:bg-white/[0.04]">
+      <img src={avatarOf(s.avatar_url, s.user_id)} alt="" className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1 text-[14px] font-black text-white">
           <span className="truncate">{s.display_name || s.username}</span>
@@ -439,7 +441,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         <div className="truncate text-[13px] text-white/35">@{s.username}</div>
         {s.bio && <div className="mt-0.5 line-clamp-1 text-[12px] text-white/50">{s.bio}</div>}
       </div>
-      <button type="button" onClick={() => follow(s.user_id)} className="rounded-full bg-white px-4 py-1.5 text-[13px] font-black text-black transition hover:bg-white/85">
+      <button type="button" onClick={() => follow(s.user_id)} className="rounded-full bg-white px-4 py-1.5 text-[13px] font-black text-black shadow-[0_2px_12px_rgba(255,255,255,0.15)] transition-all duration-200 hover:shadow-[0_2px_20px_rgba(255,255,255,0.3)] active:scale-95">
         Follow
       </button>
     </div>
@@ -448,7 +450,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const TrendRow = ({ t, i }: { t: Ticker; i: number }) => {
     const up = (t.change24h ?? 0) >= 0;
     return (
-      <button type="button" onClick={() => onSelectMint?.(t.mint)} className="flex w-full items-start justify-between px-4 py-2.5 text-left transition hover:bg-white/[0.03]">
+      <button type="button" onClick={() => onSelectMint?.(t.mint)} className="group/trend flex w-full items-start justify-between px-4 py-2.5 text-left transition-all duration-200 hover:bg-white/[0.04] hover:pl-5">
         <div>
           <div className="text-[11px] text-white/35">#{i + 1} · Trending on Solana</div>
           <div className="text-[14px] font-black text-white">${t.symbol}</div>
@@ -469,12 +471,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         return (
           <>
             {/* Sticky header with feed mode tabs */}
-            <div className="sticky top-0 z-10 border-b border-white/[0.08] bg-black/70 backdrop-blur-xl">
+            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/55 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
               <div className="flex">
                 {([["foryou", "For you"], ["following", "Following"]] as const).map(([id, label]) => (
                   <button key={id} type="button" onClick={() => setFeedMode(id)} className="relative flex-1 py-3.5 text-[15px] font-bold text-white/50 transition hover:bg-white/[0.03]">
                     <span className={cn(feedMode === id && "font-black text-white")}>{label}</span>
-                    {feedMode === id && <span className="absolute bottom-0 left-1/2 h-1 w-14 -translate-x-1/2 rounded-full bg-[#1d9bf0]" />}
+                    {feedMode === id && <span className="absolute bottom-0 left-1/2 h-[3px] w-14 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#1d9bf0] to-[#9945FF] shadow-[0_0_10px_rgba(29,155,240,0.6)]" />}
                   </button>
                 ))}
               </div>
@@ -482,6 +484,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <Composer inline refEl={composerRef} />
             {loading ? <Spinner /> : shownPosts.length === 0 ? (
               <div className="px-8 py-16 text-center">
+                <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#1d9bf0]/15 to-[#9945FF]/10 ring-1 ring-white/[0.08]">
+                  <TrendingUp className="h-6 w-6 text-[#1d9bf0]/70" />
+                </div>
                 <div className="text-[17px] font-black text-white">{feedMode === "following" ? "Nothing here yet" : "Welcome to OrbitX"}</div>
                 <div className="mt-1 text-[13px] text-white/40">{feedMode === "following" ? "Follow people to see their posts here." : "Be the first to post something."}</div>
               </div>
@@ -494,14 +499,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "explore":
         return (
           <>
-            <div className="sticky top-0 z-10 border-b border-white/[0.08] bg-black/70 p-3 backdrop-blur-xl">
+            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/55 p-3 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
                 <input
                   value={searchQ}
                   onChange={(e) => setSearchQ(e.target.value)}
                   placeholder="Search OrbitX"
-                  className="w-full rounded-full border border-transparent bg-white/[0.07] py-2.5 pl-11 pr-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-[#1d9bf0] focus:bg-transparent"
+                  className="w-full rounded-full border border-white/[0.06] bg-white/[0.06] py-2.5 pl-11 pr-4 text-[15px] text-white placeholder:text-white/30 outline-none transition-all duration-200 focus:border-[#1d9bf0]/70 focus:bg-black focus:shadow-[0_0_0_3px_rgba(29,155,240,0.15)]"
                 />
               </div>
             </div>
@@ -544,7 +549,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "notifications":
         return (
           <>
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.08] bg-black/70 px-4 py-3.5 backdrop-blur-xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-black/55 px-4 py-3.5 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
               <span className="text-[19px] font-black text-white">Notifications</span>
               {unread > 0 && (
                 <button type="button" onClick={markAllRead} className="rounded-full border border-white/15 px-3 py-1 text-[12px] font-bold text-white/60 transition hover:bg-white/[0.06]">
@@ -554,14 +559,16 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </div>
             {notifsLoading ? <Spinner /> : notifs.length === 0 ? (
               <div className="px-8 py-16 text-center">
-                <Bell className="mx-auto h-8 w-8 text-white/15" />
+                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#1d9bf0]/15 to-[#9945FF]/10 ring-1 ring-white/[0.08]">
+                  <Bell className="h-6 w-6 text-[#1d9bf0]/70" />
+                </div>
                 <div className="mt-3 text-[17px] font-black text-white">Nothing yet</div>
                 <div className="mt-1 text-[13px] text-white/40">Likes, follows and alerts will show up here.</div>
               </div>
             ) : (
               notifs.map((n) => (
-                <div key={n.id} className={cn("flex gap-3 border-b border-white/[0.08] px-4 py-3.5", !n.is_read && "bg-[#1d9bf0]/[0.04]")}>
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/[0.06]">
+                <div key={n.id} className={cn("x-fade-in flex gap-3 border-b border-white/[0.06] px-4 py-3.5 transition-colors hover:bg-white/[0.02]", !n.is_read && "bg-[#1d9bf0]/[0.05] shadow-[inset_2px_0_0_#1d9bf0]")}>
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#1d9bf0]/20 to-[#9945FF]/15 ring-1 ring-[#1d9bf0]/25">
                     <Bell className="h-4 w-4 text-[#1d9bf0]" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -592,10 +599,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "rooms":
         return (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/[0.08] bg-black/70 px-4 py-3 backdrop-blur-xl">
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/[0.06] bg-black/55 px-4 py-3 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
               <span className="mr-2 text-[19px] font-black text-white">Rooms</span>
               {([["rooms", "Community Rooms"], ["trading", "Trading Lobbies"]] as const).map(([id, label]) => (
-                <button key={id} type="button" onClick={() => setRoomsView(id)} className={cn("rounded-full px-4 py-1.5 text-[13px] font-bold transition", roomsView === id ? "bg-white text-black" : "bg-white/[0.06] text-white/50 hover:text-white")}>
+                <button key={id} type="button" onClick={() => setRoomsView(id)} className={cn("rounded-full px-4 py-1.5 text-[13px] font-bold transition-all duration-200 active:scale-95", roomsView === id ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]" : "bg-white/[0.06] text-white/50 ring-1 ring-white/[0.06] hover:bg-white/[0.1] hover:text-white")}>
                   {label}
                 </button>
               ))}
@@ -618,10 +625,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "communities":
         return (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/[0.08] bg-black/70 px-4 py-3 backdrop-blur-xl">
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/[0.06] bg-black/55 px-4 py-3 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
               <span className="mr-2 text-[19px] font-black text-white">Communities</span>
               {([["token", "Token"], ["og", "OG"]] as const).map(([id, label]) => (
-                <button key={id} type="button" onClick={() => setCommView(id)} className={cn("rounded-full px-4 py-1.5 text-[13px] font-bold transition", commView === id ? "bg-white text-black" : "bg-white/[0.06] text-white/50 hover:text-white")}>
+                <button key={id} type="button" onClick={() => setCommView(id)} className={cn("rounded-full px-4 py-1.5 text-[13px] font-bold transition-all duration-200 active:scale-95", commView === id ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]" : "bg-white/[0.06] text-white/50 ring-1 ring-white/[0.06] hover:bg-white/[0.1] hover:text-white")}>
                   {label}
                 </button>
               ))}
@@ -645,12 +652,22 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   /* ═══════════ Layout ═══════════ */
   return (
-    <div className="flex h-full min-h-0 w-full justify-center bg-black text-white">
+    <div className="relative flex h-full min-h-0 w-full justify-center bg-black text-white">
+      <style>{`
+        @keyframes xFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+        .x-fade-in { animation: xFadeIn .28s ease both; }
+        @keyframes xGlowPulse { 0%,100% { opacity: .5; } 50% { opacity: .9; } }
+      `}</style>
+      {/* ambient atmosphere */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/4 h-80 w-80 rounded-full bg-[#1d9bf0]/[0.05] blur-[120px]" />
+        <div className="absolute -bottom-40 right-1/4 h-80 w-80 rounded-full bg-[#9945FF]/[0.05] blur-[120px]" />
+      </div>
       {/* ── Left nav rail ── */}
       <header className="hidden h-full shrink-0 flex-col justify-between border-r border-white/[0.08] px-2 py-3 sm:flex sm:w-[72px] xl:w-[260px] xl:px-4">
         <div className="flex flex-col gap-1">
           <div className="mb-1 flex items-center gap-2 px-3 py-2">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-[#1d9bf0] to-[#9945FF] text-[15px] font-black text-white">O</span>
+            <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-[#1d9bf0] to-[#9945FF] text-[15px] font-black text-white shadow-[0_4px_16px_rgba(29,155,240,0.45)]">O</span>
             <span className="hidden text-[17px] font-black tracking-tight xl:block">OrbitX</span>
             <a href="/app" className="ml-auto hidden rounded-full border border-white/15 px-3 py-1 text-[11px] font-bold text-white/50 transition hover:bg-white/[0.06] hover:text-white xl:block">Hub</a>
           </div>
@@ -660,12 +677,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               type="button"
               onClick={() => setTab(n.id)}
               className={cn(
-                "group flex items-center gap-4 rounded-full px-3 py-2.5 transition hover:bg-white/[0.07]",
-                tab === n.id ? "font-black" : "font-medium text-white/80",
+                "group flex items-center gap-4 rounded-full px-3 py-2.5 transition-all duration-200 active:scale-[0.97]",
+                tab === n.id
+                  ? "bg-white/[0.06] font-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)]"
+                  : "font-medium text-white/80 hover:bg-white/[0.05]",
               )}
             >
               <span className="relative">
-                <n.Icon className={cn("h-6 w-6", tab === n.id ? "text-white" : "text-white/80")} />
+                <n.Icon className={cn("h-6 w-6 transition-transform duration-200 group-hover:scale-110", tab === n.id ? "text-[#1d9bf0] drop-shadow-[0_0_8px_rgba(29,155,240,0.5)]" : "text-white/80")} />
                 {n.id === "notifications" && unread > 0 && (
                   <span className="absolute -right-1.5 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[#1d9bf0] px-1 text-[9px] font-black">{unread > 9 ? "9+" : unread}</span>
                 )}
@@ -676,14 +695,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           <button
             type="button"
             onClick={() => { setComposeOpen(true); setTimeout(() => modalRef.current?.focus(), 60); }}
-            className="mt-3 flex items-center justify-center rounded-full bg-[#1d9bf0] py-3 text-[16px] font-black text-white shadow-lg shadow-[#1d9bf0]/25 transition hover:bg-[#1a8cd8] xl:px-8"
+            className="mt-3 flex items-center justify-center rounded-full bg-gradient-to-r from-[#1d9bf0] via-[#4a9ff5] to-[#1d9bf0] bg-[length:200%_100%] bg-left py-3 text-[16px] font-black text-white shadow-[0_8px_24px_rgba(29,155,240,0.4)] transition-all duration-300 hover:bg-right hover:shadow-[0_8px_32px_rgba(29,155,240,0.55)] active:scale-[0.98] xl:px-8"
           >
             <Feather className="h-5 w-5 xl:hidden" />
             <span className="hidden xl:block">Post</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2 rounded-full p-2 transition hover:bg-white/[0.07]">
+        <div className="flex items-center gap-2 rounded-full border border-transparent p-2 transition hover:border-white/[0.07] hover:bg-white/[0.05]">
           <img src={myAvatar} alt="" className="h-9 w-9 rounded-full object-cover" />
           <div className="hidden min-w-0 flex-1 xl:block">
             <div className="truncate text-[14px] font-black">{displayName}</div>
@@ -716,12 +735,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 value={searchQ}
                 onChange={(e) => { setSearchQ(e.target.value); if (e.target.value.trim()) setTab("explore"); }}
                 placeholder="Search"
-                className="w-full rounded-full border border-transparent bg-white/[0.07] py-2.5 pl-11 pr-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-[#1d9bf0]"
+                className="w-full rounded-full border border-white/[0.06] bg-white/[0.06] py-2.5 pl-11 pr-4 text-[15px] text-white placeholder:text-white/30 outline-none transition-all duration-200 focus:border-[#1d9bf0]/70 focus:shadow-[0_0_0_3px_rgba(29,155,240,0.15)]"
               />
             </div>
           )}
 
-          <div className="overflow-hidden rounded-2xl bg-white/[0.04]">
+          <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
             <div className="px-4 py-3 text-[19px] font-black">What's happening</div>
             {ticker.slice(0, 5).map((t, i) => <TrendRow key={t.mint} t={t} i={i} />)}
             <button type="button" onClick={() => setTab("explore")} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[#1d9bf0] transition hover:bg-white/[0.03]">
@@ -729,7 +748,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </button>
           </div>
 
-          <div className="overflow-hidden rounded-2xl bg-white/[0.04]">
+          <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
             <div className="px-4 py-3 text-[19px] font-black">Who to follow</div>
             {whoToFollow.slice(0, 3).map((s) => <FollowCard key={s.user_id} s={s} />)}
             <button type="button" onClick={() => setTab("explore")} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[#1d9bf0] transition hover:bg-white/[0.03]">
@@ -757,10 +776,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
       {/* ── Mobile bottom nav: floating centered rounded slider pill ── */}
       <nav className="pointer-events-none fixed inset-x-0 bottom-3 z-30 flex justify-center sm:hidden">
-        <div className="pointer-events-auto relative flex items-center rounded-full border border-white/10 bg-black/85 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)] backdrop-blur-2xl">
+        <div className="pointer-events-auto relative flex items-center rounded-full border border-white/[0.12] bg-gradient-to-b from-[#16181c]/95 to-black/95 p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.03),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
           {/* sliding active indicator */}
           <span
-            className="absolute top-1.5 h-10 w-12 rounded-full bg-[#1d9bf0]/20 ring-1 ring-[#1d9bf0]/40 transition-transform duration-300 ease-out"
+            className="absolute top-1.5 h-10 w-12 rounded-full bg-gradient-to-br from-[#1d9bf0]/30 to-[#9945FF]/20 ring-1 ring-[#1d9bf0]/50 shadow-[0_0_14px_rgba(29,155,240,0.4)] transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
             style={{ transform: `translateX(${PILL_INDEX * 48}px)` }}
           />
           {CORE_TABS.map((id) => {
@@ -800,7 +819,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div
-            className="absolute inset-x-3 bottom-20 rounded-3xl border border-white/10 bg-[#0b0d10] p-3 shadow-2xl"
+            className="x-fade-in absolute inset-x-3 bottom-20 rounded-3xl border border-white/[0.1] bg-gradient-to-b from-[#14171b]/98 to-[#0b0d10]/98 p-3 shadow-[0_16px_48px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="grid grid-cols-4 gap-2">
@@ -832,7 +851,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         <button
           type="button"
           onClick={() => { setComposeOpen(true); setTimeout(() => modalRef.current?.focus(), 60); }}
-          className="fixed bottom-[4.7rem] right-4 z-30 grid h-13 w-13 h-[52px] w-[52px] place-items-center rounded-full bg-[#1d9bf0] text-white shadow-2xl shadow-[#1d9bf0]/40 transition hover:bg-[#1a8cd8] sm:hidden"
+          className="fixed bottom-[4.7rem] right-4 z-30 grid h-[52px] w-[52px] place-items-center rounded-full bg-gradient-to-br from-[#1d9bf0] to-[#0f7ac4] text-white shadow-[0_8px_28px_rgba(29,155,240,0.5)] ring-1 ring-white/10 transition-all active:scale-90 sm:hidden"
         >
           <Feather className="h-6 w-6" />
         </button>
@@ -841,7 +860,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       {/* ── Compose modal ── */}
       {composeOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#5b7083]/40 p-4 pt-[8vh]" onClick={() => setComposeOpen(false)}>
-          <div className="w-full max-w-[600px] rounded-2xl bg-black shadow-2xl ring-1 ring-white/10" onClick={(e) => e.stopPropagation()}>
+          <div className="x-fade-in w-full max-w-[600px] rounded-2xl border border-white/[0.1] bg-gradient-to-b from-[#101214] to-black shadow-[0_24px_64px_rgba(0,0,0,0.8)] ring-1 ring-white/[0.06]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3">
               <button type="button" onClick={() => setComposeOpen(false)} className="rounded-full p-2 text-white/60 transition hover:bg-white/[0.07] hover:text-white">
                 <XIcon className="h-5 w-5" />
