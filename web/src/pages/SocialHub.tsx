@@ -1055,7 +1055,15 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
     try {
       const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
       ms.getTracks().forEach((t) => t.stop());
-    } catch { /* denied — user can still listen */ }
+    } catch (permErr: any) {
+      // Denied or unavailable — user can still listen. Tell them why speaking won't work.
+      const name = permErr?.name || "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        toast.error("Mic blocked — you're in listen-only mode. Allow microphone access for this site (lock icon in the address bar), then rejoin.");
+      } else if (name === "NotFoundError") {
+        toast.error("No microphone found — you're in listen-only mode.");
+      }
+    }
 
     const token = await fetchToken(lkRoomName);
     if (!token) { setConnecting(false); setActiveRoomLabel(null); return; }
@@ -1114,11 +1122,36 @@ const VoiceRooms = ({ members }: { members: CommunityMember[] }) => {
     if (!room?.localParticipant) return;
     const newMuted = !muted;
     try {
+      if (!newMuted) {
+        // Unmuting: re-request permission inside this click gesture so the
+        // browser shows its prompt if the user hasn't decided yet.
+        try {
+          const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
+          ms.getTracks().forEach((t) => t.stop());
+        } catch (permErr: any) {
+          const name = permErr?.name || "";
+          if (name === "NotAllowedError" || name === "SecurityError") {
+            toast.error("Microphone is blocked for this site. Click the lock icon in the address bar → Site settings → allow Microphone, then try again.");
+          } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+            toast.error("No microphone detected. Plug one in or check your input device.");
+          } else if (name === "NotReadableError" || name === "TrackStartError") {
+            toast.error("Your microphone is in use by another app. Close it and try again.");
+          } else {
+            toast.error(`Mic unavailable: ${permErr?.message || "unknown error"}`);
+          }
+          return;
+        }
+      }
       await room.localParticipant.setMicrophoneEnabled(!newMuted);
       setMuted(newMuted);
       syncParticipants();
     } catch (e: any) {
-      toast.error("Mic error — check browser permissions");
+      const msg = e?.message || "";
+      if ((e?.name || "") === "NotAllowedError" || msg.toLowerCase().includes("permission")) {
+        toast.error("Microphone is blocked for this site. Allow mic access in your browser settings, then try again.");
+      } else {
+        toast.error(`Mic error: ${msg || "could not enable microphone"}`);
+      }
     }
   }, [muted, syncParticipants]);
 
