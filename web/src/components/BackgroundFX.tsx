@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 
 /* ────────────────────────────────────────────────────────────────
    BackgroundFX — animated / 3D desktop backgrounds for the Hub.
@@ -8,22 +9,23 @@ import { useEffect, useRef, useState } from "react";
    Persisted in localStorage under `hub-bgfx` / `hub-wallpaper`.
    ──────────────────────────────────────────────────────────────── */
 
-export type BgMode = "nebula" | "starfield" | "grid3d" | "orbs" | "matrix" | "custom" | "minimal";
+export type BuiltinMode = "nebula" | "starfield" | "grid3d" | "orbs" | "matrix" | "custom" | "minimal";
+export type BgMode = BuiltinMode | (string & {});
 export const BG_KEY = "hub-bgfx";
 export const WALLPAPER_KEY = "hub-wallpaper";
-const MODES: BgMode[] = ["nebula", "starfield", "grid3d", "orbs", "matrix", "custom", "minimal"];
+const MODES: BuiltinMode[] = ["nebula", "starfield", "grid3d", "orbs", "matrix", "custom", "minimal"];
 
 export const readBgMode = (): BgMode => {
   try {
     const v = localStorage.getItem(BG_KEY) as BgMode | null;
-    if (v && MODES.includes(v)) return v;
+    if (v && ((MODES as string[]).includes(v) || BG_THEMES.some((t) => t.id === v))) return v;
     // migrate: users who already set a wallpaper keep it
     if (localStorage.getItem(WALLPAPER_KEY)) return "custom";
   } catch { /* noop */ }
   return "nebula";
 };
 
-export const BG_META: Record<BgMode, { name: string; desc: string; icon: string }> = {
+export const BG_META: Record<BuiltinMode, { name: string; desc: string; icon: string }> = {
   nebula:    { name: "Nebula",       desc: "Drifting aurora clouds",      icon: "🌌" },
   starfield: { name: "Warp Field",   desc: "3D stars flying past you",    icon: "✨" },
   grid3d:    { name: "Grid Horizon", desc: "Synthwave 3D floor",          icon: "🌆" },
@@ -34,14 +36,22 @@ export const BG_META: Record<BgMode, { name: string; desc: string; icon: string 
 };
 
 /* ── canvas engines ─────────────────────────────────────────── */
-function runStarfield(canvas: HTMLCanvasElement): () => void {
+function hexToRgba(hex: string, a: number): string {
+  const h = hex.replace("#", "");
+  const n = h.length === 3 ? h.split("").map((x) => x + x).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function runStarfield(canvas: HTMLCanvasElement, opts?: { hue?: number }): () => void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return () => {};
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
   let W = 0, H = 0, raf = 0, alive = true;
   const N = 260;
+  const baseHue = opts?.hue ?? 200;
+  const hueSpread = opts?.hue != null ? 46 : 80;
   const stars = Array.from({ length: N }, () => ({
-    x: (Math.random() * 2 - 1), y: (Math.random() * 2 - 1), z: Math.random(), pz: 0, hue: 200 + Math.random() * 80,
+    x: (Math.random() * 2 - 1), y: (Math.random() * 2 - 1), z: Math.random(), pz: 0, hue: baseHue + Math.random() * hueSpread,
   }));
   const resize = () => { W = canvas.clientWidth * DPR; H = canvas.clientHeight * DPR; canvas.width = W; canvas.height = H; };
   resize();
@@ -71,11 +81,13 @@ function runStarfield(canvas: HTMLCanvasElement): () => void {
   return () => { alive = false; cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
 }
 
-function runMatrix(canvas: HTMLCanvasElement): () => void {
+function runMatrix(canvas: HTMLCanvasElement, opts?: { color?: string }): () => void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return () => {};
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
   let W = 0, H = 0, raf = 0, alive = true, cols = 0, drops: number[] = [];
+  const mHead = opts?.color ? hexToRgba(opts.color, 0.92) : "rgba(190,255,210,0.9)";
+  const mTrail = opts?.color ? hexToRgba(opts.color, 0.5) : "rgba(52,211,153,0.55)";
   const CHARS = "アイウエオカキクケコサシスセソタチツテトナニヌネノ01$◎ΞΔΣΩ<>[]{}=+*/#";
   const FS = 15 * DPR;
   const resize = () => {
@@ -95,9 +107,9 @@ function runMatrix(canvas: HTMLCanvasElement): () => void {
     for (let i = 0; i < cols; i++) {
       const ch = CHARS[Math.floor(Math.random() * CHARS.length)];
       const y = drops[i] * FS;
-      ctx.fillStyle = "rgba(190,255,210,0.9)";
+      ctx.fillStyle = mHead;
       ctx.fillText(ch, i * FS, y);
-      ctx.fillStyle = "rgba(52,211,153,0.55)";
+      ctx.fillStyle = mTrail;
       ctx.fillText(ch, i * FS, y - FS);
       if (y > H && Math.random() > 0.975) drops[i] = 0;
       drops[i]++;
@@ -108,9 +120,105 @@ function runMatrix(canvas: HTMLCanvasElement): () => void {
   return () => { alive = false; cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
 }
 
+/* ── themed scenes (data-driven, palette-parameterized) ─────── */
+export interface BgTheme {
+  id: string;
+  name: string;
+  desc: string;
+  icon: string;
+  category: string;
+  engine: "aurora" | "orbs" | "grid" | "stars" | "rain";
+  colors: string[]; // 2-4 hex colors, brightest first
+  hue?: number;      // base hue for the "stars" engine
+}
+
+export const BG_THEMES: BgTheme[] = [
+  // Sports
+  { id: "sports-stadium", name: "Stadium Lights", desc: "Floodlit pitch glow", icon: "🏟️", category: "Sports", engine: "aurora", colors: ["#39ff14", "#00e676", "#0e7490", "#b2ebf2"] },
+  { id: "sports-hardwood", name: "Hardwood Court", desc: "Bouncing court energy", icon: "🏀", category: "Sports", engine: "orbs", colors: ["#ffab00", "#ff6a00", "#ffd700", "#ff6e40"] },
+  { id: "sports-grand-prix", name: "Grand Prix", desc: "Neon race circuit", icon: "🏎️", category: "Sports", engine: "grid", colors: ["#ff1a1a", "#f7ff00", "#ff5e8a", "#7b2ff7"] },
+  { id: "sports-ice-rink", name: "Ice Rink", desc: "Frozen arena shimmer", icon: "🏒", category: "Sports", engine: "aurora", colors: ["#b2ebf2", "#29b6f6", "#e0f7fa", "#1de9b6"] },
+  { id: "sports-title-fight", name: "Title Fight", desc: "Spotlight ring glow", icon: "🥊", category: "Sports", engine: "orbs", colors: ["#ff2d2d", "#ffd700", "#ff4081", "#ffab00"] },
+  // TV Shows
+  { id: "tv-upside-down", name: "Upside Down", desc: "Eerie red drift", icon: "🙃", category: "TV Shows", engine: "aurora", colors: ["#ff1744", "#7c4dff", "#b026ff", "#3d1560"] },
+  { id: "tv-sitcom-sunset", name: "Sitcom Sunset", desc: "Warm studio glow", icon: "📺", category: "TV Shows", engine: "aurora", colors: ["#ffab91", "#ff6e40", "#ffab00", "#ff4081"] },
+  { id: "tv-crime-noir", name: "Crime Noir", desc: "Moody blue city", icon: "🕵️", category: "TV Shows", engine: "grid", colors: ["#3d5afe", "#29b6f6", "#5b7cff", "#1a237e"] },
+  { id: "tv-saturday-cartoons", name: "Saturday Cartoons", desc: "Bright cartoon pop", icon: "🎨", category: "TV Shows", engine: "orbs", colors: ["#ff2d95", "#f7ff00", "#00f0ff", "#39ff14"] },
+  { id: "tv-reality-neon", name: "Reality Neon", desc: "Glossy neon haze", icon: "✨", category: "TV Shows", engine: "aurora", colors: ["#ff4081", "#b026ff", "#ff2d95", "#7c4dff"] },
+  // Movies
+  { id: "movie-space-saga", name: "Space Saga", desc: "Hyperspace star jump", icon: "🚀", category: "Movies", engine: "stars", colors: ["#ffd700", "#0066ff"], hue: 210 },
+  { id: "movie-code-matrix", name: "Code Matrix", desc: "Falling green code", icon: "🟩", category: "Movies", engine: "rain", colors: ["#39ff14"] },
+  { id: "movie-hero-skyline", name: "Hero Skyline", desc: "Caped city grid", icon: "🦸", category: "Movies", engine: "grid", colors: ["#0066ff", "#ff2d2d", "#ffd700", "#3d5afe"] },
+  { id: "movie-western-dusk", name: "Western Dusk", desc: "Desert sundown haze", icon: "🤠", category: "Movies", engine: "aurora", colors: ["#ff6a00", "#ffab00", "#ff6e40", "#c1121f"] },
+  { id: "movie-crimson-horror", name: "Crimson Horror", desc: "Blood-red fog", icon: "🩸", category: "Movies", engine: "aurora", colors: ["#c1121f", "#ff1744", "#4a0a10", "#7c0a02"] },
+  // Music Bands
+  { id: "band-rock-arena", name: "Rock Arena", desc: "Stage light bloom", icon: "🎸", category: "Music Bands", engine: "orbs", colors: ["#ff6a00", "#ff2d2d", "#ffd700", "#ffab00"] },
+  { id: "band-synthpop-80s", name: "Synthpop 80s", desc: "Retro neon floor", icon: "🎹", category: "Music Bands", engine: "grid", colors: ["#ff2d95", "#00f0ff", "#b026ff", "#0066ff"] },
+  { id: "band-jazz-lounge", name: "Jazz Lounge", desc: "Smoky gold mood", icon: "🎷", category: "Music Bands", engine: "aurora", colors: ["#ffd700", "#7c4dff", "#ffab00", "#3d1560"] },
+  { id: "band-metal-inferno", name: "Metal Inferno", desc: "Molten fire orbs", icon: "🤘", category: "Music Bands", engine: "orbs", colors: ["#ff4d00", "#ff1a1a", "#ffd700", "#ff6a00"] },
+  { id: "band-indie-pastel", name: "Indie Pastel", desc: "Soft pastel drift", icon: "🎧", category: "Music Bands", engine: "aurora", colors: ["#b388ff", "#69f0ae", "#ffab91", "#b2ebf2"] },
+  // Hyper Dimension (3D / 4D / 5D)
+  { id: "dim-prism-3d", name: "Prism 3D", desc: "Refracted 3D floor", icon: "🔺", category: "Hyper Dimension", engine: "grid", colors: ["#00f0ff", "#ff2d95", "#f7ff00", "#b026ff"] },
+  { id: "dim-hypercube-4d", name: "Hypercube 4D", desc: "Nested cube depth", icon: "🧊", category: "Hyper Dimension", engine: "orbs", colors: ["#b026ff", "#00f0ff", "#ff2d95", "#7c4dff"] },
+  { id: "dim-tesseract-5d", name: "Tesseract 5D", desc: "Warping star tunnel", icon: "🌀", category: "Hyper Dimension", engine: "stars", colors: ["#7c4dff", "#00f0ff"], hue: 265 },
+  { id: "dim-fractal-4d", name: "Fractal 4D", desc: "Recursive green bloom", icon: "❇️", category: "Hyper Dimension", engine: "aurora", colors: ["#00e676", "#00f0ff", "#39ff14", "#1de9b6"] },
+  { id: "dim-quantum-5d", name: "Quantum 5D", desc: "Quantum star field", icon: "⚛️", category: "Hyper Dimension", engine: "stars", colors: ["#ff2d95", "#b026ff"], hue: 322 },
+];
+
+export const BG_THEME_CATEGORIES = [...new Set(BG_THEMES.map((t) => t.category))];
+
+function themeVars(t: BgTheme): CSSProperties {
+  const [c1, c2 = c1, c3 = c2, c4 = c3] = t.colors;
+  return { ["--tc1"]: c1, ["--tc2"]: c2, ["--tc3"]: c3, ["--tc4"]: c4 } as CSSProperties;
+}
+
+function themePreviewStyle(t: BgTheme): CSSProperties {
+  const [a, b = a, c = b] = t.colors;
+  if (t.engine === "grid") return { background: `linear-gradient(180deg, ${b} 0%, #0a0620 72%), #05070f` };
+  if (t.engine === "rain") return { background: `linear-gradient(180deg, ${hexToRgba(a, 0.35)} 0%, #030705 82%), #030705` };
+  if (t.engine === "stars") return { background: `radial-gradient(1px 1px at 30% 40%, #fff, transparent), radial-gradient(1.5px 1.5px at 68% 62%, ${a}, transparent), radial-gradient(1px 1px at 82% 28%, ${b}, transparent), #04060c` };
+  return { background: `radial-gradient(circle at 28% 30%, ${a} 0%, transparent 58%), radial-gradient(circle at 74% 72%, ${b} 0%, transparent 60%), radial-gradient(circle at 55% 48%, ${hexToRgba(c, 0.6)} 0%, transparent 66%), #05070f` };
+}
+
+function ThemedScene({ theme }: { theme: BgTheme }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    if (theme.engine === "stars") return runStarfield(c, { hue: theme.hue });
+    if (theme.engine === "rain") return runMatrix(c, { color: theme.colors[0] });
+  }, [theme]);
+
+  const vars = themeVars(theme);
+  if (theme.engine === "aurora") return (
+    <div className="tw-aurora" style={vars}>
+      <i className="twb twb-a" /><i className="twb twb-b" /><i className="twb twb-c" /><i className="twb twb-d" />
+      <div className="bgfx-stars-static" />
+    </div>
+  );
+  if (theme.engine === "orbs") return (
+    <div className="tw-orbs" style={vars}>
+      <i className="torb to1" /><i className="torb to2" /><i className="torb to3" />
+      <i className="torb to4" /><i className="torb to5" /><i className="torb to6" />
+      <div className="bgfx-stars-static" />
+    </div>
+  );
+  if (theme.engine === "grid") return (
+    <div className="tw-grid" style={vars}>
+      <div className="twg-sky" />
+      <div className="twg-sun" />
+      <div className="twg-floor"><div className="twg-grid" /></div>
+      <div className="twg-haze" />
+    </div>
+  );
+  // stars / rain -> canvas
+  return <canvas ref={ref} className="bgfx-canvas" />;
+}
+
 /* ── main component ─────────────────────────────────────────── */
 export function BackgroundFX({ mode, wallpaper }: { mode: BgMode; wallpaper: string | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const theme = BG_THEMES.find((t) => t.id === mode) || null;
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
@@ -121,6 +229,7 @@ export function BackgroundFX({ mode, wallpaper }: { mode: BgMode; wallpaper: str
   return (
     <div className="bgfx" aria-hidden>
       <style>{bgfxCSS}</style>
+      {theme && <ThemedScene theme={theme} />}
       {mode === "custom" && wallpaper && (
         <>
           <div className="bgfx-wallpaper" style={{ backgroundImage: `url(${wallpaper})` }} />
@@ -197,6 +306,23 @@ export function BgCustomizeModal({ open, mode, hasWallpaper, onClose, onMode, on
             </button>
           ))}
         </div>
+        {BG_THEME_CATEGORIES.map((cat) => (
+          <div key={cat} className="bgp-cat-sec">
+            <div className="bgp-cat">{cat}</div>
+            <div className="bgp-grid">
+              {BG_THEMES.filter((t) => t.category === cat).map((t) => (
+                <button key={t.id} className={`bgp-tile ${mode === t.id ? "bgp-on" : ""}`} onClick={() => onMode(t.id)}>
+                  <span className="bgp-prev" style={themePreviewStyle(t)}>
+                    <b className="bgp-prev-ic">{t.icon}</b>
+                  </span>
+                  <span className="bgp-name">{t.name}</span>
+                  <span className="bgp-desc">{t.desc}</span>
+                  {mode === t.id && <span className="bgp-check">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
         <div className="bgp-wp">
           <div className="bgp-wp-title">Custom image</div>
           <div className="bgp-wp-row">
@@ -293,4 +419,27 @@ const bgfxCSS = `
 .bgp-btn-primary:hover{filter:brightness(1.15)}
 .bgp-input{flex:1;border:1px solid rgba(255,255,255,.12);border-radius:11px;background:rgba(255,255,255,.05);color:#fff;padding:9px 12px;font-size:12px;outline:0;font-family:inherit}
 .bgp-input:focus{border-color:rgba(47,128,255,.5)}
+/* themed scenes */
+.tw-aurora{position:absolute;inset:0;background:#04060c}
+.twb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;will-change:transform}
+.twb-a{width:52vw;height:52vw;left:-12vw;top:-16vh;background:radial-gradient(circle,var(--tc1) 0%,transparent 65%);animation:nbf 26s ease-in-out infinite alternate}
+.twb-b{width:44vw;height:44vw;right:-10vw;top:8vh;background:radial-gradient(circle,var(--tc2) 0%,transparent 62%);animation:nbf 32s -8s ease-in-out infinite alternate-reverse}
+.twb-c{width:40vw;height:40vw;left:22vw;bottom:-18vh;background:radial-gradient(circle,var(--tc3) 0%,transparent 62%);animation:nbf 38s -16s ease-in-out infinite alternate}
+.twb-d{width:26vw;height:26vw;right:18vw;bottom:6vh;background:radial-gradient(circle,var(--tc4) 0%,transparent 60%);opacity:.34;animation:nbf 24s -4s ease-in-out infinite alternate-reverse}
+.tw-orbs{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 20%,#0b1026 0%,#04060c 70%)}
+.torb{position:absolute;border-radius:50%;will-change:transform;filter:blur(1px) saturate(1.25)}
+.to1{width:340px;height:340px;left:6%;top:12%;background:radial-gradient(circle at 32% 30%,rgba(255,255,255,.5) 0%,var(--tc1) 30%,transparent 72%);animation:ofl 16s ease-in-out infinite alternate}
+.to2{width:190px;height:190px;right:12%;top:20%;background:radial-gradient(circle at 32% 30%,rgba(255,255,255,.55) 0%,var(--tc2) 30%,transparent 72%);animation:ofl 13s -3s ease-in-out infinite alternate-reverse}
+.to3{width:120px;height:120px;left:38%;top:56%;background:radial-gradient(circle at 32% 30%,rgba(255,255,255,.5) 0%,var(--tc3) 30%,transparent 72%);animation:ofl 18s -7s ease-in-out infinite alternate}
+.to4{width:66px;height:66px;right:30%;bottom:18%;background:radial-gradient(circle at 32% 30%,rgba(255,255,255,.6) 0%,var(--tc4) 30%,transparent 72%);animation:ofl 11s -2s ease-in-out infinite alternate-reverse}
+.to5{width:240px;height:240px;right:-4%;bottom:-6%;opacity:.6;background:radial-gradient(circle at 32% 30%,rgba(255,255,255,.4) 0%,var(--tc1) 30%,transparent 72%);animation:ofl 21s -10s ease-in-out infinite alternate}
+.to6{width:42px;height:42px;left:20%;bottom:30%;background:radial-gradient(circle at 32% 30%,rgba(255,255,255,.7) 0%,var(--tc2) 30%,transparent 75%);animation:ofl 9s -5s ease-in-out infinite alternate}
+.tw-grid{position:absolute;inset:0;perspective:520px;background:linear-gradient(180deg,#050510 0%,#0b0721 46%,#160a30 60%)}
+.twg-sky{position:absolute;inset:0 0 46% 0;background:radial-gradient(ellipse at 50% 100%,var(--tc1) 0%,transparent 62%);opacity:.42}
+.twg-sun{position:absolute;left:50%;top:30%;width:200px;height:200px;transform:translateX(-50%);border-radius:50%;background:linear-gradient(180deg,var(--tc2) 0%,var(--tc3) 55%,var(--tc4) 100%);box-shadow:0 0 90px var(--tc3);-webkit-mask:repeating-linear-gradient(180deg,#000 0 12px,transparent 12px 17px);mask:repeating-linear-gradient(180deg,#000 0 12px,transparent 12px 17px);animation:g3sun 9s ease-in-out infinite alternate}
+.twg-floor{position:absolute;left:-40%;right:-40%;top:52%;bottom:-4%;transform-style:preserve-3d;transform:rotateX(62deg);overflow:hidden;border-top:1px solid var(--tc1)}
+.twg-grid{position:absolute;inset:-100% 0 0 0;background-image:linear-gradient(var(--tc1) 1px,transparent 1px),linear-gradient(90deg,var(--tc1) 1px,transparent 1px);background-size:56px 56px;animation:g3move 1.6s linear infinite;opacity:.7}
+.twg-haze{position:absolute;left:0;right:0;top:44%;height:22%;background:linear-gradient(180deg,transparent,rgba(11,7,33,.9) 48%,transparent);filter:blur(6px)}
+.bgp-cat-sec{margin-top:2px}
+.bgp-cat{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5);margin:16px 0 8px}
 `;
