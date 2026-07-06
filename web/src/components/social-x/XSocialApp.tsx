@@ -161,6 +161,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [detailPost, setDetailPost] = useState<Post | null>(null);
   const [detailReplies, setDetailReplies] = useState<Post[]>([]);
+  const [detailParent, setDetailParent] = useState<{ id: string; username: string | null } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replyPosting, setReplyPosting] = useState(false);
@@ -420,17 +421,23 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   };
 
   useEffect(() => {
-    if (!openPostId) { setDetailPost(null); setDetailReplies([]); return; }
+    if (!openPostId) { setDetailPost(null); setDetailReplies([]); setDetailParent(null); return; }
     const existing = posts.find((p) => p.id === openPostId) || null;
     setDetailPost(existing);
+    setDetailParent(null);
     setDetailLoading(true);
     let cancelled = false;
     (async () => {
-      if (!existing) {
-        const { data } = await supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").eq("id", openPostId).single();
-        if (!cancelled && data) setDetailPost(data as Post);
+      let thePost = existing;
+      if (!thePost) {
+        const { data } = await supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,reply_to").eq("id", openPostId).single();
+        if (!cancelled && data) { thePost = data as Post; setDetailPost(data as Post); }
       }
-      const { data: reps } = await supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").eq("reply_to", openPostId).order("created_at", { ascending: true }).limit(100);
+      if (thePost?.reply_to) {
+        const { data: par } = await supabase.from("social_messages").select("id,username").eq("id", thePost.reply_to).single();
+        if (!cancelled && par) setDetailParent({ id: (par as { id: string }).id, username: (par as { username: string | null }).username });
+      }
+      const { data: reps } = await supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,reply_to").eq("reply_to", openPostId).order("created_at", { ascending: true }).limit(100);
       if (!cancelled) { setDetailReplies((reps as Post[]) || []); setDetailLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -1645,6 +1652,11 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               <span className="text-[17px] font-black text-white">Post</span>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
+              {detailParent && (
+                <button type="button" onClick={() => setOpenPostId(detailParent.id)} className="flex w-full items-center gap-1.5 border-b border-white/[0.06] px-4 py-2.5 text-left text-[13px] text-white/45 transition hover:bg-white/[0.03]">
+                  <span className="text-white/30">↑</span> Replying to <span className="font-bold text-[#1d9bf0]">@{detailParent.username || "post"}</span>
+                </button>
+              )}
               {detailPost ? <PostCard p={detailPost} /> : <div className="px-4 py-8 text-center text-sm text-white/40">Loading…</div>}
               {user && (
                 <div className="flex gap-3 border-b border-white/10 px-4 py-3">
@@ -1661,7 +1673,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 <div className="px-4 py-6 text-center text-sm text-white/40">Loading replies…</div>
               ) : detailReplies.length === 0 ? (
                 <div className="px-4 py-10 text-center text-sm text-white/40">No replies yet. Be the first.</div>
-              ) : detailReplies.map((r) => <PostCard key={r.id} p={r} />)}
+              ) : detailReplies.map((r) => <PostCard key={r.id} p={r} onOpen={setOpenPostId} />)}
             </div>
           </div>
         </div>
