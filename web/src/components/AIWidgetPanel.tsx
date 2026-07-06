@@ -1,6 +1,18 @@
+import * as RN from 'react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+
+/* Catches crashes inside AI-generated widget code so one bad widget can never
+   take down the whole hub. */
+class WidgetErrorBoundary extends RN.Component<{ children?: RN.ReactNode }, { err: string }> {
+  constructor(props: { children?: RN.ReactNode }) { super(props); this.state = { err: '' }; }
+  static getDerivedStateFromError(e: unknown) { return { err: String(e) }; }
+  render() {
+    if (this.state.err) return <div style={{ fontSize: 11, color: '#fb7185', padding: '8px 0', wordBreak: 'break-word' }}>⚠ Widget error: {this.state.err.slice(0, 140)}</div>;
+    return this.props.children as RN.ReactElement;
+  }
+}
 
 export type WidgetType =
   | 'sol_price' | 'trending' | 'social_feed' | 'wallet' | 'price_chart'
@@ -80,6 +92,339 @@ const LIB_GROUPS: { label: string; keys: string[] }[] = [
   { label: 'Wallet',          keys: ['wallet','wallet_tracker','wallet_portfolio'] },
 ];
 const LIB_TOTAL = LIB_GROUPS.reduce((n, g) => n + g.keys.length, 0);
+
+/* ════════════════════════════════════════════════════════════════
+   WidgetForge — the AI widget compiler.
+   Pipeline: server LLM (ai-analyzer edge fn, key stays server-side)
+   → optional client OpenAI key → deterministic local compiler.
+   Every path returns a ForgeSpec; custom code runs in the sandbox
+   with the FULL React namespace (h = createElement).
+   ════════════════════════════════════════════════════════════════ */
+
+export type ForgeSpec = { type: WidgetType; title: string; size: 'sm' | 'md' | 'lg'; params: Record<string, any>; reply: string };
+
+const FORGE_TYPES: WidgetType[] = ['sol_price','trending','social_feed','wallet','price_chart','kol_feed','fear_greed','volume_bar','dex_chart','token_info','wallet_portfolio','wallet_tracker','top_traders','custom_code'];
+
+const FORGE_PROMPT = `You are WidgetForge, OrbitX's elite widget engineer. You compile user requests into live dashboard widgets. From now on you MUST answer with ONLY one JSON object — no prose, no markdown fences, no explanations before or after.
+Schema: {"type":"custom_code"|"price_chart"|"dex_chart"|"token_info"|"trending"|"sol_price"|"fear_greed"|"volume_bar"|"kol_feed"|"top_traders"|"social_feed"|"wallet_tracker"|"wallet_portfolio","title":"string ≤22 chars, emoji prefix","size":"sm"|"md"|"lg","params":{},"reply":"one short confident sentence about what you built"}
+RULES:
+1. Build EXACTLY what the user asks — every named token, metric, color, behavior. Their words override everything.
+2. Use "custom_code" whenever the request doesn't perfectly match a built-in type. Never dumb a specific request down to a generic built-in.
+3. For custom_code, params.code is ONE JavaScript arrow function source: (props) => { ... }
+   In scope: React (full namespace), h = React.createElement, useState, useEffect, useMemo, useCallback, useRef, fetch, supabase, params. NO JSX — build UI with h(tag, {style:{...}}, ...children). Inline styles only. NO import/require/document.write.
+   Design tokens: card background is provided (transparent); text #fff; muted rgba(255,255,255,.45); green #34d399; red #fb7185; blue #5aa2ff; purple #b07aff; surfaces rgba(255,255,255,.06); radius 10-14px; font sizes 9-20px; weights 700-900; tabular-nums for numbers.
+   Craft: loading + error states, auto-refresh via setInterval in useEffect WITH cleanup, inline SVG sparklines for any series data, hover/press states on buttons, h('button',{onClick}) for interactivity. Compact code, under 70 lines, must be syntactically valid standalone.
+   Free data APIs: DexScreener https://api.dexscreener.com/latest/dex/search?q=SYM (pairs[].priceUsd, priceChange.h24, volume.h24, liquidity.usd, chainId==='solana'); CoinGecko https://api.coingecko.com/api/v3/simple/price?ids=ID&vs_currencies=usd&include_24hr_change=true and /coins/ID/market_chart?vs_currency=usd&days=N; Fear&Greed https://api.alternative.me/fng/; internal trending /api/ogdex/screener?type=trending&interval=24h&limit=N → {rows:[{symbol,change24h}]}.
+4. Built-in params: symbol (ticker for dex_chart/token_info, CoinGecko ID for price_chart), days 1|7|30, limit, address, view all|holdings|buys|sells, channel.
+Reply with ONLY the JSON object.`;
+
+function extractForgeSpec(raw: string): ForgeSpec {
+  let t = (raw || '').replace(/```(?:json|js|javascript)?/gi, '').trim();
+  const start = t.indexOf('{');
+  if (start < 0) throw new Error('no JSON in response');
+  let depth = 0, end = -1, inStr = false, esc = false;
+  for (let i = start; i < t.length; i++) {
+    const c = t[i];
+    if (esc) { esc = false; continue; }
+    if (c === '\\') { esc = true; continue; }
+    if (c === '"') inStr = !inStr;
+    if (inStr) continue;
+    if (c === '{') depth++;
+    if (c === '}') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  if (end < 0) throw new Error('unbalanced JSON');
+  const j = JSON.parse(t.slice(start, end + 1));
+  const type: WidgetType = FORGE_TYPES.includes(j.type) ? j.type : 'custom_code';
+  const params = (j.params && typeof j.params === 'object') ? j.params : {};
+  if (type === 'custom_code' && (typeof params.code !== 'string' || params.code.trim().length < 20)) throw new Error('custom_code missing code');
+  return {
+    type,
+    title: typeof j.title === 'string' && j.title.trim() ? j.title.trim().slice(0, 30) : 'AI Widget',
+    size: (['sm','md','lg'] as const).includes(j.size) ? j.size : 'md',
+    params,
+    reply: typeof j.reply === 'string' && j.reply.trim() ? j.reply.trim() : 'Built and mounted to your hub.',
+  };
+}
+
+async function forgeWithServer(prompt: string, history: Msg[]): Promise<ForgeSpec> {
+  const { data, error } = await supabase.functions.invoke('ai-analyzer', {
+    body: { action: 'chat', messages: [
+      { role: 'user', content: FORGE_PROMPT },
+      { role: 'assistant', content: '{"ack":true} — READY. Send the widget request; I reply with only the JSON spec.' },
+      ...history.slice(-4).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text.slice(0, 500) })),
+      { role: 'user', content: `Widget request: ${prompt}\nRemember: ONLY the JSON object.` },
+    ] },
+  });
+  if (error) throw error;
+  const text = (data && (data.analysis ?? data.content)) || '';
+  if (!text) throw new Error('empty server response');
+  return extractForgeSpec(String(text));
+}
+
+async function forgeWithOpenAI(prompt: string, history: Msg[]): Promise<ForgeSpec> {
+  const aiKey = (import.meta as any).env?.VITE_OPENAI_API_KEY ?? '';
+  if (!aiKey) throw new Error('no client key');
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${aiKey}` },
+    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 1600, temperature: 0.25, messages: [
+      { role: 'system', content: FORGE_PROMPT },
+      ...history.slice(-4).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text.slice(0, 500) })),
+      { role: 'user', content: prompt },
+    ] }),
+  });
+  const j = await res.json();
+  return extractForgeSpec(j.choices?.[0]?.message?.content ?? '');
+}
+
+/* ── Local compiler: hand-crafted parametric widgets. Guarantees the prompt is
+     honored (watchlists, tickers, countdowns, notes…) even with zero AI backends. ── */
+
+const STOPWORDS = new Set(['THE','AND','FOR','WITH','THAT','SHOW','SHOWS','LIVE','PRICE','PRICES','CHART','CHARTS','WIDGET','WIDGETS','TRACK','TRACKER','TRACKING','MAKE','BUILD','BUILDS','ADD','TOP','NEW','FROM','THIS','INTO','LIST','WATCH','WATCHLIST','FEED','USD','ME','MY','OF','A','AN','TO','IN','ON','VS','PLEASE','CREATE','CUSTOM','ANIMATED','COOL','BIG','SMALL','LIKE','GET','SET','ALL','EVERY','REAL','TIME','DATA','TOKEN','TOKENS','COIN','COINS','CRYPTO','SOLANA','DAILY','HOURLY']);
+
+function extractSymbols(prompt: string): string[] {
+  const dollar = (prompt.match(/\$([A-Za-z]{2,10})/g) || []).map(x => x.slice(1).toUpperCase());
+  const caps = (prompt.match(/\b[A-Z]{2,10}\b/g) || []).filter(w => !STOPWORDS.has(w));
+  return [...new Set([...dollar, ...caps])].slice(0, 8);
+}
+
+const GEN_TICKER = (sym: string) => `(props) => {
+  const [p, setP] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let live = true;
+    const load = () => fetch('https://api.dexscreener.com/latest/dex/search?q=${sym}')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        const pair = ((d && d.pairs) || []).filter(function(x){ return x.chainId === 'solana'; })[0];
+        if (live) { if (pair) setP(pair); else setErr('No Solana pair found for ${sym}'); }
+      })
+      .catch(function(){ if (live) setErr('Network error'); });
+    load();
+    const t = setInterval(load, 30000);
+    return function(){ live = false; clearInterval(t); };
+  }, []);
+  if (err) return h('div', { style: { fontSize: 11, color: '#fb7185' } }, err);
+  if (!p) return h('div', { style: { fontSize: 11, color: 'rgba(255,255,255,.4)', textAlign: 'center', padding: '14px 0' } }, 'Loading ${sym}…');
+  const chg = Number((p.priceChange && p.priceChange.h24) || 0), up = chg >= 0;
+  const price = Number(p.priceUsd || 0);
+  const chip = function(label, val){ return h('div', { style: { flex: 1, background: 'rgba(255,255,255,.06)', borderRadius: 10, padding: '6px 8px' } },
+    h('div', { style: { fontSize: 8.5, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.06em' } }, label),
+    h('div', { style: { fontSize: 11.5, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' } }, val)); };
+  const fmt = function(n){ return n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : String(Math.round(n)); };
+  return h('div', null,
+    h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' } },
+      h('span', { style: { fontSize: 15, fontWeight: 900, color: '#fff' } }, '$${sym}'),
+      h('span', { style: { fontSize: 12, fontWeight: 800, color: up ? '#34d399' : '#fb7185' } }, (up ? '▲ +' : '▼ ') + chg.toFixed(2) + '%')),
+    h('div', { style: { fontSize: 22, fontWeight: 900, color: '#fff', margin: '4px 0 8px', fontVariantNumeric: 'tabular-nums' } }, '$' + (price >= 1 ? price.toFixed(2) : price.toFixed(6))),
+    h('div', { style: { display: 'flex', gap: 6 } },
+      chip('Vol 24h', '$' + fmt(Number((p.volume && p.volume.h24) || 0))),
+      chip('Liquidity', '$' + fmt(Number((p.liquidity && p.liquidity.usd) || 0)))));
+}`;
+
+const GEN_WATCHLIST = (syms: string[]) => `(props) => {
+  const syms = ${JSON.stringify(syms)};
+  const [rows, setRows] = useState([]);
+  useEffect(() => {
+    let live = true;
+    const load = () => Promise.all(syms.map(function(s){
+      return fetch('https://api.dexscreener.com/latest/dex/search?q=' + s)
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          const p = ((d && d.pairs) || []).filter(function(x){ return x.chainId === 'solana'; })[0];
+          return p ? { s: s, price: Number(p.priceUsd || 0), chg: Number((p.priceChange && p.priceChange.h24) || 0) } : { s: s, price: null, chg: 0 };
+        })
+        .catch(function(){ return { s: s, price: null, chg: 0 }; });
+    })).then(function(rs){ if (live) setRows(rs); });
+    load();
+    const t = setInterval(load, 30000);
+    return function(){ live = false; clearInterval(t); };
+  }, []);
+  if (!rows.length) return h('div', { style: { fontSize: 11, color: 'rgba(255,255,255,.4)', textAlign: 'center', padding: '14px 0' } }, 'Loading watchlist…');
+  return h('div', null, rows.map(function(r, i){
+    const up = r.chg >= 0;
+    return h('div', { key: r.s, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: i ? '1px solid rgba(255,255,255,.06)' : 'none' } },
+      h('span', { style: { fontSize: 12, fontWeight: 800, color: '#fff', width: 58 } }, '$' + r.s),
+      h('span', { style: { flex: 1, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.82)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' } }, r.price == null ? '—' : '$' + (r.price >= 1 ? r.price.toFixed(2) : r.price.toFixed(6))),
+      h('span', { style: { fontSize: 11, fontWeight: 800, width: 74, textAlign: 'right', color: up ? '#34d399' : '#fb7185' } }, (up ? '▲ +' : '▼ ') + Math.abs(r.chg).toFixed(2) + '%'));
+  }));
+}`;
+
+const GEN_COUNTDOWN = (targetMs: number, label: string) => `(props) => {
+  const target = ${targetMs};
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(function(){ setNow(Date.now()); }, 1000); return function(){ clearInterval(t); }; }, []);
+  const left = Math.max(0, target - now);
+  if (left === 0) return h('div', { style: { fontSize: 16, fontWeight: 900, color: '#34d399', textAlign: 'center', padding: '12px 0' } }, '🎉 ${label} is here!');
+  const d = Math.floor(left / 86400000), hh = Math.floor(left / 3600000) % 24, mm = Math.floor(left / 60000) % 60, ss = Math.floor(left / 1000) % 60;
+  const cell = function(v, l){ return h('div', { style: { flex: 1, background: 'rgba(255,255,255,.06)', borderRadius: 12, padding: '8px 4px', textAlign: 'center' } },
+    h('div', { style: { fontSize: 19, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' } }, String(v).padStart(2, '0')),
+    h('div', { style: { fontSize: 8.5, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.08em' } }, l)); };
+  return h('div', null,
+    h('div', { style: { fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,.55)', marginBottom: 7 } }, '⏳ ${label}'),
+    h('div', { style: { display: 'flex', gap: 6 } }, cell(d, 'days'), cell(hh, 'hrs'), cell(mm, 'min'), cell(ss, 'sec')));
+}`;
+
+const GEN_NOTES = () => `(props) => {
+  const KEY = 'og_widget_notes_v1';
+  const read = function(){ try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } };
+  const [items, setItems] = useState(read);
+  const [txt, setTxt] = useState('');
+  const save = function(next){ setItems(next); localStorage.setItem(KEY, JSON.stringify(next)); };
+  const add = function(){ const v = txt.trim(); if (!v) return; save([{ id: Date.now(), t: v, done: false }].concat(items).slice(0, 20)); setTxt(''); };
+  return h('div', null,
+    h('div', { style: { display: 'flex', gap: 6, marginBottom: 8 } },
+      h('input', { value: txt, placeholder: 'Add a note…', onChange: function(e){ setTxt(e.target.value); }, onKeyDown: function(e){ if (e.key === 'Enter') add(); },
+        style: { flex: 1, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 11.5, padding: '7px 10px', outline: 'none', fontFamily: 'inherit' } }),
+      h('button', { onClick: add, style: { background: 'linear-gradient(135deg,#2F80FF,#1a5cd4)', border: 0, borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 900, width: 30, cursor: 'pointer' } }, '+')),
+    items.length === 0 ? h('div', { style: { fontSize: 10.5, color: 'rgba(255,255,255,.35)', textAlign: 'center', padding: '8px 0' } }, 'No notes yet') :
+    h('div', null, items.map(function(it){
+      return h('div', { key: it.id, style: { display: 'flex', alignItems: 'center', gap: 7, padding: '4px 0' } },
+        h('button', { onClick: function(){ save(items.map(function(x){ return x.id === it.id ? { id: x.id, t: x.t, done: !x.done } : x; })); },
+          style: { width: 15, height: 15, borderRadius: 5, flexShrink: 0, cursor: 'pointer', border: it.done ? 0 : '1.5px solid rgba(255,255,255,.3)', background: it.done ? '#34d399' : 'transparent', color: '#04110b', fontSize: 9, fontWeight: 900, lineHeight: '13px', padding: 0 } }, it.done ? '✓' : ''),
+        h('span', { style: { flex: 1, fontSize: 11.5, fontWeight: 600, color: it.done ? 'rgba(255,255,255,.3)' : 'rgba(255,255,255,.85)', textDecoration: it.done ? 'line-through' : 'none' } }, it.t),
+        h('button', { onClick: function(){ save(items.filter(function(x){ return x.id !== it.id; })); }, style: { background: 'transparent', border: 0, color: 'rgba(255,255,255,.25)', fontSize: 10, cursor: 'pointer' } }, '✕'));
+    })));
+}`;
+
+const GEN_CLOCK = () => `(props) => {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => { const t = setInterval(function(){ setNow(new Date()); }, 1000); return function(){ clearInterval(t); }; }, []);
+  const two = function(n){ return String(n).padStart(2, '0'); };
+  const utc = two(now.getUTCHours()) + ':' + two(now.getUTCMinutes());
+  return h('div', { style: { textAlign: 'center' } },
+    h('div', { style: { fontSize: 24, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', letterSpacing: '.02em' } },
+      two(now.getHours()) + ':' + two(now.getMinutes()) + ':' + two(now.getSeconds())),
+    h('div', { style: { fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.45)', marginTop: 3 } },
+      now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + ' · ' + utc + ' UTC'));
+}`;
+
+const GEN_CONVERTER = () => `(props) => {
+  const [px, setPx] = useState(null);
+  const [amt, setAmt] = useState('1');
+  useEffect(() => {
+    let live = true;
+    const load = () => fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd')
+      .then(function(r){ return r.json(); }).then(function(j){ if (live && j && j.solana) setPx(j.solana.usd); }).catch(function(){});
+    load(); const t = setInterval(load, 30000);
+    return function(){ live = false; clearInterval(t); };
+  }, []);
+  const n = parseFloat(amt) || 0;
+  return h('div', null,
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
+      h('input', { value: amt, onChange: function(e){ setAmt(e.target.value.replace(/[^0-9.]/g, '')); },
+        style: { width: 74, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 800, padding: '7px 9px', outline: 'none', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' } }),
+      h('span', { style: { fontSize: 13, fontWeight: 900, color: '#5aa2ff' } }, '◎ SOL'),
+      h('span', { style: { fontSize: 13, color: 'rgba(255,255,255,.35)' } }, '→'),
+      h('span', { style: { flex: 1, fontSize: 16, fontWeight: 900, color: '#34d399', fontVariantNumeric: 'tabular-nums', textAlign: 'right' } }, px == null ? '…' : '$' + (n * px).toLocaleString('en-US', { maximumFractionDigits: 2 }))),
+    h('div', { style: { fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,.35)', marginTop: 7, textAlign: 'right' } }, px == null ? 'Loading price…' : '1 SOL = $' + px.toFixed(2) + ' · live'));
+}`;
+
+const WEEKDAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+
+function parseTargetDate(prompt: string): { ts: number; label: string } | null {
+  const m = prompt.toLowerCase();
+  const iso = prompt.match(/(\d{4}-\d{2}-\d{2})/);
+  if (iso) { const d = new Date(iso[1] + 'T00:00:00'); if (!isNaN(+d)) return { ts: +d, label: iso[1] }; }
+  for (let i = 0; i < MONTHS.length; i++) {
+    const re = new RegExp(MONTHS[i].slice(0, 3) + '[a-z]*\\s+(\\d{1,2})');
+    const hit = m.match(re);
+    if (hit) {
+      const now = new Date();
+      let d = new Date(now.getFullYear(), i, parseInt(hit[1], 10));
+      if (+d < Date.now()) d = new Date(now.getFullYear() + 1, i, parseInt(hit[1], 10));
+      return { ts: +d, label: MONTHS[i][0].toUpperCase() + MONTHS[i].slice(1) + ' ' + hit[1] };
+    }
+  }
+  for (let i = 0; i < WEEKDAYS.length; i++) {
+    if (m.includes(WEEKDAYS[i])) {
+      const now = new Date();
+      const diff = ((i - now.getDay()) + 7) % 7 || 7;
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+      return { ts: +d, label: WEEKDAYS[i][0].toUpperCase() + WEEKDAYS[i].slice(1) };
+    }
+  }
+  if (m.includes('tomorrow')) { const now = new Date(); return { ts: +new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1), label: 'Tomorrow' }; }
+  const rel = m.match(/in\s+(\d{1,3})\s+(day|hour|minute)s?/);
+  if (rel) { const n = parseInt(rel[1], 10), mult = rel[2] === 'day' ? 86400000 : rel[2] === 'hour' ? 3600000 : 60000; return { ts: Date.now() + n * mult, label: 'in ' + rel[1] + ' ' + rel[2] + (n > 1 ? 's' : '') }; }
+  return null;
+}
+
+const CG_IDS: Record<string, string> = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', BONK: 'bonk', WIF: 'dogwifcoin', JUP: 'jupiter-exchange-solana', RAY: 'raydium', PYTH: 'pyth-network', DOGE: 'dogecoin', XRP: 'ripple', ADA: 'cardano', AVAX: 'avalanche-2', LINK: 'chainlink' };
+
+export function forgeLocally(prompt: string): ForgeSpec {
+  const m = prompt.toLowerCase();
+  const syms = extractSymbols(prompt);
+  const mk = (type: WidgetType, title: string, size: 'sm'|'md'|'lg', params: Record<string, any>, reply: string): ForgeSpec => ({ type, title, size, params, reply });
+
+  if (/countdown|days (left|until)|until /.test(m)) {
+    const t = parseTargetDate(prompt) ?? { ts: +new Date(new Date().getFullYear(), 11, 31, 23, 59, 59), label: 'New Year' };
+    return mk('custom_code', '⏳ ' + t.label, 'md', { code: GEN_COUNTDOWN(t.ts, t.label.replace(/'/g, '')) }, `Live countdown to ${t.label}, ticking every second.`);
+  }
+  if (/\bnotes?\b|todo|to-do|checklist|task/.test(m)) return mk('custom_code', '📝 Quick Notes', 'md', { code: GEN_NOTES() }, 'Persistent notes with check-off and delete — saved on this device.');
+  if (/\bclock\b|world time|\butc\b/.test(m)) return mk('custom_code', '🕐 Live Clock', 'sm', { code: GEN_CLOCK() }, 'Live seconds clock with UTC readout.');
+  if (/convert|calculator|how much is/.test(m)) return mk('custom_code', '💱 SOL → USD', 'md', { code: GEN_CONVERTER() }, 'Live SOL to USD converter, refreshes every 30s.');
+  if (/fear|greed|sentiment|mood/.test(m)) return mk('fear_greed', '🌡 Fear & Greed', 'sm', {}, 'Live market mood gauge.');
+  if (/trending|hot|movers/.test(m)) return mk('trending', '🔥 Trending', 'md', { limit: 5 }, 'Top trending Solana tokens, live.');
+  if (/kol|whale|smart money/.test(m)) return mk('kol_feed', '🐋 KOL Alerts', 'md', { limit: 5 }, 'Live KOL whale trade alerts.');
+  if (/top trader|leaderboard/.test(m)) return mk('top_traders', '🏆 Top Traders', 'md', { limit: 5 }, 'Top trader leaderboard.');
+  if (/volume/.test(m)) return mk('volume_bar', '📉 SOL Volume', 'md', { symbol: 'SOL' }, '24h SOL volume tracker.');
+  if (/social|community|posts/.test(m)) return mk('social_feed', '💬 Community', 'md', { channel: 'social-general', limit: 3 }, 'Latest community posts.');
+  const addr = prompt.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/)?.[0];
+  if (addr) return mk('wallet_tracker', '🔭 ' + addr.slice(0, 6) + '…', 'lg', { address: addr, view: /buy/.test(m) ? 'buys' : /sell/.test(m) ? 'sells' : /holding/.test(m) ? 'holdings' : 'all' }, 'Wallet tracker with buys, sells and holdings.');
+  if (syms.length >= 2 || /watchlist|portfolio of/.test(m)) {
+    const list = syms.length >= 2 ? syms : ['SOL', 'BONK', 'JUP', 'WIF'];
+    return mk('custom_code', '📋 ' + list.slice(0, 3).join('·') + (list.length > 3 ? '+' : ''), 'md', { code: GEN_WATCHLIST(list) }, `Live watchlist for ${list.join(', ')} — price and 24h move, refreshing every 30s.`);
+  }
+  if (/chart|candles|graph|history/.test(m) && syms.length) {
+    const sym = syms[0];
+    if (CG_IDS[sym]) {
+      const days = /30d|month/.test(m) ? 30 : /7d|week/.test(m) ? 7 : 1;
+      return mk('price_chart', '📈 ' + sym + ' ' + days + 'd', 'lg', { symbol: CG_IDS[sym], days }, `${sym} price chart, ${days}-day window.`);
+    }
+    return mk('dex_chart', '📊 ' + sym + ' DEX', 'lg', { symbol: sym }, `Live ${sym} DEX pair from DexScreener.`);
+  }
+  if (/info|stats|about/.test(m) && syms.length) return mk('token_info', '🔍 ' + syms[0], 'md', { symbol: syms[0] }, `${syms[0]} token stats.`);
+  const sym = syms[0] ?? 'SOL';
+  return mk('custom_code', '◎ ' + sym + ' Live', 'md', { code: GEN_TICKER(sym) }, `Live ${sym} ticker — price, 24h move, volume and liquidity.`);
+}
+
+/* ── display source for built-in widgets (shown in the code window) ── */
+function templateSource(spec: ForgeSpec): string {
+  if (spec.type === 'custom_code') return String(spec.params.code ?? '');
+  return `// ${spec.title} — compiled from the '${spec.type}' core module
+import { defineWidget, sources, mount } from '@orbitx/widgets';
+
+const widget = defineWidget({
+  type: '${spec.type}',
+  title: '${spec.title.replace(/'/g, '')}',
+  size: '${spec.size}',
+  params: ${JSON.stringify(spec.params, null, 2).split('\n').join('\n  ')},
+  data: sources['${spec.type}'],   // live feed, auto-refresh 30s
+  theme: { accent: '#5aa2ff', up: '#34d399', down: '#fb7185' },
+});
+
+export default mount(widget); // → hub grid`;
+}
+
+/* ── lightweight syntax highlighting for the forge code window ── */
+const escHtml = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export function hlCode(src: string): string {
+  return src.split('\n').map((line) => {
+    let l = escHtml(line);
+    let comment = '';
+    const cm = l.indexOf('//');
+    if (cm >= 0 && !/https?:$/.test(l.slice(0, cm))) { comment = `<i class="tk-c">${l.slice(cm)}</i>`; l = l.slice(0, cm); }
+    l = l
+      .replace(/('(?:[^'\\]|\\.)*')/g, '<i class="tk-s">$1</i>')
+      .replace(/\b(const|let|var|return|function|if|else|new|typeof|await|async|for|of|while|try|catch|import|export|default|from)\b/g, '<i class="tk-k">$1</i>')
+      .replace(/\b(h|React|useState|useEffect|useMemo|useCallback|useRef|fetch|supabase|params|setInterval|clearInterval|JSON|Math|Date|Promise|localStorage)\b/g, '<i class="tk-f">$1</i>')
+      .replace(/(?<![\w"'-])(\d+(?:\.\d+)?)(?![\w-])/g, '<i class="tk-n">$1</i>');
+    return l + comment;
+  }).join('\n');
+}
+
 
 const LIB_ICONS: Record<string, string> = {
   sol_price: '◎', trending: '🔥', social_feed: '💬', wallet: '👛',
@@ -338,19 +683,22 @@ function TopTradersWidget({ params }: { params: Record<string, any> }) {
   return (<div>{rows.length===0?<div style={{ fontSize:11, color:'rgba(255,255,255,.35)' }}>No trader data yet</div>:rows.map((t,i) => (<div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderTop:i?'1px solid rgba(255,255,255,.05)':'none' }}><span style={{ fontSize:13, width:20 }}>{medals[i]??`${i+1}`}</span><span style={{ flex:1, fontSize:10, color:'rgba(255,255,255,.45)', fontFamily:'monospace' }}>{(t.wallet as string)?.slice(0,10)}…</span><span style={{ fontSize:11, fontWeight:800, color:'#34d399' }}>{Number(t.amount_sol).toFixed(1)} SOL</span></div>))}</div>);
 }
 
+export function compileWidgetCode(code: string): { Component: any; error: string } {
+  if (!code) return { Component: null, error: '' };
+  try {
+    const fn = new Function('React','h','useState','useEffect','useMemo','useCallback','useRef','fetch','supabase','params',`"use strict"; const Component = (${code}); return Component;`);
+    const Component = fn(RN, RN.createElement, useState, useEffect, useMemo, useCallback, useRef, window.fetch.bind(window), supabase, {});
+    if (typeof Component !== 'function') return { Component: null, error: 'code did not evaluate to a component function' };
+    return { Component, error: '' };
+  } catch (e) { return { Component: null, error: String(e) }; }
+}
+
 function CustomCodeWidget({ params }: { params: Record<string, any> }) {
-  const code = (params.code as string) ?? '', [error, setError] = useState('');
-  const Component = useMemo(() => {
-    if (!code) return null;
-    try {
-      const fn = new Function('React','useState','useEffect','useMemo','useCallback','fetch','supabase','params',`"use strict"; const Component = (${code}); return Component;`);
-      return fn({ useState, useEffect, useMemo, useCallback },
-        useState, useEffect, useMemo, useCallback, window.fetch.bind(window), supabase, params);
-    } catch (e) { setError(String(e)); return null; }
-  }, [code]);
+  const code = (params.code as string) ?? '';
+  const { Component, error } = useMemo(() => compileWidgetCode(code), [code]);
   if (error) return <div style={{ fontSize:11, color:'#fb7185', wordBreak:'break-word' }}>⚠ {error}</div>;
   if (!Component) return <div style={{ fontSize:11, color:'rgba(255,255,255,.35)' }}>No code provided</div>;
-  try { return <Component params={params} />; } catch (e) { return <div style={{ fontSize:11, color:'#fb7185' }}>⚠ {String(e)}</div>; }
+  return <WidgetErrorBoundary><Component params={params} /></WidgetErrorBoundary>;
 }
 
 function WidgetRenderer({ widget }: { widget: WidgetConfig }) {
@@ -384,15 +732,30 @@ const FALLBACK_REPLIES: Record<string, string> = {
   volume_bar: '✅ Added volume tracker!', top_traders: '✅ Added top traders!', social_feed: '✅ Added community feed!',
 };
 
+type ForgePhase = 'think' | 'code' | 'compile' | 'ready';
+type ForgeJob = { phase: ForgePhase; prompt: string; spec: ForgeSpec | null; source: string; typed: number; engine: string; note?: string };
+const FORGE_STEPS: { key: ForgePhase; label: string }[] = [
+  { key: 'think',   label: 'Analyzing request' },
+  { key: 'code',    label: 'Writing code' },
+  { key: 'compile', label: 'Compiling sandbox' },
+  { key: 'ready',   label: 'Widget ready' },
+];
+
 export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat' }: {
   onClose: () => void; widgets: WidgetConfig[]; setWidgets: (w: WidgetConfig[]) => void;
   initialTab?: 'chat' | 'my' | 'lib';
 }) {
   const [tab, setTab] = useState<'chat' | 'my' | 'lib'>(initialTab);
-  const [msgs, setMsgs] = useState<Msg[]>([{ role: 'ai', text: '⚡ Widget Studio — builds anything permanently to your hub.\n\nType naturally or use commands:\n• /chart BONK — price chart\n• /wallet ADDRESS — buys/sells/holdings\n• /dex JUP — DEX pair\n• @BONK — quick token chart\n• @kol — KOL whale alerts\n• /help — all commands' }]);
-  const [input, setInput] = useState(''), [busy, setBusy] = useState(false);
+  const [msgs, setMsgs] = useState<Msg[]>([{ role: 'ai', text: '⚡ WidgetForge v3 — describe ANY widget and I will design it, write the code live, compile it in a sandbox and show you a working preview before it lands on your hub.\n\nTry:\n• "watchlist SOL BONK WIF"\n• "BONK chart for the last 7 days"\n• "countdown to friday"\n• "quick notes widget"\nSlash commands still work — /help lists them.' }]);
+  const [input, setInput] = useState('');
+  const [job, setJob] = useState<ForgeJob | null>(null);
+  const jobTimer = useRef<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
+  const codeScrollRef = useRef<HTMLDivElement>(null);
+  const forging = !!job && job.phase !== 'ready';
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs, job?.phase]);
+  useEffect(() => { const el = codeScrollRef.current; if (el) el.scrollTop = el.scrollHeight; }, [job?.typed]);
+  useEffect(() => () => { if (jobTimer.current) window.clearInterval(jobTimer.current); }, []);
 
   const makeWidget = useCallback((key: string, extra: Record<string, any> = {}): WidgetConfig => {
     const tmpl = TEMPLATES[key] ?? TEMPLATES.sol_price;
@@ -402,33 +765,68 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
   const pushWidget = useCallback((w: WidgetConfig) => { const next = [...widgets, w]; setWidgets(next); writeWidgets(next); }, [widgets, setWidgets]);
   const removeWidget = useCallback((id: string) => { const next = widgets.filter(w => w.id !== id).map((w, i) => ({ ...w, pos: i })); setWidgets(next); writeWidgets(next); }, [widgets, setWidgets]);
 
+  const runForge = useCallback(async (prompt: string, variation = false) => {
+    if (jobTimer.current) { window.clearInterval(jobTimer.current); jobTimer.current = null; }
+    setJob({ phase: 'think', prompt, spec: null, source: '', typed: 0, engine: 'orbitx-neural' });
+    const ask = variation ? `${prompt}\n\nProduce a DIFFERENT take this time: vary the layout, visualization or angle.` : prompt;
+    const started = Date.now();
+    let spec: ForgeSpec; let engine = 'orbitx-neural'; let note: string | undefined;
+    try { spec = await forgeWithServer(ask, msgs); }
+    catch {
+      try { spec = await forgeWithOpenAI(ask, msgs); engine = 'gpt-4o-mini'; }
+      catch { spec = forgeLocally(prompt); engine = 'forge-local'; }
+    }
+    if (spec.type === 'custom_code') {
+      const chk = compileWidgetCode(String(spec.params.code ?? ''));
+      if (chk.error) {
+        if (engine !== 'forge-local') { spec = forgeLocally(prompt); engine = 'forge-local'; note = 'AI draft failed the compile check — rebuilt with the deterministic engine.'; }
+      }
+    }
+    const minThink = 1500 - (Date.now() - started);
+    if (minThink > 0) await new Promise(r => setTimeout(r, minThink));
+    const source = templateSource(spec);
+    setJob({ phase: 'code', prompt, spec, source, typed: 0, engine, note });
+    const totalMs = Math.min(6500, Math.max(3200, source.length * 5));
+    const stepChars = Math.max(2, Math.round(source.length / (totalMs / 34)));
+    jobTimer.current = window.setInterval(() => {
+      setJob(j => {
+        if (!j || j.phase !== 'code') return j;
+        const typed = Math.min(j.source.length, j.typed + stepChars);
+        if (typed >= j.source.length) {
+          if (jobTimer.current) { window.clearInterval(jobTimer.current); jobTimer.current = null; }
+          window.setTimeout(() => setJob(j2 => (j2 && j2.phase === 'compile' ? { ...j2, phase: 'ready' } : j2)), 850);
+          return { ...j, typed, phase: 'compile' };
+        }
+        return { ...j, typed };
+      });
+    }, 34);
+  }, [msgs]);
+
+  const forgeAdd = useCallback(() => {
+    if (!job?.spec) return;
+    const w: WidgetConfig = { id: `w_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, type: job.spec.type, title: job.spec.title, params: job.spec.params, size: job.spec.size, pos: widgets.length };
+    pushWidget(w);
+    setMsgs(prev => [...prev, { role: 'ai', text: `✅ ${job.spec!.reply}` }]);
+    setJob(null);
+  }, [job, widgets.length, pushWidget]);
+
+  const forgeRegen = useCallback(() => { if (job) runForge(job.prompt, true); }, [job, runForge]);
+  const forgeDiscard = useCallback(() => {
+    if (jobTimer.current) { window.clearInterval(jobTimer.current); jobTimer.current = null; }
+    setJob(null);
+  }, []);
+
   const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || busy) return;
+    if (!text || forging) return;
     setInput('');
     setMsgs(prev => [...prev, { role: 'user', text }]);
-    setBusy(true);
     const cmd = parseCmd(text);
-    if (cmd === 'help') { setMsgs(prev => [...prev, { role: 'ai', text: CMD_HELP }]); setBusy(false); return; }
-    if (cmd) { const w = makeWidget(cmd.key, cmd.extra); pushWidget(w); setMsgs(prev => [...prev, { role: 'ai', text: cmd.reply }]); setBusy(false); return; }
-    try {
-      const aiKey = (import.meta as any).env?.VITE_OPENAI_API_KEY ?? '';
-      if (!aiKey) throw new Error('no key');
-      const res = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${aiKey}` }, body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 1200, temperature: 0.2, messages: [{ role: 'system', content: AI_SYSTEM }, ...msgs.slice(-6).map(m => ({ role: m.role==='ai'?'assistant':'user', content: m.text })), { role: 'user', content: text }] }) });
-      const j = await res.json();
-      const raw = j.choices?.[0]?.message?.content?.trim() ?? '';
-      const parsed = JSON.parse(raw.replace(/^```(?:json)?\n?/,'').replace(/\n?```$/,'').trim());
-      const w: WidgetConfig = { id: `w_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, type: (parsed.type as WidgetType) ?? 'sol_price', title: parsed.title ?? 'AI Widget', params: parsed.params ?? {}, size: (parsed.size as any) ?? 'md', pos: widgets.length };
-      pushWidget(w);
-      setMsgs(prev => [...prev, { role: 'ai', text: parsed.reply ?? `✅ Added "${w.title}" permanently to your hub!` }]);
-    } catch {
-      const { key, extra } = matchIntent(text);
-      const w = makeWidget(key, extra);
-      pushWidget(w);
-      setMsgs(prev => [...prev, { role: 'ai', text: FALLBACK_REPLIES[key] ?? '✅ Widget added permanently!' }]);
-    }
-    setBusy(false);
-  }, [input, busy, msgs, widgets, makeWidget, pushWidget]);
+    if (cmd === 'help') { setMsgs(prev => [...prev, { role: 'ai', text: CMD_HELP }]); return; }
+    if (cmd) { const w = makeWidget(cmd.key, cmd.extra); pushWidget(w); setMsgs(prev => [...prev, { role: 'ai', text: cmd.reply }]); return; }
+    setJob(null);
+    runForge(text);
+  }, [input, forging, makeWidget, pushWidget, runForge]);
 
   return (
     <div className="awp-overlay" onClick={onClose}>
@@ -439,11 +837,65 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
         {tab === 'chat' && (<>
           <div className="awp-msgs">
             {msgs.map((m, i) => (<div key={i} className={`awp-msg awp-msg-${m.role}`}>{m.role==='ai'&&<div className="awp-avatar">⚡</div>}<div className="awp-bubble">{m.text.split('\n').map((ln, j) => <div key={j}>{ln}</div>)}</div></div>))}
-            {busy && <div className="awp-msg awp-msg-ai"><div className="awp-avatar">⚡</div><div className="awp-bubble awp-dots"><span /><span /><span /></div></div>}
+            {job && (
+              <div className="fw-console">
+                <div className="fw-head">
+                  <span className="fw-title"><i className="fw-pulse" /> WidgetForge</span>
+                  <span className="fw-engine">{job.engine}</span>
+                </div>
+                <div className="fw-steps">
+                  {FORGE_STEPS.map((st, i) => {
+                    const cur = FORGE_STEPS.findIndex(x => x.key === job.phase);
+                    const state = i < cur ? 'done' : i === cur ? 'on' : 'wait';
+                    return (
+                      <div key={st.key} className={`fw-step fw-step-${state}`}>
+                        <span className="fw-step-ic">{state === 'done' ? '✓' : state === 'on' ? <i className="fw-spin" /> : '·'}</span>
+                        <span className="fw-step-lb">{st.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {(job.phase === 'code' || job.phase === 'compile' || job.phase === 'ready') && (
+                  <div className="fw-codewin">
+                    <div className="fw-codebar">
+                      <i className="fw-dot fw-dot-r" /><i className="fw-dot fw-dot-y" /><i className="fw-dot fw-dot-g" />
+                      <span className="fw-file">widget.tsx</span>
+                      <span className="fw-lines">{job.source.slice(0, job.typed).split('\n').length} lines</span>
+                    </div>
+                    <div className="fw-code" ref={codeScrollRef}>
+                      <pre dangerouslySetInnerHTML={{ __html: hlCode(job.source.slice(0, job.typed)) + (job.phase === 'code' ? '<i class="fw-caret"></i>' : '') }} />
+                    </div>
+                  </div>
+                )}
+                {job.phase === 'compile' && (
+                  <div className="fw-compile"><i className="fw-compile-bar" /><span>Bundling · type-checking · mounting sandbox…</span></div>
+                )}
+                {job.phase === 'ready' && job.spec && (
+                  <div className="fw-ready">
+                    {job.note && <div className="fw-note">⚠ {job.note}</div>}
+                    <div className="fw-preview-label">Live preview — running real data</div>
+                    <div className="fw-preview">
+                      <div className="fw-preview-head">
+                        <span>{LIB_ICONS[job.spec.type] ?? '📊'} {job.spec.title}</span>
+                        <em>{job.spec.type} · {job.spec.size}</em>
+                      </div>
+                      <WidgetErrorBoundary>
+                        <WidgetRenderer widget={{ id: 'fw_preview', pos: 0, type: job.spec.type, title: job.spec.title, params: job.spec.params, size: job.spec.size }} />
+                      </WidgetErrorBoundary>
+                    </div>
+                    <div className="fw-actions">
+                      <button className="fw-btn fw-btn-add" onClick={forgeAdd}>＋ Add to Hub</button>
+                      <button className="fw-btn" onClick={forgeRegen}>↻ Regenerate</button>
+                      <button className="fw-btn fw-btn-ghost" onClick={forgeDiscard}>Discard</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
-          <div className="awp-input-row"><input className="awp-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); send(); } }} placeholder="Describe a widget, /cmd, or @mention…" disabled={busy} /><button className="awp-send-btn" onClick={send} disabled={!input.trim()||busy}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg></button></div>
-          <div className="awp-pills">{['/help','/chart BONK','/wallet','/dex JUP','@kol','/fear'].map(q => (<button key={q} className="awp-pill" onClick={() => setInput(q)}>{q}</button>))}</div>
+          <div className="awp-input-row"><input className="awp-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); send(); } }} placeholder={forging ? 'Forging your widget…' : 'Describe any widget — I design, code & mount it…'} disabled={forging} /><button className="awp-send-btn" onClick={send} disabled={!input.trim()||forging}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg></button></div>
+          <div className="awp-pills">{['Watchlist SOL BONK WIF','BONK chart 7d','Countdown to friday','Quick notes','Fear & greed','/help'].map(q => (<button key={q} className="awp-pill" onClick={() => setInput(q)}>{q}</button>))}</div>
         </>)}
         {tab === 'my' && (<div className="awp-list">{widgets.length===0?<div className="awp-empty">No widgets yet — try /help!</div>:widgets.map(w => (<div key={w.id} className="awp-list-item"><div className="awp-list-icon">{LIB_ICONS[w.type]??'📊'}</div><div style={{ flex:1, minWidth:0 }}><div className="awp-list-name">{w.title}</div><div className="awp-list-meta">{w.type} · {w.size}</div></div><button className="awp-del-btn" onClick={() => removeWidget(w.id)}>✕</button></div>))}</div>)}
         {tab === 'lib' && (<div className="awp-list">
@@ -529,6 +981,57 @@ export const aiWidgetCSS = `
 .awp-pill{padding:5px 12px;border-radius:99px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.05);color:rgba(255,255,255,.65);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}
 .awp-pill:hover{border-color:rgba(47,128,255,.45);background:rgba(47,128,255,.1);color:#fff}
 .awp-list{flex:1;overflow-y:auto;padding:10px 16px 16px;display:flex;flex-direction:column;gap:7px}
+/* ── WidgetForge console ── */
+.fw-console{border:1px solid rgba(47,128,255,.22);border-radius:16px;background:linear-gradient(180deg,rgba(13,17,28,.9),rgba(8,10,17,.95));padding:12px;display:flex;flex-direction:column;gap:10px;animation:fwin .3s cubic-bezier(.34,1.56,.64,1) both;box-shadow:0 8px 30px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05)}
+@keyframes fwin{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.fw-head{display:flex;align-items:center;justify-content:space-between}
+.fw-title{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:900;color:#fff;letter-spacing:.02em}
+.fw-pulse{width:8px;height:8px;border-radius:99px;background:#2F80FF;box-shadow:0 0 0 0 rgba(47,128,255,.7);animation:fwpl 1.6s ease infinite}
+@keyframes fwpl{0%{box-shadow:0 0 0 0 rgba(47,128,255,.6)}70%{box-shadow:0 0 0 8px rgba(47,128,255,0)}100%{box-shadow:0 0 0 0 rgba(47,128,255,0)}}
+.fw-engine{font-size:9px;font-weight:800;color:#5aa2ff;background:rgba(47,128,255,.12);border:1px solid rgba(47,128,255,.25);border-radius:99px;padding:2px 9px;letter-spacing:.05em;font-family:ui-monospace,monospace}
+.fw-steps{display:flex;flex-direction:column;gap:4px}
+.fw-step{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;transition:all .25s}
+.fw-step-ic{width:17px;height:17px;border-radius:99px;display:grid;place-items:center;font-size:9.5px;font-weight:900;flex-shrink:0}
+.fw-step-done{color:rgba(255,255,255,.55)}
+.fw-step-done .fw-step-ic{background:rgba(52,211,153,.15);color:#34d399}
+.fw-step-on{color:#fff}
+.fw-step-on .fw-step-ic{background:rgba(47,128,255,.16)}
+.fw-step-wait{color:rgba(255,255,255,.22)}
+.fw-step-wait .fw-step-ic{background:rgba(255,255,255,.04);color:rgba(255,255,255,.25)}
+.fw-spin{width:9px;height:9px;border-radius:99px;border:2px solid rgba(47,128,255,.25);border-top-color:#5aa2ff;animation:fwsp .7s linear infinite;display:block}
+@keyframes fwsp{to{transform:rotate(360deg)}}
+.fw-codewin{border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.09);background:#07090f}
+.fw-codebar{display:flex;align-items:center;gap:5px;padding:7px 10px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06)}
+.fw-dot{width:9px;height:9px;border-radius:99px;display:block}
+.fw-dot-r{background:#ff5f57}.fw-dot-y{background:#febc2e}.fw-dot-g{background:#28c840}
+.fw-file{margin-left:7px;font-size:10px;font-weight:700;color:rgba(255,255,255,.55);font-family:ui-monospace,monospace}
+.fw-lines{margin-left:auto;font-size:9px;font-weight:700;color:rgba(255,255,255,.3);font-family:ui-monospace,monospace}
+.fw-code{max-height:190px;overflow-y:auto;padding:10px 12px;scroll-behavior:auto}
+.fw-code pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;line-height:1.55;color:#c9d4e8;white-space:pre-wrap;word-break:break-word}
+.fw-code .tk-k{color:#c792ea;font-style:normal}
+.fw-code .tk-s{color:#7ee0a3;font-style:normal}
+.fw-code .tk-n{color:#f0b47c;font-style:normal}
+.fw-code .tk-f{color:#79b8ff;font-style:normal}
+.fw-code .tk-c{color:#5b6478;font-style:italic}
+.fw-caret{display:inline-block;width:7px;height:13px;background:#5aa2ff;vertical-align:middle;margin-left:1px;animation:fwck .85s step-end infinite;border-radius:1px}
+@keyframes fwck{0%,100%{opacity:1}50%{opacity:0}}
+.fw-compile{display:flex;flex-direction:column;gap:6px;font-size:10.5px;font-weight:700;color:rgba(255,255,255,.5)}
+.fw-compile-bar{height:3px;border-radius:99px;background:linear-gradient(90deg,transparent,#2F80FF,#9945FF,transparent);background-size:200% 100%;animation:fwcb 1s linear infinite;display:block}
+@keyframes fwcb{from{background-position:200% 0}to{background-position:-200% 0}}
+.fw-ready{display:flex;flex-direction:column;gap:8px;animation:fwin .35s ease both}
+.fw-note{font-size:10px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:9px;padding:6px 9px}
+.fw-preview-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#34d399;display:flex;align-items:center;gap:5px}
+.fw-preview-label::before{content:'';width:6px;height:6px;border-radius:99px;background:#34d399;animation:fwpl 1.6s ease infinite}
+.fw-preview{border:1px solid rgba(255,255,255,.1);border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));padding:11px 12px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.fw-preview-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.fw-preview-head span{font-size:11.5px;font-weight:800;color:#fff}
+.fw-preview-head em{font-size:9px;font-weight:700;color:rgba(255,255,255,.35);font-style:normal;font-family:ui-monospace,monospace}
+.fw-actions{display:flex;gap:7px}
+.fw-btn{flex:1;padding:9px 8px;border-radius:11px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit;transition:all .15s}
+.fw-btn:hover{background:rgba(255,255,255,.1);transform:translateY(-1px)}
+.fw-btn-add{background:linear-gradient(135deg,#2F80FF,#1a5cd4);border-color:transparent;box-shadow:0 4px 16px rgba(47,128,255,.35)}
+.fw-btn-add:hover{filter:brightness(1.12)}
+.fw-btn-ghost{flex:0 0 auto;color:rgba(255,255,255,.5);background:transparent}
 .awp-lib-hint{font-size:11px;color:rgba(255,255,255,.4);padding:4px 4px 8px;line-height:1.4}
 .awp-lib-group{margin-bottom:10px}
 .awp-lib-head{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);padding:8px 4px 6px;position:sticky;top:0;background:linear-gradient(180deg,rgba(12,14,20,.98),rgba(12,14,20,.9));z-index:1}

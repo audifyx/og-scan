@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { AIWidgetPanel, MobileWidgetGrid, aiWidgetCSS, readWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
 import { MobileNav } from "@/components/MobileNavV2";
+import { BackgroundFX, BgCustomizeModal, readBgMode, BG_KEY, WALLPAPER_KEY, type BgMode } from "@/components/BackgroundFX";
 
 const BRAND = "OrbitX";
 const OS_NAME = "OrbitX";
@@ -139,8 +140,11 @@ export default function Hub() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"chat" | "my" | "lib">("chat");
   const [customWidgets, setCustomWidgets] = useState<WidgetConfig[]>(readWidgets);
-  const starCanvasRef = useRef<HTMLCanvasElement>(null);
   const desktopRef = useRef<HTMLDivElement>(null);
+  const [bgMode, setBgMode] = useState<BgMode>(() => readBgMode());
+  const [bgOpen, setBgOpen] = useState(false);
+  const [wallpaper, setWallpaper] = useState<string | null>(() => { try { return localStorage.getItem(WALLPAPER_KEY); } catch { return null; } });
+  const [fng, setFng] = useState<{ v: number; label: string } | null>(null);
   const now = useClock();
   const { signOut, profile } = useAuth();
   const logout = async () => { try { await signOut(); } finally { window.location.assign("/auth"); } };
@@ -251,55 +255,6 @@ export default function Hub() {
     return () => { on = false; clearInterval(iv); };
   }, []);
 
-  /* Animated starfield (skipped for reduced-motion users) */
-  useEffect(() => {
-    const canvas = starCanvasRef.current;
-    if (!canvas) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    let raf = 0;
-    let w = (canvas.width = window.innerWidth);
-    let h = (canvas.height = window.innerHeight);
-    const stars = Array.from({ length: 110 }, () => ({
-      x: Math.random() * w, y: Math.random() * h,
-      r: Math.random() * 1.3 + 0.25,
-      s: Math.random() * 0.14 + 0.03,
-      tw: Math.random() * Math.PI * 2,
-    }));
-    let shoot: { x: number; y: number; vx: number; vy: number; life: number } | null = null;
-    const onResize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; };
-    window.addEventListener("resize", onResize);
-    const tick = (t: number) => {
-      ctx.clearRect(0, 0, w, h);
-      for (const st of stars) {
-        st.y += st.s;
-        if (st.y > h) { st.y = -2; st.x = Math.random() * w; }
-        const a = 0.35 + 0.3 * Math.sin(t / 900 + st.tw);
-        ctx.beginPath();
-        ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255,255,255,${a})`;
-        ctx.fill();
-      }
-      if (!shoot && Math.random() < 0.0035) {
-        shoot = { x: Math.random() * w * 0.7 + w * 0.15, y: Math.random() * h * 0.3, vx: 7 + Math.random() * 5, vy: 3 + Math.random() * 2, life: 1 };
-      }
-      if (shoot) {
-        shoot.x += shoot.vx; shoot.y += shoot.vy; shoot.life -= 0.02;
-        ctx.strokeStyle = `rgba(180,215,255,${Math.max(0, shoot.life) * 0.8})`;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.moveTo(shoot.x, shoot.y);
-        ctx.lineTo(shoot.x - shoot.vx * 5, shoot.y - shoot.vy * 5);
-        ctx.stroke();
-        if (shoot.life <= 0 || shoot.x > w + 80) shoot = null;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", onResize); };
-  }, []);
-
   /* Mouse parallax on the wallpaper */
   useEffect(() => {
     let raf = 0;
@@ -318,24 +273,30 @@ export default function Hub() {
     return () => { window.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
   }, []);
 
-  /* Wallpaper picker (shared by dock + context menu) */
-  const pickWallpaper = useCallback(() => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = (e: any) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event: any) => {
-        localStorage.setItem("hub-wallpaper", event.target.result);
-        window.location.reload();
-      };
-      reader.readAsDataURL(file);
-    };
-    input.click();
+  /* Fear & Greed for the stat chips */
+  useEffect(() => {
+    let on = true;
+    fetch("https://api.alternative.me/fng/")
+      .then((r) => r.json())
+      .then((d) => { if (on && d?.data?.[0]) setFng({ v: Number(d.data[0].value), label: d.data[0].value_classification }); })
+      .catch(() => {});
+    return () => { on = false; };
   }, []);
 
+  /* Background customization */
+  const applyBgMode = useCallback((m: BgMode) => {
+    setBgMode(m);
+    try { localStorage.setItem(BG_KEY, m); } catch { /* noop */ }
+  }, []);
+  const applyWallpaper = useCallback((dataUrl: string | null) => {
+    setWallpaper(dataUrl);
+    try {
+      if (dataUrl) { localStorage.setItem(WALLPAPER_KEY, dataUrl); localStorage.setItem(BG_KEY, "custom"); setBgMode("custom"); }
+      else { localStorage.removeItem(WALLPAPER_KEY); if (bgMode === "custom") { setBgMode("nebula"); localStorage.setItem(BG_KEY, "nebula"); } }
+    } catch { /* noop */ }
+  }, [bgMode]);
+
+  /* Wallpaper picker (shared by dock + context menu) */
   const openApp = useCallback((app: App | typeof CENTER_TABS[0]) => {
     if (launching) return;
     setLaunching(app as App);
@@ -343,7 +304,7 @@ export default function Hub() {
       if ("action" in app) {
         if (app.action === "logout") logout();
         else if (app.action === "wallpaper") {
-          pickWallpaper();
+          setBgOpen(true);
           setLaunching(null);
         }
         else window.location.assign(app.href || "/settings");
@@ -356,7 +317,7 @@ export default function Hub() {
         }
       }
     }, 700);
-  }, [launching, logout, pickWallpaper]);
+  }, [launching, logout]);
 
   const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
   const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -381,16 +342,7 @@ export default function Hub() {
           setCtxMenu({ x: Math.min(e.clientX, window.innerWidth - 230), y: Math.min(e.clientY, window.innerHeight - 220) });
         }}
       >
-        <div className="wallpaper" aria-hidden style={{ backgroundImage: `url('${localStorage.getItem('hub-wallpaper') || ''}')`, transform: "translate(var(--par-x, 0), var(--par-y, 0)) scale(1.03)" }}>
-          <div className="wp-image" />
-          <div className="wp-overlay" />
-        </div>
-        <div className="aurora" aria-hidden>
-          <div className="aurora-blob aurora-a" />
-          <div className="aurora-blob aurora-b" />
-          <div className="aurora-blob aurora-c" />
-        </div>
-        <canvas ref={starCanvasRef} className="starfield" aria-hidden />
+        <BackgroundFX mode={bgMode} wallpaper={wallpaper} />
 
         {/* macOS Menu Bar */}
         <header className="menu-bar">
@@ -418,6 +370,9 @@ export default function Hub() {
                 )}
               </span>
             )}
+            <button className="mb-search" title="Customize background" onClick={() => setBgOpen(true)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4c3.1 0 5.6-2.5 5.6-5.6C23 5.6 18.1 2 12 2z"/></svg>
+            </button>
             <button className="mb-search" title="Search apps (⌘K)" onClick={() => { setSpotlightOpen(true); setSpotQ(""); }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
             </button>
@@ -438,6 +393,27 @@ export default function Hub() {
               {profile?.username ? `, ${profile.username}` : ""}
             </p>
             <p className="hub-greet-sub">Press <kbd>⌘K</kbd> to search · right-click for options</p>
+            <div className="hub-chips">
+              <span className="hub-chip">
+                <i className="hub-chip-dot" style={{ background: (solChange ?? 0) >= 0 ? "#34d399" : "#fb7185" }} />
+                ◎ {solPrice != null ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : "—"}
+                {solChange != null && <b style={{ color: solChange >= 0 ? "#34d399" : "#fb7185" }}>{solChange >= 0 ? "+" : ""}{solChange.toFixed(1)}%</b>}
+              </span>
+              {fng && (
+                <span className="hub-chip">
+                  🌡 {fng.v} <b style={{ color: fng.v >= 55 ? "#34d399" : fng.v >= 40 ? "#fbbf24" : "#fb7185" }}>{fng.label}</b>
+                </span>
+              )}
+              {trending[0] && (
+                <span className="hub-chip">
+                  🔥 ${trending[0].symbol} <b style={{ color: (trending[0].change24h ?? 0) >= 0 ? "#34d399" : "#fb7185" }}>{(trending[0].change24h ?? 0) >= 0 ? "+" : ""}{(trending[0].change24h ?? 0).toFixed(0)}%</b>
+                </span>
+              )}
+              <button className="hub-chip hub-chip-btn" onClick={() => { setPanelTab("my"); setPanelOpen(true); }}>
+                ⚡ {customWidgets.length} widget{customWidgets.length === 1 ? "" : "s"}
+              </button>
+              <button className="hub-chip hub-chip-btn" onClick={() => setBgOpen(true)}>🎨 Background</button>
+            </div>
           </div>
 
           <MobileWidgetGrid
@@ -553,6 +529,15 @@ export default function Hub() {
         </footer>
       </div>
 
+      <BgCustomizeModal
+        open={bgOpen}
+        mode={bgMode}
+        hasWallpaper={!!wallpaper}
+        onClose={() => setBgOpen(false)}
+        onMode={applyBgMode}
+        onWallpaper={applyWallpaper}
+      />
+
       {panelOpen && (
         <AIWidgetPanel
           initialTab={panelTab}
@@ -566,8 +551,8 @@ export default function Hub() {
       {ctxMenu && (
         <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={(e) => e.stopPropagation()}>
           <button onClick={() => { setCtxMenu(null); setSpotlightOpen(true); setSpotQ(""); }}>🔍 Search apps <span>⌘K</span></button>
-          <button onClick={() => { setCtxMenu(null); pickWallpaper(); }}>🖼️ Change wallpaper</button>
-          <button onClick={() => { setCtxMenu(null); localStorage.removeItem("hub-wallpaper"); window.location.reload(); }}>✨ Reset wallpaper</button>
+          <button onClick={() => { setCtxMenu(null); setBgOpen(true); }}>🎨 Customize background</button>
+          <button onClick={() => { setCtxMenu(null); applyWallpaper(null); applyBgMode("nebula"); }}>✨ Reset background</button>
           <div className="ctx-sep" />
           <button onClick={() => { setCtxMenu(null); setPanelTab("chat"); setPanelOpen(true); }}>✦ Widget Studio</button>
           <button onClick={() => { setCtxMenu(null); localStorage.removeItem(DOCK_KEY); window.location.reload(); }}>♻️ Reset icon layout</button>
@@ -989,4 +974,13 @@ const css = `
 .ctx-menu button:hover{background:rgba(47,128,255,.22);color:#fff}
 .ctx-menu button span{margin-left:auto;font-size:10px;color:rgba(255,255,255,.35)}
 .ctx-sep{height:1px;margin:5px 8px;background:rgba(255,255,255,.09)}
+/* ── greeting chips ── */
+.hub-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;animation:hubchips .5s .15s ease both}
+@keyframes hubchips{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.hub-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;background:rgba(10,14,24,.6);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.09);font-size:11px;font-weight:800;color:rgba(255,255,255,.85);letter-spacing:.01em}
+.hub-chip b{font-weight:900}
+.hub-chip-dot{width:6px;height:6px;border-radius:99px;display:inline-block;animation:hubdot 1.8s ease infinite}
+@keyframes hubdot{0%,100%{opacity:1}50%{opacity:.35}}
+.hub-chip-btn{cursor:pointer;font-family:inherit;transition:all .18s}
+.hub-chip-btn:hover{border-color:rgba(90,162,255,.4);background:rgba(47,128,255,.14);transform:translateY(-1px)}
 `;
