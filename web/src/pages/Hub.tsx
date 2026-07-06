@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
-import { AIWidgetPanel, MobileWidgetGrid, MobileNav, aiWidgetCSS, readWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
+import { AIWidgetPanel, MobileWidgetGrid, aiWidgetCSS, readWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
+import { MobileNav } from "@/components/MobileNavV2";
 
 const BRAND = "OrbitX";
 const OS_NAME = "OrbitX";
