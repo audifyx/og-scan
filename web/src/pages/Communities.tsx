@@ -1129,9 +1129,9 @@ function HomeFeed({
     <div>
       {/* V2 network overview */}
       <div className="border-b border-white/[0.05] px-4 py-4">
-        <div className="rounded-2xl border border-white/[0.08] bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_32%),rgba(255,255,255,0.025)] p-4">
+        <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(153,69,255,0.16),transparent_40%),rgba(255,255,255,0.025)] p-4 shadow-[0_12px_44px_-14px_rgba(34,211,238,0.28)]">
           <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-og-cyan/20 bg-og-cyan/10 text-og-cyan">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-og-cyan/25 to-[#9945FF]/20 text-og-cyan shadow-[0_6px_20px_-6px_rgba(34,211,238,0.5)]">
               <Layers className="h-6 w-6" />
             </div>
             <div className="min-w-0 flex-1">
