@@ -195,6 +195,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   }, []);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const modalRef = useRef<HTMLTextAreaElement>(null);
+  const exploreSearchRef = useRef<HTMLInputElement>(null);
 
   const displayName = profile?.display_name || profile?.username || "You";
   const handle = profile?.username || "anon";
@@ -816,6 +817,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
                   <input
+                    ref={exploreSearchRef}
                     value={searchQ}
                     onChange={(e) => setSearchQ(e.target.value)}
                     placeholder="Search people, coins & communities"
@@ -883,14 +885,64 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 )}
               </div>
             ) : (
-              <>
-                <div className="border-b border-white/[0.08] pb-2">
-                  <div className="px-4 pt-4 text-[19px] font-black text-white">Trends for you</div>
-                  {ticker.length === 0 ? <Spinner /> : ticker.slice(0, 10).map((t, i) => <TrendRow key={t.mint} t={t} i={i} />)}
+              <div className="pb-10">
+                {/* Discover hero */}
+                <div className="x-rise relative overflow-hidden border-b border-white/[0.06] px-4 pb-4 pt-4">
+                  <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-[#1d9bf0]/20 blur-[70px]" />
+                  <div className="pointer-events-none absolute -left-16 top-6 h-40 w-40 rounded-full bg-[#9945FF]/15 blur-[80px]" />
+                  <div className="relative">
+                    <div className="text-[24px] font-black tracking-tight text-white">Discover</div>
+                    <div className="mt-0.5 text-[13px] text-white/45">Find people, coins and communities across OrbitX.</div>
+                    <div className="mt-3 grid grid-cols-4 gap-2">
+                      {([
+                        { Icon: Users, label: "People", scope: "people" as const },
+                        { Icon: Coins, label: "Coins", scope: "coins" as const },
+                        { Icon: Globe, label: "Communities", scope: "communities" as const },
+                        { Icon: TrendingUp, label: "Trending", scope: "all" as const },
+                      ]).map((c) => (
+                        <button key={c.label} type="button" onClick={() => { setSearchScope(c.scope); exploreSearchRef.current?.focus(); }} className="x-tilt group flex flex-col items-center gap-1.5 rounded-2xl border border-white/[0.07] bg-white/[0.03] py-3">
+                          <c.Icon className="h-5 w-5 text-white/70 transition group-hover:text-[#1d9bf0]" />
+                          <span className="text-[10.5px] font-bold text-white/60 group-hover:text-white">{c.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
+
+                {/* Quick searches */}
+                <div className="x-rise border-b border-white/[0.06] px-4 py-3" style={{ animationDelay: "60ms" }}>
+                  <div className="mb-2 text-[13px] font-black text-white">Quick searches</div>
+                  <div className="flex flex-wrap gap-2">
+                    {[...trendingTags.slice(0, 6).map(([t]) => t), "$SOL", "$BONK", "$WIF"].filter((v, i, a) => a.indexOf(v) === i).slice(0, 8).map((tag) => (
+                      <button key={tag} type="button" onClick={() => setSearchQ(tag)} className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[12.5px] font-bold text-[#1d9bf0]/90 transition hover:border-[#1d9bf0]/40 hover:bg-[#1d9bf0]/10 active:scale-95">{tag}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Trending grid */}
+                <div className="x-rise border-b border-white/[0.06] px-4 py-3" style={{ animationDelay: "120ms" }}>
+                  <div className="mb-2 flex items-center gap-1.5 text-[15px] font-black text-white">🔥 Trending on Solana</div>
+                  {ticker.length === 0 ? <Spinner /> : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {ticker.slice(0, 8).map((t) => {
+                        const up = (t.change24h ?? 0) >= 0;
+                        return (
+                          <button key={t.mint} type="button" onClick={() => onSelectMint?.(t.mint)} className="x-tilt flex items-center justify-between rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.05] to-white/[0.02] px-3 py-2.5 text-left">
+                            <div className="min-w-0">
+                              <div className="truncate text-[13px] font-black text-white">${t.symbol}</div>
+                              <div className="truncate text-[10.5px] text-white/40">{t.priceUsd != null ? "$" + (t.priceUsd < 0.01 ? t.priceUsd.toExponential(1) : t.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 4 })) : "—"}</div>
+                            </div>
+                            <span className={cn("shrink-0 text-[12px] font-black", up ? "text-emerald-400" : "text-rose-400")}>{up ? "▲" : "▼"}{Math.abs(t.change24h ?? 0).toFixed(1)}%</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 {trendingTags.length > 0 && (
-                  <div className="border-b border-white/[0.08] pb-2">
-                    <div className="px-4 pt-4 text-[19px] font-black text-white">Trending in posts</div>
+                  <div className="x-rise border-b border-white/[0.06] pb-2" style={{ animationDelay: "180ms" }}>
+                    <div className="px-4 pt-4 text-[15px] font-black text-white">Trending in posts</div>
                     {trendingTags.map(([tag, count]) => (
                       <button key={tag} type="button" onClick={() => setSearchQ(tag)} className="flex w-full items-center justify-between px-4 py-2.5 text-left transition hover:bg-white/[0.03]">
                         <div>
@@ -902,11 +954,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                     ))}
                   </div>
                 )}
-                <div className="pb-4">
-                  <div className="px-4 pt-4 text-[19px] font-black text-white">Who to follow</div>
+
+                <div className="x-rise pb-2" style={{ animationDelay: "240ms" }}>
+                  <div className="px-4 pt-4 text-[15px] font-black text-white">Who to follow</div>
                   {whoToFollow.slice(0, 6).map((s) => <FollowCard key={s.user_id} s={s} />)}
                 </div>
-              </>
+              </div>
             )}
           </>
         );
@@ -1056,6 +1109,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         @keyframes xTick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         .x-tilt { transition: transform .2s ease, border-color .2s ease, background .2s ease; }
         .x-tilt:hover { transform: translateY(-3px); border-color: rgba(29,155,240,.45); }
+        @keyframes xRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        .x-rise { animation: xRise .5s cubic-bezier(.22,1,.36,1) both; }
       `}</style>
       {/* ambient atmosphere */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -1139,15 +1194,38 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </div>
           )}
 
-          <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
-            <div className="px-4 py-3 text-[19px] font-black">What's happening</div>
-            {ticker.slice(0, 5).map((t, i) => <TrendRow key={t.mint} t={t} i={i} />)}
+          {/* Market snapshot */}
+          <div className="x-rise overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-[19px] font-black">Market snapshot</span>
+              <span className={cn("flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-black", marketPulse.avg >= 0 ? "bg-emerald-400/10 text-emerald-400" : "bg-rose-400/10 text-rose-400")}>
+                {marketPulse.avg >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                {marketPulse.avg >= 0 ? "+" : ""}{marketPulse.avg.toFixed(1)}%
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-px bg-white/[0.06]">
+              {([
+                { k: "SOL", v: marketPulse.sol?.priceUsd != null ? "$" + marketPulse.sol.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—", c: "text-white" },
+                { k: "Gainers", v: String(marketPulse.gainers), c: "text-emerald-400" },
+                { k: "Losers", v: String(marketPulse.losers), c: "text-rose-400" },
+              ]).map((cell) => (
+                <div key={cell.k} className="bg-[#0b0d12] px-3 py-2.5">
+                  <div className="text-[9px] font-bold uppercase tracking-widest text-white/35">{cell.k}</div>
+                  <div className={cn("text-[14px] font-black", cell.c)}>{cell.v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="x-rise overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ animationDelay: "80ms" }}>
+            <div className="flex items-center gap-2 px-4 py-3"><span>🔥</span><span className="text-[19px] font-black">What's happening</span></div>
+            {ticker.length === 0 ? <div className="px-4 pb-4 text-[13px] text-white/35">Loading trends…</div> : ticker.slice(0, 5).map((t, i) => <TrendRow key={t.mint} t={t} i={i} />)}
             <button type="button" onClick={() => setTab("explore")} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[#1d9bf0] transition hover:bg-white/[0.03]">
               Show more
             </button>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+          <div className="x-rise overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ animationDelay: "160ms" }}>
             <div className="px-4 py-3 text-[19px] font-black">Who to follow</div>
             {whoToFollow.slice(0, 3).map((s) => <FollowCard key={s.user_id} s={s} />)}
             <button type="button" onClick={() => setTab("explore")} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[#1d9bf0] transition hover:bg-white/[0.03]">
