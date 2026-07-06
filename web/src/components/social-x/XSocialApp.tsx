@@ -621,7 +621,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         return (
           <>
             {/* ── Command deck hero ── */}
-            <div className="relative overflow-hidden border-b border-white/[0.06]">
+            <div className="x-rise relative overflow-hidden border-b border-white/[0.06]">
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#1d9bf0]/[0.10] via-transparent to-[#9945FF]/[0.12]" />
               <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#9945FF]/20 blur-[80px]" />
               <div className="relative px-4 pb-4 pt-4">
@@ -683,7 +683,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
             {/* ── Top movers rail ── */}
             {marketPulse.topMovers.length > 0 && (
-              <div className="border-b border-white/[0.06] px-4 py-3">
+              <div className="x-rise border-b border-white/[0.06] px-4 py-3" style={{ animationDelay: "70ms" }}>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-[13px] font-black text-white">🔥 Top movers</span>
                   <button type="button" onClick={() => setTab("explore")} className="text-[11.5px] font-bold text-[#1d9bf0] hover:underline">See all</button>
@@ -705,7 +705,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
             {/* ── Suggested to follow ── */}
             {whoToFollow.length > 0 && (
-              <div className="border-b border-white/[0.06] px-4 py-3">
+              <div className="x-rise border-b border-white/[0.06] px-4 py-3" style={{ animationDelay: "140ms" }}>
                 <div className="mb-2 text-[13px] font-black text-white">Suggested for you</div>
                 <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none]">
                   {whoToFollow.slice(0, 12).map((sg) => (
