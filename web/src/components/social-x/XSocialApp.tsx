@@ -937,7 +937,11 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 {/* Trending grid */}
                 <div className="x-rise border-b border-white/[0.06] px-4 py-3" style={{ animationDelay: "120ms" }}>
                   <div className="mb-2 flex items-center gap-1.5 text-[15px] font-black text-white">🔥 Trending on Solana</div>
-                  {ticker.length === 0 ? <Spinner /> : (
+                  {ticker.length === 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="x-shim h-[58px] rounded-2xl" />)}
+                    </div>
+                  ) : (
                     <div className="grid grid-cols-2 gap-2">
                       {ticker.slice(0, 8).map((t) => {
                         const up = (t.change24h ?? 0) >= 0;
@@ -1138,6 +1142,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         .x-tilt:hover { transform: translateY(-3px); border-color: rgba(29,155,240,.45); }
         @keyframes xRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         .x-rise { animation: xRise .5s cubic-bezier(.22,1,.36,1) both; }
+        @keyframes xShim { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        .x-shim { background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 37%, rgba(255,255,255,.04) 63%); background-size: 200% 100%; animation: xShim 1.4s ease infinite; }
       `}</style>
       {/* ambient atmosphere */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -1259,7 +1265,16 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
           <div className="x-rise overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ animationDelay: "80ms" }}>
             <div className="flex items-center gap-2 px-4 py-3"><span>🔥</span><span className="text-[19px] font-black">What's happening</span></div>
-            {ticker.length === 0 ? <div className="px-4 pb-4 text-[13px] text-white/35">Loading trends…</div> : ticker.slice(0, 5).map((t, i) => <TrendRow key={t.mint} t={t} i={i} />)}
+            {ticker.length === 0 ? (
+              <div className="space-y-2.5 px-4 pb-3 pt-1">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="space-y-1.5">
+                    <div className="x-shim h-3 w-24 rounded-full" />
+                    <div className="x-shim h-3 w-16 rounded-full" />
+                  </div>
+                ))}
+              </div>
+            ) : ticker.slice(0, 5).map((t, i) => <TrendRow key={t.mint} t={t} i={i} />)}
             <button type="button" onClick={() => setTab("explore")} className="w-full px-4 py-3 text-left text-[14px] font-bold text-[#1d9bf0] transition hover:bg-white/[0.03]">
               Show more
             </button>
