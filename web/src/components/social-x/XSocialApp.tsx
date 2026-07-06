@@ -170,6 +170,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
   const [moreOpen, setMoreOpen] = useState(false);
   const [notifFilter, setNotifFilter] = useState<"all" | "mentions" | "likes" | "follows">("all");
+  const [newPosts, setNewPosts] = useState(0);
+  const feedScrollRef = useRef<HTMLDivElement>(null);
+  const tabRef = useRef(tab); tabRef.current = tab;
+  const uidRef = useRef(user?.id); uidRef.current = user?.id;
 
   /* remember the active tab + honor legacy sidebar deep links */
   useEffect(() => {
@@ -216,7 +220,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   useEffect(() => {
     const ch = supabase.channel("x-home-feed")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "social_messages", filter: `channel=eq.${FEED_CHANNEL}` },
-        (p) => { const row = p.new as Post; setPosts((prev) => prev.some((x) => x.id === row.id) ? prev : [row, ...prev]); })
+        (p) => { const row = p.new as Post; setPosts((prev) => prev.some((x) => x.id === row.id) ? prev : [row, ...prev]); if (tabRef.current === "home" && row.user_id !== uidRef.current && (feedScrollRef.current?.scrollTop ?? 0) > 300) setNewPosts((n) => n + 1); })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "social_messages", filter: `channel=eq.${FEED_CHANNEL}` },
         (p) => { const row = p.new as Post; setPosts((prev) => prev.map((x) => x.id === row.id ? { ...x, likes_count: row.likes_count, liked_by: row.liked_by, content: row.content } : x)); })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "social_messages" },
@@ -1196,10 +1200,23 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
       {/* ── Center column ── */}
       <main className={cn(
-        "flex h-full min-h-0 min-w-0 flex-col border-r border-white/[0.08]",
+        "relative flex h-full min-h-0 min-w-0 flex-col border-r border-white/[0.08]",
         isNarrow ? "w-full max-w-[600px]" : "w-full max-w-[900px]",
       )}>
-        <div className="min-h-0 flex-1 overflow-y-auto pb-24 pt-11 sm:pb-0 sm:pt-0">{renderCenter()}</div>
+        {tab === "home" && newPosts > 0 && (
+          <button
+            type="button"
+            onClick={() => { feedScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); setNewPosts(0); }}
+            className="x-rise absolute left-1/2 top-14 z-30 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#1d9bf0] to-[#9945FF] px-4 py-2 text-[13px] font-black text-white shadow-[0_8px_24px_rgba(29,155,240,0.5)] transition hover:brightness-110 active:scale-95 sm:top-3"
+          >
+            ▲ {newPosts} new post{newPosts > 1 ? "s" : ""}
+          </button>
+        )}
+        <div
+          ref={feedScrollRef}
+          onScroll={(e) => { if (e.currentTarget.scrollTop < 200 && newPosts) setNewPosts(0); }}
+          className="min-h-0 flex-1 overflow-y-auto pb-24 pt-11 sm:pb-0 sm:pt-0"
+        >{renderCenter()}</div>
       </main>
 
       {/* ── Right rail ── */}
