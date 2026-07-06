@@ -2,7 +2,7 @@ import * as RN from 'react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { queueWidgetCloudSave } from '@/lib/widgetSync';
+import { saveWidgetsToCloud } from '@/lib/widgetSync';
 
 /* Catches crashes inside AI-generated widget code so one bad widget can never
    take down the whole hub. */
@@ -31,10 +31,10 @@ export const readWidgets = (): WidgetConfig[] => {
   try { return JSON.parse(localStorage.getItem(WG_KEY) ?? '[]'); } catch { return []; }
 };
 export const writeWidgets = (w: WidgetConfig[]) => {
-  localStorage.setItem(WG_KEY, JSON.stringify(w));
-  // Auto-save the user's custom widget list to their account so it
-  // survives refresh and syncs across devices (fails soft if signed out).
-  queueWidgetCloudSave(w);
+  try { localStorage.setItem(WG_KEY, JSON.stringify(w)); } catch { /* quota — cloud still holds it */ }
+  // Save immediately (not debounced) so a quick refresh right after a change
+  // can't drop the write; fails soft when signed out.
+  void saveWidgetsToCloud(w);
 };
 
 const TEMPLATES: Record<string, Omit<WidgetConfig, 'id' | 'pos'>> = {
@@ -876,12 +876,13 @@ const FALLBACK_REPLIES: Record<string, string> = {
 };
 
 type ForgePhase = 'think' | 'code' | 'compile' | 'ready';
-type ForgeJob = { phase: ForgePhase; prompt: string; spec: ForgeSpec | null; source: string; typed: number; engine: string; note?: string; brief?: DesignBrief | null; palette?: Palette | null };
-const FORGE_STEPS: { key: ForgePhase; label: string }[] = [
-  { key: 'think',   label: 'Analyzing · drafting design brief' },
-  { key: 'code',    label: 'Writing code' },
-  { key: 'compile', label: 'Compiling sandbox' },
-  { key: 'ready',   label: 'Widget ready' },
+type ForgeJob = { phase: ForgePhase; step: number; status: string; prompt: string; spec: ForgeSpec | null; source: string; typed: number; engine: string; note?: string; brief?: DesignBrief | null; palette?: Palette | null };
+const FORGE_STEPS: { label: string }[] = [
+  { label: 'Understanding your request' },
+  { label: 'Designing · palette + brief' },
+  { label: 'Engineering the widget' },
+  { label: 'Compiling in sandbox' },
+  { label: 'Widget ready' },
 ];
 
 export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat' }: {
@@ -911,19 +912,21 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
   const runForge = useCallback(async (prompt: string, variation = false) => {
     if (jobTimer.current) { window.clearInterval(jobTimer.current); jobTimer.current = null; }
     const pal = derivePalette(prompt);
-    setJob({ phase: 'think', prompt, spec: null, source: '', typed: 0, engine: 'neural·design', palette: pal, brief: null });
+    setJob({ phase: 'think', step: 0, status: 'Reading your request…', prompt, spec: null, source: '', typed: 0, engine: 'neural·design', palette: pal, brief: null });
     const ask = variation ? `${prompt}\n\nProduce a DIFFERENT take this time: vary the layout, visualization or angle.` : prompt;
     const started = Date.now();
+    setJob(j => (j && j.phase === 'think' ? { ...j, step: 1, status: pal ? `Locking your palette · ${pal.name}…` : 'Composing a bespoke palette…' } : j));
     let brief: DesignBrief | null = null;
     try {
       brief = await forgeDesignBrief(ask, pal);
-      setJob(j => (j && j.phase === 'think' ? { ...j, brief, engine: 'neural·2-pass' } : j));
+      setJob(j => (j && j.phase === 'think' ? { ...j, brief, engine: 'neural·2-pass', status: `Design brief ready${brief?.name ? ' · ' + brief.name : ''} — engineering…` } : j));
     } catch { /* single-pass */ }
+    setJob(j => (j && j.phase === 'think' ? { ...j, step: 2, status: 'Engineering the widget with the neural compiler…' } : j));
     let spec: ForgeSpec; let engine = brief ? 'neural·2-pass' : 'orbitx-neural'; let note: string | undefined;
     try { spec = await forgeWithServer(ask, msgs, pal, brief); }
     catch {
-      try { spec = await forgeWithOpenAI(ask, msgs, pal, brief); engine = 'gpt-4o-mini'; }
-      catch { spec = forgeLocally(prompt); engine = 'forge-local'; }
+      try { spec = await forgeWithOpenAI(ask, msgs, pal, brief); engine = 'gpt-4o-mini'; setJob(j => (j && j.phase === 'think' ? { ...j, status: 'Engineering with GPT-4o-mini…' } : j)); }
+      catch { spec = forgeLocally(prompt); engine = 'forge-local'; setJob(j => (j && j.phase === 'think' ? { ...j, status: 'Building with the deterministic engine…' } : j)); }
     }
     if (spec.type === 'custom_code') {
       const chk = compileWidgetCode(String(spec.params.code ?? ''));
@@ -934,7 +937,7 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
     const minThink = 1500 - (Date.now() - started);
     if (minThink > 0) await new Promise(r => setTimeout(r, minThink));
     const source = templateSource(spec);
-    setJob({ phase: 'code', prompt, spec, source, typed: 0, engine, note, brief, palette: pal });
+    setJob({ phase: 'code', step: 2, status: 'Writing the code…', prompt, spec, source, typed: 0, engine, note, brief, palette: pal });
     const totalMs = Math.min(6500, Math.max(3200, source.length * 5));
     const stepChars = Math.max(2, Math.round(source.length / (totalMs / 34)));
     jobTimer.current = window.setInterval(() => {
@@ -943,8 +946,8 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
         const typed = Math.min(j.source.length, j.typed + stepChars);
         if (typed >= j.source.length) {
           if (jobTimer.current) { window.clearInterval(jobTimer.current); jobTimer.current = null; }
-          window.setTimeout(() => setJob(j2 => (j2 && j2.phase === 'compile' ? { ...j2, phase: 'ready' } : j2)), 850);
-          return { ...j, typed, phase: 'compile' };
+          window.setTimeout(() => setJob(j2 => (j2 && j2.phase === 'compile' ? { ...j2, phase: 'ready', step: 4, status: 'Ready' } : j2)), 850);
+          return { ...j, typed, phase: 'compile', step: 3, status: 'Compiling · bundling · mounting sandbox…' };
         }
         return { ...j, typed };
       });
@@ -994,16 +997,21 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
                 </div>
                 <div className="fw-steps">
                   {FORGE_STEPS.map((st, i) => {
-                    const cur = FORGE_STEPS.findIndex(x => x.key === job.phase);
+                    const cur = job.step;
                     const state = i < cur ? 'done' : i === cur ? 'on' : 'wait';
                     return (
-                      <div key={st.key} className={`fw-step fw-step-${state}`}>
+                      <div key={i} className={`fw-step fw-step-${state}`}>
                         <span className="fw-step-ic">{state === 'done' ? '✓' : state === 'on' ? <i className="fw-spin" /> : '·'}</span>
                         <span className="fw-step-lb">{st.label}</span>
                       </div>
                     );
                   })}
                 </div>
+                {job.phase !== 'ready' && job.status && (
+                  <div className="fw-statusline" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 2px 2px', fontSize: 12, color: 'rgba(255,255,255,.62)' }}>
+                    <i className="fw-spin" /><span>{job.status}</span>
+                  </div>
+                )}
                 {(job.brief || job.palette) && (
                   <div className="fw-brief">
                     <div className="fw-brief-head">
