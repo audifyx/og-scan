@@ -169,6 +169,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [commView, setCommView] = useState<"token" | "og">("token");
   const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [notifFilter, setNotifFilter] = useState<"all" | "mentions" | "likes" | "follows">("all");
 
   /* remember the active tab + honor legacy sidebar deep links */
   useEffect(() => {
@@ -402,6 +403,16 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     const topMovers = [...withChg].sort((a, b) => Math.abs(b.change24h ?? 0) - Math.abs(a.change24h ?? 0)).slice(0, 10);
     return { gainers, losers, avg, sol, topMovers };
   }, [ticker]);
+
+  const shownNotifs = useMemo(() => {
+    if (notifFilter === "all") return notifs;
+    return notifs.filter((n) => {
+      const ty = (n.type || "").toLowerCase();
+      if (notifFilter === "likes") return ty.includes("like");
+      if (notifFilter === "follows") return ty.includes("follow");
+      return ty.includes("repl") || ty.includes("mention") || ty.includes("comment");
+    });
+  }, [notifs, notifFilter]);
 
   const searchedUsers = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
@@ -968,24 +979,36 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "notifications":
         return (
           <>
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-black/55 px-4 py-3.5 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
-              <span className="text-[19px] font-black text-white">Notifications</span>
-              {unread > 0 && (
-                <button type="button" onClick={markAllRead} className="rounded-full border border-white/15 px-3 py-1 text-[12px] font-bold text-white/60 transition hover:bg-white/[0.06]">
-                  Mark all read
-                </button>
-              )}
+            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/55 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
+              <div className="flex items-center justify-between px-4 py-3.5">
+                <span className="flex items-center gap-2 text-[19px] font-black text-white">
+                  Notifications
+                  {unread > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#1d9bf0] px-1.5 text-[11px] font-black text-white">{unread > 99 ? "99+" : unread}</span>}
+                </span>
+                {unread > 0 && (
+                  <button type="button" onClick={markAllRead} className="rounded-full border border-white/15 px-3 py-1 text-[12px] font-bold text-white/60 transition hover:bg-white/[0.06]">
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto px-3 pb-2.5 [scrollbar-width:none]">
+                {(([["all", "All"], ["mentions", "Mentions"], ["likes", "Likes"], ["follows", "Follows"]]) as const).map(([id, label]) => (
+                  <button key={id} type="button" onClick={() => setNotifFilter(id)} className={cn("shrink-0 rounded-full px-4 py-1.5 text-[12.5px] font-bold transition-all duration-200 active:scale-95", notifFilter === id ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]" : "bg-white/[0.06] text-white/50 ring-1 ring-white/[0.06] hover:bg-white/[0.1] hover:text-white")}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-            {notifsLoading ? <Spinner /> : notifs.length === 0 ? (
+            {notifsLoading ? <Spinner /> : shownNotifs.length === 0 ? (
               <div className="px-8 py-16 text-center">
                 <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#1d9bf0]/15 to-[#9945FF]/10 ring-1 ring-white/[0.08]">
                   <Bell className="h-6 w-6 text-[#1d9bf0]/70" />
                 </div>
-                <div className="mt-3 text-[17px] font-black text-white">Nothing yet</div>
-                <div className="mt-1 text-[13px] text-white/40">Likes, follows and alerts will show up here.</div>
+                <div className="mt-3 text-[17px] font-black text-white">{notifFilter === "all" ? "Nothing yet" : "You\u2019re all caught up"}</div>
+                <div className="mt-1 text-[13px] text-white/40">{notifFilter === "all" ? "Likes, follows and alerts will show up here." : `No ${notifFilter} notifications.`}</div>
               </div>
             ) : (
-              notifs.map((n) => (
+              shownNotifs.map((n) => (
                 <div key={n.id} className={cn("x-fade-in flex gap-3 border-b border-white/[0.06] px-4 py-3.5 transition-colors hover:bg-white/[0.02]", !n.is_read && "bg-[#1d9bf0]/[0.05] shadow-[inset_2px_0_0_#1d9bf0]")}>
                   {(() => {
                     const ty = (n.type || "").toLowerCase();
