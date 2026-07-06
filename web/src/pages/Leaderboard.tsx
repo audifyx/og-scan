@@ -7,6 +7,7 @@ import {
   Bell, Rocket, MessageSquare,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isUserOnline } from "@/lib/presence";
 import { safeAvatarUrl } from "@/lib/utils";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -51,12 +52,9 @@ interface TraderRow {
   wallet_address: string | null;
 }
 
-/** Returns true only if user has been seen within the last 3 minutes */
-const isActuallyOnline = (row: TraderRow): boolean => {
-  if (!row.is_online) return false;
-  if (!row.last_seen_at) return false;
-  return new Date(row.last_seen_at).getTime() > Date.now() - 3 * 60 * 1000;
-};
+/** Shared presence rule: is_online flag + fresh heartbeat (see lib/presence) */
+const isActuallyOnline = (row: TraderRow): boolean =>
+  isUserOnline({ is_online: row.is_online, last_seen_at: row.last_seen_at });
 
 interface InviteLeaderRow {
   inviter_id: string;

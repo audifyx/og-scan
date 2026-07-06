@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { isUserOnline } from "@/lib/presence";
 import { useAuth } from "@/hooks/useAuth";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -265,9 +266,7 @@ export const PlatformLeaderboard: React.FC = () => {
             const lvl = xpToLevel(u.total_xp || u.xp || 0);
             const effectiveXp = u.total_xp || u.xp || 0;
             const isMe = user?.id === u.user_id;
-            const online = u.is_online && u.last_seen_at
-              ? new Date(u.last_seen_at).getTime() > Date.now() - 3 * 60_000
-              : false;
+            const online = isUserOnline(u);
             return (
               <div key={u.user_id} className={cn(
                 "flex items-center gap-2.5 px-4 py-2.5 transition hover:bg-white/[0.015]",

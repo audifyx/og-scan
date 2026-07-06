@@ -8,6 +8,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { isUserOnline } from "@/lib/presence";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { formatDistanceToNow, format } from "date-fns";
@@ -19,13 +20,7 @@ import {
 /* ─── helpers ─── */
 const ago = (d: string) => formatDistanceToNow(new Date(d), { addSuffix: true });
 const stamp = (d: string) => format(new Date(d), "h:mm a");
-const isOnline = (p: AgentProfile) => {
-  if (!p) return false;
-  if (p.is_online === false) return false;
-  const t = p.last_active_at || p.last_seen_at;
-  if (!t) return Boolean(p.is_online);
-  return Date.now() - new Date(t).getTime() < 3 * 60 * 1000;
-};
+const isOnline = (p: AgentProfile) => isUserOnline(p);
 
 /* ─── types ─── */
 interface Ticket {

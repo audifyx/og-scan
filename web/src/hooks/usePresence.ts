@@ -1,16 +1,20 @@
 /**
- * usePresence — Global online presence heartbeat.
- * Updates `is_online = true` + `last_seen_at = now()` every 15s.
- * Sets `is_online = false` on page hide/unload.
- * Also recalculates `current_level` from `xp` on each heartbeat.
- * Logs one session_start activity event per mount.
+ * usePresence — Global online presence heartbeat (single writer).
+ * - Heartbeats `is_online = true` + `last_seen_at`/`last_active_at` every 15s
+ *   while the tab is visible. Skips beats while hidden.
+ * - Marks offline on tab hide / page unload using fetch({ keepalive: true })
+ *   straight to PostgREST, so the write survives navigation (supabase-js XHRs
+ *   get cancelled during unload).
+ * - No blur/focus flapping: switching monitors or brief app switches no longer
+ *   toggle status; the staleness window in lib/presence.ts covers hard crashes.
+ * - Also recalculates `current_level` from `xp` on each heartbeat.
+ * - Logs one session_start activity event per mount.
  */
 import { useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
 import { trackActivity } from "@/lib/trackActivity";
 import { useAuth } from "./useAuth";
-
-const HEARTBEAT_MS = 15_000; // 15 seconds
+import { PRESENCE_HEARTBEAT_MS } from "@/lib/presence";
 
 /** XP thresholds: level N requires N*N*100 XP */
 function levelFromXp(xp: number): number {
@@ -20,48 +24,60 @@ function levelFromXp(xp: number): number {
 
 export function usePresence() {
   const { user } = useAuth();
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
+    let stopped = false;
 
-    const heartbeat = async () => {
-      // Update online + last_seen + recalculate level
-      const { data } = await supabase
-        .from("profiles")
-        .select("xp, current_level")
-        .eq("user_id", user.id)
-        .single();
-
-      const updates: Record<string, unknown> = {
-        is_online: true,
-        last_seen_at: new Date().toISOString(),
-        last_active_at: new Date().toISOString(),
-      };
-
-      if (data) {
-        const correctLevel = levelFromXp(data.xp || 0);
-        if (correctLevel !== (data.current_level || 0)) {
-          updates.current_level = correctLevel;
-        }
-      }
-
-      await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("user_id", user.id);
+    const cacheToken = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        tokenRef.current = data.session?.access_token ?? null;
+      } catch { /* noop */ }
     };
 
+    const heartbeat = async () => {
+      if (stopped || document.hidden) return;
+      void cacheToken(); // keep a fresh token around for the unload beacon
+      const nowIso = new Date().toISOString();
+      const updates: Record<string, unknown> = {
+        is_online: true,
+        last_seen_at: nowIso,
+        last_active_at: nowIso,
+      };
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("xp, current_level")
+          .eq("user_id", user.id)
+          .single();
+        if (data) {
+          const correctLevel = levelFromXp(data.xp || 0);
+          if (correctLevel !== (data.current_level || 0)) updates.current_level = correctLevel;
+        }
+        await supabase.from("profiles").update(updates).eq("user_id", user.id);
+      } catch { /* transient network issue — the staleness window covers us */ }
+    };
+
+    /** Offline write that survives page unload. */
     const goOffline = () => {
-      // Fire-and-forget: mark offline
-      navigator.sendBeacon
-        ? undefined // sendBeacon doesn't support custom headers — use fetch below
-        : undefined;
-      supabase
-        .from("profiles")
-        .update({ is_online: false, last_seen_at: new Date().toISOString() })
-        .eq("user_id", user.id)
-        .then(() => {});
+      const token = tokenRef.current;
+      if (!token) return;
+      const nowIso = new Date().toISOString();
+      try {
+        void fetch(`${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${user.id}`, {
+          method: "PATCH",
+          keepalive: true,
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({ is_online: false, last_seen_at: nowIso, last_active_at: nowIso }),
+        });
+      } catch { /* noop */ }
     };
 
     // Log session start once per mount (fire-and-forget)
@@ -73,35 +89,28 @@ export function usePresence() {
       is_public: false,
     });
 
-    // Initial heartbeat
-    heartbeat();
+    void cacheToken().then(heartbeat);
+    const interval = setInterval(heartbeat, PRESENCE_HEARTBEAT_MS);
 
-    // Periodic heartbeat
-    intervalRef.current = setInterval(heartbeat, HEARTBEAT_MS);
-
-    // Visibility change — go offline immediately when tab hidden, come back online when visible
+    // Hidden tab -> offline immediately; visible again -> instant heartbeat.
     const onVisChange = () => {
       if (document.hidden) goOffline();
-      else heartbeat();
+      else void heartbeat();
     };
     document.addEventListener("visibilitychange", onVisChange);
 
-    // Page focus/blur for extra accuracy
-    const onBlur = () => goOffline();
-    const onFocus = () => heartbeat();
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("focus", onFocus);
-
-    // Before unload
-    const onUnload = () => goOffline();
-    window.addEventListener("beforeunload", onUnload);
+    // pagehide is the reliable unload signal (esp. iOS Safari); keep
+    // beforeunload as a desktop fallback.
+    const onPageHide = () => goOffline();
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("beforeunload", onPageHide);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      stopped = true;
+      clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisChange);
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("beforeunload", onUnload);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeunload", onPageHide);
       goOffline();
     };
   }, [user]);

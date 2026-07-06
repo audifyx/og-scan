@@ -54,6 +54,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { FollowerRecord, useFriends } from "@/hooks/useFriends";
 import { supabase } from "@/lib/supabase";
+import { isUserOnline, presenceTimestamp } from "@/lib/presence";
 import { cn, safeAvatarUrl } from "@/lib/utils";
 
 type ProfileTab =
@@ -453,24 +454,14 @@ function VerificationBadge({ tone = "blue", className }: { tone?: "blue" | "gold
   );
 }
 
-const PRESENCE_STALE_MS = 45_000;
 const PRESENCE_TICK_MS = 15_000;
 
 function getPresenceTimestamp(profile?: Pick<ProfileData, "last_active_at" | "last_seen_at"> | null) {
-  return profile?.last_active_at || profile?.last_seen_at || null;
+  return presenceTimestamp(profile ?? null);
 }
 
 function isProfileCurrentlyOnline(profile?: Pick<ProfileData, "is_online" | "last_active_at" | "last_seen_at"> | null, now = Date.now()) {
-  if (!profile) return false;
-
-  const timestamp = getPresenceTimestamp(profile);
-  if (!timestamp) return Boolean(profile.is_online);
-
-  const seenAt = new Date(timestamp).getTime();
-  if (Number.isNaN(seenAt)) return Boolean(profile.is_online);
-  if (profile.is_online === false) return false;
-
-  return now - seenAt <= PRESENCE_STALE_MS;
+  return isUserOnline(profile ?? null, now);
 }
 
 function getPresenceSubtitle(profile?: Pick<ProfileData, "is_online" | "last_active_at" | "last_seen_at"> | null, now = Date.now()) {

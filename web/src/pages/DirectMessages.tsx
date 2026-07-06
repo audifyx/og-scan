@@ -12,6 +12,7 @@ import {
   Pin, PinOff, Archive, Inbox,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isUserOnline, usePresenceTick } from "@/lib/presence";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -236,6 +237,40 @@ const DirectMessages: React.FC = () => {
     fetchConversations();
     fetchActiveUsers();
   }, [fetchConversations, fetchActiveUsers]);
+
+  /* ─── Live presence: re-render on a tick + poll fresh status every 30s ─── */
+  usePresenceTick(30_000);
+  const presenceIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    const ids = new Set<string>();
+    convos.forEach((c) => { if (c.otherUser?.user_id) ids.add(c.otherUser.user_id); });
+    activeUsers.forEach((u) => ids.add(u.user_id));
+    if (activeConvo?.otherUser?.user_id) ids.add(activeConvo.otherUser.user_id);
+    presenceIdsRef.current = [...ids];
+  }, [convos, activeUsers, activeConvo]);
+
+  useEffect(() => {
+    if (!user) return;
+    const refresh = async () => {
+      const ids = presenceIdsRef.current;
+      if (ids.length === 0) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("user_id, is_online, last_active_at")
+        .in("user_id", ids);
+      if (!data || data.length === 0) return;
+      const fresh = new Map(data.map((p) => [p.user_id, p]));
+      const patch = <T extends { user_id: string; is_online: boolean; last_active_at: string | null }>(u: T): T => {
+        const f = fresh.get(u.user_id);
+        return f ? { ...u, is_online: !!f.is_online, last_active_at: f.last_active_at ?? null } : u;
+      };
+      setConvos((prev) => prev.map((c) => (c.otherUser ? { ...c, otherUser: patch(c.otherUser) } : c)));
+      setActiveUsers((prev) => prev.map(patch));
+      setActiveConvo((prev) => (prev?.otherUser ? { ...prev, otherUser: patch(prev.otherUser) } : prev));
+    };
+    const id = setInterval(refresh, 30_000);
+    return () => clearInterval(id);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -612,7 +647,7 @@ const DirectMessages: React.FC = () => {
     const lastMsg = c.lastMessage;
     const pinned = pinnedIds.has(c.id);
     const archived = archivedIds.has(c.id);
-    const online = c.otherUser?.is_online || false;
+    const online = isUserOnline(c.otherUser);
     const preview = !lastMsg
       ? "Start the conversation"
       : lastMsg.message_type === "image"
@@ -697,7 +732,7 @@ const DirectMessages: React.FC = () => {
   /* ─── derived active-chat values ─── */
   const otherName = activeConvo?.otherUser?.username || "User";
   const otherAvatar = safeAvatar(activeConvo?.otherUser?.avatar_url, otherName);
-  const isOnline = activeConvo?.otherUser?.is_online || false;
+  const isOnline = isUserOnline(activeConvo?.otherUser);
 
   return (
     <div className="relative flex h-full overflow-hidden bg-background">
@@ -764,7 +799,7 @@ const DirectMessages: React.FC = () => {
                             alt=""
                             className="h-12 w-12 rounded-full object-cover ring-2 ring-border/40"
                           />
-                          <OnlineDot online={u.is_online} />
+                          <OnlineDot online={isUserOnline(u)} />
                         </div>
                         <span className="text-[10px] font-semibold text-foreground/70 truncate w-12 text-center">
                           {u.username?.split(" ")[0] || "Anon"}
@@ -799,7 +834,7 @@ const DirectMessages: React.FC = () => {
                             alt=""
                             className="h-9 w-9 rounded-full object-cover"
                           />
-                          <OnlineDot online={u.is_online} size="sm" />
+                          <OnlineDot online={isUserOnline(u)} size="sm" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-semibold text-foreground truncate">
@@ -807,7 +842,7 @@ const DirectMessages: React.FC = () => {
                             {u.badge && <span className="ml-1.5 text-[10px] text-primary">{u.badge}</span>}
                           </p>
                           <p className="text-[11px] text-muted-foreground/50">
-                            {u.is_online ? "Online" : lastSeen(u.last_active_at)}
+                            {isUserOnline(u) ? "Online" : lastSeen(u.last_active_at)}
                           </p>
                         </div>
                         <UserPlus className="h-3.5 w-3.5 text-muted-foreground/30" />
