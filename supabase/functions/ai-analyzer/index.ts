@@ -5,6 +5,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const NVIDIA_MODEL = Deno.env.get("NVIDIA_MODEL") || "meta/llama-3.3-70b-instruct";
 const NVIDIA_BASE_URL = Deno.env.get("NVIDIA_BASE_URL") || "https://integrate.api.nvidia.com/v1";
+const NVIDIA_CODER_MODEL = Deno.env.get("NVIDIA_CODER_MODEL") || "qwen/qwen3-coder-480b-a35b-instruct";
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
 const DEFAULT_MAX_TOKENS = Number(Deno.env.get("AI_MAX_TOKENS") || "1400");
 
@@ -162,7 +163,7 @@ function sanitizeMessages(messages: unknown): ChatMessage[] {
     .slice(-12);
 }
 
-async function callNvidia(messages: ChatMessage[], maxTokens = DEFAULT_MAX_TOKENS): Promise<ProviderResult> {
+async function callNvidia(messages: ChatMessage[], maxTokens = DEFAULT_MAX_TOKENS, model = NVIDIA_MODEL): Promise<ProviderResult> {
   const apiKeys = getNvidiaKeys();
   if (apiKeys.length === 0) {
     throw new Error("No NVIDIA API keys configured");
@@ -178,7 +179,7 @@ async function callNvidia(messages: ChatMessage[], maxTokens = DEFAULT_MAX_TOKEN
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: NVIDIA_MODEL,
+        model,
         temperature: 0.35,
         top_p: 0.95,
         max_tokens: maxTokens,
@@ -200,7 +201,7 @@ async function callNvidia(messages: ChatMessage[], maxTokens = DEFAULT_MAX_TOKEN
       continue;
     }
 
-    return { text, provider: "nvidia", model: NVIDIA_MODEL };
+    return { text, provider: "nvidia", model };
   }
 
   throw new Error(failures[failures.length - 1] || "NVIDIA request failed");
@@ -252,6 +253,26 @@ async function complete(messages: ChatMessage[], maxTokens = DEFAULT_MAX_TOKENS)
   } catch (nvidiaError) {
     console.error("NVIDIA failed, falling back to Gemini:", nvidiaError);
     return await callGemini(messages, maxTokens);
+  }
+}
+
+// Code-generation path: a coder-tuned model first, generous token budget so a
+// complete widget spec is never truncated into an invalid/partial payload.
+async function codeComplete(messages: ChatMessage[], maxTokens = 4000) {
+  const models = [NVIDIA_CODER_MODEL, NVIDIA_MODEL];
+  let lastErr: unknown = null;
+  for (const model of models) {
+    try {
+      return await callNvidia(messages, maxTokens, model);
+    } catch (e) {
+      lastErr = e;
+      console.error(`coder model ${model} failed, trying next:`, e);
+    }
+  }
+  try {
+    return await callGemini(messages, maxTokens);
+  } catch (e) {
+    throw lastErr || e;
   }
 }
 
@@ -312,6 +333,35 @@ serve(async (req) => {
         ...incomingMessages,
       ], 1000);
 
+      return new Response(JSON.stringify({
+        ok: true,
+        analysis: result.text,
+        provider: result.provider,
+        model: result.model,
+        userId: user.id,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "forge" || action === "code") {
+      const incomingMessages = sanitizeMessages(body.messages);
+      if (incomingMessages.length === 0) {
+        return new Response(JSON.stringify({ error: "messages required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const requested = Number(body?.maxTokens);
+      const maxTokens = Number.isFinite(requested) ? Math.min(8000, Math.max(1200, requested)) : 4000;
+      // No chatty copilot persona here: the caller supplies its own full system
+      // prompt. A minimal guard keeps the model literal and format-obedient so a
+      // specific request is never dumbed down to a generic result.
+      const guard: ChatMessage = {
+        role: "system",
+        content: "Follow the user's instructions exactly and literally. Honor every named color, layout, metric and behavior. Output only what the instructions ask for (for example, a single JSON object) with no extra commentary and no markdown fences. Never simplify or substitute a generic result for a specific request. Never truncate: emit the complete artifact.",
+      };
+      const result = await codeComplete([guard, ...incomingMessages], maxTokens);
       return new Response(JSON.stringify({
         ok: true,
         analysis: result.text,
