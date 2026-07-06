@@ -12,7 +12,7 @@ import {
   Home, Search, Bell, Mail, Hash, MessageSquare, Radio, Globe, User,
   Feather, X as XIcon, Heart, MessageCircle, Repeat2, Share, MoreHorizontal,
   Trash2, Copy, Flag, BadgeCheck, Loader2, TrendingUp, ArrowUpRight,
-  ArrowDownRight, Users, Bookmark, LogOut, LayoutGrid, Settings, Coins, Image as ImageIcon,
+  ArrowDownRight, Users, Bookmark, LogOut, LayoutGrid, Settings, Coins, Image as ImageIcon, Smile,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,6 +47,7 @@ const FEED_CHANNEL = "social-general";
 const MAX_LEN = 500;
 const BOOKMARKS_KEY = "orbitx-x-bookmarks";
 const DRAFT_KEY = "orbitx-x-draft";
+const EMOJIS = ["🔥", "🚀", "💎", "📈", "📉", "🐂", "🐻", "🤝", "💰", "🎯", "👀", "🙌", "😂", "😅", "😎", "🤔", "🫡", "🧠", "⚡", "✨", "🌙", "☀️", "💯", "🏆", "👑", "🥳", "😤", "🤯", "🫠", "💀", "🤡", "🧢", "🐋", "🦍", "🍀", "⏰", "📊", "❤️", "🎉", "🙏"];
 
 const dicebear = (seed: string) => `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(seed || "og")}`;
 const avatarOf = (url: string | null | undefined, seed: string) => safeAvatarUrl(url) || dicebear(seed);
@@ -155,6 +156,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [posting, setPosting] = useState(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [uploadingImg, setUploadingImg] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
@@ -502,10 +504,25 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           </div>
         )}
         <div className="mt-2 flex items-center justify-between border-t border-white/[0.06] pt-2">
-          <span className="flex items-center gap-2">
+          <span className="relative flex items-center gap-2">
             <button type="button" onClick={() => composerFileRef.current?.click()} disabled={uploadingImg} className="grid h-8 w-8 place-items-center rounded-full text-[#1d9bf0] transition hover:bg-[#1d9bf0]/10 disabled:opacity-50" title="Add image">
               {uploadingImg ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ImageIcon className="h-[18px] w-[18px]" />}
             </button>
+            <button type="button" onClick={() => setEmojiOpen((v) => !v)} className="grid h-8 w-8 place-items-center rounded-full text-[#1d9bf0] transition hover:bg-[#1d9bf0]/10" title="Add emoji">
+              <Smile className="h-[18px] w-[18px]" />
+            </button>
+            {emojiOpen && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setEmojiOpen(false)} />
+                <div className="absolute bottom-10 left-0 z-30 w-[248px] rounded-2xl border border-white/10 bg-[#16181c] p-2 shadow-2xl">
+                  <div className="grid grid-cols-8 gap-0.5">
+                    {EMOJIS.map((e) => (
+                      <button key={e} type="button" onClick={() => { setText((t) => (t + e).slice(0, MAX_LEN)); setEmojiOpen(false); }} className="rounded-md p-1 text-[18px] leading-none transition hover:bg-white/10">{e}</button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
             {text.length > 0 && (
               <svg width="18" height="18" viewBox="0 0 20 20" className="-rotate-90">
                 <circle cx="10" cy="10" r="8" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="2.5" />
