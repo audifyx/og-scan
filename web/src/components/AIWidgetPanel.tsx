@@ -2,6 +2,7 @@ import * as RN from 'react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { queueWidgetCloudSave } from '@/lib/widgetSync';
 
 /* Catches crashes inside AI-generated widget code so one bad widget can never
    take down the whole hub. */
@@ -29,7 +30,12 @@ const WG_KEY = 'og_hub_widgets_v2';
 export const readWidgets = (): WidgetConfig[] => {
   try { return JSON.parse(localStorage.getItem(WG_KEY) ?? '[]'); } catch { return []; }
 };
-const writeWidgets = (w: WidgetConfig[]) => localStorage.setItem(WG_KEY, JSON.stringify(w));
+export const writeWidgets = (w: WidgetConfig[]) => {
+  localStorage.setItem(WG_KEY, JSON.stringify(w));
+  // Auto-save the user's custom widget list to their account so it
+  // survives refresh and syncs across devices (fails soft if signed out).
+  queueWidgetCloudSave(w);
+};
 
 const TEMPLATES: Record<string, Omit<WidgetConfig, 'id' | 'pos'>> = {
   // — Originals (also used by slash-commands & AI builder) —

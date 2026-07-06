@@ -2,7 +2,7 @@ export interface AnimatedWallpaperPreset {
   id: string;
   name: string;
   category: string;
-  type: "css-3d";
+  type: "css-3d" | "image";
   config: {
     primary: string;
     secondary: string;
@@ -12,6 +12,8 @@ export interface AnimatedWallpaperPreset {
     grid?: { show: boolean; opacity: number; color: string };
     perspective: number;
     ambientLight: boolean;
+    /** Optional photographic layer (cosmic image wallpapers). */
+    image?: { url: string; overlay?: string; blur?: number; drift?: boolean };
   };
 }
 
@@ -63,6 +65,33 @@ function makePreset(
       grid: c.grid,
       perspective: c.perspective ?? 1000,
       ambientLight: c.ambientLight ?? true,
+    },
+  };
+}
+
+/** Build an image-based wallpaper. A slow parallax drift + gradient overlay keeps
+ *  it feeling "alive" while a photographic cosmic background does the heavy lifting. */
+function makeImagePreset(
+  id: string,
+  name: string,
+  category: string,
+  url: string,
+  c?: { primary?: string; secondary?: string; accent?: string; overlay?: string; blur?: number; drift?: boolean }
+): AnimatedWallpaperPreset {
+  return {
+    id,
+    name,
+    category,
+    type: "image",
+    config: {
+      primary: c?.primary ?? COLORS.neonCyan,
+      secondary: c?.secondary ?? COLORS.neonPurple,
+      accent: c?.accent ?? COLORS.neonPink,
+      background: "#01030a",
+      shapes: [],
+      perspective: 1200,
+      ambientLight: false,
+      image: { url, overlay: c?.overlay, blur: c?.blur, drift: c?.drift ?? true },
     },
   };
 }
@@ -526,6 +555,179 @@ export const ANIMATED_WALLPAPERS: AnimatedWallpaperPreset[] = [
       { kind: "sphere", count: 10, size: 70, spread: 78, speed: 15, opacity: 0.62 },
     ],
   }),
+
+  // ── SPACE (5) — animated 3D ──
+  makePreset("space-deep-void", "Deep Void", "Space", {
+    primary: COLORS.indigo, secondary: COLORS.violet, accent: COLORS.neonCyan, background: "#01020a", perspective: 1800,
+    shapes: [
+      { kind: "sphere", count: 16, size: 34, spread: 90, speed: 22, opacity: 0.7 },
+      { kind: "ring", count: 3, size: 210, spread: 40, speed: 30, opacity: 0.4 },
+    ],
+    grid: { show: true, opacity: 0.05, color: COLORS.indigo },
+  }),
+  makePreset("space-nebula-drift", "Nebula Drift", "Space", {
+    primary: COLORS.neonPink, secondary: COLORS.neonPurple, accent: COLORS.neonBlue, background: "#0a0316", perspective: 1500,
+    shapes: [
+      { kind: "sphere", count: 12, size: 48, spread: 85, speed: 20, opacity: 0.6 },
+      { kind: "torus", count: 4, size: 170, spread: 55, speed: 26, opacity: 0.45 },
+    ],
+  }),
+  makePreset("space-starfield", "Starfield", "Space", {
+    primary: "#ffffff", secondary: COLORS.sky, accent: COLORS.neonCyan, background: "#00010a", perspective: 2000,
+    shapes: [
+      { kind: "sphere", count: 22, size: 20, spread: 95, speed: 16, opacity: 0.85 },
+    ],
+    grid: { show: true, opacity: 0.04, color: "#1b2a4a" },
+  }),
+  makePreset("space-supernova", "Supernova", "Space", {
+    primary: COLORS.neonOrange, secondary: COLORS.gold, accent: COLORS.neonPink, background: "#0c0400", perspective: 1300,
+    shapes: [
+      { kind: "ring", count: 6, size: 200, spread: 45, speed: 28, opacity: 0.5 },
+      { kind: "sphere", count: 8, size: 60, spread: 70, speed: 18, opacity: 0.7 },
+    ],
+  }),
+  makePreset("space-blackhole", "Event Horizon", "Space", {
+    primary: COLORS.violet, secondary: COLORS.neonBlue, accent: COLORS.amber, background: "#000006", perspective: 1600,
+    shapes: [
+      { kind: "torus", count: 7, size: 160, spread: 50, speed: 24, opacity: 0.55 },
+      { kind: "ring", count: 4, size: 240, spread: 35, speed: 32, opacity: 0.4 },
+    ],
+  }),
+
+  // ── PLANETS (5) — animated 3D ──
+  makePreset("planets-gas-giant", "Gas Giant", "Planets", {
+    primary: COLORS.amber, secondary: COLORS.coral, accent: COLORS.gold, background: "#0a0602", perspective: 1400,
+    shapes: [
+      { kind: "sphere", count: 5, size: 120, spread: 60, speed: 24, opacity: 0.8 },
+      { kind: "ring", count: 3, size: 220, spread: 40, speed: 30, opacity: 0.5 },
+    ],
+  }),
+  makePreset("planets-ice-world", "Ice World", "Planets", {
+    primary: COLORS.frost, secondary: COLORS.sky, accent: COLORS.arctic, background: "#02060c", perspective: 1500,
+    shapes: [
+      { kind: "sphere", count: 6, size: 100, spread: 65, speed: 22, opacity: 0.75 },
+      { kind: "icosa", count: 5, size: 90, spread: 70, speed: 18, opacity: 0.6 },
+    ],
+  }),
+  makePreset("planets-ringed", "Ringed Titan", "Planets", {
+    primary: COLORS.gold, secondary: COLORS.peach, accent: COLORS.amber, background: "#08050c", perspective: 1300,
+    shapes: [
+      { kind: "sphere", count: 4, size: 130, spread: 55, speed: 26, opacity: 0.85 },
+      { kind: "ring", count: 5, size: 260, spread: 30, speed: 34, opacity: 0.45 },
+    ],
+  }),
+  makePreset("planets-lava", "Lava World", "Planets", {
+    primary: COLORS.neonOrange, secondary: "#ff2d00", accent: COLORS.gold, background: "#0a0200", perspective: 1400,
+    shapes: [
+      { kind: "sphere", count: 7, size: 90, spread: 70, speed: 20, opacity: 0.8 },
+      { kind: "torus", count: 3, size: 150, spread: 50, speed: 28, opacity: 0.5 },
+    ],
+  }),
+  makePreset("planets-twin-moons", "Twin Moons", "Planets", {
+    primary: COLORS.lavender, secondary: COLORS.violet, accent: COLORS.sky, background: "#040210", perspective: 1600,
+    shapes: [
+      { kind: "sphere", count: 9, size: 70, spread: 78, speed: 18, opacity: 0.7 },
+      { kind: "ring", count: 2, size: 200, spread: 45, speed: 30, opacity: 0.4 },
+    ],
+  }),
+
+  // ── WORLDS (4) — animated 3D ──
+  makePreset("worlds-terraform", "Terraforma", "Worlds", {
+    primary: COLORS.emerald, secondary: COLORS.teal, accent: COLORS.sky, background: "#02080a", perspective: 1400,
+    shapes: [
+      { kind: "sphere", count: 6, size: 110, spread: 62, speed: 22, opacity: 0.78 },
+      { kind: "icosa", count: 6, size: 80, spread: 72, speed: 17, opacity: 0.6 },
+    ],
+    grid: { show: true, opacity: 0.07, color: COLORS.emerald },
+  }),
+  makePreset("worlds-cyber-globe", "Cyber Globe", "Worlds", {
+    primary: COLORS.neonCyan, secondary: COLORS.neonBlue, accent: COLORS.neonPink, background: "#01040c", perspective: 1500,
+    shapes: [
+      { kind: "icosa", count: 8, size: 95, spread: 68, speed: 19, opacity: 0.72 },
+      { kind: "ring", count: 4, size: 200, spread: 45, speed: 28, opacity: 0.5 },
+    ],
+    grid: { show: true, opacity: 0.1, color: COLORS.neonCyan },
+  }),
+  makePreset("worlds-desert", "Dune World", "Worlds", {
+    primary: COLORS.peach, secondary: COLORS.amber, accent: COLORS.coral, background: "#0a0603", perspective: 1300,
+    shapes: [
+      { kind: "sphere", count: 5, size: 120, spread: 58, speed: 24, opacity: 0.82 },
+      { kind: "pyramid", count: 6, size: 90, spread: 72, speed: 16, opacity: 0.6 },
+    ],
+  }),
+  makePreset("worlds-ocean", "Ocean World", "Worlds", {
+    primary: COLORS.sky, secondary: COLORS.teal, accent: COLORS.mint, background: "#00060e", perspective: 1500,
+    shapes: [
+      { kind: "sphere", count: 7, size: 100, spread: 66, speed: 21, opacity: 0.76 },
+      { kind: "torus", count: 4, size: 160, spread: 52, speed: 27, opacity: 0.48 },
+    ],
+  }),
+
+  // ── HYPERSPACE 4D (4) — fast warping geometry ──
+  makePreset("hyper-tesseract", "Tesseract 4D", "Hyperspace 4D", {
+    primary: COLORS.neonCyan, secondary: COLORS.neonPurple, accent: COLORS.neonPink, background: "#02010a", perspective: 700,
+    shapes: [
+      { kind: "cube", count: 10, size: 110, spread: 80, speed: 9, opacity: 0.85 },
+      { kind: "ring", count: 6, size: 180, spread: 60, speed: 12, opacity: 0.6 },
+    ],
+    grid: { show: true, opacity: 0.12, color: COLORS.neonCyan },
+  }),
+  makePreset("hyper-fold", "Dimension Fold", "Hyperspace 4D", {
+    primary: COLORS.neonPink, secondary: COLORS.violet, accent: COLORS.neonCyan, background: "#08010f", perspective: 650,
+    shapes: [
+      { kind: "icosa", count: 9, size: 100, spread: 82, speed: 10, opacity: 0.8 },
+      { kind: "torus", count: 5, size: 150, spread: 65, speed: 13, opacity: 0.62 },
+    ],
+  }),
+  makePreset("hyper-vortex", "Quantum Vortex", "Hyperspace 4D", {
+    primary: COLORS.neonGreen, secondary: COLORS.neonCyan, accent: COLORS.neonYellow, background: "#020a04", perspective: 600,
+    shapes: [
+      { kind: "ring", count: 8, size: 220, spread: 55, speed: 8, opacity: 0.7 },
+      { kind: "pyramid", count: 8, size: 90, spread: 78, speed: 11, opacity: 0.68 },
+    ],
+    grid: { show: true, opacity: 0.14, color: COLORS.neonGreen },
+  }),
+  makePreset("hyper-prism", "Prism Shatter", "Hyperspace 4D", {
+    primary: COLORS.neonBlue, secondary: COLORS.neonPink, accent: COLORS.neonYellow, background: "#01030c", perspective: 720,
+    shapes: [
+      { kind: "cube", count: 12, size: 85, spread: 85, speed: 9, opacity: 0.82 },
+      { kind: "icosa", count: 6, size: 120, spread: 62, speed: 12, opacity: 0.6 },
+    ],
+  }),
+
+  // ── WARP 5D (3) — max motion / deep perspective ──
+  makePreset("warp-lightspeed", "Lightspeed 5D", "Warp 5D", {
+    primary: "#ffffff", secondary: COLORS.neonCyan, accent: COLORS.neonBlue, background: "#00000a", perspective: 400,
+    shapes: [
+      { kind: "ring", count: 10, size: 260, spread: 50, speed: 6, opacity: 0.7 },
+      { kind: "sphere", count: 16, size: 28, spread: 95, speed: 7, opacity: 0.85 },
+    ],
+    grid: { show: true, opacity: 0.16, color: COLORS.neonCyan },
+  }),
+  makePreset("warp-wormhole", "Wormhole 5D", "Warp 5D", {
+    primary: COLORS.neonPurple, secondary: COLORS.neonPink, accent: COLORS.neonCyan, background: "#050010", perspective: 450,
+    shapes: [
+      { kind: "torus", count: 9, size: 200, spread: 45, speed: 6, opacity: 0.65 },
+      { kind: "ring", count: 7, size: 300, spread: 30, speed: 8, opacity: 0.5 },
+    ],
+  }),
+  makePreset("warp-singularity", "Singularity 5D", "Warp 5D", {
+    primary: COLORS.amber, secondary: COLORS.neonOrange, accent: COLORS.violet, background: "#0a0400", perspective: 380,
+    shapes: [
+      { kind: "torus", count: 8, size: 220, spread: 42, speed: 5, opacity: 0.6 },
+      { kind: "sphere", count: 12, size: 34, spread: 92, speed: 7, opacity: 0.8 },
+    ],
+    grid: { show: true, opacity: 0.13, color: COLORS.amber },
+  }),
+
+  // ── COSMIC IMAGES (photographic) ──
+  makeImagePreset("img-galaxy-spiral", "Spiral Galaxy", "Cosmic Images", "/wallpapers/galaxy-spiral.jpg", { overlay: "linear-gradient(180deg, rgba(2,3,12,0.25), rgba(2,3,12,0.65))" }),
+  makeImagePreset("img-nebula-violet", "Violet Nebula", "Cosmic Images", "/wallpapers/nebula-violet.jpg", { overlay: "linear-gradient(180deg, rgba(8,2,20,0.2), rgba(8,2,20,0.6))" }),
+  makeImagePreset("img-earth-orbit", "Earth from Orbit", "Cosmic Images", "/wallpapers/earth-orbit.jpg", { overlay: "linear-gradient(180deg, rgba(0,4,12,0.15), rgba(0,4,12,0.6))" }),
+  makeImagePreset("img-saturn-rings", "Ringed Planet", "Cosmic Images", "/wallpapers/saturn-rings.jpg", { overlay: "linear-gradient(180deg, rgba(10,6,2,0.2), rgba(10,6,2,0.6))" }),
+  makeImagePreset("img-moon-surface", "Lunar Surface", "Cosmic Images", "/wallpapers/moon-surface.jpg", { overlay: "linear-gradient(180deg, rgba(4,4,8,0.2), rgba(4,4,8,0.65))" }),
+  makeImagePreset("img-aurora-space", "Aurora from Space", "Cosmic Images", "/wallpapers/aurora-space.jpg", { overlay: "linear-gradient(180deg, rgba(0,8,10,0.2), rgba(0,8,10,0.6))" }),
+
 ];
 
 export const ANIMATED_WALLPAPER_CATEGORIES = [...new Set(ANIMATED_WALLPAPERS.map((w) => w.category))];

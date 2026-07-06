@@ -26,6 +26,10 @@ const keyframes = `
   0% { background-position: 0 0; }
   100% { background-position: 0 100%; }
 }
+@keyframes wp-img-drift {
+  0%, 100% { transform: scale(1.08) translate3d(0, 0, 0); }
+  50% { transform: scale(1.14) translate3d(-2%, -1.5%, 0); }
+}
 `;
 
 function ShapeCube({ color, size, delay }: { color: string; size: number; delay: number }) {
@@ -224,6 +228,26 @@ export const AnimatedWallpaperRenderer = ({ preset }: { preset: AnimatedWallpape
       className="fixed inset-0 z-0 overflow-hidden pointer-events-none"
       style={{ background: config.background }}
     >
+      {/* Photographic cosmic image layer (optional) */}
+      {config.image?.url && (
+        <>
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url(${config.image.url})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              filter: config.image.blur ? `blur(${config.image.blur}px)` : undefined,
+              animation: config.image.drift === false ? undefined : "wp-img-drift 40s ease-in-out infinite",
+              willChange: "transform",
+            }}
+          />
+          {config.image.overlay && (
+            <div className="absolute inset-0" style={{ background: config.image.overlay }} />
+          )}
+        </>
+      )}
+
       {/* Ambient light orbs */}
       {config.ambientLight && clouds.map((c) => (
         <div

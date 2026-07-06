@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
-import { AIWidgetPanel, MobileWidgetGrid, aiWidgetCSS, readWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
+import { AIWidgetPanel, MobileWidgetGrid, aiWidgetCSS, readWidgets, writeWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
+import { loadWidgetsFromCloud, saveWidgetsToCloud } from "@/lib/widgetSync";
 import { MobileNav } from "@/components/MobileNavV2";
 import { BackgroundFX, BgCustomizeModal, readBgMode, BG_KEY, WALLPAPER_KEY, type BgMode } from "@/components/BackgroundFX";
 
@@ -166,6 +167,26 @@ export default function Hub() {
   useEffect(() => {
     localStorage.setItem(DOCK_KEY, JSON.stringify(Array.from(new Set(dockOrder))));
   }, [dockOrder]);
+
+  // Restore the user's saved widgets from their account on load, so custom
+  // widgets persist across refresh + devices. First cloud load wins; if the
+  // account has none yet but this device has local widgets, seed the cloud.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const cloud = await loadWidgetsFromCloud();
+      if (!alive) return;
+      if (cloud && cloud.length > 0) {
+        setCustomWidgets(cloud);
+        writeWidgets(cloud);
+      } else {
+        const local = readWidgets();
+        if (local.length > 0) await saveWidgetsToCloud(local);
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getApps = () => {
     const ordered = dockOrder.map((key) => ALL_APPS.find((a) => a.key === key)).filter(Boolean) as App[];
