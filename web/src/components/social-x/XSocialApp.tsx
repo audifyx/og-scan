@@ -157,6 +157,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [, setClockTick] = useState(0);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
@@ -185,6 +186,11 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   useEffect(() => {
     try { localStorage.setItem("og_x_tab", tab); } catch { /* ignore */ }
   }, [tab]);
+  // Keep relative timestamps ("2m", "1h") fresh without a reload.
+  useEffect(() => {
+    const id = window.setInterval(() => setClockTick((t) => (t + 1) % 1000000), 60000);
+    return () => window.clearInterval(id);
+  }, []);
   // Draft autosave: persist the composer text so it survives refresh/navigation
   // (matches the "Drafts save automatically" hint in the compose modal).
   useEffect(() => {
@@ -1236,7 +1242,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             <button
               key={n.id}
               type="button"
-              onClick={() => setTab(n.id)}
+              onClick={() => { if (tab === n.id) feedScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); else setTab(n.id); }}
               className={cn(
                 "group flex items-center gap-4 rounded-full px-3 py-2.5 transition-all duration-200 active:scale-[0.97]",
                 tab === n.id
@@ -1408,7 +1414,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               <button
                 key={id}
                 type="button"
-                onClick={() => setTab(id)}
+                onClick={() => { if (tab === id) feedScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); else setTab(id); }}
                 className={cn("relative z-10 grid h-10 w-12 place-items-center rounded-full transition-colors", on ? "text-[#1d9bf0]" : "text-white/45 hover:text-white/75")}
               >
                 <n.Icon className={cn("h-[22px] w-[22px]", on && "stroke-[2.5]")} />
