@@ -1270,6 +1270,36 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const avatarUrl = safeAvatarUrl(profileData?.avatar_url) || dices(profileData?.username || profileData?.user_id || "ogscan");
   const specialProfileMode = Boolean(profileData?.is_official_account || profileData?.affiliate_org_id || (isOwnProfile && (isAdmin || isOwner)));
   const bannerUrl = safeAvatarUrl(profileData?.banner_url) || "/orbitx-banner.jpg";
+  const activityHeat = (() => {
+    const counts = new Map<string, number>();
+    const bump = (iso?: string | null) => {
+      if (!iso) return;
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return;
+      d.setHours(0, 0, 0, 0);
+      const k = d.toISOString().slice(0, 10);
+      counts.set(k, (counts.get(k) || 0) + 1);
+    };
+    posts.forEach((p) => bump(p.created_at));
+    replies.forEach((r) => bump(r.created_at));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(start.getDate() - 118);
+    start.setDate(start.getDate() - start.getDay());
+    const cells: { key: string; count: number; date: Date }[] = [];
+    const cur = new Date(start);
+    let total = 0;
+    while (cur <= today) {
+      const k = cur.toISOString().slice(0, 10);
+      const c = counts.get(k) || 0;
+      total += c;
+      cells.push({ key: k, count: c, date: new Date(cur) });
+      cur.setDate(cur.getDate() + 1);
+    }
+    const max = cells.reduce((m, x) => Math.max(m, x.count), 0);
+    return { cells, max, total };
+  })();
   const displayName = profileData?.display_name || profileData?.username || "OG User";
   const handle = profileData?.username ? `@${profileData.username}` : "@ogscan";
   const website = profileData?.website_url || profileData?.website;
@@ -1894,8 +1924,35 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 ) : null}
 
                 {activeTab === "activity" ? (
-                  replies.length > 0 ? (
-                    <div className="border-y border-white/10">
+                  <>
+                    <div className="border-b border-white/10 px-4 py-5 sm:px-5">
+                      <div className="mb-3 flex items-center justify-between">
+                        <h4 className="text-[15px] font-black text-white">Activity</h4>
+                        <span className="text-[12px] font-bold text-white/40">{compact(activityHeat.total)} actions · ~17 weeks</span>
+                      </div>
+                      <div className="grid grid-flow-col grid-rows-7 gap-[3px] overflow-x-auto pb-1">
+                        {activityHeat.cells.map((cell) => {
+                          const intensity = activityHeat.max ? cell.count / activityHeat.max : 0;
+                          return (
+                            <div
+                              key={cell.key}
+                              title={`${cell.count} on ${cell.date.toLocaleDateString()}`}
+                              className="h-[11px] w-[11px] rounded-[3px]"
+                              style={{ backgroundColor: cell.count === 0 ? "rgba(255,255,255,0.05)" : `rgba(29,155,240,${(0.22 + intensity * 0.78).toFixed(3)})` }}
+                            />
+                          );
+                        })}
+                      </div>
+                      <div className="mt-2 flex items-center justify-end gap-1 text-[10px] text-white/35">
+                        <span className="mr-1">Less</span>
+                        {[0, 0.3, 0.55, 0.8, 1].map((a, i) => (
+                          <span key={i} className="h-[10px] w-[10px] rounded-[3px]" style={{ backgroundColor: a === 0 ? "rgba(255,255,255,0.05)" : `rgba(29,155,240,${a})` }} />
+                        ))}
+                        <span className="ml-1">More</span>
+                      </div>
+                    </div>
+                    {replies.length > 0 ? (
+                      <div className="border-b border-white/10">
                       {replies.map((reply, index) => (
                         <article key={reply.id} className={cn("bg-black px-4 py-4 sm:px-5", index !== replies.length - 1 && "border-b border-white/10")}>
                           <div className="flex items-start gap-3">
@@ -1916,9 +1973,10 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                         </article>
                       ))}
                     </div>
-                  ) : (
-                    <EmptyState icon={Activity} title="No replies yet" body="Real replies from community conversations show here automatically when this profile has posted replies." />
-                  )
+                    ) : (
+                      <EmptyState icon={Activity} title="No replies yet" body="Real replies from community conversations show here automatically when this profile has posted replies." />
+                    )}
+                  </>
                 ) : null}
 
                 {activeTab === "saved" && isOwnProfile ? (
