@@ -1468,6 +1468,11 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   return (
     <TooltipProvider delayDuration={120}>
       <div className="w-full pb-16">
+        <style>{`
+          @keyframes pfRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+          .pf-rise { animation: pfRise .5s cubic-bezier(.22,1,.36,1) both; }
+          @keyframes pfSheen { 0% { transform: translateX(-140%) skewX(-12deg); } 55%,100% { transform: translateX(320%) skewX(-12deg); } }
+        `}</style>
         <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-white/10 bg-black/85 px-4 backdrop-blur-xl">
           <button
             type="button"
@@ -1507,8 +1512,10 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
             ) : (
               <div className="absolute inset-0 bg-black" />
             )}
-            <div className="absolute inset-0 bg-black/30" />
+            <div className="absolute inset-0 bg-gradient-to-br from-[#1d9bf0]/25 via-transparent to-[#9945FF]/25" />
+            <div className="absolute inset-0 bg-black/25" />
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-white/10 to-transparent" style={{ animation: "pfSheen 7s ease-in-out infinite" }} />
             {isOwnProfile ? (
               <>
                 <Button
@@ -1528,8 +1535,10 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
           <div className="relative -mt-12 px-4 pb-4">
             <div className="relative h-[96px] w-[96px]">
-              <div className="overflow-hidden rounded-full border-4 border-black bg-black">
-                <img src={avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+              <div className="h-full w-full rounded-full bg-gradient-to-tr from-[#1d9bf0] via-[#9945FF] to-[#f91880] p-[3px] shadow-[0_10px_30px_rgba(29,155,240,0.35)]">
+                <div className="h-full w-full overflow-hidden rounded-full border-4 border-black bg-black">
+                  <img src={avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                </div>
               </div>
               <div className="absolute bottom-1.5 right-1.5 h-4 w-4 rounded-full border-2 border-black bg-emerald-400" />
               {isOwnProfile ? (
@@ -1552,7 +1561,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
               ) : null}
             </div>
 
-            <div className="mt-3 space-y-3">
+            <div className="mt-3 space-y-3 pf-rise">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-[32px] font-extrabold leading-none tracking-tight text-white">{displayName}</h1>
@@ -1603,11 +1612,18 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 {walletAddress ? <span className="inline-flex items-center gap-1.5"><Wallet className="h-4 w-4" /> {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}</span> : null}
               </div>
 
-              <div className="flex flex-wrap items-center gap-5 text-[15px] text-white/80">
-                <span><span className="font-bold text-white">{compact(followingCount)}</span> Following</span>
-                <span><span className="font-bold text-white">{compact(followerCount)}</span> Followers</span>
-                <span><span className="font-bold text-white">{compact(posts.length)}</span> Posts</span>
-                {totalXp > 0 ? <span><span className="font-bold text-white">{compact(totalXp)}</span> XP</span> : null}
+              <div className="grid grid-cols-4 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08]">
+                {[
+                  { label: "Following", value: compact(followingCount) },
+                  { label: "Followers", value: compact(followerCount) },
+                  { label: "Posts", value: compact(posts.length) },
+                  { label: totalXp > 0 ? "XP" : "OG Score", value: compact(totalXp > 0 ? totalXp : Number((profileData as any).og_score ?? 0)) },
+                ].map((stat) => (
+                  <div key={stat.label} className="bg-[#0a0e14] px-3 py-2.5 text-center transition hover:bg-white/[0.04]">
+                    <div className="text-[18px] font-black leading-none text-white">{stat.value}</div>
+                    <div className="mt-1 text-[10.5px] font-bold uppercase tracking-wider text-white/40">{stat.label}</div>
+                  </div>
+                ))}
               </div>
 
               <div className="flex flex-wrap gap-2 pt-1">
@@ -1650,11 +1666,12 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
                       className={cn(
-                        "relative min-w-[94px] shrink-0 border-b-2 border-transparent px-3.5 py-4 text-[16px] font-semibold text-white/50 transition hover:bg-white/[0.02] hover:text-white",
-                        activeTab === tab.id && "border-cyan-300 text-white",
+                        "relative min-w-[94px] shrink-0 px-3.5 py-4 text-[16px] font-semibold text-white/50 transition hover:bg-white/[0.02] hover:text-white",
+                        activeTab === tab.id && "text-white",
                       )}
                     >
                       {tab.label}
+                      {activeTab === tab.id && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-full bg-gradient-to-r from-[#1d9bf0] to-[#9945FF]" />}
                     </button>
                   ))}
                   {isOwnProfile ? (
@@ -1662,11 +1679,12 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                       type="button"
                       onClick={() => setActiveTab("settings")}
                       className={cn(
-                        "relative min-w-[96px] shrink-0 border-b-2 border-transparent px-4 py-3 text-[15px] font-bold text-white/50 transition hover:bg-white/[0.02] hover:text-white",
-                        activeTab === "settings" && "border-cyan-300 text-white",
+                        "relative min-w-[96px] shrink-0 px-4 py-4 text-[16px] font-semibold text-white/50 transition hover:bg-white/[0.02] hover:text-white",
+                        activeTab === "settings" && "text-white",
                       )}
                     >
                       Settings
+                      {activeTab === "settings" && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-full bg-gradient-to-r from-[#1d9bf0] to-[#9945FF]" />}
                     </button>
                   ) : null}
                 </div>
