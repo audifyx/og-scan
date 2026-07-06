@@ -46,6 +46,7 @@ interface CommunityLite { id: string; name: string; description: string | null; 
 const FEED_CHANNEL = "social-general";
 const MAX_LEN = 500;
 const BOOKMARKS_KEY = "orbitx-x-bookmarks";
+const DRAFT_KEY = "orbitx-x-draft";
 
 const dicebear = (seed: string) => `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(seed || "og")}`;
 const avatarOf = (url: string | null | undefined, seed: string) => safeAvatarUrl(url) || dicebear(seed);
@@ -150,7 +151,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [feedMode, setFeedMode] = useState<"foryou" | "following">("foryou");
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => { try { return localStorage.getItem(DRAFT_KEY) || ""; } catch { return ""; } });
   const [posting, setPosting] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -179,6 +180,11 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   useEffect(() => {
     try { localStorage.setItem("og_x_tab", tab); } catch { /* ignore */ }
   }, [tab]);
+  // Draft autosave: persist the composer text so it survives refresh/navigation
+  // (matches the "Drafts save automatically" hint in the compose modal).
+  useEffect(() => {
+    try { if (text.trim()) localStorage.setItem(DRAFT_KEY, text); else localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+  }, [text]);
   useEffect(() => {
     const sync = () => {
       try {
