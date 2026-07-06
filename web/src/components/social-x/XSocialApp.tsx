@@ -164,6 +164,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [detailLoading, setDetailLoading] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replyPosting, setReplyPosting] = useState(false);
+  const [replyCounts, setReplyCounts] = useState<Record<string, number>>({});
   const [, setClockTick] = useState(0);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -425,14 +426,44 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const submitReply = async () => {
     const content = replyText.trim();
     if (!content || !user || !openPostId || replyPosting) return;
+    const parentId = openPostId;
     setReplyPosting(true); setReplyText("");
     const { data, error } = await supabase.from("social_messages")
-      .insert({ channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url, content, likes_count: 0, liked_by: [], reply_to: openPostId })
+      .insert({ channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url, content, likes_count: 0, liked_by: [], reply_to: parentId })
       .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").single();
     if (error) { toast.error("Could not reply. Try again."); setReplyText(content); }
-    else if (data) setDetailReplies((prev) => [...prev, data as Post]);
+    else if (data) { setDetailReplies((prev) => [...prev, data as Post]); setReplyCounts((prev) => ({ ...prev, [parentId]: (prev[parentId] || 0) + 1 })); }
     setReplyPosting(false);
   };
+
+  const feedIdsKey = useMemo(() => posts.map((p) => p.id).join(","), [posts]);
+  useEffect(() => {
+    const ids = feedIdsKey ? feedIdsKey.split(",") : [];
+    if (ids.length === 0) { setReplyCounts({}); return; }
+    let cancelled = false;
+    supabase.from("social_messages").select("reply_to").in("reply_to", ids).limit(2000)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const m: Record<string, number> = {};
+        ((data as Array<{ reply_to: string | null }>) || []).forEach((r) => { if (r.reply_to) m[r.reply_to] = (m[r.reply_to] || 0) + 1; });
+        setReplyCounts(m);
+      });
+    return () => { cancelled = true; };
+  }, [feedIdsKey]);
+
+  useEffect(() => {
+    if (!openPostId) return;
+    const parentId = openPostId;
+    const ch = supabase.channel(`x-thread-${parentId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "social_messages", filter: `reply_to=eq.${parentId}` },
+        (p) => {
+          const row = p.new as Post;
+          setDetailReplies((prev) => prev.some((x) => x.id === row.id) ? prev : [...prev, row]);
+          if (row.user_id !== uidRef.current) setReplyCounts((prev) => ({ ...prev, [parentId]: (prev[parentId] || 0) + 1 }));
+        })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [openPostId]);
 
   const toggleLike = async (post: Post) => {
     if (!user) { toast.error("Sign in to like"); return; }
@@ -648,8 +679,9 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </>
           ); })()}
           <div className="mt-2 flex max-w-md items-center justify-between text-white/35">
-            <button type="button" onClick={(e) => { e.stopPropagation(); replyTo(p); }} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]">
+            <button type="button" onClick={(e) => { e.stopPropagation(); onOpen ? onOpen(p.id) : replyTo(p); }} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]">
               <span className="rounded-full p-1.5 transition group-hover:bg-[#1d9bf0]/10"><MessageCircle className="h-4 w-4" /></span>
+              {(replyCounts[p.id] ?? 0) > 0 && <span className="text-[12px] font-bold">{replyCounts[p.id]}</span>}
             </button>
             <button type="button" onClick={(e) => { e.stopPropagation(); repost(p); }} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-emerald-400">
               <span className="rounded-full p-1.5 transition group-hover:bg-emerald-400/10"><Repeat2 className="h-4 w-4" /></span>
