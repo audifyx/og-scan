@@ -13,6 +13,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { isUserOnline } from "@/lib/presence";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { cn } from "@/lib/utils";
@@ -121,7 +122,7 @@ const EnterpriseDashboard = () => {
           const p = profileMap.get(a.user_id) as any;
           const lastSeen = p?.last_seen_at ? new Date(p.last_seen_at) : null;
           const minsAgo = lastSeen ? Math.floor((Date.now() - lastSeen.getTime()) / 60000) : null;
-          const lastActive = p?.is_online ? "now" : minsAgo !== null ? (minsAgo < 60 ? `${minsAgo}m ago` : minsAgo < 1440 ? `${Math.floor(minsAgo / 60)}h ago` : `${Math.floor(minsAgo / 1440)}d ago`) : "—";
+          const lastActive = isUserOnline(p) ? "now" : minsAgo !== null ? (minsAgo < 60 ? `${minsAgo}m ago` : minsAgo < 1440 ? `${Math.floor(minsAgo / 60)}h ago` : `${Math.floor(minsAgo / 1440)}d ago`) : "—";
           return {
             id: a.user_id,
             name: p?.display_name || p?.username || a.user_id.slice(0, 8),

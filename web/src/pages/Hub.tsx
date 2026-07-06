@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
-import { AIWidgetPanel, MobileWidgetGrid, aiWidgetCSS, readWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
+import { AIWidgetPanel, MobileWidgetGrid, aiWidgetCSS, readWidgets, writeWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
+import { loadWidgetsFromCloud, saveWidgetsToCloud } from "@/lib/widgetSync";
 import { MobileNav } from "@/components/MobileNavV2";
 import { BackgroundFX, BgCustomizeModal, readBgMode, BG_KEY, WALLPAPER_KEY, type BgMode } from "@/components/BackgroundFX";
 
@@ -166,6 +167,26 @@ export default function Hub() {
   useEffect(() => {
     localStorage.setItem(DOCK_KEY, JSON.stringify(Array.from(new Set(dockOrder))));
   }, [dockOrder]);
+
+  // Restore the user's saved widgets from their account on load, so custom
+  // widgets persist across refresh + devices. First cloud load wins; if the
+  // account has none yet but this device has local widgets, seed the cloud.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const cloud = await loadWidgetsFromCloud();
+      if (!alive) return;
+      if (cloud && cloud.length > 0) {
+        setCustomWidgets(cloud);
+        writeWidgets(cloud);
+      } else {
+        const local = readWidgets();
+        if (local.length > 0) await saveWidgetsToCloud(local);
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getApps = () => {
     const ordered = dockOrder.map((key) => ALL_APPS.find((a) => a.key === key)).filter(Boolean) as App[];
@@ -664,9 +685,9 @@ function useClock() {
 
 const css = `
 /* ── Hub upgrades: greeting, SOL chip, spotlight ── */
-.hub-greeting{text-align:center;margin:14px 0 4px;animation:fadeSlide .5s ease both}
-.hub-greet-line{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.02em;text-shadow:0 2px 16px rgba(0,0,0,.6)}
-.hub-greet-sub{margin-top:4px;font-size:11px;font-weight:600;color:rgba(255,255,255,.42)}
+.hub-greeting{text-align:center;margin:4px 0 2px;animation:fadeSlide .5s ease both}
+.hub-greet-line{font-size:27px;font-weight:800;color:#fff;letter-spacing:-.02em;text-shadow:0 2px 16px rgba(0,0,0,.6)}
+.hub-greet-sub{margin-top:5px;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.42)}
 .hub-greet-sub kbd{padding:2px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);font-size:10px}
 @keyframes fadeSlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .mb-sol{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;border:1px solid rgba(52,211,153,.25);background:rgba(52,211,153,.09);color:#6ee7b7;font-size:11px;font-weight:800;letter-spacing:.02em}
@@ -745,12 +766,12 @@ const css = `
 }
 
 .desktop-body {
-  position: relative; z-index: 10; flex: 1; padding: 32px;
+  position: relative; z-index: 10; flex: 1; padding: 20px 20px 100px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 .app-grid {
-  display: flex; flex-direction: row; flex-wrap: wrap; gap: 28px;
-  align-items: flex-end; justify-content: center; max-width: 900px;
+  display: flex; flex-direction: row; flex-wrap: wrap; gap: 24px 18px;
+  align-items: flex-end; justify-content: center; max-width: 1000px;
 }
 .desktop-icon-wrapper {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -760,7 +781,7 @@ const css = `
 }
 .desktop-ready .desktop-icon-wrapper { animation-play-state: running; }
 .desktop-icon-label {
-  font-size: 12px; font-weight: 500;
+  font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,.92);
   text-shadow: 0 1px 2px rgba(0,0,0,0.8);
   padding: 2px 6px; border-radius: 4px; transition: background 0.1s;
 }
@@ -768,7 +789,7 @@ const css = `
 @keyframes fade-in-up { to { opacity: 1; transform: none; } }
 
 .mac-icon {
-  position: relative; width: 64px; height: 64px; border-radius: 14px;
+  position: relative; width: 78px; height: 78px; border-radius: 18px;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(0,0,0,0.2);
   overflow: hidden; color: #fff;
@@ -779,7 +800,7 @@ const css = `
   pointer-events: none;
 }
 .mac-icon-glyph {
-  position: relative; z-index: 2; width: 32px; height: 32px;
+  position: relative; z-index: 2; width: 40px; height: 40px;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
 }
 
@@ -811,7 +832,7 @@ const css = `
   position: relative; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); transform-origin: bottom;
 }
 .dock-item:hover { transform: scale(1.25) translateY(-4px); z-index: 10; }
-.dock-icon { width: 48px; height: 48px; border-radius: 12px; transition: filter 0.2s; }
+.dock-icon { width: 54px; height: 54px; border-radius: 13px; transition: filter 0.2s; }
 .dock-item:active .dock-icon { filter: brightness(0.7); }
 .dock-active-dot {
   width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,0.8);
@@ -917,8 +938,8 @@ const css = `
 .starfield{position:absolute;inset:0;z-index:2;pointer-events:none}
 
 /* Layout: icons + widgets side by side */
-.desktop-flex{display:flex;gap:26px;align-items:flex-start;justify-content:center;width:100%;max-width:1180px;margin:0 auto;padding:0 18px}
-.widgets-col{display:none;flex-direction:column;gap:14px;width:290px;flex-shrink:0;animation:fadeSlide .6s .15s ease both}
+.desktop-flex{display:flex;gap:22px;align-items:flex-start;justify-content:center;width:100%;max-width:1260px;margin:0 auto;padding:0 16px}
+.widgets-col{display:none;flex-direction:column;gap:12px;width:324px;flex-shrink:0;animation:fadeSlide .6s .15s ease both}
 @media(min-width:1024px){.widgets-col{display:flex}}
 
 /* Widget cards */
@@ -983,4 +1004,14 @@ const css = `
 @keyframes hubdot{0%,100%{opacity:1}50%{opacity:.35}}
 .hub-chip-btn{cursor:pointer;font-family:inherit;transition:all .18s}
 .hub-chip-btn:hover{border-color:rgba(90,162,255,.4);background:rgba(47,128,255,.14);transform:translateY(-1px)}
+
+/* Compact mobile hub */
+@media (max-width: 768px) {
+  .desktop-body { padding: 14px 12px 92px; }
+  .app-grid { gap: 18px 12px; }
+  .mac-icon { width: 68px; height: 68px; border-radius: 16px; }
+  .mac-icon-glyph { width: 34px; height: 34px; }
+  .hub-greet-line { font-size: 23px; }
+  .hub-greeting { margin: 2px 0 0; }
+}
 `;

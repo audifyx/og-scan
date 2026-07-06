@@ -12,6 +12,7 @@ import {
   Pin, PinOff, Archive, Inbox,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isUserOnline, usePresenceTick } from "@/lib/presence";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -249,6 +250,40 @@ const DirectMessages: React.FC = () => {
     fetchConversations();
     fetchActiveUsers();
   }, [fetchConversations, fetchActiveUsers]);
+
+  /* ─── Live presence: re-render on a tick + poll fresh status every 30s ─── */
+  usePresenceTick(30_000);
+  const presenceIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    const ids = new Set<string>();
+    convos.forEach((c) => { if (c.otherUser?.user_id) ids.add(c.otherUser.user_id); });
+    activeUsers.forEach((u) => ids.add(u.user_id));
+    if (activeConvo?.otherUser?.user_id) ids.add(activeConvo.otherUser.user_id);
+    presenceIdsRef.current = [...ids];
+  }, [convos, activeUsers, activeConvo]);
+
+  useEffect(() => {
+    if (!user) return;
+    const refresh = async () => {
+      const ids = presenceIdsRef.current;
+      if (ids.length === 0) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("user_id, is_online, last_active_at")
+        .in("user_id", ids);
+      if (!data || data.length === 0) return;
+      const fresh = new Map(data.map((p) => [p.user_id, p]));
+      const patch = <T extends { user_id: string; is_online: boolean; last_active_at: string | null }>(u: T): T => {
+        const f = fresh.get(u.user_id);
+        return f ? { ...u, is_online: !!f.is_online, last_active_at: f.last_active_at ?? null } : u;
+      };
+      setConvos((prev) => prev.map((c) => (c.otherUser ? { ...c, otherUser: patch(c.otherUser) } : c)));
+      setActiveUsers((prev) => prev.map(patch));
+      setActiveConvo((prev) => (prev?.otherUser ? { ...prev, otherUser: patch(prev.otherUser) } : prev));
+    };
+    const id = setInterval(refresh, 30_000);
+    return () => clearInterval(id);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -627,7 +662,7 @@ const DirectMessages: React.FC = () => {
     const lastMsg = c.lastMessage;
     const pinned = pinnedIds.has(c.id);
     const archived = archivedIds.has(c.id);
-    const online = c.otherUser?.is_online || false;
+    const online = isUserOnline(c.otherUser);
     const preview = !lastMsg
       ? "Start the conversation"
       : lastMsg.message_type === "image"
@@ -650,7 +685,7 @@ const DirectMessages: React.FC = () => {
             <img
               src={safeAvatar(c.otherUser?.avatar_url, c.otherUser?.username || c.otherUser?.user_id || "")}
               alt=""
-              className={cn("h-12 w-12 rounded-full object-cover", unread && "ring-2 ring-primary/50")}
+              className={cn("h-[52px] w-[52px] rounded-full object-cover ring-1 ring-white/[0.08]", unread && "ring-2 ring-[#0A84FF]/70 shadow-[0_0_14px_rgba(10,132,255,0.35)]")}
             />
             <OnlineDot online={online} />
           </div>
@@ -664,7 +699,7 @@ const DirectMessages: React.FC = () => {
               <div className="ml-2 flex flex-shrink-0 items-center gap-1.5">
                 {lastMsg && <span className="text-[12px] text-muted-foreground/50">{fmtTime(lastMsg.created_at)}</span>}
                 {unread && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#0A84FF] px-1 text-[11px] font-bold text-white shadow-[0_2px_10px_rgba(10,132,255,0.5)]">
                     {c.unreadCount}
                   </span>
                 )}
@@ -713,12 +748,17 @@ const DirectMessages: React.FC = () => {
   /* ─── derived active-chat values ─── */
   const otherName = activeConvo?.otherUser?.username || "User";
   const otherAvatar = safeAvatar(activeConvo?.otherUser?.avatar_url, otherName);
-  const isOnline = activeConvo?.otherUser?.is_online || false;
+  const isOnline = isUserOnline(activeConvo?.otherUser);
 
   return (
-    <div className="flex h-full overflow-hidden bg-background">
+    <div className="relative flex h-full overflow-hidden bg-background">
+      {/* iMessage-style ambient depth */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-32 left-1/3 h-72 w-72 rounded-full bg-[#0A84FF]/[0.07] blur-[100px]" />
+        <div className="absolute -bottom-32 right-1/4 h-72 w-72 rounded-full bg-[#9945FF]/[0.06] blur-[110px]" />
+      </div>
       {/* LEFT — conversation sidebar */}
-      <aside className={cn("h-full w-full flex-col border-r border-border/60 bg-background md:w-[360px] md:flex-shrink-0", activeConvo ? "hidden md:flex" : "flex")}>
+      <aside className={cn("relative z-10 h-full w-full flex-col border-r border-white/[0.07] bg-background/60 backdrop-blur-xl md:w-[360px] md:flex-shrink-0", activeConvo ? "hidden md:flex" : "flex")}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4">
           <div className="min-w-0">
@@ -787,7 +827,34 @@ const DirectMessages: React.FC = () => {
         {showNewDM && (
           <div className="border-b border-border/40">
             {!searchQuery && (
-              <p className="px-4 py-3 text-[12px] text-muted-foreground/45">Type a name to find people — or tap someone in the active row above.</p>
+              <div className="px-4 py-3">
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Active Users</p>
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                  {activeUsers.length === 0 ? (
+                    <p className="text-[12px] text-muted-foreground/40">No users yet</p>
+                  ) : (
+                    activeUsers.map((u) => (
+                      <button
+                        key={u.user_id}
+                        onClick={() => startConversation(u.user_id)}
+                        className="flex flex-col items-center gap-1.5 min-w-[52px]"
+                      >
+                        <div className="relative">
+                          <img
+                            src={safeAvatar(u.avatar_url, u.username || u.user_id)}
+                            alt=""
+                            className="h-12 w-12 rounded-full object-cover ring-2 ring-border/40"
+                          />
+                          <OnlineDot online={isUserOnline(u)} />
+                        </div>
+                        <span className="text-[10px] font-semibold text-foreground/70 truncate w-12 text-center">
+                          {u.username?.split(" ")[0] || "Anon"}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
             )}
 
             {/* Search results */}
@@ -813,7 +880,7 @@ const DirectMessages: React.FC = () => {
                             alt=""
                             className="h-9 w-9 rounded-full object-cover"
                           />
-                          <OnlineDot online={u.is_online} size="sm" />
+                          <OnlineDot online={isUserOnline(u)} size="sm" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-semibold text-foreground truncate">
@@ -821,7 +888,7 @@ const DirectMessages: React.FC = () => {
                             {u.badge && <span className="ml-1.5 text-[10px] text-primary">{u.badge}</span>}
                           </p>
                           <p className="text-[11px] text-muted-foreground/50">
-                            {u.is_online ? "Online" : lastSeen(u.last_active_at)}
+                            {isUserOnline(u) ? "Online" : lastSeen(u.last_active_at)}
                           </p>
                         </div>
                         <UserPlus className="h-3.5 w-3.5 text-muted-foreground/30" />
@@ -896,7 +963,7 @@ const DirectMessages: React.FC = () => {
       </aside>
 
       {/* RIGHT — chat panel */}
-      <main className={cn("h-full min-w-0 flex-1 flex-col bg-background", activeConvo ? "flex" : "hidden md:flex")}>
+      <main className={cn("relative z-10 h-full min-w-0 flex-1 flex-col bg-transparent", activeConvo ? "flex" : "hidden md:flex")}>
         {!activeConvo ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-[#2F80FF]/15 to-[#9945FF]/15">
@@ -913,7 +980,7 @@ const DirectMessages: React.FC = () => {
         ) : (
           <>
             {/* Chat header */}
-            <div className="flex items-center gap-3 border-b border-border/60 px-4 py-3">
+            <div className="flex items-center gap-3 border-b border-white/[0.07] bg-white/[0.03] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
               <button onClick={() => { setActiveConvo(null); setMessages([]); }} className="text-primary transition hover:text-primary/70 md:hidden">
                 <ArrowLeft className="h-5 w-5" />
               </button>
@@ -1036,8 +1103,8 @@ const DirectMessages: React.FC = () => {
                             "relative px-3.5 py-2 text-[14px] leading-relaxed",
                             bubbleRadius,
                             isMe
-                              ? "bg-gradient-to-br from-[#2F80FF] to-[#9945FF] text-white shadow-[0_8px_24px_-10px_rgba(47,128,255,0.7)]"
-                              : "bg-white/[0.07] text-foreground border border-white/10 backdrop-blur-md",
+                              ? "bg-gradient-to-b from-[#0A84FF] to-[#0B6FE8] text-white shadow-[0_8px_24px_-10px_rgba(10,132,255,0.8)]"
+                              : "border border-white/[0.08] bg-[#3a3a3c]/55 text-foreground shadow-[0_4px_16px_-8px_rgba(0,0,0,0.6)] backdrop-blur-xl",
                           )}
                           onDoubleClick={() => setReplyTo(msg)}
                         >
@@ -1143,7 +1210,7 @@ const DirectMessages: React.FC = () => {
                 <div className="w-7 flex-shrink-0">
                   <img src={otherAvatar} alt="" className="h-7 w-7 rounded-full object-cover" />
                 </div>
-                <div className="rounded-[20px] rounded-bl-[6px] bg-muted/70">
+                <div className="rounded-[20px] rounded-bl-[6px] border border-white/[0.08] bg-[#3a3a3c]/55 backdrop-blur-xl">
                   <TypingDots />
                 </div>
               </div>
@@ -1171,14 +1238,14 @@ const DirectMessages: React.FC = () => {
       )}
 
       {/* ── Input bar (iOS-style, glass) ── */}
-      <div className="border-t border-white/10 px-3 py-2.5">
+      <div className="border-t border-white/[0.07] bg-white/[0.03] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
         {recording ? (
           <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2.5 backdrop-blur">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
             <span className="text-[13px] font-semibold text-foreground">Recording… {recSecs}s</span>
             <div className="flex-1" />
             <button onClick={() => stopRec(true)} className="text-[12px] font-semibold text-muted-foreground hover:text-foreground">Cancel</button>
-            <button onClick={() => stopRec(false)} className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#2F80FF] to-[#9945FF] text-white active:scale-95"><Send className="h-4 w-4" /></button>
+            <button onClick={() => stopRec(false)} className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-b from-[#0A84FF] to-[#0B6FE8] text-white shadow-[0_4px_14px_rgba(10,132,255,0.5)] active:scale-95"><Send className="h-4 w-4" /></button>
           </div>
         ) : (
           <div className="flex items-end gap-2">
@@ -1186,7 +1253,7 @@ const DirectMessages: React.FC = () => {
             <button onClick={() => imgInputRef.current?.click()} disabled={uploading} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-muted-foreground transition hover:text-foreground disabled:opacity-50">
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
             </button>
-            <div className="flex-1 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 min-h-[36px] flex items-center backdrop-blur">
+            <div className="flex-1 rounded-full border border-white/[0.12] bg-white/[0.07] px-4 py-2 min-h-[36px] flex items-center shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl">
               <input
                 type="text"
                 value={input}
@@ -1197,7 +1264,7 @@ const DirectMessages: React.FC = () => {
               />
             </div>
             {input.trim() ? (
-              <button onClick={sendMessage} disabled={sending} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#2F80FF] to-[#9945FF] text-white shadow-sm active:scale-95">
+              <button onClick={sendMessage} disabled={sending} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#0A84FF] to-[#0B6FE8] text-white shadow-[0_4px_14px_rgba(10,132,255,0.5)] transition active:scale-95">
                 <Send className="h-4 w-4" />
               </button>
             ) : (

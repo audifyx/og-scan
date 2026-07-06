@@ -171,20 +171,36 @@ export default function SocialHome({ onSwitchTab, onSelectMint }: { onSwitchTab?
   const TABS: { id: Tab; label: string }[] = [{ id: "foryou", label: "For You" }, { id: "top", label: "Top" }, { id: "following", label: "Following" }];
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+    <div className="relative grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <style>{`
+        @keyframes shFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        .sh-fade { animation: shFadeIn .3s ease both; }
+      `}</style>
       {/* ── Timeline ── */}
       <div className="min-w-0">
         {/* Market ticker */}
         {ticker.length > 0 && (
-          <div className="mb-3 overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02]">
-            <div className="flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35"><Flame className="h-3 w-3 text-primary" /> Trending now</div>
-            <div className="flex gap-4 overflow-x-auto px-3 pb-2 scrollbar-none">
+          <div className="mb-3 overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.04] to-white/[0.015] shadow-[0_8px_24px_-16px_rgba(0,0,0,0.7)]">
+            <div className="flex items-center gap-2 px-3.5 pt-2.5 text-[10px] font-bold uppercase tracking-widest text-white/35">
+              <Flame className="h-3 w-3 text-primary" /> Trending now
+              <span className="ml-auto inline-flex items-center gap-1 text-[9.5px] normal-case tracking-normal text-emerald-300/70"><span className="h-1 w-1 animate-pulse rounded-full bg-emerald-400" /> live</span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto px-3 py-2.5 scrollbar-none">
               {ticker.map((t) => {
                 const up = (t.change24h ?? 0) >= 0;
                 return (
-                  <button key={t.mint} onClick={() => { onSelectMint?.(t.mint); onSwitchTab?.("scanner"); }} className="flex shrink-0 items-center gap-1.5 text-[12px]">
-                    <span className="font-bold text-white">${t.symbol}</span>
-                    <span className={cn("inline-flex items-center gap-0.5 font-semibold", up ? "text-emerald-400" : "text-rose-400")}>
+                  <button
+                    key={t.mint}
+                    onClick={() => { onSelectMint?.(t.mint); onSwitchTab?.("scanner"); }}
+                    className="group flex shrink-0 items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-white/[0.06] hover:shadow-[0_6px_18px_-8px_rgba(47,128,255,0.4)]"
+                  >
+                    <span className="text-[12px] font-black text-white">${t.symbol}</span>
+                    {t.priceUsd != null && (
+                      <span className="text-[10.5px] font-medium text-white/40">
+                        ${t.priceUsd < 0.01 ? t.priceUsd.toExponential(1) : t.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                      </span>
+                    )}
+                    <span className={cn("inline-flex items-center gap-0.5 text-[11px] font-bold", up ? "text-emerald-400" : "text-rose-400")}>
                       {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}{Math.abs(t.change24h ?? 0).toFixed(0)}%
                     </span>
                   </button>
@@ -196,21 +212,27 @@ export default function SocialHome({ onSwitchTab, onSelectMint }: { onSwitchTab?
 
         {/* Header + tabs */}
         <div className="sticky top-0 z-10 -mx-1 mb-3 bg-background/85 px-1 pt-2 backdrop-blur-md">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h1 className="text-[19px] font-black text-white">Home</h1>
+          <div className="mb-2 flex items-end justify-between gap-2">
+            <div>
+              <h1 className="bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-[22px] font-black tracking-tight text-transparent">Home</h1>
+              <p className="text-[11.5px] text-white/35">Welcome back, {displayName} — here's what's moving.</p>
+            </div>
+            <span className="mb-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-2.5 py-1 text-[10.5px] font-bold text-emerald-300/90">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> {posts.length} live post{posts.length === 1 ? "" : "s"}
+            </span>
           </div>
           <div className="flex gap-1 border-b border-white/[0.06]">
             {TABS.map((t) => (
               <button key={t.id} onClick={() => setTab(t.id)} className={cn("relative px-4 py-2.5 text-[13px] font-bold transition", tab === t.id ? "text-white" : "text-white/40 hover:text-white/70")}>
                 {t.label}
-                {tab === t.id && <span className="absolute bottom-0 left-1/2 h-[3px] w-8 -translate-x-1/2 rounded-full bg-primary" />}
+                {tab === t.id && <span className="absolute bottom-0 left-1/2 h-[3px] w-10 -translate-x-1/2 rounded-full bg-gradient-to-r from-primary to-[#9945FF] shadow-[0_0_10px_rgba(47,128,255,0.6)]" />}
               </button>
             ))}
           </div>
         </div>
 
         {/* Composer */}
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3.5">
+        <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-3.5 shadow-[0_8px_28px_-16px_rgba(0,0,0,0.7)] backdrop-blur-xl transition-all duration-200 focus-within:border-primary/40 focus-within:shadow-[0_0_0_3px_rgba(47,128,255,0.1)]">
           <div className="flex gap-3">
             <img src={profile?.avatar_url || dicebear(displayName)} alt="" className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" />
             <div className="min-w-0 flex-1">
@@ -231,7 +253,7 @@ export default function SocialHome({ onSwitchTab, onSelectMint }: { onSwitchTab?
         </div>
 
         {/* Feed */}
-        <div className="mt-3 space-y-px overflow-hidden rounded-2xl border border-white/[0.07]">
+        <div className="mt-3 space-y-px overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.01] shadow-[0_12px_40px_-24px_rgba(0,0,0,0.8)]">
           {loading ? (
             <div className="grid place-items-center py-20 text-white/30"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : shown.length === 0 ? (
@@ -243,7 +265,7 @@ export default function SocialHome({ onSwitchTab, onSelectMint }: { onSwitchTab?
           ) : shown.map((p) => {
             const liked = !!(user && (p.liked_by || []).includes(user.id));
             return (
-              <article key={p.id} className="flex gap-3 border-b border-white/[0.05] bg-white/[0.015] px-4 py-3.5 transition last:border-0 hover:bg-white/[0.03]">
+              <article key={p.id} className="sh-fade flex gap-3 border-b border-white/[0.05] bg-white/[0.015] px-4 py-3.5 transition last:border-0 hover:bg-white/[0.035]">
                 <img src={p.avatar_url || dicebear(p.username || p.user_id)} alt="" className="h-10 w-10 shrink-0 rounded-full border border-white/10 object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).src = dicebear(p.username || "og"); }} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 text-[13px]">
@@ -285,7 +307,7 @@ export default function SocialHome({ onSwitchTab, onSelectMint }: { onSwitchTab?
       {/* ── Right rail ── */}
       <aside className="hidden space-y-4 lg:block">
         {/* Who to follow */}
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+        <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.015] p-4 shadow-[0_8px_24px_-16px_rgba(0,0,0,0.7)]">
           <h3 className="mb-3 flex items-center gap-1.5 text-[13px] font-black text-white"><Users className="h-4 w-4 text-primary" /> Who to follow</h3>
           {suggested.length === 0 ? (
             <p className="text-[12px] text-white/35">You're following everyone we'd suggest. 🎉</p>
@@ -306,7 +328,7 @@ export default function SocialHome({ onSwitchTab, onSelectMint }: { onSwitchTab?
         </div>
 
         {/* Trending cashtags */}
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+        <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.015] p-4 shadow-[0_8px_24px_-16px_rgba(0,0,0,0.7)]">
           <h3 className="mb-3 flex items-center gap-1.5 text-[13px] font-black text-white"><TrendingUp className="h-4 w-4 text-primary" /> Trending cashtags</h3>
           {trendingTags.length === 0 ? <p className="text-[12px] text-white/35">Cashtags people mention will trend here.</p> : (
             <div className="space-y-2.5">
@@ -321,7 +343,7 @@ export default function SocialHome({ onSwitchTab, onSelectMint }: { onSwitchTab?
         </div>
 
         {/* Jump in */}
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+        <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.015] p-4 shadow-[0_8px_24px_-16px_rgba(0,0,0,0.7)]">
           <h3 className="mb-3 text-[13px] font-black text-white">Jump in</h3>
           <div className="space-y-1.5">
             {[

@@ -1269,6 +1269,24 @@ function ExploreCommunities({
 
   return (
     <div>
+      {/* X-style discover hero */}
+      <div className="relative overflow-hidden border-b border-white/[0.06] px-4 pb-4 pt-5">
+        <div className="pointer-events-none absolute -right-10 -top-16 h-40 w-40 rounded-full bg-og-cyan/[0.08] blur-[70px]" />
+        <div className="pointer-events-none absolute -bottom-16 -left-10 h-40 w-40 rounded-full bg-purple-500/[0.07] blur-[70px]" />
+        <div className="relative flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-[20px] font-black tracking-tight text-white">Discover Communities</h2>
+            <p className="mt-0.5 text-[12px] text-white/40">{communities.length} communities — badges, raids, spaces & knowledge hubs</p>
+          </div>
+          <button
+            onClick={onCreateNew}
+            className="shrink-0 rounded-full bg-gradient-to-r from-og-cyan to-blue-500 px-4 py-2 text-[12px] font-black text-white shadow-[0_8px_20px_-8px_rgba(34,211,238,0.6)] transition hover:brightness-110 active:scale-95"
+          >
+            + Create
+          </button>
+        </div>
+      </div>
+
       {/* Search */}
       <div className="p-4 pb-2">
         <div className="relative">
