@@ -167,6 +167,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [searching, setSearching] = useState(false);
   const [commView, setCommView] = useState<"token" | "og">("token");
   const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
+  const [moreOpen, setMoreOpen] = useState(false);
 
   /* remember the active tab + honor legacy sidebar deep links */
   useEffect(() => {
@@ -1070,6 +1071,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               </button>
             );
           })}
+          <button
+            key="more"
+            type="button"
+            onClick={() => setMoreOpen(!moreOpen)}
+            className="relative z-10 grid h-10 w-12 place-items-center rounded-full transition-colors text-white/45 hover:text-white/75"
+          >
+            <MoreHorizontal className="h-[22px] w-[22px]" />
+          </button>
         </div>
       </nav>
 
