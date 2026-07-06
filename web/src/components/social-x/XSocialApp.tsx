@@ -164,6 +164,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [searchScope, setSearchScope] = useState<"all" | "people" | "coins" | "communities">("all");
   const [foundProfiles, setFoundProfiles] = useState<Suggestion[]>([]);
   const [foundComms, setFoundComms] = useState<CommunityLite[]>([]);
+  const [foundDexCoins, setFoundDexCoins] = useState<Ticker[]>([]);
   const [searching, setSearching] = useState(false);
   const [commView, setCommView] = useState<"token" | "og">("token");
   const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
@@ -259,11 +260,30 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   /* ── Universal search: people + communities (server), coins (trending ticker) ── */
   useEffect(() => {
     const q = searchQ.trim().replace(/[%,()]/g, "");
-    if (q.length < 2) { setFoundProfiles([]); setFoundComms([]); setSearching(false); return; }
+    if (q.length < 2) { setFoundProfiles([]); setFoundComms([]); setFoundDexCoins([]); setSearching(false); return; }
     setSearching(true);
     const t = setTimeout(async () => {
       const like = `%${q}%`;
-      const [pRes, cRes] = await Promise.all([
+      // Real coin search across all of Solana (symbol or contract address), not
+      // just the trending ticker. Highest-liquidity Solana pair per token.
+      const coinsP = fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          const seen = new Set<string>();
+          return (((d && d.pairs) || []) as any[])
+            .filter((p) => p.chainId === "solana" && p.baseToken?.address)
+            .sort((a, b) => Number(b.liquidity?.usd ?? 0) - Number(a.liquidity?.usd ?? 0))
+            .filter((p) => (seen.has(p.baseToken.address) ? false : (seen.add(p.baseToken.address), true)))
+            .slice(0, 8)
+            .map((p) => ({
+              mint: p.baseToken.address as string,
+              symbol: (p.baseToken.symbol as string) ?? null,
+              priceUsd: p.priceUsd != null ? Number(p.priceUsd) : null,
+              change24h: p.priceChange?.h24 != null ? Number(p.priceChange.h24) : null,
+            } as Ticker));
+        })
+        .catch(() => [] as Ticker[]);
+      const [pRes, cRes, coins] = await Promise.all([
         supabase.from("profiles")
           .select("user_id,username,display_name,avatar_url,is_official_account,bio")
           .or(`username.ilike.${like},display_name.ilike.${like}`)
@@ -272,9 +292,11 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           .select("id,name,description,member_count,avatar_url,icon,category")
           .or(`name.ilike.${like},description.ilike.${like}`)
           .limit(10),
+        coinsP,
       ]);
       setFoundProfiles((pRes.data as Suggestion[]) || []);
       setFoundComms((cRes.data as CommunityLite[]) || []);
+      setFoundDexCoins(coins);
       setSearching(false);
     }, 300);
     return () => clearTimeout(t);
@@ -381,8 +403,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const foundCoins = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
     if (!q) return [];
-    return ticker.filter((t) => (t.symbol || "").toLowerCase().includes(q) || t.mint.toLowerCase() === q).slice(0, 8);
-  }, [searchQ, ticker]);
+    const local = ticker.filter((t) => (t.symbol || "").toLowerCase().includes(q) || t.mint.toLowerCase() === q);
+    const seen = new Set<string>();
+    return [...local, ...foundDexCoins].filter((t) => (seen.has(t.mint) ? false : (seen.add(t.mint), true))).slice(0, 10);
+  }, [searchQ, ticker, foundDexCoins]);
 
   const isNarrow = NARROW_TABS.includes(tab);
   const PILL_INDEX = CORE_TABS.indexOf(tab) >= 0 ? CORE_TABS.indexOf(tab) : MORE_TABS.includes(tab) ? CORE_TABS.length : -1; // More slot; -1 = none (notifications lives top-right)
@@ -730,7 +754,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                       <span className="text-[12px] font-bold text-white/30">{foundCoins.length}</span>
                     </div>
                     {foundCoins.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-[13px] text-white/35">No matching coins in trending right now.</div>
+                      <div className="px-4 py-6 text-center text-[13px] text-white/35">No coins found. Try a symbol or paste a contract address.</div>
                     ) : foundCoins.map((t, i) => <TrendRow key={t.mint} t={t} i={i} />)}
                   </section>
                 )}
