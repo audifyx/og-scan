@@ -36,7 +36,7 @@ export type XTab =
 
 interface Post {
   id: string; user_id: string; username: string | null; avatar_url: string | null;
-  content: string; likes_count: number | null; liked_by: string[] | null; created_at: string; reply_to?: string | null;
+  content: string; likes_count: number | null; liked_by: string[] | null; created_at: string; reply_to?: string | null; repost_of?: string | null;
 }
 interface Suggestion { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null; is_official_account?: boolean | null; bio?: string | null; }
 interface Ticker { mint: string; symbol: string | null; priceUsd: number | null; change24h: number | null; }
@@ -165,6 +165,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [replyText, setReplyText] = useState("");
   const [replyPosting, setReplyPosting] = useState(false);
   const [replyCounts, setReplyCounts] = useState<Record<string, number>>({});
+  const [repostOriginals, setRepostOriginals] = useState<Record<string, Post>>({});
   const [, setClockTick] = useState(0);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -238,7 +239,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const load = useCallback(async () => {
     const { data } = await supabase
       .from("social_messages")
-      .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at")
+      .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,repost_of")
       .eq("channel", FEED_CHANNEL).is("reply_to", null).order("created_at", { ascending: false }).limit(100);
     if (data) setPosts(data as Post[]);
     setLoading(false);
@@ -464,6 +465,20 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   }, [feedIdsKey]);
 
   useEffect(() => {
+    const ids = [...new Set(posts.filter((p) => p.repost_of).map((p) => p.repost_of as string))].filter((id) => !repostOriginals[id]);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,repost_of").in("id", ids)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const m: Record<string, Post> = {};
+        ((data as Post[]) || []).forEach((pp) => { m[pp.id] = pp; });
+        setRepostOriginals((prev) => ({ ...prev, ...m }));
+      });
+    return () => { cancelled = true; };
+  }, [posts]);
+
+  useEffect(() => {
     if (!openPostId) return;
     const parentId = openPostId;
     const ch = supabase.channel(`x-thread-${parentId}`)
@@ -506,11 +521,18 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     if (!p.id.startsWith("tmp-")) { const { error } = await supabase.from("social_messages").delete().eq("id", p.id).eq("user_id", user.id); if (error) toast.error("Could not delete post"); }
   };
 
-  const repost = (p: Post) => {
-    const quoted = `RP @${p.username || "anon"}: ${p.content}`;
-    setComposeOpen(true);
-    setText(quoted.slice(0, MAX_LEN));
-    setTimeout(() => modalRef.current?.focus(), 60);
+  const repost = async (p: Post) => {
+    if (!user) { toast.error("Sign in to repost"); return; }
+    const target = p.repost_of ? p.repost_of : p.id;
+    const orig = p.repost_of ? repostOriginals[p.repost_of] : p;
+    const optimistic: Post = { id: `tmp-${Date.now()}`, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url || null, content: "", likes_count: 0, liked_by: [], created_at: new Date().toISOString(), repost_of: target };
+    setPosts((prev) => [optimistic, ...prev]);
+    if (orig) setRepostOriginals((prev) => ({ ...prev, [target]: prev[target] ?? orig }));
+    const { data, error } = await supabase.from("social_messages")
+      .insert({ channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url, content: "", likes_count: 0, liked_by: [], repost_of: target })
+      .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at,repost_of").single();
+    if (error) { toast.error("Could not repost. Try again."); setPosts((prev) => prev.filter((x) => x.id !== optimistic.id)); }
+    else if (data) { setPosts((prev) => prev.map((x) => x.id === optimistic.id ? (data as Post) : x)); void notify((orig ?? p).user_id, "repost", "New repost", `@${handle} reposted your post`, target); toast.success("Reposted"); }
   };
 
   const replyTo = (p: Post) => {
@@ -659,7 +681,17 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     </div>
   );
 
-  const PostCard = ({ p, onOpen }: { p: Post; onOpen?: (id: string) => void }) => {
+  const PostCard = ({ p: raw, onOpen }: { p: Post; onOpen?: (id: string) => void }) => {
+    const isRepost = Boolean(raw.repost_of);
+    const original = isRepost ? repostOriginals[raw.repost_of as string] : raw;
+    if (isRepost && !original) {
+      return (
+        <article className="flex gap-3 border-b border-white/[0.06] px-4 py-3.5 text-[13px] text-white/40">
+          <Repeat2 className="mt-0.5 h-4 w-4" /> @{raw.username || "someone"} reposted · loading…
+        </article>
+      );
+    }
+    const p = (original ?? raw) as Post;
     const liked = Boolean(user && (p.liked_by || []).includes(user.id));
     const marked = bookmarks.has(p.id);
     const own = user && p.user_id === user.id;
@@ -667,6 +699,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       <article onClick={() => onOpen?.(p.id)} className={cn("x-fade-in group/post relative flex gap-3 border-b border-white/[0.06] px-4 py-3.5 transition-colors duration-200 hover:bg-white/[0.025]", onOpen && "cursor-pointer")}>
         <img src={avatarOf(p.avatar_url, p.user_id)} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-white/10 transition group-hover/post:ring-[#1d9bf0]/40" />
         <div className="min-w-0 flex-1">
+          {isRepost && <div className="mb-1 flex items-center gap-1.5 text-[12px] font-bold text-white/40"><Repeat2 className="h-3.5 w-3.5" /> @{raw.username || "someone"} reposted</div>}
           <div className="flex items-center gap-1.5 text-[14px]">
             <span className="truncate font-black text-white hover:underline">{p.username || "Anon"}</span>
             {officialIds.has(p.user_id) && <BadgeCheck className="h-4 w-4 shrink-0 text-[#1d9bf0]" />}
