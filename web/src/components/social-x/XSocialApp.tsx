@@ -32,7 +32,7 @@ const ProfilePage = lazy(() => import("@/components/profile-20x/UserProfile"));
 /* ═══════════ Types ═══════════ */
 export type XTab =
   | "home" | "explore" | "notifications" | "messages"
-  | "chat" | "rooms" | "spaces" | "communities" | "profile";
+  | "chat" | "rooms" | "spaces" | "communities" | "profile" | "bookmarks";
 
 interface Post {
   id: string; user_id: string; username: string | null; avatar_url: string | null;
@@ -106,12 +106,13 @@ const NAV: { id: XTab; label: string; Icon: React.ComponentType<{ className?: st
   { id: "spaces", label: "Spaces", Icon: Radio },
   { id: "communities", label: "Communities", Icon: Globe },
   { id: "profile", label: "Profile", Icon: User },
+  { id: "bookmarks", label: "Bookmarks", Icon: Bookmark },
 ];
 
 /* Mobile pill: 5 core tabs; the rest live in the More sheet (each tab appears exactly once).
    Notifications moved to the top-right bell — Communities takes its pill slot. */
 const CORE_TABS: XTab[] = ["home", "explore", "communities", "messages", "profile"];
-const MORE_TABS: XTab[] = ["chat", "rooms", "spaces"];
+const MORE_TABS: XTab[] = ["chat", "rooms", "spaces", "bookmarks"];
 
 /* Old sidebar/CommunityHub deep-link keys -> X shell tabs (keeps every legacy entry point working) */
 const ENTRY_MAP: Record<string, XTab> = {
@@ -137,7 +138,7 @@ function resolveInitialTab(preferred?: XTab): XTab {
 }
 
 /** Tabs that use the classic X 600px center column + right rail. */
-const NARROW_TABS: XTab[] = ["home", "explore", "notifications"];
+const NARROW_TABS: XTab[] = ["home", "explore", "notifications", "bookmarks"];
 
 const Spinner = () => (
   <div className="flex h-40 items-center justify-center">
@@ -166,6 +167,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [notifs, setNotifs] = useState<NotifRow[]>([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
   const [bookmarks, setBookmarks] = useState<Set<string>>(loadBookmarks);
+  const [bookmarkPosts, setBookmarkPosts] = useState<Post[]>([]);
+  const [bmLoading, setBmLoading] = useState(false);
   const [searchQ, setSearchQ] = useState("");
   const [searchScope, setSearchScope] = useState<"all" | "people" | "coins" | "communities">("all");
   const [foundProfiles, setFoundProfiles] = useState<Suggestion[]>([]);
@@ -285,6 +288,22 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(50)
       .then(({ data }) => { setNotifs((data as NotifRow[]) || []); setNotifsLoading(false); });
   }, [user, tab === "notifications"]);
+
+  /* ── Bookmarks: fetch saved posts by id when the tab is open ── */
+  useEffect(() => {
+    if (tab !== "bookmarks") return;
+    const ids = [...bookmarks].filter((id) => !id.startsWith("tmp-"));
+    if (ids.length === 0) { setBookmarkPosts([]); return; }
+    setBmLoading(true);
+    supabase.from("social_messages")
+      .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at")
+      .in("id", ids)
+      .then(({ data }) => {
+        const rows = ((data as Post[]) || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setBookmarkPosts(rows);
+        setBmLoading(false);
+      });
+  }, [tab, bookmarks]);
 
   /* ── Universal search: people + communities (server), coins (trending ticker) ── */
   useEffect(() => {
@@ -1118,6 +1137,34 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                   <span className="shrink-0 text-[11px] text-white/30">{timeAgo(n.created_at)}</span>
                 </div>
               ))
+            )}
+          </>
+        );
+
+      case "bookmarks":
+        return (
+          <>
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/[0.06] bg-black/55 px-4 py-3.5 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
+              <span className="text-[19px] font-black text-white">Bookmarks</span>
+              <span className="text-[13px] font-bold text-white/40">{bookmarks.size}</span>
+            </div>
+            {bmLoading ? (
+              <div>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex animate-pulse gap-3 border-b border-white/[0.06] px-4 py-4">
+                    <div className="h-10 w-10 shrink-0 rounded-full bg-white/[0.07]" />
+                    <div className="flex-1 space-y-2 py-1"><div className="h-3 w-36 rounded-full bg-white/[0.07]" /><div className="h-3 w-full rounded-full bg-white/[0.05]" /></div>
+                  </div>
+                ))}
+              </div>
+            ) : bookmarkPosts.length === 0 ? (
+              <div className="px-8 py-16 text-center">
+                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#1d9bf0]/15 to-[#9945FF]/10 ring-1 ring-white/[0.08]"><Bookmark className="h-6 w-6 text-[#1d9bf0]/70" /></div>
+                <div className="mt-3 text-[17px] font-black text-white">No bookmarks yet</div>
+                <div className="mt-1 text-[13px] text-white/40">Tap the bookmark icon on any post to save it here.</div>
+              </div>
+            ) : (
+              bookmarkPosts.map((p) => <PostCard key={p.id} p={p} />)
             )}
           </>
         );
