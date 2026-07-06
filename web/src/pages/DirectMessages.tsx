@@ -781,25 +781,28 @@ const DirectMessages: React.FC = () => {
               Active this week
             </p>
             <div className="no-scrollbar flex gap-3 overflow-x-auto pb-0.5">
-              {activeUsers.map((u) => (
+              {activeUsers.map((u) => {
+                const online = isUserOnline(u);
+                return (
                 <button
                   key={u.user_id}
                   onClick={() => startConversation(u.user_id)}
-                  title={u.is_online ? "Active now" : lastSeen(u.last_active_at)}
+                  title={online ? "Active now" : lastSeen(u.last_active_at)}
                   className="group flex w-[54px] shrink-0 flex-col items-center gap-1"
                 >
-                  <div className={cn("relative rounded-full p-[2px] transition group-active:scale-95", u.is_online ? "bg-gradient-to-tr from-emerald-400 via-[#2F80FF] to-[#9945FF]" : "bg-border/70")}>
+                  <div className={cn("relative rounded-full p-[2px] transition group-active:scale-95", online ? "bg-gradient-to-tr from-emerald-400 via-[#2F80FF] to-[#9945FF]" : "bg-border/70")}>
                     <img
                       src={safeAvatar(u.avatar_url, u.username || u.user_id)}
                       alt=""
                       className="h-12 w-12 rounded-full object-cover ring-2 ring-background transition group-hover:scale-[1.04]"
                     />
-                    {u.is_online && <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-400" />}
+                    {online && <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-400" />}
                   </div>
                   <span className="w-[54px] truncate text-center text-[10px] font-semibold text-foreground/75">{u.username?.split(" ")[0] || "Anon"}</span>
-                  <span className={cn("-mt-0.5 text-[9px] font-bold", u.is_online ? "text-emerald-400" : "text-muted-foreground/40")}>{u.is_online ? "now" : agoShort(u.last_active_at)}</span>
+                  <span className={cn("-mt-0.5 text-[9px] font-bold", online ? "text-emerald-400" : "text-muted-foreground/40")}>{online ? "now" : agoShort(u.last_active_at)}</span>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
