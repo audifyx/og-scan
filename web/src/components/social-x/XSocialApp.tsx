@@ -36,7 +36,7 @@ export type XTab =
 
 interface Post {
   id: string; user_id: string; username: string | null; avatar_url: string | null;
-  content: string; likes_count: number | null; liked_by: string[] | null; created_at: string;
+  content: string; likes_count: number | null; liked_by: string[] | null; created_at: string; reply_to?: string | null;
 }
 interface Suggestion { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null; is_official_account?: boolean | null; bio?: string | null; }
 interface Ticker { mint: string; symbol: string | null; priceUsd: number | null; change24h: number | null; }
@@ -70,8 +70,8 @@ function renderContent(text: string, onMint?: (m: string) => void) {
     if (m.index > last) parts.push(text.slice(last, m.index));
     const tok = m[0];
     if (tok.startsWith("$") || tok.startsWith("@") || tok.startsWith("#")) parts.push(<span key={i++} className="text-[#1d9bf0] hover:underline cursor-pointer">{tok}</span>);
-    else if (tok.startsWith("http")) parts.push(<a key={i++} href={tok} target="_blank" rel="noreferrer" className="text-[#1d9bf0] hover:underline break-all">{tok}</a>);
-    else if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tok)) parts.push(<button key={i++} type="button" onClick={() => onMint?.(tok)} className="font-mono text-[12px] text-[#1d9bf0] hover:underline">{tok.slice(0, 4)}…{tok.slice(-4)}</button>);
+    else if (tok.startsWith("http")) parts.push(<a key={i++} href={tok} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[#1d9bf0] hover:underline break-all">{tok}</a>);
+    else if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tok)) parts.push(<button key={i++} type="button" onClick={(e) => { e.stopPropagation(); onMint?.(tok); }} className="font-mono text-[12px] text-[#1d9bf0] hover:underline">{tok.slice(0, 4)}…{tok.slice(-4)}</button>);
     else parts.push(tok);
     last = m.index + tok.length;
   }
@@ -158,6 +158,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [openPostId, setOpenPostId] = useState<string | null>(null);
+  const [detailPost, setDetailPost] = useState<Post | null>(null);
+  const [detailReplies, setDetailReplies] = useState<Post[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [replyPosting, setReplyPosting] = useState(false);
   const [, setClockTick] = useState(0);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -232,7 +238,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     const { data } = await supabase
       .from("social_messages")
       .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at")
-      .eq("channel", FEED_CHANNEL).order("created_at", { ascending: false }).limit(100);
+      .eq("channel", FEED_CHANNEL).is("reply_to", null).order("created_at", { ascending: false }).limit(100);
     if (data) setPosts(data as Post[]);
     setLoading(false);
   }, []);
@@ -241,7 +247,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   useEffect(() => {
     const ch = supabase.channel("x-home-feed")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "social_messages", filter: `channel=eq.${FEED_CHANNEL}` },
-        (p) => { const row = p.new as Post; setPosts((prev) => prev.some((x) => x.id === row.id) ? prev : [row, ...prev]); if (tabRef.current === "home" && row.user_id !== uidRef.current && (feedScrollRef.current?.scrollTop ?? 0) > 300) setNewPosts((n) => n + 1); })
+        (p) => { const row = p.new as Post; if (row.reply_to) return; setPosts((prev) => prev.some((x) => x.id === row.id) ? prev : [row, ...prev]); if (tabRef.current === "home" && row.user_id !== uidRef.current && (feedScrollRef.current?.scrollTop ?? 0) > 300) setNewPosts((n) => n + 1); })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "social_messages", filter: `channel=eq.${FEED_CHANNEL}` },
         (p) => { const row = p.new as Post; setPosts((prev) => prev.map((x) => x.id === row.id ? { ...x, likes_count: row.likes_count, liked_by: row.liked_by, content: row.content } : x)); })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "social_messages" },
@@ -397,6 +403,35 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     else if (data) setPosts((prev) => prev.map((p) => p.id === optimistic.id ? (data as Post) : p));
     setPosting(false);
     setComposeOpen(false);
+  };
+
+  useEffect(() => {
+    if (!openPostId) { setDetailPost(null); setDetailReplies([]); return; }
+    const existing = posts.find((p) => p.id === openPostId) || null;
+    setDetailPost(existing);
+    setDetailLoading(true);
+    let cancelled = false;
+    (async () => {
+      if (!existing) {
+        const { data } = await supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").eq("id", openPostId).single();
+        if (!cancelled && data) setDetailPost(data as Post);
+      }
+      const { data: reps } = await supabase.from("social_messages").select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").eq("reply_to", openPostId).order("created_at", { ascending: true }).limit(100);
+      if (!cancelled) { setDetailReplies((reps as Post[]) || []); setDetailLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [openPostId, posts]);
+
+  const submitReply = async () => {
+    const content = replyText.trim();
+    if (!content || !user || !openPostId || replyPosting) return;
+    setReplyPosting(true); setReplyText("");
+    const { data, error } = await supabase.from("social_messages")
+      .insert({ channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url, content, likes_count: 0, liked_by: [], reply_to: openPostId })
+      .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").single();
+    if (error) { toast.error("Could not reply. Try again."); setReplyText(content); }
+    else if (data) setDetailReplies((prev) => [...prev, data as Post]);
+    setReplyPosting(false);
   };
 
   const toggleLike = async (post: Post) => {
@@ -580,12 +615,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     </div>
   );
 
-  const PostCard = ({ p }: { p: Post }) => {
+  const PostCard = ({ p, onOpen }: { p: Post; onOpen?: (id: string) => void }) => {
     const liked = Boolean(user && (p.liked_by || []).includes(user.id));
     const marked = bookmarks.has(p.id);
     const own = user && p.user_id === user.id;
     return (
-      <article className="x-fade-in group/post relative flex gap-3 border-b border-white/[0.06] px-4 py-3.5 transition-colors duration-200 hover:bg-white/[0.025]">
+      <article onClick={() => onOpen?.(p.id)} className={cn("x-fade-in group/post relative flex gap-3 border-b border-white/[0.06] px-4 py-3.5 transition-colors duration-200 hover:bg-white/[0.025]", onOpen && "cursor-pointer")}>
         <img src={avatarOf(p.avatar_url, p.user_id)} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-white/10 transition group-hover/post:ring-[#1d9bf0]/40" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[14px]">
@@ -604,7 +639,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               {imgs.length > 0 && (
                 <div className={cn("mt-2 grid gap-1.5 overflow-hidden rounded-2xl", imgs.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
                   {imgs.map((u, i) => (
-                    <a key={i} href={u} target="_blank" rel="noreferrer" className="block overflow-hidden">
+                    <a key={i} href={u} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="block overflow-hidden">
                       <img src={u} alt="" loading="lazy" className={cn("w-full object-cover ring-1 ring-white/[0.08] transition duration-300 hover:scale-[1.02]", imgs.length > 1 ? "h-40" : "max-h-[380px]")} />
                     </a>
                   ))}
@@ -613,20 +648,20 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </>
           ); })()}
           <div className="mt-2 flex max-w-md items-center justify-between text-white/35">
-            <button type="button" onClick={() => replyTo(p)} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]">
+            <button type="button" onClick={(e) => { e.stopPropagation(); replyTo(p); }} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]">
               <span className="rounded-full p-1.5 transition group-hover:bg-[#1d9bf0]/10"><MessageCircle className="h-4 w-4" /></span>
             </button>
-            <button type="button" onClick={() => repost(p)} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-emerald-400">
+            <button type="button" onClick={(e) => { e.stopPropagation(); repost(p); }} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-emerald-400">
               <span className="rounded-full p-1.5 transition group-hover:bg-emerald-400/10"><Repeat2 className="h-4 w-4" /></span>
             </button>
-            <button type="button" onClick={() => toggleLike(p)} className={cn("group flex items-center gap-1.5 transition active:scale-90 hover:text-pink-500", liked && "text-pink-500")}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); toggleLike(p); }} className={cn("group flex items-center gap-1.5 transition active:scale-90 hover:text-pink-500", liked && "text-pink-500")}>
               <span className="rounded-full p-1.5 transition group-hover:bg-pink-500/10"><Heart className={cn("h-4 w-4", liked && "x-like-pop fill-current")} /></span>
               {(p.likes_count ?? 0) > 0 && <span className="text-[12px] font-bold">{p.likes_count}</span>}
             </button>
-            <button type="button" onClick={() => toggleBookmark(p)} className={cn("group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]", marked && "text-[#1d9bf0]")}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); toggleBookmark(p); }} className={cn("group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]", marked && "text-[#1d9bf0]")}>
               <span className="rounded-full p-1.5 transition group-hover:bg-[#1d9bf0]/10"><Bookmark className={cn("h-4 w-4", marked && "fill-current")} /></span>
             </button>
-            <button type="button" onClick={() => share(p)} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]">
+            <button type="button" onClick={(e) => { e.stopPropagation(); share(p); }} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]">
               <span className="rounded-full p-1.5 transition group-hover:bg-[#1d9bf0]/10"><Share className="h-4 w-4" /></span>
             </button>
           </div>
@@ -881,7 +916,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             ) : (
               shownPosts.map((p, i) => (
                 <React.Fragment key={p.id}>
-                  <PostCard p={p} />
+                  <PostCard p={p} onOpen={setOpenPostId} />
                   {i === 2 && feedMode === "foryou" && ticker.length >= 3 && (
                     <div className="border-b border-white/[0.06] bg-gradient-to-b from-white/[0.02] to-transparent px-4 py-3">
                       <div className="mb-1 flex items-center justify-between">
@@ -1164,7 +1199,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 <div className="mt-1 text-[13px] text-white/40">Tap the bookmark icon on any post to save it here.</div>
               </div>
             ) : (
-              bookmarkPosts.map((p) => <PostCard key={p.id} p={p} />)
+              bookmarkPosts.map((p) => <PostCard key={p.id} p={p} onOpen={setOpenPostId} />)
             )}
           </>
         );
@@ -1523,6 +1558,36 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       )}
 
       <input ref={composerFileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void uploadComposerImage(e.target.files); e.currentTarget.value = ""; }} />
+      {/* ── Post detail / thread ── */}
+      {openPostId && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[6vh] backdrop-blur-sm" onClick={() => setOpenPostId(null)}>
+          <div className="flex max-h-[86vh] w-full max-w-[600px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_24px_64px_rgba(0,0,0,0.8)]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+              <button type="button" onClick={() => setOpenPostId(null)} className="rounded-full p-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"><XIcon className="h-5 w-5" /></button>
+              <span className="text-[17px] font-black text-white">Post</span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {detailPost ? <PostCard p={detailPost} /> : <div className="px-4 py-8 text-center text-sm text-white/40">Loading…</div>}
+              {user && (
+                <div className="flex gap-3 border-b border-white/10 px-4 py-3">
+                  <img src={myAvatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
+                  <div className="flex-1">
+                    <textarea value={replyText} onChange={(e) => setReplyText(e.target.value.slice(0, MAX_LEN))} placeholder="Post your reply" rows={2} className="w-full resize-none bg-transparent text-[15px] text-white placeholder:text-white/30 outline-none" />
+                    <div className="mt-1 flex justify-end">
+                      <button type="button" disabled={!replyText.trim() || replyPosting} onClick={submitReply} className={cn("rounded-full px-4 py-1.5 text-[13px] font-black transition active:scale-95", replyText.trim() && !replyPosting ? "bg-gradient-to-r from-[#1d9bf0] to-[#4a9ff5] text-white" : "bg-[#1d9bf0]/40 text-white/50")}>{replyPosting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reply"}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {detailLoading ? (
+                <div className="px-4 py-6 text-center text-sm text-white/40">Loading replies…</div>
+              ) : detailReplies.length === 0 ? (
+                <div className="px-4 py-10 text-center text-sm text-white/40">No replies yet. Be the first.</div>
+              ) : detailReplies.map((r) => <PostCard key={r.id} p={r} />)}
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── Compose modal ── */}
       {composeOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#5b7083]/40 p-4 pt-[8vh]" onClick={() => setComposeOpen(false)}>
