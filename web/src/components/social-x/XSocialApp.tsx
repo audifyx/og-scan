@@ -170,6 +170,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [foundProfiles, setFoundProfiles] = useState<Suggestion[]>([]);
   const [foundComms, setFoundComms] = useState<CommunityLite[]>([]);
   const [foundDexCoins, setFoundDexCoins] = useState<Ticker[]>([]);
+  const [topComms, setTopComms] = useState<CommunityLite[]>([]);
   const [searching, setSearching] = useState(false);
   const [commView, setCommView] = useState<"token" | "og">("token");
   const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
@@ -253,6 +254,11 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     supabase.from("profiles").select("user_id,username,display_name,avatar_url,is_official_account,bio")
       .not("username", "is", null).order("is_official_account", { ascending: false }).order("created_at", { ascending: false }).limit(30)
       .then(({ data }) => { if (data) setSuggestions(data as Suggestion[]); });
+  }, []);
+
+  useEffect(() => {
+    supabase.from("communities").select("id,name,description,member_count,avatar_url,icon,category").order("member_count", { ascending: false }).limit(6)
+      .then(({ data }) => { if (data) setTopComms(data as CommunityLite[]); });
   }, []);
 
   /* ── Trends (market ticker) ── */
@@ -1035,7 +1041,14 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                   </div>
                 )}
 
-                <div className="x-rise pb-2" style={{ animationDelay: "240ms" }}>
+                {topComms.length > 0 && (
+                  <div className="x-rise border-b border-white/[0.06] pb-2" style={{ animationDelay: "200ms" }}>
+                    <div className="px-4 pt-4 text-[15px] font-black text-white">Communities to explore</div>
+                    {topComms.map((c) => <CommunityRow key={c.id} c={c} />)}
+                  </div>
+                )}
+
+                <div className="x-rise pb-2" style={{ animationDelay: "260ms" }}>
                   <div className="px-4 pt-4 text-[15px] font-black text-white">Who to follow</div>
                   {whoToFollow.slice(0, 6).map((s) => <FollowCard key={s.user_id} s={s} />)}
                 </div>
