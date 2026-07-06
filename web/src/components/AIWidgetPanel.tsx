@@ -20,10 +20,11 @@ export const readWidgets = (): WidgetConfig[] => {
 const writeWidgets = (w: WidgetConfig[]) => localStorage.setItem(WG_KEY, JSON.stringify(w));
 
 const TEMPLATES: Record<string, Omit<WidgetConfig, 'id' | 'pos'>> = {
+  // — Originals (also used by slash-commands & AI builder) —
   sol_price:        { type: 'sol_price',        title: 'SOL Price',        params: {},                                       size: 'sm' },
   trending:         { type: 'trending',          title: 'Trending Tokens',  params: { limit: 5 },                            size: 'md' },
   social_feed:      { type: 'social_feed',       title: 'Community Feed',   params: { channel: 'social-general', limit: 3 }, size: 'md' },
-  wallet:           { type: 'wallet',            title: 'Wallet Tracker',   params: { address: '' },                        size: 'sm' },
+  wallet:           { type: 'wallet',            title: 'Wallet Balance',   params: { address: '' },                        size: 'sm' },
   price_chart:      { type: 'price_chart',       title: 'SOL Chart',        params: { symbol: 'SOL', days: 1 },              size: 'lg' },
   dex_chart:        { type: 'dex_chart',         title: 'DEX Pair Chart',   params: { symbol: 'SOL' },                      size: 'lg' },
   token_info:       { type: 'token_info',        title: 'Token Info',       params: { symbol: 'SOL' },                      size: 'md' },
@@ -33,7 +34,52 @@ const TEMPLATES: Record<string, Omit<WidgetConfig, 'id' | 'pos'>> = {
   fear_greed:       { type: 'fear_greed',        title: 'Fear & Greed',     params: {},                                     size: 'sm' },
   volume_bar:       { type: 'volume_bar',        title: 'Volume Tracker',   params: { symbol: 'SOL' },                      size: 'md' },
   top_traders:      { type: 'top_traders',       title: 'Top Traders',      params: { limit: 5 },                           size: 'md' },
+
+  // — Prices & Charts —
+  chart_sol_7d:  { type: 'price_chart', title: 'SOL Chart · 7d',  params: { symbol: 'SOL', days: 7 },                    size: 'lg' },
+  chart_sol_30d: { type: 'price_chart', title: 'SOL Chart · 30d', params: { symbol: 'SOL', days: 30 },                   size: 'lg' },
+  chart_btc:     { type: 'price_chart', title: 'Bitcoin Chart',   params: { symbol: 'bitcoin', days: 7 },                size: 'lg' },
+  chart_eth:     { type: 'price_chart', title: 'Ethereum Chart',  params: { symbol: 'ethereum', days: 7 },               size: 'lg' },
+  chart_bonk:    { type: 'price_chart', title: 'BONK Chart',      params: { symbol: 'bonk', days: 7 },                   size: 'lg' },
+  chart_wif:     { type: 'price_chart', title: 'WIF Chart',       params: { symbol: 'dogwifcoin', days: 7 },             size: 'lg' },
+  chart_jup:     { type: 'price_chart', title: 'JUP Chart',       params: { symbol: 'jupiter-exchange-solana', days: 7 },size: 'lg' },
+  chart_ray:     { type: 'price_chart', title: 'RAY Chart',       params: { symbol: 'raydium', days: 7 },                size: 'lg' },
+  chart_pyth:    { type: 'price_chart', title: 'PYTH Chart',      params: { symbol: 'pyth-network', days: 7 },           size: 'lg' },
+
+  // — DEX Pairs (live from DexScreener) —
+  dex_sol:    { type: 'dex_chart', title: 'SOL DEX Pair',    params: { symbol: 'SOL' },    size: 'lg' },
+  dex_bonk:   { type: 'dex_chart', title: 'BONK DEX Pair',   params: { symbol: 'BONK' },   size: 'lg' },
+  dex_jup:    { type: 'dex_chart', title: 'JUP DEX Pair',    params: { symbol: 'JUP' },    size: 'lg' },
+  dex_wif:    { type: 'dex_chart', title: 'WIF DEX Pair',    params: { symbol: 'WIF' },    size: 'lg' },
+  dex_pyth:   { type: 'dex_chart', title: 'PYTH DEX Pair',   params: { symbol: 'PYTH' },   size: 'lg' },
+  dex_jto:    { type: 'dex_chart', title: 'JTO DEX Pair',    params: { symbol: 'JTO' },    size: 'lg' },
+  dex_popcat: { type: 'dex_chart', title: 'POPCAT DEX Pair', params: { symbol: 'POPCAT' }, size: 'lg' },
+  dex_ray:    { type: 'dex_chart', title: 'RAY DEX Pair',    params: { symbol: 'RAY' },    size: 'lg' },
+  dex_orca:   { type: 'dex_chart', title: 'ORCA DEX Pair',   params: { symbol: 'ORCA' },   size: 'lg' },
+  dex_wen:    { type: 'dex_chart', title: 'WEN DEX Pair',    params: { symbol: 'WEN' },    size: 'lg' },
+
+  // — Token Info —
+  info_sol:    { type: 'token_info', title: 'SOL Token Info',    params: { symbol: 'SOL' },    size: 'md' },
+  info_bonk:   { type: 'token_info', title: 'BONK Token Info',   params: { symbol: 'BONK' },   size: 'md' },
+  info_jup:    { type: 'token_info', title: 'JUP Token Info',    params: { symbol: 'JUP' },    size: 'md' },
+  info_wif:    { type: 'token_info', title: 'WIF Token Info',    params: { symbol: 'WIF' },    size: 'md' },
+  info_pyth:   { type: 'token_info', title: 'PYTH Token Info',   params: { symbol: 'PYTH' },   size: 'md' },
+  info_popcat: { type: 'token_info', title: 'POPCAT Token Info', params: { symbol: 'POPCAT' }, size: 'md' },
+
+  // — Community —
+  social_announcements: { type: 'social_feed', title: 'Announcements', params: { channel: 'announcements', limit: 3 }, size: 'md' },
+  social_trades:        { type: 'social_feed', title: 'Trades Chat',   params: { channel: 'trades', limit: 3 },        size: 'md' },
 };
+
+const LIB_GROUPS: { label: string; keys: string[] }[] = [
+  { label: 'Prices & Charts', keys: ['sol_price','price_chart','chart_sol_7d','chart_sol_30d','chart_btc','chart_eth','chart_bonk','chart_wif','chart_jup','chart_ray','chart_pyth'] },
+  { label: 'DEX Pairs',       keys: ['dex_sol','dex_bonk','dex_jup','dex_wif','dex_pyth','dex_jto','dex_popcat','dex_ray','dex_orca','dex_wen'] },
+  { label: 'Token Info',      keys: ['info_sol','info_bonk','info_jup','info_wif','info_pyth','info_popcat','token_info'] },
+  { label: 'Market Intel',    keys: ['trending','fear_greed','volume_bar','kol_feed','top_traders'] },
+  { label: 'Community',       keys: ['social_feed','social_announcements','social_trades'] },
+  { label: 'Wallet',          keys: ['wallet','wallet_tracker','wallet_portfolio'] },
+];
+const LIB_TOTAL = LIB_GROUPS.reduce((n, g) => n + g.keys.length, 0);
 
 const LIB_ICONS: Record<string, string> = {
   sol_price: '◎', trending: '🔥', social_feed: '💬', wallet: '👛',
@@ -338,10 +384,11 @@ const FALLBACK_REPLIES: Record<string, string> = {
   volume_bar: '✅ Added volume tracker!', top_traders: '✅ Added top traders!', social_feed: '✅ Added community feed!',
 };
 
-export function AIWidgetPanel({ onClose, widgets, setWidgets }: {
+export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat' }: {
   onClose: () => void; widgets: WidgetConfig[]; setWidgets: (w: WidgetConfig[]) => void;
+  initialTab?: 'chat' | 'my' | 'lib';
 }) {
-  const [tab, setTab] = useState<'chat' | 'my' | 'lib'>('chat');
+  const [tab, setTab] = useState<'chat' | 'my' | 'lib'>(initialTab);
   const [msgs, setMsgs] = useState<Msg[]>([{ role: 'ai', text: '⚡ Widget Studio — builds anything permanently to your hub.\n\nType naturally or use commands:\n• /chart BONK — price chart\n• /wallet ADDRESS — buys/sells/holdings\n• /dex JUP — DEX pair\n• @BONK — quick token chart\n• @kol — KOL whale alerts\n• /help — all commands' }]);
   const [input, setInput] = useState(''), [busy, setBusy] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -388,7 +435,7 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets }: {
       <div className="awp-panel" onClick={e => e.stopPropagation()}>
         <div className="awp-handle" />
         <div className="awp-title-row"><span className="awp-title-text">⚡ Widget Studio</span><button className="awp-close" onClick={onClose}>✕</button></div>
-        <div className="awp-tabs">{(['chat','my','lib'] as const).map(t => (<button key={t} className={`awp-tab ${tab===t?'awp-tab-on':''}`} onClick={() => setTab(t)}>{t==='chat'?'🤖 AI Builder':t==='my'?`📦 My Widgets${widgets.length?` (${widgets.length})`:''}`:`📚 Library`}</button>))}</div>
+        <div className="awp-tabs">{(['chat','my','lib'] as const).map(t => (<button key={t} className={`awp-tab ${tab===t?'awp-tab-on':''}`} onClick={() => setTab(t)}>{t==='chat'?'✨ Create':t==='my'?`📦 My Widgets${widgets.length?` (${widgets.length})`:''}`:`🧩 Library (${LIB_TOTAL})`}</button>))}</div>
         {tab === 'chat' && (<>
           <div className="awp-msgs">
             {msgs.map((m, i) => (<div key={i} className={`awp-msg awp-msg-${m.role}`}>{m.role==='ai'&&<div className="awp-avatar">⚡</div>}<div className="awp-bubble">{m.text.split('\n').map((ln, j) => <div key={j}>{ln}</div>)}</div></div>))}
@@ -399,7 +446,18 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets }: {
           <div className="awp-pills">{['/help','/chart BONK','/wallet','/dex JUP','@kol','/fear'].map(q => (<button key={q} className="awp-pill" onClick={() => setInput(q)}>{q}</button>))}</div>
         </>)}
         {tab === 'my' && (<div className="awp-list">{widgets.length===0?<div className="awp-empty">No widgets yet — try /help!</div>:widgets.map(w => (<div key={w.id} className="awp-list-item"><div className="awp-list-icon">{LIB_ICONS[w.type]??'📊'}</div><div style={{ flex:1, minWidth:0 }}><div className="awp-list-name">{w.title}</div><div className="awp-list-meta">{w.type} · {w.size}</div></div><button className="awp-del-btn" onClick={() => removeWidget(w.id)}>✕</button></div>))}</div>)}
-        {tab === 'lib' && (<div className="awp-list">{Object.entries(TEMPLATES).map(([key, tmpl]) => (<button key={key} className="awp-lib-row" onClick={() => { pushWidget(makeWidget(key)); setTab('my'); }}><div className="awp-list-icon">{LIB_ICONS[key]??'📊'}</div><div style={{ flex:1, textAlign:'left' }}><div className="awp-list-name">{tmpl.title}</div><div className="awp-list-meta">Size: {tmpl.size}</div></div><div className="awp-add-badge">+ Add</div></button>))}</div>)}
+        {tab === 'lib' && (<div className="awp-list">
+          <div className="awp-lib-hint">{LIB_TOTAL}+ pre-built widgets — tap any to add it to your hub</div>
+          {LIB_GROUPS.map(group => (<div key={group.label} className="awp-lib-group">
+            <div className="awp-lib-head">{group.label} <span className="awp-lib-count">{group.keys.length}</span></div>
+            {group.keys.map(key => { const tmpl = TEMPLATES[key]; if (!tmpl) return null; return (
+              <button key={key} className="awp-lib-row" onClick={() => { pushWidget(makeWidget(key)); setTab('my'); }}>
+                <div className="awp-list-icon">{LIB_ICONS[tmpl.type] ?? '📊'}</div>
+                <div style={{ flex:1, textAlign:'left', minWidth:0 }}><div className="awp-list-name">{tmpl.title}</div><div className="awp-list-meta">{tmpl.type} · {tmpl.size}</div></div>
+                <div className="awp-add-badge">+ Add</div>
+              </button>); })}
+          </div>))}
+        </div>)}
       </div>
     </div>
   );
@@ -471,6 +529,10 @@ export const aiWidgetCSS = `
 .awp-pill{padding:5px 12px;border-radius:99px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.05);color:rgba(255,255,255,.65);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}
 .awp-pill:hover{border-color:rgba(47,128,255,.45);background:rgba(47,128,255,.1);color:#fff}
 .awp-list{flex:1;overflow-y:auto;padding:10px 16px 16px;display:flex;flex-direction:column;gap:7px}
+.awp-lib-hint{font-size:11px;color:rgba(255,255,255,.4);padding:4px 4px 8px;line-height:1.4}
+.awp-lib-group{margin-bottom:10px}
+.awp-lib-head{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);padding:8px 4px 6px;position:sticky;top:0;background:linear-gradient(180deg,rgba(12,14,20,.98),rgba(12,14,20,.9));z-index:1}
+.awp-lib-count{font-size:9px;font-weight:700;color:#5aa2ff;background:rgba(47,128,255,.14);border-radius:99px;padding:1px 7px;letter-spacing:0}
 .awp-empty{font-size:13px;color:rgba(255,255,255,.33);text-align:center;padding:40px 0}
 .awp-list-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
 .awp-list-icon{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:18px;flex-shrink:0}

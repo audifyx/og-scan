@@ -137,6 +137,7 @@ export default function Hub() {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [dockX, setDockX] = useState<number | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [panelTab, setPanelTab] = useState<"chat" | "my" | "lib">("chat");
   const [customWidgets, setCustomWidgets] = useState<WidgetConfig[]>(readWidgets);
   const starCanvasRef = useRef<HTMLCanvasElement>(null);
   const desktopRef = useRef<HTMLDivElement>(null);
@@ -445,7 +446,7 @@ export default function Hub() {
             trending={trending}
             widgets={customWidgets}
             setWidgets={setCustomWidgets}
-            onOpenPanel={() => setPanelOpen(true)}
+            onOpenPanel={() => { setPanelTab("chat"); setPanelOpen(true); }}
           />
 
           <div className="desktop-flex">
@@ -554,6 +555,7 @@ export default function Hub() {
 
       {panelOpen && (
         <AIWidgetPanel
+          initialTab={panelTab}
           onClose={() => setPanelOpen(false)}
           widgets={customWidgets}
           setWidgets={setCustomWidgets}
@@ -567,7 +569,7 @@ export default function Hub() {
           <button onClick={() => { setCtxMenu(null); pickWallpaper(); }}>🖼️ Change wallpaper</button>
           <button onClick={() => { setCtxMenu(null); localStorage.removeItem("hub-wallpaper"); window.location.reload(); }}>✨ Reset wallpaper</button>
           <div className="ctx-sep" />
-          <button onClick={() => { setCtxMenu(null); setPanelOpen(true); }}>✦ Widget Studio</button>
+          <button onClick={() => { setCtxMenu(null); setPanelTab("chat"); setPanelOpen(true); }}>✦ Widget Studio</button>
           <button onClick={() => { setCtxMenu(null); localStorage.removeItem(DOCK_KEY); window.location.reload(); }}>♻️ Reset icon layout</button>
           <button onClick={() => { setCtxMenu(null); window.location.reload(); }}>🔄 Refresh</button>
         </div>
@@ -632,7 +634,7 @@ export default function Hub() {
           </div>
         </div>
       )}
-      <MobileNav onOpenPanel={() => setPanelOpen(true)} />
+      <MobileNav onOpenPanel={(t) => { setPanelTab(t); setPanelOpen(true); }} />
     </div>
   );
 }
