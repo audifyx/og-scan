@@ -167,6 +167,59 @@ export const BG_THEMES: BgTheme[] = [
 
 export const BG_THEME_CATEGORIES = [...new Set(BG_THEMES.map((t) => t.category))];
 
+/* Per-theme subject motif: subtle floating glyphs layered over the recolored
+   engine so each theme reads as its actual subject, not just a color palette. */
+const BG_MOTIFS: Record<string, string[]> = {
+  "sports-stadium": ["⚽", "🏟️", "🥅", "🎉"],
+  "sports-hardwood": ["🏀", "🔥", "🏆"],
+  "sports-grand-prix": ["🏎️", "🏁", "🔧"],
+  "sports-ice-rink": ["🏒", "❄️", "🥅"],
+  "sports-title-fight": ["🥊", "🏆", "🔔"],
+  "tv-upside-down": ["🙃", "🔦", "🕯️"],
+  "tv-sitcom-sunset": ["📺", "🛋️", "😂"],
+  "tv-crime-noir": ["🕵️", "🔎", "🚔"],
+  "tv-saturday-cartoons": ["🎨", "📺", "✨"],
+  "tv-reality-neon": ["📸", "💎", "🌟"],
+  "movie-space-saga": ["🚀", "🪐", "⭐", "🛸"],
+  "movie-code-matrix": ["💻", "🟩", "🔢"],
+  "movie-hero-skyline": ["🦸", "🏙️", "⚡"],
+  "movie-western-dusk": ["🤠", "🌵", "🐎"],
+  "movie-crimson-horror": ["🪦", "🔪", "🕸️"],
+  "band-rock-arena": ["🎸", "🤘", "🔥"],
+  "band-synthpop-80s": ["🎹", "🎧", "🌆"],
+  "band-jazz-lounge": ["🎷", "🎺", "🍸"],
+  "band-metal-inferno": ["🤘", "🔥", "💀"],
+  "band-indie-pastel": ["🎧", "🎶", "🌸"],
+  "dim-prism-3d": ["🔺", "🔷", "🔻"],
+  "dim-hypercube-4d": ["🧊", "🔮", "◼️"],
+  "dim-tesseract-5d": ["🌀", "✨", "🔷"],
+  "dim-fractal-4d": ["❇️", "🌿", "🔁"],
+  "dim-quantum-5d": ["⚛️", "✨", "🌌"],
+};
+
+const MOTIF_SLOTS: { top: string; left: string; size: number; dur: string; delay: string; op: number }[] = [
+  { top: "13%", left: "11%", size: 30, dur: "19s", delay: "0s", op: 0.28 },
+  { top: "21%", left: "79%", size: 46, dur: "24s", delay: "-4s", op: 0.22 },
+  { top: "53%", left: "28%", size: 26, dur: "17s", delay: "-8s", op: 0.26 },
+  { top: "67%", left: "83%", size: 40, dur: "27s", delay: "-2s", op: 0.2 },
+  { top: "81%", left: "17%", size: 34, dur: "21s", delay: "-11s", op: 0.24 },
+  { top: "39%", left: "55%", size: 22, dur: "25s", delay: "-6s", op: 0.16 },
+];
+
+function ThemeMotif({ id }: { id: string }) {
+  const glyphs = BG_MOTIFS[id];
+  if (!glyphs || glyphs.length === 0) return null;
+  return (
+    <div className="tw-motif">
+      {MOTIF_SLOTS.map((sl, i) => (
+        <span key={i} className="twm" style={{ top: sl.top, left: sl.left, fontSize: sl.size, opacity: sl.op, animationDuration: sl.dur, animationDelay: sl.delay }}>
+          {glyphs[i % glyphs.length]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function themeVars(t: BgTheme): CSSProperties {
   const [c1, c2 = c1, c3 = c2, c4 = c3] = t.colors;
   return { ["--tc1"]: c1, ["--tc2"]: c2, ["--tc3"]: c3, ["--tc4"]: c4 } as CSSProperties;
@@ -190,29 +243,34 @@ function ThemedScene({ theme }: { theme: BgTheme }) {
   }, [theme]);
 
   const vars = themeVars(theme);
-  if (theme.engine === "aurora") return (
-    <div className="tw-aurora" style={vars}>
-      <i className="twb twb-a" /><i className="twb twb-b" /><i className="twb twb-c" /><i className="twb twb-d" />
-      <div className="bgfx-stars-static" />
-    </div>
+  const engine =
+    theme.engine === "aurora" ? (
+      <div className="tw-aurora" style={vars}>
+        <i className="twb twb-a" /><i className="twb twb-b" /><i className="twb twb-c" /><i className="twb twb-d" />
+        <div className="bgfx-stars-static" />
+      </div>
+    ) : theme.engine === "orbs" ? (
+      <div className="tw-orbs" style={vars}>
+        <i className="torb to1" /><i className="torb to2" /><i className="torb to3" />
+        <i className="torb to4" /><i className="torb to5" /><i className="torb to6" />
+        <div className="bgfx-stars-static" />
+      </div>
+    ) : theme.engine === "grid" ? (
+      <div className="tw-grid" style={vars}>
+        <div className="twg-sky" />
+        <div className="twg-sun" />
+        <div className="twg-floor"><div className="twg-grid" /></div>
+        <div className="twg-haze" />
+      </div>
+    ) : (
+      <canvas ref={ref} className="bgfx-canvas" />
+    );
+  return (
+    <>
+      {engine}
+      <ThemeMotif id={theme.id} />
+    </>
   );
-  if (theme.engine === "orbs") return (
-    <div className="tw-orbs" style={vars}>
-      <i className="torb to1" /><i className="torb to2" /><i className="torb to3" />
-      <i className="torb to4" /><i className="torb to5" /><i className="torb to6" />
-      <div className="bgfx-stars-static" />
-    </div>
-  );
-  if (theme.engine === "grid") return (
-    <div className="tw-grid" style={vars}>
-      <div className="twg-sky" />
-      <div className="twg-sun" />
-      <div className="twg-floor"><div className="twg-grid" /></div>
-      <div className="twg-haze" />
-    </div>
-  );
-  // stars / rain -> canvas
-  return <canvas ref={ref} className="bgfx-canvas" />;
 }
 
 /* ── main component ─────────────────────────────────────────── */
@@ -442,4 +500,7 @@ const bgfxCSS = `
 .twg-haze{position:absolute;left:0;right:0;top:44%;height:22%;background:linear-gradient(180deg,transparent,rgba(11,7,33,.9) 48%,transparent);filter:blur(6px)}
 .bgp-cat-sec{margin-top:2px}
 .bgp-cat{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5);margin:16px 0 8px}
+.tw-motif{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.twm{position:absolute;line-height:1;filter:drop-shadow(0 4px 14px rgba(0,0,0,.55));will-change:transform;animation-name:twmfloat;animation-timing-function:ease-in-out;animation-iteration-count:infinite;animation-direction:alternate}
+@keyframes twmfloat{0%{transform:translate3d(0,0,0) rotate(-6deg) scale(1)}100%{transform:translate3d(14px,-26px,0) rotate(8deg) scale(1.14)}}
 `;
