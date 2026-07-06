@@ -2,24 +2,19 @@ import { supabase } from "@/lib/supabase";
 import type { WidgetConfig } from "@/components/AIWidgetPanel";
 
 /**
- * Cloud persistence for Hub widgets.
- *
- * Widgets auto-save to the user's account so the "My Widgets" list survives
- * refresh and follows the user across devices. Storage: `public.user_widgets`
- * (one row per user, owner-only RLS, updated_at trigger) — applied and
- * verified end-to-end against production on 2026-07-06.
- *
- * All calls fail soft: if the user is signed out or Supabase is unavailable,
- * we silently fall back to the localStorage copy AIWidgetPanel already keeps.
+ * Cloud persistence for Hub widgets (public.user_widgets, owner-only RLS).
+ * Saves are immediate + flushed on tab hide/unload so a quick refresh right
+ * after a change can never drop the write. Fails soft when signed out.
  */
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSerialized = "";
+let pending: WidgetConfig[] | null = null;
 
 async function currentUserId(): Promise<string | null> {
   try {
-    const { data } = await supabase.auth.getUser();
-    return data.user?.id ?? null;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user?.id ?? null;
   } catch {
     return null;
   }
@@ -50,19 +45,31 @@ export async function saveWidgetsToCloud(widgets: WidgetConfig[]): Promise<void>
   const uid = await currentUserId();
   if (!uid) return;
   const serialized = JSON.stringify(widgets);
-  if (serialized === lastSerialized) return; // no-op if unchanged
+  if (serialized === lastSerialized) { pending = null; return; }
   try {
     const { error } = await supabase
       .from("user_widgets")
-      .upsert({ user_id: uid, widgets }, { onConflict: "user_id" });
-    if (!error) lastSerialized = serialized;
+      .upsert({ user_id: uid, widgets, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (!error) { lastSerialized = serialized; pending = null; }
   } catch {
     /* fail soft — localStorage still holds the layout */
   }
 }
 
-/** Debounced auto-save; called on every widget change. */
-export function queueWidgetCloudSave(widgets: WidgetConfig[], delayMs = 800): void {
+/** Debounced auto-save (kept for callers that prefer it). */
+export function queueWidgetCloudSave(widgets: WidgetConfig[], delayMs = 500): void {
+  pending = widgets;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => { void saveWidgetsToCloud(widgets); }, delayMs);
+}
+
+// Flush any pending save when the tab is backgrounded or unloaded, so a fast
+// refresh after a change still persists.
+if (typeof window !== "undefined") {
+  const flush = () => { if (pending) void saveWidgetsToCloud(pending); };
+  try {
+    document.addEventListener("visibilitychange", () => { if (document.hidden) flush(); });
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+  } catch { /* noop */ }
 }
