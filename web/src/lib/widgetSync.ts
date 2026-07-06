@@ -5,16 +5,13 @@ import type { WidgetConfig } from "@/components/AIWidgetPanel";
  * Cloud persistence for Hub widgets.
  *
  * Widgets auto-save to the user's account so the "My Widgets" list survives
- * refresh and follows the user across devices. Storage: the existing
- * `user_settings` table (one row per user, owner RLS), under
- * `data.hub_widgets` — verified working end-to-end against production, no
- * schema changes required.
+ * refresh and follows the user across devices. Storage: `public.user_widgets`
+ * (one row per user, owner-only RLS, updated_at trigger) — applied and
+ * verified end-to-end against production on 2026-07-06.
  *
  * All calls fail soft: if the user is signed out or Supabase is unavailable,
  * we silently fall back to the localStorage copy AIWidgetPanel already keeps.
  */
-
-const DATA_KEY = "hub_widgets";
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSerialized = "";
@@ -34,13 +31,12 @@ export async function loadWidgetsFromCloud(): Promise<WidgetConfig[] | null> {
   if (!uid) return null;
   try {
     const { data, error } = await supabase
-      .from("user_settings")
-      .select("data")
+      .from("user_widgets")
+      .select("widgets")
       .eq("user_id", uid)
       .maybeSingle();
     if (error || !data) return null;
-    const bag = (data.data ?? {}) as Record<string, unknown>;
-    const widgets = bag[DATA_KEY];
+    const widgets = data.widgets as unknown;
     if (!Array.isArray(widgets)) return null;
     lastSerialized = JSON.stringify(widgets);
     return widgets as WidgetConfig[];
@@ -49,23 +45,16 @@ export async function loadWidgetsFromCloud(): Promise<WidgetConfig[] | null> {
   }
 }
 
-/** Upsert the widget layout to the account immediately (preserves other data keys). */
+/** Upsert the widget layout to the account immediately. */
 export async function saveWidgetsToCloud(widgets: WidgetConfig[]): Promise<void> {
   const uid = await currentUserId();
   if (!uid) return;
   const serialized = JSON.stringify(widgets);
   if (serialized === lastSerialized) return; // no-op if unchanged
   try {
-    // Read-merge-write so we never clobber other keys stored in data.
-    const { data: existing } = await supabase
-      .from("user_settings")
-      .select("data")
-      .eq("user_id", uid)
-      .maybeSingle();
-    const bag = { ...((existing?.data ?? {}) as Record<string, unknown>), [DATA_KEY]: widgets };
     const { error } = await supabase
-      .from("user_settings")
-      .upsert({ user_id: uid, data: bag }, { onConflict: "user_id" });
+      .from("user_widgets")
+      .upsert({ user_id: uid, widgets }, { onConflict: "user_id" });
     if (!error) lastSerialized = serialized;
   } catch {
     /* fail soft — localStorage still holds the layout */
