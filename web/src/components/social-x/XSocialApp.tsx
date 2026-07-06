@@ -392,6 +392,16 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   const whoToFollow = suggestions.filter((s) => s.user_id !== user?.id && !followingSet.has(s.user_id));
 
+  const marketPulse = useMemo(() => {
+    const withChg = ticker.filter((t) => t.change24h != null);
+    const gainers = withChg.filter((t) => (t.change24h ?? 0) > 0).length;
+    const losers = withChg.filter((t) => (t.change24h ?? 0) < 0).length;
+    const avg = withChg.length ? withChg.reduce((sum, t) => sum + (t.change24h ?? 0), 0) / withChg.length : 0;
+    const sol = ticker.find((t) => (t.symbol || "").toUpperCase() === "SOL") || null;
+    const topMovers = [...withChg].sort((a, b) => Math.abs(b.change24h ?? 0) - Math.abs(a.change24h ?? 0)).slice(0, 10);
+    return { gainers, losers, avg, sol, topMovers };
+  }, [ticker]);
+
   const searchedUsers = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
     if (!q) return [];
@@ -598,6 +608,107 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "home":
         return (
           <>
+            {/* ── Command deck hero ── */}
+            <div className="relative overflow-hidden border-b border-white/[0.06]">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#1d9bf0]/[0.10] via-transparent to-[#9945FF]/[0.12]" />
+              <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#9945FF]/20 blur-[80px]" />
+              <div className="relative px-4 pb-4 pt-4">
+                <div className="flex items-center gap-3">
+                  <div className="relative shrink-0">
+                    <img src={myAvatar} alt="" className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white/15" />
+                    <span className="absolute -bottom-1.5 -right-1.5 grid h-5 w-5 place-items-center rounded-full bg-black text-[11px] ring-1 ring-white/20">👋</span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/40">
+                      {(() => { const hr = new Date().getHours(); return hr < 5 ? "Late night" : hr < 12 ? "gm ☀️" : hr < 17 ? "Good afternoon" : hr < 21 ? "Good evening" : "Night owl 🌙"; })()}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[21px] font-black leading-tight text-white">
+                      <span className="truncate">{displayName}</span>
+                      {profile?.is_official_account && <BadgeCheck className="h-5 w-5 shrink-0 text-[#1d9bf0]" />}
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setTab("notifications")} className="relative ml-auto grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.08] active:scale-95">
+                    <Bell className="h-5 w-5" />
+                    {unread > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#1d9bf0] px-1 text-[9px] font-black">{unread > 9 ? "9+" : unread}</span>}
+                  </button>
+                </div>
+
+                {/* live market pulse */}
+                <div className="mt-3.5 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/40 p-3 backdrop-blur-xl">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#9945FF]/30 to-[#1d9bf0]/25 ring-1 ring-white/10">
+                    <TrendingUp className="h-4 w-4 text-[#1d9bf0]" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[9.5px] font-bold uppercase tracking-widest text-white/40">Market pulse</div>
+                    <div className="text-[15px] font-black text-white">
+                      {marketPulse.avg >= 0 ? "Risk-on" : "Cooling off"}{" "}
+                      <span className={marketPulse.avg >= 0 ? "text-emerald-400" : "text-rose-400"}>{marketPulse.avg >= 0 ? "+" : ""}{marketPulse.avg.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                  <div className="ml-auto flex shrink-0 items-center gap-2.5 text-[12px] font-black">
+                    <span className="text-emerald-400">▲{marketPulse.gainers}</span>
+                    <span className="text-rose-400">▼{marketPulse.losers}</span>
+                    {marketPulse.sol?.priceUsd != null && <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-white/85">SOL ${marketPulse.sol.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>}
+                  </div>
+                </div>
+
+                {/* quick actions */}
+                <div className="mt-3 grid grid-cols-4 gap-2">
+                  {[
+                    { Icon: Feather, label: "Post", on: () => { setTab("home"); setTimeout(() => composerRef.current?.focus(), 60); } },
+                    { Icon: Search, label: "Explore", on: () => setTab("explore") },
+                    { Icon: Globe, label: "Communities", on: () => setTab("communities") },
+                    { Icon: Mail, label: "Messages", on: () => setTab("messages") },
+                  ].map((a) => (
+                    <button key={a.label} type="button" onClick={a.on} className="group flex flex-col items-center gap-1.5 rounded-2xl border border-white/[0.07] bg-white/[0.03] py-2.5 transition hover:border-[#1d9bf0]/40 hover:bg-[#1d9bf0]/[0.07] active:scale-95">
+                      <a.Icon className="h-5 w-5 text-white/70 transition group-hover:text-[#1d9bf0]" />
+                      <span className="text-[10.5px] font-bold text-white/60 group-hover:text-white">{a.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Top movers rail ── */}
+            {marketPulse.topMovers.length > 0 && (
+              <div className="border-b border-white/[0.06] px-4 py-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-[13px] font-black text-white">🔥 Top movers</span>
+                  <button type="button" onClick={() => setTab("explore")} className="text-[11.5px] font-bold text-[#1d9bf0] hover:underline">See all</button>
+                </div>
+                <div className="flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+                  {marketPulse.topMovers.map((t) => {
+                    const up = (t.change24h ?? 0) >= 0;
+                    return (
+                      <button key={t.mint} type="button" onClick={() => onSelectMint?.(t.mint)} className="x-tilt w-32 shrink-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-3 text-left">
+                        <div className="text-[13px] font-black text-white">${t.symbol}</div>
+                        <div className="mt-0.5 truncate text-[11px] text-white/40">{t.priceUsd != null ? "$" + (t.priceUsd < 0.01 ? t.priceUsd.toExponential(1) : t.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 4 })) : "—"}</div>
+                        <div className={cn("mt-2 inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-black", up ? "bg-emerald-400/10 text-emerald-400" : "bg-rose-400/10 text-rose-400")}>{up ? "▲" : "▼"} {Math.abs(t.change24h ?? 0).toFixed(1)}%</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Suggested to follow ── */}
+            {whoToFollow.length > 0 && (
+              <div className="border-b border-white/[0.06] px-4 py-3">
+                <div className="mb-2 text-[13px] font-black text-white">Suggested for you</div>
+                <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none]">
+                  {whoToFollow.slice(0, 12).map((sg) => (
+                    <div key={sg.user_id} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+                      <div className="rounded-full bg-gradient-to-tr from-[#1d9bf0] via-[#9945FF] to-[#f91880] p-[2px]">
+                        <img src={avatarOf(sg.avatar_url, sg.user_id)} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-black" />
+                      </div>
+                      <span className="w-16 truncate text-center text-[10px] font-semibold text-white/70">{sg.username || "anon"}</span>
+                      <button type="button" onClick={() => follow(sg.user_id)} className="rounded-full bg-white px-2.5 py-0.5 text-[10px] font-black text-black transition hover:bg-white/90 active:scale-95">Follow</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Sticky header with feed mode tabs + live dot */}
             <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/55 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
               <div className="flex">
@@ -943,6 +1054,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         .x-marquee-track { display: flex; width: max-content; animation: xTick 36s linear infinite; }
         .x-marquee:hover .x-marquee-track { animation-play-state: paused; }
         @keyframes xTick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .x-tilt { transition: transform .2s ease, border-color .2s ease, background .2s ease; }
+        .x-tilt:hover { transform: translateY(-3px); border-color: rgba(29,155,240,.45); }
       `}</style>
       {/* ambient atmosphere */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
