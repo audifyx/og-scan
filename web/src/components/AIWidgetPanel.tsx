@@ -105,20 +105,33 @@ export type ForgeSpec = { type: WidgetType; title: string; size: 'sm' | 'md' | '
 
 const FORGE_TYPES: WidgetType[] = ['sol_price','trending','social_feed','wallet','price_chart','kol_feed','fear_greed','volume_bar','dex_chart','token_info','wallet_portfolio','wallet_tracker','top_traders','custom_code'];
 
-const FORGE_PROMPT = `You are WidgetForge, OrbitX's elite widget engineer. You compile user requests into live dashboard widgets. From now on you MUST answer with ONLY one JSON object — no prose, no markdown fences, no explanations before or after.
-Schema: {"type":"custom_code"|"price_chart"|"dex_chart"|"token_info"|"trending"|"sol_price"|"fear_greed"|"volume_bar"|"kol_feed"|"top_traders"|"social_feed"|"wallet_tracker"|"wallet_portfolio","title":"string ≤22 chars, emoji prefix","size":"sm"|"md"|"lg","params":{},"reply":"one short confident sentence about what you built"}
-RULES:
-1. Build EXACTLY what the user asks — every named token, metric, color, behavior. Their words override everything.
-2. Use "custom_code" whenever the request doesn't perfectly match a built-in type. Never dumb a specific request down to a generic built-in.
-3. For custom_code, params.code is ONE JavaScript arrow function source: (props) => { ... }
-   In scope: React (full namespace), h = React.createElement, useState, useEffect, useMemo, useCallback, useRef, fetch, supabase, params. NO JSX — build UI with h(tag, {style:{...}}, ...children). Inline styles only. NO import/require/document.write.
-   Design tokens: card background is provided (transparent); text #fff; muted rgba(255,255,255,.45); green #34d399; red #fb7185; blue #5aa2ff; purple #b07aff; surfaces rgba(255,255,255,.06); radius 10-14px; font sizes 9-20px; weights 700-900; tabular-nums for numbers.
-   Craft: loading + error states, auto-refresh via setInterval in useEffect WITH cleanup, inline SVG sparklines for any series data, hover/press states on buttons, h('button',{onClick}) for interactivity. Compact code, under 70 lines, must be syntactically valid standalone.
-   Free data APIs: DexScreener https://api.dexscreener.com/latest/dex/search?q=SYM (pairs[].priceUsd, priceChange.h24, volume.h24, liquidity.usd, chainId==='solana'); CoinGecko https://api.coingecko.com/api/v3/simple/price?ids=ID&vs_currencies=usd&include_24hr_change=true and /coins/ID/market_chart?vs_currency=usd&days=N; Fear&Greed https://api.alternative.me/fng/; internal trending /api/ogdex/screener?type=trending&interval=24h&limit=N → {rows:[{symbol,change24h}]}.
-4. Built-in params: symbol (ticker for dex_chart/token_info, CoinGecko ID for price_chart), days 1|7|30, limit, address, view all|holdings|buys|sells, channel.
-Reply with ONLY the JSON object.`;
+const FORGE_PROMPT = `You are WidgetForge — OrbitX's frontier-grade widget engineer, built to work at the level of the very best AI pair-programmers (think Claude Opus craftsmanship: precise, complete, tasteful, zero laziness). You compile user requests into live dashboard widgets. Answer with ONLY one JSON object — no prose, no markdown fences.
+Schema: {"type":"custom_code"|"price_chart"|"dex_chart"|"token_info"|"trending"|"sol_price"|"fear_greed"|"volume_bar"|"kol_feed"|"top_traders"|"social_feed"|"wallet_tracker"|"wallet_portfolio","title":"≤22 chars, emoji prefix","size":"sm"|"md"|"lg","params":{},"reply":"one confident sentence"}
 
-function extractForgeSpec(raw: string): ForgeSpec {
+PRIME DIRECTIVE — BUILD EXACTLY WHAT WAS ASKED:
+Every named token, metric, color, layout and behavior in the request is a hard requirement. The user's words override every default below. Prefer "custom_code" for anything that isn't a perfect built-in match — never dumb a specific request down to a generic widget.
+
+DESIGN DOCTRINE (custom_code):
+1. Composition first: a widget is a tiny product. Establish hierarchy — one hero element (big number, chart, gauge), supporting stats as chips, micro-labels in uppercase 8-9px with letter-spacing.
+2. COLOR LAW: if the user specifies ANY colors (hex codes, color names, or vibes like synthwave/luxury/matrix), those exact colors drive the accents, gradients, glows and borders. When no colors are given, design a bespoke palette that fits the subject (gold for BTC, violet for SOL, emerald for gains trackers) — never default gray. Always: gradient accent bar or gradient text for the hero, soft glow (boxShadow with the accent at ~35% alpha), translucent accent-tinted surfaces (accent + '1f').
+3. Depth & life: layered surfaces rgba(255,255,255,.05) with 1px rgba borders, border-radius 10-14, live-updating values with a pulsing status dot, deltas as pill badges (green #34d399 up / red #fb7185 down — semantic, keep these), inline SVG sparklines/rings/bars for ANY series or ratio data (vectorEffect:'non-scaling-stroke').
+4. Interactivity: h('button'|'input', {onClick|onChange}) with real state; tabs where data has views; hover affordances via opacity/filter.
+5. States: loading skeleton text, explicit error message, empty state. Auto-refresh via setInterval in useEffect WITH cleanup.
+CONTRACT: params.code is ONE JS arrow function "(props) => {...}". In scope: React, h = React.createElement, useState, useEffect, useMemo, useCallback, useRef, fetch, supabase, params. NO JSX, no imports, inline styles only. Compact (≤70 lines) but COMPLETE — no TODOs.
+DATA (free, no key): DexScreener https://api.dexscreener.com/latest/dex/search?q=SYM → pairs[] (chainId==='solana', priceUsd, priceChange.{m5,h1,h6,h24}, volume.h24, liquidity.usd); trend sparkline trick: reconstruct points from priceChange fields. CoinGecko /api/v3/simple/price?ids=ID&vs_currencies=usd&include_24hr_change=true and /coins/ID/market_chart?vs_currency=usd&days=N. Fear&Greed https://api.alternative.me/fng/. Internal /api/ogdex/screener?type=trending&interval=24h&limit=N → {rows:[{symbol,change24h}]}.
+
+EXEMPLAR (the quality bar — study the craft, then exceed it for the actual request):
+{"type":"custom_code","title":"⚡ JUP Pulse","size":"md","params":{"code":"(props) => { const [p, setP] = useState(null); useEffect(() => { let live = true; const load = () => fetch('https://api.dexscreener.com/latest/dex/search?q=JUP').then(function(r){ return r.json(); }).then(function(d){ const x = ((d && d.pairs) || []).filter(function(q){ return q.chainId === 'solana'; })[0]; if (live && x) setP(x); }).catch(function(){}); load(); const t = setInterval(load, 30000); return function(){ live = false; clearInterval(t); }; }, []); if (!p) return h('div', { style: { fontSize: 11, color: 'rgba(255,255,255,.4)', textAlign: 'center', padding: '14px 0' } }, 'Syncing JUP…'); const pc = p.priceChange || {}; const chg = Number(pc.h24 || 0), up = chg >= 0, tone = up ? '#34d399' : '#fb7185'; const price = Number(p.priceUsd || 0); const pts = [pc.h24, pc.h6, pc.h1, pc.m5].map(function(c){ return price / (1 + (Number(c) || 0) / 100); }).concat([price]); const mn = Math.min.apply(null, pts), mx = Math.max.apply(null, pts); const ln = pts.map(function(v, i){ return (i / (pts.length - 1)) * 100 + ',' + (24 - (mx > mn ? (v - mn) / (mx - mn) : 0.5) * 20 - 2); }).join(' '); return h('div', null, h('div', { style: { height: 3, borderRadius: 99, background: 'linear-gradient(90deg,#5eead4,#0ea5e9)', marginBottom: 9, boxShadow: '0 0 12px rgba(94,234,212,.4)' } }), h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, h('span', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 900, color: '#fff' } }, h('i', { style: { width: 7, height: 7, borderRadius: 99, background: '#5eead4', boxShadow: '0 0 10px rgba(94,234,212,.6)' } }), '$JUP'), h('span', { style: { fontSize: 10.5, fontWeight: 900, color: tone, background: up ? 'rgba(52,211,153,.1)' : 'rgba(251,113,133,.1)', borderRadius: 99, padding: '3px 9px' } }, (up ? '▲ +' : '▼ ') + Math.abs(chg).toFixed(2) + '%')), h('div', { style: { fontSize: 22, fontWeight: 900, color: '#fff', margin: '5px 0 3px', fontVariantNumeric: 'tabular-nums' } }, '$' + price.toFixed(4)), h('svg', { width: '100%', height: 26, viewBox: '0 0 100 26', preserveAspectRatio: 'none' }, h('polyline', { points: ln, fill: 'none', stroke: tone, strokeWidth: 2, strokeLinecap: 'round', vectorEffect: 'non-scaling-stroke' }))); }"},"reply":"JUP Pulse: teal-gradient live ticker with a real 24h trend line."}
+
+Built-in params: symbol (ticker for dex_chart/token_info, CoinGecko ID for price_chart), days 1|7|30, limit, address, view, channel. Reply with ONLY the JSON object.`;
+
+export type DesignBrief = { name?: string; palette?: { accent?: string; accent2?: string; glow?: string; mood?: string }; layout?: string; features?: string[]; viz?: string };
+
+const DESIGN_PROMPT = `You are a world-class product designer for OrbitX (dark, premium, data-dense trading UI). Given a widget request, produce a sharp design brief. Answer ONLY compact JSON, no prose:
+{"name":"widget name ≤20 chars","palette":{"accent":"#hex","accent2":"#hex","glow":"rgba(...)","mood":"2-3 word vibe"},"layout":"one concrete line: hero element + supporting elements","features":["3-5 concrete features, each specific and buildable"],"viz":"sparkline|ring|bars|list|grid|gauge|none"}
+Rules: if the user names colors or a vibe, the palette MUST use exactly those; otherwise invent a bespoke palette that fits the subject (never default blue-gray). Features must directly serve the request — no filler.`;
+
+function extractJsonBlock(raw: string): any {
   let t = (raw || '').replace(/```(?:json|js|javascript)?/gi, '').trim();
   const start = t.indexOf('{');
   if (start < 0) throw new Error('no JSON in response');
@@ -133,7 +146,11 @@ function extractForgeSpec(raw: string): ForgeSpec {
     if (c === '}') { depth--; if (depth === 0) { end = i; break; } }
   }
   if (end < 0) throw new Error('unbalanced JSON');
-  const j = JSON.parse(t.slice(start, end + 1));
+  return JSON.parse(t.slice(start, end + 1));
+}
+
+function extractForgeSpec(raw: string): ForgeSpec {
+  const j = extractJsonBlock(raw);
   const type: WidgetType = FORGE_TYPES.includes(j.type) ? j.type : 'custom_code';
   const params = (j.params && typeof j.params === 'object') ? j.params : {};
   if (type === 'custom_code' && (typeof params.code !== 'string' || params.code.trim().length < 20)) throw new Error('custom_code missing code');
@@ -146,31 +163,53 @@ function extractForgeSpec(raw: string): ForgeSpec {
   };
 }
 
-async function forgeWithServer(prompt: string, history: Msg[]): Promise<ForgeSpec> {
-  const { data, error } = await supabase.functions.invoke('ai-analyzer', {
-    body: { action: 'chat', messages: [
-      { role: 'user', content: FORGE_PROMPT },
-      { role: 'assistant', content: '{"ack":true} — READY. Send the widget request; I reply with only the JSON spec.' },
-      ...history.slice(-4).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text.slice(0, 500) })),
-      { role: 'user', content: `Widget request: ${prompt}\nRemember: ONLY the JSON object.` },
-    ] },
-  });
+function composeForgeAsk(prompt: string, pal: Palette | null, brief: DesignBrief | null): string {
+  let t = `Widget request: ${prompt}`;
+  if (pal) t += `\nUSER PALETTE (mandatory — use these EXACT colors for accents, gradients, glows, borders): accent ${pal.a}, secondary ${pal.b}, glow ${pal.g} (${pal.name}).`;
+  if (brief) t += `\nAPPROVED DESIGN BRIEF (implement it fully): ${JSON.stringify(brief)}`;
+  t += '\nRemember: ONLY the JSON spec object.';
+  return t;
+}
+
+async function callForgeLLM(messages: { role: string; content: string }[]): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('ai-analyzer', { body: { action: 'chat', messages } });
   if (error) throw error;
   const text = (data && (data.analysis ?? data.content)) || '';
   if (!text) throw new Error('empty server response');
-  return extractForgeSpec(String(text));
+  return String(text);
 }
 
-async function forgeWithOpenAI(prompt: string, history: Msg[]): Promise<ForgeSpec> {
+async function forgeDesignBrief(prompt: string, pal: Palette | null): Promise<DesignBrief> {
+  const text = await callForgeLLM([
+    { role: 'user', content: DESIGN_PROMPT },
+    { role: 'assistant', content: '{"ack":true} READY — send the request.' },
+    { role: 'user', content: `Request: ${prompt}${pal ? `\nUser-specified palette (mandatory): accent ${pal.a}, secondary ${pal.b}, glow ${pal.g} (${pal.name})` : ''}\nJSON only.` },
+  ]);
+  const j = extractJsonBlock(text);
+  if (!j || typeof j !== 'object') throw new Error('bad brief');
+  return j as DesignBrief;
+}
+
+async function forgeWithServer(prompt: string, history: Msg[], pal: Palette | null, brief: DesignBrief | null): Promise<ForgeSpec> {
+  const text = await callForgeLLM([
+    { role: 'user', content: FORGE_PROMPT },
+    { role: 'assistant', content: '{"ack":true} — READY. Send the widget request; I reply with only the JSON spec.' },
+    ...history.slice(-4).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text.slice(0, 500) })),
+    { role: 'user', content: composeForgeAsk(prompt, pal, brief) },
+  ]);
+  return extractForgeSpec(text);
+}
+
+async function forgeWithOpenAI(prompt: string, history: Msg[], pal: Palette | null, brief: DesignBrief | null): Promise<ForgeSpec> {
   const aiKey = (import.meta as any).env?.VITE_OPENAI_API_KEY ?? '';
   if (!aiKey) throw new Error('no client key');
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${aiKey}` },
-    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 1600, temperature: 0.25, messages: [
+    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 2400, temperature: 0.3, messages: [
       { role: 'system', content: FORGE_PROMPT },
       ...history.slice(-4).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text.slice(0, 500) })),
-      { role: 'user', content: prompt },
+      { role: 'user', content: composeForgeAsk(prompt, pal, brief) },
     ] }),
   });
   const j = await res.json();
@@ -188,7 +227,64 @@ function extractSymbols(prompt: string): string[] {
   return [...new Set([...dollar, ...caps])].slice(0, 8);
 }
 
-const GEN_TICKER = (sym: string) => `(props) => {
+/* ── Color intelligence: users can "code in" any colors — hex codes, named
+     colors or whole vibes — and every engine (AI + local) must honor them. ── */
+export type Palette = { a: string; b: string; g: string; name: string };
+export const DEFAULT_PAL: Palette = { a: '#5aa2ff', b: '#9945FF', g: 'rgba(90,162,255,.35)', name: 'orbit' };
+
+const NAMED_COLORS: Record<string, [string, string]> = {
+  red: ['#ef4444', '#b91c1c'], crimson: ['#dc2626', '#7f1d1d'], pink: ['#ec4899', '#be185d'],
+  magenta: ['#d946ef', '#a21caf'], purple: ['#a855f7', '#6d28d9'], violet: ['#8b5cf6', '#5b21b6'],
+  indigo: ['#6366f1', '#4338ca'], blue: ['#3b82f6', '#1d4ed8'], cyan: ['#22d3ee', '#0891b2'],
+  teal: ['#2dd4bf', '#0f766e'], green: ['#22c55e', '#15803d'], emerald: ['#34d399', '#059669'],
+  lime: ['#a3e635', '#4d7c0f'], yellow: ['#facc15', '#a16207'], gold: ['#e6c15a', '#a1791f'],
+  amber: ['#f59e0b', '#b45309'], orange: ['#f97316', '#c2410c'], white: ['#f4f4f5', '#a1a1aa'],
+  silver: ['#cbd5e1', '#64748b'], turquoise: ['#06b6d4', '#0e7490'], lavender: ['#c4b5fd', '#8b5cf6'],
+  rose: ['#fb7185', '#e11d48'], mint: ['#6ee7b7', '#10b981'], coral: ['#fb923c', '#ea580c'],
+};
+const VIBE_PALETTES: Record<string, Palette> = {
+  synthwave: { a: '#ff2bd6', b: '#00e5ff', g: 'rgba(255,43,214,.4)', name: 'synthwave' },
+  cyberpunk: { a: '#f0e130', b: '#00e5ff', g: 'rgba(240,225,48,.35)', name: 'cyberpunk' },
+  matrix:    { a: '#22c55e', b: '#052e16', g: 'rgba(74,222,128,.4)', name: 'matrix' },
+  sunset:    { a: '#ff7e5f', b: '#feb47b', g: 'rgba(255,126,95,.4)', name: 'sunset' },
+  ocean:     { a: '#38bdf8', b: '#0ea5e9', g: 'rgba(56,189,248,.4)', name: 'ocean' },
+  fire:      { a: '#f97316', b: '#ef4444', g: 'rgba(249,115,22,.45)', name: 'fire' },
+  luxury:    { a: '#e6c15a', b: '#8b6914', g: 'rgba(230,193,90,.4)', name: 'luxury gold' },
+  ice:       { a: '#a5f3fc', b: '#38bdf8', g: 'rgba(165,243,252,.4)', name: 'ice' },
+  neon:      { a: '#39ff14', b: '#ff2bd6', g: 'rgba(57,255,20,.4)', name: 'neon' },
+  pastel:    { a: '#f9a8d4', b: '#a5b4fc', g: 'rgba(249,168,212,.35)', name: 'pastel' },
+  royal:     { a: '#7c3aed', b: '#fbbf24', g: 'rgba(124,58,237,.4)', name: 'royal' },
+  dracula:   { a: '#bd93f9', b: '#ff79c6', g: 'rgba(189,147,249,.4)', name: 'dracula' },
+  vaporwave: { a: '#ff71ce', b: '#01cdfe', g: 'rgba(255,113,206,.4)', name: 'vaporwave' },
+};
+const hexGlow = (hex: string): string => {
+  const m = hex.replace('#', '');
+  const v = m.length === 3 ? m.split('').map(c => c + c).join('') : m.padEnd(6, '0');
+  const r = parseInt(v.slice(0, 2), 16) || 0, g = parseInt(v.slice(2, 4), 16) || 0, b = parseInt(v.slice(4, 6), 16) || 0;
+  return `rgba(${r},${g},${b},.4)`;
+};
+export function derivePalette(prompt: string): Palette | null {
+  const m = prompt.toLowerCase();
+  const hexes = prompt.match(/#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/g) || [];
+  if (hexes.length) {
+    const a = hexes[0], b = hexes[1] ?? hexes[0];
+    return { a, b, g: hexGlow(a), name: 'custom hex' };
+  }
+  for (const vibe of Object.keys(VIBE_PALETTES)) if (m.includes(vibe)) return VIBE_PALETTES[vibe];
+  const found: string[] = [];
+  for (const c of Object.keys(NAMED_COLORS)) if (new RegExp(`\\b${c}\\b`).test(m)) found.push(c);
+  found.sort((x, y) => m.indexOf(x) - m.indexOf(y));
+  if (found.length) {
+    const [a] = NAMED_COLORS[found[0]];
+    const b = found[1] ? NAMED_COLORS[found[1]][0] : NAMED_COLORS[found[0]][1];
+    return { a, b, g: hexGlow(a), name: found.slice(0, 2).join(' + ') };
+  }
+  return null;
+}
+
+const ACCENT_BAR = (pal: Palette) => `h('div', { style: { height: 3, borderRadius: 99, background: 'linear-gradient(90deg,${pal.a},${pal.b})', marginBottom: 9, boxShadow: '0 0 12px ${pal.g}' } })`;
+
+const GEN_TICKER = (sym: string, pal: Palette) => `(props) => {
   const [p, setP] = useState(null);
   const [err, setErr] = useState('');
   useEffect(() => {
@@ -206,23 +302,31 @@ const GEN_TICKER = (sym: string) => `(props) => {
   }, []);
   if (err) return h('div', { style: { fontSize: 11, color: '#fb7185' } }, err);
   if (!p) return h('div', { style: { fontSize: 11, color: 'rgba(255,255,255,.4)', textAlign: 'center', padding: '14px 0' } }, 'Loading ${sym}…');
-  const chg = Number((p.priceChange && p.priceChange.h24) || 0), up = chg >= 0;
+  const pc = p.priceChange || {};
+  const chg = Number(pc.h24 || 0), up = chg >= 0, tone = up ? '#34d399' : '#fb7185';
   const price = Number(p.priceUsd || 0);
-  const chip = function(label, val){ return h('div', { style: { flex: 1, background: 'rgba(255,255,255,.06)', borderRadius: 10, padding: '6px 8px' } },
-    h('div', { style: { fontSize: 8.5, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.06em' } }, label),
+  const pts = [pc.h24, pc.h6, pc.h1, pc.m5].map(function(c){ return price / (1 + (Number(c) || 0) / 100); }).concat([price]);
+  const mn = Math.min.apply(null, pts), mx = Math.max.apply(null, pts);
+  const line = pts.map(function(v, i){ return (i / (pts.length - 1)) * 100 + ',' + (26 - (mx > mn ? (v - mn) / (mx - mn) : 0.5) * 22 - 2); }).join(' ');
+  const chip = function(label, val){ return h('div', { style: { flex: 1, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 10, padding: '6px 8px' } },
+    h('div', { style: { fontSize: 8.5, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.07em' } }, label),
     h('div', { style: { fontSize: 11.5, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' } }, val)); };
   const fmt = function(n){ return n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : String(Math.round(n)); };
   return h('div', null,
-    h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' } },
-      h('span', { style: { fontSize: 15, fontWeight: 900, color: '#fff' } }, '$${sym}'),
-      h('span', { style: { fontSize: 12, fontWeight: 800, color: up ? '#34d399' : '#fb7185' } }, (up ? '▲ +' : '▼ ') + chg.toFixed(2) + '%')),
-    h('div', { style: { fontSize: 22, fontWeight: 900, color: '#fff', margin: '4px 0 8px', fontVariantNumeric: 'tabular-nums' } }, '$' + (price >= 1 ? price.toFixed(2) : price.toFixed(6))),
+    ${ACCENT_BAR(pal)},
+    h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+      h('span', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, fontWeight: 900, color: '#fff' } },
+        h('i', { style: { width: 7, height: 7, borderRadius: 99, background: '${pal.a}', boxShadow: '0 0 10px ${pal.g}', display: 'inline-block' } }), '$${sym}'),
+      h('span', { style: { fontSize: 11, fontWeight: 900, color: tone, background: up ? 'rgba(52,211,153,.1)' : 'rgba(251,113,133,.1)', borderRadius: 99, padding: '3px 9px' } }, (up ? '▲ +' : '▼ ') + Math.abs(chg).toFixed(2) + '%')),
+    h('div', { style: { fontSize: 23, fontWeight: 900, color: '#fff', margin: '5px 0 3px', fontVariantNumeric: 'tabular-nums', letterSpacing: '-.01em' } }, '$' + (price >= 1 ? price.toFixed(2) : price.toFixed(6))),
+    h('svg', { width: '100%', height: 28, viewBox: '0 0 100 28', preserveAspectRatio: 'none', style: { marginBottom: 7 } },
+      h('polyline', { points: line, fill: 'none', stroke: tone, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', vectorEffect: 'non-scaling-stroke' })),
     h('div', { style: { display: 'flex', gap: 6 } },
       chip('Vol 24h', '$' + fmt(Number((p.volume && p.volume.h24) || 0))),
       chip('Liquidity', '$' + fmt(Number((p.liquidity && p.liquidity.usd) || 0)))));
 }`;
 
-const GEN_WATCHLIST = (syms: string[]) => `(props) => {
+const GEN_WATCHLIST = (syms: string[], pal: Palette) => `(props) => {
   const syms = ${JSON.stringify(syms)};
   const [rows, setRows] = useState([]);
   useEffect(() => {
@@ -241,31 +345,35 @@ const GEN_WATCHLIST = (syms: string[]) => `(props) => {
     return function(){ live = false; clearInterval(t); };
   }, []);
   if (!rows.length) return h('div', { style: { fontSize: 11, color: 'rgba(255,255,255,.4)', textAlign: 'center', padding: '14px 0' } }, 'Loading watchlist…');
-  return h('div', null, rows.map(function(r, i){
-    const up = r.chg >= 0;
-    return h('div', { key: r.s, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: i ? '1px solid rgba(255,255,255,.06)' : 'none' } },
-      h('span', { style: { fontSize: 12, fontWeight: 800, color: '#fff', width: 58 } }, '$' + r.s),
-      h('span', { style: { flex: 1, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.82)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' } }, r.price == null ? '—' : '$' + (r.price >= 1 ? r.price.toFixed(2) : r.price.toFixed(6))),
-      h('span', { style: { fontSize: 11, fontWeight: 800, width: 74, textAlign: 'right', color: up ? '#34d399' : '#fb7185' } }, (up ? '▲ +' : '▼ ') + Math.abs(r.chg).toFixed(2) + '%'));
-  }));
+  return h('div', null,
+    ${ACCENT_BAR(pal)},
+    rows.map(function(r, i){
+      const up = r.chg >= 0, tone = up ? '#34d399' : '#fb7185';
+      return h('div', { key: r.s, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '6.5px 0', borderTop: i ? '1px solid rgba(255,255,255,.06)' : 'none' } },
+        h('span', { style: { width: 20, height: 20, borderRadius: 7, background: 'linear-gradient(135deg,${pal.a}33,${pal.b}22)', border: '1px solid ${pal.a}44', color: '${pal.a}', fontSize: 9, fontWeight: 900, display: 'grid', placeItems: 'center', flexShrink: 0 } }, i + 1),
+        h('span', { style: { fontSize: 12, fontWeight: 800, color: '#fff', width: 56 } }, '$' + r.s),
+        h('span', { style: { flex: 1, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.82)', fontVariantNumeric: 'tabular-nums', textAlign: 'right' } }, r.price == null ? '—' : '$' + (r.price >= 1 ? r.price.toFixed(2) : r.price.toFixed(6))),
+        h('span', { style: { fontSize: 10.5, fontWeight: 900, minWidth: 72, textAlign: 'center', color: tone, background: up ? 'rgba(52,211,153,.09)' : 'rgba(251,113,133,.09)', borderRadius: 99, padding: '2.5px 7px' } }, (up ? '+' : '') + r.chg.toFixed(2) + '%'));
+    }));
 }`;
 
-const GEN_COUNTDOWN = (targetMs: number, label: string) => `(props) => {
+const GEN_COUNTDOWN = (targetMs: number, label: string, pal: Palette) => `(props) => {
   const target = ${targetMs};
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(function(){ setNow(Date.now()); }, 1000); return function(){ clearInterval(t); }; }, []);
   const left = Math.max(0, target - now);
-  if (left === 0) return h('div', { style: { fontSize: 16, fontWeight: 900, color: '#34d399', textAlign: 'center', padding: '12px 0' } }, '🎉 ${label} is here!');
+  if (left === 0) return h('div', { style: { fontSize: 16, fontWeight: 900, color: '${pal.a}', textAlign: 'center', padding: '12px 0', textShadow: '0 0 18px ${pal.g}' } }, '🎉 ${label} is here!');
   const d = Math.floor(left / 86400000), hh = Math.floor(left / 3600000) % 24, mm = Math.floor(left / 60000) % 60, ss = Math.floor(left / 1000) % 60;
-  const cell = function(v, l){ return h('div', { style: { flex: 1, background: 'rgba(255,255,255,.06)', borderRadius: 12, padding: '8px 4px', textAlign: 'center' } },
+  const cell = function(v, l, hot){ return h('div', { style: { flex: 1, background: hot ? 'linear-gradient(160deg,${pal.a}1f,${pal.b}14)' : 'rgba(255,255,255,.055)', border: hot ? '1px solid ${pal.a}55' : '1px solid rgba(255,255,255,.07)', borderRadius: 12, padding: '9px 4px', textAlign: 'center', boxShadow: hot ? '0 0 18px ${pal.g}' : 'none' } },
     h('div', { style: { fontSize: 19, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' } }, String(v).padStart(2, '0')),
-    h('div', { style: { fontSize: 8.5, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.08em' } }, l)); };
+    h('div', { style: { fontSize: 8.5, fontWeight: 800, color: hot ? '${pal.a}' : 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.09em' } }, l)); };
   return h('div', null,
-    h('div', { style: { fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,.55)', marginBottom: 7 } }, '⏳ ${label}'),
-    h('div', { style: { display: 'flex', gap: 6 } }, cell(d, 'days'), cell(hh, 'hrs'), cell(mm, 'min'), cell(ss, 'sec')));
+    ${ACCENT_BAR(pal)},
+    h('div', { style: { fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,.6)', marginBottom: 8 } }, '⏳ ${label}'),
+    h('div', { style: { display: 'flex', gap: 6 } }, cell(d, 'days', d > 0), cell(hh, 'hrs', d === 0 && hh > 0), cell(mm, 'min', false), cell(ss, 'sec', false)));
 }`;
 
-const GEN_NOTES = () => `(props) => {
+const GEN_NOTES = (pal: Palette) => `(props) => {
   const KEY = 'og_widget_notes_v1';
   const read = function(){ try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } };
   const [items, setItems] = useState(read);
@@ -273,33 +381,35 @@ const GEN_NOTES = () => `(props) => {
   const save = function(next){ setItems(next); localStorage.setItem(KEY, JSON.stringify(next)); };
   const add = function(){ const v = txt.trim(); if (!v) return; save([{ id: Date.now(), t: v, done: false }].concat(items).slice(0, 20)); setTxt(''); };
   return h('div', null,
+    ${ACCENT_BAR(pal)},
     h('div', { style: { display: 'flex', gap: 6, marginBottom: 8 } },
       h('input', { value: txt, placeholder: 'Add a note…', onChange: function(e){ setTxt(e.target.value); }, onKeyDown: function(e){ if (e.key === 'Enter') add(); },
         style: { flex: 1, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#fff', fontSize: 11.5, padding: '7px 10px', outline: 'none', fontFamily: 'inherit' } }),
-      h('button', { onClick: add, style: { background: 'linear-gradient(135deg,#2F80FF,#1a5cd4)', border: 0, borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 900, width: 30, cursor: 'pointer' } }, '+')),
+      h('button', { onClick: add, style: { background: 'linear-gradient(135deg,${pal.a},${pal.b})', border: 0, borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 900, width: 30, cursor: 'pointer', boxShadow: '0 3px 12px ${pal.g}' } }, '+')),
     items.length === 0 ? h('div', { style: { fontSize: 10.5, color: 'rgba(255,255,255,.35)', textAlign: 'center', padding: '8px 0' } }, 'No notes yet') :
     h('div', null, items.map(function(it){
       return h('div', { key: it.id, style: { display: 'flex', alignItems: 'center', gap: 7, padding: '4px 0' } },
         h('button', { onClick: function(){ save(items.map(function(x){ return x.id === it.id ? { id: x.id, t: x.t, done: !x.done } : x; })); },
-          style: { width: 15, height: 15, borderRadius: 5, flexShrink: 0, cursor: 'pointer', border: it.done ? 0 : '1.5px solid rgba(255,255,255,.3)', background: it.done ? '#34d399' : 'transparent', color: '#04110b', fontSize: 9, fontWeight: 900, lineHeight: '13px', padding: 0 } }, it.done ? '✓' : ''),
+          style: { width: 15, height: 15, borderRadius: 5, flexShrink: 0, cursor: 'pointer', border: it.done ? 0 : '1.5px solid rgba(255,255,255,.3)', background: it.done ? '${pal.a}' : 'transparent', color: '#04110b', fontSize: 9, fontWeight: 900, lineHeight: '13px', padding: 0 } }, it.done ? '✓' : ''),
         h('span', { style: { flex: 1, fontSize: 11.5, fontWeight: 600, color: it.done ? 'rgba(255,255,255,.3)' : 'rgba(255,255,255,.85)', textDecoration: it.done ? 'line-through' : 'none' } }, it.t),
         h('button', { onClick: function(){ save(items.filter(function(x){ return x.id !== it.id; })); }, style: { background: 'transparent', border: 0, color: 'rgba(255,255,255,.25)', fontSize: 10, cursor: 'pointer' } }, '✕'));
     })));
 }`;
 
-const GEN_CLOCK = () => `(props) => {
+const GEN_CLOCK = (pal: Palette) => `(props) => {
   const [now, setNow] = useState(new Date());
   useEffect(() => { const t = setInterval(function(){ setNow(new Date()); }, 1000); return function(){ clearInterval(t); }; }, []);
   const two = function(n){ return String(n).padStart(2, '0'); };
   const utc = two(now.getUTCHours()) + ':' + two(now.getUTCMinutes());
   return h('div', { style: { textAlign: 'center' } },
-    h('div', { style: { fontSize: 24, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums', letterSpacing: '.02em' } },
+    ${ACCENT_BAR(pal)},
+    h('div', { style: { fontSize: 25, fontWeight: 900, fontVariantNumeric: 'tabular-nums', letterSpacing: '.02em', background: 'linear-gradient(135deg,${pal.a},${pal.b})', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', filter: 'drop-shadow(0 0 14px ${pal.g})' } },
       two(now.getHours()) + ':' + two(now.getMinutes()) + ':' + two(now.getSeconds())),
     h('div', { style: { fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.45)', marginTop: 3 } },
       now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + ' · ' + utc + ' UTC'));
 }`;
 
-const GEN_CONVERTER = () => `(props) => {
+const GEN_CONVERTER = (pal: Palette) => `(props) => {
   const [px, setPx] = useState(null);
   const [amt, setAmt] = useState('1');
   useEffect(() => {
@@ -311,10 +421,11 @@ const GEN_CONVERTER = () => `(props) => {
   }, []);
   const n = parseFloat(amt) || 0;
   return h('div', null,
+    ${ACCENT_BAR(pal)},
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
       h('input', { value: amt, onChange: function(e){ setAmt(e.target.value.replace(/[^0-9.]/g, '')); },
-        style: { width: 74, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 800, padding: '7px 9px', outline: 'none', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' } }),
-      h('span', { style: { fontSize: 13, fontWeight: 900, color: '#5aa2ff' } }, '◎ SOL'),
+        style: { width: 74, background: 'rgba(255,255,255,.07)', border: '1px solid ${pal.a}44', borderRadius: 10, color: '#fff', fontSize: 14, fontWeight: 800, padding: '7px 9px', outline: 'none', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' } }),
+      h('span', { style: { fontSize: 13, fontWeight: 900, color: '${pal.a}' } }, '◎ SOL'),
       h('span', { style: { fontSize: 13, color: 'rgba(255,255,255,.35)' } }, '→'),
       h('span', { style: { flex: 1, fontSize: 16, fontWeight: 900, color: '#34d399', fontVariantNumeric: 'tabular-nums', textAlign: 'right' } }, px == null ? '…' : '$' + (n * px).toLocaleString('en-US', { maximumFractionDigits: 2 }))),
     h('div', { style: { fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,.35)', marginTop: 7, textAlign: 'right' } }, px == null ? 'Loading price…' : '1 SOL = $' + px.toFixed(2) + ' · live'));
@@ -356,15 +467,16 @@ const CG_IDS: Record<string, string> = { BTC: 'bitcoin', ETH: 'ethereum', SOL: '
 export function forgeLocally(prompt: string): ForgeSpec {
   const m = prompt.toLowerCase();
   const syms = extractSymbols(prompt);
+  const pal = derivePalette(prompt) ?? DEFAULT_PAL;
   const mk = (type: WidgetType, title: string, size: 'sm'|'md'|'lg', params: Record<string, any>, reply: string): ForgeSpec => ({ type, title, size, params, reply });
 
   if (/countdown|days (left|until)|until /.test(m)) {
     const t = parseTargetDate(prompt) ?? { ts: +new Date(new Date().getFullYear(), 11, 31, 23, 59, 59), label: 'New Year' };
-    return mk('custom_code', '⏳ ' + t.label, 'md', { code: GEN_COUNTDOWN(t.ts, t.label.replace(/'/g, '')) }, `Live countdown to ${t.label}, ticking every second.`);
+    return mk('custom_code', '⏳ ' + t.label, 'md', { code: GEN_COUNTDOWN(t.ts, t.label.replace(/'/g, ''), pal) }, `Live countdown to ${t.label}, ticking every second.`);
   }
-  if (/\bnotes?\b|todo|to-do|checklist|task/.test(m)) return mk('custom_code', '📝 Quick Notes', 'md', { code: GEN_NOTES() }, 'Persistent notes with check-off and delete — saved on this device.');
-  if (/\bclock\b|world time|\butc\b/.test(m)) return mk('custom_code', '🕐 Live Clock', 'sm', { code: GEN_CLOCK() }, 'Live seconds clock with UTC readout.');
-  if (/convert|calculator|how much is/.test(m)) return mk('custom_code', '💱 SOL → USD', 'md', { code: GEN_CONVERTER() }, 'Live SOL to USD converter, refreshes every 30s.');
+  if (/\bnotes?\b|todo|to-do|checklist|task/.test(m)) return mk('custom_code', '📝 Quick Notes', 'md', { code: GEN_NOTES(pal) }, 'Persistent notes with check-off and delete — saved on this device.');
+  if (/\bclock\b|world time|\butc\b/.test(m)) return mk('custom_code', '🕐 Live Clock', 'sm', { code: GEN_CLOCK(pal) }, 'Live seconds clock with UTC readout.');
+  if (/convert|calculator|how much is/.test(m)) return mk('custom_code', '💱 SOL → USD', 'md', { code: GEN_CONVERTER(pal) }, 'Live SOL to USD converter, refreshes every 30s.');
   if (/fear|greed|sentiment|mood/.test(m)) return mk('fear_greed', '🌡 Fear & Greed', 'sm', {}, 'Live market mood gauge.');
   if (/trending|hot|movers/.test(m)) return mk('trending', '🔥 Trending', 'md', { limit: 5 }, 'Top trending Solana tokens, live.');
   if (/kol|whale|smart money/.test(m)) return mk('kol_feed', '🐋 KOL Alerts', 'md', { limit: 5 }, 'Live KOL whale trade alerts.');
@@ -375,7 +487,7 @@ export function forgeLocally(prompt: string): ForgeSpec {
   if (addr) return mk('wallet_tracker', '🔭 ' + addr.slice(0, 6) + '…', 'lg', { address: addr, view: /buy/.test(m) ? 'buys' : /sell/.test(m) ? 'sells' : /holding/.test(m) ? 'holdings' : 'all' }, 'Wallet tracker with buys, sells and holdings.');
   if (syms.length >= 2 || /watchlist|portfolio of/.test(m)) {
     const list = syms.length >= 2 ? syms : ['SOL', 'BONK', 'JUP', 'WIF'];
-    return mk('custom_code', '📋 ' + list.slice(0, 3).join('·') + (list.length > 3 ? '+' : ''), 'md', { code: GEN_WATCHLIST(list) }, `Live watchlist for ${list.join(', ')} — price and 24h move, refreshing every 30s.`);
+    return mk('custom_code', '📋 ' + list.slice(0, 3).join('·') + (list.length > 3 ? '+' : ''), 'md', { code: GEN_WATCHLIST(list, pal) }, `Live watchlist for ${list.join(', ')} — price and 24h move, refreshing every 30s.`);
   }
   if (/chart|candles|graph|history/.test(m) && syms.length) {
     const sym = syms[0];
@@ -387,7 +499,7 @@ export function forgeLocally(prompt: string): ForgeSpec {
   }
   if (/info|stats|about/.test(m) && syms.length) return mk('token_info', '🔍 ' + syms[0], 'md', { symbol: syms[0] }, `${syms[0]} token stats.`);
   const sym = syms[0] ?? 'SOL';
-  return mk('custom_code', '◎ ' + sym + ' Live', 'md', { code: GEN_TICKER(sym) }, `Live ${sym} ticker — price, 24h move, volume and liquidity.`);
+  return mk('custom_code', '◎ ' + sym + ' Live', 'md', { code: GEN_TICKER(sym, pal) }, `Live ${sym} ticker — price, 24h move, volume and liquidity.`);
 }
 
 /* ── display source for built-in widgets (shown in the code window) ── */
@@ -733,9 +845,9 @@ const FALLBACK_REPLIES: Record<string, string> = {
 };
 
 type ForgePhase = 'think' | 'code' | 'compile' | 'ready';
-type ForgeJob = { phase: ForgePhase; prompt: string; spec: ForgeSpec | null; source: string; typed: number; engine: string; note?: string };
+type ForgeJob = { phase: ForgePhase; prompt: string; spec: ForgeSpec | null; source: string; typed: number; engine: string; note?: string; brief?: DesignBrief | null; palette?: Palette | null };
 const FORGE_STEPS: { key: ForgePhase; label: string }[] = [
-  { key: 'think',   label: 'Analyzing request' },
+  { key: 'think',   label: 'Analyzing · drafting design brief' },
   { key: 'code',    label: 'Writing code' },
   { key: 'compile', label: 'Compiling sandbox' },
   { key: 'ready',   label: 'Widget ready' },
@@ -746,7 +858,7 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
   initialTab?: 'chat' | 'my' | 'lib';
 }) {
   const [tab, setTab] = useState<'chat' | 'my' | 'lib'>(initialTab);
-  const [msgs, setMsgs] = useState<Msg[]>([{ role: 'ai', text: '⚡ WidgetForge v3 — describe ANY widget and I will design it, write the code live, compile it in a sandbox and show you a working preview before it lands on your hub.\n\nTry:\n• "watchlist SOL BONK WIF"\n• "BONK chart for the last 7 days"\n• "countdown to friday"\n• "quick notes widget"\nSlash commands still work — /help lists them.' }]);
+  const [msgs, setMsgs] = useState<Msg[]>([{ role: 'ai', text: '⚡ WidgetForge v3 — describe ANY widget and I will design it, write the code live, compile it in a sandbox and show you a working preview before it lands on your hub.\n\nTry:\n• "watchlist SOL BONK WIF"\n• "BONK chart for the last 7 days"\n• "countdown to friday"\n• "quick notes widget"\n• "synthwave BONK ticker in hot pink and cyan"\nName ANY colors, hex codes or vibes — I design with them. /help lists slash commands.' }]);
   const [input, setInput] = useState('');
   const [job, setJob] = useState<ForgeJob | null>(null);
   const jobTimer = useRef<number | null>(null);
@@ -767,13 +879,19 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
 
   const runForge = useCallback(async (prompt: string, variation = false) => {
     if (jobTimer.current) { window.clearInterval(jobTimer.current); jobTimer.current = null; }
-    setJob({ phase: 'think', prompt, spec: null, source: '', typed: 0, engine: 'orbitx-neural' });
+    const pal = derivePalette(prompt);
+    setJob({ phase: 'think', prompt, spec: null, source: '', typed: 0, engine: 'neural·design', palette: pal, brief: null });
     const ask = variation ? `${prompt}\n\nProduce a DIFFERENT take this time: vary the layout, visualization or angle.` : prompt;
     const started = Date.now();
-    let spec: ForgeSpec; let engine = 'orbitx-neural'; let note: string | undefined;
-    try { spec = await forgeWithServer(ask, msgs); }
+    let brief: DesignBrief | null = null;
+    try {
+      brief = await forgeDesignBrief(ask, pal);
+      setJob(j => (j && j.phase === 'think' ? { ...j, brief, engine: 'neural·2-pass' } : j));
+    } catch { /* single-pass */ }
+    let spec: ForgeSpec; let engine = brief ? 'neural·2-pass' : 'orbitx-neural'; let note: string | undefined;
+    try { spec = await forgeWithServer(ask, msgs, pal, brief); }
     catch {
-      try { spec = await forgeWithOpenAI(ask, msgs); engine = 'gpt-4o-mini'; }
+      try { spec = await forgeWithOpenAI(ask, msgs, pal, brief); engine = 'gpt-4o-mini'; }
       catch { spec = forgeLocally(prompt); engine = 'forge-local'; }
     }
     if (spec.type === 'custom_code') {
@@ -785,7 +903,7 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
     const minThink = 1500 - (Date.now() - started);
     if (minThink > 0) await new Promise(r => setTimeout(r, minThink));
     const source = templateSource(spec);
-    setJob({ phase: 'code', prompt, spec, source, typed: 0, engine, note });
+    setJob({ phase: 'code', prompt, spec, source, typed: 0, engine, note, brief, palette: pal });
     const totalMs = Math.min(6500, Math.max(3200, source.length * 5));
     const stepChars = Math.max(2, Math.round(source.length / (totalMs / 34)));
     jobTimer.current = window.setInterval(() => {
@@ -855,6 +973,25 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
                     );
                   })}
                 </div>
+                {(job.brief || job.palette) && (
+                  <div className="fw-brief">
+                    <div className="fw-brief-head">
+                      <span>🎨 Design brief{job.brief?.name ? ` — ${job.brief.name}` : ''}</span>
+                      {(job.brief?.palette?.mood || job.palette?.name) && <em>{job.brief?.palette?.mood ?? job.palette?.name}</em>}
+                    </div>
+                    <div className="fw-brief-row">
+                      {[job.brief?.palette?.accent ?? job.palette?.a, job.brief?.palette?.accent2 ?? job.palette?.b].filter(Boolean).map((c, i) => (
+                        <span key={i} className="fw-sw" style={{ background: String(c), boxShadow: `0 0 10px ${String(c)}66` }} title={String(c)} />
+                      ))}
+                      {job.palette && <span className="fw-brief-pal">user palette · {job.palette.name}</span>}
+                      {job.brief?.viz && job.brief.viz !== 'none' && <span className="fw-feat">{job.brief.viz}</span>}
+                    </div>
+                    {job.brief?.layout && <div className="fw-brief-layout">{job.brief.layout}</div>}
+                    {!!job.brief?.features?.length && (
+                      <div className="fw-brief-row">{job.brief.features.slice(0, 5).map((f, i) => <span key={i} className="fw-feat">{f}</span>)}</div>
+                    )}
+                  </div>
+                )}
                 {(job.phase === 'code' || job.phase === 'compile' || job.phase === 'ready') && (
                   <div className="fw-codewin">
                     <div className="fw-codebar">
@@ -895,7 +1032,7 @@ export function AIWidgetPanel({ onClose, widgets, setWidgets, initialTab = 'chat
             <div ref={bottomRef} />
           </div>
           <div className="awp-input-row"><input className="awp-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); send(); } }} placeholder={forging ? 'Forging your widget…' : 'Describe any widget — I design, code & mount it…'} disabled={forging} /><button className="awp-send-btn" onClick={send} disabled={!input.trim()||forging}><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg></button></div>
-          <div className="awp-pills">{['Watchlist SOL BONK WIF','BONK chart 7d','Countdown to friday','Quick notes','Fear & greed','/help'].map(q => (<button key={q} className="awp-pill" onClick={() => setInput(q)}>{q}</button>))}</div>
+          <div className="awp-pills">{['Synthwave SOL ticker','Gold luxury BTC watchlist','WIF pulse in #ff2bd6','Countdown to friday','Matrix style notes','/help'].map(q => (<button key={q} className="awp-pill" onClick={() => setInput(q)}>{q}</button>))}</div>
         </>)}
         {tab === 'my' && (<div className="awp-list">{widgets.length===0?<div className="awp-empty">No widgets yet — try /help!</div>:widgets.map(w => (<div key={w.id} className="awp-list-item"><div className="awp-list-icon">{LIB_ICONS[w.type]??'📊'}</div><div style={{ flex:1, minWidth:0 }}><div className="awp-list-name">{w.title}</div><div className="awp-list-meta">{w.type} · {w.size}</div></div><button className="awp-del-btn" onClick={() => removeWidget(w.id)}>✕</button></div>))}</div>)}
         {tab === 'lib' && (<div className="awp-list">
@@ -1000,6 +1137,14 @@ export const aiWidgetCSS = `
 .fw-step-wait .fw-step-ic{background:rgba(255,255,255,.04);color:rgba(255,255,255,.25)}
 .fw-spin{width:9px;height:9px;border-radius:99px;border:2px solid rgba(47,128,255,.25);border-top-color:#5aa2ff;animation:fwsp .7s linear infinite;display:block}
 @keyframes fwsp{to{transform:rotate(360deg)}}
+.fw-brief{border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.03);padding:9px 11px;display:flex;flex-direction:column;gap:6px;animation:fwin .3s ease both}
+.fw-brief-head{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;font-weight:900;color:#fff}
+.fw-brief-head em{font-style:normal;font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.07em}
+.fw-brief-row{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.fw-sw{width:16px;height:16px;border-radius:6px;display:inline-block;border:1px solid rgba(255,255,255,.25)}
+.fw-brief-pal{font-size:9px;font-weight:800;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.05em}
+.fw-brief-layout{font-size:10px;font-weight:600;color:rgba(255,255,255,.55);line-height:1.45}
+.fw-feat{font-size:9px;font-weight:800;color:#9ecbff;background:rgba(47,128,255,.1);border:1px solid rgba(47,128,255,.2);border-radius:99px;padding:2px 8px}
 .fw-codewin{border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.09);background:#07090f}
 .fw-codebar{display:flex;align-items:center;gap:5px;padding:7px 10px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06)}
 .fw-dot{width:9px;height:9px;border-radius:99px;display:block}
