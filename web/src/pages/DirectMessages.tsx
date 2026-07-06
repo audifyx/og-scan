@@ -89,6 +89,16 @@ const lastSeen = (ts: string | null): string => {
   return "Last seen " + formatDistanceToNow(new Date(ts), { addSuffix: true });
 };
 
+/* compact relative time for the active-users hub: "now" · "5m" · "3h" · "2d" */
+const agoShort = (ts: string | null): string => {
+  if (!ts) return "";
+  const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+  if (m < 3) return "now";
+  if (m < 60) return `${m}m`;
+  if (m < 1440) return `${Math.floor(m / 60)}h`;
+  return `${Math.floor(m / 1440)}d`;
+};
+
 /* ═══════════════════════════════════════════════════════════════
    Online Dot
    ═══════════════════════════════════════════════════════════════ */
@@ -164,12 +174,15 @@ const DirectMessages: React.FC = () => {
 
   /* ─── Fetch active users for quick-start ─── */
   const fetchActiveUsers = useCallback(async () => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
     const { data } = await supabase
       .from("profiles")
       .select("user_id, username, avatar_url, is_online, last_active_at, badge")
       .neq("user_id", user?.id || "")
+      .or(`is_online.eq.true,last_active_at.gte.${sevenDaysAgo}`)
+      .order("is_online", { ascending: false })
       .order("last_active_at", { ascending: false })
-      .limit(8);
+      .limit(16);
     setActiveUsers(data || []);
   }, [user?.id]);
 
@@ -586,8 +599,10 @@ const DirectMessages: React.FC = () => {
 
   /* ─── filtered convos ─── */
   const filtered = useMemo(() => {
-    if (!searchQuery) return convos;
-    return convos.filter((c) =>
+    const ts = (c: Conversation) => new Date(c.lastMessage?.created_at || c.updated_at || 0).getTime();
+    const base = [...convos].sort((a, b) => ts(b) - ts(a));
+    if (!searchQuery) return base;
+    return base.filter((c) =>
       (c.otherUser?.username || "").toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }, [convos, searchQuery]);
@@ -626,7 +641,7 @@ const DirectMessages: React.FC = () => {
         <div
           onClick={() => setActiveConvo(c)}
           className={cn(
-            "flex w-full cursor-pointer items-center gap-3.5 px-4 py-3.5 text-left transition hover:bg-muted/30 active:bg-muted/50",
+            "flex w-full cursor-pointer items-center gap-3.5 py-3.5 pl-4 pr-11 text-left transition hover:bg-muted/30 active:bg-muted/50",
             pinned && "bg-primary/[0.04]",
             activeConvo?.id === c.id && "bg-muted/50",
           )}
@@ -664,14 +679,15 @@ const DirectMessages: React.FC = () => {
         <button
           onClick={(e) => { e.stopPropagation(); setConvoMenuId(menuOpen ? null : c.id); }}
           data-open={menuOpen}
-          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground/40 opacity-0 transition hover:bg-muted hover:text-foreground group-hover:opacity-100 data-[open=true]:opacity-100"
+          title="Conversation options"
+          className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground/45 transition hover:bg-muted hover:text-foreground active:scale-90 data-[open=true]:bg-muted data-[open=true]:text-foreground"
         >
-          <MoreHorizontal className="h-4 w-4" />
+          <MoreHorizontal className="h-[18px] w-[18px]" />
         </button>
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setConvoMenuId(null)} />
-            <div className="absolute right-3 top-10 z-50 w-44 overflow-hidden rounded-xl border border-border/60 bg-popover py-1 shadow-xl">
+            <div className="absolute right-3 top-[60%] z-50 w-44 overflow-hidden rounded-xl border border-border/60 bg-popover py-1 shadow-xl">
               <button onClick={() => togglePin(c.id)} className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] text-foreground transition hover:bg-muted">
                 {pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
                 {pinned ? "Unpin" : "Pin to top"}
@@ -717,6 +733,37 @@ const DirectMessages: React.FC = () => {
             {showNewDM ? <XIcon className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
           </button>
         </div>
+        {/* ── Active hub: online + last 7 days, always visible ── */}
+        {!showArchived && activeUsers.length > 0 && (
+          <div className="border-b border-border/40 px-4 pb-3 pt-1">
+            <p className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/45">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+              Active this week
+            </p>
+            <div className="no-scrollbar flex gap-3 overflow-x-auto pb-0.5">
+              {activeUsers.map((u) => (
+                <button
+                  key={u.user_id}
+                  onClick={() => startConversation(u.user_id)}
+                  title={u.is_online ? "Active now" : lastSeen(u.last_active_at)}
+                  className="group flex w-[54px] shrink-0 flex-col items-center gap-1"
+                >
+                  <div className={cn("relative rounded-full p-[2px] transition group-active:scale-95", u.is_online ? "bg-gradient-to-tr from-emerald-400 via-[#2F80FF] to-[#9945FF]" : "bg-border/70")}>
+                    <img
+                      src={safeAvatar(u.avatar_url, u.username || u.user_id)}
+                      alt=""
+                      className="h-12 w-12 rounded-full object-cover ring-2 ring-background transition group-hover:scale-[1.04]"
+                    />
+                    {u.is_online && <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-400" />}
+                  </div>
+                  <span className="w-[54px] truncate text-center text-[10px] font-semibold text-foreground/75">{u.username?.split(" ")[0] || "Anon"}</span>
+                  <span className={cn("-mt-0.5 text-[9px] font-bold", u.is_online ? "text-emerald-400" : "text-muted-foreground/40")}>{u.is_online ? "now" : agoShort(u.last_active_at)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Search bar ── */}
         <div className="px-4 py-2.5 border-b border-border/40">
           <div className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
@@ -739,36 +786,8 @@ const DirectMessages: React.FC = () => {
         {/* ── New DM user search results ── */}
         {showNewDM && (
           <div className="border-b border-border/40">
-            {/* Suggested: active users */}
             {!searchQuery && (
-              <div className="px-4 py-3">
-                <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Active Users</p>
-                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-                  {activeUsers.length === 0 ? (
-                    <p className="text-[12px] text-muted-foreground/40">No users yet</p>
-                  ) : (
-                    activeUsers.map((u) => (
-                      <button
-                        key={u.user_id}
-                        onClick={() => startConversation(u.user_id)}
-                        className="flex flex-col items-center gap-1.5 min-w-[52px]"
-                      >
-                        <div className="relative">
-                          <img
-                            src={safeAvatar(u.avatar_url, u.username || u.user_id)}
-                            alt=""
-                            className="h-12 w-12 rounded-full object-cover ring-2 ring-border/40"
-                          />
-                          <OnlineDot online={u.is_online} />
-                        </div>
-                        <span className="text-[10px] font-semibold text-foreground/70 truncate w-12 text-center">
-                          {u.username?.split(" ")[0] || "Anon"}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
+              <p className="px-4 py-3 text-[12px] text-muted-foreground/45">Type a name to find people — or tap someone in the active row above.</p>
             )}
 
             {/* Search results */}

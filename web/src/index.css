@@ -502,6 +502,8 @@
   /* ── scrollbars ── */
   .ios-scroll { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .ios-scroll::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
 
   .sidebar-scrollbar { -webkit-overflow-scrolling: touch; }
   @media (max-width: 1023px) {
