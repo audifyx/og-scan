@@ -364,11 +364,23 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   };
 
   /* ── Actions ── */
+  const notify = async (recipientId: string | null | undefined, type: string, title: string, message: string, targetId?: string) => {
+    if (!recipientId || !user || recipientId === user.id) return;
+    try {
+      await supabase.from("notifications").insert({
+        user_id: recipientId, type, title, message,
+        is_read: false, read: false, actor_id: user.id, kind: type,
+        target_type: "post", target_id: targetId ?? null, created_at: new Date().toISOString(),
+      });
+    } catch { /* best-effort */ }
+  };
+
   const follow = async (uid: string) => {
     if (!user) { toast.error("Sign in to follow"); return; }
     setFollowingSet((prev) => new Set(prev).add(uid));
     const { error } = await supabase.from("followers").insert({ follower_id: user.id, followee_id: uid });
     if (error) setFollowingSet((prev) => { const n = new Set(prev); n.delete(uid); return n; });
+    else void notify(uid, "follow", "New follower", `@${handle} followed you`);
   };
 
   const uploadComposerImage = async (files: FileList | null) => {
@@ -432,7 +444,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       .insert({ channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url, content, likes_count: 0, liked_by: [], reply_to: parentId })
       .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").single();
     if (error) { toast.error("Could not reply. Try again."); setReplyText(content); }
-    else if (data) { setDetailReplies((prev) => [...prev, data as Post]); setReplyCounts((prev) => ({ ...prev, [parentId]: (prev[parentId] || 0) + 1 })); }
+    else if (data) { setDetailReplies((prev) => [...prev, data as Post]); setReplyCounts((prev) => ({ ...prev, [parentId]: (prev[parentId] || 0) + 1 })); void notify(detailPost?.user_id, "reply", "New reply", `@${handle} replied: ${content.slice(0, 80)}`, parentId); }
     setReplyPosting(false);
   };
 
@@ -470,6 +482,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     if (post.id.startsWith("tmp-")) return;
     const likedBy = post.liked_by || [];
     const liked = likedBy.includes(user.id);
+    if (!liked) void notify(post.user_id, "like", "New like", `@${handle} liked your post`, post.id);
     const nextLikedBy = liked ? likedBy.filter((x) => x !== user.id) : [...likedBy, user.id];
     setPosts((prev) => prev.map((p) => p.id === post.id ? { ...p, liked_by: nextLikedBy, likes_count: nextLikedBy.length } : p));
     const { error } = await supabase.from("social_messages").update({ likes_count: nextLikedBy.length, liked_by: nextLikedBy }).eq("id", post.id);
