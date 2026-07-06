@@ -610,13 +610,14 @@ function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-5 py-10 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-md border border-white/10 bg-white/[0.04]">
-        <Icon className="h-6 w-6 text-white/45" />
+    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.045] to-white/[0.01] px-5 py-12 text-center">
+      <div className="pointer-events-none absolute -top-16 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-[#1d9bf0]/10 blur-[70px]" />
+      <div className="relative mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#1d9bf0]/20 to-[#9945FF]/15 ring-1 ring-white/10 shadow-[0_8px_30px_rgba(29,155,240,0.18)]">
+        <Icon className="h-7 w-7 text-[#1d9bf0]" />
       </div>
-      <h4 className="mt-4 text-sm font-bold text-white">{title}</h4>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">{body}</p>
-      {action ? <div className="mt-5">{action}</div> : null}
+      <h4 className="relative mt-4 text-[16px] font-black text-white">{title}</h4>
+      <p className="relative mx-auto mt-2 max-w-md text-[13.5px] leading-6 text-white/45">{body}</p>
+      {action ? <div className="relative mt-5">{action}</div> : null}
     </div>
   );
 }
