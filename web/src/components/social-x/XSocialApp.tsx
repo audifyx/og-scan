@@ -12,7 +12,7 @@ import {
   Home, Search, Bell, Mail, Hash, MessageSquare, Radio, Globe, User,
   Feather, X as XIcon, Heart, MessageCircle, Repeat2, Share, MoreHorizontal,
   Trash2, Copy, Flag, BadgeCheck, Loader2, TrendingUp, ArrowUpRight,
-  ArrowDownRight, Users, Bookmark, LogOut, LayoutGrid, Settings,
+  ArrowDownRight, Users, Bookmark, LogOut, LayoutGrid, Settings, Coins,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,6 +41,7 @@ interface Post {
 interface Suggestion { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null; is_official_account?: boolean | null; bio?: string | null; }
 interface Ticker { mint: string; symbol: string | null; priceUsd: number | null; change24h: number | null; }
 interface NotifRow { id: string; type: string; title: string; message: string; is_read: boolean; created_at: string; }
+interface CommunityLite { id: string; name: string; description: string | null; member_count: number | null; avatar_url?: string | null; icon?: string | null; category?: string | null; }
 
 const FEED_CHANNEL = "social-general";
 const MAX_LEN = 500;
@@ -96,9 +97,10 @@ const NAV: { id: XTab; label: string; Icon: React.ComponentType<{ className?: st
   { id: "profile", label: "Profile", Icon: User },
 ];
 
-/* Mobile pill: 5 core tabs; the rest live in the More sheet (each tab appears exactly once) */
-const CORE_TABS: XTab[] = ["home", "explore", "notifications", "messages", "profile"];
-const MORE_TABS: XTab[] = ["chat", "rooms", "spaces", "communities"];
+/* Mobile pill: 5 core tabs; the rest live in the More sheet (each tab appears exactly once).
+   Notifications moved to the top-right bell — Communities takes its pill slot. */
+const CORE_TABS: XTab[] = ["home", "explore", "communities", "messages", "profile"];
+const MORE_TABS: XTab[] = ["chat", "rooms", "spaces"];
 
 /* Old sidebar/CommunityHub deep-link keys -> X shell tabs (keeps every legacy entry point working) */
 const ENTRY_MAP: Record<string, XTab> = {
@@ -150,6 +152,10 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [notifsLoading, setNotifsLoading] = useState(false);
   const [bookmarks, setBookmarks] = useState<Set<string>>(loadBookmarks);
   const [searchQ, setSearchQ] = useState("");
+  const [searchScope, setSearchScope] = useState<"all" | "people" | "coins" | "communities">("all");
+  const [foundProfiles, setFoundProfiles] = useState<Suggestion[]>([]);
+  const [foundComms, setFoundComms] = useState<CommunityLite[]>([]);
+  const [searching, setSearching] = useState(false);
   const [commView, setCommView] = useState<"token" | "og">("token");
   const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
   const [moreOpen, setMoreOpen] = useState(false);
@@ -232,14 +238,38 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     return () => { on = false; clearInterval(id); };
   }, []);
 
-  /* ── Notifications ── */
+  /* ── Notifications (loaded eagerly so the top-right bell badge is live) ── */
   useEffect(() => {
-    if (tab !== "notifications" || !user) return;
-    setNotifsLoading(true);
+    if (!user) return;
+    if (tab === "notifications") setNotifsLoading(true);
     supabase.from("notifications").select("id,type,title,message,is_read,created_at")
       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(50)
       .then(({ data }) => { setNotifs((data as NotifRow[]) || []); setNotifsLoading(false); });
   }, [tab, user]);
+
+  /* ── Universal search: people + communities (server), coins (trending ticker) ── */
+  useEffect(() => {
+    const q = searchQ.trim().replace(/[%,()]/g, "");
+    if (q.length < 2) { setFoundProfiles([]); setFoundComms([]); setSearching(false); return; }
+    setSearching(true);
+    const t = setTimeout(async () => {
+      const like = `%${q}%`;
+      const [pRes, cRes] = await Promise.all([
+        supabase.from("profiles")
+          .select("user_id,username,display_name,avatar_url,is_official_account,bio")
+          .or(`username.ilike.${like},display_name.ilike.${like}`)
+          .not("username", "is", null).limit(12),
+        supabase.from("communities")
+          .select("id,name,description,member_count,avatar_url,icon,category")
+          .or(`name.ilike.${like},description.ilike.${like}`)
+          .limit(10),
+      ]);
+      setFoundProfiles((pRes.data as Suggestion[]) || []);
+      setFoundComms((cRes.data as CommunityLite[]) || []);
+      setSearching(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQ]);
 
   const markAllRead = async () => {
     if (!user) return;
@@ -332,11 +362,19 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const searchedUsers = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
     if (!q) return [];
-    return suggestions.filter((s) => (s.username || "").toLowerCase().includes(q) || (s.display_name || "").toLowerCase().includes(q)).slice(0, 8);
-  }, [searchQ, suggestions]);
+    const local = suggestions.filter((s) => (s.username || "").toLowerCase().includes(q) || (s.display_name || "").toLowerCase().includes(q));
+    const seen = new Set<string>();
+    return [...foundProfiles, ...local].filter((s) => (seen.has(s.user_id) ? false : (seen.add(s.user_id), true))).slice(0, 10);
+  }, [searchQ, suggestions, foundProfiles]);
+
+  const foundCoins = useMemo(() => {
+    const q = searchQ.trim().toLowerCase();
+    if (!q) return [];
+    return ticker.filter((t) => (t.symbol || "").toLowerCase().includes(q) || t.mint.toLowerCase() === q).slice(0, 8);
+  }, [searchQ, ticker]);
 
   const isNarrow = NARROW_TABS.includes(tab);
-  const PILL_INDEX = CORE_TABS.indexOf(tab) >= 0 ? CORE_TABS.indexOf(tab) : CORE_TABS.length; // last slot = More
+  const PILL_INDEX = CORE_TABS.indexOf(tab) >= 0 ? CORE_TABS.indexOf(tab) : MORE_TABS.includes(tab) ? CORE_TABS.length : -1; // More slot; -1 = none (notifications lives top-right)
   const unread = notifs.filter((n) => !n.is_read).length;
 
   /* ═══════════ Sub-renderers ═══════════ */
@@ -464,6 +502,32 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     );
   };
 
+  const CommunityRow = ({ c }: { c: CommunityLite }) => (
+    <button
+      type="button"
+      onClick={() => { setCommView("og"); setTab("communities"); }}
+      className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-all duration-200 hover:bg-white/[0.04]"
+    >
+      {c.avatar_url ? (
+        <img src={c.avatar_url} alt="" className="h-11 w-11 shrink-0 rounded-2xl object-cover ring-1 ring-white/[0.1]" />
+      ) : (
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#1d9bf0]/25 to-[#9945FF]/20 text-[18px] ring-1 ring-white/[0.1]">
+          {c.icon || (c.name || "?").slice(0, 1).toUpperCase()}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-[14px] font-black text-white">{c.name}</span>
+          {c.category && <span className="shrink-0 rounded-full bg-white/[0.07] px-2 py-0.5 text-[10px] font-bold text-white/45 ring-1 ring-white/[0.06]">{c.category}</span>}
+        </div>
+        <div className="truncate text-[12px] text-white/40">
+          {(c.member_count ?? 0).toLocaleString()} member{(c.member_count ?? 0) === 1 ? "" : "s"}{c.description ? ` · ${c.description}` : ""}
+        </div>
+      </div>
+      <span className="shrink-0 rounded-full bg-white px-4 py-1.5 text-[12px] font-black text-black opacity-90 transition group-hover:opacity-100">View</span>
+    </button>
+  );
+
   /* ═══════════ Center column content ═══════════ */
   const renderCenter = () => {
     switch (tab) {
@@ -496,26 +560,88 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           </>
         );
 
-      case "explore":
+      case "explore": {
+        const scopeChips: { id: "all" | "people" | "coins" | "communities"; label: string }[] = [
+          { id: "all", label: "All" },
+          { id: "people", label: "People" },
+          { id: "coins", label: "Coins" },
+          { id: "communities", label: "Communities" },
+        ];
+        const showPeople = searchScope === "all" || searchScope === "people";
+        const showCoins = searchScope === "all" || searchScope === "coins";
+        const showComms = searchScope === "all" || searchScope === "communities";
         return (
           <>
-            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/55 p-3 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-                <input
-                  value={searchQ}
-                  onChange={(e) => setSearchQ(e.target.value)}
-                  placeholder="Search OrbitX"
-                  className="w-full rounded-full border border-white/[0.06] bg-white/[0.06] py-2.5 pl-11 pr-4 text-[15px] text-white placeholder:text-white/30 outline-none transition-all duration-200 focus:border-[#1d9bf0]/70 focus:bg-black focus:shadow-[0_0_0_3px_rgba(29,155,240,0.15)]"
-                />
+            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/55 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
+              <div className="p-3 pb-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                  <input
+                    value={searchQ}
+                    onChange={(e) => setSearchQ(e.target.value)}
+                    placeholder="Search people, coins & communities"
+                    className="w-full rounded-full border border-white/[0.06] bg-white/[0.06] py-2.5 pl-11 pr-10 text-[15px] text-white placeholder:text-white/30 outline-none transition-all duration-200 focus:border-[#1d9bf0]/70 focus:bg-black focus:shadow-[0_0_0_3px_rgba(29,155,240,0.15)]"
+                  />
+                  {searchQ && (
+                    <button type="button" onClick={() => setSearchQ("")} className="absolute right-3 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full bg-white/[0.1] text-white/50 transition hover:bg-white/[0.2] hover:text-white" aria-label="Clear search">
+                      <XIcon className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               </div>
+              {searchQ.trim() && (
+                <div className="flex gap-1.5 overflow-x-auto px-3 pb-2.5 [scrollbar-width:none]">
+                  {scopeChips.map((c) => (
+                    <button key={c.id} type="button" onClick={() => setSearchScope(c.id)} className={cn("shrink-0 rounded-full px-4 py-1.5 text-[12.5px] font-bold transition-all duration-200 active:scale-95", searchScope === c.id ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]" : "bg-white/[0.06] text-white/50 ring-1 ring-white/[0.06] hover:bg-white/[0.1] hover:text-white")}>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {searchQ.trim() ? (
-              <div>
-                <div className="px-4 pt-4 text-[19px] font-black text-white">People</div>
-                {searchedUsers.length === 0 ? (
-                  <div className="px-4 py-10 text-center text-[13px] text-white/35">No matching users.</div>
-                ) : searchedUsers.map((s) => <FollowCard key={s.user_id} s={s} />)}
+              <div className="pb-8">
+                {searching && (
+                  <div className="h-0.5 w-full overflow-hidden bg-white/[0.04]">
+                    <div className="h-full w-1/3 animate-pulse rounded-full bg-gradient-to-r from-[#1d9bf0] to-[#9945FF]" />
+                  </div>
+                )}
+                {showPeople && (
+                  <section className="border-b border-white/[0.06] pb-2">
+                    <div className="flex items-center gap-2 px-4 pb-1 pt-5">
+                      <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[#1d9bf0]/20 to-[#9945FF]/15 ring-1 ring-white/[0.08]"><Users className="h-3.5 w-3.5 text-[#1d9bf0]" /></span>
+                      <span className="text-[17px] font-black text-white">People</span>
+                      <span className="text-[12px] font-bold text-white/30">{searchedUsers.length}</span>
+                    </div>
+                    {searchedUsers.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-[13px] text-white/35">No matching users.</div>
+                    ) : searchedUsers.map((s) => <FollowCard key={s.user_id} s={s} />)}
+                  </section>
+                )}
+                {showCoins && (
+                  <section className="border-b border-white/[0.06] pb-2">
+                    <div className="flex items-center gap-2 px-4 pb-1 pt-5">
+                      <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[#1d9bf0]/20 to-[#9945FF]/15 ring-1 ring-white/[0.08]"><Coins className="h-3.5 w-3.5 text-[#1d9bf0]" /></span>
+                      <span className="text-[17px] font-black text-white">Coins</span>
+                      <span className="text-[12px] font-bold text-white/30">{foundCoins.length}</span>
+                    </div>
+                    {foundCoins.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-[13px] text-white/35">No matching coins in trending right now.</div>
+                    ) : foundCoins.map((t, i) => <TrendRow key={t.mint} t={t} i={i} />)}
+                  </section>
+                )}
+                {showComms && (
+                  <section className="pb-2">
+                    <div className="flex items-center gap-2 px-4 pb-1 pt-5">
+                      <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[#1d9bf0]/20 to-[#9945FF]/15 ring-1 ring-white/[0.08]"><Globe className="h-3.5 w-3.5 text-[#1d9bf0]" /></span>
+                      <span className="text-[17px] font-black text-white">Communities</span>
+                      <span className="text-[12px] font-bold text-white/30">{foundComms.length}</span>
+                    </div>
+                    {foundComms.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-[13px] text-white/35">No matching communities.</div>
+                    ) : foundComms.map((c) => <CommunityRow key={c.id} c={c} />)}
+                  </section>
+                )}
               </div>
             ) : (
               <>
@@ -545,6 +671,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             )}
           </>
         );
+      }
 
       case "notifications":
         return (
@@ -625,13 +752,28 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "communities":
         return (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-white/[0.06] bg-black/55 px-4 py-3 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
-              <span className="mr-2 text-[19px] font-black text-white">Communities</span>
-              {([["token", "Token"], ["og", "OG"]] as const).map(([id, label]) => (
-                <button key={id} type="button" onClick={() => setCommView(id)} className={cn("rounded-full px-4 py-1.5 text-[13px] font-bold transition-all duration-200 active:scale-95", commView === id ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]" : "bg-white/[0.06] text-white/50 ring-1 ring-white/[0.06] hover:bg-white/[0.1] hover:text-white")}>
-                  {label}
+            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/55 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
+              <div className="flex items-center justify-between px-4 pt-3">
+                <div>
+                  <div className="text-[19px] font-black leading-tight text-white">Communities</div>
+                  <div className="text-[11px] text-white/35">Token rooms & OG groups — find your people</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSearchScope("communities"); setTab("explore"); }}
+                  aria-label="Search communities"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-white/[0.06] text-white/60 ring-1 ring-white/[0.08] transition hover:bg-white/[0.1] hover:text-white active:scale-95"
+                >
+                  <Search className="h-4 w-4" />
                 </button>
-              ))}
+              </div>
+              <div className="flex items-center gap-2 px-4 py-3">
+                {([["token", "Token Communities"], ["og", "OG Communities"]] as const).map(([id, label]) => (
+                  <button key={id} type="button" onClick={() => setCommView(id)} className={cn("rounded-full px-4 py-1.5 text-[13px] font-bold transition-all duration-200 active:scale-95", commView === id ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]" : "bg-white/[0.06] text-white/50 ring-1 ring-white/[0.06] hover:bg-white/[0.1] hover:text-white")}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <Suspense fallback={<Spinner />}>
@@ -769,6 +911,17 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           <span className="text-[15px] font-black tracking-tight text-white">OrbitX</span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => { setTab("notifications"); setMoreOpen(false); }}
+            aria-label="Notifications"
+            className={cn("relative rounded-full p-2 transition", tab === "notifications" ? "text-[#1d9bf0]" : "text-white/40 hover:text-white")}
+          >
+            <Bell className="h-4 w-4" />
+            {unread > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#1d9bf0] px-1 text-[9px] font-black text-white ring-2 ring-black">{unread > 9 ? "9+" : unread}</span>
+            )}
+          </button>
           <a href="/settings" className="rounded-full p-2 text-white/40 transition hover:text-white"><Settings className="h-4 w-4" /></a>
           <a href="/app" className="rounded-full border border-white/15 px-3 py-1 text-[11px] font-bold text-white/60 transition hover:bg-white/[0.06] hover:text-white">Hub</a>
         </div>
@@ -778,10 +931,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       <nav className="pointer-events-none fixed inset-x-0 bottom-3 z-30 flex justify-center sm:hidden">
         <div className="pointer-events-auto relative flex items-center rounded-full border border-white/[0.12] bg-gradient-to-b from-[#16181c]/95 to-black/95 p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.03),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
           {/* sliding active indicator */}
-          <span
-            className="absolute top-1.5 h-10 w-12 rounded-full bg-gradient-to-br from-[#1d9bf0]/30 to-[#9945FF]/20 ring-1 ring-[#1d9bf0]/50 shadow-[0_0_14px_rgba(29,155,240,0.4)] transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-            style={{ transform: `translateX(${PILL_INDEX * 48}px)` }}
-          />
+          {PILL_INDEX >= 0 && (
+            <span
+              className="absolute top-1.5 h-10 w-12 rounded-full bg-gradient-to-br from-[#1d9bf0]/30 to-[#9945FF]/20 ring-1 ring-[#1d9bf0]/50 shadow-[0_0_14px_rgba(29,155,240,0.4)] transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+              style={{ transform: `translateX(${PILL_INDEX * 48}px)` }}
+            />
+          )}
           {CORE_TABS.map((id) => {
             const n = NAV.find((x) => x.id === id)!;
             const on = tab === id;
@@ -822,7 +977,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             className="x-fade-in absolute inset-x-3 bottom-20 rounded-3xl border border-white/[0.1] bg-gradient-to-b from-[#14171b]/98 to-[#0b0d10]/98 p-3 shadow-[0_16px_48px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {MORE_TABS.map((id) => {
                 const n = NAV.find((x) => x.id === id)!;
                 const on = tab === id;
