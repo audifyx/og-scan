@@ -202,6 +202,7 @@ const App = () => (
             <Route path="/art-feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/spaces" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/social" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/orbitx-social" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/listings" element={<OgdexRedirect to="/ORBITX_DEX/store" />} />
             <Route path="/listings/:mintAddress" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mintAddress}`} />} />
             <Route path="/token-manager" element={<OgdexRedirect to="/ORBITX_DEX/metadata" />} />

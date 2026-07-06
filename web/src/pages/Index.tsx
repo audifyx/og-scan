@@ -709,6 +709,7 @@ const ROUTE_ALIASES: Record<string, TabId> = TABS.reduce(
     social: "social",
     "social-hub": "social",
     socialhub: "social",
+    "orbitx-social": "social",
     settings: "profile",
     "trading-hub": "trading-hub",
     wallets: "live-trading",

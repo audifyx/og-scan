@@ -83,6 +83,15 @@ function saveBookmarks(s: Set<string>) {
   try { localStorage.setItem(BOOKMARKS_KEY, JSON.stringify([...s])); } catch { /* ignore */ }
 }
 
+/* Pull image URLs out of post text so they render as real media, X-style. */
+const IMG_URL_RE = /https?:\/\/[^\s]+\.(?:png|jpe?g|gif|webp)(?:\?[^\s]*)?/gi;
+function splitMedia(content: string): { text: string; imgs: string[] } {
+  const imgs = content.match(IMG_URL_RE) || [];
+  let text = content;
+  for (const u of imgs) text = text.replace(u, "").trim();
+  return { text, imgs: imgs.slice(0, 4) };
+}
+
 /* ═══════════ Nav config ═══════════ */
 const NAV: { id: XTab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "home", label: "Home", Icon: Home },
@@ -96,9 +105,9 @@ const NAV: { id: XTab; label: string; Icon: React.ComponentType<{ className?: st
   { id: "profile", label: "Profile", Icon: User },
 ];
 
-/* Mobile pill: 5 core tabs; the rest live in the More sheet (each tab appears exactly once) */
-const CORE_TABS: XTab[] = ["home", "explore", "notifications", "messages", "profile"];
-const MORE_TABS: XTab[] = ["chat", "rooms", "spaces", "communities"];
+/* Mobile pill: content destinations only. Notifications / Messages / Profile
+   live in the top bar (no duplicates anywhere). */
+const CORE_TABS: XTab[] = ["home", "explore", "chat", "rooms", "spaces", "communities"];
 
 /* Old sidebar/CommunityHub deep-link keys -> X shell tabs (keeps every legacy entry point working) */
 const ENTRY_MAP: Record<string, XTab> = {
@@ -152,7 +161,6 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [searchQ, setSearchQ] = useState("");
   const [commView, setCommView] = useState<"token" | "og">("token");
   const [roomsView, setRoomsView] = useState<"rooms" | "trading">("rooms");
-  const [moreOpen, setMoreOpen] = useState(false);
 
   /* remember the active tab + honor legacy sidebar deep links */
   useEffect(() => {
@@ -234,12 +242,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   /* ── Notifications ── */
   useEffect(() => {
-    if (tab !== "notifications" || !user) return;
+    if (!user) return;
     setNotifsLoading(true);
     supabase.from("notifications").select("id,type,title,message,is_read,created_at")
       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(50)
       .then(({ data }) => { setNotifs((data as NotifRow[]) || []); setNotifsLoading(false); });
-  }, [tab, user]);
+  }, [user, tab === "notifications"]);
 
   const markAllRead = async () => {
     if (!user) return;
@@ -327,6 +335,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
   }, [posts]);
 
+  const officialIds = useMemo(() => new Set(suggestions.filter((x) => x.is_official_account).map((x) => x.user_id)), [suggestions]);
+
   const whoToFollow = suggestions.filter((s) => s.user_id !== user?.id && !followingSet.has(s.user_id));
 
   const searchedUsers = useMemo(() => {
@@ -336,7 +346,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   }, [searchQ, suggestions]);
 
   const isNarrow = NARROW_TABS.includes(tab);
-  const PILL_INDEX = CORE_TABS.indexOf(tab) >= 0 ? CORE_TABS.indexOf(tab) : CORE_TABS.length; // last slot = More
+  const PILL_INDEX = CORE_TABS.indexOf(tab);
   const unread = notifs.filter((n) => !n.is_read).length;
 
   /* ═══════════ Sub-renderers ═══════════ */
@@ -354,8 +364,23 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           className="w-full resize-none bg-transparent text-[17px] text-white placeholder:text-white/30 outline-none"
           onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit(); }}
         />
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {["$SOL", "$BONK", "#trenches", "gm ☀️", "🔥"].map((q) => (
+            <button key={q} type="button" onClick={() => setText((t) => (t + (t && !t.endsWith(" ") ? " " : "") + q + " ").slice(0, MAX_LEN))} className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] font-bold text-[#1d9bf0]/90 transition hover:border-[#1d9bf0]/40 hover:bg-[#1d9bf0]/10 active:scale-95">
+            {q}
+            </button>
+          ))}
+        </div>
         <div className="mt-2 flex items-center justify-between border-t border-white/[0.06] pt-2">
-          <span className={cn("text-[11px] font-bold", text.length > MAX_LEN - 40 ? "text-orange-400" : "text-white/25")}>{text.length}/{MAX_LEN}</span>
+          <span className="flex items-center gap-2">
+            {text.length > 0 && (
+              <svg width="18" height="18" viewBox="0 0 20 20" className="-rotate-90">
+                <circle cx="10" cy="10" r="8" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="2.5" />
+                <circle cx="10" cy="10" r="8" fill="none" stroke={text.length > MAX_LEN - 40 ? "#fb923c" : "#1d9bf0"} strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${(text.length / MAX_LEN) * 50.3} 50.3`} />
+              </svg>
+            )}
+            <span className={cn("text-[11px] font-bold", text.length > MAX_LEN - 40 ? "text-orange-400" : "text-white/25")}>{text.length}/{MAX_LEN}</span>
+          </span>
           <button
             type="button"
             disabled={!text.trim() || posting}
@@ -384,6 +409,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[14px]">
             <span className="truncate font-black text-white hover:underline">{p.username || "Anon"}</span>
+            {officialIds.has(p.user_id) && <BadgeCheck className="h-4 w-4 shrink-0 text-[#1d9bf0]" />}
             <span className="truncate text-white/35">@{(p.username || "anon").toLowerCase().replace(/\s+/g, "")}</span>
             <span className="text-white/30">·</span>
             <span className="shrink-0 text-white/35 hover:underline">{timeAgo(p.created_at)}</span>
@@ -391,7 +417,20 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               <MoreHorizontal className="h-4 w-4" />
             </button>
           </div>
-          <div className="whitespace-pre-wrap break-words text-[15px] leading-snug text-white/90">{renderContent(p.content, onSelectMint)}</div>
+          {(() => { const { text: body, imgs } = splitMedia(p.content); return (
+            <>
+              {body && <div className="whitespace-pre-wrap break-words text-[15px] leading-snug text-white/90">{renderContent(body, onSelectMint)}</div>}
+              {imgs.length > 0 && (
+                <div className={cn("mt-2 grid gap-1.5 overflow-hidden rounded-2xl", imgs.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
+                  {imgs.map((u, i) => (
+                    <a key={i} href={u} target="_blank" rel="noreferrer" className="block overflow-hidden">
+                      <img src={u} alt="" loading="lazy" className={cn("w-full object-cover ring-1 ring-white/[0.08] transition duration-300 hover:scale-[1.02]", imgs.length > 1 ? "h-40" : "max-h-[380px]")} />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </>
+          ); })()}
           <div className="mt-2 flex max-w-md items-center justify-between text-white/35">
             <button type="button" onClick={() => replyTo(p)} className="group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]">
               <span className="rounded-full p-1.5 transition group-hover:bg-[#1d9bf0]/10"><MessageCircle className="h-4 w-4" /></span>
@@ -400,7 +439,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               <span className="rounded-full p-1.5 transition group-hover:bg-emerald-400/10"><Repeat2 className="h-4 w-4" /></span>
             </button>
             <button type="button" onClick={() => toggleLike(p)} className={cn("group flex items-center gap-1.5 transition active:scale-90 hover:text-pink-500", liked && "text-pink-500")}>
-              <span className="rounded-full p-1.5 transition group-hover:bg-pink-500/10"><Heart className={cn("h-4 w-4", liked && "fill-current")} /></span>
+              <span className="rounded-full p-1.5 transition group-hover:bg-pink-500/10"><Heart className={cn("h-4 w-4", liked && "x-like-pop fill-current")} /></span>
               {(p.likes_count ?? 0) > 0 && <span className="text-[12px] font-bold">{p.likes_count}</span>}
             </button>
             <button type="button" onClick={() => toggleBookmark(p)} className={cn("group flex items-center gap-1.5 transition active:scale-90 hover:text-[#1d9bf0]", marked && "text-[#1d9bf0]")}>
@@ -470,28 +509,92 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "home":
         return (
           <>
-            {/* Sticky header with feed mode tabs */}
+            {/* Sticky header with feed mode tabs + live dot */}
             <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/55 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
               <div className="flex">
                 {([["foryou", "For you"], ["following", "Following"]] as const).map(([id, label]) => (
                   <button key={id} type="button" onClick={() => setFeedMode(id)} className="relative flex-1 py-3.5 text-[15px] font-bold text-white/50 transition hover:bg-white/[0.03]">
-                    <span className={cn(feedMode === id && "font-black text-white")}>{label}</span>
+                    <span className={cn("inline-flex items-center gap-1.5", feedMode === id && "font-black text-white")}>
+                      {id === "foryou" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" style={{ animation: "xGlowPulse 2s ease infinite" }} />}
+                      {label}
+                    </span>
                     {feedMode === id && <span className="absolute bottom-0 left-1/2 h-[3px] w-14 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#1d9bf0] to-[#9945FF] shadow-[0_0_10px_rgba(29,155,240,0.6)]" />}
                   </button>
                 ))}
               </div>
+              {/* live market marquee */}
+              {ticker.length > 3 && (
+                <div className="x-marquee border-t border-white/[0.05]">
+                  <div className="x-marquee-track">
+                    {[...ticker, ...ticker].map((t, i) => {
+                      const up = (t.change24h ?? 0) >= 0;
+                      return (
+                        <button key={`${t.mint}-${i}`} type="button" onClick={() => onSelectMint?.(t.mint)} className="flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-[11.5px] font-bold transition hover:bg-white/[0.04]">
+                          <span className="text-white/85">${t.symbol}</span>
+                          <span className={up ? "text-emerald-400" : "text-rose-400"}>{up ? "▲" : "▼"}{Math.abs(t.change24h ?? 0).toFixed(1)}%</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <Composer inline refEl={composerRef} />
-            {loading ? <Spinner /> : shownPosts.length === 0 ? (
-              <div className="px-8 py-16 text-center">
+            {loading ? (
+              <div>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex animate-pulse gap-3 border-b border-white/[0.06] px-4 py-4" style={{ animationDelay: `${i * 150}ms` }}>
+                    <div className="h-10 w-10 shrink-0 rounded-full bg-white/[0.07]" />
+                    <div className="flex-1 space-y-2 py-1">
+                      <div className="h-3 w-36 rounded-full bg-white/[0.07]" />
+                      <div className="h-3 w-full rounded-full bg-white/[0.05]" />
+                      <div className="h-3 w-2/3 rounded-full bg-white/[0.05]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : shownPosts.length === 0 ? (
+              <div className="px-8 py-14 text-center">
                 <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#1d9bf0]/15 to-[#9945FF]/10 ring-1 ring-white/[0.08]">
                   <TrendingUp className="h-6 w-6 text-[#1d9bf0]/70" />
                 </div>
                 <div className="text-[17px] font-black text-white">{feedMode === "following" ? "Nothing here yet" : "Welcome to OrbitX"}</div>
-                <div className="mt-1 text-[13px] text-white/40">{feedMode === "following" ? "Follow people to see their posts here." : "Be the first to post something."}</div>
+                <div className="mt-1 text-[13px] text-white/40">{feedMode === "following" ? "Follow people to see their posts here." : "Break the silence — one tap:"}</div>
+                {feedMode === "foryou" && (
+                  <div className="mx-auto mt-4 flex max-w-xs flex-col gap-2">
+                    {["gm to the trenches ☀️", "What is everyone aping today? 👀", "First post on OrbitX 🚀"].map((q) => (
+                      <button key={q} type="button" onClick={() => submit(q)} className="rounded-full border border-[#1d9bf0]/30 bg-[#1d9bf0]/[0.07] px-4 py-2 text-[13px] font-bold text-[#1d9bf0] transition hover:bg-[#1d9bf0]/[0.15] active:scale-95">
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
-              shownPosts.map((p) => <PostCard key={p.id} p={p} />)
+              shownPosts.map((p, i) => (
+                <React.Fragment key={p.id}>
+                  <PostCard p={p} />
+                  {i === 2 && feedMode === "foryou" && ticker.length >= 3 && (
+                    <div className="border-b border-white/[0.06] bg-gradient-to-b from-white/[0.02] to-transparent px-4 py-3">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-[13px] font-black text-white">🔥 Moving right now</span>
+                        <button type="button" onClick={() => setTab("explore")} className="text-[11.5px] font-bold text-[#1d9bf0] hover:underline">See all</button>
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {ticker.slice(0, 6).map((t) => {
+                          const up = (t.change24h ?? 0) >= 0;
+                          return (
+                            <button key={t.mint} type="button" onClick={() => onSelectMint?.(t.mint)} className="flex shrink-0 flex-col items-start gap-0.5 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 transition hover:border-[#1d9bf0]/40 hover:bg-[#1d9bf0]/[0.06] active:scale-95">
+                              <span className="text-[12.5px] font-black text-white">${t.symbol}</span>
+                              <span className={cn("text-[11px] font-bold", up ? "text-emerald-400" : "text-rose-400")}>{up ? "+" : ""}{(t.change24h ?? 0).toFixed(1)}%</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
+              ))
             )}
           </>
         );
@@ -568,9 +671,19 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             ) : (
               notifs.map((n) => (
                 <div key={n.id} className={cn("x-fade-in flex gap-3 border-b border-white/[0.06] px-4 py-3.5 transition-colors hover:bg-white/[0.02]", !n.is_read && "bg-[#1d9bf0]/[0.05] shadow-[inset_2px_0_0_#1d9bf0]")}>
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#1d9bf0]/20 to-[#9945FF]/15 ring-1 ring-[#1d9bf0]/25">
-                    <Bell className="h-4 w-4 text-[#1d9bf0]" />
-                  </div>
+                  {(() => {
+                    const ty = (n.type || "").toLowerCase();
+                    const [Ic, tone, ring] = ty.includes("like") ? [Heart, "text-pink-500", "from-pink-500/20 to-rose-500/10 ring-pink-500/25"] as const
+                      : ty.includes("follow") ? [User, "text-emerald-400", "from-emerald-400/20 to-teal-500/10 ring-emerald-400/25"] as const
+                      : ty.includes("repl") || ty.includes("mention") || ty.includes("comment") ? [MessageCircle, "text-[#1d9bf0]", "from-[#1d9bf0]/20 to-[#9945FF]/15 ring-[#1d9bf0]/25"] as const
+                      : ty.includes("alert") || ty.includes("price") ? [TrendingUp, "text-amber-400", "from-amber-400/20 to-orange-500/10 ring-amber-400/25"] as const
+                      : [Bell, "text-[#1d9bf0]", "from-[#1d9bf0]/20 to-[#9945FF]/15 ring-[#1d9bf0]/25"] as const;
+                    return (
+                      <div className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br ring-1", ring)}>
+                        <Ic className={cn("h-4 w-4", tone)} />
+                      </div>
+                    );
+                  })()}
                   <div className="min-w-0 flex-1">
                     <div className="text-[14px] font-black text-white">{n.title || n.type}</div>
                     <div className="text-[13px] text-white/50">{n.message}</div>
@@ -657,6 +770,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         @keyframes xFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
         .x-fade-in { animation: xFadeIn .28s ease both; }
         @keyframes xGlowPulse { 0%,100% { opacity: .5; } 50% { opacity: .9; } }
+        @keyframes xLikePop { 0% { transform: scale(1); } 40% { transform: scale(1.45); } 70% { transform: scale(.9); } 100% { transform: scale(1); } }
+        .x-like-pop { animation: xLikePop .45s cubic-bezier(.34,1.56,.64,1) both; }
+        .x-marquee { overflow: hidden; position: relative; }
+        .x-marquee-track { display: flex; width: max-content; animation: xTick 36s linear infinite; }
+        .x-marquee:hover .x-marquee-track { animation-play-state: paused; }
+        @keyframes xTick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       `}</style>
       {/* ambient atmosphere */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -768,19 +887,31 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-[#1d9bf0] to-[#9945FF] text-[13px] font-black text-white">O</span>
           <span className="text-[15px] font-black tracking-tight text-white">OrbitX</span>
         </div>
-        <div className="flex items-center gap-1">
-          <a href="/settings" className="rounded-full p-2 text-white/40 transition hover:text-white"><Settings className="h-4 w-4" /></a>
-          <a href="/app" className="rounded-full border border-white/15 px-3 py-1 text-[11px] font-bold text-white/60 transition hover:bg-white/[0.06] hover:text-white">Hub</a>
+        <div className="flex items-center gap-0.5">
+          <button type="button" onClick={() => setTab("notifications")} className={cn("relative rounded-full p-2 transition", tab === "notifications" ? "text-[#1d9bf0]" : "text-white/45 hover:text-white")}>
+            <Bell className="h-[18px] w-[18px]" />
+            {unread > 0 && <span className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#1d9bf0] px-1 text-[9px] font-black text-white shadow-[0_0_8px_rgba(29,155,240,0.6)]">{unread > 9 ? "9+" : unread}</span>}
+          </button>
+          <button type="button" onClick={() => setTab("messages")} className={cn("rounded-full p-2 transition", tab === "messages" ? "text-[#1d9bf0]" : "text-white/45 hover:text-white")}>
+            <Mail className="h-[18px] w-[18px]" />
+          </button>
+          <button type="button" onClick={() => setTab("profile")} className="ml-0.5 rounded-full p-0.5 transition active:scale-95">
+            <img src={myAvatar} alt="" className={cn("h-7 w-7 rounded-full object-cover ring-2 transition", tab === "profile" ? "ring-[#1d9bf0]" : "ring-white/15")} />
+          </button>
+          <a href="/app" className="ml-1 rounded-full border border-white/15 px-3 py-1 text-[11px] font-bold text-white/60 transition hover:bg-white/[0.06] hover:text-white">Hub</a>
         </div>
       </div>
 
       {/* ── Mobile bottom nav: floating centered rounded slider pill ── */}
       <nav className="pointer-events-none fixed inset-x-0 bottom-3 z-30 flex justify-center sm:hidden">
         <div className="pointer-events-auto relative flex items-center rounded-full border border-white/[0.12] bg-gradient-to-b from-[#16181c]/95 to-black/95 p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.03),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
-          {/* sliding active indicator */}
+          {/* sliding active indicator (hidden when the active tab lives in the top bar) */}
           <span
-            className="absolute top-1.5 h-10 w-12 rounded-full bg-gradient-to-br from-[#1d9bf0]/30 to-[#9945FF]/20 ring-1 ring-[#1d9bf0]/50 shadow-[0_0_14px_rgba(29,155,240,0.4)] transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-            style={{ transform: `translateX(${PILL_INDEX * 48}px)` }}
+            className={cn(
+              "absolute top-1.5 h-10 w-12 rounded-full bg-gradient-to-br from-[#1d9bf0]/30 to-[#9945FF]/20 ring-1 ring-[#1d9bf0]/50 shadow-[0_0_14px_rgba(29,155,240,0.4)] transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+              PILL_INDEX < 0 && "opacity-0",
+            )}
+            style={{ transform: `translateX(${Math.max(0, PILL_INDEX) * 48}px)` }}
           />
           {CORE_TABS.map((id) => {
             const n = NAV.find((x) => x.id === id)!;
@@ -789,62 +920,15 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
               <button
                 key={id}
                 type="button"
-                onClick={() => { setTab(id); setMoreOpen(false); }}
+                onClick={() => setTab(id)}
                 className={cn("relative z-10 grid h-10 w-12 place-items-center rounded-full transition-colors", on ? "text-[#1d9bf0]" : "text-white/45 hover:text-white/75")}
               >
                 <n.Icon className={cn("h-[22px] w-[22px]", on && "stroke-[2.5]")} />
-                {id === "notifications" && unread > 0 && <span className="absolute right-2.5 top-1.5 h-2 w-2 rounded-full bg-[#1d9bf0]" />}
               </button>
             );
           })}
-          {/* More slot — hosts Chat / Rooms / Spaces / Communities (shown once, here only) */}
-          {(() => {
-            const activeMore = MORE_TABS.includes(tab) ? NAV.find((x) => x.id === tab)! : null;
-            const MoreIcon = activeMore ? activeMore.Icon : LayoutGrid;
-            return (
-              <button
-                type="button"
-                onClick={() => setMoreOpen((v) => !v)}
-                className={cn("relative z-10 grid h-10 w-12 place-items-center rounded-full transition-colors", activeMore ? "text-[#1d9bf0]" : "text-white/45 hover:text-white/75")}
-              >
-                <MoreIcon className={cn("h-[22px] w-[22px]", activeMore && "stroke-[2.5]")} />
-              </button>
-            );
-          })()}
         </div>
       </nav>
-
-      {/* ── More sheet (Chat / Rooms / Spaces / Communities) ── */}
-      {moreOpen && (
-        <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setMoreOpen(false)}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div
-            className="x-fade-in absolute inset-x-3 bottom-20 rounded-3xl border border-white/[0.1] bg-gradient-to-b from-[#14171b]/98 to-[#0b0d10]/98 p-3 shadow-[0_16px_48px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="grid grid-cols-4 gap-2">
-              {MORE_TABS.map((id) => {
-                const n = NAV.find((x) => x.id === id)!;
-                const on = tab === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => { setTab(id); setMoreOpen(false); }}
-                    className={cn(
-                      "flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 transition",
-                      on ? "bg-[#1d9bf0]/15 text-[#1d9bf0]" : "text-white/60 hover:bg-white/[0.05] hover:text-white",
-                    )}
-                  >
-                    <n.Icon className="h-6 w-6" />
-                    <span className="text-[11px] font-bold">{n.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Mobile compose FAB ── */}
       {tab === "home" && (
