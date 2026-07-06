@@ -852,6 +852,26 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
   const [followBusy, setFollowBusy] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewingUser, setViewingUser] = useState<string | null>(null);
+  const [followModal, setFollowModal] = useState<null | "followers" | "following">(null);
+  const [followRows, setFollowRows] = useState<FollowerRecord[]>([]);
+  const [followRowsLoading, setFollowRowsLoading] = useState(false);
+  useEffect(() => {
+    if (!followModal || !targetUserId) return;
+    setFollowRowsLoading(true);
+    const pickCol = followModal === "followers" ? "follower_id" : "followee_id";
+    const matchCol = followModal === "followers" ? "followee_id" : "follower_id";
+    let cancelled = false;
+    (async () => {
+      const { data: rel } = await supabase.from("followers").select(pickCol).eq(matchCol, targetUserId).limit(200);
+      const ids = ((rel as Array<Record<string, string>>) || []).map((r) => r[pickCol]).filter(Boolean);
+      if (ids.length === 0) { if (!cancelled) { setFollowRows([]); setFollowRowsLoading(false); } return; }
+      const { data: profs } = await supabase.from("profiles").select("user_id, username, display_name, avatar_url, bio, verified, is_official_account, affiliate_org_id").in("user_id", ids);
+      if (cancelled) return;
+      setFollowRows(((profs as FollowerRecord[]) || []));
+      setFollowRowsLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [followModal, targetUserId]);
 
   const [liveSpace, setLiveSpace] = useState<SpaceRecord | null>(null);
   const [scheduledSpaces, setScheduledSpaces] = useState<SpaceRecord[]>([]);
@@ -1645,17 +1665,43 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
 
               <div className="grid grid-cols-4 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08]">
                 {[
-                  { label: "Following", value: compact(followingCount) },
-                  { label: "Followers", value: compact(followerCount) },
-                  { label: "Posts", value: compact(posts.length) },
-                  { label: totalXp > 0 ? "XP" : "OG Score", value: compact(totalXp > 0 ? totalXp : Number((profileData as any).og_score ?? 0)) },
+                  { label: "Following", value: compact(followingCount), onClick: () => setFollowModal("following") },
+                  { label: "Followers", value: compact(followerCount), onClick: () => setFollowModal("followers") },
+                  { label: "Posts", value: compact(posts.length), onClick: undefined as (() => void) | undefined },
+                  { label: totalXp > 0 ? "XP" : "OG Score", value: compact(totalXp > 0 ? totalXp : Number((profileData as any).og_score ?? 0)), onClick: undefined as (() => void) | undefined },
                 ].map((stat) => (
-                  <div key={stat.label} className="bg-[#0a0e14] px-3 py-2.5 text-center transition hover:bg-white/[0.04]">
+                  <button
+                    key={stat.label}
+                    type="button"
+                    onClick={stat.onClick}
+                    disabled={!stat.onClick}
+                    className={cn("bg-[#0a0e14] px-3 py-2.5 text-center transition", stat.onClick ? "cursor-pointer hover:bg-white/[0.07]" : "cursor-default hover:bg-white/[0.04]")}
+                  >
                     <div className="text-[18px] font-black leading-none text-white">{stat.value}</div>
                     <div className="mt-1 text-[10.5px] font-bold uppercase tracking-wider text-white/40">{stat.label}</div>
-                  </div>
+                  </button>
                 ))}
               </div>
+
+              {followModal && (
+                <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/60 p-4 pt-[10vh] backdrop-blur-sm" onClick={() => setFollowModal(null)}>
+                  <div className="flex max-h-[72vh] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0e14] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                      <span className="text-[16px] font-black capitalize text-white">{followModal}</span>
+                      <button type="button" onClick={() => setFollowModal(null)} className="rounded-full px-2 py-1 text-[15px] text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Close">✕</button>
+                    </div>
+                    <div className="flex-1 space-y-2 overflow-y-auto p-3">
+                      {followRowsLoading ? (
+                        <p className="px-3 py-8 text-center text-sm text-white/40">Loading…</p>
+                      ) : followRows.length === 0 ? (
+                        <p className="px-3 py-8 text-center text-sm text-white/40">No {followModal} yet.</p>
+                      ) : (
+                        followRows.map((r) => <MiniFollowerCard key={r.user_id} record={r} onOpen={(id) => { setFollowModal(null); setViewingUser(id); }} />)
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2 pt-1">
                 {isOwnProfile ? (
