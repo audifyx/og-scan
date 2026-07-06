@@ -124,7 +124,7 @@ DESIGN DOCTRINE (custom_code):
 4. Interactivity: h('button'|'input', {onClick|onChange}) with real state; tabs where data has views; hover affordances via opacity/filter.
 5. States: loading skeleton text, explicit error message, empty state. Auto-refresh via setInterval in useEffect WITH cleanup.
 CONTRACT: params.code is ONE JS arrow function "(props) => {...}". In scope: React, h = React.createElement, useState, useEffect, useMemo, useCallback, useRef, fetch, supabase, params. NO JSX, no imports, inline styles only. Compact (≤70 lines) but COMPLETE — no TODOs.
-DATA (free, no key): DexScreener https://api.dexscreener.com/latest/dex/search?q=SYM → pairs[] (chainId==='solana', priceUsd, priceChange.{m5,h1,h6,h24}, volume.h24, liquidity.usd); trend sparkline trick: reconstruct points from priceChange fields. CoinGecko /api/v3/simple/price?ids=ID&vs_currencies=usd&include_24hr_change=true and /coins/ID/market_chart?vs_currency=usd&days=N. Fear&Greed https://api.alternative.me/fng/. Internal /api/ogdex/screener?type=trending&interval=24h&limit=N → {rows:[{symbol,change24h}]}.
+DATA (free, no key): DexScreener https://api.dexscreener.com/latest/dex/search?q=SYM → pairs[] (chainId==='solana', priceUsd, priceChange.{m5,h1,h6,h24}, volume.h24, liquidity.usd); for a contract address / pump.fun mint (base58, often ending 'pump') use https://api.dexscreener.com/latest/dex/tokens/ADDRESS → pairs[] and pick the highest-liquidity chainId==='solana' pair; trend sparkline trick: reconstruct points from priceChange fields. CoinGecko /api/v3/simple/price?ids=ID&vs_currencies=usd&include_24hr_change=true and /coins/ID/market_chart?vs_currency=usd&days=N. Fear&Greed https://api.alternative.me/fng/. Internal /api/ogdex/screener?type=trending&interval=24h&limit=N → {rows:[{symbol,change24h}]}.
 
 EXEMPLAR (the quality bar — study the craft, then exceed it for the actual request):
 {"type":"custom_code","title":"⚡ JUP Pulse","size":"md","params":{"code":"(props) => { const [p, setP] = useState(null); useEffect(() => { let live = true; const load = () => fetch('https://api.dexscreener.com/latest/dex/search?q=JUP').then(function(r){ return r.json(); }).then(function(d){ const x = ((d && d.pairs) || []).filter(function(q){ return q.chainId === 'solana'; })[0]; if (live && x) setP(x); }).catch(function(){}); load(); const t = setInterval(load, 30000); return function(){ live = false; clearInterval(t); }; }, []); if (!p) return h('div', { style: { fontSize: 11, color: 'rgba(255,255,255,.4)', textAlign: 'center', padding: '14px 0' } }, 'Syncing JUP…'); const pc = p.priceChange || {}; const chg = Number(pc.h24 || 0), up = chg >= 0, tone = up ? '#34d399' : '#fb7185'; const price = Number(p.priceUsd || 0); const pts = [pc.h24, pc.h6, pc.h1, pc.m5].map(function(c){ return price / (1 + (Number(c) || 0) / 100); }).concat([price]); const mn = Math.min.apply(null, pts), mx = Math.max.apply(null, pts); const ln = pts.map(function(v, i){ return (i / (pts.length - 1)) * 100 + ',' + (24 - (mx > mn ? (v - mn) / (mx - mn) : 0.5) * 20 - 2); }).join(' '); return h('div', null, h('div', { style: { height: 3, borderRadius: 99, background: 'linear-gradient(90deg,#5eead4,#0ea5e9)', marginBottom: 9, boxShadow: '0 0 12px rgba(94,234,212,.4)' } }), h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, h('span', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 900, color: '#fff' } }, h('i', { style: { width: 7, height: 7, borderRadius: 99, background: '#5eead4', boxShadow: '0 0 10px rgba(94,234,212,.6)' } }), '$JUP'), h('span', { style: { fontSize: 10.5, fontWeight: 900, color: tone, background: up ? 'rgba(52,211,153,.1)' : 'rgba(251,113,133,.1)', borderRadius: 99, padding: '3px 9px' } }, (up ? '▲ +' : '▼ ') + Math.abs(chg).toFixed(2) + '%')), h('div', { style: { fontSize: 22, fontWeight: 900, color: '#fff', margin: '5px 0 3px', fontVariantNumeric: 'tabular-nums' } }, '$' + price.toFixed(4)), h('svg', { width: '100%', height: 26, viewBox: '0 0 100 26', preserveAspectRatio: 'none' }, h('polyline', { points: ln, fill: 'none', stroke: tone, strokeWidth: 2, strokeLinecap: 'round', vectorEffect: 'non-scaling-stroke' }))); }"},"reply":"JUP Pulse: teal-gradient live ticker with a real 24h trend line."}
@@ -178,11 +178,19 @@ function composeForgeAsk(prompt: string, pal: Palette | null, brief: DesignBrief
 }
 
 async function callForgeLLM(messages: { role: string; content: string }[]): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('ai-analyzer', { body: { action: 'chat', messages } });
-  if (error) throw error;
-  const text = (data && (data.analysis ?? data.content)) || '';
-  if (!text) throw new Error('empty server response');
-  return String(text);
+  const invoke = async (action: string, extra: Record<string, unknown> = {}) => {
+    const { data, error } = await supabase.functions.invoke('ai-analyzer', { body: { action, messages, ...extra } });
+    if (error) throw error;
+    const text = (data && (data.analysis ?? data.content)) || '';
+    if (!text) throw new Error('empty server response');
+    return String(text);
+  };
+  // Dedicated code-gen path: no chatty persona + high token budget so a full
+  // custom widget is never truncated into an unparseable payload (which is what
+  // forced the stock local fallback). Falls back to the generic chat action for
+  // older edge-function deployments that predate the "forge" action.
+  try { return await invoke('forge', { maxTokens: 4000 }); }
+  catch { return await invoke('chat'); }
 }
 
 async function forgeDesignBrief(prompt: string, pal: Palette | null): Promise<DesignBrief> {
@@ -293,13 +301,18 @@ const ACCENT_BAR = (pal: Palette) => `h('div', { style: { height: 3, borderRadiu
 const GEN_TICKER = (sym: string, pal: Palette) => `(props) => {
   const [p, setP] = useState(null);
   const [err, setErr] = useState('');
+  const q = '${sym}';
+  const isAddr = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(q);
   useEffect(() => {
     let live = true;
-    const load = () => fetch('https://api.dexscreener.com/latest/dex/search?q=${sym}')
+    const url = isAddr ? 'https://api.dexscreener.com/latest/dex/tokens/' + q : 'https://api.dexscreener.com/latest/dex/search?q=' + q;
+    const load = () => fetch(url)
       .then(function(r){ return r.json(); })
       .then(function(d){
-        const pair = ((d && d.pairs) || []).filter(function(x){ return x.chainId === 'solana'; })[0];
-        if (live) { if (pair) setP(pair); else setErr('No Solana pair found for ${sym}'); }
+        const sol = ((d && d.pairs) || []).filter(function(x){ return x.chainId === 'solana'; });
+        sol.sort(function(a, b){ return Number((b.liquidity && b.liquidity.usd) || 0) - Number((a.liquidity && a.liquidity.usd) || 0); });
+        const pair = sol[0];
+        if (live) { if (pair) setP(pair); else setErr('No Solana pair found'); }
       })
       .catch(function(){ if (live) setErr('Network error'); });
     load();
@@ -307,7 +320,7 @@ const GEN_TICKER = (sym: string, pal: Palette) => `(props) => {
     return function(){ live = false; clearInterval(t); };
   }, []);
   if (err) return h('div', { style: { fontSize: 11, color: '#fb7185' } }, err);
-  if (!p) return h('div', { style: { fontSize: 11, color: 'rgba(255,255,255,.4)', textAlign: 'center', padding: '14px 0' } }, 'Loading ${sym}…');
+  if (!p) return h('div', { style: { fontSize: 11, color: 'rgba(255,255,255,.4)', textAlign: 'center', padding: '14px 0' } }, 'Loading…');
   const pc = p.priceChange || {};
   const chg = Number(pc.h24 || 0), up = chg >= 0, tone = up ? '#34d399' : '#fb7185';
   const price = Number(p.priceUsd || 0);
@@ -322,7 +335,7 @@ const GEN_TICKER = (sym: string, pal: Palette) => `(props) => {
     ${ACCENT_BAR(pal)},
     h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
       h('span', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, fontWeight: 900, color: '#fff' } },
-        h('i', { style: { width: 7, height: 7, borderRadius: 99, background: '${pal.a}', boxShadow: '0 0 10px ${pal.g}', display: 'inline-block' } }), '$${sym}'),
+        h('i', { style: { width: 7, height: 7, borderRadius: 99, background: '${pal.a}', boxShadow: '0 0 10px ${pal.g}', display: 'inline-block' } }), '$' + ((p.baseToken && p.baseToken.symbol) || (isAddr ? q.slice(0, 4) : q))),
       h('span', { style: { fontSize: 11, fontWeight: 900, color: tone, background: up ? 'rgba(52,211,153,.1)' : 'rgba(251,113,133,.1)', borderRadius: 99, padding: '3px 9px' } }, (up ? '▲ +' : '▼ ') + Math.abs(chg).toFixed(2) + '%')),
     h('div', { style: { fontSize: 23, fontWeight: 900, color: '#fff', margin: '5px 0 3px', fontVariantNumeric: 'tabular-nums', letterSpacing: '-.01em' } }, '$' + (price >= 1 ? price.toFixed(2) : price.toFixed(6))),
     h('svg', { width: '100%', height: 28, viewBox: '0 0 100 28', preserveAspectRatio: 'none', style: { marginBottom: 7 } },
@@ -338,11 +351,16 @@ const GEN_WATCHLIST = (syms: string[], pal: Palette) => `(props) => {
   useEffect(() => {
     let live = true;
     const load = () => Promise.all(syms.map(function(s){
-      return fetch('https://api.dexscreener.com/latest/dex/search?q=' + s)
+      var isA = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
+      var u = isA ? 'https://api.dexscreener.com/latest/dex/tokens/' + s : 'https://api.dexscreener.com/latest/dex/search?q=' + s;
+      return fetch(u)
         .then(function(r){ return r.json(); })
         .then(function(d){
-          const p = ((d && d.pairs) || []).filter(function(x){ return x.chainId === 'solana'; })[0];
-          return p ? { s: s, price: Number(p.priceUsd || 0), chg: Number((p.priceChange && p.priceChange.h24) || 0) } : { s: s, price: null, chg: 0 };
+          var sol = ((d && d.pairs) || []).filter(function(x){ return x.chainId === 'solana'; });
+          sol.sort(function(a, b){ return Number((b.liquidity && b.liquidity.usd) || 0) - Number((a.liquidity && a.liquidity.usd) || 0); });
+          var p = sol[0];
+          var lbl = isA ? ((p && p.baseToken && p.baseToken.symbol) || s.slice(0, 4)) : s;
+          return p ? { s: lbl, price: Number(p.priceUsd || 0), chg: Number((p.priceChange && p.priceChange.h24) || 0) } : { s: isA ? s.slice(0, 4) : s, price: null, chg: 0 };
         })
         .catch(function(){ return { s: s, price: null, chg: 0 }; });
     })).then(function(rs){ if (live) setRows(rs); });
@@ -490,7 +508,14 @@ export function forgeLocally(prompt: string): ForgeSpec {
   if (/volume/.test(m)) return mk('volume_bar', '📉 SOL Volume', 'md', { symbol: 'SOL' }, '24h SOL volume tracker.');
   if (/social|community|posts/.test(m)) return mk('social_feed', '💬 Community', 'md', { channel: 'social-general', limit: 3 }, 'Latest community posts.');
   const addr = prompt.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/)?.[0];
-  if (addr) return mk('wallet_tracker', '🔭 ' + addr.slice(0, 6) + '…', 'lg', { address: addr, view: /buy/.test(m) ? 'buys' : /sell/.test(m) ? 'sells' : /holding/.test(m) ? 'holdings' : 'all' }, 'Wallet tracker with buys, sells and holdings.');
+  if (addr) {
+    const wantsWallet = /\bwallet|buys?\b|sells?\b|holding|portfolio|trader\b/.test(m);
+    const looksLikeToken = /pump$/i.test(addr) || /\btoken|coin|mint|contract|\bca\b|price|ticker|chart|pump\b/.test(m);
+    if (looksLikeToken || !wantsWallet) {
+      return mk('custom_code', '◎ ' + addr.slice(0, 4) + '…', 'md', { code: GEN_TICKER(addr, pal) }, 'Live token tracker for ' + addr.slice(0, 6) + '… — resolves pump.fun / SPL mints via DexScreener.');
+    }
+    return mk('wallet_tracker', '🔭 ' + addr.slice(0, 6) + '…', 'lg', { address: addr, view: /buy/.test(m) ? 'buys' : /sell/.test(m) ? 'sells' : /holding/.test(m) ? 'holdings' : 'all' }, 'Wallet tracker with buys, sells and holdings.');
+  }
   if (syms.length >= 2 || /watchlist|portfolio of/.test(m)) {
     const list = syms.length >= 2 ? syms : ['SOL', 'BONK', 'JUP', 'WIF'];
     return mk('custom_code', '📋 ' + list.slice(0, 3).join('·') + (list.length > 3 ? '+' : ''), 'md', { code: GEN_WATCHLIST(list, pal) }, `Live watchlist for ${list.join(', ')} — price and 24h move, refreshing every 30s.`);
@@ -686,7 +711,7 @@ function PriceChartWidget({ params }: { params: Record<string, any> }) {
 function DexChartWidget({ params }: { params: Record<string, any> }) {
   const [pair, setPair] = useState<any>(null), [err, setErr] = useState('');
   const sym = (params.symbol as string) ?? 'SOL';
-  useEffect(() => { let live = true; fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(sym)}`).then(r => r.json()).then(d => { if (!live) return; const pairs = (d?.pairs ?? []).filter((p: any) => p.chainId === 'solana'); if (pairs.length > 0) setPair(pairs[0]); else setErr('No Solana pairs found'); }).catch(() => setErr('Failed to load')); return () => { live = false; }; }, [sym]);
+  useEffect(() => { let live = true; const isAddr = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(sym); const url = isAddr ? `https://api.dexscreener.com/latest/dex/tokens/${sym}` : `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(sym)}`; fetch(url).then(r => r.json()).then(d => { if (!live) return; const pairs = (d?.pairs ?? []).filter((p: any) => p.chainId === 'solana').sort((a: any, b: any) => Number(b.liquidity?.usd ?? 0) - Number(a.liquidity?.usd ?? 0)); if (pairs.length > 0) setPair(pairs[0]); else setErr('No Solana pairs found'); }).catch(() => setErr('Failed to load')); return () => { live = false; }; }, [sym]);
   if (err) return <div style={{ fontSize:11, color:'#fb7185' }}>{err}</div>;
   if (!pair) return <div style={{ fontSize:11, color:'rgba(255,255,255,.35)' }}>Loading DEX data…</div>;
   const p24 = Number(pair.priceChange?.h24 ?? 0), up = p24 >= 0, price = Number(pair.priceUsd ?? 0);
@@ -695,7 +720,7 @@ function DexChartWidget({ params }: { params: Record<string, any> }) {
 
 function TokenInfoWidget({ params }: { params: Record<string, any> }) {
   const [info, setInfo] = useState<any>(null), sym = (params.symbol as string) ?? 'SOL';
-  useEffect(() => { let live = true; fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(sym)}`).then(r => r.json()).then(d => { if (!live) return; const p = (d?.pairs ?? []).find((x: any) => x.chainId === 'solana' && x.baseToken?.symbol?.toUpperCase() === sym.toUpperCase()); if (p) setInfo(p); }).catch(() => {}); return () => { live = false; }; }, [sym]);
+  useEffect(() => { let live = true; const isAddr = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(sym); const url = isAddr ? `https://api.dexscreener.com/latest/dex/tokens/${sym}` : `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(sym)}`; fetch(url).then(r => r.json()).then(d => { if (!live) return; const sol = (d?.pairs ?? []).filter((x: any) => x.chainId === 'solana').sort((a: any, b: any) => Number(b.liquidity?.usd ?? 0) - Number(a.liquidity?.usd ?? 0)); const p = isAddr ? sol[0] : (sol.find((x: any) => x.baseToken?.symbol?.toUpperCase() === sym.toUpperCase()) ?? sol[0]); if (p) setInfo(p); }).catch(() => {}); return () => { live = false; }; }, [sym]);
   if (!info) return <div style={{ fontSize:11, color:'rgba(255,255,255,.35)' }}>Loading {sym}…</div>;
   const chg = Number(info.priceChange?.h24 ?? 0), price = Number(info.priceUsd ?? 0);
   return (<div><div style={{ display:'flex', gap:10, alignItems:'center', marginBottom:10 }}><div style={{ width:38, height:38, borderRadius:'50%', background:'linear-gradient(135deg,#2F80FF,#9945FF)', display:'grid', placeItems:'center', fontSize:14, fontWeight:900, color:'#fff', flexShrink:0 }}>{sym[0]}</div><div><div style={{ fontSize:14, fontWeight:900, color:'#fff' }}>{sym}</div><div style={{ fontSize:11, fontWeight:800, color:chg>=0?'#34d399':'#fb7185' }}>{chg>=0?'+':''}{chg.toFixed(2)}% 24h</div></div><div style={{ marginLeft:'auto', textAlign:'right' }}><div style={{ fontSize:15, fontWeight:900, color:'#fff' }}>${price<0.001?price.toFixed(8):price<1?price.toFixed(4):price.toFixed(2)}</div></div></div>{info.baseToken?.address && <div style={{ fontSize:9, color:'rgba(255,255,255,.3)', fontFamily:'monospace', marginBottom:8, wordBreak:'break-all' }}>{(info.baseToken.address as string).slice(0,24)}…</div>}<a href={info.url} target="_blank" rel="noopener" style={{ fontSize:10, color:'#5aa2ff', textDecoration:'none', fontWeight:700 }}>View on DexScreener →</a></div>);
