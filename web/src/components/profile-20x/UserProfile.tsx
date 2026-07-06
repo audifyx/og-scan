@@ -271,12 +271,8 @@ interface Props {
 const PROFILE_TABS: Array<{ id: ProfileTab; label: string }> = [
   { id: "posts", label: "Posts" },
   { id: "activity", label: "Replies" },
-  { id: "achievements", label: "Highlights" },
-  { id: "calls", label: "Articles" },
   { id: "media", label: "Media" },
-  { id: "spaces", label: "Spaces" },
   { id: "communities", label: "Communities" },
-  { id: "holdings", label: "Holdings" },
   { id: "saved", label: "Saved" },
 ];
 
@@ -1791,7 +1787,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                   )
                 ) : null}
 
-                {activeTab === "calls" ? (
+                {activeTab === "media" ? <div className="border-y border-white/10 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white/35">Articles</div> : null}
+                {activeTab === "media" ? (
                   articlePosts.length > 0 ? (
                     <div className="border-y border-white/10">
                       {articlePosts.map((post, index) => (
@@ -1887,7 +1884,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                   )
                 ) : null}
 
-                {activeTab === "spaces" ? (
+                {activeTab === "communities" ? <div className="border-y border-white/10 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white/35">Spaces</div> : null}
+                {activeTab === "communities" ? (
                   liveSpace || scheduledSpaces.length > 0 || pastSpaces.length > 0 ? (
                     <div className="space-y-4">
                       {liveSpace ? (
@@ -1914,7 +1912,8 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                   )
                 ) : null}
 
-                {activeTab === "achievements" ? (
+                {activeTab === "media" ? <div className="border-y border-white/10 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white/35">Highlights</div> : null}
+                {activeTab === "media" ? (
                   highlightPosts.length > 0 || topTrade || liveSpace || pastSpaces.length > 0 ? (
                     <div className="border-y border-white/10">
                       {highlightPosts.map((post, index) => (
