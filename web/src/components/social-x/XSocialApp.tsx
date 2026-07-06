@@ -12,7 +12,7 @@ import {
   Home, Search, Bell, Mail, Hash, MessageSquare, Radio, Globe, User,
   Feather, X as XIcon, Heart, MessageCircle, Repeat2, Share, MoreHorizontal,
   Trash2, Copy, Flag, BadgeCheck, Loader2, TrendingUp, ArrowUpRight,
-  ArrowDownRight, Users, Bookmark, LogOut, LayoutGrid, Settings, Coins,
+  ArrowDownRight, Users, Bookmark, LogOut, LayoutGrid, Settings, Coins, Image as ImageIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -153,6 +153,8 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState(() => { try { return localStorage.getItem(DRAFT_KEY) || ""; } catch { return ""; } });
   const [posting, setPosting] = useState(false);
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [uploadingImg, setUploadingImg] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
@@ -206,6 +208,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
   }, []);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const modalRef = useRef<HTMLTextAreaElement>(null);
+  const composerFileRef = useRef<HTMLInputElement>(null);
   const exploreSearchRef = useRef<HTMLInputElement>(null);
 
   const displayName = profile?.display_name || profile?.username || "You";
@@ -328,16 +331,36 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
     if (error) setFollowingSet((prev) => { const n = new Set(prev); n.delete(uid); return n; });
   };
 
+  const uploadComposerImage = async (files: FileList | null) => {
+    if (!files || !user) return;
+    setUploadingImg(true);
+    try {
+      for (const file of Array.from(files).slice(0, 4)) {
+        if (!file.type.startsWith("image/")) continue;
+        const ext = (file.name.split(".").pop() || "png").toLowerCase();
+        const path = `posts/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error } = await supabase.storage.from("profile-media").upload(path, file, { contentType: file.type, upsert: false });
+        if (error) { toast.error("Image upload failed"); continue; }
+        const { data } = supabase.storage.from("profile-media").getPublicUrl(path);
+        if (data?.publicUrl) setPendingImages((prev) => [...prev, data.publicUrl].slice(0, 4));
+      }
+    } finally { setUploadingImg(false); }
+  };
+
   const submit = async (raw?: string) => {
-    const content = (raw ?? text).trim();
+    const base = (raw ?? text).trim();
+    const media = pendingImages.length ? pendingImages.join("\n") : "";
+    const content = [base, media].filter(Boolean).join("\n").trim();
     if (!content || !user || posting) return;
     setPosting(true); setText("");
+    const imgsSnapshot = pendingImages;
+    setPendingImages([]);
     const optimistic: Post = { id: `tmp-${Date.now()}`, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url || null, content, likes_count: 0, liked_by: [], created_at: new Date().toISOString() };
     setPosts((prev) => [optimistic, ...prev]);
     const { data, error } = await supabase.from("social_messages")
       .insert({ channel: FEED_CHANNEL, user_id: user.id, username: profile?.username || "Anon", avatar_url: profile?.avatar_url, content, likes_count: 0, liked_by: [] })
       .select("id,user_id,username,avatar_url,content,likes_count,liked_by,created_at").single();
-    if (error) { toast.error("Could not post. Try again."); setPosts((prev) => prev.filter((p) => p.id !== optimistic.id)); setText(content); }
+    if (error) { toast.error("Could not post. Try again."); setPosts((prev) => prev.filter((p) => p.id !== optimistic.id)); setText(base); setPendingImages(imgsSnapshot); }
     else if (data) setPosts((prev) => prev.map((p) => p.id === optimistic.id ? (data as Post) : p));
     setPosting(false);
     setComposeOpen(false);
@@ -466,8 +489,23 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             </button>
           ))}
         </div>
+        {pendingImages.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {pendingImages.map((url) => (
+              <div key={url} className="relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-white/10">
+                <img src={url} alt="" className="h-full w-full object-cover" />
+                <button type="button" onClick={() => setPendingImages((prev) => prev.filter((u) => u !== url))} className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-black/70 text-white/80 transition hover:text-white" aria-label="Remove image">
+                  <XIcon className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="mt-2 flex items-center justify-between border-t border-white/[0.06] pt-2">
           <span className="flex items-center gap-2">
+            <button type="button" onClick={() => composerFileRef.current?.click()} disabled={uploadingImg} className="grid h-8 w-8 place-items-center rounded-full text-[#1d9bf0] transition hover:bg-[#1d9bf0]/10 disabled:opacity-50" title="Add image">
+              {uploadingImg ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ImageIcon className="h-[18px] w-[18px]" />}
+            </button>
             {text.length > 0 && (
               <svg width="18" height="18" viewBox="0 0 20 20" className="-rotate-90">
                 <circle cx="10" cy="10" r="8" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="2.5" />
@@ -478,11 +516,11 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
           </span>
           <button
             type="button"
-            disabled={!text.trim() || posting}
+            disabled={(!text.trim() && pendingImages.length === 0) || posting}
             onClick={() => submit()}
             className={cn(
               "rounded-full px-5 py-1.5 text-[14px] font-black transition-all duration-200 active:scale-95",
-              text.trim() && !posting
+              (text.trim() || pendingImages.length > 0) && !posting
                 ? "bg-gradient-to-r from-[#1d9bf0] to-[#4a9ff5] text-white shadow-[0_4px_16px_rgba(29,155,240,0.4)] hover:shadow-[0_4px_24px_rgba(29,155,240,0.6)]"
                 : "bg-[#1d9bf0]/40 text-white/50",
             )}
@@ -1401,6 +1439,7 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
         </button>
       )}
 
+      <input ref={composerFileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void uploadComposerImage(e.target.files); e.currentTarget.value = ""; }} />
       {/* ── Compose modal ── */}
       {composeOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#5b7083]/40 p-4 pt-[8vh]" onClick={() => setComposeOpen(false)}>
