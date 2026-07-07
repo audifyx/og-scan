@@ -85,10 +85,11 @@
   html, body, #root {
     @apply bg-background text-foreground;
     min-height: 100%;
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    font-family: "Outfit", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
       "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
+    scroll-behavior: smooth;
   }
   body {
     overscroll-behavior-y: none;
@@ -1198,4 +1199,23 @@ body::before {
   .main-scroll::-webkit-scrollbar { width: 10px; }
   .main-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
   .main-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); background-clip: padding-box; }
+}
+
+/* ─── Page/route transition (fade + slight rise on navigation) ─── */
+@keyframes og-page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.og-page-fade-in {
+  animation: og-page-in 260ms ease-out both;
+}
+
+/* ─── Respect reduced-motion preference: strip non-essential motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  .og-page-fade-in { animation: none; }
+  *, *::before, *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
