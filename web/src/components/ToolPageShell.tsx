@@ -138,10 +138,10 @@ interface EmptyStateProps {
 export const EmptyState: React.FC<EmptyStateProps> = ({ icon: Icon, title, description }) => (
   <div className="flex flex-col items-center justify-center py-16">
     <div className="flex h-14 w-14 items-center justify-center rounded-2xl glass-sm">
-      <Icon className="h-6 w-6 text-white/[0.08]" />
+      <Icon className="h-6 w-6 text-white/30" />
     </div>
-    <p className="mt-3 text-[12px] font-bold text-white/20">{title}</p>
-    {description && <p className="mt-1 text-[10px] text-white/10">{description}</p>}
+    <p className="mt-3 text-[12px] font-bold text-white/50">{title}</p>
+    {description && <p className="mt-1 text-[10px] text-white/30">{description}</p>}
   </div>
 );
 
@@ -149,7 +149,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ icon: Icon, title, descr
 export const LoadingState: React.FC<{ text?: string }> = ({ text = "Loading..." }) => (
   <div className="flex flex-col items-center justify-center py-16">
     <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/10 border-t-og-lime" />
-    <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-white/20">{text}</p>
+    <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-white/40">{text}</p>
   </div>
 );
 
