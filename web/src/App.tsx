@@ -11,6 +11,7 @@ import { AdminRoute } from "@/components/AdminRoute";
 import { MaintenanceLock } from "@/components/MaintenanceLock";
 import BetaGate from "@/components/BetaGate";
 import { IntercomSync } from "@/components/IntercomSync";
+import { OnboardingTour } from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import BetaHome from "./pages/BetaHome";
 import Index from "./pages/Index";
@@ -143,6 +144,7 @@ const App = () => (
         <PresenceHeartbeat />
         <SecurityTracker />
         <IntercomSync />
+        <OnboardingTour />
         <BrowserRouter>
           <SupportNotificationBanner />
           <Routes>
