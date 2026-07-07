@@ -118,6 +118,7 @@ const ALL_APPS: App[] = [
   { key: "gaming", name: "Gaming", caption: "Climb & Win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
   { key: "ai", name: "AI Assistant", caption: "Help & Support", href: "/ai-chat", tone: "#14a0ff", iconBg: "linear-gradient(135deg, #14a0ff, #0077b6)", glyph: Glyph.ai },
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet Alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
+  { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <div style={{ fontSize: "20px" }}>📈</div> },
 ];
 
 const CENTER_TABS: { key: string; name: string; href?: string; action: "profile" | "settings" | "logout" | "wallpaper"; tone: string; glyph: JSX.Element }[] = [
