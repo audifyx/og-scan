@@ -17,6 +17,7 @@ import Index from "./pages/Index";
 import Splash from "./pages/Splash";
 import Hub from "./pages/Hub";
 import KOLTracker from "./pages/KOLTracker";
+import PnlTracker from "./pages/PnlTracker";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Setup from "./pages/Setup";
@@ -168,6 +169,7 @@ const App = () => (
             <Route path="/koltelebot" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
             <Route path="/kol-tracker" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
             <Route path="/app/kol-tracker" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
+            <Route path="/app/pnl-tracker" element={<ProtectedRoute><PnlTracker /></ProtectedRoute>} />
             <Route path="/hub" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
             <Route path="/command" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/home" element={<ProtectedRoute><Index /></ProtectedRoute>} />
