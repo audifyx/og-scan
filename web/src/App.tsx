@@ -9,7 +9,6 @@ import { ThemeProvider } from "@/hooks/useTheme";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { MaintenanceLock } from "@/components/MaintenanceLock";
-import BetaGate from "@/components/BetaGate";
 import { IntercomSync } from "@/components/IntercomSync";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -130,7 +129,6 @@ function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undef
 
 const App = () => (
   <ErrorBoundary>
-  <BetaGate>
   <MaintenanceLock>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -358,7 +356,6 @@ const App = () => (
     </AuthProvider>
   </QueryClientProvider>
   </MaintenanceLock>
-  </BetaGate>
   </ErrorBoundary>
 );
 
