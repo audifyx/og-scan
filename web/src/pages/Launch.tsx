@@ -10,7 +10,6 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { HELIUS_API_KEY } from "@/lib/og";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,10 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import {
-  VersionedTransaction, Transaction,
-  SystemProgram, PublicKey, LAMPORTS_PER_SOL,
-} from "@solana/web3.js";
+import { VersionedTransaction } from "@solana/web3.js";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import {
@@ -39,10 +35,6 @@ import { formatDistanceToNow } from "date-fns";
 
 const MAX_IMG_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMG = ["image/png", "image/jpeg", "image/gif", "image/webp"];
-
-/** OrbitX revenue wallet — receives the $3 launch fee */
-const FEE_WALLET = new PublicKey("4jSxy7gni9ndwzPfNisfKnmCSUeVYrpNACmDxYADfi4i");
-const LAUNCH_FEE_USD = 3;
 
 const STORAGE_KEY = "ogscan_launched_tokens";
 
@@ -87,7 +79,7 @@ interface FormData {
   devBuySol: string;
 }
 
-type LaunchStep = "form" | "paying" | "uploading" | "signing" | "sending" | "success" | "error";
+type LaunchStep = "form" | "uploading" | "signing" | "sending" | "success" | "error";
 type PageView = "gallery" | "create";
 
 const STEP_LABELS = ["IPFS", "Sign", "Send"];
@@ -500,43 +492,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const [txSignature, setTxSignature] = useState("");
   const [mintAddress, setMintAddress] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [solPrice, setSolPrice] = useState<number | null>(null);
   const [metadataUri, setMetadataUri] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  /* ─── Fetch SOL price ──────────────────────────────────────────────── */
-
-  useEffect(() => {
-    const fetchPrice = async () => {
-      // Try Helius price first, then CoinGecko fallback
-      try {
-        const res = await fetch(
-          `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              jsonrpc: "2.0", id: "sol-price", method: "getAsset",
-              params: { id: "So11111111111111111111111111111111111111112" },
-            }),
-          }
-        );
-        const data = await res.json();
-        const price = data?.result?.token_info?.price_info?.price_per_token;
-        if (price && price > 0) { setSolPrice(price); return; }
-      } catch {}
-      try {
-        const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
-        const data = await res.json();
-        if (data?.solana?.usd) setSolPrice(data.solana.usd);
-      } catch {}
-    };
-    fetchPrice();
-    const interval = setInterval(fetchPrice, 60_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const feeSol = solPrice ? LAUNCH_FEE_USD / solPrice : null;
 
   /* ─── Image handling ───────────────────────────────────────────────── */
 
@@ -717,7 +674,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white mb-2">Launch on Pump.fun</h1>
             <p className="text-sm text-white/40 max-w-md mx-auto">
-              Fill in the details, pay the launch fee, and your token goes live.
+              Fill in the details and your token goes live — free to launch.
             </p>
           </div>
         </div>
@@ -787,14 +744,14 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         )}
 
         {/* ─── Loading / In-Progress ─────────────────────────── */}
-        {(step === "paying" || step === "uploading" || step === "signing" || step === "sending") && (
+        {(step === "uploading" || step === "signing" || step === "sending") && (
           <Card className="border-[#ab9ff2]/20 bg-[#ab9ff2]/[0.02] backdrop-blur-sm">
             <CardContent className="p-12 text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#ab9ff2]/10 border border-[#ab9ff2]/20 animate-pulse">
                 <Loader2 className="h-10 w-10 text-[#ab9ff2] animate-spin" />
               </div>
               <h2 className="text-xl font-black text-white mb-2">
-                {step === "paying" ? "Pay Launch Fee" : step === "uploading" ? "Uploading…" : step === "signing" ? "Sign Transaction" : "Broadcasting…"}
+                {step === "uploading" ? "Uploading…" : step === "signing" ? "Sign Transaction" : "Broadcasting…"}
               </h2>
               <p className="text-sm text-white/50">{statusMsg}</p>
 
