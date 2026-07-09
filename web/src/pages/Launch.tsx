@@ -24,6 +24,7 @@ import {
   Keypair, VersionedTransaction, Transaction,
   SystemProgram, PublicKey, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
+import bs58 from "bs58";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import {
@@ -39,10 +40,6 @@ import { formatDistanceToNow } from "date-fns";
 
 const MAX_IMG_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMG = ["image/png", "image/jpeg", "image/gif", "image/webp"];
-
-/** OrbitX revenue wallet — receives the $3 launch fee */
-const FEE_WALLET = new PublicKey("4jSxy7gni9ndwzPfNisfKnmCSUeVYrpNACmDxYADfi4i");
-const LAUNCH_FEE_USD = 3;
 
 const STORAGE_KEY = "ogscan_launched_tokens";
 
@@ -84,7 +81,7 @@ interface FormData {
   devBuySol: string;
 }
 
-type LaunchStep = "form" | "paying" | "uploading" | "signing" | "sending" | "success" | "error";
+type LaunchStep = "form" | "uploading" | "signing" | "sending" | "success" | "error";
 type PageView = "gallery" | "create";
 
 const STEP_LABELS = ["IPFS", "Sign", "Send"];
@@ -533,8 +530,6 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     return () => clearInterval(interval);
   }, []);
 
-  const feeSol = solPrice ? LAUNCH_FEE_USD / solPrice : null;
-
   /* ─── Image handling ───────────────────────────────────────────────── */
 
   const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -589,10 +584,24 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       const { metadataUri: uri } = await ipfsRes.json();
       setMetadataUri(uri);
 
-      /* Step 2 — Generate mint keypair */
-      setStatusMsg("Generating token address…");
-      const mintKeypair = Keypair.generate();
-      setMintAddress(mintKeypair.publicKey.toBase58());
+      /* Step 2 — Generate vanity mint keypair ending with "orbit" */
+      setStatusMsg("Generating vanity token address (ending with 'orbit')…");
+      const vanityRes = await fetch("/api/vanity-mint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suffix: "orbit", maxIterations: 500000 }),
+      });
+      if (!vanityRes.ok) {
+        const err = await vanityRes.json().catch(() => ({ error: "Vanity mint generation failed" }));
+        throw new Error(err.error || "Vanity mint generation failed");
+      }
+      const { publicKey: vanityPubKey, secretKey: vanitySecretKeyBase58, attempts, timeMs } = await vanityRes.json();
+      console.log(`[v0] Generated vanity mint ${vanityPubKey} after ${attempts} attempts in ${timeMs}ms`);
+      
+      // Reconstruct the keypair from the base58-encoded secret key
+      const secretKeyBytes = bs58.decode(vanitySecretKeyBase58);
+      const mintKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyBytes));
+      setMintAddress(vanityPubKey);
 
       /* Step 3 — Get unsigned transaction from PumpPortal */
       setStatusMsg("Building launch transaction…");
@@ -700,7 +709,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white mb-2">Launch on Pump.fun</h1>
             <p className="text-sm text-white/40 max-w-md mx-auto">
-              Fill in the details, pay the launch fee, and your token goes live.
+              Fill in the details and launch your token with a vanity "orbit" address—completely free!
             </p>
           </div>
         </div>
@@ -770,14 +779,14 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         )}
 
         {/* ─── Loading / In-Progress ─────────────────────────── */}
-        {(step === "paying" || step === "uploading" || step === "signing" || step === "sending") && (
+        {(step === "uploading" || step === "signing" || step === "sending") && (
           <Card className="border-[#ab9ff2]/20 bg-[#ab9ff2]/[0.02] backdrop-blur-sm">
             <CardContent className="p-12 text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#ab9ff2]/10 border border-[#ab9ff2]/20 animate-pulse">
                 <Loader2 className="h-10 w-10 text-[#ab9ff2] animate-spin" />
               </div>
               <h2 className="text-xl font-black text-white mb-2">
-                {step === "paying" ? "Pay Launch Fee" : step === "uploading" ? "Uploading…" : step === "signing" ? "Sign Transaction" : "Broadcasting…"}
+                {step === "uploading" ? "Uploading…" : step === "signing" ? "Sign Transaction" : "Broadcasting…"}
               </h2>
               <p className="text-sm text-white/50">{statusMsg}</p>
 
@@ -929,8 +938,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               </button>
             )}
 
-            <p className="text-center text-[10px] text-white/15 leading-relaxed">
-              By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet.<br />Only the standard Solana network fee applies (~0.02 SOL).
+  <p className="text-center text-[10px] text-white/15 leading-relaxed">
+By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "orbit".<br />Only the standard Solana network fee applies (~0.02 SOL). Free for all users!
             </p>
           </div>
         )}
