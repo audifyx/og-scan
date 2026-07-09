@@ -5,20 +5,22 @@ import bs58 from "bs58";
 /**
  * POST /api/vanity-mint
  *
- * Generate a Solana vanity mint keypair whose address ends with "orbit"
- * Returns the full keypair in the response (only secret key stays server-side for now).
+ * Generate a Solana vanity mint keypair whose address ends with "bit"
+ * Uses shorter suffix for realistic computation time (~0.5-2 seconds).
  *
  * Request body:
  * {
- *   suffix?: string; // defaults to "orbit"
- *   maxIterations?: number; // defaults to 500000
+ *   suffix?: string; // defaults to "bit" (3 chars)
+ *   maxIterations?: number; // defaults to 1000000
  * }
  *
  * Response:
  * {
- *   publicKey: string; // base58 encoded
+ *   publicKey: string; // base58 encoded, ends with suffix
  *   secretKey: string; // base58 encoded (serialized secret key)
  *   generatedAt: string; // ISO timestamp
+ *   attempts: number; // how many attempts before finding
+ *   timeMs: number; // how long it took in milliseconds
  * }
  */
 
@@ -28,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { suffix = "orbit", maxIterations = 500000 } = req.body || {};
+    const { suffix = "bit", maxIterations = 1000000 } = req.body || {};
 
     if (typeof suffix !== "string" || suffix.length === 0) {
       return res.status(400).json({ error: "Invalid suffix parameter" });

@@ -2,11 +2,13 @@ import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 
 /**
- * Generate a Solana vanity keypair whose base58 address ends with "orbit"
- * This runs synchronously and will keep generating until a match is found.
+ * Generate a Solana vanity keypair whose base58 address ends with "bit"
+ * Uses 3-character suffix for realistic computation time (~0.5-2 seconds).
  * For server-side use only (intensive computation).
+ *
+ * Note: "orbit" (5 chars) would require ~656M combinations - not practical.
  */
-export function generateVanityMint(suffix = "orbit", maxIterations = 1000000): Keypair {
+export function generateVanityMint(suffix = "bit", maxIterations = 1000000): Keypair {
   const suffixLower = suffix.toLowerCase();
 
   for (let i = 0; i < maxIterations; i++) {
