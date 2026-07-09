@@ -584,12 +584,12 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       const { metadataUri: uri } = await ipfsRes.json();
       setMetadataUri(uri);
 
-      /* Step 2 — Generate vanity mint keypair ending with "bit" */
-      setStatusMsg("Generating custom token address (ending with 'bit')…");
+      /* Step 2 — Generate vanity mint keypair ending with "obx" */
+      setStatusMsg("Generating custom token address (ending with 'obx')…");
       const vanityRes = await fetch("/api/vanity-mint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ suffix: "bit", maxIterations: 1000000 }),
+        body: JSON.stringify({ suffix: "obx", maxIterations: 1000000 }),
       });
       if (!vanityRes.ok) {
         const err = await vanityRes.json().catch(() => ({ error: "Vanity mint generation failed" }));
@@ -709,7 +709,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white mb-2">Launch on Pump.fun</h1>
             <p className="text-sm text-white/40 max-w-md mx-auto">
-              Fill in the details and launch your token with a custom "bit" vanity address—completely free!
+              Fill in the details and launch your token with a custom "obx" vanity address—completely free!
             </p>
           </div>
         </div>
@@ -939,7 +939,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             )}
 
   <p className="text-center text-[10px] text-white/15 leading-relaxed">
-By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "bit".<br />Only the standard Solana network fee applies (~0.02 SOL). Free for all users!
+By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "obx".<br />Only the standard Solana network fee applies (~0.02 SOL). Free for all users!
             </p>
           </div>
         )}

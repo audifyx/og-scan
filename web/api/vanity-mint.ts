@@ -5,12 +5,12 @@ import bs58 from "bs58";
 /**
  * POST /api/vanity-mint
  *
- * Generate a Solana vanity mint keypair whose address ends with "bit"
- * Uses shorter suffix for realistic computation time (~0.5-2 seconds).
+ * Generate a Solana vanity mint keypair whose address ends with "obx"
+ * Computation time: ~1-2 minutes on Vercel serverless.
  *
  * Request body:
  * {
- *   suffix?: string; // defaults to "bit" (3 chars)
+ *   suffix?: string; // defaults to "obx" (3 chars)
  *   maxIterations?: number; // defaults to 1000000
  * }
  *
@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { suffix = "bit", maxIterations = 1000000 } = req.body || {};
+    const { suffix = "obx", maxIterations = 1000000 } = req.body || {};
 
     if (typeof suffix !== "string" || suffix.length === 0) {
       return res.status(400).json({ error: "Invalid suffix parameter" });
