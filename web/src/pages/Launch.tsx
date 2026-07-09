@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import {
-  Keypair, VersionedTransaction, Transaction,
+  VersionedTransaction, Transaction,
   SystemProgram, PublicKey, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -45,6 +45,9 @@ const FEE_WALLET = new PublicKey("4jSxy7gni9ndwzPfNisfKnmCSUeVYrpNACmDxYADfi4i")
 const LAUNCH_FEE_USD = 3;
 
 const STORAGE_KEY = "ogscan_launched_tokens";
+
+/** Preset tickers for OrbitX launches (see Ticker field quick-picks). */
+const TICKER_PRESETS = ["ORBITX", "ORB", "ORBIT"];
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
 
@@ -589,13 +592,10 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       const { metadataUri: uri } = await ipfsRes.json();
       setMetadataUri(uri);
 
-      /* Step 2 — Generate mint keypair */
-      setStatusMsg("Generating token address…");
-      const mintKeypair = Keypair.generate();
-      setMintAddress(mintKeypair.publicKey.toBase58());
-
-      /* Step 3 — Get unsigned transaction from PumpPortal */
-      setStatusMsg("Building launch transaction…");
+      /* Step 2 — Build the create tx server-side with a VANITY mint.
+         The mint keypair is generated AND partial-signed on the server; its
+         secret key never reaches the browser. */
+      setStatusMsg("Reserving your vanity token address…");
       const devBuy = parseFloat(form.devBuySol) || 0;
       const createRes = await fetch("/api/pump-create", {
         method: "POST",
@@ -603,21 +603,23 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         body: JSON.stringify({
           step: "create", publicKey: publicKey.toBase58(), metadataUri: uri,
           name: form.name.trim(), symbol: form.symbol.trim().toUpperCase(),
-          mintPublicKey: mintKeypair.publicKey.toBase58(), devBuySol: devBuy, slippage: 15,
+          devBuySol: devBuy, slippage: 15,
         }),
       });
       if (!createRes.ok) {
         const err = await createRes.json().catch(() => ({ error: "Transaction build failed" }));
         throw new Error(err.error || "Transaction build failed");
       }
-      const { transaction: txBase64 } = await createRes.json();
+      const { transaction: txBase64, mintAddress: vanityMint } = await createRes.json();
+      if (!vanityMint) throw new Error("Server did not return a mint address");
+      setMintAddress(vanityMint);
 
-      /* Step 4 — Deserialize, sign with mint keypair, then sign with Phantom */
+      /* Step 3 — Add the wallet (fee-payer) signature in Phantom. The mint
+         signature is already attached server-side. */
       setStep("signing");
       setStatusMsg("Sign the token creation transaction in Phantom…");
       const txBytes = Uint8Array.from(atob(txBase64), (c) => c.charCodeAt(0));
       const tx = VersionedTransaction.deserialize(txBytes);
-      tx.sign([mintKeypair]);
       const signedTx = await signTransaction(tx);
 
       /* Step 5 — Send */
@@ -630,7 +632,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
       setTxSignature(sig);
 
-      const mintAddr = mintKeypair.publicKey.toBase58();
+      const mintAddr = vanityMint;
       saveLaunch({
         mintAddress: mintAddr,
         name: form.name.trim(),
@@ -646,6 +648,21 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         devBuySol: devBuy || undefined,
         launcherWallet: publicKey.toBase58(),
       });
+
+      // Best-effort: persist the confirmed launch server-side (non-fatal).
+      fetch("/api/pump-create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: "record",
+          mintAddress: mintAddr,
+          txSignature: sig,
+          name: form.name.trim(),
+          symbol: form.symbol.trim().toUpperCase(),
+          launcherWallet: publicKey.toBase58(),
+          metadataUri: uri,
+        }),
+      }).catch(() => {});
 
       setStep("success");
       toast.success("Token launched! 🚀");
@@ -850,7 +867,34 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                     <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Ticker *</Label>
                     <Input placeholder="e.g. DOGE" value={form.symbol} onChange={(e) => updateField("symbol", e.target.value.toUpperCase())} maxLength={10}
                       className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[#ab9ff2]/40 uppercase" />
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {TICKER_PRESETS.map((preset) => {
+                        const isActive = form.symbol.trim().toUpperCase() === preset;
+                        return (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => updateField("symbol", preset)}
+                            className={`rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                              isActive
+                                ? "bg-[#ab9ff2]/20 border border-[#ab9ff2]/40 text-[#ab9ff2]"
+                                : "bg-white/[0.03] border border-white/[0.08] text-white/40 hover:text-white/70 hover:border-white/20"
+                            }`}
+                          >
+                            ${preset}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+                </div>
+
+                {/* Vanity address note */}
+                <div className="flex items-start gap-2 rounded-lg bg-[#ab9ff2]/[0.04] border border-[#ab9ff2]/10 px-3 py-2">
+                  <Sparkles className="h-3.5 w-3.5 text-[#ab9ff2]/70 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-white/45 leading-relaxed">
+                    Every OrbitX launch mints a <span className="text-[#ab9ff2]/80 font-semibold">vanity contract address</span> — your token's address is generated to end with the OrbitX tag automatically. No extra step.
+                  </p>
                 </div>
 
                 {/* Description */}
