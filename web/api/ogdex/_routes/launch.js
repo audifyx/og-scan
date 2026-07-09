@@ -22,8 +22,9 @@ import { send, callFn, dbInsert, dbSelect, readBody, PAY_WALLET } from "../_lib.
  * the "Newly Listed" section (/api/launches).
  */
 
-const FEE_USD = 5;
-const FEE_TOLERANCE = 0.92;               // accept >= 92% of $5 to absorb price drift
+const FEE_USD = 0;                        // launches are free — no fee charged
+const FEE_TOLERANCE = 0.92;               // (unused while FEE_USD is 0) accept >= 92% to absorb price drift
+const FREE_LAUNCH = FEE_USD <= 0;         // when true, every launch is free for every wallet
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
@@ -68,7 +69,7 @@ export default async function handler(req, res) {
     if (url.searchParams.get("config")) {
       const solPrice = await solPriceUsd();
       const wallet = (url.searchParams.get("wallet") || "").trim();
-      const isFirstLaunch = wallet ? await walletHasNoLaunches(wallet) : false;
+      const isFirstLaunch = FREE_LAUNCH ? true : (wallet ? await walletHasNoLaunches(wallet) : false);
       return send(res, 200, {
         ok: true, feeUsd: FEE_USD, isFirstLaunch, payWallet: PAY_WALLET, solPrice,
         usdcMint: USDC_MINT, usdtMint: USDT_MINT, solMint: SOL_MINT,
@@ -149,8 +150,9 @@ async function handleRecord(body, res) {
   if (!mint) return send(res, 400, { ok: false, error: "mint required" });
 
   // A wallet's first launch is free. Re-check server-side (never trust the
-  // client) right before recording, so this can't be spoofed.
-  const isFirstLaunch = creator_wallet ? await walletHasNoLaunches(creator_wallet) : false;
+  // client) right before recording, so this can't be spoofed. While
+  // FREE_LAUNCH is on, every launch is free — no fee, no payment_tx.
+  const isFirstLaunch = FREE_LAUNCH ? true : (creator_wallet ? await walletHasNoLaunches(creator_wallet) : false);
 
   let verify = { ok: true, usd: 0, currency: pay_currency };
   if (!isFirstLaunch) {

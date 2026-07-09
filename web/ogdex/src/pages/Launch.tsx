@@ -75,14 +75,17 @@ export default function Launch() {
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const isFirstLaunch = !!cfg?.isFirstLaunch;
-  const feeUsd = cfg?.feeUsd ?? 5;
+  const feeUsd = cfg?.feeUsd ?? 0;
+  // Launches are free. Treat as free unless the server ever reports a real fee
+  // again — defaults to free even if the config request hasn't loaded yet.
+  const isFree = feeUsd <= 0 || !!cfg?.isFirstLaunch;
+  const isFirstLaunch = isFree;
   const effSolPrice = solPrice ?? cfg?.solPrice ?? null;
   const feeSol = effSolPrice ? feeUsd / effSolPrice : null;
-  const feeDisplay = isFirstLaunch
+  const feeDisplay = isFree
     ? "FREE"
     : currency === "sol"
-    ? (feeSol ? `${feeSol.toFixed(4)} SOL` : `$${feeUsd} in SOL`)
+    ? (feeSol ? `${feeSol.toFixed(4)} SOL` : `${feeUsd} in SOL`)
     : `${feeUsd} ${currency.toUpperCase()}`;
 
   const onConnect = async () => {
@@ -136,10 +139,10 @@ export default function Launch() {
     if (v) { setError(v); return; }
     setError(""); setBusy(true); setResult(null);
     try {
-      /* 1. Pay the launch fee — waived for a wallet's first launch */
+      /* 1. Launch fee — none; launching is free */
       let paymentTx = "";
-      if (isFirstLaunch) {
-        setStatus("First launch is on us — no fee…");
+      if (isFree) {
+        setStatus("Launching is free — no fee…");
       } else {
         setStatus(`Sending ${feeDisplay} launch fee…`);
         paymentTx = await payFee({
@@ -246,12 +249,7 @@ export default function Launch() {
           <h1 className="text-2xl font-black">Launch a Token</h1>
         </div>
         <p className="text-muted text-sm">
-          {isFirstLaunch ? (
-            <>Create a token on pump.fun directly from OrbitX DEX. <span className="text-up font-semibold">Your first launch is FREE</span> — after that it's a flat ${feeUsd} fee (SOL or USDC/USDT). Your new token is added to the <span className="text-white">Newly Listed</span> section instantly.</>
-          ) : (
-            <>Create a token on pump.fun directly from OrbitX DEX. Flat <span className="text-white font-semibold">${feeUsd}</span> launch
-            fee (SOL or USDC/USDT). Your new token is added to the <span className="text-white">Newly Listed</span> section instantly.</>
-          )}
+          <>Create a token on pump.fun directly from OrbitX DEX. <span className="text-up font-semibold">Launching is free</span> — you only pay the standard Solana network fee. Your new token is added to the <span className="text-white">Newly Listed</span> section instantly.</>
         </p>
       </div>
 
@@ -332,10 +330,10 @@ export default function Launch() {
         <div className={`card p-4 flex items-center gap-3 ${isFirstLaunch ? "border-up/30 bg-up/5" : ""}`}>
           <Wallet className={`w-5 h-5 shrink-0 ${isFirstLaunch ? "text-up" : "text-accent"}`} />
           <div>
-            <div className="text-xs text-muted">{isFirstLaunch ? "Launch fee — first launch" : "Launch fee"}</div>
-            <div className={`text-2xl font-black ${isFirstLaunch ? "text-up" : ""}`}>{feeDisplay}</div>
-            {isFirstLaunch
-              ? <div className="text-xs text-muted">Normally ${feeUsd} — waived for your first token</div>
+            <div className="text-xs text-muted">Launch fee</div>
+            <div className={`text-2xl font-black ${isFree ? "text-up" : ""}`}>{feeDisplay}</div>
+            {isFree
+              ? <div className="text-xs text-muted">Launching is free</div>
               : currency === "sol" && <div className="text-xs text-muted">(${feeUsd} at current SOL price)</div>}
           </div>
           <div className="ml-auto text-right text-xs text-muted">
@@ -359,7 +357,7 @@ export default function Launch() {
       <div className="card p-4 space-y-2 text-xs text-muted border-line">
         <div className="flex items-center gap-1.5 font-semibold text-white text-sm mb-1"><Info className="w-4 h-4 text-accent" /> How it works</div>
         <p>1. Connect your wallet and fill in your token details + image.</p>
-        <p>2. {isFirstLaunch ? "Your first launch is free — no payment needed." : `Pay the $${feeUsd} launch fee (SOL or USDC/USDT) — verified on-chain automatically.`}</p>
+        <p>2. {isFree ? "Launching is free — no launch fee, just the standard Solana network fee." : `Pay the ${feeUsd} launch fee (SOL or USDC/USDT) — verified on-chain automatically.`}</p>
         <p>3. Confirm the create transaction; your token deploys on pump.fun and you get the link + CA.</p>
         <p>4. It's added to <strong className="text-white">Newly Listed</strong>. Launched tokens are unverified with no boost — boost or list separately for featured placement.</p>
       </div>
