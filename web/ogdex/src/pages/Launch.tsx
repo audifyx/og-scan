@@ -43,10 +43,15 @@ export default function Launch() {
   const [solPrice, setSolPrice] = useState<number | null>(null);
 
   useEffect(() => {
-    getLaunchConfig().then(setCfg).catch(() => {});
     const p = getProvider();
     if (p?.publicKey) setWallet(p.publicKey.toString());
   }, []);
+
+  // Refetch config whenever the connected wallet changes so we know if this
+  // wallet still has its free first launch available.
+  useEffect(() => {
+    getLaunchConfig(wallet ?? undefined).then(setCfg).catch(() => {});
+  }, [wallet]);
 
   // SOL price is fetched client-side (browser CORS works with Jupiter) so the
   // pay-in-SOL option always has a quote, regardless of server egress.
@@ -70,10 +75,13 @@ export default function Launch() {
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const isFirstLaunch = !!cfg?.isFirstLaunch;
   const feeUsd = cfg?.feeUsd ?? 5;
   const effSolPrice = solPrice ?? cfg?.solPrice ?? null;
   const feeSol = effSolPrice ? feeUsd / effSolPrice : null;
-  const feeDisplay = currency === "sol"
+  const feeDisplay = isFirstLaunch
+    ? "FREE"
+    : currency === "sol"
     ? (feeSol ? `${feeSol.toFixed(4)} SOL` : `$${feeUsd} in SOL`)
     : `${feeUsd} ${currency.toUpperCase()}`;
 
@@ -128,15 +136,20 @@ export default function Launch() {
     if (v) { setError(v); return; }
     setError(""); setBusy(true); setResult(null);
     try {
-      /* 1. Pay the $5 launch fee */
-      setStatus(`Sending ${feeDisplay} launch fee…`);
-      const paymentTx = await payFee({
-        payWallet: cfg!.payWallet,
-        currency,
-        amountSol: currency === "sol" ? feeSol! : undefined,
-        amountUsd: currency !== "sol" ? feeUsd : undefined,
-        tokenMint: currency === "usdc" ? cfg!.usdcMint : currency === "usdt" ? cfg!.usdtMint : undefined,
-      });
+      /* 1. Pay the launch fee — waived for a wallet's first launch */
+      let paymentTx = "";
+      if (isFirstLaunch) {
+        setStatus("First launch is on us — no fee…");
+      } else {
+        setStatus(`Sending ${feeDisplay} launch fee…`);
+        paymentTx = await payFee({
+          payWallet: cfg!.payWallet,
+          currency,
+          amountSol: currency === "sol" ? feeSol! : undefined,
+          amountUsd: currency !== "sol" ? feeUsd : undefined,
+          tokenMint: currency === "usdc" ? cfg!.usdcMint : currency === "usdt" ? cfg!.usdtMint : undefined,
+        });
+      }
 
       /* 2. Upload image + metadata to IPFS */
       setStatus("Uploading image & metadata to IPFS…");
@@ -233,8 +246,12 @@ export default function Launch() {
           <h1 className="text-2xl font-black">Launch a Token</h1>
         </div>
         <p className="text-muted text-sm">
-          Create a token on pump.fun directly from OrbitX DEX. Flat <span className="text-white font-semibold">${feeUsd}</span> launch
-          fee (SOL or USDC/USDT). Your new token is added to the <span className="text-white">Newly Listed</span> section instantly.
+          {isFirstLaunch ? (
+            <>Create a token on pump.fun directly from OrbitX DEX. <span className="text-up font-semibold">Your first launch is FREE</span> — after that it's a flat ${feeUsd} fee (SOL or USDC/USDT). Your new token is added to the <span className="text-white">Newly Listed</span> section instantly.</>
+          ) : (
+            <>Create a token on pump.fun directly from OrbitX DEX. Flat <span className="text-white font-semibold">${feeUsd}</span> launch
+            fee (SOL or USDC/USDT). Your new token is added to the <span className="text-white">Newly Listed</span> section instantly.</>
+          )}
         </p>
       </div>
 
@@ -302,20 +319,24 @@ export default function Launch() {
       {/* 3. Fee */}
       <section className="space-y-3">
         <label className="text-xs font-semibold text-muted uppercase tracking-wide">3. Launch fee</label>
-        <div className="flex gap-1 bg-panel2 rounded-lg p-1 w-fit">
-          {(["sol", "usdc", "usdt"] as Currency[]).map((c) => (
-            <button key={c} onClick={() => setCurrency(c)}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${currency === c ? "bg-panel text-white" : "text-muted hover:text-white"}`}>
-              {c === "sol" ? "Pay in SOL" : c.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <div className="card p-4 flex items-center gap-3">
-          <Wallet className="w-5 h-5 text-accent shrink-0" />
+        {!isFirstLaunch && (
+          <div className="flex gap-1 bg-panel2 rounded-lg p-1 w-fit">
+            {(["sol", "usdc", "usdt"] as Currency[]).map((c) => (
+              <button key={c} onClick={() => setCurrency(c)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${currency === c ? "bg-panel text-white" : "text-muted hover:text-white"}`}>
+                {c === "sol" ? "Pay in SOL" : c.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className={`card p-4 flex items-center gap-3 ${isFirstLaunch ? "border-up/30 bg-up/5" : ""}`}>
+          <Wallet className={`w-5 h-5 shrink-0 ${isFirstLaunch ? "text-up" : "text-accent"}`} />
           <div>
-            <div className="text-xs text-muted">Launch fee</div>
-            <div className="text-2xl font-black">{feeDisplay}</div>
-            {currency === "sol" && <div className="text-xs text-muted">(${feeUsd} at current SOL price)</div>}
+            <div className="text-xs text-muted">{isFirstLaunch ? "Launch fee — first launch" : "Launch fee"}</div>
+            <div className={`text-2xl font-black ${isFirstLaunch ? "text-up" : ""}`}>{feeDisplay}</div>
+            {isFirstLaunch
+              ? <div className="text-xs text-muted">Normally ${feeUsd} — waived for your first token</div>
+              : currency === "sol" && <div className="text-xs text-muted">(${feeUsd} at current SOL price)</div>}
           </div>
           <div className="ml-auto text-right text-xs text-muted">
             <div>+ ~0.02 SOL</div>
@@ -338,7 +359,7 @@ export default function Launch() {
       <div className="card p-4 space-y-2 text-xs text-muted border-line">
         <div className="flex items-center gap-1.5 font-semibold text-white text-sm mb-1"><Info className="w-4 h-4 text-accent" /> How it works</div>
         <p>1. Connect your wallet and fill in your token details + image.</p>
-        <p>2. Pay the ${feeUsd} launch fee (SOL or USDC/USDT) — verified on-chain automatically.</p>
+        <p>2. {isFirstLaunch ? "Your first launch is free — no payment needed." : `Pay the $${feeUsd} launch fee (SOL or USDC/USDT) — verified on-chain automatically.`}</p>
         <p>3. Confirm the create transaction; your token deploys on pump.fun and you get the link + CA.</p>
         <p>4. It's added to <strong className="text-white">Newly Listed</strong>. Launched tokens are unverified with no boost — boost or list separately for featured placement.</p>
       </div>

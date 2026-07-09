@@ -150,7 +150,7 @@ export function setWatchlistWallet(wallet: string | null) {
 }
 /* ---- Token Launcher ---- */
 export interface LaunchConfig {
-  ok: boolean; feeUsd: number; payWallet: string; solPrice: number | null;
+  ok: boolean; feeUsd: number; isFirstLaunch?: boolean; payWallet: string; solPrice: number | null;
   usdcMint: string; usdtMint: string; solMint: string;
 }
 export interface LaunchedToken {
@@ -160,7 +160,8 @@ export interface LaunchedToken {
   verified: boolean; boosted: boolean; source?: string;
   links: { pumpfun: string; solscan: string; ogdex: string };
 }
-export const getLaunchConfig = () => j<LaunchConfig>(`/api/ogdex/launch?config=1`);
+export const getLaunchConfig = (wallet?: string) =>
+  j<LaunchConfig>(`/api/ogdex/launch?config=1${wallet ? `&wallet=${encodeURIComponent(wallet)}` : ""}`);
 export const launchStep = (body: any) =>
   postJson(`/api/ogdex/launch`, body) as Promise<any>;
 export const getLaunches = (limit = 50) =>

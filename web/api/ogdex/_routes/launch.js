@@ -29,6 +29,17 @@ const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
 const STABLES = { [USDC_MINT]: "usdc", [USDT_MINT]: "usdt" };
 
+// A wallet's first launch is free — no fee required. Checked against the
+// ogdex_launches table (creator_wallet column).
+async function walletHasNoLaunches(wallet) {
+  try {
+    const rows = await dbSelect("ogdex_launches", `creator_wallet=eq.${encodeURIComponent(wallet)}&select=id&limit=1`);
+    return rows.length === 0;
+  } catch {
+    return false; // fail safe — if we can't check, don't hand out a free launch
+  }
+}
+
 async function rpc(method, params) {
   const r = await callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params });
   return r?.data?.result ?? r?.result ?? null;
@@ -56,8 +67,10 @@ export default async function handler(req, res) {
     const url = new URL(req.url, "http://x");
     if (url.searchParams.get("config")) {
       const solPrice = await solPriceUsd();
+      const wallet = (url.searchParams.get("wallet") || "").trim();
+      const isFirstLaunch = wallet ? await walletHasNoLaunches(wallet) : false;
       return send(res, 200, {
-        ok: true, feeUsd: FEE_USD, payWallet: PAY_WALLET, solPrice,
+        ok: true, feeUsd: FEE_USD, isFirstLaunch, payWallet: PAY_WALLET, solPrice,
         usdcMint: USDC_MINT, usdtMint: USDT_MINT, solMint: SOL_MINT,
       });
     }
@@ -132,17 +145,30 @@ async function handleRecord(body, res) {
   const mint = String(body.mint || "").trim();
   const payment_tx = String(body.payment_tx || "").trim();
   const pay_currency = String(body.pay_currency || "sol").toLowerCase();
+  const creator_wallet = body.creator_wallet || null;
   if (!mint) return send(res, 400, { ok: false, error: "mint required" });
-  if (!payment_tx) return send(res, 400, { ok: false, error: "payment_tx required" });
 
-  // Reject reused payments (defence in depth — DB has a UNIQUE constraint too).
-  try {
-    const dup = await dbSelect("ogdex_launches", `payment_tx=eq.${encodeURIComponent(payment_tx)}&select=id&limit=1`);
-    if (dup.length) return send(res, 409, { ok: false, error: "this payment has already been used" });
-  } catch {}
+  // A wallet's first launch is free. Re-check server-side (never trust the
+  // client) right before recording, so this can't be spoofed.
+  const isFirstLaunch = creator_wallet ? await walletHasNoLaunches(creator_wallet) : false;
 
-  const verify = await verifyFee(payment_tx, pay_currency);
-  if (!verify.ok) return send(res, 402, { ok: false, error: verify.error || "fee payment could not be verified" });
+  let verify = { ok: true, usd: 0, currency: pay_currency };
+  if (!isFirstLaunch) {
+    if (!payment_tx) return send(res, 400, { ok: false, error: "payment_tx required" });
+    // Reject reused payments (defence in depth — DB has a UNIQUE constraint too).
+    try {
+      const dup = await dbSelect("ogdex_launches", `payment_tx=eq.${encodeURIComponent(payment_tx)}&select=id&limit=1`);
+      if (dup.length) return send(res, 409, { ok: false, error: "this payment has already been used" });
+    } catch {}
+    verify = await verifyFee(payment_tx, pay_currency);
+    if (!verify.ok) return send(res, 402, { ok: false, error: verify.error || "fee payment could not be verified" });
+  } else if (payment_tx) {
+    // A tx was sent anyway (e.g. stale client) — still guard against reuse.
+    try {
+      const dup = await dbSelect("ogdex_launches", `payment_tx=eq.${encodeURIComponent(payment_tx)}&select=id&limit=1`);
+      if (dup.length) return send(res, 409, { ok: false, error: "this payment has already been used" });
+    } catch {}
+  }
 
   const row = {
     mint,
@@ -150,10 +176,10 @@ async function handleRecord(body, res) {
     name: body.name || null,
     icon: body.icon || null,
     description: body.description || null,
-    creator_wallet: body.creator_wallet || null,
+    creator_wallet,
     pay_currency: ["sol", "usdc", "usdt"].includes(pay_currency) ? pay_currency : "sol",
-    fee_usd: FEE_USD,
-    payment_tx,
+    fee_usd: isFirstLaunch ? 0 : FEE_USD,
+    payment_tx: payment_tx || "FREE_FIRST_LAUNCH",
     launch_tx: body.launch_tx || null,
     links: body.links || {},
     status: "listed",
@@ -169,7 +195,7 @@ async function handleRecord(body, res) {
   const token = (inserted && inserted[0]) || row;
   return send(res, 200, {
     ok: true,
-    token: { ...token, paidUsd: verify.usd },
+    token: { ...token, paidUsd: verify.usd, freeLaunch: isFirstLaunch },
     links: {
       pumpfun: `https://pump.fun/${mint}`,
       solscan: `https://solscan.io/token/${mint}`,
