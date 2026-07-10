@@ -70,12 +70,12 @@
 **Contract Address**
 
 ```
-HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump
+13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9
 ```
 
-[![Trade on Jupiter](https://img.shields.io/badge/Trade-Jupiter-FF6B35?style=for-the-badge)](https://jup.ag/swap/HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump)&nbsp;
-[![View on Solscan](https://img.shields.io/badge/View-Solscan-9945FF?style=for-the-badge)](https://solscan.io/token/HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump)&nbsp;
-[![Chart on Dexscreener](https://img.shields.io/badge/Chart-Dexscreener-00FF88?style=for-the-badge)](https://dexscreener.com/solana/HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump)
+[![Trade on Jupiter](https://img.shields.io/badge/Trade-Jupiter-FF6B35?style=for-the-badge)](https://jup.ag/swap/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9)&nbsp;
+[![View on Solscan](https://img.shields.io/badge/View-Solscan-9945FF?style=for-the-badge)](https://solscan.io/token/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9)&nbsp;
+[![Chart on Dexscreener](https://img.shields.io/badge/Chart-Dexscreener-00FF88?style=for-the-badge)](https://dexscreener.com/solana/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9)
 
 </div>
 
