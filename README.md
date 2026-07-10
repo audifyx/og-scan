@@ -20,13 +20,13 @@
 
 ---
 
-## What is OG Scan?
+## What is OrbitX?
 
-**OG Scan** is a unified on-chain intelligence platform covering **16 blockchains** — scan tokens, analyze wallets, generate AI reports, detect early launches, track markets, and automate alerts, all in one place.
+**OrbitX** is an on-chain operating system for crypto — one destination that unifies trading intelligence, a social layer, live streaming, prediction markets, and gaming, connected by a single wallet-based identity. Its core, **OrbitX DEX** (live at ogscan.fun), aggregates public blockchain and market data across **16 chains**, enriches it, and surfaces what most tools hide: dev-wallet and dev-sold status, the first on-chain buyer, paid-listing status, whale/KOL holders, real all-time-high history, bundle/sniper detection, and wallet copy-tracking.
 
-> Token scanning · Wallet forensics · AI analyst · PDF reports · Market radar · Early launch detection · Telegram bot · Webhook alerts · X integration · Custom AI bots · Live crypto news · Instant listings
+> Forensic token intelligence · Social feed · Live voice & video · Prediction markets & games · Free token launchpad · Per-token AI analyst · Public MCP agent API · Non-custodial by design
 
-**→ [ogscan.fun](https://ogscan.fun)**
+**→ [ogscan.fun](https://ogscan.fun)** · Full breakdown: **[Whitepaper](https://ogscan.fun/ORBITX_DEX/whitepaper)** · **[Roadmap](https://ogscan.fun/ORBITX_DEX/roadmap)**
 
 ---
 
@@ -87,84 +87,70 @@
 <tr>
 <td valign="top" width="50%">
 
-### 🔍 OG Scanner
-Paste a contract address and get instant analysis — holders, activity, risk flags, contract forensics. Works across 16 chains.
+### 🔍 OrbitX DEX — Screener & Forensics
+Curated, garbage-filtered discovery across 16 chains. Every token page carries a trust verdict, dev-wallet/dev-sold status, first-buyer tx, paid-listing flag, and bundle/sniper detection.
 
 </td>
 <td valign="top" width="50%">
 
-### 💰 Wallet Intelligence
-Deep-dive any wallet. Holdings, trade history, win rate, timing patterns. Ask AI about behavior directly.
-
-</td>
-</tr>
-<tr>
-<td valign="top" width="50%">
-
-### 🧠 AI Analyst
-Share a token or wallet and get detailed AI analysis trained on years of on-chain data. Unlimited chat.
-
-</td>
-<td valign="top" width="50%">
-
-### 📊 PDF Reports
-Generate downloadable reports with charts, metrics, and AI insights. `/report <token>` in Telegram or web.
+### 💰 Wallet Intelligence & Copy-Tracking
+Portfolio with realized/unrealized PnL, a smart-money directory with a live buy/sell feed, and follow up to 10 wallets to see what they do next.
 
 </td>
 </tr>
 <tr>
 <td valign="top" width="50%">
 
-### 📈 Market Radar
-Track launches, trending pairs, and market activity across 16 chains. Live feeds refresh every minute.
+### 🧠 The Coin AI
+Every token gets its own AI agent, grounded in live on-chain data *and* live web search — real numbers, real wallets, cited sources, one-tap Solscan links.
 
 </td>
 <td valign="top" width="50%">
 
-### ⚡ Early Launch Detection
-Catch projects before they move. Detect mint events, liquidity adds, and token creation in real-time.
-
-</td>
-</tr>
-<tr>
-<td valign="top" width="50%">
-
-### 🤖 Telegram Bot
-Full platform experience in Telegram. Scan tokens, generate reports, analyze wallets, chat with AI. `/scan` `/report` `/chat`
-
-</td>
-<td valign="top" width="50%">
-
-### 🔔 Webhook Alerts
-Real-time alerts for launches, price targets, and whale activity. No-code setup — connect any system.
+### 🚀 Free Launchpad
+Launch a token straight to pump.fun from inside OrbitX DEX — free, with an optional custom vanity mint address (e.g. ending in `obx`).
 
 </td>
 </tr>
 <tr>
 <td valign="top" width="50%">
 
-### 🐦 X Integration
-Connect your X account. Auto-publish community posts to your profile. We handle API costs.
+### 📈 Pulse & Multi-source Sniper
+Real-time momentum signals plus a live feed (newest, bonding, trending, gainers, migrated) with safety chips — Snipe Feed, Scanner, New Pairs, OG Finder, Migrations, Swap.
 
 </td>
 <td valign="top" width="50%">
 
-### ⚙️ Custom AI Bots
-Build branded bots for Telegram or Discord. Upload knowledge files, customize, and deploy instantly. 5+ free.
+### 🌐 OrbitX Social
+X-style timeline, profiles, communities, per-token chat, and a KOL social feed — cashtag and mint linking built in.
 
 </td>
 </tr>
 <tr>
 <td valign="top" width="50%">
 
-### 📰 Live Crypto News
-Track bullish and bearish news, market narratives, and ecosystem updates in real-time.
+### 🎙️ OrbitX Live
+Voice Spaces with lobbies and recordings, plus full live streaming — camera or screen share, multi-broadcaster grid, live chat.
 
 </td>
 <td valign="top" width="50%">
 
-### 🎯 Instant Listings
-Paste a CA and auto-pull project names, logos, banners, metadata, and market data in seconds.
+### 🎮 Predictions & Gaming
+Native prediction markets and provably-fair 1v1 games, wired into your OrbitX insights with leaderboards and achievements.
+
+</td>
+</tr>
+<tr>
+<td valign="top" width="50%">
+
+### 🤖 Public MCP Agent API
+`GET/POST /api/ogdex/mcp` — any MCP-compatible AI assistant (Claude, GPT, custom agents) can query token lookup, screener, forensics, ATH, wallet PnL, and chart data directly.
+
+</td>
+<td valign="top" width="50%">
+
+### 🔒 Non-custodial by Design
+OrbitX never takes custody of funds or keys. Every trade is signed by your own wallet. Pro tier gates on token balance, checked non-custodially.
 
 </td>
 </tr>
