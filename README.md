@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/audifyx/og-scan/main/assets/banner.jpg" width="100%" alt="OG Scan — Advanced On-Chain Intelligence"/>
+<img src="https://raw.githubusercontent.com/audifyx/og-scan/main/web/ogdex/public/ogdex-banner.jpg" width="100%" alt="OrbitX — The On-Chain Operating System"/>
 
 <br/><br/>
 
