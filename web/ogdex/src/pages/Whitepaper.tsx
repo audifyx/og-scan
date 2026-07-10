@@ -205,7 +205,7 @@ export default function Whitepaper() {
       </P>
       <P>
         <span className="text-muted">Official contract:</span>{" "}
-        <span className="font-mono text-[11px] text-white break-all">HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump</span>
+        <span className="font-mono text-[11px] text-white break-all">13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9</span>
       </P>
       <p className="text-[12px] leading-relaxed text-muted mb-4">
         Nothing here is a promise of value, an offer, or financial advice — always verify the official contract address before

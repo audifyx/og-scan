@@ -26,7 +26,7 @@ const DEFAULT_PAIRS: PairData[] = [
   { address: "WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk", name: "WEN/SOL", symbol: "WEN", category: "meme" },
   { address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", name: "USDC/SOL", symbol: "USDC", category: "stable" },
   { address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", name: "USDT/SOL", symbol: "USDT", category: "stable" },
-  { address: "HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump", name: "SOLTOOLS/SOL", symbol: "SOLTOOLS", category: "official" },
+  { address: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9", name: "SOLTOOLS/SOL", symbol: "SOLTOOLS", category: "official" },
 ];
 
 const Charts = () => {

@@ -13,7 +13,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import logo from "@/assets/logo.png";
 
-const CONTRACT_ADDRESS = "HEivoBHhWT939vcaevGgZBtoArS4CAywCMjdVBTSpump";
+const CONTRACT_ADDRESS = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
 const LINKS = {
   pumpFun: "https://join.pump.fun/HSag/494el64d",
