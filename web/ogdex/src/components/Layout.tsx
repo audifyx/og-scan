@@ -20,7 +20,7 @@ function Brand() {
         <span className="font-black text-[17px] tracking-tight" style={{ fontFamily: "'Sora', 'Plus Jakarta Sans', sans-serif" }}>
           Orbit<span className="text-brand-gradient">X</span>
         </span>
-        <span className="text-[9px] font-bold tracking-[0.18em] uppercase" style={{ color: "#2F80FF" }}>DEX Intelligence</span>
+        <span className="term" style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.26em", color: "#28F0C8" }}>DEX_INTELLIGENCE</span>
       </span>
     </span>
   );
@@ -111,13 +111,13 @@ export default function Layout() {
       className="min-h-screen flex flex-col"
       style={{
         backgroundImage:
-          "radial-gradient(1000px 680px at 10% -4%, rgba(47,128,255,0.20), transparent 60%)," +
-          "radial-gradient(1000px 760px at 100% 6%, rgba(153,69,255,0.18), transparent 62%)," +
-          "radial-gradient(900px 900px at 50% 120%, rgba(20,224,200,0.10), transparent 60%)," +
-          "linear-gradient(rgba(3,5,12,0.66), rgba(3,5,12,0.82))," +
-          "url(/bg/bg-aurora.jpg)",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+          "radial-gradient(1100px 720px at 8% -6%, rgba(47,128,255,0.16), transparent 58%)," +
+          "radial-gradient(1000px 760px at 100% 4%, rgba(153,69,255,0.13), transparent 60%)," +
+          "radial-gradient(1200px 900px at 50% 122%, rgba(40,240,200,0.08), transparent 60%)," +
+          "linear-gradient(rgba(47,128,255,0.035) 1px, transparent 1px)," +
+          "linear-gradient(90deg, rgba(47,128,255,0.035) 1px, transparent 1px)," +
+          "linear-gradient(180deg, #000000 0%, #03060E 60%, #000000 100%)",
+        backgroundSize: "100% 100%, 100% 100%, 100% 100%, 46px 46px, 46px 46px, 100% 100%",
         backgroundAttachment: "fixed",
       }}
     >
@@ -132,11 +132,11 @@ export default function Layout() {
             <Link to="/"><Brand /></Link>
 
             {/* Live stats pill */}
-            <div className="hidden lg:flex items-center gap-3 ml-3 pl-4 border-l" style={{ borderColor: "rgba(47,128,255,0.12)" }}>
-              <span className="text-[11px] text-[#8497B8]"><span className="text-[#2F80FF] font-bold">{pstats.activeUsers}</span> users</span>
-              <span className="text-[11px] text-[#8497B8]"><span className="text-white/70 font-semibold">{pstats.tokenCount}</span> tokens</span>
-              <span className="text-[11px] text-[#8497B8]"><span className="text-[#2F80FF] font-bold">{pstats.volume}</span> vol</span>
-              <span className="text-[11px] text-[#8497B8]"><span className="text-[#FFC53D] font-bold">{pstats.daysLive}d</span> live</span>
+            <div className="hidden lg:flex items-center gap-3.5 ml-3 pl-4 border-l term text-[10px]" style={{ borderColor: "rgba(47,128,255,0.12)", color: "#5A6B88" }}>
+              <span>USERS <span className="text-[#28F0C8] font-bold">{pstats.activeUsers}</span></span>
+              <span>TOKENS <span className="text-white/75 font-semibold">{pstats.tokenCount}</span></span>
+              <span>VOL <span className="text-[#2F80FF] font-bold">{pstats.volume}</span></span>
+              <span>UP <span className="text-[#FFC53D] font-bold">{pstats.daysLive}d</span></span>
             </div>
 
             {/* Spacer */}
@@ -207,18 +207,34 @@ export default function Layout() {
                 <Link
                   key={to}
                   to={to}
-                  className={`relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[13px] font-bold whitespace-nowrap shrink-0 transition-all duration-200
+                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono uppercase tracking-wider text-[11px] font-bold whitespace-nowrap shrink-0 transition-all duration-200
                     ${active
-                      ? "text-white border border-accent/50 shadow-glow-blue"
-                      : "text-[#8497B8] border border-transparent hover:text-white hover:border-accent/25 hover:bg-white/[0.04]"}`}
-                  style={active ? { background: "linear-gradient(135deg, rgba(47,128,255,0.22), rgba(153,69,255,0.15))" } : undefined}
+                      ? "text-white border border-term/50 shadow-glow-term"
+                      : "text-[#8FA3C4] border border-transparent hover:text-white hover:border-accent/30 hover:bg-white/[0.04]"}`}
+                  style={active ? { background: "linear-gradient(135deg, rgba(40,240,200,0.16), rgba(47,128,255,0.16))" } : undefined}
                 >
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? "text-accent" : ""}`} />
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? "text-term" : ""}`} />
                   {label}
                 </Link>
               );
             })}
           </nav>
+        </div>
+
+        {/* ── Terminal system-status strip ── */}
+        <div className="hidden md:block border-b backdrop-blur-xl" style={{ backgroundColor: "rgba(0,0,0,0.7)", borderColor: "rgba(47,128,255,0.1)" }}>
+          <div className="max-w-[1600px] mx-auto px-5 h-6 flex items-center gap-4 term text-[10px]" style={{ color: "#5A6B88" }}>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#28F0C8", boxShadow: "0 0 8px #28F0C8" }} />
+              <span style={{ color: "#28F0C8", letterSpacing: "0.14em" }}>SYSTEM ONLINE</span>
+            </span>
+            <span>NET <span className="text-white/70">SOLANA_MAINNET</span></span>
+            <span className="hidden lg:inline">LATENCY <span className="text-white/70">~42ms</span></span>
+            <span className="hidden lg:inline">ACTIVE <span className="text-[#28F0C8]">{pstats.activeUsers}</span></span>
+            <span className="hidden xl:inline">VOL_24H <span style={{ color: "#FFC53D" }}>{pstats.volume}</span></span>
+            <span className="flex-1" />
+            <span className="term-prompt term-cursor" style={{ color: "#8FA3C4", letterSpacing: "0.06em" }}>orbitx@dex:~</span>
+          </div>
         </div>
       </div>
 
