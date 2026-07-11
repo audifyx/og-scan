@@ -574,6 +574,10 @@ const CommunityRooms: React.FC = () => {
   const isBanned = !!currentMember?.is_banned || (!!currentMember?.banned_until && new Date(currentMember.banned_until).getTime() > Date.now());
   const pinnedMessages = messages.filter(message => message.is_pinned && !message.is_deleted);
   const requestedRoomId = useMemo(() => new URLSearchParams(window.location.search).get("room"), []);
+  const inviterRef = useMemo(() => new URLSearchParams(window.location.search).get("ref"), []);
+  const [inviteModal, setInviteModal] = useState<{ room: Room; inviterName: string; inviterAvatar: string | null } | null>(null);
+  const [joiningInvite, setJoiningInvite] = useState(false);
+  const handledInviteKey = useRef<string | null>(null);
   const requestedMessageId = useMemo(() => new URLSearchParams(window.location.search).get("message"), []);
 
   const filteredRooms = useMemo(() => {
@@ -615,7 +619,20 @@ const CommunityRooms: React.FC = () => {
     } else {
       const rows = (data || []) as Room[];
       setRooms(rows);
-      const requestedRoom = requestedRoomId ? rows.find(room => room.id === requestedRoomId) : null;
+      let requestedRoom = requestedRoomId ? rows.find(room => room.id === requestedRoomId) : null;
+
+      // Invite link to a room we can't see yet (private/invite-only, not
+      // joined) — fall back to the safe preview RPC so we can still show
+      // the "@x invited you" popup before the viewer has joined.
+      if (!requestedRoom && requestedRoomId && inviterRef) {
+        const { data: preview } = await supabase.rpc("get_room_invite_preview", { p_room_id: requestedRoomId });
+        const previewRoom = Array.isArray(preview) ? preview[0] : preview;
+        if (previewRoom?.id) {
+          requestedRoom = { ...previewRoom, member_count: previewRoom.member_count ?? 0, created_at: new Date().toISOString() } as Room;
+          setRooms(prev => (prev.some(r => r.id === requestedRoom!.id) ? prev : [requestedRoom!, ...prev]));
+        }
+      }
+
       if (requestedRoom) {
         setActiveRoom(requestedRoom);
       } else if (!activeRoom && rows.length > 0) {
@@ -623,7 +640,7 @@ const CommunityRooms: React.FC = () => {
       }
     }
     setLoadingRooms(false);
-  }, [activeRoom, requestedRoomId]);
+  }, [activeRoom, requestedRoomId, inviterRef]);
 
   const loadMembers = useCallback(async (roomId: string) => {
     const { data, error } = await supabase
@@ -737,6 +754,67 @@ const CommunityRooms: React.FC = () => {
   }, [canModerate]);
 
   useEffect(() => { loadRooms(); }, [loadRooms]);
+
+  // Invite links: /community-rooms?room=<id>&ref=<inviter username>
+  // Once the target room is loaded, show "@ref invited you to join" —
+  // but only if the viewer isn't already a member and hasn't dismissed it yet.
+  useEffect(() => {
+    if (!inviterRef || !activeRoom || !user?.id) return;
+    const key = `${activeRoom.id}:${inviterRef}`;
+    if (handledInviteKey.current === key) return;
+    if (inviterRef.toLowerCase() === (profile?.username || "").toLowerCase()) return; // can't invite yourself
+
+    let cancelled = false;
+    (async () => {
+      const { data: existingMember } = await supabase
+        .from("community_room_members")
+        .select("user_id")
+        .eq("room_id", activeRoom.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      handledInviteKey.current = key;
+      if (existingMember) return; // already in — no need to prompt
+
+      const { data: inviterProfile } = await supabase
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("username", inviterRef)
+        .maybeSingle();
+      if (cancelled) return;
+      setInviteModal({
+        room: activeRoom,
+        inviterName: inviterProfile?.username || inviterRef,
+        inviterAvatar: inviterProfile?.avatar_url || null,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [inviterRef, activeRoom, user?.id, profile?.username]);
+
+  const acceptInvite = async () => {
+    if (!inviteModal || !user?.id) return;
+    setJoiningInvite(true);
+    const { error } = await supabase
+      .from("community_room_members")
+      .upsert({ room_id: inviteModal.room.id, user_id: user.id, role: "member" }, { onConflict: "room_id,user_id" });
+    setJoiningInvite(false);
+    if (error) {
+      console.error("accept invite failed", error);
+      toast.error("Could not join — try again");
+      return;
+    }
+    toast.success(`Joined ${inviteModal.room.name}`);
+    loadMembers(inviteModal.room.id);
+    loadMessages(inviteModal.room.id);
+    loadRooms();
+    setInviteModal(null);
+    navigate(`${window.location.pathname}?room=${inviteModal.room.id}`, { replace: true });
+  };
+
+  const dismissInvite = () => {
+    if (inviteModal) navigate(`${window.location.pathname}?room=${inviteModal.room.id}`, { replace: true });
+    setInviteModal(null);
+  };
 
   // Real-time: community_rooms list updates (new rooms, renames, deletions)
   useEffect(() => {
@@ -1129,12 +1207,13 @@ const CommunityRooms: React.FC = () => {
 
   const copyRoomLink = async () => {
     if (!activeRoom) return;
-    const roomPath = `${window.location.origin}${window.location.pathname}?room=${activeRoom.id}`;
+    const ref = profile?.username ? `&ref=${encodeURIComponent(profile.username)}` : "";
+    const roomPath = `${window.location.origin}${window.location.pathname}?room=${activeRoom.id}${ref}`;
     try {
       await navigator.clipboard.writeText(roomPath);
-      toast.success("Room link copied");
+      toast.success("Invite link copied");
     } catch {
-      toast.error("Could not copy room link");
+      toast.error("Could not copy invite link");
     }
   };
 
@@ -1701,6 +1780,50 @@ const CommunityRooms: React.FC = () => {
             <button onClick={() => setModTarget(null)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white/[0.04] px-3 py-2 text-xs font-bold text-white/45 hover:text-white">
               <UserMinus className="h-3.5 w-3.5" />
               Close
+            </button>
+          </div>
+        </div>
+      )}
+      {inviteModal && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="relative w-full max-w-sm rounded-2xl border border-white/[0.1] bg-popover p-6 text-center shadow-2xl">
+            <button onClick={dismissInvite} className="absolute right-4 top-4 rounded-lg p-1.5 text-white/35 hover:bg-white/[0.05]"><X className="h-4 w-4" /></button>
+
+            {inviteModal.inviterAvatar ? (
+              <img src={inviteModal.inviterAvatar} alt={inviteModal.inviterName} className="mx-auto mb-3 h-14 w-14 rounded-full object-cover ring-2 ring-og-lime/40" />
+            ) : (
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-og-lime/15 text-lg font-black text-og-lime ring-2 ring-og-lime/40">
+                {inviteModal.inviterName.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+
+            <p className="text-sm text-white/60">
+              <span className="font-bold text-white">@{inviteModal.inviterName}</span> has invited you to join
+            </p>
+
+            <div className="my-3 flex items-center justify-center gap-2">
+              {inviteModal.room.avatar_url && (
+                <img src={inviteModal.room.avatar_url} alt={inviteModal.room.name} className="h-6 w-6 rounded-lg object-cover" />
+              )}
+              <h3 className="text-lg font-black text-white">{inviteModal.room.name}</h3>
+            </div>
+            {inviteModal.room.description && (
+              <p className="mb-4 text-xs text-white/40 line-clamp-2">{inviteModal.room.description}</p>
+            )}
+            <p className="mb-5 text-[11px] font-semibold uppercase tracking-wide text-white/25">
+              {inviteModal.room.member_count || 0} members
+            </p>
+
+            <button
+              onClick={acceptInvite}
+              disabled={joiningInvite}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 px-4 py-3 text-sm font-black text-white shadow-lg shadow-emerald-500/30 transition hover:brightness-110 disabled:opacity-50"
+            >
+              {joiningInvite ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              {joiningInvite ? "Joining…" : "Join community"}
+            </button>
+            <button onClick={dismissInvite} className="mt-2 w-full rounded-xl px-4 py-2 text-xs font-bold text-white/40 hover:text-white">
+              Not now
             </button>
           </div>
         </div>
