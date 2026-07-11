@@ -28,7 +28,8 @@ export default function NewlyListed() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-5 h-5 text-accent" />
-            <h1 className="text-2xl font-black">Newly Listed</h1>
+            <div className="term text-[11px]" style={{ color: "#66707E" }}><span style={{ color: "#00FFA3" }}>orbitx@dex</span>:~$ launches --fresh --live</div>
+            <h1 className="text-2xl font-black">NEW_LISTINGS</h1>
           </div>
           <p className="text-muted text-sm">Fresh tokens launched through OrbitX DEX. Unverified and unboosted — do your own research.</p>
         </div>

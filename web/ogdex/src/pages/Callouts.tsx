@@ -42,7 +42,8 @@ export default function Callouts() {
     <div className="mx-auto max-w-[900px] space-y-5 px-4 py-6">
       <div className="flex items-center gap-2">
         <Megaphone className="h-5 w-5 text-accent" />
-        <h1 className="font-display text-2xl font-black text-white">Callouts</h1>
+        <div className="term text-[11px]" style={{ color: "#66707E" }}><span style={{ color: "#00FFA3" }}>orbitx@dex</span>:~$ callouts --community --top</div>
+        <h1 className="font-display text-2xl font-black text-white">CALLOUTS</h1>
       </div>
       <p className="-mt-2 text-sm text-muted">
         Live token and wallet callouts from the community. Tap any token to run an OrbitX.

@@ -13,13 +13,13 @@ import { getScreener, fmtUsd, compact, type Row } from "../lib/api";
 
 type ToolId = "sniper" | "holders" | "liquidity" | "wallet" | "staking" | "il";
 
-const TOOLS: { id: ToolId; label: string; desc: string; Icon: typeof Shield; kind: "feed" | "mint" | "wallet" | "calc"; ph: string }[] = [
-  { id: "sniper",   label: "Token Sniper",     desc: "Live pump.fun launches",     Icon: Crosshair,  kind: "feed",   ph: "" },
-  { id: "holders",  label: "Holder Analysis",  desc: "Top holder distribution",    Icon: Users,      kind: "mint",   ph: "Paste a token contract address" },
-  { id: "liquidity",label: "Liquidity Scanner",desc: "Pools & liquidity depth",    Icon: Droplets,   kind: "mint",   ph: "Paste a token contract address" },
-  { id: "wallet",   label: "Wallet Profiler",  desc: "Holdings & activity",        Icon: Wallet2,    kind: "wallet", ph: "Paste a wallet address" },
-  { id: "staking",  label: "Staking Calc",     desc: "Estimate staking rewards",   Icon: Calculator, kind: "calc",   ph: "" },
-  { id: "il",       label: "Impermanent Loss", desc: "LP loss vs holding",         Icon: AlertTriangle, kind: "calc", ph: "" },
+const TOOLS: { id: ToolId; label: string; desc: string; cmd: string; Icon: typeof Shield; kind: "feed" | "mint" | "wallet" | "calc"; ph: string }[] = [
+  { id: "sniper",   label: "Token Sniper",     desc: "Live pump.fun launches",     cmd: "snipe --live",      Icon: Crosshair,  kind: "feed",   ph: "" },
+  { id: "holders",  label: "Holder Analysis",  desc: "Top holder distribution",    cmd: "holders --top 20",  Icon: Users,      kind: "mint",   ph: "paste token contract address" },
+  { id: "liquidity",label: "Liquidity Scanner",desc: "Pools & liquidity depth",    cmd: "liq --depth",       Icon: Droplets,   kind: "mint",   ph: "paste token contract address" },
+  { id: "wallet",   label: "Wallet Profiler",  desc: "Holdings & activity",        cmd: "profile --wallet",  Icon: Wallet2,    kind: "wallet", ph: "paste wallet address" },
+  { id: "staking",  label: "Staking Calc",     desc: "Estimate staking rewards",   cmd: "calc --stake",      Icon: Calculator, kind: "calc",   ph: "" },
+  { id: "il",       label: "Impermanent Loss", desc: "LP loss vs holding",         cmd: "calc --il",         Icon: AlertTriangle, kind: "calc", ph: "" },
 ];
 
 const fmt = (n: number | null | undefined, d = 2) =>
@@ -56,20 +56,28 @@ export default function Tools() {
 
   return (
     <div className="mx-auto max-w-[1080px] space-y-6 px-4 py-6">
-      <div className="flex items-center gap-2">
-        <Crosshair className="h-5 w-5 text-accent" />
-        <h1 className="font-display text-2xl font-black text-white">OrbitX Tools</h1>
-        <span className="pill bg-accent/15 text-accent text-[10px] font-bold ml-1">6 tools</span>
+      <div className="term-panel bg-term-grid px-4 sm:px-5 py-4">
+        <div className="term text-[11px]" style={{ color: "#66707E" }}>
+          <span style={{ color: "#00FFA3" }}>orbitx@dex</span><span>:~$</span> tools --list --all
+        </div>
+        <div className="flex items-end gap-3 mt-1.5">
+          <h1 className="font-display text-2xl font-black text-white flex items-center gap-2"><Crosshair className="h-5 w-5 text-accent" /> TOOLKIT</h1>
+          <span className="pill bg-accent/15 text-accent text-[10px] term font-bold mb-0.5">6 MODULES LOADED</span>
+        </div>
       </div>
 
       {/* Tool selector */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {TOOLS.map((t) => (
           <button key={t.id} onClick={() => pickTool(t.id)}
-            className={`flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition ${tool === t.id ? "border-accent/60 bg-accent/10" : "border-line bg-panel2/60 hover:border-accent/30"}`}>
-            <t.Icon className={`h-4 w-4 ${tool === t.id ? "text-accent" : "text-muted"}`} />
+            className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition ${tool === t.id ? "border-accent/60 bg-accent/10 shadow-glow-term" : "border-line bg-panel hover:border-accent/30"}`}>
+            <span className="flex items-center gap-1.5 w-full">
+              <t.Icon className={`h-4 w-4 ${tool === t.id ? "text-accent" : "text-muted"}`} />
+              {tool === t.id && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
+            </span>
             <span className="text-[12.5px] font-bold text-white">{t.label}</span>
-            <span className="text-[10.5px] text-muted leading-tight">{t.desc}</span>
+            <span className={`term text-[9.5px] leading-tight ${tool === t.id ? "text-accent/80" : "text-faint"}`}>$ {t.cmd}</span>
+            <span className="text-[10px] text-muted leading-tight">{t.desc}</span>
           </button>
         ))}
       </div>
@@ -77,13 +85,13 @@ export default function Tools() {
       {/* ── Tool body ── */}
       {tool === "sniper" ? <TokenSniper /> : tool === "staking" ? <StakingCalc /> : tool === "il" ? <ImpermanentLoss /> : (
         <>
-          <form onSubmit={run} className="flex items-center gap-2 rounded-2xl border border-line bg-bg/70 p-2 focus-within:border-accent/60">
-            <Search className="ml-2 h-4 w-4 shrink-0 text-muted" />
+          <form onSubmit={run} className="flex items-center gap-2 rounded-lg border border-line bg-panel p-2 focus-within:border-accent/60 focus-within:shadow-glow-term">
+            <span className="term text-xs pl-2 shrink-0 select-none"><span className="text-accent">$ {active.cmd}</span></span>
             <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={active.ph}
-              className="flex-1 bg-transparent px-1 py-2 text-sm text-white outline-none placeholder:text-muted/60" />
+              className="flex-1 bg-transparent px-1 py-2 term text-sm text-white outline-none placeholder:text-muted/50" style={{ caretColor: "#00FFA3" }} />
             <button type="submit" disabled={loading}
-              className="rounded-xl bg-accent px-5 py-2 text-sm font-bold text-black transition hover:brightness-110 disabled:opacity-60">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Run"}
+              className="rounded-md bg-accent px-5 py-2 term text-sm font-bold text-black transition hover:brightness-110 disabled:opacity-60">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "EXEC"}
             </button>
           </form>
 
@@ -98,14 +106,14 @@ export default function Tools() {
 
       {/* Related live feeds */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link to="/new" className="flex items-center gap-3 rounded-2xl border border-line bg-panel2/60 p-4 transition hover:border-accent/40">
+        <Link to="/new" className="card card-hover-lift flex items-center gap-3 p-4">
           <Rocket className="h-5 w-5 text-accent" />
-          <div><div className="text-sm font-bold text-white">Newly Listed</div><div className="text-[12px] text-muted">Fresh launches on OrbitX</div></div>
+          <div><div className="text-sm font-bold text-white">Newly Listed</div><div className="term text-[10px] text-faint">$ launches --fresh</div></div>
           <ArrowRight className="ml-auto h-4 w-4 text-muted" />
         </Link>
-        <Link to="/pulse" className="flex items-center gap-3 rounded-2xl border border-line bg-panel2/60 p-4 transition hover:border-accent/40">
+        <Link to="/pulse" className="card card-hover-lift flex items-center gap-3 p-4">
           <Flame className="h-5 w-5 text-accent" />
-          <div><div className="text-sm font-bold text-white">Market Pulse</div><div className="text-[12px] text-muted">Trending pairs & signals</div></div>
+          <div><div className="text-sm font-bold text-white">Market Pulse</div><div className="term text-[10px] text-faint">$ pulse --signals</div></div>
           <ArrowRight className="ml-auto h-4 w-4 text-muted" />
         </Link>
       </div>

@@ -49,7 +49,8 @@ function Node({ node, report }: { node: TokenLineageNode; report: ForensicOgRepo
   const isOg = node.relationship === "TRUE OG" || (report.og && report.og.id === t.id);
   return (
     <Link to={`/token/${t.id}`}
-      className={`group flex items-center gap-3 rounded-2xl border p-3.5 transition hover:border-accent/50 ${isOg ? "border-up/40 bg-up/[0.05]" : rel.danger ? "border-down/25 bg-down/[0.03]" : "border-line bg-panel2/60"}`}>
+      className={`group flex items-center gap-3 rounded-lg border p-3.5 transition hover:border-accent/50 ${isOg ? "border-up/40 bg-up/[0.05]" : rel.danger ? "border-down/25 bg-down/[0.03]" : "border-line bg-panel"}`}
+      style={{ borderLeftWidth: 3, borderLeftColor: isOg ? "#00FFA3" : rel.danger ? "#FF5C5C" : "#1C2320" }}>
       <ScoreRing score={Math.round(node.score ?? sc?.trueOgProbability ?? 0)} />
       {t.icon ? <img src={t.icon} alt="" className="h-9 w-9 rounded-full object-cover" onError={(e) => ((e.target as HTMLImageElement).style.visibility = "hidden")} />
                : <div className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-[11px] font-bold text-muted">{(t.symbol || "?").slice(0, 3)}</div>}
@@ -77,7 +78,7 @@ function Node({ node, report }: { node: TokenLineageNode; report: ForensicOgRepo
 }
 
 function Chip({ n, label, tone }: { n: number; label: string; tone: string }) {
-  return <div className="rounded-xl border border-line bg-panel2/60 px-3 py-2 text-center"><div className={`text-lg font-black ${tone}`}>{n}</div><div className="text-[10px] uppercase tracking-wider text-muted">{label}</div></div>;
+  return <div className="card px-3 py-2 text-center"><div className={`term text-lg font-black tabular ${tone}`}>{n}</div><div className="term-label mt-0.5">{label}</div></div>;
 }
 
 export default function OgScanner() {
@@ -119,23 +120,23 @@ export default function OgScanner() {
   return (
     <div className="mx-auto max-w-[980px] space-y-4 px-4 py-6">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-3xl border border-accent/20 bg-glass p-5">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-accent/20 blur-3xl" />
-        <div className="relative flex items-start gap-3">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-accent to-accent2 shadow-glow-blue"><Crosshair className="h-6 w-6 text-white" strokeWidth={2.2} /></div>
-          <div>
-            <div className="flex items-center gap-2"><h1 className="font-display text-xl font-black text-white">OrbitX Scanner</h1><span className="rounded-full border border-accent/40 bg-accent/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-accent">Forensic</span></div>
-            <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">Forensic origin attribution. Search the chain, find the real OG, expose every clone and flag the dangerous ones. Click any token to view its full page.</p>
-          </div>
+      <div className="term-panel bg-term-grid px-4 sm:px-5 py-4">
+        <div className="term text-[11px]" style={{ color: "#66707E" }}>
+          <span style={{ color: "#00FFA3" }}>orbitx@dex</span><span>:~$</span> ogscan --forensic --lineage --expose-clones
         </div>
+        <div className="flex flex-wrap items-end gap-3 mt-1.5">
+          <h1 className="font-display text-2xl font-black text-white flex items-center gap-2"><Crosshair className="h-5 w-5 text-accent" strokeWidth={2.2} /> OG_SCANNER</h1>
+          <span className="rounded-md border border-accent/40 bg-accent/15 px-2 py-0.5 text-[9px] term font-black uppercase tracking-widest text-accent mb-1">FORENSIC MODE</span>
+        </div>
+        <p className="term text-[11px] leading-relaxed text-muted mt-1 max-w-lg">trace token lineage → identify the TRUE OG → expose clones, fake revivals and exploit copies. click any node for the full token page.</p>
       </div>
 
       {/* Search */}
-      <div className="flex items-center gap-2 rounded-2xl border border-accent/25 bg-bg/70 p-2 backdrop-blur focus-within:border-accent/60">
-        <Search className="ml-2 h-5 w-5 shrink-0 text-accent" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="$BONK · WIF · paste a contract address"
-          className="min-w-0 flex-1 bg-transparent px-1 font-mono text-sm tracking-wide text-white outline-none placeholder:text-muted/50" />
-        {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent" />}
+      <div className="flex items-center gap-2 rounded-lg border border-line bg-panel p-2 focus-within:border-accent/60 focus-within:shadow-glow-term">
+        <span className="term text-xs pl-2 shrink-0 select-none text-accent">$ ogscan</span>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="$BONK · WIF · contract address…"
+          className="min-w-0 flex-1 bg-transparent px-1 font-mono text-sm tracking-wide text-white outline-none placeholder:text-muted/50" style={{ caretColor: "#00FFA3" }} />
+        {loading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent mr-2" /> : <Search className="h-4 w-4 shrink-0 text-faint mr-2" />}
       </div>
 
       {error && <div className="rounded-xl border border-down/30 bg-down/10 px-4 py-3 text-sm text-down">{error}</div>}
@@ -144,16 +145,17 @@ export default function OgScanner() {
         <>
           {/* OG verdict */}
           {report.og ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-up/30 bg-up/[0.06] p-4">
+            <div className="flex items-center gap-3 rounded-lg border border-up/30 bg-up/[0.06] p-4">
+              <span className="term text-[11px] font-black text-up shrink-0">[OG✓]</span>
               <Crown className="h-5 w-5 shrink-0 text-up" />
-              <div className="min-w-0 text-sm text-white">
-                Real OG: <span className="font-bold">{report.og.name || report.og.symbol}</span> <span className="text-muted">${report.og.symbol}</span>
-                <span className="ml-1 font-mono text-[11px] text-muted">{shortAddr(report.og.id, 4)}</span>
+              <div className="min-w-0 text-sm text-white term">
+                TRUE_OG = <span className="font-bold">{report.og.name || report.og.symbol}</span> <span className="text-muted">${report.og.symbol}</span>
+                <span className="ml-1 font-mono text-[11px] text-faint">{shortAddr(report.og.id, 4)}</span>
               </div>
-              <Link to={`/token/${report.og.id}`} className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-xl bg-up/15 px-3 py-1.5 text-[12px] font-bold text-up">View token <ExternalLink className="h-3.5 w-3.5" /></Link>
+              <Link to={`/token/${report.og.id}`} className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md bg-up/15 px-3 py-1.5 text-[12px] term font-bold text-up">OPEN <ExternalLink className="h-3.5 w-3.5" /></Link>
             </div>
           ) : (
-            <div className="rounded-2xl border border-gold/30 bg-gold/[0.06] p-4 text-sm text-gold">No clear OG found — all candidates look contested or low-trust. Treat with caution.</div>
+            <div className="rounded-lg border border-gold/30 bg-gold/[0.06] p-4 text-sm text-gold term"><span className="font-black">[WARN]</span> no clear OG found — all candidates contested or low-trust. proceed with caution.</div>
           )}
 
           {/* Summary */}
@@ -166,14 +168,22 @@ export default function OgScanner() {
 
           {/* Lineage */}
           <div className="space-y-2">
-            <div className="px-1 text-[11px] font-bold uppercase tracking-widest text-muted">Lineage · {nodes.length} tokens</div>
+            <div className="px-1 term-label term-prompt">LINEAGE_TREE · {nodes.length} NODES</div>
             {nodes.map((n) => <Node key={n.token.id} node={n} report={report} />)}
           </div>
         </>
       )}
 
       {q.trim().length < 2 && (
-        <div className="rounded-xl border border-line bg-panel2/40 p-8 text-center text-sm text-muted">Type a token name, symbol or contract address to run a forensic scan.</div>
+        <div className="term-panel p-8 text-sm text-muted term" style={{ minHeight: 260 }}>
+          <div className="text-center"><span className="text-accent">$</span> awaiting input — type a token name, symbol or contract address<span className="term-cursor" /></div>
+          <div className="mt-6 max-w-md mx-auto space-y-1.5 text-[11px]">
+            <div className="term-label mb-2 text-center">EXAMPLE_QUERIES</div>
+            {["$BONK — find the original BONK among clones", "WIF — trace dogwifhat lineage", "paste any CA — full forensic attribution"].map((ex) => (
+              <div key={ex} className="flex items-start gap-2"><span className="text-accent shrink-0">›</span><span className="text-faint">{ex}</span></div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

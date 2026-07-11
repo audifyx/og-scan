@@ -16,11 +16,28 @@ export default function KolProfile() {
   const [loading, setLoading] = useState(true);
   const [watched, setWatched] = useState(false);
 
+  const [act, setAct] = useState<KolActivity[] | null>(null);
+
   useEffect(() => {
-    setLoading(true);
+    setLoading(true); setAct(null);
     getKolProfile(address).then((d) => { setKol(d.kol || null); setWallets(d.wallets || []); setLoading(false); });
+    getKolActivity(address, 40).then((d) => setAct(d.activity || []));
     setWatched(isWatched(address));
   }, [address]);
+
+  // Trading stats computed from recent on-chain activity
+  const stats = (() => {
+    if (!act || !act.length) return null;
+    let buyN = 0, sellN = 0, buyUsd = 0, sellUsd = 0;
+    const tokens = new Set<string>();
+    for (const a of act) {
+      const usd = a.usdValue || 0;
+      if (a.side === "buy") { buyN++; buyUsd += usd; } else { sellN++; sellUsd += usd; }
+      if (a.mint) tokens.add(a.mint);
+    }
+    const totUsd = buyUsd + sellUsd;
+    return { buyN, sellN, buyUsd, sellUsd, net: buyUsd - sellUsd, tokens: tokens.size, avg: totUsd / act.length, last: act[0]?.time || null, n: act.length };
+  })();
 
   if (loading) return <div className="grid place-items-center py-24 text-muted"><Loader2 className="w-6 h-6 animate-spin" /></div>;
   if (!kol) return <div className="text-center py-24"><p className="text-muted">KOL not found.</p><Link to="/kol" className="text-accent text-sm mt-2 inline-block">← KOL Scanner</Link></div>;
@@ -28,7 +45,10 @@ export default function KolProfile() {
   const disputed = kol.status === "disputed";
   return (
     <div>
-      <Link to="/kol" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white mb-4"><ArrowLeft className="w-4 h-4" /> KOL Scanner</Link>
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <Link to="/kol" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white"><ArrowLeft className="w-4 h-4" /> <span className="term text-xs">cd ../kol</span></Link>
+        <span className="term text-[11px] text-faint hidden sm:inline"><span className="text-accent">orbitx@dex</span>:~$ kol --profile {short(address)}</span>
+      </div>
 
       <div className="card p-5 mb-4">
         <div className="flex flex-wrap items-start gap-4">
@@ -41,9 +61,10 @@ export default function KolProfile() {
             </div>
             {kol.twitter && <a href={kol.twitterUrl || "#"} target="_blank" rel="noreferrer" className="text-accent/80 hover:text-accent text-sm">{kol.twitter}</a>}
             <div className="mt-1"><Copyable text={kol.address} display={short(kol.address)} className="text-xs text-muted" /></div>
-            <div className="flex gap-4 mt-2 text-sm">
-              <div><span className="text-muted text-xs">PnL (recent) </span><span className={`font-semibold ${kol.pnl == null ? "text-muted" : kol.pnl >= 0 ? "text-up" : "text-down"}`}>{kol.pnl == null ? "—" : (kol.pnl >= 0 ? "+" : "") + fmtUsd(kol.pnl)}</span></div>
-              <div><span className="text-muted text-xs">Win rate </span><span className="font-semibold">{kol.winRate == null ? "—" : kol.winRate + "%"}</span></div>
+            <div className="flex gap-4 mt-2 text-sm term">
+              <div><span className="text-faint text-[10px] uppercase tracking-wider">PnL </span><span className={`font-bold ${kol.pnl == null ? "text-muted" : kol.pnl >= 0 ? "text-up" : "text-down"}`}>{kol.pnl == null ? "—" : (kol.pnl >= 0 ? "+" : "−") + fmtUsd(Math.abs(kol.pnl), { compact: true })}</span></div>
+              <div><span className="text-faint text-[10px] uppercase tracking-wider">Win </span><span className={`font-bold ${kol.winRate == null ? "" : kol.winRate >= 50 ? "text-up" : "text-down"}`}>{kol.winRate == null ? "—" : kol.winRate + "%"}</span></div>
+              {kol.followers != null && <div><span className="text-faint text-[10px] uppercase tracking-wider">Reach </span><span className="font-bold">{compact(kol.followers)}</span></div>}
             </div>
           </div>
           <div className="sm:ml-auto flex flex-wrap gap-2">
@@ -54,13 +75,25 @@ export default function KolProfile() {
         </div>
       </div>
 
+      {/* ── Trading stats deck (from recent on-chain swaps) ── */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-4">
+          <div className="card px-3.5 py-3"><div className="term-label mb-1">BUYS</div><div className="term text-lg font-bold text-up tabular">{stats.buyN}</div><div className="term text-[10px] text-faint mt-1">{fmtUsd(stats.buyUsd, { compact: true })}</div></div>
+          <div className="card px-3.5 py-3"><div className="term-label mb-1">SELLS</div><div className="term text-lg font-bold text-down tabular">{stats.sellN}</div><div className="term text-[10px] text-faint mt-1">{fmtUsd(stats.sellUsd, { compact: true })}</div></div>
+          <div className="card px-3.5 py-3"><div className="term-label mb-1">NET_FLOW</div><div className={`term text-lg font-bold tabular ${stats.net >= 0 ? "text-up" : "text-down"}`}>{(stats.net >= 0 ? "+" : "−") + fmtUsd(Math.abs(stats.net), { compact: true })}</div><div className="term text-[10px] text-faint mt-1">{stats.net >= 0 ? "accumulating" : "distributing"}</div></div>
+          <div className="card px-3.5 py-3"><div className="term-label mb-1">TOKENS</div><div className="term text-lg font-bold tabular">{stats.tokens}</div><div className="term text-[10px] text-faint mt-1">traded recently</div></div>
+          <div className="card px-3.5 py-3"><div className="term-label mb-1">AVG_TRADE</div><div className="term text-lg font-bold tabular">{fmtUsd(stats.avg, { compact: true })}</div><div className="term text-[10px] text-faint mt-1">per swap · {stats.n} swaps</div></div>
+          <div className="card px-3.5 py-3"><div className="term-label mb-1">LAST_ACTIVE</div><div className="term text-lg font-bold tabular">{stats.last ? timeAgo(stats.last) : "—"}</div><div className="term text-[10px] text-faint mt-1">on-chain swap</div></div>
+        </div>
+      )}
+
       <div className="flex gap-1 bg-panel border border-line rounded-lg p-1 mb-4 w-fit">
         {[["activity", "Activity"], ["holdings", "Holdings"], ["wallets", `Wallets (${wallets.length})`], ["about", "About"]].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id as any)} className={`btn ${tab === id ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>{label}</button>
+          <button key={id} onClick={() => setTab(id as any)} className={`btn term text-[11px] uppercase tracking-wider ${tab === id ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>{label}</button>
         ))}
       </div>
 
-      {tab === "activity" && <ActivityFeed address={kol.address} />}
+      {tab === "activity" && <ActivityFeed act={act} />}
       {tab === "holdings" && <Holdings address={kol.address} />}
       {tab === "wallets" && (
         <div className="card divide-y divide-line/60">
@@ -82,16 +115,14 @@ export default function KolProfile() {
   );
 }
 
-function ActivityFeed({ address }: { address: string }) {
-  const [act, setAct] = useState<KolActivity[] | null>(null);
-  useEffect(() => { let on = true; getKolActivity(address, 18).then((d) => { if (on) setAct(d.activity || []); }); return () => { on = false; }; }, [address]);
+function ActivityFeed({ act }: { act: KolActivity[] | null }) {
   if (!act) return <div className="grid place-items-center py-16 text-muted"><Loader2 className="w-5 h-5 animate-spin" /></div>;
-  if (!act.length) return <div className="card p-10 text-center text-muted text-sm">No recent swaps detected on-chain.</div>;
+  if (!act.length) return <div className="card p-10 text-center text-muted text-sm term">No recent swaps detected on-chain.</div>;
   return (
     <div className="card divide-y divide-line/60">
-      <div className="px-4 py-2.5 text-sm font-semibold flex items-center gap-2"><Activity className="w-4 h-4 text-accent" /> Recent on-chain activity</div>
+      <div className="px-4 py-2.5 flex items-center gap-2"><Activity className="w-4 h-4 text-accent" /><span className="term-label">SWAP_TAPE</span><span className="term text-[10px] text-faint ml-auto">{act.length} events</span></div>
       {act.map((a, i) => (
-        <div key={i} className="flex items-center gap-3 px-4 py-3 hover:bg-panel2/30">
+        <div key={i} className="flex items-center gap-3 px-4 py-3 hover:bg-panel2/30" style={{ borderLeft: `2px solid ${a.side === "buy" ? "#00FFA3" : "#FF5C5C"}` }}>
           <div className={`w-8 h-8 rounded-full grid place-items-center shrink-0 ${a.side === "buy" ? "bg-up/15" : "bg-down/15"}`}>{a.side === "buy" ? <ArrowUpRight className="w-4 h-4 text-up" /> : <ArrowDownRight className="w-4 h-4 text-down" />}</div>
           <TokenLogo src={a.image} sym={a.symbol || ""} size={26} />
           <div className="min-w-0 flex-1 text-sm">

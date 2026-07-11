@@ -15,7 +15,8 @@ export default function Leaderboard() {
       <div className="mb-4"><Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white"><ArrowLeft className="w-4 h-4" /> Discovery</Link></div>
       <div className="mb-6 text-center">
         <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl border border-accent/20 bg-accent/10"><Trophy className="h-7 w-7 text-accent" /></div>
-        <h1 className="text-2xl font-black tracking-tight">Trader Leaderboard</h1>
+        <div className="term text-[11px]" style={{ color: "#66707E" }}><span style={{ color: "#00FFA3" }}>orbitx@dex</span>:~$ leaderboard --traders --rank pnl</div>
+        <h1 className="text-2xl font-black tracking-tight">TRADER_LEADERBOARD</h1>
         <p className="mt-2 text-sm text-muted">Realized PnL and win rate from recent on-chain swaps, ranked across tracked KOL / smart-money wallets.</p>
       </div>
 
