@@ -4,37 +4,35 @@ export default {
   theme: {
     extend: {
       colors: {
-        // ── OrbitX DEX · Terminal / deep-black theme ──
+        // ── OrbitX DEX v2 · Phosphor terminal: pure black / white / green ──
         bg:      "#000000",  // pure black
-        panel:   "#04070E",  // near-black surface
-        panel2:  "#080D1A",  // raised surface
-        line:    "#12203B",  // hairline borders
-        accent:  "#2F80FF",  // electric blue (primary)
-        accent2: "#9945FF",  // solana purple (secondary)
+        panel:   "#050505",  // flat near-black surface
+        panel2:  "#0B0C0C",  // raised surface
+        line:    "#1C2320",  // hairline borders (green-tinted grey)
+        accent:  "#00FFA3",  // phosphor green (primary)
+        accent2: "#00D1FF",  // terminal cyan (secondary)
         gold:    "#FFC53D",  // premium gold
-        term:    "#28F0C8",  // terminal cyan-green (data / prompt)
-        up:      "#14F195",  // gains
-        down:    "#FF4D6D",  // loss
-        muted:   "#8FA3C4",  // muted blue-grey text
-        faint:   "#5A6B88",  // very muted labels
+        term:    "#00FFA3",  // alias — terminal green
+        up:      "#00FFA3",  // gains
+        down:    "#FF5C5C",  // loss
+        muted:   "#A8B3C2",  // muted grey text (readable on black)
+        faint:   "#66707E",  // very muted labels
       },
       fontFamily: {
-        sans:    ["Plus Jakarta Sans", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        display: ["Space Grotesk", "Sora", "Plus Jakarta Sans", "sans-serif"],
+        // Mono-first UI — the whole app reads like a terminal.
+        sans:    ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        display: ["Space Grotesk", "JetBrains Mono", "sans-serif"],
         mono:    ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
-      letterSpacing: {
-        term: "0.02em",
-      },
       backgroundImage: {
-        "glass":        "linear-gradient(145deg, rgba(47,128,255,0.08), rgba(153,69,255,0.05))",
-        "glass-accent": "linear-gradient(145deg, rgba(47,128,255,0.14), rgba(255,197,61,0.06))",
-        "term-grid":    "linear-gradient(rgba(47,128,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(47,128,255,0.05) 1px, transparent 1px)",
+        "glass":        "linear-gradient(145deg, rgba(0,255,163,0.06), rgba(0,209,255,0.04))",
+        "glass-accent": "linear-gradient(145deg, rgba(0,255,163,0.10), rgba(255,197,61,0.05))",
+        "term-grid":    "linear-gradient(rgba(0,255,163,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,163,0.04) 1px, transparent 1px)",
       },
       boxShadow: {
-        "glow-blue": "0 0 40px -8px rgba(47,128,255,0.55)",
+        "glow-blue": "0 0 34px -8px rgba(0,255,163,0.5)",   /* legacy name, now green */
         "glow-gold": "0 0 40px -8px rgba(255,197,61,0.45)",
-        "glow-term": "0 0 40px -10px rgba(40,240,200,0.5)",
+        "glow-term": "0 0 34px -8px rgba(0,255,163,0.5)",
       },
     },
   },

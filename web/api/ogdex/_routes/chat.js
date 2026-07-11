@@ -91,9 +91,14 @@ export default async function handler(req, res) {
       context = buildContext(d, f && f.ok ? f : null, a && a.ok ? a : null);
     }
 
-    const r = await callFn("ogdex-chat", {
-      mint, symbol: context?.identity?.symbol || null, name: context?.identity?.name || null, messages, context,
-    });
+    // Timebox the edge function call: if it exceeds 26s we return clean JSON
+    // instead of letting the platform kill the request with an opaque 504.
+    const r = await Promise.race([
+      callFn("ogdex-chat", {
+        mint, symbol: context?.identity?.symbol || null, name: context?.identity?.name || null, messages, context,
+      }),
+      new Promise((resolve) => setTimeout(() => resolve({ ok: false, error: "AI timed out — please try again" }), 26000)),
+    ]);
     if (!r || r.ok === false) return send(res, 200, { ok: false, error: r?.error || "AI unavailable", answer: null });
     return send(res, 200, { ok: true, answer: r.answer, sources: r.sources || [], provider: r.provider || null });
   } catch (e) {

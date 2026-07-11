@@ -69,7 +69,7 @@ async function profile(res, address) {
 
 async function activity(res, sp) {
   const address = (sp.get("activity") || "").trim();
-  const limit = Math.min(Number(sp.get("limit")) || 12, 25);
+  const limit = Math.min(Number(sp.get("limit")) || 20, 40);
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) return send(res, 400, { ok: false, error: "wallet required" });
   cache(res, 15, 45);
   try {
@@ -116,7 +116,14 @@ async function feed(res, sp) {
   const limit = Math.min(Number(sp.get("limit")) || 60, 120);
   const side = sp.get("side"); const kolId = sp.get("kolId"); const token = sp.get("token");
   cache(res, 5, 20);
-  try { await ingestBatch(sp); } catch {}
+  // Ingest new swaps with a hard time budget so the feed always responds fast.
+  // Ingestion is parallelized (see ingestBatch); typical completion is 1-3s.
+  try {
+    await Promise.race([
+      ingestBatch(sp),
+      new Promise((r) => setTimeout(r, Number(process.env.KOL_INGEST_BUDGET_MS) || 6500)),
+    ]);
+  } catch {}
   try {
     let q = `select=*&order=tx_timestamp.desc&limit=${limit}`;
     if (side) q += `&tx_type=eq.${side}`;
@@ -124,17 +131,23 @@ async function feed(res, sp) {
     if (token) q += `&or=(token_in.eq.${token},token_out.eq.${token})`;
     const rows = await dbSelect("ogdex_kol_feed", q);
 
-    // Collect mints that are missing symbol/name and enrich them
+    // Enrich ONLY mints that are genuinely missing symbol/name in the DB
+    // (previously every mint was re-fetched from GeckoTerminal on every load).
     const missingMints = [...new Set(
       rows
+        .filter(r => !(r.tx_type === "buy" ? r.symbol_out : r.symbol_in))
         .map(r => r.tx_type === "buy" ? r.token_out : r.token_in)
-        .filter(m => m && m !== SOL)
+        .filter(m => m && m !== SOL && !MINT_META_CACHE[m])
     )];
-    const tokenMeta = missingMints.length ? await enrichMints(missingMints) : {};
+    const fresh = missingMints.length ? await enrichMints(missingMints) : {};
+    Object.assign(MINT_META_CACHE, fresh);
 
-    return send(res, 200, { ok: true, count: rows.length, feed: rows.map(r => fmtFeed(r, tokenMeta)) });
+    return send(res, 200, { ok: true, count: rows.length, feed: rows.map(r => fmtFeed(r, MINT_META_CACHE)) });
   } catch (e) { return send(res, 200, { ok: false, error: String(e?.message || e), feed: [] }); }
 }
+
+// Warm-instance cache of mint -> {name,symbol,icon} so repeat feed loads skip GeckoTerminal.
+const MINT_META_CACHE = {};
 function fmtFeed(r, tokenMeta = {}) {
   const buy = r.tx_type === "buy";
   const mint   = buy ? r.token_out : r.token_in;
@@ -155,40 +168,57 @@ function fmtFeed(r, tokenMeta = {}) {
     time: r.tx_timestamp ? new Date(r.tx_timestamp).getTime() : null, txHash: r.tx_hash };
 }
 async function ingestBatch(sp) {
-  const BATCH = 8;
+  // Wallets scanned per feed poll (parallel). Rotates through the directory so
+  // every tracked wallet is swept in a handful of polls instead of dozens.
+  const BATCH = Math.min(Number(sp.get("batch")) || 20, 40);
+  const SIGS_PER_WALLET = 10;   // look-back per wallet (was 6)
+  const TX_PER_WALLET = 6;      // new txs parsed per wallet per pass (was 3)
   const offset = Number(sp.get("offset")) || Math.floor(Date.now() / 60000) % 10;
   const wallets = await dbSelect("ogdex_kol_directory", "select=address,kol_id,kol_wallet_id,is_active&is_active=is.true&kol_wallet_id=not.is.null&limit=500");
   if (!wallets.length) return;
   const start = (offset * BATCH) % wallets.length;
-  const slice = wallets.slice(start, start + BATCH);
-  const swapsAll = [];
-  for (const w of slice) {
-    try {
-      const sigs = (await rpc("getSignaturesForAddress", [w.address, { limit: 6 }])) || [];
-      const hashes = sigs.map((s) => s.signature); if (!hashes.length) continue;
-      const existing = await dbSelect("kol_transactions", `select=tx_hash&tx_hash=in.(${hashes.join(",")})`).catch(() => []);
-      const seen = new Set(existing.map((e) => e.tx_hash));
-      const fresh = hashes.filter((h) => !seen.has(h)).slice(0, 3);
-      for (const h of fresh) {
-        const tx = await rpc("getTransaction", [h, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]).catch(() => null);
-        const sw = parseSwap(tx, w.address);
-        if (sw) swapsAll.push({ ...sw, kol_id: w.kol_id, kol_wallet_id: w.kol_wallet_id });
-      }
-    } catch {}
-  }
+  let slice = wallets.slice(start, start + BATCH);
+  if (slice.length < BATCH) slice = slice.concat(wallets.slice(0, BATCH - slice.length));
+
+  // 1) Fetch signatures for all wallets in parallel.
+  const sigsAll = await Promise.all(slice.map((w) =>
+    rpc("getSignaturesForAddress", [w.address, { limit: SIGS_PER_WALLET }]).then((r) => r || []).catch(() => [])
+  ));
+
+  // 2) One dedupe query for ALL candidate hashes (was one query per wallet).
+  const allHashes = sigsAll.flatMap((sigs) => sigs.map((x) => x.signature)).filter(Boolean);
+  if (!allHashes.length) return;
+  const existing = await dbSelect("kol_transactions", `select=tx_hash&tx_hash=in.(${allHashes.join(",")})`).catch(() => []);
+  const seen = new Set(existing.map((e) => e.tx_hash));
+
+  // 3) Fetch + parse fresh transactions for all wallets in parallel.
+  const jobs = [];
+  slice.forEach((w, i) => {
+    const fresh = (sigsAll[i] || []).map((x) => x.signature).filter((h) => h && !seen.has(h)).slice(0, TX_PER_WALLET);
+    for (const h of fresh) {
+      jobs.push(
+        rpc("getTransaction", [h, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }])
+          .then((tx) => { const sw = parseSwap(tx, w.address); return sw ? { ...sw, kol_id: w.kol_id, kol_wallet_id: w.kol_wallet_id } : null; })
+          .catch(() => null)
+      );
+    }
+  });
+  const swapsAll = (await Promise.all(jobs)).filter(Boolean);
   if (!swapsAll.length) return;
-  const meta = await enrichTokens(swapsAll.map((s) => s.mint));
-  for (const s of swapsAll) {
+
+  // 4) Enrich + insert all rows in ONE batched request (was one insert per swap).
+  const meta = await enrichTokens(swapsAll.map((s) => s.mint)).catch(() => ({}));
+  const rows = swapsAll.map((s) => {
     const m = meta[s.mint] || {}; const buy = s.side === "buy";
-    try {
-      await dbInsert("kol_transactions", {
-        kol_id: s.kol_id, kol_wallet_id: s.kol_wallet_id, tx_hash: s.txHash, tx_type: s.side,
-        token_in: buy ? SOL : s.mint, token_out: buy ? s.mint : SOL, symbol_in: buy ? "SOL" : (m.symbol || null), symbol_out: buy ? (m.symbol || null) : "SOL",
-        amount_in: buy ? s.solAmount : s.tokenAmount, amount_out: buy ? s.tokenAmount : s.solAmount, price_usd: m.price ?? null,
-        tx_status: "success", blockchain: "solana", tx_timestamp: new Date(s.time || Date.now()).toISOString(),
-      });
-    } catch {}
-  }
+    return {
+      kol_id: s.kol_id, kol_wallet_id: s.kol_wallet_id, tx_hash: s.txHash, tx_type: s.side,
+      token_in: buy ? SOL : s.mint, token_out: buy ? s.mint : SOL, symbol_in: buy ? "SOL" : (m.symbol || null), symbol_out: buy ? (m.symbol || null) : "SOL",
+      amount_in: buy ? s.solAmount : s.tokenAmount, amount_out: buy ? s.tokenAmount : s.solAmount, price_usd: m.price ?? null,
+      tx_status: "success", blockchain: "solana", tx_timestamp: new Date(s.time || Date.now()).toISOString(),
+    };
+  });
+  try { await dbInsert("kol_transactions", rows); }
+  catch { for (const row of rows) { try { await dbInsert("kol_transactions", row); } catch {} } }
 }
 
 async function pnlRefresh(res, sp) {

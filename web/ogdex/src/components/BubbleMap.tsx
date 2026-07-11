@@ -45,11 +45,11 @@ interface Link {
 
 // ── Palette ───────────────────────────────────────────────────────────
 const C = {
-  insider:   "#ff4d6d",
+  insider:   "#FF5C5C",
   bundle:    "#ff9f1c",
   sniper:    "#ffd60a",
   clean:     "#2dd4bf",
-  funder:    "#ff4d6d",
+  funder:    "#FF5C5C",
   bundleHub: "#ff9f1c",
   accent:    "#22d3ee",
 } as const;

@@ -90,16 +90,20 @@ export default function CoinChat({ d, forensics, ath }: { d: TokenDetailData; fo
     if (!q || loading) return;
     const next = [...msgs, { role: "user" as const, content: q }];
     setMsgs(next); setInput(""); setLoading(true); setSources([]);
+    const attempt = () => askCoin(d.mint, next, buildContext(d, forensics, ath));
     try {
-      const r = await askCoin(d.mint, next, buildContext(d, forensics, ath));
-      if (r.ok && r.answer) {
+      let r = await attempt().catch(() => null);
+      // One silent retry — transient network/edge blips shouldn't surface as errors.
+      if (!r || !(r.ok && r.answer)) {
+        await new Promise((ok) => setTimeout(ok, 1200));
+        r = await attempt().catch(() => null);
+      }
+      if (r && r.ok && r.answer) {
         setMsgs([...next, { role: "assistant", content: r.answer }]);
         setSources(r.sources || []); setProvider(r.provider || null);
       } else {
-        setMsgs([...next, { role: "assistant", content: r.error || "I couldn't reach my brain just now — try again in a moment." }]);
+        setMsgs([...next, { role: "assistant", content: (r && r.error) || "I'm having trouble reaching my AI backend right now. Give it a few seconds and ask again — your question isn't lost." }]);
       }
-    } catch {
-      setMsgs([...next, { role: "assistant", content: "Network hiccup — try again." }]);
     } finally { setLoading(false); }
   };
 

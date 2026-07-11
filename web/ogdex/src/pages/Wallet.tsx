@@ -136,7 +136,7 @@ export default function Wallet() {
 
       {/* ── Allocation ── */}
       {d?.ok && total > 0 && rows.length > 0 && (() => {
-        const COLORS = ["#2F80FF", "#9945FF", "#14E0C8", "#FFC53D", "#FF6BD0", "#19E3D0", "#FF8A3D", "#7B5BFF"];
+        const COLORS = ["#00FFA3", "#00D1FF", "#14E0C8", "#FFC53D", "#FF6BD0", "#19E3D0", "#FF8A3D", "#7B5BFF"];
         const top = rows.slice(0, 8);
         const otherVal = rows.slice(8).reduce((a, h) => a + (h.usdValue || 0), 0);
         return (

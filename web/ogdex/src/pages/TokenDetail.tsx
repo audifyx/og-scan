@@ -244,7 +244,7 @@ export default function TokenDetail() {
             <span className="text-muted text-sm">{name}</span>
             {verified && <Verified size={14} />}
             {d.verdict && <span className="pill bg-accent/15 text-accent text-[10px] font-bold">{d.verdict}</span>}
-            {meta.isPumpFun && <span className="pill text-[10px]" style={{ background: "rgba(153,69,255,0.15)", color: "#c084fc" }}>pump.fun</span>}
+            {meta.isPumpFun && <span className="pill text-[10px]" style={{ background: "rgba(0,209,255,0.15)", color: "#c084fc" }}>pump.fun</span>}
             {(t.tags || []).slice(0, 3).map((tg: string) => (
               <span key={tg} className="pill bg-panel2 text-muted text-[10px] capitalize">{tg}</span>
             ))}
@@ -282,7 +282,7 @@ export default function TokenDetail() {
           <div className="flex flex-wrap gap-2">
             <a href="#trade"
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white hover:opacity-90 transition-opacity shadow-glow-blue"
-              style={{ background: "linear-gradient(135deg, #2F80FF, #9945FF)" }}>
+              style={{ background: "linear-gradient(135deg, #00FFA3, #00D1FF)" }}>
               <Zap className="w-3.5 h-3.5" /> Buy / Sell
             </a>
             <a href={`/api/ogdex/report?mint=${mint}`} target="_blank" rel="noreferrer"
@@ -339,9 +339,9 @@ export default function TokenDetail() {
                   active ? "text-accent" : "text-muted hover:text-white hover:bg-panel2/60"
                 }`}
                 style={active ? {
-                  background: "linear-gradient(135deg, rgba(47,128,255,0.18), rgba(153,69,255,0.12))",
-                  border: "1px solid rgba(47,128,255,0.35)",
-                  boxShadow: "0 0 14px rgba(47,128,255,0.14)",
+                  background: "linear-gradient(135deg, rgba(0,255,163,0.18), rgba(0,209,255,0.12))",
+                  border: "1px solid rgba(0,255,163,0.35)",
+                  boxShadow: "0 0 14px rgba(0,255,163,0.14)",
                 } : { border: "1px solid transparent" }}>
                 {label}
                 {active && <span className="absolute -bottom-px left-1/4 right-1/4 h-0.5 rounded-full bg-accent opacity-80" />}
