@@ -37,7 +37,7 @@ function passwordStrength(pw: string): { score: number; label: string; color: st
   return { score: 4, label: "Strong", color: "#34d399" };
 }
 
-type AuthMode = "signin" | "signup" | "reset";
+type AuthMode = "signin" | "signup" | "reset" | "update";
 
 const modeCopy = {
   signin: {
@@ -58,12 +58,18 @@ const modeCopy = {
     body: "Enter your email and OrbitX will send the reset flow.",
     cta: "Send reset link",
   },
+  update: {
+    eyebrow: "Almost done",
+    title: "Set a new password",
+    body: "You arrived from a secure reset link. Choose a new password for your account.",
+    cta: "Save new password",
+  },
 } satisfies Record<AuthMode, { eyebrow: string; title: string; body: string; cta: string }>;
 
 const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading, signIn, signUp, resetPassword } = useAuth();
+  const { user, loading, signIn, signUp, resetPassword, updatePassword } = useAuth();
 
   const [mode, setMode] = useState<AuthMode>((searchParams.get("mode") as AuthMode) || "signin");
   const [email, setEmail] = useState("");
@@ -84,20 +90,34 @@ const Auth = () => {
     if (ref) localStorage.setItem("og_ref_code", ref);
   }, [searchParams]);
 
+  // Recovery-link landing: Supabase may deliver the token in the URL hash
+  // (#access_token=...&type=recovery) or fire PASSWORD_RECOVERY (flagged in
+  // sessionStorage by useAuth). Either way, show the set-new-password form.
+  useEffect(() => {
+    let recovery = false;
+    try {
+      if (window.location.hash.includes("type=recovery")) recovery = true;
+      if (sessionStorage.getItem("og_password_recovery") === "1") recovery = true;
+    } catch { /* noop */ }
+    if (recovery) setMode("update");
+  }, []);
+
   useEffect(() => {
     const urlMode = searchParams.get("mode") as AuthMode | null;
-    if (urlMode === "signin" || urlMode === "signup" || urlMode === "reset") setMode(urlMode);
+    if (urlMode === "signin" || urlMode === "signup" || urlMode === "reset" || urlMode === "update") setMode(urlMode);
   }, [searchParams]);
 
   useEffect(() => {
-    if (!loading && user && mode !== "signup") {
+    if (!loading && user && mode !== "signup" && mode !== "update") {
       navigate(searchParams.get("next") || "/app");
     }
   }, [user, loading, navigate, mode, searchParams]);
 
   const validate = () => {
     const newErrors: typeof errors = {};
-    try { emailSchema.parse(email); } catch (e) { if (e instanceof z.ZodError) newErrors.email = e.errors[0].message; }
+    if (mode !== "update") {
+      try { emailSchema.parse(email); } catch (e) { if (e instanceof z.ZodError) newErrors.email = e.errors[0].message; }
+    }
     if (mode === "signup") {
       const clean = username.replace(/^@/, "");
       try { usernameSchema.parse(clean); } catch (e) { if (e instanceof z.ZodError) newErrors.username = e.errors[0].message; }
@@ -108,7 +128,7 @@ const Auth = () => {
     if (mode !== "reset") {
       try { passwordSchema.parse(password); } catch (e) { if (e instanceof z.ZodError) newErrors.password = e.errors[0].message; }
     }
-    if (mode === "signup" && password !== confirmPassword) newErrors.confirm = "Passwords do not match";
+    if ((mode === "signup" || mode === "update") && password !== confirmPassword) newErrors.confirm = "Passwords do not match";
     if (mode === "signup" && humanCode.trim().toUpperCase() !== "ORBITX") newErrors.humanCode = "Type ORBITX exactly to verify you are human";
     if (mode === "signup" && !captchaToken) newErrors.captcha = "Please complete the CAPTCHA verification";
     setErrors(newErrors);
@@ -155,6 +175,13 @@ const Auth = () => {
         } else {
           toast.success(`Welcome @${clean}. Check your email to verify your account.`);
           navigate("/setup");
+        }
+      } else if (mode === "update") {
+        const { error } = await updatePassword(password);
+        if (error) toast.error(error.message);
+        else {
+          toast.success("Password updated — you're in");
+          navigate("/app");
         }
       } else {
         const { error } = await resetPassword(email);
@@ -285,6 +312,7 @@ const Auth = () => {
                     </div>
                   )}
 
+                  {mode !== "update" && (
                   <div className="space-y-1.5">
                     <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Email</Label>
                     <div className="relative">
@@ -293,6 +321,7 @@ const Auth = () => {
                     </div>
                     {errors.email && <p className="text-xs font-semibold text-og-blood">{errors.email}</p>}
                   </div>
+                  )}
 
                   {mode !== "reset" && (
                     <div className="space-y-1.5">
@@ -319,6 +348,17 @@ const Auth = () => {
                           </div>
                         );
                       })()}
+                    </div>
+                  )}
+
+                  {mode === "update" && (
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-black uppercase tracking-[0.16em] text-white/42">Confirm new password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+                        <Input type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="min-h-[48px] rounded-2xl border-white/10 bg-white/[0.07] pl-11 text-base text-white focus:border-[#2F80FF]" placeholder="Confirm new password" />
+                      </div>
+                      {errors.confirm && <p className="text-xs font-semibold text-og-blood">{errors.confirm}</p>}
                     </div>
                   )}
 
@@ -375,6 +415,11 @@ const Auth = () => {
                   {mode === "reset" && (
                     <button type="button" onClick={() => setMode("signin")} className="text-xs font-bold text-[#2F80FF] transition hover:text-white">
                       Back to sign in
+                    </button>
+                  )}
+                  {mode === "update" && (
+                    <button type="button" onClick={() => { try { sessionStorage.removeItem("og_password_recovery"); } catch { /* noop */ } setMode("signin"); }} className="text-xs font-bold text-white/45 transition hover:text-white">
+                      Cancel — back to sign in
                     </button>
                   )}
                 </div>

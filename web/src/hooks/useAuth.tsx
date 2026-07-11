@@ -37,6 +37,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ error: Error | null }>;
   changeEmail: (newEmail: string, currentPassword: string) => Promise<{ error: Error | null }>;
@@ -93,7 +94,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }, 5000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, sess) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, sess) => {
+      if (event === "PASSWORD_RECOVERY") {
+        try { sessionStorage.setItem("og_password_recovery", "1"); } catch { /* noop */ }
+      }
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
@@ -234,8 +238,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth`,
+      redirectTo: `${window.location.origin}/auth?mode=update`,
     });
+    return { error: error as Error | null };
+  };
+
+  // Set a new password from a recovery-link session (no current password needed).
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (!error) { try { sessionStorage.removeItem("og_password_recovery"); } catch { /* noop */ } }
     return { error: error as Error | null };
   };
 
@@ -393,7 +404,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signUp, signIn, signOut, resetPassword, updateProfile, changePassword, changeEmail, sendEmailVerification, deleteAccount }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, signUp, signIn, signOut, resetPassword, updatePassword, updateProfile, changePassword, changeEmail, sendEmailVerification, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );
