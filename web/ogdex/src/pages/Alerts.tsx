@@ -117,7 +117,8 @@ export default function Alerts() {
         <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl border border-accent/20 bg-accent/10">
           <Bell className="h-7 w-7 text-accent" />
         </div>
-        <h1 className="text-2xl font-black tracking-tight">Smart Alerts</h1>
+        <div className="term text-[11px]" style={{ color: "#66707E" }}><span style={{ color: "#00FFA3" }}>orbitx@dex</span>:~$ alerts --watch --notify</div>
+        <h1 className="text-2xl font-black tracking-tight">SMART_ALERTS</h1>
         <p className="mt-2 text-sm text-muted">
           Price moves, whale trades, dev sells, migrations — get pinged the moment it happens.
           Delivered to Telegram or any webhook. Tied to your wallet, synced across devices.

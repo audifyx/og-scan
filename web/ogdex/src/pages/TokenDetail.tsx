@@ -61,12 +61,13 @@ function SocialPill({ href, icon, label, accent }: { href: string; icon: React.R
   );
 }
 
-function StatPill({ label, value, sub, accent }: { label: string; value?: string; sub?: string; accent?: boolean }) {
+function StatPill({ label, value, sub, accent, tone }: { label: string; value?: string; sub?: string; accent?: boolean; tone?: "up" | "down" }) {
+  const vc = tone === "up" ? "text-up" : tone === "down" ? "text-down" : accent ? "text-accent" : "text-white";
   return (
-    <div className={`flex-shrink-0 flex flex-col justify-center px-3.5 py-2 rounded-xl border min-w-[80px] ${accent ? "bg-accent/10 border-accent/30" : "bg-panel border-line"}`}>
-      <div className="text-[9px] uppercase tracking-widest text-muted mb-0.5">{label}</div>
-      <div className={`text-sm font-bold ${accent ? "text-accent" : "text-white"}`}>{value ?? "—"}</div>
-      {sub && <div className="text-[9px] text-muted mt-0.5">{sub}</div>}
+    <div className={`flex-shrink-0 flex flex-col justify-center px-3.5 py-2 rounded-lg border min-w-[84px] ${accent ? "bg-accent/10 border-accent/30" : "bg-panel border-line"}`}>
+      <div className="term text-[8.5px] uppercase tracking-[0.18em] text-faint mb-0.5">{label}</div>
+      <div className={`term text-sm font-bold tabular ${vc}`}>{value ?? "—"}</div>
+      {sub && <div className="term text-[9px] text-faint mt-0.5">{sub}</div>}
     </div>
   );
 }
@@ -75,8 +76,8 @@ function ChangePill({ label, v }: { label: string; v?: number | null }) {
   if (v == null) return null;
   const pos = v >= 0;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold ${pos ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>
-      {label} {pos ? "+" : ""}{v.toFixed(2)}%
+    <span className={`term inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold tabular ${pos ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>
+      {label} {pos ? "▲" : "▼"}{Math.abs(v).toFixed(2)}%
     </span>
   );
 }
@@ -172,10 +173,16 @@ export default function TokenDetail() {
   return (
     <div className="max-w-5xl mx-auto space-y-3">
 
-      {/* Back link */}
-      <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Screener
-      </Link>
+      {/* Terminal breadcrumb */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white transition-colors">
+          <ArrowLeft className="w-4 h-4" /> <span className="term text-xs">cd ..</span>
+        </Link>
+        <span className="term text-[11px] text-faint hidden sm:inline">
+          <span className="text-accent">orbitx@dex</span>:~$ token --inspect <span className="text-white/70">{short(mint)}</span>
+        </span>
+        <span className="term text-[10px] text-faint ml-auto hidden md:inline">chain: solana · live feed<span className="term-cursor" /></span>
+      </div>
 
       {/* ══════════════════════════════════════
           HEADER CARD
@@ -308,6 +315,19 @@ export default function TokenDetail() {
           <StatPill label="Token Age"   value={meta.ageDays != null ? meta.ageDays + "d" : "—"} />
           <StatPill label="Whales"      value={String(whales)} sub={whales === 0 ? "healthy" : "concentrated"} />
           <StatPill label="Risk"        value={safety?.riskScore != null ? String(safety.riskScore) : "—"} />
+          <StatPill label="Buys_24h"    tone="up"   value={t.numBuys != null ? compact(t.numBuys) : "—"}  sub={t.buyVolume != null ? "$" + compact(t.buyVolume) : undefined} />
+          <StatPill label="Sells_24h"   tone="down" value={t.numSells != null ? compact(t.numSells) : "—"} sub={t.sellVolume != null ? "$" + compact(t.sellVolume) : undefined} />
+          <StatPill label="Traders"     value={t.numTraders != null ? compact(t.numTraders) : "—"} />
+          <StatPill label="Net_Buyers"  tone={(t.netBuyers ?? 0) >= 0 ? "up" : "down"} value={t.netBuyers != null ? (t.netBuyers >= 0 ? "+" : "") + compact(t.netBuyers) : "—"} />
+          {(t.buyVolume != null && t.sellVolume != null && (t.buyVolume + t.sellVolume) > 0) && (
+            <div className="flex-shrink-0 flex flex-col justify-center px-3.5 py-2 rounded-lg border bg-panel border-line min-w-[130px]">
+              <div className="term text-[8.5px] uppercase tracking-[0.18em] text-faint mb-1.5">Buy_Pressure</div>
+              <div className="h-1.5 rounded-full overflow-hidden flex" style={{ background: "rgba(255,92,92,0.35)" }}>
+                <div className="h-full" style={{ width: `${(t.buyVolume / (t.buyVolume + t.sellVolume)) * 100}%`, background: "linear-gradient(90deg,#00C776,#00FFA3)" }} />
+              </div>
+              <div className="term text-[9px] mt-1 flex justify-between"><span className="text-up">{Math.round((t.buyVolume / (t.buyVolume + t.sellVolume)) * 100)}%</span><span className="text-down">{Math.round((t.sellVolume / (t.buyVolume + t.sellVolume)) * 100)}%</span></div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -335,7 +355,7 @@ export default function TokenDetail() {
             const active = tab === id;
             return (
               <button key={id} onClick={() => setTab(id as any)}
-                className={`relative flex-shrink-0 whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                className={`term relative flex-shrink-0 whitespace-nowrap px-3.5 py-2 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all duration-200 ${
                   active ? "text-accent" : "text-muted hover:text-white hover:bg-panel2/60"
                 }`}
                 style={active ? {

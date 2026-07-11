@@ -23,7 +23,8 @@ export default function WalletIndex() {
           <Wallet className="w-5 h-5 text-accent" />
         </div>
         <div>
-          <h1 className="font-bold text-lg">Portfolio</h1>
+          <div className="term text-[11px]" style={{ color: "#66707E" }}><span style={{ color: "#00FFA3" }}>orbitx@dex</span>:~$ portfolio --track</div>
+          <h1 className="font-bold text-lg">PORTFOLIO</h1>
           <p className="text-xs text-muted">Look up any Solana wallet</p>
         </div>
       </div>
