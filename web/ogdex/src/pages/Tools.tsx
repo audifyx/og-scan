@@ -391,7 +391,7 @@ function ImpermanentLoss() {
             <span>Price change</span>
             <span className={priceChange >= 0 ? "text-up" : "text-down"}>{priceChange >= 0 ? "+" : ""}{priceChange}%</span>
           </div>
-          <input type="range" min={-90} max={500} step={5} value={priceChange} onChange={(e) => setPriceChange(Number(e.target.value))} className="w-full accent-[#2F80FF]" />
+          <input type="range" min={-90} max={500} step={5} value={priceChange} onChange={(e) => setPriceChange(Number(e.target.value))} className="w-full accent-[#00FFA3]" />
           <div className="flex justify-between text-[10px] text-muted/70"><span>-90%</span><span>0%</span><span>+500%</span></div>
         </div>
       </div>

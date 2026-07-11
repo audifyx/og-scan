@@ -214,7 +214,7 @@ export default function Screener() {
                     ${active
                       ? "text-white border-accent/60 shadow-glow-blue"
                       : "text-muted border-line hover:text-white hover:border-accent/30 bg-panel"}`}
-                  style={active ? { background: "linear-gradient(135deg, rgba(47,128,255,0.22), rgba(153,69,255,0.16))" } : undefined}
+                  style={active ? { background: "linear-gradient(135deg, rgba(0,255,163,0.22), rgba(0,209,255,0.16))" } : undefined}
                 >
                   <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? "text-accent" : ""}`} />
                   {cat.label}
@@ -537,7 +537,7 @@ function SocialFeed({ items, loading }: { items: SocialItem[]; loading: boolean 
                   <span className={`pill text-[9px] uppercase ml-auto
                     ${item.source === "coingecko" ? "bg-green-500/15 text-green-400" :
                       item.source === "geckoterminal" ? "bg-accent/15 text-accent" :
-                      item.source === "jupiter" ? "bg-[#2F80FF]/15 text-[#2F80FF]" :
+                      item.source === "jupiter" ? "bg-[#00FFA3]/15 text-[#00FFA3]" :
                       "bg-panel2 text-muted"}`}>
                     {item.source === "coingecko" ? "CoinGecko"
                       : item.source === "geckoterminal" ? "GeckoTerminal"

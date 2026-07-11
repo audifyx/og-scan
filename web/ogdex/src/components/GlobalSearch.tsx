@@ -101,18 +101,18 @@ export default function GlobalSearch() {
       {/* Desktop trigger — inline in header */}
       <button
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
-        className="hidden md:flex items-center gap-2 w-56 lg:w-72 pl-3 pr-4 py-2 rounded-xl text-sm text-[#8497B8] transition-all"
-        style={{ background: "rgba(47,128,255,0.06)", border: "1.5px solid rgba(47,128,255,0.18)" }}
+        className="hidden md:flex items-center gap-2 w-56 lg:w-72 pl-3 pr-4 py-2 rounded-xl text-sm text-[#A8B3C2] transition-all"
+        style={{ background: "rgba(0,255,163,0.06)", border: "1.5px solid rgba(0,255,163,0.18)" }}
       >
         <Search className="w-3.5 h-3.5 shrink-0" />
         <span className="flex-1 text-left">Search tokens, wallets…</span>
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.07)", color: "#8497B8" }}>⌘K</span>
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.07)", color: "#A8B3C2" }}>⌘K</span>
       </button>
 
       {/* Mobile trigger — icon only */}
       <button
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
-        className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-[#8497B8] hover:text-white transition-colors"
+        className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-[#A8B3C2] hover:text-white transition-colors"
         style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
         aria-label="Search"
       >
@@ -126,8 +126,8 @@ export default function GlobalSearch() {
 
             {/* Search input */}
             <div className="relative flex items-center rounded-2xl overflow-hidden"
-              style={{ background: "#0A1226", border: "1.5px solid rgba(47,128,255,0.4)", boxShadow: "0 0 40px rgba(47,128,255,0.2)" }}>
-              <Search className="w-5 h-5 absolute left-4 text-[#2F80FF] pointer-events-none" />
+              style={{ background: "#0B0C0C", border: "1.5px solid rgba(0,255,163,0.4)", boxShadow: "0 0 40px rgba(0,255,163,0.2)" }}>
+              <Search className="w-5 h-5 absolute left-4 text-[#00FFA3] pointer-events-none" />
               <input
                 ref={inputRef}
                 value={q}
@@ -136,10 +136,10 @@ export default function GlobalSearch() {
                 placeholder="Search token name, symbol, or paste address…"
                 autoComplete="off"
                 spellCheck={false}
-                className="w-full bg-transparent pl-12 pr-12 py-4 text-white text-base outline-none placeholder-[#8497B8]"
+                className="w-full bg-transparent pl-12 pr-12 py-4 text-white text-base outline-none placeholder-[#A8B3C2]"
               />
-              {loading && <Loader2 className="w-4 h-4 absolute right-10 text-[#2F80FF] animate-spin" />}
-              <button onClick={close} className="absolute right-3 p-1.5 rounded-lg text-[#8497B8] hover:text-white hover:bg-white/10 transition-all">
+              {loading && <Loader2 className="w-4 h-4 absolute right-10 text-[#00FFA3] animate-spin" />}
+              <button onClick={close} className="absolute right-3 p-1.5 rounded-lg text-[#A8B3C2] hover:text-white hover:bg-white/10 transition-all">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -147,12 +147,12 @@ export default function GlobalSearch() {
             {/* Results dropdown */}
             {(results.length > 0 || (q.trim() && !loading)) && (
               <div className="mt-2 rounded-2xl overflow-hidden"
-                style={{ background: "#0A1226", border: "1px solid rgba(47,128,255,0.18)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+                style={{ background: "#0B0C0C", border: "1px solid rgba(0,255,163,0.18)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
 
                 {results.length > 0 ? (
                   <>
-                    <div className="px-4 py-2 border-b" style={{ borderColor: "rgba(47,128,255,0.1)" }}>
-                      <span className="text-[10px] uppercase tracking-widest text-[#8497B8] font-bold">Tokens</span>
+                    <div className="px-4 py-2 border-b" style={{ borderColor: "rgba(0,255,163,0.1)" }}>
+                      <span className="text-[10px] uppercase tracking-widest text-[#A8B3C2] font-bold">Tokens</span>
                     </div>
                     <div>
                       {results.map((r, i) => {
@@ -164,23 +164,23 @@ export default function GlobalSearch() {
                             onClick={() => go(r)}
                             onMouseEnter={() => setCursor(i)}
                             className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all hover:bg-white/5"
-                            style={cursor === i ? { background: "rgba(47,128,255,0.1)" } : {}}
+                            style={cursor === i ? { background: "rgba(0,255,163,0.1)" } : {}}
                           >
                             {/* Icon */}
                             <div className="w-9 h-9 rounded-full shrink-0 overflow-hidden flex items-center justify-center"
-                              style={{ background: "rgba(47,128,255,0.12)" }}>
+                              style={{ background: "rgba(0,255,163,0.12)" }}>
                               {r.icon
                                 ? <img src={r.icon} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                                : <TrendingUp className="w-4 h-4 text-[#2F80FF]" />}
+                                : <TrendingUp className="w-4 h-4 text-[#00FFA3]" />}
                             </div>
 
                             {/* Name + symbol */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="font-bold text-white text-sm truncate">{r.symbol || r.name || r.mint.slice(0, 8)}</span>
-                                {r.name && r.symbol && <span className="text-xs text-[#8497B8] truncate">{r.name}</span>}
+                                {r.name && r.symbol && <span className="text-xs text-[#A8B3C2] truncate">{r.name}</span>}
                               </div>
-                              <div className="text-[10px] text-[#8497B8] font-mono truncate">{r.mint.slice(0, 8)}…{r.mint.slice(-4)}</div>
+                              <div className="text-[10px] text-[#A8B3C2] font-mono truncate">{r.mint.slice(0, 8)}…{r.mint.slice(-4)}</div>
                             </div>
 
                             {/* Price + change */}
@@ -191,10 +191,10 @@ export default function GlobalSearch() {
                                   {isUp ? "+" : ""}{pct.toFixed(2)}%
                                 </div>
                               )}
-                              {r.mcap != null && <div className="text-[10px] text-[#8497B8]">MCap {compact(r.mcap)}</div>}
+                              {r.mcap != null && <div className="text-[10px] text-[#A8B3C2]">MCap {compact(r.mcap)}</div>}
                             </div>
 
-                            <ArrowRight className="w-3.5 h-3.5 text-[#8497B8] shrink-0 ml-1" />
+                            <ArrowRight className="w-3.5 h-3.5 text-[#A8B3C2] shrink-0 ml-1" />
                           </button>
                         );
                       })}
@@ -202,10 +202,10 @@ export default function GlobalSearch() {
 
                     {/* Wallet lookup shortcut if typed value looks like an address */}
                     {addr && (
-                      <div className="border-t px-4 py-2" style={{ borderColor: "rgba(47,128,255,0.1)" }}>
+                      <div className="border-t px-4 py-2" style={{ borderColor: "rgba(0,255,163,0.1)" }}>
                         <button
                           onClick={() => { nav(`/wallet/${q.trim()}`); close(); }}
-                          className="flex items-center gap-2 text-xs text-[#8497B8] hover:text-white transition-colors"
+                          className="flex items-center gap-2 text-xs text-[#A8B3C2] hover:text-white transition-colors"
                         >
                           <Wallet2 className="w-3.5 h-3.5" />
                           View as wallet instead
@@ -214,19 +214,19 @@ export default function GlobalSearch() {
                     )}
                   </>
                 ) : (
-                  <div className="px-4 py-6 text-center text-sm text-[#8497B8]">
+                  <div className="px-4 py-6 text-center text-sm text-[#A8B3C2]">
                     No results for <span className="text-white font-semibold">"{q}"</span>
                     {isAddr(q.trim()) && (
                       <div className="mt-2 flex gap-2 justify-center">
-                        <button onClick={() => { nav(`/token/${q.trim()}`); close(); }} className="px-3 py-1 rounded-lg text-xs font-bold" style={{ background: "rgba(47,128,255,0.15)", color: "#2F80FF" }}>Open as Token</button>
-                        <button onClick={() => { nav(`/wallet/${q.trim()}`); close(); }} className="px-3 py-1 rounded-lg text-xs font-bold" style={{ background: "rgba(255,255,255,0.07)", color: "#8497B8" }}>Open as Wallet</button>
+                        <button onClick={() => { nav(`/token/${q.trim()}`); close(); }} className="px-3 py-1 rounded-lg text-xs font-bold" style={{ background: "rgba(0,255,163,0.15)", color: "#00FFA3" }}>Open as Token</button>
+                        <button onClick={() => { nav(`/wallet/${q.trim()}`); close(); }} className="px-3 py-1 rounded-lg text-xs font-bold" style={{ background: "rgba(255,255,255,0.07)", color: "#A8B3C2" }}>Open as Wallet</button>
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Footer hint */}
-                <div className="px-4 py-2 border-t flex items-center gap-3 text-[10px] text-[#8497B8]" style={{ borderColor: "rgba(47,128,255,0.1)" }}>
+                <div className="px-4 py-2 border-t flex items-center gap-3 text-[10px] text-[#A8B3C2]" style={{ borderColor: "rgba(0,255,163,0.1)" }}>
                   <span>↑↓ navigate</span>
                   <span>↵ open</span>
                   <span>Esc close</span>

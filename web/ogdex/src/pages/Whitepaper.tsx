@@ -75,7 +75,7 @@ export default function Whitepaper() {
         what they found.
       </Lede>
 
-      <img src="/ORBITX_DEX/ogdex-hero.jpg" alt="OrbitX product interface" className="w-full rounded-xl border border-white/10 mb-8" loading="lazy" />
+      <img style={{ filter: "grayscale(1) sepia(1) hue-rotate(105deg) saturate(2.2) brightness(0.9)" }} src="/ORBITX_DEX/ogdex-hero.jpg" alt="OrbitX product interface" className="w-full rounded-xl border border-white/10 mb-8" loading="lazy" />
 
       <Section icon={Eye} eyebrow="Chapter 1" />
       <H>The problem with on-chain trading</H>

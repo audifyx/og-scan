@@ -32,7 +32,7 @@ function safety(sc?: TokenForensicScores) {
 }
 
 function ScoreRing({ score }: { score: number }) {
-  const c = score >= 70 ? "#14F195" : score >= 45 ? "#FFC53D" : "#FF4D6D";
+  const c = score >= 70 ? "#00FFA3" : score >= 45 ? "#FFC53D" : "#FF5C5C";
   return (
     <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(${c} ${score * 3.6}deg, rgba(255,255,255,0.08) 0)` }}>
       <div className="grid h-8 w-8 place-items-center rounded-full bg-bg"><span className="text-[12px] font-black" style={{ color: c }}>{score}</span></div>
