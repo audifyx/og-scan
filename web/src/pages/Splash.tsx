@@ -13,6 +13,7 @@ const HERO_FRAMES = [
 ] as const;
 
 const BRAND = "OrbitX";
+const CONTRACT_ADDRESS = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
 const LINKS = {
   app: "https://orbitx.world",
@@ -210,6 +211,14 @@ export default function Splash() {
   const [heroFrame, setHeroFrame] = useState(0);
   const [heroReady, setHeroReady] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
+  const [caCopied, setCaCopied] = useState(false);
+  const copyCA = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(CONTRACT_ADDRESS);
+      setCaCopied(true);
+      setTimeout(() => setCaCopied(false), 1800);
+    } catch { /* clipboard unavailable — noop */ }
+  }, []);
 
   useParticles(canvasRef);
 
@@ -344,6 +353,17 @@ export default function Splash() {
                 {BRAND} · The On-Chain OS
               </p>
             </div>
+
+            <button type="button" className="sp-ca-pill" onClick={copyCA} title="Copy contract address">
+              <span className="sp-ca-label">CA</span>
+              <span className="sp-ca-addr">{CONTRACT_ADDRESS}</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                {caCopied
+                  ? <path d="M20 6 9 17l-5-5" />
+                  : <><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></>}
+              </svg>
+              {caCopied && <span className="sp-ca-copied">Copied</span>}
+            </button>
 
             <h1 className="sp-h1">
               <div className="sp-h1-line" style={{ animationDelay: "0.2s" }}>One platform.</div>
@@ -929,6 +949,35 @@ const css = `
 @keyframes dotPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.sp-ca-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px; color: #b9c3dd; font-weight: 600;
+  padding: 8px 14px; border-radius: 980px; margin-bottom: 22px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.09);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .1s ease;
+  max-width: 100%;
+}
+.sp-ca-pill:hover { border-color: rgba(153,69,255,0.5); background: rgba(153,69,255,0.08); }
+.sp-ca-pill:active { transform: scale(0.98); }
+.sp-ca-label {
+  color: #9945FF; font-weight: 800; letter-spacing: 0.08em; font-size: 10.5px;
+  padding: 2px 7px; border-radius: 6px; background: rgba(153,69,255,0.14); flex-shrink: 0;
+}
+.sp-ca-addr {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 210px; color: #d6dcec;
+}
+.sp-ca-pill svg { flex-shrink: 0; opacity: 0.7; }
+.sp-ca-copied {
+  color: #14E0C8; font-weight: 700; font-size: 11px; flex-shrink: 0;
+}
+@media(max-width:980px) {
+  .sp-ca-addr { max-width: 160px; }
 }
 
 /* Headline */

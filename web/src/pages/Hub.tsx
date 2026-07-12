@@ -10,6 +10,7 @@ const BRAND = "OrbitX";
 const OS_NAME = "OrbitX";
 const VERSION = "v2.0";
 const DOCK_KEY = "og_dock_order";
+const ORBITX_CA = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
 const wgTimeAgo = (iso: string) => {
   const sec = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -135,6 +136,9 @@ export default function Hub() {
   const [spotQ, setSpotQ] = useState("");
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [solChange, setSolChange] = useState<number | null>(null);
+  const [orbitxPrice, setOrbitxPrice] = useState<number | null>(null);
+  const [orbitxChange, setOrbitxChange] = useState<number | null>(null);
+  const [caCopiedHub, setCaCopiedHub] = useState(false);
   const [trending, setTrending] = useState<{ mint: string; symbol: string; priceUsd: number | null; change24h: number | null }[]>([]);
   const [latestPosts, setLatestPosts] = useState<{ id: string; username: string | null; content: string; created_at: string }[]>([]);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
@@ -256,6 +260,31 @@ export default function Hub() {
     fetchPrice();
     const iv = setInterval(fetchPrice, 60_000);
     return () => { on = false; clearInterval(iv); };
+  }, []);
+
+  /* Live $ORBITX price + CA chip */
+  useEffect(() => {
+    let on = true;
+    const fetchOrbitxPrice = () =>
+      fetch(`https://api.dexscreener.com/latest/dex/tokens/${ORBITX_CA}`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (!on) return;
+          const pair = j?.pairs?.[0];
+          if (!pair) return;
+          setOrbitxPrice(Number(pair.priceUsd) || null);
+          setOrbitxChange(pair.priceChange?.h24 != null ? Number(pair.priceChange.h24) : null);
+        })
+        .catch(() => {});
+    fetchOrbitxPrice();
+    const iv = setInterval(fetchOrbitxPrice, 30_000);
+    return () => { on = false; clearInterval(iv); };
+  }, []);
+
+  const copyOrbitxCA = useCallback(() => {
+    navigator.clipboard.writeText(ORBITX_CA).catch(() => {});
+    setCaCopiedHub(true);
+    setTimeout(() => setCaCopiedHub(false), 1600);
   }, []);
 
   /* Widgets: trending tokens + latest community posts (best-effort) */
@@ -382,6 +411,17 @@ export default function Hub() {
             </nav>
           </div>
           <div className="mb-right">
+            {orbitxPrice != null && (
+              <button className="mb-sol mb-orbitx" title="Click to copy contract address" onClick={copyOrbitxCA}>
+                <span className="mb-sol-dot" style={{ background: "#9945FF" }} /> $ORBITX ${orbitxPrice < 0.01 ? orbitxPrice.toExponential(2) : orbitxPrice.toFixed(6)}
+                {orbitxChange != null && (
+                  <b style={{ color: orbitxChange >= 0 ? "#34d399" : "#fb7185", marginLeft: 2 }}>
+                    {orbitxChange >= 0 ? "+" : ""}{orbitxChange.toFixed(1)}%
+                  </b>
+                )}
+                <span className="mb-orbitx-ca">{caCopiedHub ? "Copied!" : "CA"}</span>
+              </button>
+            )}
             {solPrice != null && (
               <span className="mb-sol" title="Solana price (live, 24h change)">
                 <span className="mb-sol-dot" /> SOL ${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}
@@ -416,6 +456,12 @@ export default function Hub() {
             </p>
             <p className="hub-greet-sub">Press <kbd>⌘K</kbd> to search · right-click for options</p>
             <div className="hub-chips">
+              <button className="hub-chip hub-chip-btn hub-chip-orbitx" onClick={copyOrbitxCA} title="Click to copy contract address">
+                <i className="hub-chip-dot" style={{ background: "#9945FF" }} />
+                $ORBITX {orbitxPrice != null ? `$${orbitxPrice < 0.01 ? orbitxPrice.toExponential(2) : orbitxPrice.toFixed(6)}` : "—"}
+                {orbitxChange != null && <b style={{ color: orbitxChange >= 0 ? "#34d399" : "#fb7185" }}>{orbitxChange >= 0 ? "+" : ""}{orbitxChange.toFixed(1)}%</b>}
+                <span className="hub-chip-ca">{caCopiedHub ? "Copied!" : `${ORBITX_CA.slice(0, 4)}…${ORBITX_CA.slice(-4)}`}</span>
+              </button>
               <span className="hub-chip">
                 <i className="hub-chip-dot" style={{ background: (solChange ?? 0) >= 0 ? "#34d399" : "#fb7185" }} />
                 ◎ {solPrice != null ? `$${solPrice >= 1000 ? solPrice.toFixed(0) : solPrice.toFixed(2)}` : "—"}
@@ -693,6 +739,9 @@ const css = `
 @keyframes fadeSlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .mb-sol{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;border:1px solid rgba(52,211,153,.25);background:rgba(52,211,153,.09);color:#6ee7b7;font-size:11px;font-weight:800;letter-spacing:.02em}
 .mb-sol-dot{width:5px;height:5px;border-radius:99px;background:#34d399;animation:pulse 2s infinite}
+.mb-orbitx{border-color:rgba(153,69,255,.3);background:rgba(153,69,255,.1);color:#c9a3ff;cursor:pointer;font-family:inherit}
+.mb-orbitx:hover{background:rgba(153,69,255,.18)}
+.mb-orbitx-ca{opacity:.6;font-weight:700;margin-left:2px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .mb-search{display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:7px;background:transparent;color:rgba(255,255,255,.65);cursor:pointer;transition:background .15s}
 .mb-search:hover{background:rgba(255,255,255,.12)}
@@ -1005,6 +1054,9 @@ const css = `
 @keyframes hubdot{0%,100%{opacity:1}50%{opacity:.35}}
 .hub-chip-btn{cursor:pointer;font-family:inherit;transition:all .18s}
 .hub-chip-btn:hover{border-color:rgba(90,162,255,.4);background:rgba(47,128,255,.14);transform:translateY(-1px)}
+.hub-chip-orbitx{border-color:rgba(153,69,255,.35);background:rgba(153,69,255,.1)}
+.hub-chip-orbitx:hover{border-color:rgba(153,69,255,.55);background:rgba(153,69,255,.18)}
+.hub-chip-ca{opacity:.55;font-weight:700;font-size:10px;margin-left:1px}
 
 /* Compact mobile hub */
 @media (max-width: 768px) {
