@@ -7,8 +7,6 @@
  * discover and call OG DEX tools from here without modifying the main router.
  */
 
-import { createClient } from "@vercel/kv"; // optional rate-limiting; graceful fallback
-
 const BASE = "https://ogscan.fun";
 
 const TOOLS = [
