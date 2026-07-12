@@ -12,7 +12,7 @@ const TOOLS = [
       type: "object",
       properties: {
         mint: { type: "string", description: "Token mint address (Solana) or contract address (EVM)" },
-        chain: { type: "string", enum: ["solana", "ethereum", "base", "bsc", "arbitrum", "polygon", "avalanche", "sui", "ton"], default: "solana" },
+        chain: { type: "string", enum: ["solana", "ethereum", "base", "bsc", "arbitrum", "polygon", "avalanche", "sui", "ton", "robinhood"], default: "solana" },
       },
       required: ["mint"],
     },

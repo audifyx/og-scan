@@ -84,6 +84,7 @@ const CHAINS = [
   { id: "avalanche",label: "Avax",      color: "text-red-400",    dot: "#f87171" },
   { id: "sui",      label: "SUI",       color: "text-sky-400",    dot: "#38bdf8" },
   { id: "ton",      label: "TON",       color: "text-blue-300",   dot: "#93c5fd" },
+  { id: "robinhood",label: "Robinhood", color: "text-green-400",  dot: "#00C805" },
 ];
 
 type SortKey = "mcap"|"liquidity"|"volume"|"change"|"holderCount"|"organicScore";

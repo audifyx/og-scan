@@ -2,7 +2,7 @@ import { jup, callFn, send, cache, dbSelect } from "../_lib.js";
 import { normToken, num } from "../_normalize.js";
 import { CELEB_MINTS, fetchMints } from "../_curated.js";
 
-const CHAINS = ["solana","ethereum","bsc","base","polygon","arbitrum","avalanche","sui","ton"];
+const CHAINS = ["solana","ethereum","bsc","base","polygon","arbitrum","avalanche","sui","ton","robinhood"];
 const GT_HDR = { Accept: "application/json;version=20230302" };
 const STABLES = new Set(["USDC","USDT","SOL","WSOL","JLP","JITOSOL","MSOL","BSOL","JUPSOL","INF","USDS","USDE","PYUSD","EURC","CBBTC","WBTC","HSOL","JUP","ISC","USDH","DAI","BUSD","WETH","ETH","WBNB","BNB","WMATIC","MATIC","POL","WPOL","WAVAX","AVAX","WTON","STETH","WSTETH","FDUSD","TUSD","USDD"]);
 

@@ -7,7 +7,7 @@ export default async function handler(req, res) {
       { tier: "standard", price: 40, sla: "24 hours", label: "Standard listing" },
       { tier: "express", price: 60, sla: "6 hours", label: "Express listing" },
     ],
-    chains: ["solana", "ethereum", "base", "bsc", "polygon", "arbitrum", "avalanche", "ton", "sui", "tron", "other"],
+    chains: ["solana", "ethereum", "base", "bsc", "polygon", "arbitrum", "avalanche", "ton", "sui", "tron", "robinhood", "other"],
     telegram: "@ogscanofficial",
     community: { x: "200+", ogscan: "55+", telegram: "yes" },
   });

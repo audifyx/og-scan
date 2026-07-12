@@ -139,6 +139,13 @@ export default function Hub() {
   const [orbitxPrice, setOrbitxPrice] = useState<number | null>(null);
   const [orbitxChange, setOrbitxChange] = useState<number | null>(null);
   const [caCopiedHub, setCaCopiedHub] = useState(false);
+  const [showChainBanner, setShowChainBanner] = useState(() => {
+    try { return localStorage.getItem("og_banner_robinhood_v1") !== "1"; } catch { return true; }
+  });
+  const dismissChainBanner = useCallback(() => {
+    setShowChainBanner(false);
+    try { localStorage.setItem("og_banner_robinhood_v1", "1"); } catch {}
+  }, []);
   const [trending, setTrending] = useState<{ mint: string; symbol: string; priceUsd: number | null; change24h: number | null }[]>([]);
   const [latestPosts, setLatestPosts] = useState<{ id: string; username: string | null; content: string; created_at: string }[]>([]);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
@@ -447,6 +454,19 @@ export default function Hub() {
           </div>
         </header>
 
+        {showChainBanner && (
+          <div className="chain-banner">
+            <span className="chain-banner-emoji">🪽</span>
+            <p className="chain-banner-text">
+              <b>New chain supported:</b> OrbitX now supports <b>Robinhood Chain</b> — search, scan, and screen any Robinhood Chain token right alongside Solana, Ethereum, Base, and 13 other chains.
+            </p>
+            <a href="/ORBITX_DEX" className="chain-banner-cta">Explore</a>
+            <button className="chain-banner-close" onClick={dismissChainBanner} aria-label="Dismiss">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
+        )}
+
         {/* Desktop Body / App Grid */}
         <main className="desktop-body">
           <div className="hub-greeting">
@@ -742,6 +762,19 @@ const css = `
 .mb-orbitx{border-color:rgba(153,69,255,.3);background:rgba(153,69,255,.1);color:#c9a3ff;cursor:pointer;font-family:inherit}
 .mb-orbitx:hover{background:rgba(153,69,255,.18)}
 .mb-orbitx-ca{opacity:.6;font-weight:700;margin-left:2px}
+
+.chain-banner{display:flex;align-items:center;gap:10px;padding:9px 16px;margin:0 12px;border-radius:12px;
+  background:linear-gradient(90deg,rgba(0,200,5,.14),rgba(0,200,5,.05));border:1px solid rgba(0,200,5,.25);
+  animation:fadeSlide .4s ease both}
+.chain-banner-emoji{font-size:16px;flex-shrink:0}
+.chain-banner-text{flex:1;font-size:12.5px;color:#d8f5d8;line-height:1.4;min-width:0}
+.chain-banner-text b{color:#fff}
+.chain-banner-cta{flex-shrink:0;font-size:11.5px;font-weight:800;color:#00C805;padding:5px 12px;border-radius:99px;
+  border:1px solid rgba(0,200,5,.4);background:rgba(0,200,5,.1);white-space:nowrap;transition:background .15s}
+.chain-banner-cta:hover{background:rgba(0,200,5,.2)}
+.chain-banner-close{flex-shrink:0;color:#9ca3af;padding:4px;border-radius:8px;transition:background .15s,color .15s}
+.chain-banner-close:hover{background:rgba(255,255,255,.08);color:#fff}
+@media(max-width:640px){.chain-banner{margin:0 8px;padding:8px 10px}.chain-banner-text{font-size:11.5px}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .mb-search{display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:7px;background:transparent;color:rgba(255,255,255,.65);cursor:pointer;transition:background .15s}
 .mb-search:hover{background:rgba(255,255,255,.12)}

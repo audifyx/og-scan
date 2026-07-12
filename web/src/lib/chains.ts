@@ -137,6 +137,27 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
       { id: "traderjoe", name: "Trader Joe", emoji: "🎩", description: "Avalanche's leading DEX", searchTerms: ["traderjoe", "trader joe"], website: "https://traderjoexyz.com" },
     ],
   },
+  {
+    id: "robinhood",
+    name: "Robinhood Chain",
+    shortName: "HOOD",
+    // No etherscanChainId — Etherscan/GoPlus don't index this chain yet;
+    // only Blockscout does. Security-check calls degrade gracefully to null.
+    nativeCurrency: "ETH",
+    emoji: "🪽",
+    color: "from-[#00C805]/20 to-[#00C805]/5",
+    accent: "border-[#00C805]/30 bg-[#00C805]/10 text-[#00C805]",
+    explorerUrl: "https://robinhoodchain.blockscout.com",
+    isEvm: true,
+    mainDex: "Uniswap",
+    dexUrl: "https://app.uniswap.org/swap",
+    dexScreenerSlug: "robinhood",
+    geckoTerminalSlug: "robinhood",
+    category: "l2",
+    launchpads: [
+      { id: "noxafun", name: "NOXA Fun", emoji: "🐳", description: "Hybrid Uniswap V3 launchpad, permanently locked LP", searchTerms: ["noxa", "noxa.fun", "noxafun"], website: "https://fun.noxa.fi/robinhood" },
+    ],
+  },
   // ─── EVM L2s ───
   {
     id: "base",
