@@ -15,22 +15,24 @@ const TIME_BUDGET_MS = 55_000; // leave headroom under the 60s hard limit
 /**
  * POST /api/vanity-mint
  *
- * Generate a Solana vanity mint keypair whose address ends with "obx"
- * Computation time: ~1-2 minutes on Vercel serverless.
+ * Generate a Solana vanity mint keypair whose address ends with "orb" — the
+ * OrbitX Launchpad brand suffix. Every coin launched through the Launchpad
+ * gets a custom CA ending in "orb". Computation time: ~1s for a 3-char suffix.
  *
  * Request body:
  * {
- *   suffix?: string; // defaults to "obx" (3 chars)
+ *   suffix?: string; // defaults to "orb" (3 chars)
  *   maxIterations?: number; // defaults to 1000000
  * }
  *
  * Response:
  * {
- *   publicKey: string; // base58 encoded, ends with suffix
- *   secretKey: string; // base58 encoded (serialized secret key)
- *   generatedAt: string; // ISO timestamp
- *   attempts: number; // how many attempts before finding
- *   timeMs: number; // how long it took in milliseconds
+ *   publicKey: string;        // base58 encoded, ends with suffix
+ *   secretKey: string;        // base58 encoded (serialized secret key)
+ *   secretKeyArray: number[]; // raw secret key bytes (dependency-free client reconstruction)
+ *   generatedAt: string;      // ISO timestamp
+ *   attempts: number;         // how many attempts before finding
+ *   timeMs: number;           // how long it took in milliseconds
  * }
  */
 
@@ -40,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { suffix = "obx", maxIterations = 1000000 } = req.body || {};
+    const { suffix = "orb", maxIterations = 1000000 } = req.body || {};
 
     if (typeof suffix !== "string" || suffix.length === 0) {
       return res.status(400).json({ error: "Invalid suffix parameter" });
@@ -100,6 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       publicKey: keypair.publicKey.toBase58(),
       secretKey: secretKeyBase58,
+      secretKeyArray: Array.from(secretKeyBytes),
       generatedAt: new Date().toISOString(),
       attempts,
       timeMs: Date.now() - startTime,

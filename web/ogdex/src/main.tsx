@@ -1,6 +1,6 @@
 import React, { Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import "./index.css";
 import Layout from "./components/Layout";
@@ -24,7 +24,7 @@ const WalletIndex = lazy(() => import("./pages/WalletIndex"));
 const KolScanner = lazy(() => import("./pages/KolScanner"));
 const KolProfile = lazy(() => import("./pages/KolProfile"));
 const Admin = lazy(() => import("./pages/Admin"));
-const Launch = lazy(() => import("./pages/Launch"));
+const Launchpad = lazy(() => import("./pages/Launchpad"));
 const NewlyListed = lazy(() => import("./pages/NewlyListed"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
@@ -63,7 +63,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="callouts" element={<Suspense fallback={<PageFallback />}><Callouts /></Suspense>} />
           <Route path="submit" element={<Suspense fallback={<PageFallback />}><Submit /></Suspense>} />
           <Route path="boost" element={<Suspense fallback={<PageFallback />}><Boost /></Suspense>} />
-          <Route path="launch" element={<Suspense fallback={<PageFallback />}><Launch /></Suspense>} />
+          <Route path="launchpad" element={<Suspense fallback={<PageFallback />}><Launchpad /></Suspense>} />
+          {/* Launcher moved into the Launchpad — keep /launch as a redirect. */}
+          <Route path="launch" element={<Navigate to="/launchpad" replace />} />
           <Route path="new" element={<Suspense fallback={<PageFallback />}><NewlyListed /></Suspense>} />
           <Route path="wallet" element={<Suspense fallback={<PageFallback />}><WalletIndex /></Suspense>} />
           <Route path="wallet/:address" element={<Suspense fallback={<PageFallback />}><Wallet /></Suspense>} />

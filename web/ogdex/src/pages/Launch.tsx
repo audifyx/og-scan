@@ -9,6 +9,7 @@ import {
   getProvider, connectWallet, payFee, newMintKeypair,
   signAndSendCreate, fileToBase64,
 } from "../lib/solana";
+import { generateVanityMint, VANITY_SUFFIX } from "../lib/vanity-mint";
 
 const MAX_IMG = 5 * 1024 * 1024;
 const ACCEPTED = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -164,10 +165,20 @@ export default function Launch() {
       });
       if (!ipfs?.ok) throw new Error(ipfs?.error || "IPFS upload failed");
 
-      /* 3. Build the create transaction */
-      setStatus("Preparing your token…");
-      const mintKp = newMintKeypair();
+      /* 3. Generate a custom vanity mint (CA ends in "orb"), then build the create tx */
+      setStatus(`Generating your custom …${VANITY_SUFFIX} contract address…`);
+      let mintKp;
+      try {
+        mintKp = (await generateVanityMint(VANITY_SUFFIX)).keypair;
+      } catch (ve) {
+        // Vanity search is probabilistic and bounded by the serverless time
+        // budget. If it can't find one in time, fall back to a standard mint
+        // so the launch never hard-fails.
+        console.warn("[launchpad] vanity mint unavailable, using standard mint:", ve);
+        mintKp = newMintKeypair();
+      }
       const mint = mintKp.publicKey.toBase58();
+      setStatus("Preparing your token…");
       const created = await launchStep({
         step: "create", publicKey: wallet, metadataUri: ipfs.metadataUri,
         name: form.name, symbol: form.symbol, mintPublicKey: mint,
@@ -249,7 +260,7 @@ export default function Launch() {
           <h1 className="text-2xl font-black">Launch a Token</h1>
         </div>
         <p className="text-muted text-sm">
-          <>Create a token on pump.fun directly from OrbitX DEX. <span className="text-up font-semibold">Launching is free</span> — you only pay the standard Solana network fee. Your new token is added to the <span className="text-white">Newly Listed</span> section instantly.</>
+          <>Create a token on pump.fun directly from the OrbitX Launchpad. <span className="text-up font-semibold">Launching is free</span> — you only pay the standard Solana network fee, and every coin gets a <span className="text-accent font-semibold">custom …{VANITY_SUFFIX} contract address</span>. Your token appears in the Launchpad feed instantly.</>
         </p>
       </div>
 

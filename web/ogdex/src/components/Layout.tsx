@@ -31,14 +31,15 @@ const STAT_FALLBACK: PlatformStats = { activeUsers: 55, telegram: 185, xFollower
 
 // ── Top header wheel: all functional/app tabs (horizontal scroll) ──
 const NAV_LINKS = [
-  { to: "/",        label: "Home",     Icon: Coins,      exact: true  },
-  { to: "/pulse",   label: "Pulse",    Icon: Flame,      exact: false },
-  { to: "/scanner", label: "Scanner",  Icon: Crosshair,  exact: false },
-  { to: "/tools",   label: "Tools",    Icon: Wrench,     exact: false },
-  { to: "/new",     label: "New",      Icon: Sparkles,   exact: false },
-  { to: "/wallet",  label: "Wallets",  Icon: Wallet2,    exact: false },
-  { to: "/kol",     label: "KOL",      Icon: Users,      exact: false },
-  { to: "/more",    label: "More",     Icon: LayoutGrid, exact: false },
+  { to: "/",          label: "Home",      Icon: Coins,      exact: true  },
+  { to: "/launchpad", label: "Launchpad", Icon: Rocket,     exact: false },
+  { to: "/pulse",     label: "Pulse",     Icon: Flame,      exact: false },
+  { to: "/scanner",   label: "Scanner",   Icon: Crosshair,  exact: false },
+  { to: "/tools",     label: "Tools",     Icon: Wrench,     exact: false },
+  { to: "/new",       label: "New",       Icon: Sparkles,   exact: false },
+  { to: "/wallet",    label: "Wallets",   Icon: Wallet2,    exact: false },
+  { to: "/kol",       label: "KOL",       Icon: Users,      exact: false },
+  { to: "/more",      label: "More",      Icon: LayoutGrid, exact: false },
 ];
 
 // ── Quick-access set for the compact mobile bottom bar ──
@@ -57,7 +58,7 @@ const FOOTER_PRODUCT = [
   { to: "/alerts",      label: "Smart Alerts" },
   { to: "/callouts",    label: "Callouts" },
   { to: "/metadata",    label: "Metadata" },
-  { to: "/launch",      label: "Launch a Token" },
+  { to: "/launchpad",   label: "Launchpad" },
   { to: "/more",        label: "More" },
 ];
 const FOOTER_RESOURCES = [

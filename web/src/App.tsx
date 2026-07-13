@@ -254,8 +254,9 @@ const App = () => (
             <Route path="/live-trading" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/charts" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/live-feed-page" element={<OgdexRedirect to="/ORBITX_DEX" />} />
-            <Route path="/pumpv5" element={<OgdexRedirect to="/ORBITX_DEX/launch" />} />
-            <Route path="/launch" element={<OgdexRedirect to="/ORBITX_DEX/launch" />} />
+            <Route path="/launchpad" element={<OgdexRedirect to="/ORBITX_DEX/launchpad" />} />
+            <Route path="/pumpv5" element={<OgdexRedirect to="/ORBITX_DEX/launchpad" />} />
+            <Route path="/launch" element={<OgdexRedirect to="/ORBITX_DEX/launchpad" />} />
 
             {/* ── Protected: Admin ── */}
             <Route path="/admin" element={<OgdexRedirect to="/ORBITX_DEX/admin" />} />
