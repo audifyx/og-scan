@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { getToken, getForensics, Forensics as ForensicsData, getXray, XrayReport, getAth, AthData, track, TokenDetailData, fmtUsd, compact, fmtNum, fmtPct, short, getTopTraders, TokenHolder, TopTrader } from "../lib/api";
 import { timeAgo } from "../lib/format";
 import TokenLogo from "../components/TokenLogo";
@@ -88,6 +88,10 @@ function ChangePill({ label, v }: { label: string; v?: number | null }) {
 
 export default function TokenDetail() {
   const { mint = "" } = useParams();
+  const [sp] = useSearchParams();
+  const isEvm = /^0x[0-9a-fA-F]{40}$/.test(mint);
+  const chainParam = (sp.get("chain") || (isEvm ? "" : "solana")).toLowerCase();
+  const isSol = !isEvm && chainParam === "solana";
   const [d, setD] = useState<TokenDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -102,24 +106,25 @@ export default function TokenDetail() {
   const [dir, setDir] = useState<Record<string, KolDirEntry>>({});
 
   useEffect(() => { getKolDirectory().then(setDir).catch(() => {}); }, []);
-  useEffect(() => { let on = true; setForLoading(true); getForensics(mint).then((x) => { if (on) { setForensics(x); setForLoading(false); } }).catch(() => { if (on) setForLoading(false); }); return () => { on = false; }; }, [mint]);
-  useEffect(() => { let on = true; getAth(mint).then((x) => { if (on && x?.ok) setAth(x); }).catch(() => {}); return () => { on = false; }; }, [mint]);
+  useEffect(() => { if (!isSol) { setForLoading(false); return; } let on = true; setForLoading(true); getForensics(mint).then((x) => { if (on) { setForensics(x); setForLoading(false); } }).catch(() => { if (on) setForLoading(false); }); return () => { on = false; }; }, [mint, isSol]);
+  useEffect(() => { if (!isSol) return; let on = true; getAth(mint).then((x) => { if (on && x?.ok) setAth(x); }).catch(() => {}); return () => { on = false; }; }, [mint, isSol]);
   useEffect(() => {
+    if (!isSol) return;
     let on = true; setTopData(null); setTopLoading(true);
     getTopTraders(mint).then((x) => { if (on && x?.ok) setTopData({ holders: x.holders, traders: x.traders }); }).catch(() => {}).finally(() => { if (on) setTopLoading(false); });
     return () => { on = false; };
-  }, [mint]);
-  useEffect(() => { let on = true; setXrayLoading(true); getXray(mint).then((x) => { if (on) { setXray(x); setXrayLoading(false); } }).catch(() => { if (on) setXrayLoading(false); }); return () => { on = false; }; }, [mint]);
+  }, [mint, isSol]);
+  useEffect(() => { if (!isSol) return; let on = true; setXrayLoading(true); getXray(mint).then((x) => { if (on) { setXray(x); setXrayLoading(false); } }).catch(() => { if (on) setXrayLoading(false); }); return () => { on = false; }; }, [mint, isSol]);
   useEffect(() => {
     let on = true; setLoading(true);
-    getToken(mint).then((x) => { if (on) { setD(x); setLoading(false); try { track("token_view", { token_ref: x?.token?.symbol || mint, meta: { mint } }); } catch {} } }).catch(() => { if (on) setLoading(false); });
+    getToken(mint, chainParam).then((x) => { if (on) { setD(x); setLoading(false); try { track("token_view", { token_ref: x?.token?.symbol || mint, meta: { mint } }); } catch {} } }).catch(() => { if (on) setLoading(false); });
     return () => { on = false; };
-  }, [mint]);
+  }, [mint, chainParam]);
   useEffect(() => {
     if (tab !== "trades" && tab !== "overview") return;
-    const id = setInterval(() => { getToken(mint).then((x) => x && setD(x)); }, 12000);
+    const id = setInterval(() => { getToken(mint, chainParam).then((x) => x && setD(x)); }, 12000);
     return () => clearInterval(id);
-  }, [tab, mint]);
+  }, [tab, mint, chainParam]);
 
   if (loading) return (
     <div className="grid place-items-center py-24 text-muted">
@@ -158,17 +163,26 @@ export default function TokenDetail() {
   const scoreColor = score == null ? "text-muted" : score >= 70 ? "text-up" : score >= 45 ? "text-accent" : "text-down";
   const copy = () => { navigator.clipboard.writeText(mint); setCopied(true); setTimeout(() => setCopied(false), 1200); };
 
-  const TABS: [string, string][] = [
-    ["overview",   "Overview"],
-    ["chat",       "✨ Ask AI"],
-    ["predictive", "Predictive"],
-    ["smartmoney", "Smart Money"],
-    ["kolwhale",   "KOL & Whale"],
-    ["holders",    `Holders${holders.length ? ` (${holders.length})` : ""}`],
-    ["trades",     `Live Trades${trades.length ? ` (${trades.length})` : ""}`],
-    ["xray",       "🩻 Risk X-ray"],
-    ["forensics",  "Forensics"],
-  ];
+  const evm = (meta.chain || chainParam) !== "solana" && !isSol;
+  const secUnavail = !!(d.flags?.securityUnavailable || meta.securityUnavailable);
+  const TABS: [string, string][] = evm
+    ? [
+        ["overview",   "Overview"],
+        ["chat",       "✨ Ask AI"],
+        ["holders",    `Holders${holders.length ? ` (${holders.length})` : ""}`],
+        ["trades",     `Live Trades${trades.length ? ` (${trades.length})` : ""}`],
+      ]
+    : [
+        ["overview",   "Overview"],
+        ["chat",       "✨ Ask AI"],
+        ["predictive", "Predictive"],
+        ["smartmoney", "Smart Money"],
+        ["kolwhale",   "KOL & Whale"],
+        ["holders",    `Holders${holders.length ? ` (${holders.length})` : ""}`],
+        ["trades",     `Live Trades${trades.length ? ` (${trades.length})` : ""}`],
+        ["xray",       "🩻 Risk X-ray"],
+        ["forensics",  "Forensics"],
+      ];
 
   return (
     <div className="max-w-5xl mx-auto space-y-3">
@@ -181,7 +195,7 @@ export default function TokenDetail() {
         <span className="term text-[11px] text-faint hidden sm:inline">
           <span className="text-accent">orbitx@dex</span>:~$ token --inspect <span className="text-white/70">{short(mint)}</span>
         </span>
-        <span className="term text-[10px] text-faint ml-auto hidden md:inline">chain: solana · live feed<span className="term-cursor" /></span>
+        <span className="term text-[10px] text-faint ml-auto hidden md:inline">chain: {meta.chain || chainParam || "solana"} · live feed<span className="term-cursor" /></span>
       </div>
 
       {/* ══════════════════════════════════════
@@ -379,7 +393,7 @@ export default function TokenDetail() {
         {tab === "smartmoney" && <CapitalFlow d={d} />}
         {tab === "kolwhale"   && <KolWhaleActivity d={d} dir={dir} holders={holders} />}
         {tab === "holders"    && <HoldersAndTraders holders={holders} topData={topData} topLoading={topLoading} price={price} dir={dir} safety={safety} />}
-        {tab === "trades"     && <TradesTable trades={trades} mint={mint} dir={dir} onRefresh={() => getToken(mint).then(setD)} />}
+        {tab === "trades"     && <TradesTable trades={trades} mint={mint} dir={dir} onRefresh={() => getToken(mint, chainParam).then(setD)} />}
         {tab === "xray"       && <RiskXray x={xray} loading={xrayLoading} />}
         {tab === "forensics"  && <><DevOrigin f={forensics} loading={forLoading} /><Forensics d={d} meta={meta} safety={safety} /></>}
       </ErrorBoundary>
@@ -402,6 +416,12 @@ function Overview({ d, t, meta, safety, trades, ath, score, whales }: any) {
 
   return (
     <div className="space-y-3">
+
+      {meta.securityUnavailable && (
+        <div className="card px-4 py-2.5 text-[11px] text-yellow-400/90 border border-yellow-400/20 bg-yellow-400/5">
+          Security & holder analysis isn't available on the {meta.chain || "this"} chain yet — no rug/honeypot provider indexes it. Price, chart, and live trades are fully live. Always DYOR.
+        </div>
+      )}
 
       {/* OrbitX Score + Forensic Scores */}
       <div className="grid lg:grid-cols-3 gap-3">

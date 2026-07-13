@@ -50,7 +50,7 @@ export const getBoosts = () => j<{ ok: boolean; boosts: Boost[]; error?: string 
 export const getBoostTiers = () => j<{ tiers: any[]; payWallet: string }>("/api/ogdex/boosts?tiers=1");
 export const submitBoost = (data: any) => postJson("/api/ogdex/boosts", data) as Promise<{ ok: boolean; boost?: Boost; error?: string }>;
 export const search = (q: string) => j<{ rows: Row[] }>(`/api/ogdex/search?q=${encodeURIComponent(q)}`);
-export const getToken = (mint: string) => j(`/api/ogdex/token?mint=${mint}`);
+export const getToken = (mint: string, chain?: string) => j(`/api/ogdex/token?mint=${mint}${chain && chain !== "solana" ? `&chain=${chain}` : ""}`);
 export interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number; }
 export interface ChartData { ok: boolean; candles: Candle[]; pool?: string | null; poolName?: string | null; dex?: string | null; interval?: string; error?: string; note?: string; }
 export const getChart = (mint: string, interval = "1h", limit = 200, chain = "solana") =>

@@ -1,6 +1,7 @@
 import { jup, callFn, send, cache, INTEL_FN } from "../_lib.js";
 import { getLabeledHolders } from "../_holders.js";
 import { normToken, num } from "../_normalize.js";
+import { evmTrades, evmSecurity } from "../_evm.js";
 
 const GT_HDR = { Accept: "application/json;version=20230302" };
 const GT = "https://api.geckoterminal.com/api/v2";
@@ -72,6 +73,7 @@ async function computeAth(network, mint, token, fallbackPool) {
 export default async function handler(req, res) {
   const url  = new URL(req.url, "http://x");
   const mint = url.searchParams.get("mint") || "";
+  const chainHint = (url.searchParams.get("chain") || "").toLowerCase();
   if (!mint) return send(res, 400, { error: "mint required" });
   cache(res, 10, 30);
 
@@ -84,7 +86,11 @@ export default async function handler(req, res) {
       }).then(r => r.ok ? r.json() : null).catch(() => null);
 
       const pairs = (dexRaw?.pairs || []).filter(p => p.baseToken?.address?.toLowerCase() === mint.toLowerCase());
-      const best  = [...pairs].sort((a, b) => (num(b.liquidity?.usd) || 0) - (num(a.liquidity?.usd) || 0))[0] || null;
+      // Prefer pairs on the caller-specified chain (avoids picking the wrong
+      // chain when the same 0x address exists on several chains); else deepest LP.
+      const onHint = chainHint ? pairs.filter(p => String(p.chainId).toLowerCase() === chainHint) : [];
+      const pool   = (onHint.length ? onHint : pairs);
+      const best   = [...pool].sort((a, b) => (num(b.liquidity?.usd) || 0) - (num(a.liquidity?.usd) || 0))[0] || null;
 
       if (!best) return send(res, 200, { mint, token: null, pairs: [], error: "Token not found on any chain" });
 
@@ -127,7 +133,12 @@ export default async function handler(req, res) {
       }
 
       const gtNet = EVM_CHAIN_TO_GT[chain] || chain;
-      const { athPrice, athMcap } = await computeAth(gtNet, mint, token, best.pairAddress);
+      const [{ athPrice, athMcap }, trades, sec] = await Promise.all([
+        computeAth(gtNet, mint, token, best.pairAddress),
+        evmTrades(gtNet, best.pairAddress, mint, 100),
+        evmSecurity(chain, mint, token),
+      ]);
+      if (sec.holderCount != null) token.holderCount = sec.holderCount;
 
       const pairsMapped = pairs.slice(0, 5).map(p => ({
         dex: p.dexId, address: p.pairAddress, priceUsd: num(p.priceUsd),
@@ -137,7 +148,14 @@ export default async function handler(req, res) {
 
       return send(res, 200, {
         mint, token, athPrice, athMcap, pairs: pairsMapped, chain,
-        meta: { chain, socials: links.socials, banner: links.banner, ageDays: token.ageDays, createdAt: token.createdAt },
+        safety: sec.safety,
+        intel: { trades, holders: sec.holders },
+        flags: { securityUnavailable: sec.unsupported },
+        meta: {
+          chain, socials: links.socials, banner: links.banner,
+          ageDays: token.ageDays, createdAt: token.createdAt,
+          securityUnavailable: sec.unsupported,
+        },
       });
     } catch (e) {
       return send(res, 200, { mint, error: String(e?.message || e) });

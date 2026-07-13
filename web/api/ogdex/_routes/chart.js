@@ -8,6 +8,9 @@ const GT = "https://api.geckoterminal.com/api/v2";
 const NETWORK = {
   solana: "solana", ethereum: "eth", base: "base", bsc: "bsc",
   polygon: "polygon_pos", arbitrum: "arbitrum", avalanche: "avax", ton: "ton", tron: "tron", sui: "sui",
+  robinhood: "robinhood", optimism: "optimism", blast: "blast", sonic: "sonic",
+  berachain: "berachain", linea: "linea", scroll: "scroll", zksync: "zksync",
+  mantle: "mantle", celo: "celo",
 };
 
 // app interval -> GeckoTerminal { timeframe, aggregate }
@@ -35,7 +38,7 @@ export default async function handler(req, res) {
   let pool = url.searchParams.get("pool") || "";
   if (!mint && !pool) return send(res, 400, { ok: false, error: "mint required" });
 
-  const net = NETWORK[chain] || "solana";
+  const net = NETWORK[chain] || (chain && chain !== "solana" ? chain : "solana");
   const tf = TF[interval] || TF["1h"];
   cache(res, 30, 120);
 

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Loader2, Search, RefreshCw, Feather, TrendingUp, Flame, Droplets,
@@ -13,9 +14,8 @@ const SORTS: { key: SortKey; label: string; icon: any }[] = [
   { key: "change",    label: "24h %",     icon: ArrowUpRight },
 ];
 
-// GeckoTerminal / DexScreener slug for the Robinhood chain (see web/src/lib/chains.ts)
+// GeckoTerminal link for the Robinhood chain (see web/src/lib/chains.ts)
 const GT = (pool: string) => `https://www.geckoterminal.com/robinhood/pools/${pool}`;
-const DS = (pool: string) => `https://dexscreener.com/robinhood/${pool}`;
 
 function useCopy() {
   const [copied, setCopied] = useState<string | null>(null);
@@ -160,16 +160,16 @@ export default function Robinhood() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {view.map((t) => (
             <div key={t.mint} className="card p-4 space-y-3 transition-colors hover:border-accent/40">
-              <div className="flex items-center gap-3">
+              <Link to={`/token/${t.mint}?chain=robinhood`} className="flex items-center gap-3 group">
                 {t.icon
                   ? <img src={t.icon} className="w-10 h-10 rounded-full object-cover shrink-0" />
                   : <div className="w-10 h-10 rounded-full bg-panel2 grid place-items-center text-accent font-bold shrink-0">{(t.symbol || "?").slice(0, 2)}</div>}
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold text-sm truncate">{t.name || short(t.mint)}</div>
+                  <div className="font-bold text-sm truncate group-hover:text-accent transition-colors">{t.name || short(t.mint)}</div>
                   <div className="text-xs text-muted font-mono truncate">${t.symbol || "—"}</div>
                 </div>
                 <div className="text-xs"><Change v={t.change24h} /></div>
-              </div>
+              </Link>
 
               <div className="grid grid-cols-2 gap-1.5">
                 <Stat label="Market cap" value={t.mcap ? fmtUsd(t.mcap, { compact: true }) : "—"} accent />
@@ -185,8 +185,8 @@ export default function Robinhood() {
               </button>
 
               <div className="grid grid-cols-2 gap-1.5">
-                <a href={t.poolAddress ? GT(t.poolAddress) : "#"} target="_blank" rel="noreferrer" className="btn bg-accent/15 text-accent text-[11px] inline-flex items-center justify-center gap-1 py-1.5">Chart <ExternalLink className="w-3 h-3" /></a>
-                <a href={t.poolAddress ? DS(t.poolAddress) : "#"} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[11px] inline-flex items-center justify-center gap-1 py-1.5">DexScreener <ExternalLink className="w-3 h-3" /></a>
+                <Link to={`/token/${t.mint}?chain=robinhood`} className="btn bg-accent/15 text-accent text-[11px] inline-flex items-center justify-center gap-1 py-1.5 font-bold">View data <ArrowUpRight className="w-3 h-3" /></Link>
+                <a href={t.poolAddress ? GT(t.poolAddress) : "#"} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[11px] inline-flex items-center justify-center gap-1 py-1.5">Chart <ExternalLink className="w-3 h-3" /></a>
               </div>
             </div>
           ))}
