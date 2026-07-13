@@ -255,7 +255,10 @@ async function handleRecord(body, res) {
     creator_wallet,
     pay_currency: ["sol", "usdc", "usdt"].includes(pay_currency) ? pay_currency : "sol",
     fee_usd: isFirstLaunch ? 0 : FEE_USD,
-    payment_tx: payment_tx || "FREE_FIRST_LAUNCH",
+    // Placeholder for free launches must still be unique — payment_tx has a
+    // DB UNIQUE constraint, and a fixed literal here would let only the
+    // very first free launch ever succeed (every one after collides on it).
+    payment_tx: payment_tx || `FREE-${chain}-${mint}`,
     launch_tx: body.launch_tx || null,
     // Chain + launchpad live in the links jsonb (no schema migration needed);
     // legacy rows with no chain are treated as Solana everywhere.
