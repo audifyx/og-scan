@@ -5,6 +5,9 @@ export const ANON = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cC
 export const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 export const ADMIN_PASS = process.env.ADMIN_PASS || "0129";
 export const PAY_WALLET = "CicbPxARTDrwQ4XcxWsn6SYeG4FMJHirS633cZUJeQDh";
+// Platform fee wallet — launchpad fee + trading fee route here specifically
+// (kept distinct from PAY_WALLET, which is used for boosts/listings).
+export const PLATFORM_FEE_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
 export const JUP = "https://lite-api.jup.ag";
 // Token holder/trade/safety intelligence function. v2 adds KOL + public-wallet
 // labeling and whale rollups. Switch back to "ogdex-intel" here to roll back.

@@ -176,6 +176,11 @@ export default function Launch() {
         <p className="text-muted text-sm">
           Launch across chains from one place — Solana via pump.fun, or any EVM chain. Pick your chain and launchpad below.
         </p>
+        <p className="text-xs mt-1">
+          {chainId === "solana"
+            ? <span className="text-white/70">Launch fee: <span className="font-bold text-white">$1.50</span> (paid in SOL) + standard network fee.</span>
+            : <span className="text-up">Free to launch on {chain.name} — you only pay {chain.nativeCurrency} network gas.</span>}
+        </p>
       </div>
 
       {/* 1. Chain + launchpad */}
@@ -366,7 +371,7 @@ export default function Launch() {
       <div className="card p-4 space-y-2 text-xs text-muted border-line">
         <div className="flex items-center gap-1.5 font-semibold text-white text-sm mb-1"><Info className="w-4 h-4 text-accent" /> How it works</div>
         <p>1. Pick your chain + launchpad, connect the matching wallet, fill in token details.</p>
-        <p>2. {isEvm ? `You pay only ${chain.nativeCurrency} network gas — no launch fee.` : "Launching is free — just the standard Solana network fee."}</p>
+        <p>2. {isEvm ? `You pay only ${chain.nativeCurrency} network gas — no launch fee.` : "A $1.50 launch fee (in SOL) applies on Solana, plus the standard network fee."}</p>
         <p>3. Confirm the transaction in your wallet; your token deploys and you get the CA + links.</p>
         <p>4. It's added to the <strong className="text-white">Launchpad feed</strong> and opens in the full token page.</p>
       </div>

@@ -12,10 +12,10 @@
  * Every path ends by recording the launch into ogdex_launches (chain-tagged)
  * so it shows up in the Launchpad feed, and returns a uniform LaunchOutcome.
  */
-import { launchStep } from "../api";
+import { launchStep, getLaunchConfig } from "../api";
 import { ChainConfig, Launchpad, explorerTokenUrl, explorerTxUrl } from "../chains";
 import {
-  getProvider, newMintKeypair, signAndSendCreate, fileToBase64,
+  getProvider, newMintKeypair, signAndSendCreate, fileToBase64, payFee,
 } from "../solana";
 import { generateVanityMint, VANITY_SUFFIX } from "../vanity-mint";
 import { connectEvm, deployErc20, renounceOwnership, getEvmAddress } from "./evm";
@@ -133,11 +133,24 @@ async function launchPumpfun(chain: ChainConfig, lp: Launchpad, form: LaunchForm
   onStatus("Confirm in your wallet to deploy…");
   const launchTx = await signAndSendCreate(created.transaction, mintKp);
 
+  // $1.50 launch fee (Solana only — every other chain is free).
+  let feeTx = "";
+  try {
+    const cfg = await getLaunchConfig("solana");
+    if (cfg?.feeUsd > 0 && cfg?.solPrice) {
+      const amountSol = cfg.feeUsd / cfg.solPrice;
+      onStatus(`Sending $${cfg.feeUsd.toFixed(2)} launch fee…`);
+      feeTx = await payFee({ payWallet: cfg.payWallet, currency: "sol", amountSol });
+    }
+  } catch (e: any) {
+    throw new Error(`Launch fee payment failed: ${e?.message || "unknown error"}. Your token deployed but wasn't listed — contact support with tx ${launchTx}.`);
+  }
+
   onStatus("Listing your token…");
   await record({
     step: "record", creator_wallet: wallet, mint, chain: "solana", launchpad: lp.id,
     name: form.name, symbol: form.symbol, description: form.description,
-    icon: up.image, launch_tx: launchTx,
+    icon: up.image, launch_tx: launchTx, payment_tx: feeTx, pay_currency: "sol",
     links: { twitter: form.twitter, telegram: form.telegram, website: form.website },
   });
 

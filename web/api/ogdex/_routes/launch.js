@@ -1,12 +1,13 @@
-import { send, callFn, dbInsert, dbSelect, readBody, PAY_WALLET } from "../_lib.js";
+import { send, callFn, dbInsert, dbSelect, readBody, PLATFORM_FEE_WALLET } from "../_lib.js";
 
 /**
  * OG DEX Token Launcher backend.
  *
- * Flat $5 launch fee, paid in SOL or USDC/USDT to PAY_WALLET (same wallet as
- * boosts/listings), verified on-chain via the fee transaction signature.
+ * $1.50 launch fee on SOLANA launches only, paid in SOL to PLATFORM_FEE_WALLET,
+ * verified on-chain via the fee transaction signature. Every other chain
+ * (all 16 EVM chains) remains free.
  *
- * GET  /api/launch?config=1
+ * GET  /api/launch?config=1&chain=solana
  *   → { ok, feeUsd, payWallet, solPrice, usdcMint, usdtMint }
  *
  * POST /api/launch   (body.step)
@@ -15,31 +16,19 @@ import { send, callFn, dbInsert, dbSelect, readBody, PAY_WALLET } from "../_lib.
  *   step "create" { publicKey, metadataUri, name, symbol, mintPublicKey, devBuySol, slippage }
  *                 → { transaction }              (unsigned PumpPortal create tx, base64)
  *   step "record" { payment_tx, pay_currency, creator_wallet, mint, name, symbol, icon,
- *                   description, launch_tx, links }
- *                 → { ok, token }   verifies the $5 fee on-chain, then stores the launch
+ *                   description, launch_tx, links, chain }
+ *                 → { ok, token }   verifies the $1.50 fee on-chain (Solana only), then stores the launch
  *
  * Launched tokens are stored UNVERIFIED with no boost — they surface only in
  * the "Newly Listed" section (/api/launches).
  */
 
-const FEE_USD = 0;                        // launches are free — no fee charged
-const FEE_TOLERANCE = 0.92;               // (unused while FEE_USD is 0) accept >= 92% to absorb price drift
-const FREE_LAUNCH = FEE_USD <= 0;         // when true, every launch is free for every wallet
+const FEE_USD = 1.5;                      // Solana launch fee — other chains are free
+const FEE_TOLERANCE = 0.92;               // accept >= 92% of $1.50 to absorb price drift
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
 const STABLES = { [USDC_MINT]: "usdc", [USDT_MINT]: "usdt" };
-
-// A wallet's first launch is free — no fee required. Checked against the
-// ogdex_launches table (creator_wallet column).
-async function walletHasNoLaunches(wallet) {
-  try {
-    const rows = await dbSelect("ogdex_launches", `creator_wallet=eq.${encodeURIComponent(wallet)}&select=id&limit=1`);
-    return rows.length === 0;
-  } catch {
-    return false; // fail safe — if we can't check, don't hand out a free launch
-  }
-}
 
 /**
  * Duplicate-launch guard. No two Launchpad tokens may share the same name OR
@@ -114,11 +103,11 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const url = new URL(req.url, "http://x");
     if (url.searchParams.get("config")) {
+      const chain = (url.searchParams.get("chain") || "solana").toLowerCase();
       const solPrice = await solPriceUsd();
-      const wallet = (url.searchParams.get("wallet") || "").trim();
-      const isFirstLaunch = FREE_LAUNCH ? true : (wallet ? await walletHasNoLaunches(wallet) : false);
+      const feeUsd = chain === "solana" ? FEE_USD : 0;
       return send(res, 200, {
-        ok: true, feeUsd: FEE_USD, isFirstLaunch, payWallet: PAY_WALLET, solPrice,
+        ok: true, feeUsd, payWallet: PLATFORM_FEE_WALLET, solPrice,
         usdcMint: USDC_MINT, usdtMint: USDT_MINT, solMint: SOL_MINT,
       });
     }
@@ -223,13 +212,12 @@ async function handleRecord(body, res) {
   const launchpad = body.launchpad ? String(body.launchpad) : (chain === "solana" ? "pumpfun" : null);
   if (!mint) return send(res, 400, { ok: false, error: "mint required" });
 
-  // A wallet's first launch is free. Re-check server-side (never trust the
-  // client) right before recording, so this can't be spoofed. While
-  // FREE_LAUNCH is on, every launch is free — no fee, no payment_tx.
-  const isFirstLaunch = FREE_LAUNCH ? true : (creator_wallet ? await walletHasNoLaunches(creator_wallet) : false);
+  // $1.50 fee on Solana only — every other chain is free. Never trust the
+  // client's own claim about the chain being free; re-derive it here.
+  const chargeFee = chain === "solana";
 
   let verify = { ok: true, usd: 0, currency: pay_currency };
-  if (!isFirstLaunch) {
+  if (chargeFee) {
     if (!payment_tx) return send(res, 400, { ok: false, error: "payment_tx required" });
     // Reject reused payments (defence in depth — DB has a UNIQUE constraint too).
     try {
@@ -254,10 +242,10 @@ async function handleRecord(body, res) {
     description: body.description || null,
     creator_wallet,
     pay_currency: ["sol", "usdc", "usdt"].includes(pay_currency) ? pay_currency : "sol",
-    fee_usd: isFirstLaunch ? 0 : FEE_USD,
-    // Placeholder for free launches must still be unique — payment_tx has a
-    // DB UNIQUE constraint, and a fixed literal here would let only the
-    // very first free launch ever succeed (every one after collides on it).
+    fee_usd: chargeFee ? FEE_USD : 0,
+    // Placeholder for free (non-Solana) launches must still be unique —
+    // payment_tx has a DB UNIQUE constraint, and a fixed literal here would
+    // let only the very first free launch ever succeed.
     payment_tx: payment_tx || `FREE-${chain}-${mint}`,
     launch_tx: body.launch_tx || null,
     // Chain + launchpad live in the links jsonb (no schema migration needed);
@@ -285,7 +273,7 @@ async function handleRecord(body, res) {
   const isEvm = chain !== "solana";
   return send(res, 200, {
     ok: true,
-    token: { ...token, chain, launchpad, paidUsd: verify.usd, freeLaunch: isFirstLaunch },
+    token: { ...token, chain, launchpad, paidUsd: verify.usd, freeLaunch: !chargeFee },
     links: isEvm
       ? { ogdex: `/token/${mint}?chain=${chain}` }
       : { pumpfun: `https://pump.fun/${mint}`, solscan: `https://solscan.io/token/${mint}`, ogdex: `/token/${mint}` },
@@ -293,8 +281,8 @@ async function handleRecord(body, res) {
 }
 
 /**
- * Verify a fee payment transaction actually transferred >= $5 (allowing
- * small price drift) to PAY_WALLET, in SOL or the chosen stablecoin.
+ * Verify a fee payment transaction actually transferred >= $1.50 (allowing
+ * small price drift) to PLATFORM_FEE_WALLET, in SOL or the chosen stablecoin.
  */
 async function verifyFee(signature, payCurrency) {
   let tx;
@@ -310,7 +298,7 @@ async function verifyFee(signature, payCurrency) {
 
   if (payCurrency === "sol") {
     const keys = (tx.transaction?.message?.accountKeys || []).map((k) => (typeof k === "string" ? k : k.pubkey));
-    const idx = keys.indexOf(PAY_WALLET);
+    const idx = keys.indexOf(PLATFORM_FEE_WALLET);
     if (idx < 0) return { ok: false, error: "payment wallet not found in transaction" };
     const pre = tx.meta?.preBalances?.[idx] ?? 0;
     const post = tx.meta?.postBalances?.[idx] ?? 0;
@@ -323,12 +311,12 @@ async function verifyFee(signature, payCurrency) {
     return { ok: true, usd: Number(usd.toFixed(2)), currency: "sol" };
   }
 
-  // Stablecoin (USDC / USDT): compare token balance deltas owned by PAY_WALLET.
+  // Stablecoin (USDC / USDT): compare token balance deltas owned by PLATFORM_FEE_WALLET.
   const pre = tx.meta?.preTokenBalances || [];
   const post = tx.meta?.postTokenBalances || [];
   let best = 0;
   for (const pb of post) {
-    if (pb.owner !== PAY_WALLET) continue;
+    if (pb.owner !== PLATFORM_FEE_WALLET) continue;
     if (!STABLES[pb.mint]) continue;
     const match = pre.find((x) => x.accountIndex === pb.accountIndex) || {};
     const before = Number(match.uiTokenAmount?.uiAmount || 0);
