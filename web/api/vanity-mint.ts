@@ -1,6 +1,16 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { Keypair } from "@solana/web3.js";
+import { ed25519 } from "@noble/curves/ed25519";
 import bs58 from "bs58";
+
+// IMPORTANT: this endpoint intentionally does NOT import @solana/web3.js.
+// That pulls in rpc-websockets (for its Connection/RPC subscription code,
+// which this function never uses — it only ever generates keypairs), and a
+// recent rpc-websockets version requires the ESM-only `uuid` package via
+// require(), which crashes the whole function on cold start with
+// ERR_REQUIRE_ESM. @noble/curves/ed25519 generates keypairs in the exact
+// same format (32-byte seed + 32-byte pubkey = Solana's 64-byte secretKey),
+// fully compatible with Keypair.fromSecretKey() on the client, with zero
+// risk of dragging in unrelated networking deps.
 
 // Brute-forcing a 3-char base58 suffix needs ~100k+ keypair generations,
 // which reliably blows past Vercel's default function timeout. Hobby plan
@@ -11,6 +21,16 @@ export const config = {
 };
 
 const TIME_BUDGET_MS = 55_000; // leave headroom under the 60s hard limit
+
+interface EdKeypair { publicKey: Uint8Array; secretKey64: Uint8Array }
+
+function generateKeypair(): EdKeypair {
+  const kp = ed25519.keygen(); // { secretKey: 32-byte seed, publicKey: 32-byte pubkey }
+  const secretKey64 = new Uint8Array(64);
+  secretKey64.set(kp.secretKey, 0);
+  secretKey64.set(kp.publicKey, 32);
+  return { publicKey: kp.publicKey, secretKey64 };
+}
 
 /**
  * POST /api/vanity-mint
@@ -52,19 +72,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const startTime = Date.now();
 
     const suffixLower = suffix.toLowerCase();
-    let keypair: Keypair | null = null;
+    let keypair: EdKeypair | null = null;
     let attempts = 0;
 
     // Intensive search for vanity address — bounded by both attempt count
     // and a wall-clock time budget so we never let Vercel's hard timeout
     // cut us off mid-response.
     for (attempts = 0; attempts < maxIterations; attempts++) {
-      keypair = Keypair.generate();
-      const address = keypair.publicKey.toBase58().toLowerCase();
+      const candidate = generateKeypair();
+      const address = bs58.encode(candidate.publicKey).toLowerCase();
 
       if (address.endsWith(suffixLower)) {
+        keypair = candidate;
         console.log(
-          `[v0] Vanity mint found after ${attempts + 1} attempts, ${Date.now() - startTime}ms: ${keypair.publicKey.toBase58()}`
+          `[v0] Vanity mint found after ${attempts + 1} attempts, ${Date.now() - startTime}ms: ${bs58.encode(candidate.publicKey)}`
         );
         break;
       }
@@ -96,11 +117,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Return the keypair information
     // The secret key is returned to the client so they can use it for signing
-    const secretKeyBytes = keypair.secretKey;
+    const secretKeyBytes = keypair.secretKey64;
     const secretKeyBase58 = bs58.encode(secretKeyBytes);
 
     return res.status(200).json({
-      publicKey: keypair.publicKey.toBase58(),
+      publicKey: bs58.encode(keypair.publicKey),
       secretKey: secretKeyBase58,
       secretKeyArray: Array.from(secretKeyBytes),
       generatedAt: new Date().toISOString(),
