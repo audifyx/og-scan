@@ -1,36 +1,45 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Rocket, Wallet, Upload, Globe, Twitter, Send, Loader2, CheckCircle,
   Copy, ExternalLink, AlertTriangle, Sparkles, Image as ImageIcon, Info,
+  ChevronDown, Settings2, Flame, Coins, ShieldCheck,
 } from "lucide-react";
-import { getLaunchConfig, launchStep, LaunchConfig } from "../lib/api";
 import {
-  getProvider, connectWallet, payFee, newMintKeypair,
-  signAndSendCreate, fileToBase64,
-} from "../lib/solana";
-import { generateVanityMint, VANITY_SUFFIX } from "../lib/vanity-mint";
+  SUPPORTED_CHAINS, getChain, ChainConfig, Launchpad,
+} from "../lib/chains";
+import { getProvider, connectWallet } from "../lib/solana";
+import { connectEvm, getEvmAddress, hasEvmWallet } from "../lib/launch/evm";
+import { launchToken, LaunchOutcome, LaunchForm } from "../lib/launch";
+import { VANITY_SUFFIX } from "../lib/vanity-mint";
 
 const MAX_IMG = 5 * 1024 * 1024;
 const ACCEPTED = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
-type Currency = "sol" | "usdc" | "usdt";
-
-interface Result {
-  mint: string;
-  paymentTx: string;
-  launchTx: string;
-  links: { pumpfun: string; solscan: string; ogdex: string };
-}
-
 export default function Launch() {
-  const [wallet, setWallet] = useState<string | null>(null);
-  const [cfg, setCfg] = useState<LaunchConfig | null>(null);
-  const [currency, setCurrency] = useState<Currency>("sol");
+  const [chainId, setChainId] = useState("solana");
+  const chain = getChain(chainId);
+  const [lpId, setLpId] = useState(chain.launchpads[0].id);
+  const lp: Launchpad = useMemo(
+    () => chain.launchpads.find((l) => l.id === lpId) || chain.launchpads[0],
+    [chain, lpId]
+  );
+  const isEvm = chain.isEvm;
+  const isErc20 = lp.kind === "erc20";
+  const isPump = lp.kind === "pumpfun";
+
+  const [chainOpen, setChainOpen] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const [solWallet, setSolWallet] = useState<string | null>(null);
+  const [evmWallet, setEvmWallet] = useState<string | null>(null);
+  const wallet = isEvm ? evmWallet : solWallet;
 
   const [form, setForm] = useState({
     name: "", symbol: "", description: "",
-    twitter: "", telegram: "", website: "", devBuySol: "0",
+    twitter: "", telegram: "", website: "",
+    devBuySol: "0", vanity: true,
+    supply: "1000000000", decimals: "18", renounce: false,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -39,60 +48,28 @@ export default function Launch() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [result, setResult] = useState<Result | null>(null);
+  const [result, setResult] = useState<LaunchOutcome | null>(null);
   const [copied, setCopied] = useState("");
-  const [solPrice, setSolPrice] = useState<number | null>(null);
 
+  // When the chain changes, pick its first launchpad + close the picker.
+  useEffect(() => { setLpId(getChain(chainId).launchpads[0].id); setChainOpen(false); setError(""); }, [chainId]);
+
+  // Detect an already-connected wallet on mount / chain switch.
   useEffect(() => {
     const p = getProvider();
-    if (p?.publicKey) setWallet(p.publicKey.toString());
+    if (p?.publicKey) setSolWallet(p.publicKey.toString());
+    const a = getEvmAddress();
+    if (a) setEvmWallet(a);
   }, []);
 
-  // Refetch config whenever the connected wallet changes so we know if this
-  // wallet still has its free first launch available.
-  useEffect(() => {
-    getLaunchConfig(wallet ?? undefined).then(setCfg).catch(() => {});
-  }, [wallet]);
-
-  // SOL price is fetched client-side (browser CORS works with Jupiter) so the
-  // pay-in-SOL option always has a quote, regardless of server egress.
-  useEffect(() => {
-    const SOL = "So11111111111111111111111111111111111111112";
-    (async () => {
-      try {
-        const r = await fetch(`https://lite-api.jup.ag/price/v3?ids=${SOL}`);
-        const d = await r.json();
-        const p = Number(d?.[SOL]?.usdPrice);
-        if (p > 0) { setSolPrice(p); return; }
-      } catch {}
-      try {
-        const r = await fetch(`https://lite-api.jup.ag/price/v2?ids=${SOL}`);
-        const d = await r.json();
-        const p = Number(d?.data?.[SOL]?.price);
-        if (p > 0) setSolPrice(p);
-      } catch {}
-    })();
-  }, []);
-
-  const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
-
-  const feeUsd = cfg?.feeUsd ?? 0;
-  // Launches are free. Treat as free unless the server ever reports a real fee
-  // again — defaults to free even if the config request hasn't loaded yet.
-  const isFree = feeUsd <= 0 || !!cfg?.isFirstLaunch;
-  const isFirstLaunch = isFree;
-  const effSolPrice = solPrice ?? cfg?.solPrice ?? null;
-  const feeSol = effSolPrice ? feeUsd / effSolPrice : null;
-  const feeDisplay = isFree
-    ? "FREE"
-    : currency === "sol"
-    ? (feeSol ? `${feeSol.toFixed(4)} SOL` : `${feeUsd} in SOL`)
-    : `${feeUsd} ${currency.toUpperCase()}`;
+  const set = (k: keyof typeof form, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
   const onConnect = async () => {
     setError("");
-    try { setWallet(await connectWallet()); }
-    catch (e: any) { setError(e.message || "Failed to connect wallet"); }
+    try {
+      if (isEvm) setEvmWallet(await connectEvm());
+      else setSolWallet(await connectWallet());
+    } catch (e: any) { setError(e.message || "Failed to connect wallet"); }
   };
 
   const onPickImage = (f: File | null) => {
@@ -105,34 +82,22 @@ export default function Launch() {
   };
 
   const copy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(label); setTimeout(() => setCopied(""), 1500);
-    });
+    navigator.clipboard.writeText(text).then(() => { setCopied(label); setTimeout(() => setCopied(""), 1500); });
   };
 
   const validate = () => {
-    if (!wallet) return "Connect your wallet first";
+    if (lp.status === "soon") return `${lp.name} isn't wired up yet — pick "Standard Token" on ${chain.name}, or launch on Solana.`;
+    if (!wallet) return isEvm ? "Connect your EVM wallet first" : "Connect your Solana wallet first";
     if (!form.name.trim()) return "Token name is required";
     if (!form.symbol.trim()) return "Token symbol is required";
-    if (!imageFile) return "Upload a token image";
-    if (currency === "sol" && !effSolPrice) return "Could not load SOL price — try again";
-    return "";
-  };
-
-  const recordWithRetry = async (payload: any, tries = 4): Promise<any> => {
-    let last: any = null;
-    for (let i = 0; i < tries; i++) {
-      const r = await launchStep(payload);
-      if (r?.ok) return r;
-      last = r;
-      // fee tx may not be indexed yet — wait and retry
-      if (/not found|confirmation/i.test(r?.error || "")) {
-        await new Promise((res) => setTimeout(res, 2500));
-        continue;
-      }
-      break;
+    if (isPump && !imageFile) return "Upload a token image";
+    if (isErc20) {
+      const s = Number(form.supply);
+      if (!(s > 0)) return "Total supply must be greater than 0";
+      const d = Number(form.decimals);
+      if (!(d >= 0 && d <= 18)) return "Decimals must be between 0 and 18";
     }
-    throw new Error(last?.error || "Could not verify payment");
+    return "";
   };
 
   const launch = async () => {
@@ -140,74 +105,20 @@ export default function Launch() {
     if (v) { setError(v); return; }
     setError(""); setBusy(true); setResult(null);
     try {
-      /* 1. Launch fee — none; launching is free */
-      let paymentTx = "";
-      if (isFree) {
-        setStatus("Launching is free — no fee…");
-      } else {
-        setStatus(`Sending ${feeDisplay} launch fee…`);
-        paymentTx = await payFee({
-          payWallet: cfg!.payWallet,
-          currency,
-          amountSol: currency === "sol" ? feeSol! : undefined,
-          amountUsd: currency !== "sol" ? feeUsd : undefined,
-          tokenMint: currency === "usdc" ? cfg!.usdcMint : currency === "usdt" ? cfg!.usdtMint : undefined,
-        });
-      }
-
-      /* 2. Upload image + metadata to IPFS */
-      setStatus("Uploading image & metadata to IPFS…");
-      const imageBase64 = await fileToBase64(imageFile!);
-      const ipfs = await launchStep({
-        step: "ipfs", imageBase64, imageMimeType: imageFile!.type,
+      const payload: LaunchForm = {
         name: form.name, symbol: form.symbol, description: form.description,
         twitter: form.twitter, telegram: form.telegram, website: form.website,
-      });
-      if (!ipfs?.ok) throw new Error(ipfs?.error || "IPFS upload failed");
-
-      /* 3. Generate a custom vanity mint (CA ends in the brand suffix), then build the create tx */
-      setStatus(`Generating your custom …${VANITY_SUFFIX} contract address…`);
-      let mintKp;
-      try {
-        mintKp = (await generateVanityMint(VANITY_SUFFIX)).keypair;
-      } catch (ve) {
-        // Vanity search is probabilistic and bounded by the serverless time
-        // budget. If it can't find one in time, fall back to a standard mint
-        // so the launch never hard-fails.
-        console.warn("[launchpad] vanity mint unavailable, using standard mint:", ve);
-        mintKp = newMintKeypair();
-      }
-      const mint = mintKp.publicKey.toBase58();
-      setStatus("Preparing your token…");
-      const created = await launchStep({
-        step: "create", publicKey: wallet, metadataUri: ipfs.metadataUri,
-        name: form.name, symbol: form.symbol, mintPublicKey: mint,
-        devBuySol: parseFloat(form.devBuySol) || 0, slippage: 15,
-      });
-      if (!created?.ok) throw new Error(created?.error || "Failed to build transaction");
-
-      /* 4. Sign + broadcast (mint keypair + Phantom) */
-      setStatus("Confirm in your wallet to deploy…");
-      const launchTx = await signAndSendCreate(created.transaction, mintKp);
-
-      /* 5. Verify fee on-chain + record into Newly Listed */
-      setStatus("Verifying payment & listing your token…");
-      const rec = await recordWithRetry({
-        step: "record", payment_tx: paymentTx, pay_currency: currency,
-        creator_wallet: wallet, mint, name: form.name, symbol: form.symbol,
-        description: form.description, icon: ipfs.metadata?.image || null,
-        launch_tx: launchTx,
-        links: { twitter: form.twitter, telegram: form.telegram, website: form.website },
-      });
-
-      setResult({ mint, paymentTx, launchTx, links: rec.links });
+        imageFile,
+        devBuySol: form.devBuySol, vanity: form.vanity,
+        supply: form.supply, decimals: form.decimals, renounce: form.renounce,
+      };
+      const outcome = await launchToken(chain, lp, payload, wallet, setStatus);
+      setResult(outcome);
       setStatus("");
     } catch (e: any) {
       setError(e.message || "Launch failed");
       setStatus("");
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   /* ── Success screen ── */
@@ -219,7 +130,7 @@ export default function Launch() {
       <div>
         <h2 className="text-2xl font-black">Token Launched! 🚀</h2>
         <p className="text-muted text-sm mt-1">
-          {form.name} (${form.symbol}) is live on pump.fun and added to <span className="text-white">Newly Listed</span>.
+          {form.name} (${form.symbol}) is live on <span className="text-white">{lp.name}</span> ({chain.name}) and added to the Launchpad feed.
         </p>
       </div>
 
@@ -227,26 +138,23 @@ export default function Launch() {
         <div>
           <div className="text-xs text-muted mb-1">Contract address (CA)</div>
           <div className="flex items-center gap-2 bg-panel2 rounded-lg px-3 py-2">
-            <span className="font-mono text-xs text-white/80 break-all flex-1">{result.mint}</span>
-            <button onClick={() => copy(result.mint, "ca")} className="shrink-0 text-muted hover:text-white">
+            <span className="font-mono text-xs text-white/80 break-all flex-1">{result.address}</span>
+            <button onClick={() => copy(result.address, "ca")} className="shrink-0 text-muted hover:text-white">
               {copied === "ca" ? <CheckCircle className="w-4 h-4 text-up" /> : <Copy className="w-4 h-4" />}
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <a href={result.links.pumpfun} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-xs inline-flex items-center justify-center gap-1 py-2">pump.fun <ExternalLink className="w-3 h-3" /></a>
-          <a href={result.links.solscan} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-xs inline-flex items-center justify-center gap-1 py-2">Solscan <ExternalLink className="w-3 h-3" /></a>
-          <Link to={result.links.ogdex} className="btn bg-accent/15 text-accent text-xs inline-flex items-center justify-center gap-1 py-2">OrbitX DEX <ExternalLink className="w-3 h-3" /></Link>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {result.links.external.map((l) => (
+            <a key={l.url} href={l.url} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-xs inline-flex items-center justify-center gap-1 py-2">{l.label} <ExternalLink className="w-3 h-3" /></a>
+          ))}
+          <Link to={result.links.ogdex} className="btn bg-accent/15 text-accent text-xs inline-flex items-center justify-center gap-1 py-2">View data <ExternalLink className="w-3 h-3" /></Link>
         </div>
       </div>
 
-      <div className="flex items-center justify-center gap-2 text-xs text-muted">
-        <Info className="w-3.5 h-3.5" /> Launched tokens are unverified and not boosted. Want featured placement?
-        <Link to="/store" className="text-accent hover:underline">Boost or list it →</Link>
-      </div>
       <div className="flex gap-2 justify-center pt-2">
-        <Link to="/new" className="btn bg-accent text-black font-bold px-5 py-2.5">View Newly Listed</Link>
-        <button onClick={() => { setResult(null); setImageFile(null); setImagePreview(""); setForm({ name: "", symbol: "", description: "", twitter: "", telegram: "", website: "", devBuySol: "0" }); }} className="btn bg-panel2 text-white px-5 py-2.5">Launch another</button>
+        <Link to="/launchpad" className="btn bg-accent text-black font-bold px-5 py-2.5">Back to Launchpad</Link>
+        <button onClick={() => { setResult(null); setImageFile(null); setImagePreview(""); setForm((f) => ({ ...f, name: "", symbol: "", description: "", twitter: "", telegram: "", website: "" })); }} className="btn bg-panel2 text-white px-5 py-2.5">Launch another</button>
       </div>
     </div>
   );
@@ -260,13 +168,71 @@ export default function Launch() {
           <h1 className="text-2xl font-black">Launch a Token</h1>
         </div>
         <p className="text-muted text-sm">
-          <>Create a token on pump.fun directly from the OrbitX Launchpad. <span className="text-up font-semibold">Launching is free</span> — you only pay the standard Solana network fee, and every coin gets a <span className="text-accent font-semibold">custom …{VANITY_SUFFIX} contract address</span>. Your token appears in the Launchpad feed instantly.</>
+          Launch across chains from one place — Solana via pump.fun, or any EVM chain. Pick your chain and launchpad below.
         </p>
       </div>
 
-      {/* 1. Wallet */}
+      {/* 1. Chain + launchpad */}
+      <section className="space-y-3">
+        <label className="text-xs font-semibold text-muted uppercase tracking-wide">1. Chain &amp; launchpad</label>
+
+        {/* Chain dropdown */}
+        <div className="relative">
+          <button onClick={() => setChainOpen((o) => !o)}
+            className="w-full card p-3 flex items-center gap-3 hover:border-accent/40 transition-colors">
+            <span className="text-xl">{chain.emoji}</span>
+            <div className="text-left flex-1">
+              <div className="text-sm font-bold">{chain.name}</div>
+              <div className="text-[11px] text-muted">Native: {chain.nativeCurrency}</div>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-muted transition-transform ${chainOpen ? "rotate-180" : ""}`} />
+          </button>
+          {chainOpen && (
+            <div className="absolute z-20 mt-1 w-full max-h-72 overflow-auto card p-1 shadow-xl border-line">
+              {SUPPORTED_CHAINS.map((c) => (
+                <button key={c.id} onClick={() => setChainId(c.id)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-panel2 transition-colors ${c.id === chainId ? "bg-panel2" : ""}`}>
+                  <span className="text-lg">{c.emoji}</span>
+                  <span className="text-sm font-medium flex-1">{c.name}</span>
+                  <span className="text-[10px] text-muted font-mono">{c.shortName}</span>
+                  {c.id === chainId && <CheckCircle className="w-3.5 h-3.5 text-accent" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Launchpad picker */}
+        <div className="grid gap-2">
+          {chain.launchpads.map((l) => (
+            <button key={l.id} onClick={() => setLpId(l.id)}
+              className={`card p-3 flex items-center gap-3 text-left transition-colors ${l.id === lpId ? "border-accent/50 bg-accent/5" : "hover:border-line"}`}>
+              <span className="text-xl">{l.emoji}</span>
+              <div className="flex-1">
+                <div className="text-sm font-bold flex items-center gap-2">
+                  {l.name}
+                  {l.status === "soon"
+                    ? <span className="pill bg-yellow-400/15 text-yellow-400 text-[9px]">SOON</span>
+                    : <span className="pill bg-up/15 text-up text-[9px]">LIVE</span>}
+                </div>
+                <div className="text-[11px] text-muted">{l.description}</div>
+              </div>
+              {l.id === lpId && <CheckCircle className="w-4 h-4 text-accent shrink-0" />}
+            </button>
+          ))}
+        </div>
+
+        {lp.status === "soon" && (
+          <div className="flex items-start gap-2 text-[11px] text-yellow-400/90 bg-yellow-400/5 rounded-lg p-2.5 border border-yellow-400/20">
+            <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            {lp.name} integration is being wired up next. For now you can launch a real token on {chain.name} with <strong>Standard Token</strong>, or launch on Solana via pump.fun.
+          </div>
+        )}
+      </section>
+
+      {/* 2. Wallet */}
       <section className="space-y-2">
-        <label className="text-xs font-semibold text-muted uppercase tracking-wide">1. Connect wallet</label>
+        <label className="text-xs font-semibold text-muted uppercase tracking-wide">2. Connect {isEvm ? "EVM" : "Solana"} wallet</label>
         {wallet ? (
           <div className="card p-3 flex items-center gap-2">
             <Wallet className="w-4 h-4 text-up" />
@@ -275,14 +241,17 @@ export default function Launch() {
           </div>
         ) : (
           <button onClick={onConnect} className="w-full btn bg-accent text-black font-bold py-3 inline-flex items-center justify-center gap-2">
-            <Wallet className="w-4 h-4" /> Connect Phantom
+            <Wallet className="w-4 h-4" /> {isEvm ? "Connect EVM wallet" : "Connect Phantom"}
           </button>
+        )}
+        {isEvm && !hasEvmWallet() && !wallet && (
+          <div className="text-[11px] text-muted">No EVM wallet detected — install MetaMask (or Rabby / Phantom-EVM) to launch on {chain.name}.</div>
         )}
       </section>
 
-      {/* 2. Token details */}
+      {/* 3. Token details */}
       <section className="space-y-3">
-        <label className="text-xs font-semibold text-muted uppercase tracking-wide">2. Token details</label>
+        <label className="text-xs font-semibold text-muted uppercase tracking-wide">3. Token details</label>
         <div className="grid grid-cols-2 gap-3">
           <input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Token name" maxLength={32}
             className="card p-3 text-sm bg-transparent outline-none placeholder:text-muted/40" />
@@ -300,7 +269,7 @@ export default function Launch() {
             : <div className="w-12 h-12 rounded-lg bg-panel2 grid place-items-center"><ImageIcon className="w-5 h-5 text-muted" /></div>}
           <div className="flex-1">
             <div className="text-sm font-medium flex items-center gap-1.5"><Upload className="w-3.5 h-3.5 text-accent" /> {imageFile ? imageFile.name : "Upload token image"}</div>
-            <div className="text-xs text-muted">PNG, JPG, GIF or WEBP — max 5MB</div>
+            <div className="text-xs text-muted">PNG, JPG, GIF or WEBP — max 5MB{isErc20 ? " (optional)" : ""}</div>
           </div>
           <input ref={fileRef} type="file" accept={ACCEPTED.join(",")} className="hidden"
             onChange={(e) => onPickImage(e.target.files?.[0] || null)} />
@@ -312,46 +281,69 @@ export default function Launch() {
           <div className="card p-2.5 flex items-center gap-2"><Send className="w-4 h-4 text-muted shrink-0" /><input value={form.telegram} onChange={(e) => set("telegram", e.target.value)} placeholder="Telegram (optional)" className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted/40" /></div>
           <div className="card p-2.5 flex items-center gap-2"><Globe className="w-4 h-4 text-muted shrink-0" /><input value={form.website} onChange={(e) => set("website", e.target.value)} placeholder="Website (optional)" className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted/40" /></div>
         </div>
-
-        {/* Optional dev buy */}
-        <div className="card p-3 flex items-center gap-3">
-          <Sparkles className="w-4 h-4 text-accent shrink-0" />
-          <div className="flex-1">
-            <div className="text-sm font-medium">Dev buy (optional)</div>
-            <div className="text-xs text-muted">Buy your own token at launch, in SOL</div>
-          </div>
-          <input type="number" min="0" step="0.01" value={form.devBuySol} onChange={(e) => set("devBuySol", e.target.value)}
-            className="w-24 bg-panel2 rounded-lg px-3 py-1.5 text-sm text-right outline-none font-mono" />
-        </div>
       </section>
 
-      {/* 3. Fee */}
+      {/* 4. Advanced / customization */}
       <section className="space-y-3">
-        <label className="text-xs font-semibold text-muted uppercase tracking-wide">3. Launch fee</label>
-        {!isFirstLaunch && (
-          <div className="flex gap-1 bg-panel2 rounded-lg p-1 w-fit">
-            {(["sol", "usdc", "usdt"] as Currency[]).map((c) => (
-              <button key={c} onClick={() => setCurrency(c)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${currency === c ? "bg-panel text-white" : "text-muted hover:text-white"}`}>
-                {c === "sol" ? "Pay in SOL" : c.toUpperCase()}
-              </button>
-            ))}
+        <button onClick={() => setShowAdvanced((s) => !s)} className="flex items-center gap-2 text-xs font-semibold text-muted uppercase tracking-wide hover:text-white transition-colors">
+          <Settings2 className="w-3.5 h-3.5" /> 4. Advanced options
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+        </button>
+
+        {showAdvanced && (
+          <div className="space-y-2.5">
+            {isPump && (
+              <>
+                <div className="card p-3 flex items-center gap-3">
+                  <Sparkles className="w-4 h-4 text-accent shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">Dev buy (optional)</div>
+                    <div className="text-xs text-muted">Buy your own token at launch, in SOL</div>
+                  </div>
+                  <input type="number" min="0" step="0.01" value={form.devBuySol} onChange={(e) => set("devBuySol", e.target.value)}
+                    className="w-24 bg-panel2 rounded-lg px-3 py-1.5 text-sm text-right outline-none font-mono" />
+                </div>
+                <label className="card p-3 flex items-center gap-3 cursor-pointer">
+                  <Coins className="w-4 h-4 text-accent shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">Custom vanity CA</div>
+                    <div className="text-xs text-muted">Contract address ends in …{VANITY_SUFFIX}</div>
+                  </div>
+                  <input type="checkbox" checked={form.vanity} onChange={(e) => set("vanity", e.target.checked)} className="w-4 h-4 accent-[color:var(--accent,#00FFA3)]" />
+                </label>
+              </>
+            )}
+
+            {isErc20 && (
+              <>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="card p-3">
+                    <div className="text-xs text-muted mb-1">Total supply</div>
+                    <input type="number" min="1" value={form.supply} onChange={(e) => set("supply", e.target.value)}
+                      className="w-full bg-transparent text-sm outline-none font-mono" />
+                  </div>
+                  <div className="card p-3">
+                    <div className="text-xs text-muted mb-1">Decimals</div>
+                    <input type="number" min="0" max="18" value={form.decimals} onChange={(e) => set("decimals", e.target.value)}
+                      className="w-full bg-transparent text-sm outline-none font-mono" />
+                  </div>
+                </div>
+                <label className="card p-3 flex items-center gap-3 cursor-pointer">
+                  <Flame className="w-4 h-4 text-accent shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">Renounce ownership on launch</div>
+                    <div className="text-xs text-muted">Locks supply permanently — no future minting (trustless)</div>
+                  </div>
+                  <input type="checkbox" checked={form.renounce} onChange={(e) => set("renounce", e.target.checked)} className="w-4 h-4" />
+                </label>
+                <div className="flex items-start gap-2 text-[11px] text-muted">
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-0.5 text-accent" />
+                  Deploys a real ERC-20 (holder burn + optional owner mint). Add liquidity on {chain.name}'s DEX after launch to make it tradable.
+                </div>
+              </>
+            )}
           </div>
         )}
-        <div className={`card p-4 flex items-center gap-3 ${isFirstLaunch ? "border-up/30 bg-up/5" : ""}`}>
-          <Wallet className={`w-5 h-5 shrink-0 ${isFirstLaunch ? "text-up" : "text-accent"}`} />
-          <div>
-            <div className="text-xs text-muted">Launch fee</div>
-            <div className={`text-2xl font-black ${isFree ? "text-up" : ""}`}>{feeDisplay}</div>
-            {isFree
-              ? <div className="text-xs text-muted">Launching is free</div>
-              : currency === "sol" && <div className="text-xs text-muted">(${feeUsd} at current SOL price)</div>}
-          </div>
-          <div className="ml-auto text-right text-xs text-muted">
-            <div>+ ~0.02 SOL</div>
-            <div>network fee</div>
-          </div>
-        </div>
       </section>
 
       {error && (
@@ -360,17 +352,17 @@ export default function Launch() {
         </div>
       )}
 
-      <button onClick={launch} disabled={busy || !wallet}
+      <button onClick={launch} disabled={busy || lp.status === "soon"}
         className="w-full btn bg-accent text-black font-bold py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
-        {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> {status || "Launching…"}</> : <><Rocket className="w-4 h-4" /> Launch token ({feeDisplay})</>}
+        {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> {status || "Launching…"}</> : <><Rocket className="w-4 h-4" /> Launch on {lp.name}</>}
       </button>
 
       <div className="card p-4 space-y-2 text-xs text-muted border-line">
         <div className="flex items-center gap-1.5 font-semibold text-white text-sm mb-1"><Info className="w-4 h-4 text-accent" /> How it works</div>
-        <p>1. Connect your wallet and fill in your token details + image.</p>
-        <p>2. {isFree ? "Launching is free — no launch fee, just the standard Solana network fee." : `Pay the ${feeUsd} launch fee (SOL or USDC/USDT) — verified on-chain automatically.`}</p>
-        <p>3. Confirm the create transaction; your token deploys on pump.fun and you get the link + CA.</p>
-        <p>4. It's added to <strong className="text-white">Newly Listed</strong>. Launched tokens are unverified with no boost — boost or list separately for featured placement.</p>
+        <p>1. Pick your chain + launchpad, connect the matching wallet, fill in token details.</p>
+        <p>2. {isEvm ? `You pay only ${chain.nativeCurrency} network gas — no launch fee.` : "Launching is free — just the standard Solana network fee."}</p>
+        <p>3. Confirm the transaction in your wallet; your token deploys and you get the CA + links.</p>
+        <p>4. It's added to the <strong className="text-white">Launchpad feed</strong> and opens in the full token page.</p>
       </div>
     </div>
   );

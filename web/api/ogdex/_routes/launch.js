@@ -50,7 +50,7 @@ async function walletHasNoLaunches(wallet) {
  *
  * Returns { field, value, existing } for the first collision, or null.
  */
-async function findDuplicateLaunch(name, symbol) {
+async function findDuplicateLaunch(name, symbol, chain = "solana") {
   const nm = String(name || "").trim();
   const sy = String(symbol || "").trim();
   const filters = [];
@@ -62,7 +62,7 @@ async function findDuplicateLaunch(name, symbol) {
   try {
     rows = await dbSelect(
       "ogdex_launches",
-      `or=(${filters.join(",")})&status=eq.listed&select=id,name,symbol,mint&limit=50`
+      `or=(${filters.join(",")})&status=eq.listed&select=id,name,symbol,mint,links&limit=100`
     );
   } catch {
     return null; // fail-open on lookup error — never block a launch on infra hiccup
@@ -70,7 +70,11 @@ async function findDuplicateLaunch(name, symbol) {
 
   const nml = nm.toLowerCase();
   const syl = sy.toLowerCase();
+  // Duplicates are scoped PER CHAIN — the same name may exist on Solana and BSC.
+  // Chain is stored inside the links jsonb; legacy rows with no chain are Solana.
   for (const r of rows) {
+    const rowChain = (r.links && r.links.chain) || "solana";
+    if (rowChain !== chain) continue;
     if (nm && String(r.name || "").trim().toLowerCase() === nml)
       return { field: "name", value: nm, existing: r };
     if (sy && String(r.symbol || "").trim().toLowerCase() === syl)
@@ -143,7 +147,7 @@ async function handleIpfs(body, res) {
 
   // Reject duplicate launches up front — before any IPFS upload or on-chain
   // deploy — so the user finds out immediately, not after paying gas.
-  const dup = await findDuplicateLaunch(name, symbol);
+  const dup = await findDuplicateLaunch(name, symbol, String(body.chain || "solana").toLowerCase());
   if (dup) return send(res, 409, { ok: false, error: dupError(dup) });
 
   const imageBuffer = Buffer.from(imageBase64, "base64");
@@ -173,7 +177,7 @@ async function handleCreate(body, res) {
 
   // Defence in depth: block dup name/symbol before building the on-chain tx,
   // in case a client reaches this step without going through "ipfs".
-  const dupC = await findDuplicateLaunch(name, symbol);
+  const dupC = await findDuplicateLaunch(name, symbol, "solana");
   if (dupC) return send(res, 409, { ok: false, error: dupError(dupC) });
 
   const payload = {
@@ -200,6 +204,8 @@ async function handleRecord(body, res) {
   const payment_tx = String(body.payment_tx || "").trim();
   const pay_currency = String(body.pay_currency || "sol").toLowerCase();
   const creator_wallet = body.creator_wallet || null;
+  const chain = String(body.chain || "solana").toLowerCase();
+  const launchpad = body.launchpad ? String(body.launchpad) : (chain === "solana" ? "pumpfun" : null);
   if (!mint) return send(res, 400, { ok: false, error: "mint required" });
 
   // A wallet's first launch is free. Re-check server-side (never trust the
@@ -236,14 +242,16 @@ async function handleRecord(body, res) {
     fee_usd: isFirstLaunch ? 0 : FEE_USD,
     payment_tx: payment_tx || "FREE_FIRST_LAUNCH",
     launch_tx: body.launch_tx || null,
-    links: body.links || {},
+    // Chain + launchpad live in the links jsonb (no schema migration needed);
+    // legacy rows with no chain are treated as Solana everywhere.
+    links: { ...(body.links || {}), chain, launchpad, contract: mint },
     status: "listed",
   };
 
   // Authoritative duplicate guard — the last line of defence before a token
   // enters the Launchpad feed. Nothing gets listed twice under the same
-  // name/symbol, even if earlier client-side steps were bypassed.
-  const dupR = await findDuplicateLaunch(row.name, row.symbol);
+  // name/symbol on the same chain, even if earlier client-side steps were bypassed.
+  const dupR = await findDuplicateLaunch(row.name, row.symbol, chain);
   if (dupR && dupR.existing?.mint !== mint)
     return send(res, 409, { ok: false, error: dupError(dupR) });
 
@@ -256,14 +264,13 @@ async function handleRecord(body, res) {
     throw e;
   }
   const token = (inserted && inserted[0]) || row;
+  const isEvm = chain !== "solana";
   return send(res, 200, {
     ok: true,
-    token: { ...token, paidUsd: verify.usd, freeLaunch: isFirstLaunch },
-    links: {
-      pumpfun: `https://pump.fun/${mint}`,
-      solscan: `https://solscan.io/token/${mint}`,
-      ogdex: `/token/${mint}`,
-    },
+    token: { ...token, chain, launchpad, paidUsd: verify.usd, freeLaunch: isFirstLaunch },
+    links: isEvm
+      ? { ogdex: `/token/${mint}?chain=${chain}` }
+      : { pumpfun: `https://pump.fun/${mint}`, solscan: `https://solscan.io/token/${mint}`, ogdex: `/token/${mint}` },
   });
 }
 

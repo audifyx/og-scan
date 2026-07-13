@@ -159,7 +159,8 @@ export interface LaunchedToken {
   launch_tx?: string | null; priceUsd?: number | null; mcap?: number | null;
   volume24h?: number | null; liquidity?: number | null;
   verified: boolean; boosted: boolean; source?: string;
-  links: { pumpfun: string; solscan: string; ogdex: string };
+  chain?: string; launchpad?: string | null;
+  links: { pumpfun?: string; solscan?: string; explorer?: string; ogdex: string };
 }
 export const getLaunchConfig = (wallet?: string) =>
   j<LaunchConfig>(`/api/ogdex/launch?config=1${wallet ? `&wallet=${encodeURIComponent(wallet)}` : ""}`);

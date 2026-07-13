@@ -5,6 +5,7 @@ import {
   Copy, Check, RefreshCw, Flame, TrendingUp, Droplets, Clock, User,
 } from "lucide-react";
 import { getLaunches, LaunchedToken, fmtUsd, short } from "../lib/api";
+import { getChain } from "../lib/chains";
 import { VANITY_SUFFIX, isVanityAddress } from "../lib/vanity-mint";
 
 type SortKey = "new" | "mcap" | "volume" | "liquidity";
@@ -232,7 +233,10 @@ export default function LaunchpadFeed() {
                       {t.name || short(t.mint)}
                       {isNew && <span className="pill bg-up/20 text-up text-[8px] font-black animate-pulse">NEW</span>}
                     </div>
-                    <div className="text-xs text-muted font-mono truncate">${t.symbol || "—"}</div>
+                    <div className="text-xs text-muted font-mono truncate flex items-center gap-1">
+                      ${t.symbol || "—"}
+                      {t.chain && <span className="pill bg-panel2 text-muted/80 text-[8px] font-bold uppercase">{getChain(t.chain).shortName}</span>}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-muted/70 shrink-0"><Clock className="w-3 h-3" />{timeAgo(t.created_at)}</div>
                 </div>
@@ -254,9 +258,15 @@ export default function LaunchpadFeed() {
                 </div>
 
                 <div className="grid grid-cols-3 gap-1.5">
-                  <Link to={`/token/${t.mint}`} className="btn bg-accent/15 text-accent text-[11px] inline-flex items-center justify-center gap-1 py-1.5">Chart</Link>
-                  <a href={t.links.pumpfun} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[11px] inline-flex items-center justify-center gap-1 py-1.5">pump <ExternalLink className="w-3 h-3" /></a>
-                  <a href={t.links.solscan} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[11px] inline-flex items-center justify-center gap-1 py-1.5">scan <ExternalLink className="w-3 h-3" /></a>
+                  <Link to={t.chain && t.chain !== "solana" ? `/token/${t.mint}?chain=${t.chain}` : `/token/${t.mint}`} className="btn bg-accent/15 text-accent text-[11px] inline-flex items-center justify-center gap-1 py-1.5">Chart</Link>
+                  {t.chain && t.chain !== "solana" ? (
+                    <a href={t.links.explorer || "#"} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[11px] inline-flex items-center justify-center gap-1 py-1.5 col-span-2">explorer <ExternalLink className="w-3 h-3" /></a>
+                  ) : (
+                    <>
+                      <a href={t.links.pumpfun || "#"} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[11px] inline-flex items-center justify-center gap-1 py-1.5">pump <ExternalLink className="w-3 h-3" /></a>
+                      <a href={t.links.solscan || "#"} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[11px] inline-flex items-center justify-center gap-1 py-1.5">scan <ExternalLink className="w-3 h-3" /></a>
+                    </>
+                  )}
                 </div>
               </div>
             );
