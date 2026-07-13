@@ -105,8 +105,21 @@ async function launchPumpfun(chain: ChainConfig, lp: Launchpad, form: LaunchForm
 
   onStatus(form.vanity ? `Generating your custom …${VANITY_SUFFIX} contract address…` : "Preparing mint…");
   let mintKp;
-  try { mintKp = form.vanity ? (await generateVanityMint(VANITY_SUFFIX)).keypair : newMintKeypair(); }
-  catch { mintKp = newMintKeypair(); }
+  let vanityUsed = false;
+  if (form.vanity) {
+    try {
+      mintKp = (await generateVanityMint(VANITY_SUFFIX)).keypair;
+      vanityUsed = true;
+    } catch (e: any) {
+      // Vanity generation is probabilistic and can occasionally fail (timeout,
+      // rate limit, etc). Don't block the launch — but don't pretend it
+      // worked either. Tell the user before falling back to a standard mint.
+      onStatus(`Couldn't generate a custom …${VANITY_SUFFIX} address (${e?.message || "unknown error"}) — using a standard address instead…`);
+      mintKp = newMintKeypair();
+    }
+  } else {
+    mintKp = newMintKeypair();
+  }
   const mint = mintKp.publicKey.toBase58();
 
   onStatus("Preparing your token…");
@@ -129,7 +142,7 @@ async function launchPumpfun(chain: ChainConfig, lp: Launchpad, form: LaunchForm
   });
 
   return {
-    chain: "solana", launchpadId: lp.id, address: mint, txHash: launchTx, vanity: form.vanity,
+    chain: "solana", launchpadId: lp.id, address: mint, txHash: launchTx, vanity: vanityUsed,
     links: {
       external: [
         { label: "pump.fun", url: `https://pump.fun/${mint}` },

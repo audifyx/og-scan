@@ -135,7 +135,14 @@ export default function Launch() {
 
       <div className="card p-4 space-y-3 text-left">
         <div>
-          <div className="text-xs text-muted mb-1">Contract address (CA)</div>
+          <div className="text-xs text-muted mb-1 flex items-center gap-1.5">
+            Contract address (CA)
+            {result.vanity ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-up/15 text-up">ends in "obx" ✓</span>
+            ) : form.vanity ? (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-down/15 text-down">vanity generation failed — standard address used</span>
+            ) : null}
+          </div>
           <div className="flex items-center gap-2 bg-panel2 rounded-lg px-3 py-2">
             <span className="font-mono text-xs text-white/80 break-all flex-1">{result.address}</span>
             <button onClick={() => copy(result.address, "ca")} className="shrink-0 text-muted hover:text-white">
