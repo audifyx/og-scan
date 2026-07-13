@@ -157,6 +157,7 @@ export interface LaunchedToken {
   mint: string; symbol?: string | null; name?: string | null; icon?: string | null;
   description?: string | null; creator_wallet?: string | null; created_at: string;
   launch_tx?: string | null; priceUsd?: number | null; mcap?: number | null;
+  volume24h?: number | null; liquidity?: number | null;
   verified: boolean; boosted: boolean; source?: string;
   links: { pumpfun: string; solscan: string; ogdex: string };
 }

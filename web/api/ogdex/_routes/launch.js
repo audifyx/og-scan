@@ -41,6 +41,49 @@ async function walletHasNoLaunches(wallet) {
   }
 }
 
+/**
+ * Duplicate-launch guard. No two Launchpad tokens may share the same name OR
+ * the same symbol (case-insensitive, trimmed). The DB narrows candidates with
+ * a case-insensitive `ilike`; we then confirm an EXACT case-insensitive match
+ * in JS so that names containing SQL wildcard characters (% or _) can't cause
+ * false positives that would block a legitimate launch.
+ *
+ * Returns { field, value, existing } for the first collision, or null.
+ */
+async function findDuplicateLaunch(name, symbol) {
+  const nm = String(name || "").trim();
+  const sy = String(symbol || "").trim();
+  const filters = [];
+  if (nm) filters.push(`name.ilike.${encodeURIComponent(nm)}`);
+  if (sy) filters.push(`symbol.ilike.${encodeURIComponent(sy)}`);
+  if (!filters.length) return null;
+
+  let rows = [];
+  try {
+    rows = await dbSelect(
+      "ogdex_launches",
+      `or=(${filters.join(",")})&status=eq.listed&select=id,name,symbol,mint&limit=50`
+    );
+  } catch {
+    return null; // fail-open on lookup error — never block a launch on infra hiccup
+  }
+
+  const nml = nm.toLowerCase();
+  const syl = sy.toLowerCase();
+  for (const r of rows) {
+    if (nm && String(r.name || "").trim().toLowerCase() === nml)
+      return { field: "name", value: nm, existing: r };
+    if (sy && String(r.symbol || "").trim().toLowerCase() === syl)
+      return { field: "symbol", value: sy, existing: r };
+  }
+  return null;
+}
+
+function dupError(dup) {
+  const label = dup.field === "name" ? "name" : "ticker";
+  return `A token with that ${label} ("${dup.value}") has already been launched on the OrbitX Launchpad. Duplicate launches aren't allowed — pick a different ${dup.field}.`;
+}
+
 async function rpc(method, params) {
   const r = await callFn("rpc-proxy", { jsonrpc: "2.0", id: 1, method, params });
   return r?.data?.result ?? r?.result ?? null;
@@ -98,6 +141,11 @@ async function handleIpfs(body, res) {
   if (!imageBase64 || !name || !symbol)
     return send(res, 400, { ok: false, error: "imageBase64, name and symbol are required" });
 
+  // Reject duplicate launches up front — before any IPFS upload or on-chain
+  // deploy — so the user finds out immediately, not after paying gas.
+  const dup = await findDuplicateLaunch(name, symbol);
+  if (dup) return send(res, 409, { ok: false, error: dupError(dup) });
+
   const imageBuffer = Buffer.from(imageBase64, "base64");
   const ext = (imageMimeType || "image/png").split("/")[1] || "png";
   const form = new FormData();
@@ -122,6 +170,11 @@ async function handleCreate(body, res) {
   const { publicKey, metadataUri, name, symbol, mintPublicKey, devBuySol, slippage } = body;
   if (!publicKey || !metadataUri || !name || !symbol || !mintPublicKey)
     return send(res, 400, { ok: false, error: "missing required fields" });
+
+  // Defence in depth: block dup name/symbol before building the on-chain tx,
+  // in case a client reaches this step without going through "ipfs".
+  const dupC = await findDuplicateLaunch(name, symbol);
+  if (dupC) return send(res, 409, { ok: false, error: dupError(dupC) });
 
   const payload = {
     publicKey, action: "create",
@@ -186,6 +239,14 @@ async function handleRecord(body, res) {
     links: body.links || {},
     status: "listed",
   };
+
+  // Authoritative duplicate guard — the last line of defence before a token
+  // enters the Launchpad feed. Nothing gets listed twice under the same
+  // name/symbol, even if earlier client-side steps were bypassed.
+  const dupR = await findDuplicateLaunch(row.name, row.symbol);
+  if (dupR && dupR.existing?.mint !== mint)
+    return send(res, 409, { ok: false, error: dupError(dupR) });
+
   let inserted;
   try {
     inserted = await dbInsert("ogdex_launches", row);

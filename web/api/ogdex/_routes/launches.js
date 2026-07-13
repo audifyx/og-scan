@@ -32,6 +32,8 @@ export default async function handler(req, res) {
         launch_tx: r.launch_tx || null,
         priceUsd: m.price ?? null,
         mcap: m.mcap ?? null,
+        volume24h: m.volume24h ?? null,
+        liquidity: m.liquidity ?? null,
         verified: false,
         boosted: false,
         source: "ogdex-launch",

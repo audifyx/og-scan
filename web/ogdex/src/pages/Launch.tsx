@@ -165,7 +165,7 @@ export default function Launch() {
       });
       if (!ipfs?.ok) throw new Error(ipfs?.error || "IPFS upload failed");
 
-      /* 3. Generate a custom vanity mint (CA ends in "orb"), then build the create tx */
+      /* 3. Generate a custom vanity mint (CA ends in the brand suffix), then build the create tx */
       setStatus(`Generating your custom …${VANITY_SUFFIX} contract address…`);
       let mintKp;
       try {

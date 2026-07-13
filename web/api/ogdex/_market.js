@@ -11,7 +11,7 @@ export async function enrichTokens(mints) {
     const chunk = uniq.slice(i, i + 30);
     try {
       const r = await fetch(`${GT}/networks/solana/tokens/multi/${chunk.join(",")}`, { headers: { Accept: "application/json;version=20230302" } });
-      if (r.ok) { const d = await r.json(); for (const t of d?.data || []) { const a = t.attributes || {}; out[a.address] = { symbol: a.symbol, name: a.name, image: a.image_url && a.image_url !== "missing.png" ? a.image_url : null, price: Number(a.price_usd) || null, mcap: Number(a.market_cap_usd) || Number(a.fdv_usd) || null }; } }
+      if (r.ok) { const d = await r.json(); for (const t of d?.data || []) { const a = t.attributes || {}; out[a.address] = { symbol: a.symbol, name: a.name, image: a.image_url && a.image_url !== "missing.png" ? a.image_url : null, price: Number(a.price_usd) || null, mcap: Number(a.market_cap_usd) || Number(a.fdv_usd) || null, volume24h: Number(a.volume_usd?.h24) || null, liquidity: Number(a.total_reserve_in_usd) || null }; } }
     } catch {}
   }
   // Jupiter price fallback for any missing price
