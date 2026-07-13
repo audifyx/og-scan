@@ -4,13 +4,13 @@ import { Keypair } from "@solana/web3.js";
  * OrbitX Launchpad vanity mint.
  *
  * Every coin launched through the Launchpad gets a custom contract address
- * (CA) ending in the brand suffix "orb". Generation is done server-side by
+ * (CA) ending in the brand suffix "obx". Generation is done server-side by
  * /api/vanity-mint (brute-forcing base58 suffixes is CPU heavy and would
  * freeze the browser), which returns the mint keypair. We reconstruct the
  * Keypair from the raw secret-key bytes so the dex app needs no extra base58
  * dependency.
  */
-export const VANITY_SUFFIX = "orb";
+export const VANITY_SUFFIX = "obx";
 
 export interface VanityMint {
   keypair: Keypair;

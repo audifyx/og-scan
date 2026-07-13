@@ -15,13 +15,13 @@ const TIME_BUDGET_MS = 55_000; // leave headroom under the 60s hard limit
 /**
  * POST /api/vanity-mint
  *
- * Generate a Solana vanity mint keypair whose address ends with "orb" — the
+ * Generate a Solana vanity mint keypair whose address ends with "obx" — the
  * OrbitX Launchpad brand suffix. Every coin launched through the Launchpad
- * gets a custom CA ending in "orb". Computation time: ~1s for a 3-char suffix.
+ * gets a custom CA ending in "obx". Computation time: ~1s for a 3-char suffix.
  *
  * Request body:
  * {
- *   suffix?: string; // defaults to "orb" (3 chars)
+ *   suffix?: string; // defaults to "obx" (3 chars)
  *   maxIterations?: number; // defaults to 1000000
  * }
  *
@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { suffix = "orb", maxIterations = 1000000 } = req.body || {};
+    const { suffix = "obx", maxIterations = 1000000 } = req.body || {};
 
     if (typeof suffix !== "string" || suffix.length === 0) {
       return res.status(400).json({ error: "Invalid suffix parameter" });
