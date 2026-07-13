@@ -129,14 +129,29 @@ export default async function handler(req, res) {
   try {
     const body = await readBody(req);
     switch (body?.step) {
+      case "check":  return await handleCheck(body, res);
       case "ipfs":   return await handleIpfs(body, res);
       case "create": return await handleCreate(body, res);
       case "record": return await handleRecord(body, res);
-      default:       return send(res, 400, { ok: false, error: "invalid step (ipfs|create|record)" });
+      default:       return send(res, 400, { ok: false, error: "invalid step (check|ipfs|create|record)" });
     }
   } catch (e) {
     return send(res, 500, { ok: false, error: String(e?.message || e) });
   }
+}
+
+/* ── Step 0 (optional): pre-deploy duplicate check ────────────────────── */
+/**
+ * Lets the client confirm a name/symbol is free ON THE SELECTED CHAIN before
+ * spending any gas or building a transaction. Always 200 — the caller reads
+ * `duplicate` to decide whether to proceed. Duplicates are scoped per chain,
+ * so the same name may live on Solana and on an EVM chain independently.
+ */
+async function handleCheck(body, res) {
+  const chain = String(body.chain || "solana").toLowerCase();
+  const dup = await findDuplicateLaunch(body.name, body.symbol, chain);
+  if (dup) return send(res, 200, { ok: true, duplicate: true, field: dup.field, error: dupError(dup) });
+  return send(res, 200, { ok: true, duplicate: false });
 }
 
 /* ── Step 1: upload image + metadata to pump.fun IPFS ─────────────────── */

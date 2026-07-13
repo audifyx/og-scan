@@ -55,16 +55,28 @@ export interface LaunchOutcome {
 export type StatusFn = (msg: string) => void;
 
 /** Upload image + metadata to IPFS (reused across chains just for image hosting). */
-async function uploadImage(form: LaunchForm): Promise<string | null> {
+async function uploadImage(form: LaunchForm, chain: string): Promise<string | null> {
   if (!form.imageFile) return null;
   const imageBase64 = await fileToBase64(form.imageFile);
   const ipfs = await launchStep({
     step: "ipfs", imageBase64, imageMimeType: form.imageFile.type,
     name: form.name, symbol: form.symbol, description: form.description,
     twitter: form.twitter, telegram: form.telegram, website: form.website,
+    chain,
   });
   if (!ipfs?.ok) throw new Error(ipfs?.error || "Image upload failed");
   return { uri: ipfs.metadataUri, image: ipfs.metadata?.image || null } as any;
+}
+
+/** Confirm the name/symbol is free on the selected chain BEFORE any deploy/gas. */
+async function assertNotDuplicate(name: string, symbol: string, chainId: string) {
+  try {
+    const chk = await launchStep({ step: "check", name, symbol, chain: chainId });
+    if (chk?.duplicate) throw new Error(chk.error || "A token with that name or ticker already exists on this chain.");
+  } catch (e: any) {
+    // Only surface a real duplicate; never block a launch on a check-endpoint hiccup.
+    if (/already (exists|been launched)|duplicate|ticker|name/i.test(e?.message || "")) throw e;
+  }
 }
 
 async function record(payload: any, tries = 4): Promise<any> {
@@ -84,8 +96,11 @@ async function record(payload: any, tries = 4): Promise<any> {
 
 /* ── Solana / pump.fun ─────────────────────────────────────────────────── */
 async function launchPumpfun(chain: ChainConfig, lp: Launchpad, form: LaunchForm, wallet: string, onStatus: StatusFn): Promise<LaunchOutcome> {
+  onStatus("Checking name & ticker…");
+  await assertNotDuplicate(form.name, form.symbol, "solana");
+
   onStatus("Uploading image & metadata to IPFS…");
-  const up: any = await uploadImage(form);
+  const up: any = await uploadImage(form, "solana");
   if (!up?.uri) throw new Error("A token image is required for pump.fun launches");
 
   onStatus(form.vanity ? `Generating your custom …${VANITY_SUFFIX} contract address…` : "Preparing mint…");
@@ -127,13 +142,16 @@ async function launchPumpfun(chain: ChainConfig, lp: Launchpad, form: LaunchForm
 
 /* ── EVM ERC-20 (universal, all EVM chains) ────────────────────────────── */
 async function launchErc20(chain: ChainConfig, lp: Launchpad, form: LaunchForm, onStatus: StatusFn): Promise<LaunchOutcome> {
+  onStatus("Checking name & ticker…");
+  await assertNotDuplicate(form.name, form.symbol, chain.id);
+
   onStatus("Connecting EVM wallet…");
   let owner = getEvmAddress();
   if (!owner) owner = await connectEvm();
 
   onStatus("Uploading image…");
   let icon: string | null = null;
-  try { const up: any = await uploadImage(form); icon = up?.image || null; } catch { /* image optional for EVM */ }
+  try { const up: any = await uploadImage(form, chain.id); icon = up?.image || null; } catch { /* image optional for EVM */ }
 
   onStatus(`Confirm in your wallet to deploy on ${chain.name}…`);
   const { address, txHash } = await deployErc20({
