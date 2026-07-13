@@ -1,7 +1,7 @@
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Send, Wallet2, LogOut, Flame, Users, Sparkles, Rocket, Bell, Code, FileText, Wrench, Megaphone, Crosshair, LayoutGrid } from "lucide-react";
+import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Send, Wallet2, LogOut, Flame, Users, Sparkles, Rocket, Bell, Code, FileText, Wrench, Megaphone, Crosshair, LayoutGrid, Feather } from "lucide-react";
 import { track, getWatchlist, short } from "../lib/api";
 import { useWallet } from "../lib/wallet";
 import LiveStats, { fetchPlatformStats } from "./LiveStats";
@@ -33,6 +33,7 @@ const STAT_FALLBACK: PlatformStats = { activeUsers: 55, telegram: 185, xFollower
 const NAV_LINKS = [
   { to: "/",          label: "Home",      Icon: Coins,      exact: true  },
   { to: "/launchpad", label: "Launchpad", Icon: Rocket,     exact: false },
+  { to: "/robinhood", label: "Robinhood", Icon: Feather,    exact: false },
   { to: "/pulse",     label: "Pulse",     Icon: Flame,      exact: false },
   { to: "/scanner",   label: "Scanner",   Icon: Crosshair,  exact: false },
   { to: "/tools",     label: "Tools",     Icon: Wrench,     exact: false },
@@ -59,6 +60,7 @@ const FOOTER_PRODUCT = [
   { to: "/callouts",    label: "Callouts" },
   { to: "/metadata",    label: "Metadata" },
   { to: "/launchpad",   label: "Launchpad" },
+  { to: "/robinhood",   label: "Robinhood" },
   { to: "/more",        label: "More" },
 ];
 const FOOTER_RESOURCES = [
