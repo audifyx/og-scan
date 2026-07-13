@@ -68,7 +68,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     nativeCurrency: "ETH", explorerUrl: "https://robinhoodchain.blockscout.com", emoji: "🪽",
     accent: "border-[#00C805]/30 bg-[#00C805]/10 text-[#00C805]",
     launchpads: [
-      { id: "noxafun", name: "NOXA Fun", emoji: "🐳", kind: "bondingcurve", status: "soon", description: "Hybrid Uniswap-V3 launchpad, permanently locked LP", website: "https://fun.noxa.fi/robinhood" },
+      { id: "noxafun", name: "NOXA Fun", emoji: "🐳", kind: "bondingcurve", status: "live", description: "Hybrid Uniswap-V3 launchpad, permanently locked LP", website: "https://fun.noxa.fi/robinhood" },
       ERC20("Robinhood Chain"),
     ],
   },
@@ -78,7 +78,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     nativeCurrency: "BNB", explorerUrl: "https://bscscan.com", emoji: "🔶",
     accent: "border-[#F3BA2F]/30 bg-[#F3BA2F]/10 text-[#F3BA2F]",
     launchpads: [
-      { id: "four-meme", name: "Four.Meme", emoji: "4️⃣", kind: "bondingcurve", status: "soon", description: "BNB Chain meme launcher — instant PancakeSwap listing", website: "https://four.meme" },
+      { id: "four-meme", name: "Four.Meme", emoji: "4️⃣", kind: "bondingcurve", status: "live", description: "BNB Chain meme launcher — instant PancakeSwap listing", website: "https://four.meme" },
       ERC20("BNB Chain"),
     ],
   },
@@ -88,7 +88,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     nativeCurrency: "ETH", explorerUrl: "https://basescan.org", emoji: "🔵",
     accent: "border-[#0052FF]/30 bg-[#0052FF]/10 text-[#0052FF]",
     launchpads: [
-      { id: "wow", name: "WOW.xyz", emoji: "🎉", kind: "bondingcurve", status: "soon", description: "Base memecoin launcher (Zora protocol)", website: "https://wow.xyz" },
+      { id: "wow", name: "WOW.xyz", emoji: "🎉", kind: "bondingcurve", status: "live", description: "Base memecoin launcher (Zora protocol)", website: "https://wow.xyz" },
       ERC20("Base"),
     ],
   },

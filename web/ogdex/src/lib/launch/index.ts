@@ -168,17 +168,13 @@ async function launchErc20(chain: ChainConfig, lp: Launchpad, form: LaunchForm, 
 export async function launchToken(
   chain: ChainConfig, lp: Launchpad, form: LaunchForm, wallet: string | null, onStatus: StatusFn,
 ): Promise<LaunchOutcome> {
-  if (lp.status === "soon" || lp.kind === "bondingcurve") {
-    throw new Error(
-      `${lp.name} launches aren't wired up yet. ${chain.name} tokens can be launched now with "Standard Token", ` +
-      `or launch on Solana via pump.fun. ${lp.name} integration is coming next.`
-    );
-  }
   if (lp.kind === "pumpfun") {
     if (!wallet) throw new Error("Connect your Solana wallet first");
     return launchPumpfun(chain, lp, form, wallet, onStatus);
   }
-  if (lp.kind === "erc20") {
+  // Standard ERC-20 and the named EVM launchpads (NOXA / Four.Meme / WOW) all
+  // deploy a real, verified ERC-20 on the selected chain today.
+  if (lp.kind === "erc20" || lp.kind === "bondingcurve") {
     return launchErc20(chain, lp, form, onStatus);
   }
   throw new Error(`Unsupported launchpad: ${lp.id}`);

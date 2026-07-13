@@ -25,7 +25,7 @@ export default function Launch() {
     [chain, lpId]
   );
   const isEvm = chain.isEvm;
-  const isErc20 = lp.kind === "erc20";
+  const isErc20 = lp.kind === "erc20" || lp.kind === "bondingcurve";
   const isPump = lp.kind === "pumpfun";
 
   const [chainOpen, setChainOpen] = useState(false);
@@ -86,7 +86,6 @@ export default function Launch() {
   };
 
   const validate = () => {
-    if (lp.status === "soon") return `${lp.name} isn't wired up yet — pick "Standard Token" on ${chain.name}, or launch on Solana.`;
     if (!wallet) return isEvm ? "Connect your EVM wallet first" : "Connect your Solana wallet first";
     if (!form.name.trim()) return "Token name is required";
     if (!form.symbol.trim()) return "Token symbol is required";
@@ -352,7 +351,7 @@ export default function Launch() {
         </div>
       )}
 
-      <button onClick={launch} disabled={busy || lp.status === "soon"}
+      <button onClick={launch} disabled={busy}
         className="w-full btn bg-accent text-black font-bold py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
         {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> {status || "Launching…"}</> : <><Rocket className="w-4 h-4" /> Launch on {lp.name}</>}
       </button>
