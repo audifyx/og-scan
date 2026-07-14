@@ -3,7 +3,7 @@ import {
   Hash, Mic, Headphones, Mail, User, Radio, Sparkles, ArrowRight,
 } from "lucide-react";
 
-const BRAND = "OGSCAN";
+const BRAND = "ORBITX";
 
 type Card = { tag: string; title: string; copy: string; href: string; Icon: typeof Hash; tone: string };
 const CARDS: Card[] = [

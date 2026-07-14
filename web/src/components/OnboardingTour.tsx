@@ -12,7 +12,7 @@ import { useOnboardingTour } from "@/hooks/useOnboardingTour";
 
 const SLIDES: { title: string; body: string }[] = [
   {
-    title: "Welcome to OG Scan",
+    title: "Welcome to OrbitX",
     body: "Scan any token to get an instant on-chain read: OG holder detection, wallet intel, and risk signals in one place.",
   },
   {
