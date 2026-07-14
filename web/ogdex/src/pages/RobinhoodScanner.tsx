@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crosshair, Search, Loader2, Feather, ShieldAlert, ShieldCheck, AlertTriangle, Droplets, Users, Flame, Activity, ArrowUpRight, Info } from "lucide-react";
-import { getScreener, type Row, fmtUsd, short } from "../lib/api";
+import { Crosshair, Search, Loader2, Feather, ShieldAlert, ShieldCheck, AlertTriangle, Droplets, Users, Flame, Activity, ArrowUpRight, Info, BadgeCheck, XCircle } from "lucide-react";
+import { getScreener, getToken, type Row, fmtUsd, short } from "../lib/api";
 
 function analyze(t: Row) {
   const liq = t.liquidity || 0, hold = t.holderCount || 0, vol = t.volume || 0;
@@ -25,11 +25,34 @@ function Bar({ label, value, Icon }: { label: string; value: number; Icon: any }
   );
 }
 
+function SecRow({ ok, label, good, bad }: { ok: boolean; label: string; good: string; bad: string }) {
+  return (
+    <div className="rounded-lg border border-line bg-panel2/50 p-2.5">
+      <div className="text-[9px] uppercase text-muted/60">{label}</div>
+      <div className={`mt-0.5 inline-flex items-center gap-1 text-xs font-bold ${ok ? "text-up" : "text-down"}`}>
+        {ok ? <BadgeCheck className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}{ok ? good : bad}
+      </div>
+    </div>
+  );
+}
+
 export default function RobinhoodScanner() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<Row | null>(null);
+  const [sec, setSec] = useState<any>(null);
+  const [secLoading, setSecLoading] = useState(false);
+
+  useEffect(() => {
+    if (!sel) { setSec(null); return; }
+    let on = true; setSecLoading(true); setSec(null);
+    getToken(sel.mint, "robinhood")
+      .then((r: any) => { if (on) setSec(r?.safety || null); })
+      .catch(() => { if (on) setSec(null); })
+      .finally(() => { if (on) setSecLoading(false); });
+    return () => { on = false; };
+  }, [sel]);
 
   useEffect(() => {
     let on = true;
@@ -106,9 +129,42 @@ export default function RobinhoodScanner() {
 
           <Link to={`/token/${sel.mint}?chain=robinhood`} className="btn bg-accent/15 text-accent text-sm inline-flex items-center gap-1.5 px-4 py-2 font-bold">View full token data <ArrowUpRight className="w-4 h-4" /></Link>
 
+          {/* Real contract security via Blockscout */}
+          <div className="card p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-accent" />
+              <h3 className="text-sm font-black text-white">Contract Security</h3>
+              <span className="text-[10px] text-muted">live via Blockscout</span>
+              {secLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted ml-auto" />}
+            </div>
+            {sec ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <SecRow ok={sec.verified === true} label="Verified" good="Source verified" bad="Unverified" />
+                  <SecRow ok={sec.ownerRenounced === true || sec.ownerRenounced === null} label="Ownership" good={sec.ownerRenounced === null ? "No owner fn" : "Renounced"} bad="Owner active" />
+                  <div className="rounded-lg border border-line bg-panel2/50 p-2.5"><div className="text-[9px] uppercase text-muted/60">Top 10 holders</div><div className={`text-sm font-bold ${(sec.topHoldersPct ?? 0) >= 60 ? "text-down" : (sec.topHoldersPct ?? 0) >= 35 ? "text-gold" : "text-up"}`}>{sec.topHoldersPct != null ? sec.topHoldersPct.toFixed(1) + "%" : "\u2014"}</div></div>
+                  <div className="rounded-lg border border-line bg-panel2/50 p-2.5"><div className="text-[9px] uppercase text-muted/60">Risk score</div><div className={`text-sm font-bold ${(sec.riskScore ?? 0) >= 40 ? "text-down" : "text-up"}`}>{sec.riskScore ?? "\u2014"}</div></div>
+                </div>
+                {Array.isArray(sec.risks) && sec.risks.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {sec.risks.map((r: any, i: number) => (
+                      <span key={i} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${r.level === "danger" ? "bg-down/12 text-down" : "bg-gold/12 text-gold"}`}>
+                        <AlertTriangle className="w-3 h-3" />{r.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : secLoading ? (
+              <div className="text-[11px] text-muted">Fetching on-chain contract data...</div>
+            ) : (
+              <div className="text-[11px] text-muted">Contract data not available for this token.</div>
+            )}
+          </div>
+
           <div className="flex items-start gap-2 rounded-lg border border-line bg-panel2/50 px-3 py-2.5 text-[11px] text-muted">
             <Info className="w-4 h-4 shrink-0 text-gold mt-0.5" />
-            <span>This is a <span className="text-white">heuristic</span> read from live market data (liquidity, holders, volume, trade balance). Contract-level security — mint/freeze authority, honeypot and rug checks — is <span className="text-white">not yet available</span> for the Robinhood chain because no security provider indexes it. Always DYOR.</span>
+            <span>This is a <span className="text-white">heuristic</span> read from live market data (liquidity, holders, volume, trade balance). Contract verification, ownership and holder-distribution data are <span className="text-white">live on-chain</span> via Blockscout. Trade-simulation checks (honeypot / buy-sell tax) are not available for this chain yet. Always DYOR.</span>
           </div>
         </div>
       )}
