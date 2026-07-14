@@ -4,7 +4,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 //   * max 1 account per device (fingerprint)
 //   * max 3 accounts per IP
 // Runs with the service role; public GoTrue signup is disabled so this can't be bypassed.
-const ALLOWED_ORIGINS = ["https://ogscan.fun", "https://www.ogscan.fun"];
+const ALLOWED_ORIGINS = [
+  "https://ogscan.fun", "https://www.ogscan.fun",
+  "https://orbitx.world", "https://www.orbitx.world",
+];
 const MAX_PER_DEVICE = 1;
 const MAX_PER_IP = 3;
 

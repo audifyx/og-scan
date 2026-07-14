@@ -9,13 +9,19 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-const cors = {
-  "Access-Control-Allow-Origin": "https://ogscan.fun",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Content-Type": "application/json",
-};
+const ALLOWED_ORIGINS = ["https://ogscan.fun", "https://www.ogscan.fun", "https://orbitx.world", "https://www.orbitx.world"];
+function corsFor(origin: string | null) {
+  const o = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.ogscan.fun";
+  return {
+    "Access-Control-Allow-Origin": o,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Content-Type": "application/json",
+    "Vary": "Origin",
+  };
+}
 
 serve(async (req) => {
+  const cors = corsFor(req.headers.get("origin"));
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: cors, status: 204 });
   }
