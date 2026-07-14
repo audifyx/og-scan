@@ -33,6 +33,7 @@ const SpacesManagement = lazy(() => import("@/components/admin/sections/SpacesMa
 const SupportCenter = lazy(() => import("@/components/admin/sections/SupportCenter").then((m) => ({ default: m.SupportCenter })));
 const ChatManagement = lazy(() => import("@/components/admin/sections/ChatManagement").then((m) => ({ default: m.ChatManagement })));
 const NotificationsManager = lazy(() => import("@/components/admin/sections/NotificationsManager").then((m) => ({ default: m.NotificationsManager })));
+const AnnouncementManager = lazy(() => import("@/components/admin/sections/AnnouncementManager").then((m) => ({ default: m.AnnouncementManager })));
 const PriceAlerts = lazy(() => import("@/components/admin/sections/PriceAlerts").then((m) => ({ default: m.PriceAlerts })));
 const WalletTradeManagement = lazy(() => import("@/components/admin/sections/WalletTradeManagement").then((m) => ({ default: m.WalletTradeManagement })));
 const MediaManagement = lazy(() => import("@/components/admin/sections/MediaManagement").then((m) => ({ default: m.MediaManagement })));
@@ -104,6 +105,11 @@ const SECTION_META: Record<AdminSection, { eyebrow: string; title: string; descr
     eyebrow: "Messaging ops",
     title: "Notifications",
     description: "Control outbound announcements, alerts, and notification delivery tools.",
+  },
+  announcements: {
+    eyebrow: "Broadcast",
+    title: "Announcements",
+    description: "Publish, schedule, and retire platform-wide announcements by severity and audience.",
   },
   alerts: {
     eyebrow: "Market monitoring",
@@ -274,6 +280,8 @@ export default function Admin() {
         return <ChatManagement />;
       case "notifications":
         return <NotificationsManager />;
+      case "announcements":
+        return <AnnouncementManager />;
       case "alerts":
         return <PriceAlerts />;
       case "wallets":
