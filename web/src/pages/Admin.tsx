@@ -34,6 +34,9 @@ const SupportCenter = lazy(() => import("@/components/admin/sections/SupportCent
 const ChatManagement = lazy(() => import("@/components/admin/sections/ChatManagement").then((m) => ({ default: m.ChatManagement })));
 const NotificationsManager = lazy(() => import("@/components/admin/sections/NotificationsManager").then((m) => ({ default: m.NotificationsManager })));
 const AnnouncementManager = lazy(() => import("@/components/admin/sections/AnnouncementManager").then((m) => ({ default: m.AnnouncementManager })));
+const AdvancedAnalytics = lazy(() => import("@/components/admin/sections/AdvancedAnalytics").then((m) => ({ default: m.AdvancedAnalytics })));
+const ActivityFeed = lazy(() => import("@/components/admin/sections/ActivityFeed").then((m) => ({ default: m.ActivityFeed })));
+const ApiSettings = lazy(() => import("@/components/admin/sections/ApiSettings").then((m) => ({ default: m.ApiSettings })));
 const PriceAlerts = lazy(() => import("@/components/admin/sections/PriceAlerts").then((m) => ({ default: m.PriceAlerts })));
 const WalletTradeManagement = lazy(() => import("@/components/admin/sections/WalletTradeManagement").then((m) => ({ default: m.WalletTradeManagement })));
 const MediaManagement = lazy(() => import("@/components/admin/sections/MediaManagement").then((m) => ({ default: m.MediaManagement })));
@@ -110,6 +113,21 @@ const SECTION_META: Record<AdminSection, { eyebrow: string; title: string; descr
     eyebrow: "Broadcast",
     title: "Announcements",
     description: "Publish, schedule, and retire platform-wide announcements by severity and audience.",
+  },
+  advanced_analytics: {
+    eyebrow: "Deep metrics",
+    title: "Deep Analytics",
+    description: "Trading, token, launchpad, and scanner analytics from live platform data.",
+  },
+  activity: {
+    eyebrow: "Live ops",
+    title: "Activity Feed",
+    description: "Unified chronological feed of platform, user, and on-chain live events.",
+  },
+  api: {
+    eyebrow: "Developer platform",
+    title: "API Settings",
+    description: "Manage platform API secrets, developer API keys, and rate-limit activity.",
   },
   alerts: {
     eyebrow: "Market monitoring",
@@ -282,6 +300,12 @@ export default function Admin() {
         return <NotificationsManager />;
       case "announcements":
         return <AnnouncementManager />;
+      case "advanced_analytics":
+        return <AdvancedAnalytics />;
+      case "activity":
+        return <ActivityFeed />;
+      case "api":
+        return <ApiSettings />;
       case "alerts":
         return <PriceAlerts />;
       case "wallets":

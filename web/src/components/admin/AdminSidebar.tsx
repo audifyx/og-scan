@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Activity,
   AlertTriangle,
   BarChart3,
   Bell,
@@ -17,6 +18,7 @@ import {
   Headphones,
   Headset,
   Image,
+  KeyRound,
   LayoutDashboard,
   Megaphone,
   MessageSquare,
@@ -34,6 +36,7 @@ import {
 import type { AdminSection } from "./types";
 
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
+  Activity,
   AlertTriangle,
   BarChart3,
   Bell,
@@ -43,6 +46,7 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   Headphones,
   Headset,
   Image,
+  KeyRound,
   LayoutDashboard,
   Megaphone,
   MessageSquare,
@@ -72,6 +76,8 @@ const SECTIONS: { group: string; items: SectionItem[] }[] = [
       { id: "overview",   label: "Overview",    icon: "LayoutDashboard" },
       { id: "admin_apps", label: "Admin Apps",   icon: "PanelTop" },
       { id: "analytics",  label: "Analytics",    icon: "TrendingUp" },
+      { id: "advanced_analytics", label: "Deep Analytics", icon: "BarChart3" },
+      { id: "activity",   label: "Activity Feed", icon: "Activity" },
       { id: "tools",      label: "Admin Tools",  icon: "Wrench" },
     ],
   },
@@ -110,6 +116,7 @@ const SECTIONS: { group: string; items: SectionItem[] }[] = [
     items: [
       { id: "settings", label: "Settings",  icon: "Settings" },
       { id: "audit",    label: "Audit Log", icon: "FileText" },
+      { id: "api",      label: "API Settings", icon: "KeyRound" },
     ],
   },
 ];
