@@ -3,12 +3,18 @@
 // avoiding CORS entirely. The React frontend then embeds each post via the official
 // Telegram post widget (telegram-widget.js), which handles document/image display.
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "https://ogscan.fun",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = ["https://ogscan.fun", "https://www.ogscan.fun", "https://orbitx.world", "https://www.orbitx.world"];
+function corsFor(origin: string | null) {
+  const o = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "https://ogscan.fun";
+  return {
+    "Access-Control-Allow-Origin": o,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
 
 Deno.serve(async (req: Request) => {
+  const CORS_HEADERS = corsFor(req.headers.get("origin"));
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });

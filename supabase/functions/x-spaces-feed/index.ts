@@ -23,19 +23,26 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const X_BEARER_TOKEN = Deno.env.get("X_BEARER_TOKEN") ?? "";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "https://ogscan.fun",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = ["https://ogscan.fun", "https://www.ogscan.fun", "https://orbitx.world", "https://www.orbitx.world"];
+function corsFor(origin: string | null) {
+  const o = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "https://ogscan.fun";
+  return {
+    "Access-Control-Allow-Origin": o,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
 
-const json = (data: unknown, status = 200) =>
+const makeJson = (cors: Record<string, string>) => (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  const cors = corsFor(req.headers.get("origin"));
+  const json = makeJson(cors);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
     // ── 1. Authenticate user ─────────────────────────────────────────────────

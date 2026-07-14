@@ -12,10 +12,15 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MAX_PER_FEED = 10;
 const MAX_TOTAL = 40;
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://ogscan.fun",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = ["https://ogscan.fun", "https://www.ogscan.fun", "https://orbitx.world", "https://www.orbitx.world"];
+function corsFor(origin: string | null) {
+  const o = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "https://ogscan.fun";
+  return {
+    "Access-Control-Allow-Origin": o,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
 
 const RSS_FEEDS = [
   { name: "CoinTelegraph", url: "https://cointelegraph.com/rss", category: "news" },
@@ -133,6 +138,7 @@ async function fetchFeed(name: string, url: string): Promise<any[]> {
 }
 
 serve(async (req) => {
+  const corsHeaders = corsFor(req.headers.get("origin"));
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

@@ -17,10 +17,15 @@ const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:audifyx@gmail.com
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://ogscan.fun",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = ["https://ogscan.fun", "https://www.ogscan.fun", "https://orbitx.world", "https://www.orbitx.world"];
+function corsFor(origin: string | null) {
+  const o = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "https://ogscan.fun";
+  return {
+    "Access-Control-Allow-Origin": o,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
 
 type NotificationPreferenceKey =
   | "directMessages"
@@ -158,6 +163,7 @@ function buildActions(type?: string | null, url?: string | null, actions?: Notif
 }
 
 serve(async (req) => {
+  const corsHeaders = corsFor(req.headers.get("origin"));
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
