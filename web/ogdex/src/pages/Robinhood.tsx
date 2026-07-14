@@ -184,7 +184,7 @@ export default function Robinhood() {
       </div>
 
       <div className="text-[11px] text-muted bg-panel2/50 rounded-lg px-3 py-2 border border-line">
-        Market data (price, market cap, volume, liquidity) is live via GeckoTerminal. Honeypot / rug / holder analysis isn't available for the Robinhood chain yet — no security provider indexes it. Always DYOR.
+        Market data is live via GeckoTerminal; contract verification, ownership and holder distribution are live on-chain via Blockscout (open the Scanner). Honeypot / tax simulation is not available for this chain yet. Always DYOR.
       </div>
 
       {err && !rows.length && <div className="card p-4 text-center text-sm text-yellow-400">Couldn't load Robinhood coins right now — retrying automatically.</div>}

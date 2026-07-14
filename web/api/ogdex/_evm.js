@@ -48,10 +48,80 @@ export async function evmTrades(gtNet, pool, mint, limit = 100) {
   } catch { return []; }
 }
 
+// ── Real security via Blockscout for chains GoPlus doesn't index (e.g. Robinhood) ──
+const BLOCKSCOUT = { robinhood: "https://robinhoodchain.blockscout.com" };
+const EVM_RPC = { robinhood: "https://rpc.mainnet.chain.robinhood.com" };
+
+async function jget(url) {
+  try { const r = await fetch(url, { headers: { Accept: "application/json" } }); return r.ok ? await r.json() : null; } catch { return null; }
+}
+
+// Read owner() (0x8da5cb5b). zero addr → renounced(true); non-zero → active(false); revert/none → null.
+async function ownerRenounced(rpc, mint) {
+  if (!rpc) return null;
+  try {
+    const r = await fetch(rpc, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: mint, data: "0x8da5cb5b" }, "latest"] }) });
+    const j = await r.json();
+    const res = j && j.result;
+    if (!res || res === "0x" || res.length < 66) return null;
+    const addr = "0x" + res.slice(-40);
+    return /^0x0{40}$/i.test(addr);
+  } catch { return null; }
+}
+
+export async function blockscoutSecurity(dexChainId, mint, token = {}) {
+  const base = BLOCKSCOUT[dexChainId];
+  if (!base) return { safety: null, holders: [], holderCount: null, unsupported: true };
+  const [tok, hold, contract, renounced] = await Promise.all([
+    jget(`${base}/api/v2/tokens/${mint}`),
+    jget(`${base}/api/v2/tokens/${mint}/holders`),
+    jget(`${base}/api/v2/smart-contracts/${mint}`),
+    ownerRenounced(EVM_RPC[dexChainId], mint),
+  ]);
+  if (!tok && !(hold && hold.items)) return { safety: null, holders: [], holderCount: null, unsupported: true };
+
+  const decimals = n(tok?.decimals) ?? 18;
+  const totalSupply = tok?.total_supply != null ? Number(tok.total_supply) / Math.pow(10, decimals) : null;
+  const holderCount = n(tok?.holders) ?? n(tok?.holders_count);
+  const verified = !!(contract && contract.is_verified === true);
+
+  const mcap = n(token.mcap);
+  const items = Array.isArray(hold?.items) ? hold.items : [];
+  const holders = items.slice(0, 50).map((h) => {
+    const raw = Number(h.value || 0) / Math.pow(10, decimals);
+    const pct = totalSupply ? (raw / totalSupply) * 100 : null;
+    const a = h.address || {};
+    return { owner: a.hash || null, uiAmount: raw, pct, usdValue: pct != null && mcap != null ? (pct / 100) * mcap : null, isContract: !!a.is_contract, label: a.name || undefined };
+  });
+  const top10Pct = holders.slice(0, 10).reduce((s, h) => s + (h.pct || 0), 0);
+
+  const risks = [];
+  let score = 0;
+  if (!verified) { risks.push({ level: "warn", name: "Unverified contract", desc: "Source not verified on Blockscout" }); score += 15; }
+  if (renounced === false) { risks.push({ level: "warn", name: "Owner active", desc: "Ownership not renounced" }); score += 15; }
+  if (top10Pct >= 70) { risks.push({ level: "danger", name: "Concentrated supply", desc: `Top 10 hold ${top10Pct.toFixed(0)}%` }); score += 30; }
+  else if (top10Pct >= 40) { risks.push({ level: "warn", name: "Holder concentration", desc: `Top 10 hold ${top10Pct.toFixed(0)}%` }); score += 15; }
+  if (holderCount != null && holderCount < 25) { risks.push({ level: "warn", name: "Few holders", desc: "Low holder count" }); score += 10; }
+
+  const safety = {
+    riskScore: Math.min(100, score),
+    creator: null, creatorTokensCount: null, launchpad: null,
+    lpLockedPct: null, honeypot: false, buyTax: null, sellTax: null,
+    risks, holderCount,
+    verified, ownerRenounced: renounced, topHoldersPct: top10Pct || null, totalSupply,
+    source: "blockscout",
+  };
+  return { safety, holders, holderCount, unsupported: false };
+}
+
 // ── Security + holders via GoPlus (major EVM chains only) ─────────────────────
 export async function evmSecurity(dexChainId, mint, token = {}) {
   const gp = GOPLUS_CHAIN[dexChainId];
-  if (!gp) return { safety: null, holders: [], holderCount: null, unsupported: true };
+  if (!gp) {
+    if (BLOCKSCOUT[dexChainId]) return blockscoutSecurity(dexChainId, mint, token);
+    return { safety: null, holders: [], holderCount: null, unsupported: true };
+  }
   try {
     const raw = await fetch(
       `https://api.gopluslabs.io/api/v1/token_security/${gp}?contract_addresses=${mint}`,
