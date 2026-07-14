@@ -29,13 +29,20 @@ const TWITTER_ACCESS_TOKEN_SECRET = Deno.env.get("TWITTER_ACCESS_TOKEN_SECRET") 
 const TWITTER_CONSUMER_KEY = Deno.env.get("TWITTER_CONSUMER_KEY") ?? "";
 const TWITTER_CONSUMER_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET") ?? "";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "https://ogscan.fun",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = ["https://ogscan.fun", "https://www.ogscan.fun", "https://orbitx.world", "https://www.orbitx.world"];
+function corsFor(origin: string | null) {
+  const o = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "https://ogscan.fun";
+  return {
+    "Access-Control-Allow-Origin": o,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  const cors = corsFor(req.headers.get("origin"));
+  const json = makeJson(cors);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -489,9 +496,8 @@ async function refreshOAuth2Token(refreshToken: string) {
   return res.json() as Promise<{ access_token: string; refresh_token?: string; expires_in: number }>;
 }
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
+const makeJson = (cors: Record<string, string>) => (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
-}

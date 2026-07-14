@@ -14,10 +14,15 @@ const HELIUS_RPC = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 const HELIUS_BASE = `https://api.helius.xyz/v0`;
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
-const cors = {
-  "Access-Control-Allow-Origin": "https://ogscan.fun",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = ["https://ogscan.fun", "https://www.ogscan.fun", "https://orbitx.world", "https://www.orbitx.world"];
+function corsFor(origin: string | null) {
+  const o = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "https://ogscan.fun";
+  return {
+    "Access-Control-Allow-Origin": o,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
 
 async function heliusTxs(wallet: string, limit = 100) {
   const res = await fetch(`${HELIUS_BASE}/addresses/${wallet}/transactions?api-key=${HELIUS_API_KEY}&limit=${limit}`);
@@ -73,6 +78,7 @@ async function syncWallet(wallet: string, solPrice: number) {
 }
 
 serve(async (req) => {
+  const cors = corsFor(req.headers.get("origin"));
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {

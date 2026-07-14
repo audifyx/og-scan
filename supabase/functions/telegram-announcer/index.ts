@@ -8,10 +8,15 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET");
 const OG_SCAN_URL = "https://www.ogscan.fun/app";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://ogscan.fun",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret",
-};
+const ALLOWED_ORIGINS = ["https://ogscan.fun", "https://www.ogscan.fun", "https://orbitx.world", "https://www.orbitx.world"];
+function corsFor(origin: string | null) {
+  const o = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "https://ogscan.fun";
+  return {
+    "Access-Control-Allow-Origin": o,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret",
+    "Vary": "Origin",
+  };
+}
 
 // Simple deduplication: track recently sent event IDs in memory
 // (per-instance, sufficient for rate-limiting duplicate webhook fires)
@@ -223,6 +228,7 @@ function buildMessage(payload: WebhookPayload): string | null {
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 serve(async (req) => {
+  const corsHeaders = corsFor(req.headers.get("origin"));
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
