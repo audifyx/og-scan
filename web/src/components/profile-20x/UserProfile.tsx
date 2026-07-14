@@ -1536,7 +1536,7 @@ export const UserProfile: React.FC<Props> = ({ viewUserId }) => {
                 navigate("/profile");
                 return;
               }
-              navigate("/overview");
+              navigate("/app");
             }}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
             aria-label="Go back"

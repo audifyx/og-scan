@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { 
   Crown, Brain, MessageSquare, Waves, Bell, Calculator, Image, TrendingUp, 
-  Users, Sparkles, Zap, BarChart3, Wallet, ChevronRight, Star
+  Users, Sparkles, Zap, BarChart3, Wallet, Star
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -108,12 +108,6 @@ const Premium = () => {
                   <p className="text-xl font-bold">{daysUntilReset} days</p>
                 </div>
               </div>
-
-              {/* Link to Credits Page */}
-              <Link to="/credits" className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors">
-                <span>View Details</span>
-                <ChevronRight className="h-4 w-4" />
-              </Link>
             </div>
 
             {/* Progress Bar */}
