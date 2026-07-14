@@ -185,7 +185,7 @@ export type AdminSection =
   | "lobbies" | "tokens" | "spaces" | "support"
   | "chat" | "notifications" | "alerts" | "wallets"
   | "media" | "settings" | "audit" | "analytics" | "tools"
-  | "affiliates" | "org_affiliates";
+  | "affiliates" | "org_affiliates" | "announcements";
 
 export interface AdminSectionDef {
   id: AdminSection;
