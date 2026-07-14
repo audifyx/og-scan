@@ -10,13 +10,14 @@ Deno.serve(async (req)=>{
     });
   }
   try {
-    const { inputMint, outputMint, amount, slippageBps = 50, wallet } = await req.json();
+    const { inputMint, outputMint, amount, slippageBps = 50, wallet, platformFeeBps } = await req.json();
     // Get quote from Jupiter
     const quoteUrl = new URL(`${JUPITER_API_URL}/quote`);
     quoteUrl.searchParams.set("inputMint", inputMint);
     quoteUrl.searchParams.set("outputMint", outputMint);
     quoteUrl.searchParams.set("amount", amount.toString());
     quoteUrl.searchParams.set("slippageBps", slippageBps.toString());
+    if (platformFeeBps) quoteUrl.searchParams.set("platformFeeBps", String(platformFeeBps));
     const quoteResponse = await fetch(quoteUrl.toString(), {
       headers: {
         "Authorization": `Bearer ${JUPITER_API_KEY}`

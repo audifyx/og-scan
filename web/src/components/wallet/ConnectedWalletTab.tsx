@@ -29,6 +29,7 @@ import {
   formatAddress, formatUsd
 } from "@/lib/solana-api";
 import { HELIUS_RPC, HELIUS_API_KEY, SOL_MINT, JUPITER_BASE, JUPITER_API_KEY } from "@/lib/og";
+import { PLATFORM_FEE_BPS, PLATFORM_FEE_ENABLED, deriveFeeAccount } from "@/lib/platformFee";
 import { formatDistanceToNow } from "date-fns";
 import { VersionedTransaction } from "@solana/web3.js";
 
@@ -78,7 +79,7 @@ async function phantomSwap(
   const phantom = (window as any).phantom?.solana;
   if (!phantom?.isPhantom) throw new Error("Phantom wallet not detected");
   const quoteRes = await fetch(
-    `${JUPITER_BASE}/swap/v1/quote?inputMint=${fromMint}&outputMint=${toMint}&amount=${amountLamports}&slippageBps=${slippageBps}&restrictIntermediateTokens=true`,
+    `${JUPITER_BASE}/swap/v1/quote?inputMint=${fromMint}&outputMint=${toMint}&amount=${amountLamports}&slippageBps=${slippageBps}&restrictIntermediateTokens=true${PLATFORM_FEE_ENABLED ? `&platformFeeBps=${PLATFORM_FEE_BPS}` : ""}`,
     { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
   );
   if (!quoteRes.ok) throw new Error("Failed to get swap quote");
@@ -86,7 +87,7 @@ async function phantomSwap(
   const swapRes = await fetch(`${JUPITER_BASE}/swap/v1/swap`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${JUPITER_API_KEY}` },
-    body: JSON.stringify({ quoteResponse: quote, userPublicKey, wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: "auto" }),
+    body: JSON.stringify({ quoteResponse: quote, userPublicKey, wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: "auto", ...(PLATFORM_FEE_ENABLED ? { feeAccount: deriveFeeAccount(toMint) } : {}) }),
   });
   if (!swapRes.ok) throw new Error("Failed to build swap transaction");
   const { swapTransaction } = await swapRes.json();
@@ -161,7 +162,7 @@ export function ConnectedWalletTab() {
   const [swapMode, setSwapMode] = useState<"buy" | "sell">("buy");
   const [swapAmount, setSwapAmount] = useState("");
   const [swapLoading, setSwapLoading] = useState(false);
-  const [swapQuote, setSwapQuote] = useState<{ outAmount: number; outSymbol: string; priceImpact: number } | null>(null);
+  const [swapQuote, setSwapQuote] = useState<{ outAmount: number; outSymbol: string; priceImpact: number; platformFee: number } | null>(null);
   const [slippage, setSlippage] = useState(100);
 
   // Chart / expanded token state
@@ -370,14 +371,15 @@ export function ConnectedWalletTab() {
         const amountLamports = Math.floor(Number(swapAmount) * Math.pow(10, decimals));
         if (amountLamports <= 0) return;
         const res = await fetch(
-          `${JUPITER_BASE}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountLamports}&slippageBps=${slippage}`,
+          `${JUPITER_BASE}/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountLamports}&slippageBps=${slippage}${PLATFORM_FEE_ENABLED ? `&platformFeeBps=${PLATFORM_FEE_BPS}` : ""}`,
           { headers: { "Authorization": `Bearer ${JUPITER_API_KEY}` } }
         );
         const q = await res.json();
         if (q.outAmount) {
           const outDecimals = swapMode === "buy" ? swapToken.decimals : 9;
           const outSymbol = swapMode === "buy" ? swapToken.symbol : "SOL";
-          setSwapQuote({ outAmount: Number(q.outAmount) / Math.pow(10, outDecimals), outSymbol, priceImpact: parseFloat(q.priceImpactPct ?? "0") * 100 });
+          const platformFee = q.platformFee ? Number(q.platformFee.amount) / Math.pow(10, outDecimals) : 0;
+          setSwapQuote({ outAmount: Number(q.outAmount) / Math.pow(10, outDecimals), outSymbol, priceImpact: parseFloat(q.priceImpactPct ?? "0") * 100, platformFee });
         }
       } catch { /* ignore */ }
     }, 600);
@@ -1275,6 +1277,14 @@ export function ConnectedWalletTab() {
                 <div className="flex justify-between text-xs">
                   <span className="text-white/40">You receive</span>
                   <span className="font-semibold text-[hsl(var(--og-lime))]">{swapQuote.outAmount.toFixed(4)} {swapQuote.outSymbol}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-white/40">Platform fee (1%)</span>
+                  <span className="text-white/60">{(swapQuote.platformFee ?? 0).toFixed(4)} {swapQuote.outSymbol}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-white/40">Network fee</span>
+                  <span className="text-white/60">~0.00001 SOL</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-white/40">Price impact</span>

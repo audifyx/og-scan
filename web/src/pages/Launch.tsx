@@ -25,6 +25,7 @@ import {
   SystemProgram, PublicKey, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import bs58 from "bs58";
+import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD } from "@/lib/platformFee";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import {
@@ -562,6 +563,21 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile) return;
 
     try {
+      /* Step 0 — Platform launch fee ($1.50 in SOL, Solana only) */
+      if (LAUNCHPAD_FEE_USD > 0) {
+        setStep("uploading");
+        setStatusMsg("Paying launch fee…");
+        const px = solPrice || 150;
+        const feeLamports = Math.ceil((LAUNCHPAD_FEE_USD / px) * LAMPORTS_PER_SOL);
+        const feeTx = new Transaction().add(
+          SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: new PublicKey(PLATFORM_WALLET), lamports: feeLamports }),
+        );
+        feeTx.feePayer = publicKey;
+        feeTx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        const signedFee = await signTransaction(feeTx);
+        await connection.sendRawTransaction(signedFee.serialize());
+      }
+
       /* Step 1 — Upload to IPFS */
       setStep("uploading");
       setStatusMsg("Uploading image & metadata to IPFS…");
@@ -948,7 +964,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             )}
 
   <p className="text-center text-[10px] text-white/15 leading-relaxed">
-By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "obx".<br />Only the standard Solana network fee applies (~0.02 SOL). Free for all users!
+By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "obx".<br />A $1.50 platform launch fee (paid in SOL) applies on Solana, plus the standard network fee (~0.02 SOL). Other chains are free.
             </p>
           </div>
         )}
