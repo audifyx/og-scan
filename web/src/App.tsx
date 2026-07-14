@@ -44,6 +44,7 @@ import CommunityClassic from "./pages/CommunityClassic";
 import OfficialToken from "./pages/OfficialToken";
 import PumpV5 from "./pages/PumpV5";
 import Launch from "./pages/Launch";
+import OrbitxLaunch from "./pages/OrbitxLaunch";
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
@@ -163,6 +164,9 @@ const App = () => (
 
             {/* ── Public: App install page ── */}
             <Route path="/install" element={<InstallApp />} />
+
+            {/* ── Custom launchpad (Orbitx Launch Console) ── */}
+            <Route path="/orbitxlaunch" element={<OrbitxLaunch />} />
 
             {/* ── Protected: App shell ── */}
             <Route path="/app" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
