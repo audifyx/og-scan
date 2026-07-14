@@ -11,6 +11,18 @@ import {
 
 const num = (n: any) => (Number.isFinite(Number(n)) ? Number(n) : null);
 
+// Phase 8 — data-backed "why is this OG" evidence, derived from forensic scores.
+const EVIDENCE: { key: keyof TokenForensicScores; label: string; good: string; weak: string }[] = [
+  { key: "earliestMintBonusScore", label: "Original deployment",    good: "Earliest mint of this name on-chain",       weak: "A different mint predates this one" },
+  { key: "firstTransactionScore",  label: "Historical tx evidence", good: "Earliest first on-chain transaction",        weak: "Later first activity than rivals" },
+  { key: "earliestLiquidityScore", label: "First liquidity",        good: "First to seed real liquidity",               weak: "Liquidity seeded after competitors" },
+  { key: "deployerTrustScore",     label: "Deployer evidence",      good: "Deployed by an authentic, trusted wallet",  weak: "Deployer authenticity is weak" },
+  { key: "antiCloneConfidence",    label: "Earlier than copycats",  good: "Predates the detected clones",               weak: "Clone timeline is contested" },
+  { key: "metadataStability",      label: "Metadata evidence",      good: "Original, stable metadata",                 weak: "Metadata changed or copied" },
+  { key: "holderDistributionScore",label: "Wallet / holder evidence", good: "Healthy original holder base",             weak: "Concentrated or fresh-wallet holders" },
+  { key: "dominanceScore",         label: "Dominance",              good: "Primary token by market dominance",         weak: "Not the dominant token in its cluster" },
+];
+
 // relationship → visual style
 const REL: Record<TokenLineageNode["relationship"], { cls: string; Icon: typeof Crown; danger?: boolean }> = {
   "TRUE OG":        { cls: "text-up border-up/40 bg-up/10", Icon: Crown },
@@ -157,6 +169,39 @@ export default function OgScanner() {
           ) : (
             <div className="rounded-lg border border-gold/30 bg-gold/[0.06] p-4 text-sm text-gold term"><span className="font-black">[WARN]</span> no clear OG found — all candidates contested or low-trust. proceed with caution.</div>
           )}
+
+          {/* OG Explanation — Phase 8: why is this the OG? */}
+          {report.og && report.tokenScores[report.og.id] && (() => {
+            const sc = report.tokenScores[report.og.id];
+            return (
+              <div className="rounded-lg border border-up/25 bg-up/[0.04] p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Crown className="h-4 w-4 text-up shrink-0" />
+                  <h2 className="font-display text-sm font-black text-white">WHY IS THIS THE OG?</h2>
+                  <span className="ml-auto term text-[11px] text-muted">TRUE_OG probability <span className="font-black text-up">{Math.round(sc.trueOgProbability ?? 0)}%</span></span>
+                </div>
+                <p className="term text-[11px] text-muted">Every claim below is derived from on-chain forensic scoring of {report.og.name || report.og.symbol}. Higher scores = stronger, data-backed originality evidence.</p>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {EVIDENCE.map((e) => {
+                    const v = Math.round(Number(sc[e.key] ?? 0));
+                    const ok = v >= 60;
+                    return (
+                      <div key={e.key} className={`flex items-start gap-2 rounded-lg border p-2.5 ${ok ? "border-up/25 bg-up/[0.04]" : "border-gold/25 bg-gold/[0.04]"}`}>
+                        {ok ? <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-up" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-gold" />}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[12px] font-bold text-white">{e.label}</span>
+                            <span className={`term text-[11px] font-black ${ok ? "text-up" : "text-gold"}`}>{v}</span>
+                          </div>
+                          <div className="text-[11px] text-muted">{ok ? e.good : e.weak}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Summary */}
           <div className="grid grid-cols-4 gap-2">

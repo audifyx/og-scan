@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   Shield, Users, Droplets, Wallet2, Calculator, Search, Loader2, ArrowRight,
   Crosshair, ExternalLink, CheckCircle2, XCircle, AlertTriangle, RefreshCw,
-  Clock, TrendingUp, TrendingDown, Flame, Rocket, DollarSign,
+  Clock, TrendingUp, TrendingDown, Flame, Rocket, DollarSign, Star, Share2, Check,
 } from "lucide-react";
 import {
   isMint, tokenHolders, liquidityScan, walletProfile,
@@ -145,6 +145,11 @@ function TokenSniper() {
   const [loading, setLoading] = useState(true);
   const [updated, setUpdated] = useState<number>(0);
   const [auto, setAuto] = useState(true);
+  const [favs, setFavs] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem("orbitx.sniper.favs") || "[]")); } catch { return new Set(); } });
+  const [favOnly, setFavOnly] = useState(false);
+  const [shared, setShared] = useState<string | null>(null);
+  const toggleFav = (mint: string) => setFavs((prev) => { const n = new Set(prev); n.has(mint) ? n.delete(mint) : n.add(mint); try { localStorage.setItem("orbitx.sniper.favs", JSON.stringify([...n])); } catch { /* ignore */ } return n; });
+  const share = (mint: string) => { try { navigator.clipboard.writeText(`https://orbitx.world/token/${mint}`); } catch { /* ignore */ } setShared(mint); setTimeout(() => setShared(null), 1200); };
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
@@ -172,6 +177,7 @@ function TokenSniper() {
   }, [auto, load]);
 
   const active = LISTS.find((l) => l.id === list)!;
+  const shown = favOnly ? rows.filter((r) => favs.has(r.mint)) : rows;
 
   return (
     <div className="space-y-3">
@@ -193,10 +199,14 @@ function TokenSniper() {
             <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${auto ? "bg-up" : "bg-muted"}`} />
           </span>
           <span className="text-sm font-bold text-white">Live · {active.desc}</span>
-          <span className="pill bg-panel2 text-muted text-[10px]">{rows.length} coins</span>
+          <span className="pill bg-panel2 text-muted text-[10px]">{shown.length} coins</span>
           {updated > 0 && <span className="hidden md:inline text-[11px] text-muted">updated {timeAgo(new Date(updated).toISOString())} ago</span>}
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setFavOnly((f) => !f)}
+            className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${favOnly ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-400" : "border-line bg-panel2 text-muted hover:text-white"}`}>
+            ★ Saved
+          </button>
           <button onClick={() => setAuto((a) => !a)}
             className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${auto ? "border-up/40 bg-up/10 text-up" : "border-line bg-panel2 text-muted hover:text-white"}`}>
             {auto ? "Auto on" : "Auto off"}
@@ -209,11 +219,11 @@ function TokenSniper() {
 
       {loading && rows.length === 0 ? (
         <div className="grid place-items-center py-16 text-muted"><Loader2 className="h-6 w-6 animate-spin" /></div>
-      ) : rows.length === 0 ? (
+      ) : shown.length === 0 ? (
         <div className="rounded-xl border border-line bg-panel2/60 p-10 text-center text-sm text-muted">No coins right now. They appear here the moment they show up on-chain.</div>
       ) : (
         <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map((r) => {
+          {shown.map((r) => {
             const change = r.change5m ?? r.change1h ?? r.change24h ?? null;
             const up = (change ?? 0) >= 0;
             const a = r.audit || {};
@@ -261,6 +271,12 @@ function TokenSniper() {
                 )}
 
                 <div className="flex items-center justify-end gap-1.5">
+                  <button onClick={() => toggleFav(r.mint)} title="Save to watchlist" className="btn bg-panel2 text-[10.5px] inline-flex items-center px-2 py-1">
+                    <Star className={`h-3 w-3 ${favs.has(r.mint) ? "text-yellow-400 fill-yellow-400" : "text-muted"}`} />
+                  </button>
+                  <button onClick={() => share(r.mint)} title="Copy share link" className="btn bg-panel2 text-[10.5px] inline-flex items-center px-2 py-1">
+                    {shared === r.mint ? <Check className="h-3 w-3 text-up" /> : <Share2 className="h-3 w-3 text-muted" />}
+                  </button>
                   <Link to={`/token/${r.mint}`} className="btn bg-accent/15 text-accent text-[10.5px] inline-flex items-center gap-1 px-2 py-1">Scan</Link>
                   <a href={`https://pump.fun/${r.mint}`} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[10.5px] inline-flex items-center gap-1 px-2 py-1">pump <ExternalLink className="h-3 w-3" /></a>
                   <a href={`https://solscan.io/token/${r.mint}`} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[10.5px] inline-flex items-center gap-1 px-2 py-1">scan <ExternalLink className="h-3 w-3" /></a>
