@@ -2,16 +2,27 @@ import { Link } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Loader2, Search, RefreshCw, Feather, TrendingUp, Flame, Droplets,
-  Copy, Check, ExternalLink, ArrowUpRight, ArrowDownRight,
+  Copy, Check, ExternalLink, ArrowUpRight, ArrowDownRight, Users, Clock, Layers,
 } from "lucide-react";
 import { getScreener, Row, fmtUsd, short } from "../lib/api";
 
-type SortKey = "volume" | "mcap" | "liquidity" | "change";
+type SortKey = "volume" | "mcap" | "liquidity" | "change" | "holders" | "newest" | "gainers" | "losers";
+type CapKey = "all" | "low" | "mid" | "high";
 const SORTS: { key: SortKey; label: string; icon: any }[] = [
   { key: "volume",    label: "Volume",    icon: Flame },
   { key: "mcap",      label: "Market cap", icon: TrendingUp },
   { key: "liquidity", label: "Liquidity", icon: Droplets },
   { key: "change",    label: "24h %",     icon: ArrowUpRight },
+  { key: "gainers",   label: "Gainers",   icon: ArrowUpRight },
+  { key: "losers",    label: "Losers",    icon: ArrowDownRight },
+  { key: "holders",   label: "Holders",   icon: Users },
+  { key: "newest",    label: "Newest",    icon: Clock },
+];
+const CAPS: { key: CapKey; label: string }[] = [
+  { key: "all", label: "All caps" },
+  { key: "low", label: "Low cap (<$100K)" },
+  { key: "mid", label: "Mid cap ($100K–$1M)" },
+  { key: "high", label: "High cap (>$1M)" },
 ];
 
 // GeckoTerminal link for the Robinhood chain (see web/src/lib/chains.ts)
@@ -62,6 +73,7 @@ export default function Robinhood() {
   const [updatedAt, setUpdatedAt] = useState(0);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<SortKey>("volume");
+  const [cap, setCap] = useState<CapKey>("all");
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { copied, copy } = useCopy();
 
@@ -80,26 +92,37 @@ export default function Robinhood() {
   }, []);
 
   const totalVol = useMemo(() => rows.reduce((s, r) => s + (r.volume || 0), 0), [rows]);
+  const gainers = useMemo(() => rows.filter((r) => (r.change24h || 0) > 0).length, [rows]);
+  const avgChange = useMemo(() => rows.length ? rows.reduce((s, r) => s + (r.change24h || 0), 0) / rows.length : 0, [rows]);
 
   const view = useMemo(() => {
     const s = q.trim().toLowerCase();
     let out = rows.filter((r) => {
-      if (!s) return true;
-      return (r.name || "").toLowerCase().includes(s) ||
+      if (s && !((r.name || "").toLowerCase().includes(s) ||
         (r.symbol || "").toLowerCase().includes(s) ||
-        (r.mint || "").toLowerCase().includes(s);
+        (r.mint || "").toLowerCase().includes(s))) return false;
+      const mc = r.mcap || 0;
+      if (cap === "low") return mc > 0 && mc < 100_000;
+      if (cap === "mid") return mc >= 100_000 && mc <= 1_000_000;
+      if (cap === "high") return mc > 1_000_000;
+      return true;
     });
     const num = (n?: number | null) => (typeof n === "number" && isFinite(n) ? n : -Infinity);
+    const ts = (r: Row) => (r.createdAt ? new Date(r.createdAt).getTime() : (r.ageDays != null ? Date.now() - r.ageDays * 86400000 : 0));
     out = [...out].sort((a, b) => {
       switch (sort) {
         case "mcap":      return num(b.mcap) - num(a.mcap);
         case "liquidity": return num(b.liquidity) - num(a.liquidity);
-        case "change":    return num(b.change24h) - num(a.change24h);
+        case "change":
+        case "gainers":   return num(b.change24h) - num(a.change24h);
+        case "losers":    return num(a.change24h) - num(b.change24h);
+        case "holders":   return num(b.holderCount) - num(a.holderCount);
+        case "newest":    return ts(b) - ts(a);
         default:          return num(b.volume) - num(a.volume);
       }
     });
     return out;
-  }, [rows, q, sort]);
+  }, [rows, q, sort, cap]);
 
   return (
     <div className="max-w-6xl mx-auto px-3 py-6 space-y-4">
@@ -126,6 +149,14 @@ export default function Robinhood() {
         </div>
       </div>
 
+      {/* Market overview */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="card p-3"><div className="text-[10px] uppercase text-muted/60">Coins</div><div className="text-lg font-black text-accent">{rows.length}</div></div>
+        <div className="card p-3"><div className="text-[10px] uppercase text-muted/60">24h Volume</div><div className="text-lg font-black">{fmtUsd(totalVol, { compact: true })}</div></div>
+        <div className="card p-3"><div className="text-[10px] uppercase text-muted/60">Gainers</div><div className="text-lg font-black text-up">{gainers}<span className="text-xs text-muted">/{rows.length}</span></div></div>
+        <div className="card p-3"><div className="text-[10px] uppercase text-muted/60">Avg 24h</div><div className={`text-lg font-black ${avgChange >= 0 ? "text-up" : "text-down"}`}>{avgChange >= 0 ? "+" : ""}{avgChange.toFixed(1)}%</div></div>
+      </div>
+
       {/* Controls */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative">
@@ -138,6 +169,14 @@ export default function Robinhood() {
             <button key={key} onClick={() => setSort(key)}
               className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md transition-colors ${sort === key ? "bg-accent/20 text-accent" : "text-muted hover:text-white"}`}>
               <Icon className="w-3 h-3" />{label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1 flex-wrap">
+          {CAPS.map(({ key, label }) => (
+            <button key={key} onClick={() => setCap(key)}
+              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${cap === key ? "bg-accent/20 text-accent border-accent/40" : "bg-panel2 text-muted border-line hover:text-white"}`}>
+              {key === "all" && <Layers className="w-3 h-3" />}{label}
             </button>
           ))}
         </div>
