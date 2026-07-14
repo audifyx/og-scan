@@ -636,7 +636,7 @@ function parseCmd(input: string): CmdResult | 'help' | null {
   return null;
 }
 
-const AI_SYSTEM = `You are an advanced AI widget builder for OGScan, a Solana DeFi platform.
+const AI_SYSTEM = `You are an advanced AI widget builder for OrbitX, a Solana DeFi platform.
 Build ANY widget the user requests. Return ONLY valid JSON:
 {
   "type": "custom_code"|"sol_price"|"trending"|"price_chart"|"dex_chart"|"wallet"|"wallet_portfolio"|"wallet_tracker"|"token_info"|"social_feed"|"kol_feed"|"fear_greed"|"volume_bar"|"top_traders",

@@ -196,7 +196,7 @@ export const OgFinder = ({ onSelect }: Props) => {
             <span className="text-og-gold text-glow-gold">DIRECT OG</span>
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Drop any ticker, meme, brand, or narrative. OGSCAN now shows both layers: the earliest Solana mint proof and the current Primary token by dominance. A later official winner can be Primary, while the first mint remains Legacy OG.
+            Drop any ticker, meme, brand, or narrative. OrbitX now shows both layers: the earliest Solana mint proof and the current Primary token by dominance. A later official winner can be Primary, while the first mint remains Legacy OG.
           </p>
         </div>
 

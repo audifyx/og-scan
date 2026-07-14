@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const BRAND = "OGSCAN";
+const BRAND = "ORBITX";
 
-/** Waitlist — OGSCAN black-glass theme, premium 3D email capture. Route: /waitlist */
+/** Waitlist — OrbitX black-glass theme, premium 3D email capture. Route: /waitlist */
 export default function Waitlist() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");

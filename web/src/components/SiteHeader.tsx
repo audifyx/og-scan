@@ -38,7 +38,7 @@ export const SiteHeader = ({ navItems, activeId, onNavigate }: Props) => {
             <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-og-cyan shadow-og" />
           </div>
           <div className="min-w-0">
-            <div className="truncate font-display text-sm font-bold tracking-[0.22em] text-foreground">ogscan<span className="text-og-lime">.fun</span></div>
+            <div className="truncate font-display text-sm font-bold tracking-[0.22em] text-foreground">orbitx<span className="text-og-lime">.world</span></div>
             <div className="truncate text-[9px] uppercase tracking-[0.3em] text-muted-foreground">Tool command deck</div>
           </div>
         </button>

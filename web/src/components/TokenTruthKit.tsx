@@ -31,7 +31,7 @@ export const TRUTH_LEGEND: Record<TruthTermKey, TruthLegendEntry> = {
   },
   narrativeCluster: {
     label: "Narrative Cluster",
-    tooltip: "All tokens that match the same ticker/name/meme narrative after normalization. OGSCAN compares tokens inside this cluster before assigning labels.",
+    tooltip: "All tokens that match the same ticker/name/meme narrative after normalization. OrbitX compares tokens inside this cluster before assigning labels.",
     why: "Copycats often use tiny spelling, casing, emoji, or unicode changes to hide inside the same meme narrative.",
     placement: "Beside Narrative ID / Cluster metrics at the top of Scanner and Direct OG reports.",
   },
@@ -227,7 +227,7 @@ export function buildTokenRiskAlerts(token: JupTokenInfo, forensic?: TokenForens
     alerts.push({
       level: "danger",
       title: "LP pulled / dead liquidity detected",
-      text: token.lpPullReason ?? `This token shows ${fmtUsd(token.reportedLiquidity ?? token.liquidity)} reported LP/MC but only ${fmtUsd(liquidity)} quote-backed live liquidity. OGSCAN excludes it from TRUE OG selection.`,
+      text: token.lpPullReason ?? `This token shows ${fmtUsd(token.reportedLiquidity ?? token.liquidity)} reported LP/MC but only ${fmtUsd(liquidity)} quote-backed live liquidity. OrbitX excludes it from TRUE OG selection.`,
     });
   }
 
@@ -281,7 +281,7 @@ export function buildTokenRiskAlerts(token: JupTokenInfo, forensic?: TokenForens
     alerts.push({
       level: "warning",
       title: "Thin liquidity anomaly",
-      text: `Quote-backed live liquidity is only ${fmtUsd(liquidity)}. OGSCAN excludes sub-$1k or LP-pulled candidates from OG selection, but thin LP still deserves caution.`,
+      text: `Quote-backed live liquidity is only ${fmtUsd(liquidity)}. OrbitX excludes sub-$1k or LP-pulled candidates from OG selection, but thin LP still deserves caution.`,
     });
   }
 

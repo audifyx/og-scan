@@ -297,7 +297,7 @@ export const TechStack = () => {
         <div className="grid grid-cols-2 gap-px bg-og-grid sm:grid-cols-3 lg:grid-cols-4">
           {[
             { label: "TOKEN SEARCH", src: "JUPITER" },
-            { label: "NARRATIVE CLUSTER", src: "OGSCAN" },
+            { label: "NARRATIVE CLUSTER", src: "ORBITX" },
             { label: "TRUE ORBITX SCORE", src: "12-FACTOR FUSION" },
             { label: "CLONE PROBABILITY", src: "ORIGIN GRAPH" },
             { label: "PARSED TX", src: "HELIUS" },
