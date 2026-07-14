@@ -1,7 +1,7 @@
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Send, Wallet2, LogOut, Flame, Users, Sparkles, Rocket, Bell, Code, FileText, Wrench, Megaphone, Crosshair, LayoutGrid, Feather } from "lucide-react";
+import { Search, Zap, ShoppingBag, Wallet, Star, ChevronDown, Coins, Send, Wallet2, LogOut, Flame, Users, Rocket, Bell, Code, FileText, Wrench, Megaphone, Crosshair, LayoutGrid, Feather } from "lucide-react";
 import { track, getWatchlist, short } from "../lib/api";
 import { useWallet } from "../lib/wallet";
 import LiveStats, { fetchPlatformStats } from "./LiveStats";
@@ -37,7 +37,6 @@ const NAV_LINKS = [
   { to: "/pulse",     label: "Pulse",     Icon: Flame,      exact: false },
   { to: "/scanner",   label: "Scanner",   Icon: Crosshair,  exact: false },
   { to: "/tools",     label: "Tools",     Icon: Wrench,     exact: false },
-  { to: "/new",       label: "New",       Icon: Sparkles,   exact: false },
   { to: "/wallet",    label: "Wallets",   Icon: Wallet2,    exact: false },
   { to: "/kol",       label: "KOL",       Icon: Users,      exact: false },
   { to: "/more",      label: "More",      Icon: LayoutGrid, exact: false },
@@ -52,7 +51,6 @@ const FOOTER_PRODUCT = [
   { to: "/tools",       label: "Token Sniper" },
   { to: "/scanner",     label: "Scanner" },
   { to: "/pulse",       label: "Market Pulse" },
-  { to: "/new",         label: "New Launches" },
   { to: "/wallet",      label: "Portfolio" },
   { to: "/kol",         label: "KOL Scanner" },
   { to: "/store",       label: "List & Boost" },

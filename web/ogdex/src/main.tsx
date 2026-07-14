@@ -26,7 +26,6 @@ const KolProfile = lazy(() => import("./pages/KolProfile"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Launchpad = lazy(() => import("./pages/Launchpad"));
 const Robinhood = lazy(() => import("./pages/Robinhood"));
-const NewlyListed = lazy(() => import("./pages/NewlyListed"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Whitepaper = lazy(() => import("./pages/Whitepaper"));
@@ -68,7 +67,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="robinhood" element={<Suspense fallback={<PageFallback />}><Robinhood /></Suspense>} />
           {/* Launcher moved into the Launchpad — keep /launch as a redirect. */}
           <Route path="launch" element={<Navigate to="/launchpad" replace />} />
-          <Route path="new" element={<Suspense fallback={<PageFallback />}><NewlyListed /></Suspense>} />
+          <Route path="new" element={<Navigate to="/launchpad" replace />} />
           <Route path="wallet" element={<Suspense fallback={<PageFallback />}><WalletIndex /></Suspense>} />
           <Route path="wallet/:address" element={<Suspense fallback={<PageFallback />}><Wallet /></Suspense>} />
           <Route path="kol" element={<Suspense fallback={<PageFallback />}><KolScanner /></Suspense>} />

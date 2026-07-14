@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Rocket, Zap, Sparkles, ShieldCheck, ChevronDown } from "lucide-react";
+import { Rocket, Zap, Sparkles, ShieldCheck, ChevronDown, Radio, LayoutGrid } from "lucide-react";
 import Launch from "./Launch";
 import LaunchpadFeed from "../components/LaunchpadFeed";
+import LaunchesExplorer from "../components/LaunchesExplorer";
 import { VANITY_SUFFIX } from "../lib/vanity-mint";
 
 /**
@@ -16,6 +17,7 @@ export default function Launchpad() {
   // On mobile the launcher is collapsed by default so the feed leads; on
   // desktop both panes are always visible side by side.
   const [showLauncher, setShowLauncher] = useState(true);
+  const [feedTab, setFeedTab] = useState<"live" | "explore">("explore");
 
   return (
     <div className="max-w-[1500px] mx-auto px-4 py-6 space-y-6">
@@ -68,8 +70,18 @@ export default function Launchpad() {
           </div>
         </aside>
 
-        <section>
-          <LaunchpadFeed />
+        <section className="space-y-4">
+          <div className="flex items-center gap-1.5 border-b border-line pb-2">
+            <button onClick={() => setFeedTab("explore")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${feedTab === "explore" ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>
+              <LayoutGrid className="w-4 h-4" /> Explore Launches
+            </button>
+            <button onClick={() => setFeedTab("live")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${feedTab === "live" ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>
+              <Radio className="w-4 h-4" /> Live Feed
+            </button>
+          </div>
+          {feedTab === "explore" ? <LaunchesExplorer /> : <LaunchpadFeed />}
         </section>
       </div>
     </div>
