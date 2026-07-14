@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Loader2, Search, RefreshCw, Feather, TrendingUp, Flame, Droplets,
+  Loader2, Search, RefreshCw, Feather, TrendingUp, Flame, Droplets, Crosshair,
   Copy, Check, ExternalLink, ArrowUpRight, ArrowDownRight, Users, Clock, Layers,
 } from "lucide-react";
 import { getScreener, Row, fmtUsd, short } from "../lib/api";
@@ -141,6 +141,7 @@ export default function Robinhood() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Link to="/robinhood/scanner" className="btn bg-accent/15 text-accent text-[11px] inline-flex items-center gap-1.5 py-1.5 px-3 font-bold"><Crosshair className="w-3.5 h-3.5" />Scanner</Link>
           <span className="pill bg-accent/15 text-accent text-[10px] font-bold">{rows.length} coins</span>
           {totalVol > 0 && <span className="pill bg-up/10 text-up text-[10px] font-bold">{fmtUsd(totalVol, { compact: true })} 24h vol</span>}
           <button onClick={() => load(true)} className="btn bg-panel2 text-muted hover:text-white text-[11px] inline-flex items-center gap-1.5 py-1.5 px-3">
