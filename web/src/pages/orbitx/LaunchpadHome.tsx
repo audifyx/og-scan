@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Rocket, Flame, Droplets, Layers, Loader2, ShieldCheck, TrendingUp, Zap } from "lucide-react";
+import { Rocket, Flame, Droplets, Loader2, ShieldCheck, TrendingUp, Zap, HandCoins, Coins, BadgeDollarSign } from "lucide-react";
+import { ORBITX_FEE_USD, fmtUsd } from "@/lib/orbitx/fee";
+import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 import { listTokens, type FeedKind } from "@/lib/orbitx/registry";
 import { TokenCard, StatTile, SectionLabel } from "./_shared";
 
@@ -50,27 +52,59 @@ export default function LaunchpadHome() {
 
   return (
     <div>
-      {/* Hero */}
+      {/* Hero — v2 */}
       <div className="og-glass-frame relative mb-6 overflow-hidden p-6 sm:p-9">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-30" />
+        <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-[hsl(var(--og-gold))]/12 blur-3xl" />
         <div className="relative max-w-2xl">
-          <div className="glass-pill text-[hsl(var(--og-lime))]">
-            <ShieldCheck className="h-3.5 w-3.5" /> ANTI-VAMP · UNIQUE CA / NAME / TICKER
+          <div className="flex flex-wrap gap-2">
+            <div className="glass-pill text-[hsl(var(--og-lime))]">
+              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[hsl(var(--og-lime))] opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-[hsl(var(--og-lime))]" /></span>
+              MAINNET LIVE
+            </div>
+            <div className="glass-pill text-[hsl(var(--og-gold))]">
+              <ShieldCheck className="h-3.5 w-3.5" /> ANTI-VAMP
+            </div>
           </div>
-          <h1 className="mt-4 font-display text-3xl font-bold leading-[1.1] tracking-tight text-foreground sm:text-[2.7rem]">
-            Launch a Solana token<br />that <span className="gradient-text">can't be cloned</span>.
+          <h1 className="mt-4 font-display text-3xl font-bold leading-[1.08] tracking-tight text-foreground sm:text-[2.9rem]">
+            Launch it. Trade it.<br /><span className="gradient-text">Get paid every trade.</span>
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
-            Two lanes, one platform: <span className="text-[hsl(var(--og-cyan))]">Pump-style</span> bonding-curve launches, or a fully <span className="text-[hsl(var(--og-gold))]">Custom</span> SPL mint. Both get an <span className="font-mono text-[hsl(var(--og-gold))]">obx</span> vanity address and anti-vamp protection.
+            Two lanes — <span className="text-[hsl(var(--og-cyan))]">Pump</span> bonding curves or a fully <span className="text-[hsl(var(--og-gold))]">Custom</span> on-chain mint. Same flat fee, same {(CREATOR_FEE_BPS / 100).toFixed(2)}% creator cut of every buy and sell, claimable in-app with the wallet that launched.
           </p>
           <div className="mt-5 flex flex-wrap gap-2.5">
             <Link to="/orbitxlaunch/create" className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--og-gold))]/50 bg-[hsl(var(--og-gold))]/15 px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-[hsl(var(--og-gold))] transition hover:bg-[hsl(var(--og-gold))]/25">
-              <Rocket className="h-4 w-4" /> Choose a launch
+              <Rocket className="h-4 w-4" /> Launch a token
+            </Link>
+            <Link to="/orbitxlaunch/claim" className="inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-[hsl(var(--og-lime))] transition hover:bg-[hsl(var(--og-lime))]/20">
+              <HandCoins className="h-4 w-4" /> Claim creator fees
             </Link>
             <Link to="/orbitxlaunch/create/pump" className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-foreground transition hover:bg-white/10">
               <Zap className="h-4 w-4 text-[hsl(var(--og-cyan))]" /> Quick pump launch
             </Link>
           </div>
+        </div>
+      </div>
+
+      {/* Fee parity band — pump.fun fee system, both lanes */}
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <div className="og-glass-card relative overflow-hidden p-4">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--og-gold))]/60 to-transparent" />
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground"><BadgeDollarSign className="h-3.5 w-3.5 text-[hsl(var(--og-gold))]" /> Launch fee</div>
+          <div className="mt-1.5 font-display text-2xl font-bold text-[hsl(var(--og-gold))]">{fmtUsd(ORBITX_FEE_USD)}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">flat, in SOL — identical on both lanes</div>
+        </div>
+        <div className="og-glass-card relative overflow-hidden p-4">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--og-lime))]/60 to-transparent" />
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground"><Coins className="h-3.5 w-3.5 text-[hsl(var(--og-lime))]" /> Creator fee</div>
+          <div className="mt-1.5 font-display text-2xl font-bold text-[hsl(var(--og-lime))]">{(CREATOR_FEE_BPS / 100).toFixed(2)}%</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">of every buy & sell — pump.fun's creator rate</div>
+        </div>
+        <div className="og-glass-card relative overflow-hidden p-4">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--og-cyan))]/60 to-transparent" />
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground"><HandCoins className="h-3.5 w-3.5 text-[hsl(var(--og-cyan))]" /> Claims</div>
+          <div className="mt-1.5 font-display text-2xl font-bold text-[hsl(var(--og-cyan))]">In-app</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">connect the launch wallet → claim. Both lanes.</div>
         </div>
       </div>
 
