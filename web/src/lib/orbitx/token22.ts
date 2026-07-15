@@ -29,7 +29,7 @@ import {
   createMintToCheckedInstruction, createBurnCheckedInstruction, createSetAuthorityInstruction,
   AuthorityType, TYPE_SIZE, LENGTH_SIZE,
 } from "@solana/spl-token";
-import { createInitializeInstruction, pack, type TokenMetadata } from "@solana/spl-token-metadata";
+import { createInitializeInstruction, createUpdateAuthorityInstruction, pack, type TokenMetadata } from "@solana/spl-token-metadata";
 import { PLATFORM_WALLET, CREATOR_FEE_BPS } from "@/lib/platformFee";
 
 export interface CustomLaunchParams {
@@ -44,6 +44,7 @@ export interface CustomLaunchParams {
   burnPct: number;             // 0-100, burned at launch
   revokeMint: boolean;
   revokeFreeze: boolean;
+  immutableMetadata: boolean;  // removes the metadata update authority at launch
   launchFeeLamports: number;   // flat $1.50 in lamports, -> PLATFORM_WALLET
   vampFlagged: boolean;        // true => creator fees force-routed to OBX buyback wallet
 }
@@ -136,6 +137,14 @@ export async function buildCustomLaunchTransaction(p: CustomLaunchParams): Promi
   /* 6 — authority revokes */
   if (p.revokeMint) {
     tx.add(createSetAuthorityInstruction(mint, p.creator, AuthorityType.MintTokens, null, [], TOKEN_2022_PROGRAM_ID));
+  }
+  if (p.immutableMetadata) {
+    tx.add(createUpdateAuthorityInstruction({
+      programId: TOKEN_2022_PROGRAM_ID,
+      metadata: mint,
+      oldAuthority: p.creator,
+      newAuthority: null,
+    }));
   }
 
   return { tx, mint, creatorAta, feeAuthority };

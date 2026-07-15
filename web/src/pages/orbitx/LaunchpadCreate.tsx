@@ -368,6 +368,7 @@ export default function LaunchpadCreate() {
         burnPct: cfg.burnPct,
         revokeMint: cfg.revokeMint,
         revokeFreeze: cfg.revokeFreeze,
+        immutableMetadata: cfg.immutableMetadata,
         launchFeeLamports: feeLamports,
         vampFlagged: flagged,
       });

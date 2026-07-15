@@ -196,7 +196,7 @@ export default function LaunchpadClaim() {
                     {pumpLoading ? "…" : pumpSol === null ? "—" : `${pumpSol.toFixed(6)} SOL`}
                   </div>
                 </div>
-                <Button onClick={claimPump} disabled={pumpClaiming || pumpLoading || !pumpSol}
+                <Button onClick={claimPump} disabled={pumpClaiming || pumpLoading || pumpSol === 0}
                   className="bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90 disabled:opacity-50">
                   {pumpClaiming ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Claiming…</> : <><Coins className="mr-2 h-4 w-4" /> Claim pump.fun fees</>}
                 </Button>
