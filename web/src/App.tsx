@@ -44,7 +44,12 @@ import CommunityClassic from "./pages/CommunityClassic";
 import OfficialToken from "./pages/OfficialToken";
 import PumpV5 from "./pages/PumpV5";
 import Launch from "./pages/Launch";
-import OrbitxLaunch from "./pages/OrbitxLaunch";
+import LaunchpadLayout from "./pages/orbitx/LaunchpadLayout";
+import LaunchpadHome from "./pages/orbitx/LaunchpadHome";
+import LaunchpadCreate from "./pages/orbitx/LaunchpadCreate";
+import LaunchpadToken from "./pages/orbitx/LaunchpadToken";
+import LaunchpadAbout from "./pages/orbitx/LaunchpadAbout";
+import LaunchpadProfile from "./pages/orbitx/LaunchpadProfile";
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
@@ -166,7 +171,13 @@ const App = () => (
             <Route path="/install" element={<InstallApp />} />
 
             {/* ── Custom launchpad (Orbitx Launch Console) ── */}
-            <Route path="/orbitxlaunch" element={<OrbitxLaunch />} />
+            <Route path="/orbitxlaunch" element={<LaunchpadLayout />}>
+              <Route index element={<LaunchpadHome />} />
+              <Route path="create" element={<LaunchpadCreate />} />
+              <Route path="token/:mint" element={<LaunchpadToken />} />
+              <Route path="about" element={<LaunchpadAbout />} />
+              <Route path="profile" element={<LaunchpadProfile />} />
+            </Route>
 
             {/* ── Protected: App shell ── */}
             <Route path="/app" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
