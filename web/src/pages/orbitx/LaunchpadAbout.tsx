@@ -47,7 +47,7 @@ export default function LaunchpadAbout() {
       </div>
 
       <div className="og-glass-card mt-6 border-[hsl(var(--og-cyan))]/25 p-4 text-sm text-muted-foreground">
-        <span className="font-display font-bold uppercase tracking-wide text-[hsl(var(--og-cyan))]">Status //</span> the launchpad UI, both launch lanes, anti-vamp registry, and fee model are live. Custom-lane on-chain minting + pool creation roll out devnet-first, then mainnet after testing — so you never launch blind.
+        <span className="font-display font-bold uppercase tracking-wide text-[hsl(var(--og-cyan))]">Status //</span> both launch lanes are fully live on Solana mainnet — pump.fun launches, custom Token-2022 launches with on-chain metadata, optional Raydium CPMM pools, the 0.30% creator fee on every buy/sell (pump.fun's creator rate), and in-app fee claiming at /orbitxlaunch/claim.
       </div>
 
       <div className="mt-6 flex justify-center">

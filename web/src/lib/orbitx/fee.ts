@@ -1,13 +1,17 @@
-// Orbitx Launchpad — fee model.
-// Fee = pass-through on-chain/DEX cost (we don't control that) + a flat Orbitx
-// platform fee, priced in USD and converted to SOL live so it stays constant in
-// dollar terms regardless of the SOL price.
+// Orbitx Launchpad — fee model (pump.fun parity).
+// The fee STRUCTURE mirrors pump.fun (see pump.fun/docs/fees):
+//   - trading: 0.30% creator fee on every buy/sell (pump bonding-curve creator rate)
+//   - platform: 0.95% protocol-rate swap fee on in-app swaps
+// plus one flat Orbitx launch fee, IDENTICAL on both lanes ($1.50, converted
+// to SOL live so it stays constant in dollar terms).
+import { LAUNCHPAD_FEE_USD, CREATOR_FEE_BPS } from "@/lib/platformFee";
 
-export const ORBITX_FEE_USD = 2; // flat Orbitx platform fee, in USD
+export const ORBITX_FEE_USD = LAUNCHPAD_FEE_USD; // flat Orbitx launch fee — same on pump + custom lanes
+export { CREATOR_FEE_BPS };                      // 0.30% per buy/sell, claimable by the creator
 
 // Real, approximate on-chain costs (mainnet). These are the user's cost, not ours.
 export const RAYDIUM_POOL_FEE_SOL = 0.15; // Raydium CPMM pool-creation protocol fee
-export const MINT_COST_SOL = 0.012;       // SPL mint rent + Metaplex metadata + ATA + tx fees
+export const MINT_COST_SOL = 0.012;       // mint rent + metadata + ATA + tx fees
 
 const FALLBACK_SOL_USD = 150; // used only if the live price feed is unreachable
 

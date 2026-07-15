@@ -52,6 +52,7 @@ import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
 import LaunchpadToken from "./pages/orbitx/LaunchpadToken";
 import LaunchpadAbout from "./pages/orbitx/LaunchpadAbout";
 import LaunchpadProfile from "./pages/orbitx/LaunchpadProfile";
+import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
@@ -179,6 +180,7 @@ const App = () => (
               <Route path="create/custom" element={<LaunchpadCreate />} />
               <Route path="create/pump" element={<LaunchpadPump />} />
               <Route path="token/:mint" element={<LaunchpadToken />} />
+              <Route path="claim" element={<LaunchpadClaim />} />
               <Route path="about" element={<LaunchpadAbout />} />
               <Route path="profile" element={<LaunchpadProfile />} />
             </Route>

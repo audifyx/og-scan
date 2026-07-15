@@ -27,6 +27,8 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD } from "@/lib/platformFee";
+import { registerToken } from "@/lib/orbitx/registry";
+import { Link } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import {
@@ -678,6 +680,27 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         launcherWallet: publicKey.toBase58(),
       });
 
+      // Shared OrbitX registry — powers the Home feed + the Claim Fees page.
+      try {
+        await registerToken({
+          mint_address: mintAddr,
+          name: form.name.trim(),
+          ticker: form.symbol.trim().toUpperCase(),
+          creator_wallet: publicKey.toBase58(),
+          decimals: 6,
+          supply: 1_000_000_000,
+          dex: "pumpfun",
+          mint_signature: sig,
+          metadata_uri: uri,
+          fee_route: "creator",
+          cluster: "mainnet-beta",
+          launch_type: "pump",
+        });
+      } catch (regErr) {
+        // duplicate names/tickers or transient registry errors must not eat a live launch
+        console.warn("[orbitx] pump registry insert failed", regErr);
+      }
+
       setStep("success");
       toast.success("Token launched! 🚀");
     } catch (err: any) {
@@ -767,6 +790,10 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link to="/orbitxlaunch/claim"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[hsl(var(--og-gold))] px-6 py-3 text-sm font-bold text-black hover:bg-[hsl(var(--og-gold))]/90 transition-colors">
+                  <DollarSign className="h-4 w-4" /> Claim Creator Fees
+                </Link>
                 <a href={`https://pump.fun/${mintAddress}`} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-[hsl(var(--og-cyan))] px-6 py-3 text-sm font-bold text-black hover:bg-[hsl(var(--og-cyan))] transition-colors">
                   <ExternalLink className="h-4 w-4" /> View on Pump.fun
@@ -961,7 +988,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             )}
 
   <p className="text-center text-[10px] text-white/15 leading-relaxed">
-By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "obx".<br />A $1.50 platform launch fee (paid in SOL) applies on Solana, plus the standard network fee (~0.02 SOL). Other chains are free.
+By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "obx".<br />A $1.50 platform launch fee (paid in SOL) applies — the same flat fee as the custom lane — plus the standard network fee (~0.02 SOL).<br />You earn pump.fun creator fees on every buy/sell (0.30% on the bonding curve, dynamic after graduation) — claim them in-app under Claim Fees.
             </p>
           </div>
         )}

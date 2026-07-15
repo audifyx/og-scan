@@ -2,12 +2,13 @@
 // Terminal/glass aesthetic matching the OrbitX DEX design system.
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Rocket, Home, PlusCircle, Info, UserCircle2 } from "lucide-react";
+import { Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { to: "/orbitxlaunch", label: "HOME", icon: Home, end: true },
   { to: "/orbitxlaunch/create", label: "LAUNCH", icon: PlusCircle, end: false },
+  { to: "/orbitxlaunch/claim", label: "CLAIM FEES", icon: HandCoins, end: false },
   { to: "/orbitxlaunch/profile", label: "PROFILE", icon: UserCircle2, end: false },
   { to: "/orbitxlaunch/about", label: "ABOUT", icon: Info, end: false },
 ];

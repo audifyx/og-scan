@@ -1,9 +1,10 @@
 /**
  * OrbitxLaunch — the Orbitx Launch Console (mounted at /orbitxlaunch).
  *
- * Premium space-themed CUSTOM Solana launchpad — own SPL mint + Metaplex
- * metadata + own independent DEX pool. NOT pump.fun. Built natively on the
- * OrbitX design system (og-* tokens, shadcn ui kit, AppLayout). Solana-only.
+ * Premium space-themed CUSTOM Solana launchpad — REAL on-chain launch on
+ * mainnet: own Token-2022 SPL mint + on-chain metadata + 0.30% creator fee
+ * on every buy/sell (pump.fun's creator-fee rate, claimable in-app at
+ * /orbitxlaunch/claim) + optional Raydium CPMM pool. NOT pump.fun.
  */
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
@@ -19,16 +20,20 @@ import { Separator } from "@/components/ui/separator";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { Keypair } from "@solana/web3.js";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Rocket, Wallet, Globe, Twitter, Send, MessagesSquare, Upload, Image as ImageIcon,
   Coins, ShieldCheck, Droplets, Sparkles, Lock, Flame, Gauge, Timer,
   CheckCircle2, AlertTriangle, Info, Wand2, ChevronRight, Loader2, Copy, Check,
 } from "lucide-react";
-import { computeFee, type FeeBreakdown } from "@/lib/orbitx/fee";
-import { vampCheck } from "@/lib/orbitx/registry";
+import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, type FeeBreakdown } from "@/lib/orbitx/fee";
+import { vampCheck, registerToken } from "@/lib/orbitx/registry";
+import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
+import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
+import { supabase } from "@/lib/supabase";
 
 const MAX_LOGO_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMG = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -93,6 +98,43 @@ const DEFAULT_CONFIG: LaunchConfig = {
   vanityPrefix: "OBX",
 };
 
+type LaunchPhase = "idle" | "checking" | "uploading" | "signing" | "confirming" | "pool" | "registering" | "done";
+
+interface LaunchedInfo {
+  mint: string; sig: string; poolId?: string; poolTx?: string; lpBurned: boolean; flagged: boolean;
+}
+
+/** Upload logo + metadata JSON to storage; returns public logo URL + metadata URI. */
+async function uploadLaunchAssets(mintAddr: string, cfg: LaunchConfig, creator: string): Promise<{ logoUrl: string; uri: string }> {
+  const dataUrl = cfg.logoDataUrl as string;
+  const mime = dataUrl.slice(5, dataUrl.indexOf(";")) || "image/png";
+  const ext = (mime.split("/")[1] || "png").replace("jpeg", "jpg");
+  const bytes = Uint8Array.from(atob(dataUrl.split(",")[1]), (c) => c.charCodeAt(0));
+  const logoPath = `orbitxlaunch/${mintAddr}/logo.${ext}`;
+  const { error: logoErr } = await supabase.storage.from("profile-media")
+    .upload(logoPath, new Blob([bytes], { type: mime }), { contentType: mime, upsert: true });
+  if (logoErr) throw new Error(`Logo upload failed: ${logoErr.message}`);
+  const logoUrl = supabase.storage.from("profile-media").getPublicUrl(logoPath).data.publicUrl;
+  const metaJson = {
+    name: cfg.name.trim(),
+    symbol: cfg.ticker.trim().toUpperCase(),
+    description: cfg.description.trim(),
+    image: logoUrl,
+    external_url: cfg.website || undefined,
+    extensions: {
+      website: cfg.website || undefined, twitter: cfg.twitter || undefined,
+      telegram: cfg.telegram || undefined, discord: cfg.discord || undefined,
+    },
+    creator, tags: ["orbitx-launch"],
+  };
+  const jsonPath = `orbitxlaunch/${mintAddr}/metadata.json`;
+  const { error: jsonErr } = await supabase.storage.from("profile-media")
+    .upload(jsonPath, new Blob([JSON.stringify(metaJson, null, 2)], { type: "application/json" }), { contentType: "application/json", upsert: true });
+  if (jsonErr) throw new Error(`Metadata upload failed: ${jsonErr.message}`);
+  const uri = supabase.storage.from("profile-media").getPublicUrl(jsonPath).data.publicUrl;
+  return { logoUrl, uri };
+}
+
 const fieldClass =
   "bg-black/40 border-white/10 focus-visible:ring-[hsl(var(--og-gold))] focus-visible:border-[hsl(var(--og-gold))]/60";
 
@@ -152,10 +194,14 @@ function humanTime(sec: number) {
 }
 
 export default function LaunchpadCreate() {
-  const { connected, publicKey, connect, wallets, select } = useWallet();
+  const { connected, publicKey, connect, wallets, select, signTransaction, signAllTransactions } = useWallet();
+  const { connection } = useConnection();
   const [cfg, setCfg] = useState<LaunchConfig>(DEFAULT_CONFIG);
   const [active, setActive] = useState<SectionId>("identity");
   const [launching, setLaunching] = useState(false);
+  const [phase, setPhase] = useState<LaunchPhase>("idle");
+  const [phaseMsg, setPhaseMsg] = useState("");
+  const [launched, setLaunched] = useState<LaunchedInfo | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const set = useCallback(<K extends keyof LaunchConfig>(key: K, value: LaunchConfig[K]) => {
@@ -201,6 +247,7 @@ export default function LaunchpadCreate() {
   const [foundKey, setFoundKey] = useState<string | null>(null);
   const [rate, setRate] = useState(0);
   const grindStop = useRef(false);
+  const foundKpRef = useRef<Keypair | null>(null);
   const vanityEst = useMemo(() => estimateVanity(cfg.vanityPrefix, rate || 8000), [cfg.vanityPrefix, rate]);
 
   const runGrind = useCallback(() => {
@@ -219,6 +266,7 @@ export default function LaunchpadCreate() {
         count++;
         const addr = kp.publicKey.toBase58();
         if (addr.toLowerCase().startsWith(targetLower)) {
+          foundKpRef.current = kp;
           setFoundKey(addr); setAttempts(count);
           setRate(Math.round((count / (performance.now() - started)) * 1000));
           setGrinding(false);
@@ -277,22 +325,133 @@ export default function LaunchpadCreate() {
 
   const handleLaunch = async () => {
     if (errors.length) { toast.error(errors[0]); return; }
-    if (!connected) { toast.error("Connect a wallet first"); return; }
+    if (!connected || !publicKey || !signTransaction) { toast.error("Connect a wallet first"); return; }
+    if (!cfg.logoDataUrl) { toast.error("Upload a logo — it becomes your token image"); return; }
     setLaunching(true);
     try {
+      /* 1 — anti-vamp identity check */
+      setPhase("checking"); setPhaseMsg("Anti-vamp check…");
+      let flagged = false;
       const matches = await vampCheck(cfg.name, cfg.ticker);
       const clone = matches.find((m) => m.sim >= 0.85);
       if (clone) {
         toast.error(`Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${clone.name} ($${clone.ticker}). Anti-vamp requires a unique identity.`);
+        setPhase("idle");
         return;
       }
       if (matches.length > 0) {
-        toast.warning(`${matches.length} similar token(s) exist — this would launch flagged, creator fees routed to OBX buybacks.`);
-      } else {
-        toast.success(`${cfg.ticker.toUpperCase()} passed the anti-vamp check. On-chain mint (devnet-first) rolls out next.`);
+        flagged = true;
+        toast.warning(`${matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`);
       }
-    } catch {
-      toast.error("Anti-vamp check failed — try again in a moment.");
+
+      /* 2 — mint keypair (vanity-ground if available) */
+      const mintKeypair = foundKpRef.current ?? Keypair.generate();
+      const mintAddr = mintKeypair.publicKey.toBase58();
+
+      /* 3 — upload logo + metadata */
+      setPhase("uploading"); setPhaseMsg("Uploading logo + metadata…");
+      const { logoUrl, uri } = await uploadLaunchAssets(mintAddr, cfg, publicKey.toBase58());
+
+      /* 4 — build, sign, send the on-chain mint transaction (mainnet) */
+      setPhase("signing"); setPhaseMsg("Approve the launch transaction in your wallet…");
+      const { price } = await getSolUsd();
+      const feeLamports = launchFeeLamports(ORBITX_FEE_USD, price);
+      const { tx } = await buildCustomLaunchTransaction({
+        connection,
+        creator: publicKey,
+        mintKeypair,
+        name: cfg.name.trim(),
+        symbol: cfg.ticker.trim().toUpperCase(),
+        metadataUri: uri,
+        decimals: cfg.decimals,
+        supply: BigInt(cfg.supply),
+        burnPct: cfg.burnPct,
+        revokeMint: cfg.revokeMint,
+        revokeFreeze: cfg.revokeFreeze,
+        launchFeeLamports: feeLamports,
+        vampFlagged: flagged,
+      });
+      tx.feePayer = publicKey;
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      tx.partialSign(mintKeypair);
+      const signed = await signTransaction(tx);
+      setPhase("confirming"); setPhaseMsg("Broadcasting to Solana mainnet…");
+      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+      const conf = await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+      if (conf.value.err) throw new Error("Mint transaction failed on-chain: " + JSON.stringify(conf.value.err));
+
+      /* 5 — optional Raydium CPMM pool */
+      let poolId: string | undefined; let poolTx: string | undefined; let lpBurned = false;
+      const seedSol = Number(cfg.liquiditySol) || 0;
+      if (cfg.addLiquidity && seedSol > 0 && signAllTransactions) {
+        setPhase("pool"); setPhaseMsg("Creating the Raydium CPMM pool…");
+        try {
+          const supplyNum = Number(cfg.supply);
+          const priceUsd = Number(cfg.initialPriceUsd) || 0;
+          const maxPoolTokens = supplyNum * ((100 - cfg.burnPct) / 100) * 0.95;
+          const tokensForPool = priceUsd > 0 ? Math.min((seedSol * price) / priceUsd, maxPoolTokens) : supplyNum * 0.5;
+          const tokenAmountRaw = BigInt(Math.max(1, Math.floor(tokensForPool))) * BigInt(10) ** BigInt(cfg.decimals);
+          const pool = await createCpmmPool({
+            connection, owner: publicKey, signAllTransactions,
+            mint: mintAddr, decimals: cfg.decimals,
+            tokenAmountRaw, solLamports: BigInt(Math.floor(seedSol * LAMPORTS_PER_SOL)),
+          });
+          poolId = pool.poolId; poolTx = pool.txId;
+          if (cfg.burnLp && pool.lpMint) {
+            setPhaseMsg("Burning LP forever…");
+            const burn = await buildBurnLpTransaction(connection, publicKey, pool.lpMint);
+            if (burn) {
+              burn.tx.feePayer = publicKey;
+              burn.tx.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
+              const signedBurn = await signTransaction(burn.tx);
+              const burnSig = await connection.sendRawTransaction(signedBurn.serialize(), { maxRetries: 3 });
+              await connection.confirmTransaction(burnSig, "confirmed");
+              lpBurned = true;
+            }
+          }
+        } catch (poolErr) {
+          console.error("[orbitx] pool creation failed", poolErr);
+          const msg = poolErr instanceof Error ? poolErr.message : String(poolErr);
+          toast.error(`Token is LIVE, but pool creation failed: ${msg}. You can create the pool on Raydium any time.`);
+        }
+      }
+
+      /* 6 — register in the OrbitX index (anti-vamp registry) */
+      setPhase("registering"); setPhaseMsg("Registering in the OrbitX index…");
+      try {
+        await registerToken({
+          mint_address: mintAddr,
+          name: cfg.name.trim(),
+          ticker: cfg.ticker.trim().toUpperCase(),
+          creator_wallet: publicKey.toBase58(),
+          decimals: cfg.decimals,
+          supply: Number(cfg.supply),
+          dex: poolId ? "raydium-cpmm" : null,
+          lp_pool_address: poolId ?? null,
+          lp_signature: poolTx ?? null,
+          mint_signature: sig,
+          metadata_uri: uri,
+          logo_url: logoUrl,
+          is_vamp: flagged,
+          fee_route: flagged ? "orbitx_buyback" : "creator",
+          cluster: "mainnet-beta",
+          launch_type: "custom",
+        });
+      } catch (regErr) {
+        // token is live on-chain regardless — registry failure must not eat the launch
+        console.warn("[orbitx] registry insert failed", regErr);
+      }
+
+      setLaunched({ mint: mintAddr, sig, poolId, poolTx, lpBurned, flagged });
+      setPhase("done");
+      toast.success(`${cfg.ticker.toUpperCase()} is LIVE on Solana mainnet`);
+    } catch (err) {
+      console.error("[orbitx] launch error", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("User rejected")) toast.error("Transaction cancelled");
+      else toast.error(msg || "Launch failed");
+      setPhase("idle");
     } finally {
       setLaunching(false);
     }
@@ -426,7 +585,7 @@ export default function LaunchpadCreate() {
             {!cfg.addLiquidity && (
               <div className="flex items-start gap-2 rounded-xl border border-[hsl(var(--og-lime))]/25 bg-[hsl(var(--og-lime))]/5 p-3 text-xs text-muted-foreground">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--og-lime))]" />
-                No liquidity required — your token launches for just the ~0.01 SOL network cost + the $2 Orbitx fee. Add a pool whenever you're ready.
+                No liquidity required — your token launches for just the ~0.01 SOL network cost + the {fmtUsd(ORBITX_FEE_USD)} Orbitx fee. Add a pool whenever you're ready.
               </div>
             )}
             {cfg.addLiquidity && (
@@ -515,6 +674,56 @@ export default function LaunchpadCreate() {
         );
     }
   };
+
+
+  if (launched) {
+    return (
+      <div className="mx-auto max-w-2xl py-10">
+        <Card className="glass-card border-[hsl(var(--og-lime))]/30 bg-black/40">
+          <CardContent className="space-y-5 p-8 text-center">
+            <CheckCircle2 className="mx-auto h-14 w-14 text-[hsl(var(--og-lime))]" />
+            <div>
+              <h2 className="font-display text-2xl font-bold">Token launched on Solana mainnet</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {cfg.name.trim()} (${cfg.ticker.trim().toUpperCase()}) is live{launched.poolId ? " and instantly tradable on Raydium" : ""}.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-black/40 p-4 text-left">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Contract address</div>
+              <div className="mt-1 flex items-center gap-2">
+                <code className="break-all font-mono text-sm text-[hsl(var(--og-cyan))]">{launched.mint}</code>
+                <button onClick={() => { navigator.clipboard.writeText(launched.mint); toast.success("Copied"); }} className="text-muted-foreground hover:text-foreground"><Copy className="h-4 w-4" /></button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+              <Badge className={launched.flagged ? "border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 text-[hsl(var(--og-blood))]" : "border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 text-[hsl(var(--og-lime))]"}>
+                0.30% creator fee → {launched.flagged ? "OBX buybacks (flagged)" : "your wallet"}
+              </Badge>
+              {launched.poolId && <Badge className="border-[hsl(var(--og-cyan))]/40 bg-[hsl(var(--og-cyan))]/10 text-[hsl(var(--og-cyan))]">Raydium pool live</Badge>}
+              {launched.lpBurned && <Badge className="border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 text-[hsl(var(--og-blood))]">LP burned</Badge>}
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
+              <a href={`https://solscan.io/tx/${launched.sig}`} target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-cyan))] underline-offset-4 hover:underline">Mint tx</a>
+              <a href={`https://solscan.io/token/${launched.mint}`} target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-cyan))] underline-offset-4 hover:underline">Solscan</a>
+              {launched.poolId && (
+                <a href={`https://raydium.io/swap/?inputMint=sol&outputMint=${launched.mint}`} target="_blank" rel="noopener noreferrer" className="text-[hsl(var(--og-cyan))] underline-offset-4 hover:underline">Trade on Raydium</a>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+              {!launched.flagged && (
+                <Link to="/orbitxlaunch/claim">
+                  <Button className="w-full bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90 sm:w-auto"><Coins className="mr-2 h-4 w-4" /> Claim creator fees</Button>
+                </Link>
+              )}
+              <Button variant="outline" className="border-white/15" onClick={() => { setLaunched(null); setPhase("idle"); setCfg(DEFAULT_CONFIG); foundKpRef.current = null; setFoundKey(null); }}>
+                Launch another
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -638,7 +847,7 @@ export default function LaunchpadCreate() {
                 {fee && fee.poolFeeSol > 0 && (
                   <div className="flex items-center justify-between"><span className="text-muted-foreground">DEX pool creation</span><span className="font-mono">{fee.poolFeeSol.toFixed(3)} SOL</span></div>
                 )}
-                <div className="flex items-center justify-between"><span className="text-muted-foreground">Orbitx fee ($2)</span><span className="font-mono text-[hsl(var(--og-gold))]">{fee ? fee.orbitxFeeSol.toFixed(4) : "…"} SOL</span></div>
+                <div className="flex items-center justify-between"><span className="text-muted-foreground">Orbitx fee ({fmtUsd(ORBITX_FEE_USD)})</span><span className="font-mono text-[hsl(var(--og-gold))]">{fee ? fee.orbitxFeeSol.toFixed(4) : "…"} SOL</span></div>
                 {fee && fee.liquiditySol > 0 && (
                   <div className="flex items-center justify-between"><span className="text-muted-foreground">Liquidity you seed <span className="text-[9px] opacity-70">(your capital)</span></span><span className="font-mono">{fee.liquiditySol.toFixed(3)} SOL</span></div>
                 )}
@@ -648,7 +857,7 @@ export default function LaunchpadCreate() {
 
               <Button onClick={handleLaunch} disabled={launching || errors.length > 0}
                 className="w-full bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90 disabled:opacity-50">
-                {launching ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Validating…</> : <><Rocket className="mr-2 h-4 w-4" /> Launch Token</>}
+                {launching ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {phaseMsg || "Working…"}</> : <><Rocket className="mr-2 h-4 w-4" /> Launch Token (mainnet)</>}
               </Button>
               {errors.length > 0 && (
                 <div className="mt-3 space-y-1">
