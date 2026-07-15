@@ -48,6 +48,7 @@ import LaunchpadLayout from "./pages/orbitx/LaunchpadLayout";
 import LaunchpadHome from "./pages/orbitx/LaunchpadHome";
 import LaunchpadCreate from "./pages/orbitx/LaunchpadCreate";
 import LaunchpadChoose from "./pages/orbitx/LaunchpadChoose";
+import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
 import LaunchpadToken from "./pages/orbitx/LaunchpadToken";
 import LaunchpadAbout from "./pages/orbitx/LaunchpadAbout";
 import LaunchpadProfile from "./pages/orbitx/LaunchpadProfile";
@@ -176,6 +177,7 @@ const App = () => (
               <Route index element={<LaunchpadHome />} />
               <Route path="create" element={<LaunchpadChoose />} />
               <Route path="create/custom" element={<LaunchpadCreate />} />
+              <Route path="create/pump" element={<LaunchpadPump />} />
               <Route path="token/:mint" element={<LaunchpadToken />} />
               <Route path="about" element={<LaunchpadAbout />} />
               <Route path="profile" element={<LaunchpadProfile />} />
