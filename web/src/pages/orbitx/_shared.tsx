@@ -51,6 +51,7 @@ export function TokenCard({ t }: { t: OrbitxToken }) {
         ) : (
           <span className="inline-flex items-center gap-1 rounded-md bg-white/5 px-1.5 py-0.5 font-bold text-muted-foreground"><ShieldCheck className="h-3 w-3" /> Verified unique</span>
         )}
+        <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-bold ${t.launch_type === "pump" ? "bg-[hsl(var(--og-cyan))]/15 text-[hsl(var(--og-cyan))]" : "bg-[hsl(var(--og-gold))]/15 text-[hsl(var(--og-gold))]"}`}>{t.launch_type === "pump" ? "Pump" : "Custom"}</span>
         {t.dex && <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-muted-foreground">{t.dex}</span>}
         <span className="ml-auto text-muted-foreground">{timeAgo(t.created_at)}</span>
       </div>

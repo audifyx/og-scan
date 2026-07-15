@@ -47,6 +47,7 @@ import Launch from "./pages/Launch";
 import LaunchpadLayout from "./pages/orbitx/LaunchpadLayout";
 import LaunchpadHome from "./pages/orbitx/LaunchpadHome";
 import LaunchpadCreate from "./pages/orbitx/LaunchpadCreate";
+import LaunchpadChoose from "./pages/orbitx/LaunchpadChoose";
 import LaunchpadToken from "./pages/orbitx/LaunchpadToken";
 import LaunchpadAbout from "./pages/orbitx/LaunchpadAbout";
 import LaunchpadProfile from "./pages/orbitx/LaunchpadProfile";
@@ -173,7 +174,8 @@ const App = () => (
             {/* ── Custom launchpad (Orbitx Launch Console) ── */}
             <Route path="/orbitxlaunch" element={<LaunchpadLayout />}>
               <Route index element={<LaunchpadHome />} />
-              <Route path="create" element={<LaunchpadCreate />} />
+              <Route path="create" element={<LaunchpadChoose />} />
+              <Route path="create/custom" element={<LaunchpadCreate />} />
               <Route path="token/:mint" element={<LaunchpadToken />} />
               <Route path="about" element={<LaunchpadAbout />} />
               <Route path="profile" element={<LaunchpadProfile />} />

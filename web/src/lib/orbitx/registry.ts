@@ -23,6 +23,7 @@ export interface OrbitxToken {
   is_vamp: boolean;
   fee_route: FeeRoute;
   cluster: string;
+  launch_type: "custom" | "pump";
   created_at: string;
 }
 
@@ -70,7 +71,7 @@ export interface RegisterTokenInput {
   mint_address: string; name: string; ticker: string; creator_wallet: string;
   decimals: number; supply: number; dex?: string | null; lp_pool_address?: string | null;
   lp_signature?: string | null; mint_signature?: string | null; metadata_uri?: string | null;
-  logo_url?: string | null; is_vamp?: boolean; fee_route?: FeeRoute; cluster?: string;
+  logo_url?: string | null; is_vamp?: boolean; fee_route?: FeeRoute; cluster?: string; launch_type?: "custom" | "pump";
 }
 
 /**

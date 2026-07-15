@@ -61,6 +61,7 @@ export default function LaunchpadToken() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-black tracking-tight text-foreground">{t.name}</h1>
               <span className="rounded-md bg-white/5 px-2 py-0.5 font-mono text-xs text-muted-foreground">${t.ticker}</span>
+              <span className={`rounded-md px-2 py-0.5 text-xs font-bold ${t.launch_type === "pump" ? "bg-[hsl(var(--og-cyan))]/15 text-[hsl(var(--og-cyan))]" : "bg-[hsl(var(--og-gold))]/15 text-[hsl(var(--og-gold))]"}`}>{t.launch_type === "pump" ? "Pump launch" : "Custom launch"}</span>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
               {graduated
