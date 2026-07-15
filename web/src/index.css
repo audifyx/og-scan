@@ -1219,3 +1219,111 @@ body::before {
     scroll-behavior: auto !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Orbitx Launchpad V3 — terminal / cyberpunk theme (scoped to .lp-v3)
+   Remaps the launchpad accent palette only inside /orbitxlaunch:
+   gold → electric purple #a855f7, cyan → #22d3ee, lime → #22ff88.
+   Every existing launchpad page inherits this with zero logic changes.
+   ═══════════════════════════════════════════════════════════════════ */
+.lp-v3 {
+  --og-gold: 271 91% 65%;   /* electric purple #a855f7 — primary accent */
+  --og-cyan: 188 86% 53%;   /* neon cyan #22d3ee */
+  --og-lime: 148 100% 57%;  /* acid green #22ff88 */
+  --lp-magenta: 300 100% 62%;
+  --lp-ink: 0 0% 4%;        /* #0a0a0a */
+  --lp-panel: 0 0% 7%;      /* #111111 */
+}
+
+/* CRT scanline overlay */
+.lp-scanlines {
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.022) 0px,
+    rgba(255, 255, 255, 0.022) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* Subtle drifting data-stream particles */
+.lp-particles {
+  background-image:
+    radial-gradient(circle, hsl(var(--og-gold) / 0.33) 1px, transparent 1.6px),
+    radial-gradient(circle, hsl(var(--og-cyan) / 0.28) 1px, transparent 1.6px);
+  background-size: 96px 150px, 140px 210px;
+  animation: lp-drift 28s linear infinite;
+}
+@keyframes lp-drift {
+  from { background-position: 0 0, 48px 70px; }
+  to   { background-position: 0 600px, 48px 910px; }
+}
+
+/* Vertical terminal "code rain" columns (static, ultra-subtle) */
+.lp-rain {
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 46px, hsl(var(--og-gold) / 0.045) 46px 47px),
+    repeating-linear-gradient(90deg, transparent 0 73px, hsl(var(--og-cyan) / 0.035) 73px 74px);
+}
+
+/* Primary glowing CTA */
+.lp-cta {
+  background: linear-gradient(135deg, hsl(271 91% 62%), hsl(288 92% 56%));
+  box-shadow:
+    0 0 26px -6px hsl(271 91% 65% / 0.75),
+    inset 0 0 0 1px hsl(271 91% 82% / 0.35);
+  transition: box-shadow 0.25s ease, transform 0.15s ease, filter 0.2s ease;
+}
+.lp-cta:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow:
+    0 0 46px -6px hsl(271 91% 65% / 0.95),
+    0 0 90px -30px hsl(300 100% 62% / 0.5),
+    inset 0 0 0 1px hsl(271 91% 85% / 0.5);
+}
+
+/* Token card hover: glow + scale */
+.lp-card {
+  transition: transform 0.18s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.lp-card:hover {
+  transform: translateY(-3px) scale(1.015);
+  border-color: hsl(var(--og-gold) / 0.5);
+  box-shadow:
+    0 0 0 1px hsl(var(--og-gold) / 0.22),
+    0 14px 48px -18px hsl(var(--og-gold) / 0.55);
+}
+
+/* Graduation progress bar */
+.lp-progress {
+  height: 6px;
+  border-radius: 9999px;
+  background: hsl(0 0% 100% / 0.06);
+  overflow: hidden;
+}
+.lp-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, hsl(var(--og-gold)), hsl(var(--lp-magenta, 300 100% 62%)));
+  box-shadow: 0 0 10px hsl(var(--og-gold) / 0.6);
+  transition: width 0.4s ease;
+}
+.lp-progress-fill.is-complete {
+  background: linear-gradient(90deg, hsl(var(--og-lime)), hsl(var(--og-cyan)));
+  box-shadow: 0 0 12px hsl(var(--og-lime) / 0.65);
+}
+
+/* Neon count badge */
+.lp-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--og-gold) / 0.4);
+  background: hsl(var(--og-gold) / 0.12);
+  color: hsl(var(--og-gold));
+  text-shadow: 0 0 8px hsl(var(--og-gold) / 0.6);
+}
