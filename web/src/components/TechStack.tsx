@@ -209,7 +209,7 @@ export const TechStack = () => {
                 <AtSign className="h-3.5 w-3.5" /> Follow X
               </a>
               <a href={OGSCAN_SITE_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 border border-og-grid px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-widest text-foreground/70 transition hover:border-og-lime hover:text-og-lime">
-                <Globe2 className="h-3.5 w-3.5" /> ogscan.fun
+                <Globe2 className="h-3.5 w-3.5" /> orbitx.world
               </a>
             </div>
           </div>

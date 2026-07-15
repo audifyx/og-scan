@@ -52,7 +52,7 @@ export default function XIntegration({ spaceId, spaceTitle, mode = "full", onClo
   const [copied, setCopied] = useState(false);
   const [xCards, setXCards] = useState<XSpaceCard[]>([]);
 
-  const publicUrl = spaceId ? `https://ogscan.fun/space/${spaceId}` : `https://ogscan.fun/spaces`;
+  const publicUrl = spaceId ? `https://orbitx.world/space/${spaceId}` : `https://orbitx.world/spaces`;
 
   /* ── Load profile handle & X cards ── */
   useEffect(() => {

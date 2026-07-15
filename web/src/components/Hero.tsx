@@ -120,7 +120,7 @@ export const Hero = ({ onScanClick, onSwapClick }: HeroProps) => {
                   ))}
                 </div>
                 <a href={OGSCAN_SITE_URL} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-white/50 underline underline-offset-4 transition hover:text-og-lime">
-                  ogscan.fun <ArrowRight className="h-3.5 w-3.5" />
+                  orbitx.world <ArrowRight className="h-3.5 w-3.5" />
                 </a>
               </div>
             </div>

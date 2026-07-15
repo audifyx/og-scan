@@ -25,7 +25,7 @@ export const SiteFooter = () => {
               </div>
             </a>
             <div>
-              <a href={OGSCAN_SITE_URL} target="_blank" rel="noreferrer" className="font-display text-4xl font-bold text-og-gold text-glow-gold hover:text-og-lime">ogscan.fun</a>
+              <a href={OGSCAN_SITE_URL} target="_blank" rel="noreferrer" className="font-display text-4xl font-bold text-og-gold text-glow-gold hover:text-og-lime">orbitx.world</a>
               <div className="mt-2 max-w-xl text-xs uppercase leading-relaxed tracking-widest text-muted-foreground">
                 Official OrbitX links. Built for Solana traders who want origin data before narrative noise.
               </div>
@@ -66,7 +66,7 @@ export const SiteFooter = () => {
         <div className="mt-10 flex flex-col items-center gap-2 border-t border-og-grid pt-5">
           <div className="inline-flex items-center gap-3 font-mono text-[9px] uppercase tracking-[0.5em] text-muted-foreground">
             <span className="h-px w-8 bg-og-grid" />
-            © {new Date().getFullYear()} · ogscan.fun · Built on Solana
+              © {new Date().getFullYear()} · orbitx.world · Built on Solana
             <span className="h-px w-8 bg-og-grid" />
           </div>
           <div className="font-mono text-[8px] uppercase tracking-[0.35em] text-muted-foreground/50">

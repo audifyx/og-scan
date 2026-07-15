@@ -1,4 +1,5 @@
 // Polyfill Buffer for browser environment (required by Solana/Jupiter swap libs)
+// MUST run before any module that references Buffer is imported
 import { Buffer } from "buffer";
 (window as any).Buffer = Buffer;
 
@@ -7,7 +8,6 @@ import { initSentry } from "./lib/sentry";
 initSentry();
 
 import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
 import "./index.css";
 
 // Auto-recover from stale chunk references after a new deploy
@@ -22,4 +22,11 @@ window.addEventListener("vite:preloadError", (event) => {
   }
 });
 
-createRoot(document.getElementById("root")!).render(<App />);
+// Defer App import until AFTER Buffer polyfill is set up
+// This prevents ESM hoisting from evaluating App before window.Buffer is defined
+async function bootstrap() {
+  const { default: App } = await import("./App.tsx");
+  createRoot(document.getElementById("root")!).render(<App />);
+}
+
+bootstrap().catch(console.error);
