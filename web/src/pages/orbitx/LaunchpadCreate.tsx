@@ -102,7 +102,7 @@ function StatChip({ label, value, tone = "gold" }: { label: string; value: strin
     lime: "text-[hsl(var(--og-lime))]", blood: "text-[hsl(var(--og-blood))]",
   };
   return (
-    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={`font-mono text-sm font-semibold ${toneMap[tone]}`}>{value}</div>
     </div>
@@ -520,7 +520,7 @@ export default function LaunchpadCreate() {
     <>
       <div className="relative mx-auto max-w-6xl px-4 pb-24 pt-6">
         {/* Hero */}
-        <div className="relative mb-8 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[hsl(var(--og-gold))]/10 to-transparent p-8">
+        <div className="og-glass-frame relative mb-8 overflow-hidden p-8">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[hsl(var(--og-gold))]/10 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[hsl(var(--og-cyan))]/10 blur-3xl" />
           <div className="pointer-events-none absolute right-8 top-1/2 hidden -translate-y-1/2 opacity-60 md:block">
@@ -583,11 +583,11 @@ export default function LaunchpadCreate() {
           </nav>
 
           {/* Active section */}
-          <Card className="border-white/10 bg-card/60 backdrop-blur"><CardContent className="p-6">{renderSection()}</CardContent></Card>
+          <Card className="og-glass-card border-0"><CardContent className="p-6">{renderSection()}</CardContent></Card>
 
           {/* Live summary */}
           <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <Card className="border-white/10 bg-card/60 backdrop-blur"><CardContent className="p-5">
+            <Card className="og-glass-card border-0"><CardContent className="p-5">
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   {cfg.logoDataUrl ? <img src={cfg.logoDataUrl} alt="" className="h-full w-full object-cover" /> : <Coins className="h-5 w-5 text-muted-foreground" />}
