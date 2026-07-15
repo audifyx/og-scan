@@ -31,3 +31,4 @@ npm-debug.log*
 supabase/.temp
 supabase/.branches
 *.tgz
+.env*.local
