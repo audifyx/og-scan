@@ -43,7 +43,6 @@ import CommunityClassic from "./pages/CommunityClassic";
 import OfficialToken from "./pages/OfficialToken";
 import PumpV5 from "./pages/PumpV5";
 import Launch from "./pages/Launch";
-import Launchpad from "./pages/Launchpad";
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
@@ -255,7 +254,7 @@ const App = () => (
             <Route path="/live-feed-page" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/pumpv5" element={<OgdexRedirect to="/ORBITX_DEX/launch" />} />
             <Route path="/launch" element={<OgdexRedirect to="/ORBITX_DEX/launch" />} />
-            <Route path="/app/launchpad" element={<ProtectedRoute><Launchpad /></ProtectedRoute>} />
+            <Route path="/app/launchpad" element={<ProtectedRoute><Launch /></ProtectedRoute>} />
             <Route path="/launchpad" element={<OgdexRedirect to="/app/launchpad" />} />
 
             {/* ── Protected: Admin ── */}
