@@ -1,4 +1,5 @@
 {
+  "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "npm run build && npm --prefix ogdex install --no-audit --no-fund && npm --prefix ogdex run build",
   "rewrites": [
     {
