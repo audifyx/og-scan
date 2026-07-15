@@ -1,6 +1,5 @@
-// Polyfill Buffer for browser environment (required by Solana/Jupiter swap libs)
-import { Buffer } from "buffer";
-(window as any).Buffer = Buffer;
+// Buffer polyfill — MUST stay the first import so it evaluates before the app graph.
+import "./polyfills";
 
 // Error tracking — must be initialised before React renders
 import { initSentry } from "./lib/sentry";
