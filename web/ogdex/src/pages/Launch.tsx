@@ -48,8 +48,6 @@ export default function Launch() {
     if (p?.publicKey) setWallet(p.publicKey.toString());
   }, []);
 
-  // SOL price is fetched client-side (browser CORS works with Jupiter) so the
-  // pay-in-SOL option always has a quote, regardless of server egress.
   useEffect(() => {
     const SOL = "So11111111111111111111111111111111111111112";
     (async () => {
@@ -113,7 +111,6 @@ export default function Launch() {
       const r = await launchStep(payload);
       if (r?.ok) return r;
       last = r;
-      // fee tx may not be indexed yet — wait and retry
       if (/not found|confirmation/i.test(r?.error || "")) {
         await new Promise((res) => setTimeout(res, 2500));
         continue;
@@ -128,7 +125,6 @@ export default function Launch() {
     if (v) { setError(v); return; }
     setError(""); setBusy(true); setResult(null);
     try {
-      /* 1. Pay the $5 launch fee */
       setStatus(`Sending ${feeDisplay} launch fee…`);
       const paymentTx = await payFee({
         payWallet: cfg!.payWallet,
@@ -138,7 +134,6 @@ export default function Launch() {
         tokenMint: currency === "usdc" ? cfg!.usdcMint : currency === "usdt" ? cfg!.usdtMint : undefined,
       });
 
-      /* 2. Upload image + metadata to IPFS */
       setStatus("Uploading image & metadata to IPFS…");
       const imageBase64 = await fileToBase64(imageFile!);
       const ipfs = await launchStep({
@@ -148,7 +143,6 @@ export default function Launch() {
       });
       if (!ipfs?.ok) throw new Error(ipfs?.error || "IPFS upload failed");
 
-      /* 3. Build the create transaction */
       setStatus("Preparing your token…");
       const mintKp = newMintKeypair();
       const mint = mintKp.publicKey.toBase58();
@@ -159,11 +153,9 @@ export default function Launch() {
       });
       if (!created?.ok) throw new Error(created?.error || "Failed to build transaction");
 
-      /* 4. Sign + broadcast (mint keypair + Phantom) */
       setStatus("Confirm in your wallet to deploy…");
       const launchTx = await signAndSendCreate(created.transaction, mintKp);
 
-      /* 5. Verify fee on-chain + record into Newly Listed */
       setStatus("Verifying payment & listing your token…");
       const rec = await recordWithRetry({
         step: "record", payment_tx: paymentTx, pay_currency: currency,
@@ -183,7 +175,6 @@ export default function Launch() {
     }
   };
 
-  /* ── Success screen ── */
   if (result) return (
     <div className="max-w-lg mx-auto py-14 text-center space-y-5">
       <div className="w-16 h-16 rounded-full bg-up/15 grid place-items-center mx-auto">
@@ -224,7 +215,6 @@ export default function Launch() {
     </div>
   );
 
-  /* ── Launcher form ── */
   return (
     <div className="max-w-xl mx-auto py-8 px-4 space-y-6">
       <div>
@@ -238,7 +228,6 @@ export default function Launch() {
         </p>
       </div>
 
-      {/* 1. Wallet */}
       <section className="space-y-2">
         <label className="text-xs font-semibold text-muted uppercase tracking-wide">1. Connect wallet</label>
         {wallet ? (
@@ -254,7 +243,6 @@ export default function Launch() {
         )}
       </section>
 
-      {/* 2. Token details */}
       <section className="space-y-3">
         <label className="text-xs font-semibold text-muted uppercase tracking-wide">2. Token details</label>
         <div className="grid grid-cols-2 gap-3">
@@ -266,7 +254,6 @@ export default function Launch() {
         <textarea value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Description (optional)" rows={3}
           className="card w-full p-3 text-sm bg-transparent outline-none placeholder:text-muted/40 resize-none" />
 
-        {/* Image */}
         <div onClick={() => fileRef.current?.click()}
           className="card p-4 flex items-center gap-3 cursor-pointer hover:border-accent/40 transition-colors">
           {imagePreview
@@ -280,14 +267,12 @@ export default function Launch() {
             onChange={(e) => onPickImage(e.target.files?.[0] || null)} />
         </div>
 
-        {/* Socials */}
         <div className="grid gap-2">
           <div className="card p-2.5 flex items-center gap-2"><Twitter className="w-4 h-4 text-muted shrink-0" /><input value={form.twitter} onChange={(e) => set("twitter", e.target.value)} placeholder="Twitter / X (optional)" className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted/40" /></div>
           <div className="card p-2.5 flex items-center gap-2"><Send className="w-4 h-4 text-muted shrink-0" /><input value={form.telegram} onChange={(e) => set("telegram", e.target.value)} placeholder="Telegram (optional)" className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted/40" /></div>
           <div className="card p-2.5 flex items-center gap-2"><Globe className="w-4 h-4 text-muted shrink-0" /><input value={form.website} onChange={(e) => set("website", e.target.value)} placeholder="Website (optional)" className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted/40" /></div>
         </div>
 
-        {/* Optional dev buy */}
         <div className="card p-3 flex items-center gap-3">
           <Sparkles className="w-4 h-4 text-accent shrink-0" />
           <div className="flex-1">
@@ -299,7 +284,6 @@ export default function Launch() {
         </div>
       </section>
 
-      {/* 3. Fee */}
       <section className="space-y-3">
         <label className="text-xs font-semibold text-muted uppercase tracking-wide">3. Launch fee</label>
         <div className="flex gap-1 bg-panel2 rounded-lg p-1 w-fit">

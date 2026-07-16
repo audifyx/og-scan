@@ -108,15 +108,6 @@ const Glyph = {
       <circle cx="35" cy="12" r="5" fill="currentColor" />
     </svg>
   ),
-  launchpad: (
-    <svg viewBox="0 0 48 48" fill="none">
-      <path d="M24 4c-11 0-20 9-20 20s9 20 20 20 20-9 20-20-9-20-20-20z" stroke="currentColor" strokeWidth="3" opacity=".5" />
-      <path d="M24 12v24M12 24h24" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-      <circle cx="24" cy="24" r="3" fill="currentColor" />
-      <circle cx="32" cy="16" r="2" fill="currentColor" opacity=".7" />
-      <circle cx="16" cy="32" r="2" fill="currentColor" opacity=".7" />
-    </svg>
-  ),
 };
 
 const ALL_APPS: App[] = [
@@ -127,7 +118,6 @@ const ALL_APPS: App[] = [
   { key: "gaming", name: "Gaming", caption: "Climb & Win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
   { key: "ai", name: "AI Assistant", caption: "Help & Support", href: "/ai-chat", tone: "#14a0ff", iconBg: "linear-gradient(135deg, #14a0ff, #0077b6)", glyph: Glyph.ai },
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet Alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
-  { key: "launchpad", name: "Launchpad", caption: "Create Tokens", href: "/app/launchpad", tone: "#A855F7", iconBg: "linear-gradient(135deg, #D946EF, #7C3AED)", glyph: Glyph.launchpad },
 ];
 
 const CENTER_TABS: { key: string; name: string; href?: string; action: "profile" | "settings" | "logout" | "wallpaper"; tone: string; glyph: JSX.Element }[] = [

@@ -4,7 +4,7 @@ import {
   Wallet, Coins, LineChart, Wrench, Crown, Cpu, Rocket,
   Bell, MessageSquare, Webhook, Trophy, Settings,
   Search, Shield, BarChart3, Zap, Globe, Radio, Headphones,
-  Globe2, ArrowLeftRight, FileText, Sparkles
+  Globe2, ArrowLeftRight, FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
@@ -24,7 +24,6 @@ const apps: AppItem[] = [
   { icon: Wrench, label: "Tools", path: "/tools", gradient: "from-slate-500 to-slate-700" },
 
   { icon: Rocket, label: "Launch Pad", path: "/pump-v5", gradient: "from-primary to-accent", badge: "NEW" },
-  { icon: Sparkles, label: "Launchpad", path: "/app/launchpad", gradient: "from-violet-500 to-purple-700", badge: "NEW" },
 
   { icon: Bell, label: "Alerts", path: "/notifications", gradient: "from-rose-500 to-red-700" },
   { icon: MessageSquare, label: "Alpha Chat", path: "/alpha-chat", gradient: "from-cyan-500 to-blue-700" },
