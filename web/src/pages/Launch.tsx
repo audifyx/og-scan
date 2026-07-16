@@ -705,19 +705,29 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     toast.success(`${label} copied!`);
   };
 
-  const handleConnectWallet = () => {
-    const { isMobile, isPhantomBrowser } = detectMobileWallet();
+  const handleConnectWallet = async () => {
+    try {
+      select("Phantom" as any);
+      await connect();
+    } catch (err) {
+      console.error("Connection error:", err);
+      
+      const message = `Failed to connect Phantom wallet.
 
-    // On mobile but NOT in Phantom browser → deep-link to Phantom app
-    if (isMobile && !isPhantomBrowser) {
-      const deepLink = `https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}?ref=ogscan`;
-      window.open(deepLink, "_blank");
-      return;
+On Mobile:
+• Make sure Phantom app is INSTALLED (not just browser)
+• Try: phantom.app/download
+• The app should appear as an option when you tap "Connect"
+
+On Desktop:
+• Install Phantom extension from phantom.app
+• Make sure extension is enabled
+
+Then try connecting again.`;
+      
+      alert(message);
+      throw err;
     }
-
-    // On desktop or in Phantom browser → use wallet adapter
-    select("Phantom" as any);
-    setTimeout(() => connect().catch(() => {}), 100);
   };
 
   const getStepIndex = (): number => {
