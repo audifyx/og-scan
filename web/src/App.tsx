@@ -48,6 +48,12 @@ import LaunchpadLayout from "./pages/orbitx/LaunchpadLayout";
 import LaunchpadHome from "./pages/orbitx/LaunchpadHome";
 import LaunchpadCreate from "./pages/orbitx/LaunchpadCreate";
 import LaunchpadChoose from "./pages/orbitx/LaunchpadChoose";
+// Terminal / Trading Platform UI
+import LaunchpadTerminal from "./pages/orbitx/LaunchpadTerminal";
+import TerminalHome from "./pages/orbitx/TerminalHome";
+import TerminalTrade from "./pages/orbitx/TerminalTrade";
+import TerminalPortfolio from "./pages/orbitx/TerminalPortfolio";
+import TerminalLaunch from "./pages/orbitx/TerminalLaunch";
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
 import LaunchpadToken from "./pages/orbitx/LaunchpadToken";
 import LaunchpadAbout from "./pages/orbitx/LaunchpadAbout";
@@ -183,6 +189,14 @@ const App = () => (
               <Route path="claim" element={<LaunchpadClaim />} />
               <Route path="about" element={<LaunchpadAbout />} />
               <Route path="profile" element={<LaunchpadProfile />} />
+            </Route>
+
+            {/* ── Terminal UI: Trading Platform Style ── */}
+            <Route path="/terminal" element={<LaunchpadTerminal />}>
+              <Route index element={<TerminalHome />} />
+              <Route path="trade" element={<TerminalTrade />} />
+              <Route path="portfolio" element={<TerminalPortfolio />} />
+              <Route path="launch" element={<TerminalLaunch />} />
             </Route>
 
             {/* ── Protected: App shell ── */}
