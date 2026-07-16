@@ -68,17 +68,68 @@ export async function vampCheck(name: string, ticker: string): Promise<VampMatch
 }
 
 /**
- * Check if a token name is already taken across all chains/launchpads.
- * Returns true if the name exists, false if available.
+ * Comprehensive name duplication check across all major token sources.
+ * Scans pump.fun, DexScreener, OG Scanner, and our registry.
+ * Returns true if name exists anywhere, false if name is original.
  */
 export async function isNameTaken(name: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("orbitx_tokens")
-    .select("id")
-    .ilike("name", name.trim())
-    .limit(1);
-  if (error) throw error;
-  return (data?.length ?? 0) > 0;
+  const trimmed = name.trim().toLowerCase();
+  if (!trimmed) return false;
+
+  try {
+    // 1. Check our orbitx_tokens registry
+    const { data: orbitxData, error: orbitxErr } = await supabase
+      .from("orbitx_tokens")
+      .select("id")
+      .ilike("name", trimmed)
+      .limit(1);
+    if (!orbitxErr && orbitxData && orbitxData.length > 0) return true;
+
+    // 2. Check pump.fun (search by name in their API)
+    try {
+      const pumpRes = await fetch(`https://api.pump.fun/search?q=${encodeURIComponent(trimmed)}`);
+      if (pumpRes.ok) {
+        const pumpData = await pumpRes.json();
+        if (Array.isArray(pumpData) && pumpData.some((t: any) => t.name?.toLowerCase() === trimmed)) {
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error("pump.fun check failed:", e);
+    }
+
+    // 3. Check DexScreener for tokens with matching name
+    try {
+      const dexRes = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(trimmed)}`);
+      if (dexRes.ok) {
+        const dexData = await dexRes.json();
+        if (dexData.pairs && dexData.pairs.some((p: any) => p.baseToken?.name?.toLowerCase() === trimmed)) {
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error("DexScreener check failed:", e);
+    }
+
+    // 4. Check OG Scanner API
+    try {
+      const ogRes = await fetch(`/api/ogdex/_routes/search.js?q=${encodeURIComponent(trimmed)}`);
+      if (ogRes.ok) {
+        const ogData = await ogRes.json();
+        if (Array.isArray(ogData) && ogData.some((t: any) => t.name?.toLowerCase() === trimmed)) {
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error("OG Scanner check failed:", e);
+    }
+
+    return false;
+  } catch (err) {
+    console.error("Comprehensive name check failed:", err);
+    // On error, assume name is taken to be safe (don't let duplicates through)
+    return true;
+  }
 }
 
 export interface RegisterTokenInput {

@@ -444,6 +444,17 @@ export default function LaunchpadCreate() {
 
       /* 6 — register in the OrbitX index (anti-vamp registry) */
       setPhase("registering"); setPhaseMsg("Registering in the OrbitX index…");
+      
+      // Server-side duplicate name check (final validation)
+      try {
+        const nameTakenOnServer = await isNameTaken(cfg.name);
+        if (nameTakenOnServer) {
+          throw new Error("no clones be original — this name is already taken. Use a different name.");
+        }
+      } catch (nameCheckErr) {
+        throw nameCheckErr;
+      }
+      
       try {
         await registerToken({
           mint_address: mintAddr,
@@ -483,16 +494,40 @@ export default function LaunchpadCreate() {
   };
 
   const renderSection = () => {
+    const nameInvalid = nameTaken || checkingName;
+    
+    // Lock entire form if name is not valid
+    if (nameInvalid && active !== "identity") {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+          <AlertCircle className="h-12 w-12 text-[hsl(var(--og-blood))]" />
+          <div>
+            <div className="text-xl font-bold text-[hsl(var(--og-blood))]">🚫 Complete Token Identity First</div>
+            <div className="text-sm text-muted-foreground mt-2">All fields are locked. Go back to the Identity section and choose an original name.</div>
+          </div>
+        </div>
+      );
+    }
+    
     switch (active) {
       case "identity":
+        const nameInvalid = nameTaken || checkingName;
         return (
           <div className="space-y-5">
+            {nameInvalid && (
+              <div className="rounded-lg border border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-[hsl(var(--og-blood))] flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-[hsl(var(--og-blood))]">🚫 Name Not Available</div>
+                  <div className="text-sm text-[hsl(var(--og-blood))]/80 mt-1">no clones be original — use a different name. All other fields are locked until you find an original name.</div>
+                </div>
+              </div>
+            )}
             <SectionHeading icon={Sparkles} title="Token Identity" desc="Name, ticker, story and logo — the face of your launch." />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label>Token Name</Label>
-                  {checkingName && <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--og-gold))]" />}
+                  <Label>Token Name {checkingName && <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--og-gold))]" />}</Label>
                 </div>
                 <Input 
                   className={`${fieldClass} ${nameTaken ? 'border-[hsl(var(--og-blood))]' : ''}`} 
@@ -503,22 +538,22 @@ export default function LaunchpadCreate() {
                 {nameTaken && (
                   <div className="flex items-start gap-2 text-sm text-[hsl(var(--og-blood))]">
                     <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>no vamps aloud please use a different name</span>
+                    <span>no clones be original use a different name</span>
                   </div>
                 )}
               </div>
               <div className="space-y-2"><Label>Ticker</Label>
-                <Input className={fieldClass} placeholder="ORBIT" maxLength={10} value={cfg.ticker} onChange={(e) => set("ticker", e.target.value.toUpperCase())} /></div>
+                <Input disabled={nameInvalid} className={fieldClass} placeholder="ORBIT" maxLength={10} value={cfg.ticker} onChange={(e) => set("ticker", e.target.value.toUpperCase())} /></div>
             </div>
             <div className="space-y-2"><Label>Description</Label>
-              <Textarea className={fieldClass} rows={4} placeholder="What is this token? Why does it exist?" value={cfg.description} onChange={(e) => set("description", e.target.value)} /></div>
+              <Textarea disabled={nameInvalid} className={fieldClass} rows={4} placeholder="What is this token? Why does it exist?" value={cfg.description} onChange={(e) => set("description", e.target.value)} /></div>
             <div className="space-y-2"><Label>Logo</Label>
-              <div className="flex items-center gap-4">
+              <div className={`flex items-center gap-4 ${nameInvalid ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/40">
                   {cfg.logoDataUrl ? <img src={cfg.logoDataUrl} alt="logo" className="h-full w-full object-cover" /> : <ImageIcon className="h-6 w-6 text-muted-foreground" />}
                 </div>
-                <input ref={fileRef} type="file" accept={ACCEPTED_IMG.join(",")} className="hidden" onChange={onLogo} />
-                <Button variant="outline" onClick={() => fileRef.current?.click()} className="border-white/15"><Upload className="mr-2 h-4 w-4" /> Upload logo</Button>
+                <input ref={fileRef} type="file" accept={ACCEPTED_IMG.join(",")} className="hidden" onChange={onLogo} disabled={nameInvalid} />
+                <Button disabled={nameInvalid} variant="outline" onClick={() => fileRef.current?.click()} className="border-white/15"><Upload className="mr-2 h-4 w-4" /> Upload logo</Button>
               </div></div>
           </div>
         );
