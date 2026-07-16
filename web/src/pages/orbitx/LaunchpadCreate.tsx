@@ -26,11 +26,11 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Rocket, Wallet, Globe, Twitter, Send, MessagesSquare, Upload, Image as ImageIcon,
-  Coins, ShieldCheck, Droplets, Sparkles, Lock, Flame, Gauge, Timer,
+  Coins, ShieldCheck, Droplets, Sparkles, Lock, Flame, Gauge, Timer, AlertCircle,
   CheckCircle2, AlertTriangle, Info, Wand2, ChevronRight, Loader2, Copy, Check,
 } from "lucide-react";
 import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, type FeeBreakdown } from "@/lib/orbitx/fee";
-import { vampCheck, registerToken } from "@/lib/orbitx/registry";
+import { vampCheck, registerToken, isNameTaken } from "@/lib/orbitx/registry";
 import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
 import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
 import { supabase } from "@/lib/supabase";
@@ -202,7 +202,31 @@ export default function LaunchpadCreate() {
   const [phase, setPhase] = useState<LaunchPhase>("idle");
   const [phaseMsg, setPhaseMsg] = useState("");
   const [launched, setLaunched] = useState<LaunchedInfo | null>(null);
+  const [nameTaken, setNameTaken] = useState(false);
+  const [checkingName, setCheckingName] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const nameCheckTimer = useRef<NodeJS.Timeout>();
+
+  // Debounced name duplicate check
+  useEffect(() => {
+    if (!cfg.name.trim()) {
+      setNameTaken(false);
+      return;
+    }
+    clearTimeout(nameCheckTimer.current);
+    setCheckingName(true);
+    nameCheckTimer.current = setTimeout(async () => {
+      try {
+        const taken = await isNameTaken(cfg.name);
+        setNameTaken(taken);
+      } catch (err) {
+        console.error("Name check failed:", err);
+      } finally {
+        setCheckingName(false);
+      }
+    }, 500);
+    return () => clearTimeout(nameCheckTimer.current);
+  }, [cfg.name]);
 
   const set = useCallback(<K extends keyof LaunchConfig>(key: K, value: LaunchConfig[K]) => {
     setCfg((c) => ({ ...c, [key]: value }));
@@ -215,7 +239,7 @@ export default function LaunchpadCreate() {
   const allocValid = allocTotal === 100;
 
   const sectionDone = useMemo<Record<SectionId, boolean>>(() => ({
-    identity: !!cfg.name.trim() && !!cfg.ticker.trim() && !!cfg.description.trim() && !!cfg.logoDataUrl,
+    identity: !!cfg.name.trim() && !!cfg.ticker.trim() && !!cfg.description.trim() && !!cfg.logoDataUrl && !nameTaken && !checkingName,
     socials: !!(cfg.website || cfg.twitter || cfg.telegram || cfg.discord),
     supply: /^\d+$/.test(cfg.supply) && Number(cfg.supply) > 0 && Number(cfg.initialPriceUsd) > 0,
     authorities: cfg.revokeMint && cfg.revokeFreeze,
@@ -465,8 +489,24 @@ export default function LaunchpadCreate() {
           <div className="space-y-5">
             <SectionHeading icon={Sparkles} title="Token Identity" desc="Name, ticker, story and logo — the face of your launch." />
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Token Name</Label>
-                <Input className={fieldClass} placeholder="Orbit Protocol" value={cfg.name} onChange={(e) => set("name", e.target.value)} /></div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label>Token Name</Label>
+                  {checkingName && <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--og-gold))]" />}
+                </div>
+                <Input 
+                  className={`${fieldClass} ${nameTaken ? 'border-[hsl(var(--og-blood))]' : ''}`} 
+                  placeholder="Orbit Protocol" 
+                  value={cfg.name} 
+                  onChange={(e) => set("name", e.target.value)} 
+                />
+                {nameTaken && (
+                  <div className="flex items-start gap-2 text-sm text-[hsl(var(--og-blood))]">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>no vamps aloud please use a different name</span>
+                  </div>
+                )}
+              </div>
               <div className="space-y-2"><Label>Ticker</Label>
                 <Input className={fieldClass} placeholder="ORBIT" maxLength={10} value={cfg.ticker} onChange={(e) => set("ticker", e.target.value.toUpperCase())} /></div>
             </div>

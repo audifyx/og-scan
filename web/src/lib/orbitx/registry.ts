@@ -67,6 +67,20 @@ export async function vampCheck(name: string, ticker: string): Promise<VampMatch
   return (data ?? []) as VampMatch[];
 }
 
+/**
+ * Check if a token name is already taken across all chains/launchpads.
+ * Returns true if the name exists, false if available.
+ */
+export async function isNameTaken(name: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("orbitx_tokens")
+    .select("id")
+    .ilike("name", name.trim())
+    .limit(1);
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
+}
+
 export interface RegisterTokenInput {
   mint_address: string; name: string; ticker: string; creator_wallet: string;
   decimals: number; supply: number; dex?: string | null; lp_pool_address?: string | null;

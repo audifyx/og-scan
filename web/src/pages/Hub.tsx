@@ -109,6 +109,13 @@ const Glyph = {
       <circle cx="35" cy="12" r="5" fill="currentColor" />
     </svg>
   ),
+  launchpad: (
+    <svg viewBox="0 0 48 48" fill="none">
+      <path d="M24 6c6 3 10 9 10 17 0 5-2 9-4 12l-6 7-6-7c-2-3-4-7-4-12 0-8 4-14 10-17z" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="24" cy="20" r="4" stroke="currentColor" strokeWidth="3.5" />
+      <path d="M16 30l-5 5 3 8 6-6M32 30l5 5-3 8-6-6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity=".8" />
+    </svg>
+  ),
 };
 
 const ALL_APPS: App[] = [
@@ -120,6 +127,7 @@ const ALL_APPS: App[] = [
   { key: "ai", name: "AI Assistant", caption: "Help & Support", href: "/ai-chat", tone: "#14a0ff", iconBg: "linear-gradient(135deg, #14a0ff, #0077b6)", glyph: Glyph.ai },
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet Alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
   { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <div style={{ fontSize: "20px" }}>📈</div> },
+  { key: "launchpad", name: "Launchpad", caption: "Launch a token", href: "/orbitxlaunch", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFC53D, #B8860B)", glyph: Glyph.launchpad },
 ];
 
 const CENTER_TABS: { key: string; name: string; href?: string; action: "profile" | "settings" | "logout" | "wallpaper"; tone: string; glyph: JSX.Element }[] = [
