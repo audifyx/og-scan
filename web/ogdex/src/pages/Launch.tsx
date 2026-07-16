@@ -349,6 +349,7 @@ export default function Launch() {
         <p>3. Sign the create tx; token deploys on pump.fun with custom "obx" address.</p>
         <p>4. Added to Newly Listed. Unverified tokens have no boost — upgrade for featured placement.</p>
       </div>
+      </div>
     </div>
   );
 }
