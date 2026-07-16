@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { detectMobileWallet, connectPhantomMobile, isRunningInPhantomApp } from "@/lib/mobile-wallet";
 import {
   Keypair, VersionedTransaction, Transaction,
   SystemProgram, PublicKey, LAMPORTS_PER_SOL,
@@ -705,6 +706,16 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   };
 
   const handleConnectWallet = () => {
+    const { isMobile, isPhantomBrowser } = detectMobileWallet();
+
+    // On mobile but NOT in Phantom browser → deep-link to Phantom app
+    if (isMobile && !isPhantomBrowser) {
+      const deepLink = `https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}?ref=ogscan`;
+      window.open(deepLink, "_blank");
+      return;
+    }
+
+    // On desktop or in Phantom browser → use wallet adapter
     select("Phantom" as any);
     setTimeout(() => connect().catch(() => {}), 100);
   };
@@ -949,7 +960,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               <>
                 <button onClick={handleConnectWallet}
                   className="w-full flex items-center justify-center gap-3 rounded-xl border border-[#ab9ff2]/20 bg-[#ab9ff2]/5 px-6 py-4 text-[#ab9ff2] font-bold hover:bg-[#ab9ff2]/10 transition-all">
-                  <Wallet className="h-5 w-5" /> Connect Wallet to Launch
+                  <Wallet className="h-5 w-5" /> {typeof window !== 'undefined' && /android|iphone|ipad/.test(navigator.userAgent.toLowerCase()) && !/phantom/.test(navigator.userAgent.toLowerCase()) ? 'Open Phantom App' : 'Connect Wallet'} to Launch
                 </button>
 
               </>
