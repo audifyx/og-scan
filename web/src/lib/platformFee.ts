@@ -18,7 +18,7 @@ export const PLATFORM_FEE_ENABLED = true;     // kill-switch if a fee account is
    promo window passes, the flat $1.50 launch fee resumes automatically on
    the next page load — no redeploy needed. Started 2026-07-17. */
 export const BASE_LAUNCH_FEE_USD = 1.5;      // normal flat launch fee — SAME on pump + custom lanes
-export const LAUNCH_FEE_PROMO_END = Date.parse("2026-08-16T23:59:59Z"); // 30 days from promo start
+export const LAUNCH_FEE_PROMO_END = Date.parse("2026-08-16T09:33:00Z"); // exactly 30 days from promo start (2026-07-17 09:33 UTC)
 export const isLaunchFeePromoActive = (): boolean => Date.now() < LAUNCH_FEE_PROMO_END;
 export const launchFeePromoDaysLeft = (): number =>
   Math.max(0, Math.ceil((LAUNCH_FEE_PROMO_END - Date.now()) / 86_400_000));
