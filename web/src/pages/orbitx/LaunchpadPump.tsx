@@ -39,6 +39,7 @@ import {
   Users, ArrowLeft, RefreshCw, Search, ChevronRight,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { Confetti } from "./lpx";
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 
@@ -220,7 +221,7 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
 
   const navigate = useNavigate();
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0a0a0f] via-[#0d0d15] to-[#0a0a0f] px-4 py-6 md:py-10">
+    <div className="px-0 py-1">
       <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -229,22 +230,22 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
               <button onClick={() => navigate("/trading-hub")} className="flex items-center justify-center h-8 w-8 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-white/60 hover:text-white">
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[hsl(var(--og-cyan))]/20 bg-[hsl(var(--og-cyan))]/5 px-4 py-1.5">
-                <Rocket className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
-                <span className="text-xs font-bold text-[hsl(var(--og-cyan))] uppercase tracking-widest">OG Token Launcher</span>
+              <div className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--og-lime))]/30 bg-[hsl(var(--og-lime))]/[0.06] px-4 py-1.5">
+                <Rocket className="h-4 w-4 text-[hsl(var(--og-lime))]" />
+                <span className="font-mono text-[10px] font-bold text-[hsl(var(--og-lime))] uppercase tracking-[0.24em]">Pump lane · launch archive</span>
               </div>
             </div>
-            <h1 className="text-2xl md:text-3xl font-black text-white">
-              Launched Tokens
+            <h1 className="font-display text-2xl md:text-3xl font-black text-white">
+              LAUNCHED <span className="lpx-glow text-[hsl(var(--og-lime))]">TOKENS</span>
             </h1>
-            <p className="text-sm text-white/40 mt-1">
-              All tokens created through OrbitX's launcher
+            <p className="text-sm text-muted-foreground mt-1">
+              Every token deployed through the OrbitX pump lane — live-priced via DexScreener
             </p>
           </div>
 
           <button
             onClick={onCreateClick}
-            className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-[hsl(var(--og-cyan))] to-[hsl(var(--og-lime))] px-5 py-3 text-sm font-black text-black hover:from-[hsl(var(--og-cyan))] hover:to-[hsl(var(--og-cyan))] transition-all shadow-lg shadow-[hsl(var(--og-cyan))]/20 shrink-0"
+            className="lp-cta flex items-center gap-2.5 rounded-xl px-5 py-3 font-display text-sm font-black uppercase tracking-wider shrink-0"
           >
             <Plus className="h-4.5 w-4.5" />
             Launch Token
@@ -311,7 +312,7 @@ function EmptyState({ onCreateClick, hasSearch }: { onCreateClick: () => void; h
       </p>
       <button
         onClick={onCreateClick}
-        className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(var(--og-cyan))] to-[hsl(var(--og-lime))] px-6 py-3 text-sm font-bold text-black hover:from-[hsl(var(--og-cyan))] hover:to-[hsl(var(--og-cyan))] transition-all"
+        className="lp-cta flex items-center gap-2 rounded-xl px-6 py-3 font-display text-sm font-black uppercase tracking-wider"
       >
         <Rocket className="h-4 w-4" />
         Launch Your First Token
@@ -739,7 +740,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0a0a0f] via-[#0d0d15] to-[#0a0a0f] px-4 py-6 md:py-10">
+    <div className="px-0 py-1">
       <div className="mx-auto max-w-2xl">
 
         {/* Back button + Header */}
@@ -748,11 +749,11 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             <ArrowLeft className="h-4 w-4" /> Back to Launched Tokens
           </button>
           <div className="text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[hsl(var(--og-cyan))]/20 bg-[hsl(var(--og-cyan))]/5 px-4 py-1.5 mb-4">
-              <Rocket className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
-              <span className="text-xs font-bold text-[hsl(var(--og-cyan))] uppercase tracking-widest">Create Token</span>
+            <div className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--og-lime))]/30 bg-[hsl(var(--og-lime))]/[0.06] px-4 py-1.5 mb-4">
+              <Rocket className="h-4 w-4 text-[hsl(var(--og-lime))]" />
+              <span className="font-mono text-[10px] font-bold text-[hsl(var(--og-lime))] uppercase tracking-[0.24em]">Deploy console · pump lane</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-black text-white mb-2">Launch on Pump.fun</h1>
+            <h1 className="font-display text-2xl md:text-3xl font-black text-white mb-2">LAUNCH ON <span className="lpx-glow text-[hsl(var(--og-lime))]">PUMP.FUN</span></h1>
             <p className="text-sm text-white/40 max-w-md mx-auto">
               Fill in the details and launch your token with a custom "obx" vanity address—completely free!
             </p>
@@ -761,12 +762,13 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
         {/* ─── Success Screen ──────────────────────────────── */}
         {step === "success" && (
-          <Card className="border-green-500/30 bg-green-500/[0.03] backdrop-blur-sm">
-            <CardContent className="p-8 text-center">
+          <Card className="lpx-panel lpx-panel--hot relative overflow-hidden border-0 bg-transparent">
+            <Confetti />
+            <CardContent className="relative p-8 text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10 border border-green-500/20">
                 <CheckCircle className="h-10 w-10 text-green-400" />
               </div>
-              <h2 className="text-2xl font-black text-white mb-2">Token Launched! 🚀</h2>
+              <h2 className="lpx-glow font-display text-2xl font-black text-[hsl(var(--og-lime))] mb-2">DEPLOYMENT COMPLETE 🚀</h2>
               <p className="text-sm text-white/50 mb-6">Your token is now live on pump.fun</p>
 
               <div className="mb-4 rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
@@ -829,7 +831,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
         {/* ─── Loading / In-Progress ─────────────────────────── */}
         {(step === "uploading" || step === "signing" || step === "sending") && (
-          <Card className="border-[hsl(var(--og-cyan))]/20 bg-[hsl(var(--og-cyan))]/[0.02] backdrop-blur-sm">
+          <Card className="lpx-panel lpx-panel--hot relative overflow-hidden border-0 bg-transparent">
             <CardContent className="p-12 text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--og-cyan))]/10 border border-[hsl(var(--og-cyan))]/20 animate-pulse">
                 <Loader2 className="h-10 w-10 text-[hsl(var(--og-cyan))] animate-spin" />
@@ -871,7 +873,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         {step === "form" && (
           <div className="space-y-5">
             {/* Token Info Card */}
-            <Card className="border-white/[0.06] bg-white/[0.02] backdrop-blur-sm">
+            <Card className="lpx-panel border-0 bg-transparent">
               <CardContent className="p-5 md:p-6 space-y-5">
                 <div className="flex items-center gap-2 mb-1">
                   <Sparkles className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
@@ -922,7 +924,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             </Card>
 
             {/* Socials Card */}
-            <Card className="border-white/[0.06] bg-white/[0.02] backdrop-blur-sm">
+            <Card className="lpx-panel border-0 bg-transparent">
               <CardContent className="p-5 md:p-6 space-y-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Globe className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
@@ -950,7 +952,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             </Card>
 
             {/* Dev Buy Card */}
-            <Card className="border-white/[0.06] bg-white/[0.02] backdrop-blur-sm">
+            <Card className="lpx-panel border-0 bg-transparent">
               <CardContent className="p-5 md:p-6 space-y-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Zap className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
@@ -980,7 +982,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             ) : (
               <button onClick={handleLaunch} disabled={!canLaunch}
                 className={`w-full flex items-center justify-center gap-3 rounded-xl px-6 py-4 text-base font-black transition-all ${
-                  canLaunch ? "bg-gradient-to-r from-[hsl(var(--og-cyan))] to-[hsl(var(--og-lime))] text-black hover:from-[hsl(var(--og-cyan))] hover:to-[hsl(var(--og-cyan))] shadow-lg shadow-[hsl(var(--og-cyan))]/20" : "bg-white/[0.04] text-white/20 cursor-not-allowed"
+                  canLaunch ? "lp-cta font-display uppercase tracking-wider" : "bg-white/[0.04] text-white/20 cursor-not-allowed"
                 }`}>
                 <Rocket className="h-5 w-5" />
                 {!form.name.trim() || !form.symbol.trim() ? "Fill in token details" : !imageFile ? "Upload a logo" : `Launch ${form.symbol.trim()} 🚀`}

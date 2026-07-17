@@ -277,3 +277,40 @@ export function KV({ k, v, tone }: { k: string; v: React.ReactNode; tone?: "lime
     </div>
   );
 }
+
+/* ── Shared confetti burst (success screens) ── */
+const LPX_CONFETTI_COLORS = [
+  "hsl(132 100% 54%)", "hsl(44 96% 56%)", "hsl(158 92% 48%)",
+  "hsl(300 100% 62%)", "#ffffff",
+];
+
+export function Confetti({ count = 40 }: { count?: number }) {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => ({
+        left: `${6 + Math.random() * 88}%`,
+        top: `${15 + Math.random() * 35}%`,
+        dx: `${(Math.random() - 0.5) * 240}px`,
+        dy: `${-60 - Math.random() * 170}px`,
+        rot: `${Math.random() * 720 - 360}deg`,
+        t: `${1 + Math.random() * 1.2}s`,
+        d: `${Math.random() * 0.4}s`,
+        color: LPX_CONFETTI_COLORS[i % LPX_CONFETTI_COLORS.length],
+      })),
+    [count],
+  );
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {pieces.map((p, i) => (
+        <span
+          key={i}
+          className="lpx-confetti-piece"
+          style={{
+            left: p.left, top: p.top, background: p.color,
+            "--dx": p.dx, "--dy": p.dy, "--rot": p.rot, "--t": p.t, "--d": p.d,
+          } as React.CSSProperties}
+        />
+      ))}
+    </div>
+  );
+}

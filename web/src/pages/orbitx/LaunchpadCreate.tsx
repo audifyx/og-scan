@@ -34,6 +34,7 @@ import { vampCheck, registerToken, isNameTaken } from "@/lib/orbitx/registry";
 import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
 import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
 import { supabase } from "@/lib/supabase";
+import { Confetti } from "./lpx";
 
 const MAX_LOGO_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMG = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -136,7 +137,7 @@ async function uploadLaunchAssets(mintAddr: string, cfg: LaunchConfig, creator: 
 }
 
 const fieldClass =
-  "bg-black/40 border-white/10 focus-visible:ring-[hsl(var(--og-gold))] focus-visible:border-[hsl(var(--og-gold))]/60";
+  "bg-black/40 border-white/10 focus-visible:ring-[hsl(var(--og-lime))] focus-visible:border-[hsl(var(--og-lime))]/60";
 
 function StatChip({ label, value, tone = "gold" }: { label: string; value: string; tone?: "gold" | "cyan" | "lime" | "blood" }) {
   const toneMap: Record<string, string> = {
@@ -154,11 +155,11 @@ function StatChip({ label, value, tone = "gold" }: { label: string; value: strin
 function SectionHeading({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) {
   return (
     <div className="mb-5 flex items-start gap-3">
-      <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg border border-[hsl(var(--og-gold))]/30 bg-[hsl(var(--og-gold))]/10">
-        <Icon className="h-[18px] w-[18px] text-[hsl(var(--og-gold))]" />
+      <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg border border-[hsl(var(--og-lime))]/35 bg-[hsl(var(--og-lime))]/10 shadow-[0_0_16px_-6px_hsl(var(--og-lime)/0.6)]">
+        <Icon className="h-[18px] w-[18px] text-[hsl(var(--og-lime))]" />
       </div>
       <div>
-        <h3 className="font-display text-lg font-semibold tracking-tight">{title}</h3>
+        <h3 className="font-display text-lg font-black uppercase tracking-wide">{title}</h3>
         <p className="text-sm text-muted-foreground">{desc}</p>
       </div>
     </div>
@@ -755,11 +756,15 @@ export default function LaunchpadCreate() {
   if (launched) {
     return (
       <div className="mx-auto max-w-2xl py-10">
-        <Card className="glass-card border-[hsl(var(--og-lime))]/30 bg-black/40">
-          <CardContent className="space-y-5 p-8 text-center">
-            <CheckCircle2 className="mx-auto h-14 w-14 text-[hsl(var(--og-lime))]" />
+        <Card className="lpx-panel lpx-panel--hot relative overflow-hidden border-0 bg-transparent">
+          <Confetti />
+          <CardContent className="relative space-y-5 p-8 text-center">
+            <div className="lpx-pop mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[hsl(var(--og-lime))]/45 bg-[hsl(var(--og-lime))]/10">
+              <CheckCircle2 className="h-9 w-9 text-[hsl(var(--og-lime))]" />
+            </div>
             <div>
-              <h2 className="font-display text-2xl font-bold">Token launched on Solana mainnet</h2>
+              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Deployment complete</div>
+              <h2 className="lpx-glow font-display text-2xl font-black text-[hsl(var(--og-lime))]">TOKEN LIVE ON MAINNET</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {cfg.name.trim()} (${cfg.ticker.trim().toUpperCase()}) is live{launched.poolId ? " and instantly tradable on Raydium" : ""}.
               </p>
@@ -804,49 +809,43 @@ export default function LaunchpadCreate() {
   return (
     <>
       <div className="relative mx-auto max-w-6xl px-4 pb-24 pt-6">
-        {/* Hero */}
-        <div className="og-glass-frame relative mb-8 overflow-hidden p-8">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[hsl(var(--og-gold))]/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[hsl(var(--og-cyan))]/10 blur-3xl" />
-          <div className="pointer-events-none absolute right-8 top-1/2 hidden -translate-y-1/2 opacity-60 md:block">
-            <div className="relative h-40 w-40 animate-[spin_38s_linear_infinite] rounded-full border border-dashed border-[hsl(var(--og-gold))]/30">
-              <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-[hsl(var(--og-gold))] shadow-[0_0_12px_hsl(var(--og-gold))]" />
-              <div className="absolute inset-4 rounded-full border border-dashed border-[hsl(var(--og-cyan))]/30">
-                <span className="absolute -top-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[hsl(var(--og-cyan))] shadow-[0_0_10px_hsl(var(--og-cyan))]" />
-              </div>
-              <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[hsl(var(--og-gold))] shadow-[0_0_18px_hsl(var(--og-gold))]" />
-            </div>
-          </div>
-          {([["12%", "18%"], ["28%", "62%"], ["8%", "78%"], ["70%", "22%"], ["85%", "70%"]] as [string, string][]).map(([t, l], i) => (
-            <span key={i} className="pointer-events-none absolute h-1 w-1 rounded-full bg-white/60 animate-pulse" style={{ top: t, left: l, animationDelay: `${i * 0.6}s` }} />
-          ))}
-
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Deploy console header */}
+        <div className="lpx-panel lpx-panel--hot relative mb-6 overflow-hidden">
+          <div className="lpx-sweep" />
+          <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-xl">
-              <div className="mb-3 flex items-center gap-2">
-                <Badge className="border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 text-[hsl(var(--og-gold))]"><Rocket className="mr-1 h-3 w-3" /> Orbitx Launch</Badge>
-                <Badge variant="outline" className="border-[hsl(var(--og-cyan))]/40 text-[hsl(var(--og-cyan))]">Solana-only</Badge>
-              </div>
-              <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                Launch a token on <span className="text-[hsl(var(--og-gold))] text-glow-gold">Solana</span>
+              <div className="font-mono text-[10px] uppercase tracking-[0.34em] text-[hsl(var(--og-lime))]">{"//"} deploy console — custom lane</div>
+              <h1 className="mt-1 font-display text-2xl font-black tracking-tight sm:text-3xl">
+                BUILD YOUR <span className="lpx-glow text-[hsl(var(--og-lime))]">MINT</span>
               </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Your own launchpad — own SPL mint, Metaplex metadata, independent DEX liquidity, on-chain protections and a custom OBX vanity address. No pump.fun.
+              <p className="mt-1 text-sm text-muted-foreground">
+                Own SPL mint · Metaplex metadata · optional Raydium pool · on-chain creator fees · OBX vanity address. No pump.fun.
               </p>
-              <div className="mt-5 max-w-sm">
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Launch readiness</span>
-                  <span className="font-mono font-semibold text-[hsl(var(--og-gold))]">{readiness}%</span>
+              <div className="mt-4 grid max-w-md grid-cols-2 gap-4">
+                <div>
+                  <div className="mb-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-widest">
+                    <span className="text-muted-foreground">Launch readiness</span>
+                    <span className="font-bold text-[hsl(var(--og-lime))]">{readiness}%</span>
+                  </div>
+                  <div className="lpx-gauge"><div style={{ width: `${readiness}%` }} /></div>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full bg-gradient-to-r from-[hsl(var(--og-cyan))] to-[hsl(var(--og-gold))] transition-all duration-500" style={{ width: `${readiness}%` }} />
+                <div>
+                  <div className="mb-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-widest">
+                    <span className="text-muted-foreground">Trust score</span>
+                    <span className="font-bold" style={{ color: toneHsl[trustTone] }}>{trust}/100</span>
+                  </div>
+                  <div className="lpx-gauge"><div style={{ width: `${trust}%`, background: toneHsl[trustTone], boxShadow: `0 0 10px ${toneHsl[trustTone]}` }} /></div>
                 </div>
               </div>
             </div>
             {connected ? (
-              <Badge variant="outline" className="border-[hsl(var(--og-lime))]/40 text-[hsl(var(--og-lime))]"><Wallet className="mr-1 h-3 w-3" /> {publicKey?.toBase58().slice(0, 4)}…{publicKey?.toBase58().slice(-4)}</Badge>
+              <span className="flex items-center gap-1.5 self-start rounded-lg border border-[hsl(var(--og-lime))]/35 bg-black/40 px-3 py-2 font-mono text-[11px] font-bold text-[hsl(var(--og-lime))]">
+                <span className="lpx-led" /> {publicKey?.toBase58().slice(0, 4)}…{publicKey?.toBase58().slice(-4)}
+              </span>
             ) : (
-              <Button onClick={handleConnect} className="bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90"><Wallet className="mr-2 h-4 w-4" /> Connect Wallet</Button>
+              <button type="button" onClick={handleConnect} className="lp-cta self-start rounded-lg px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider">
+                <Wallet className="mr-2 inline h-4 w-4" /> Connect Wallet
+              </button>
             )}
           </div>
         </div>
@@ -857,22 +856,23 @@ export default function LaunchpadCreate() {
             {SECTIONS.map((s, idx) => {
               const Icon = s.icon; const on = active === s.id; const done = sectionDone[s.id];
               return (
-                <button key={s.id} onClick={() => setActive(s.id)}
-                  className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-all lg:w-full ${on ? "border-[hsl(var(--og-gold))]/50 bg-[hsl(var(--og-gold))]/10 text-[hsl(var(--og-gold))]" : "border-white/8 bg-black/20 text-muted-foreground hover:border-white/20 hover:text-foreground"}`}>
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="flex-1 text-left">{s.label}</span>
-                  {done ? <Check className="h-3.5 w-3.5 text-[hsl(var(--og-lime))]" /> : <span className="font-mono text-[10px] text-muted-foreground/60">{idx + 1}</span>}
+                <button key={s.id} onClick={() => setActive(s.id)} data-on={on}
+                  className="lpx-step shrink-0 lg:w-full">
+                  <span className="idx">{String(idx + 1).padStart(2, "0")}</span>
+                  <Icon className={`h-4 w-4 shrink-0 ${on ? "text-[hsl(var(--og-lime))]" : "text-muted-foreground"}`} />
+                  <span className={`flex-1 text-left font-mono text-[11px] font-bold uppercase tracking-wider ${on ? "text-[hsl(var(--og-lime))]" : "text-muted-foreground"}`}>{s.label}</span>
+                  {done && <Check className="h-3.5 w-3.5 text-[hsl(var(--og-lime))]" />}
                 </button>
               );
             })}
           </nav>
 
           {/* Active section */}
-          <Card className="og-glass-card border-0"><CardContent className="p-6">{renderSection()}</CardContent></Card>
+          <div className="lpx-panel"><div className="p-6">{renderSection()}</div></div>
 
           {/* Live summary */}
           <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <Card className="og-glass-card border-0"><CardContent className="p-5">
+            <div className="lpx-panel"><header className="lpx-panel-title">Launch telemetry</header><div className="p-5">
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   {cfg.logoDataUrl ? <img src={cfg.logoDataUrl} alt="" className="h-full w-full object-cover" /> : <Coins className="h-5 w-5 text-muted-foreground" />}
@@ -931,9 +931,15 @@ export default function LaunchpadCreate() {
                 <div className="flex items-center justify-between text-sm font-semibold"><span className="text-foreground">Total from wallet</span><span className="font-mono text-[hsl(var(--og-gold))]">{fee ? fee.totalOutOfPocketSol.toFixed(3) : "…"} SOL</span></div>
               </div>
 
+              {launching && (
+                <div className="lpx-term mb-3 rounded-lg border border-[hsl(var(--og-lime))]/20 bg-black/60 p-2.5">
+                  <div className="gold">$ orbitx deploy --lane custom</div>
+                  <div>[{phase}] {phaseMsg || "working…"}<span className="lpx-caret" /></div>
+                </div>
+              )}
               <Button onClick={handleLaunch} disabled={launching || errors.length > 0}
-                className="w-full bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90 disabled:opacity-50">
-                {launching ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {phaseMsg || "Working…"}</> : <><Rocket className="mr-2 h-4 w-4" /> Launch Token (mainnet)</>}
+                className="lp-cta w-full border-0 font-display text-sm font-black uppercase tracking-wider disabled:opacity-50">
+                {launching ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {phaseMsg || "Working…"}</> : <><Rocket className="mr-2 h-4 w-4" /> Deploy token — mainnet</>}
               </Button>
               {errors.length > 0 && (
                 <div className="mt-3 space-y-1">
@@ -942,7 +948,7 @@ export default function LaunchpadCreate() {
                   ))}
                 </div>
               )}
-            </CardContent></Card>
+            </div></div>
 
             <button onClick={() => { const i = SECTIONS.findIndex((s) => s.id === active); setActive(SECTIONS[(i + 1) % SECTIONS.length].id); }}
               className="flex w-full items-center justify-center gap-1 rounded-xl border border-white/10 bg-black/20 py-2 text-sm text-muted-foreground hover:text-foreground">
