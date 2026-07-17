@@ -29,7 +29,7 @@ import {
   Coins, ShieldCheck, Droplets, Sparkles, Lock, Flame, Gauge, Timer, AlertCircle,
   CheckCircle2, AlertTriangle, Info, Wand2, ChevronRight, Loader2, Copy, Check,
 } from "lucide-react";
-import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, type FeeBreakdown } from "@/lib/orbitx/fee";
+import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, BASE_LAUNCH_FEE_USD, type FeeBreakdown } from "@/lib/orbitx/fee";
 import { vampCheck, registerToken, isNameTaken } from "@/lib/orbitx/registry";
 import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
 import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
@@ -662,7 +662,7 @@ export default function LaunchpadCreate() {
             {!cfg.addLiquidity && (
               <div className="flex items-start gap-2 rounded-xl border border-[hsl(var(--og-lime))]/25 bg-[hsl(var(--og-lime))]/5 p-3 text-xs text-muted-foreground">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--og-lime))]" />
-                No liquidity required — your token launches for just the ~0.01 SOL network cost + the {fmtUsd(ORBITX_FEE_USD)} Orbitx fee. Add a pool whenever you're ready.
+                No liquidity required — your token launches for just the ~0.01 SOL network cost{isLaunchFeePromoActive() ? " — the Orbitx launch fee is FREE right now" : ` + the ${fmtUsd(ORBITX_FEE_USD)} Orbitx fee`}. Add a pool whenever you're ready.
               </div>
             )}
             {cfg.addLiquidity && (
@@ -923,7 +923,7 @@ export default function LaunchpadCreate() {
                 {fee && fee.poolFeeSol > 0 && (
                   <div className="flex items-center justify-between"><span className="text-muted-foreground">DEX pool creation</span><span className="font-mono">{fee.poolFeeSol.toFixed(3)} SOL</span></div>
                 )}
-                <div className="flex items-center justify-between"><span className="text-muted-foreground">Orbitx fee ({fmtUsd(ORBITX_FEE_USD)})</span><span className="font-mono text-[hsl(var(--og-gold))]">{fee ? fee.orbitxFeeSol.toFixed(4) : "…"} SOL</span></div>
+                <div className="flex items-center justify-between"><span className="text-muted-foreground">Orbitx fee {isLaunchFeePromoActive() ? <><s className="opacity-50">{fmtUsd(BASE_LAUNCH_FEE_USD)}</s> <span className="font-bold text-[hsl(var(--og-lime))]">FREE</span></> : <>({fmtUsd(ORBITX_FEE_USD)})</>}</span><span className="font-mono text-[hsl(var(--og-gold))]">{fee ? fee.orbitxFeeSol.toFixed(4) : "…"} SOL</span></div>
                 {fee && fee.liquiditySol > 0 && (
                   <div className="flex items-center justify-between"><span className="text-muted-foreground">Liquidity you seed <span className="text-[9px] opacity-70">(your capital)</span></span><span className="font-mono">{fee.liquiditySol.toFixed(3)} SOL</span></div>
                 )}

@@ -26,7 +26,7 @@ import {
   SystemProgram, PublicKey, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD } from "@/lib/platformFee";
+import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/platformFee";
 import { registerToken } from "@/lib/orbitx/registry";
 import { Link } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -755,7 +755,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             </div>
             <h1 className="font-display text-2xl md:text-3xl font-black text-white mb-2">LAUNCH ON <span className="lpx-glow text-[hsl(var(--og-lime))]">PUMP.FUN</span></h1>
             <p className="text-sm text-white/40 max-w-md mx-auto">
-              Fill in the details and launch your token with a custom "obx" vanity address—completely free!
+              {isLaunchFeePromoActive() ? <>Launch fee <span className="font-bold text-[hsl(var(--og-lime))]">FREE for {launchFeePromoDaysLeft()} more days</span> — fill in the details and deploy with a custom "obx" vanity address.</> : <>Fill in the details and launch your token with a custom "obx" vanity address.</>}
             </p>
           </div>
         </div>
@@ -990,7 +990,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             )}
 
   <p className="text-center text-[10px] text-white/15 leading-relaxed">
-By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "obx".<br />A $1.50 platform launch fee (paid in SOL) applies — the same flat fee as the custom lane — plus the standard network fee (~0.02 SOL).<br />You earn pump.fun creator fees on every buy/sell (0.30% on the bonding curve, dynamic after graduation) — claim them in-app under Claim Fees.
+By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "obx".<br />{isLaunchFeePromoActive() ? <>Launch fee: <span className="font-bold text-[hsl(var(--og-lime))]">FREE for a limited time</span> (normally ${BASE_LAUNCH_FEE_USD.toFixed(2)}) — you only pay the standard network fee (~0.02 SOL).</> : <>A ${BASE_LAUNCH_FEE_USD.toFixed(2)} platform launch fee (paid in SOL) applies — the same flat fee as the custom lane — plus the standard network fee (~0.02 SOL).</>}<br />You earn pump.fun creator fees on every buy/sell (0.30% on the bonding curve, dynamic after graduation) — claim them in-app under Claim Fees.
             </p>
           </div>
         )}

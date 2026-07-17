@@ -9,7 +9,7 @@ import {
   Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ORBITX_FEE_USD, fmtUsd } from "@/lib/orbitx/fee";
+import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 import { HELIUS_RPC } from "@/lib/og";
 import { shortAddr } from "./_shared";
@@ -129,7 +129,11 @@ function NetworkStrip() {
       <span className="shrink-0">{fmtInt(tel.data?.tps)} <span className="text-white/30">tps</span></span>
       <span className="shrink-0">rpc <span className="text-[hsl(var(--og-lime))]">{tel.data?.latencyMs != null ? `${tel.data.latencyMs}ms` : "—"}</span></span>
       <span className="shrink-0">sol <span className="text-[hsl(var(--og-gold))]">{solUsd.data ? `$${solUsd.data.price.toFixed(2)}` : "—"}</span></span>
-      <span className="hidden shrink-0 sm:inline">{fmtUsd(ORBITX_FEE_USD)} flat launch · {(CREATOR_FEE_BPS / 100).toFixed(2)}% creator fee</span>
+      {isLaunchFeePromoActive() ? (
+        <span className="hidden shrink-0 font-bold text-[hsl(var(--og-gold))] sm:inline">★ FREE launches — {launchFeePromoDaysLeft()}d left · {(CREATOR_FEE_BPS / 100).toFixed(2)}% creator fee</span>
+      ) : (
+        <span className="hidden shrink-0 sm:inline">{fmtUsd(ORBITX_FEE_USD)} flat launch · {(CREATOR_FEE_BPS / 100).toFixed(2)}% creator fee</span>
+      )}
     </div>
   );
 }
@@ -230,7 +234,7 @@ export default function LaunchpadLayout() {
               <span className="h-px w-16 bg-gradient-to-l from-transparent to-[hsl(var(--og-lime))]/50" />
             </div>
             <div className="grid grid-cols-1 gap-2 rounded-xl border border-[hsl(var(--og-lime))]/12 bg-black/35 p-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground sm:grid-cols-3">
-              <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--og-gold))]" /> {fmtUsd(ORBITX_FEE_USD)} flat launch fee · both lanes</div>
+              <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--og-gold))]" /> {isLaunchFeePromoActive() ? <>launches FREE for {launchFeePromoDaysLeft()} more days · then {fmtUsd(BASE_LAUNCH_FEE_USD)} flat</> : <>{fmtUsd(ORBITX_FEE_USD)} flat launch fee · both lanes</>}</div>
               <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--og-lime))]" /> {(CREATOR_FEE_BPS / 100).toFixed(2)}% of every trade → creator</div>
               <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--og-cyan))]" /> claim in-app · same wallet that launched</div>
             </div>

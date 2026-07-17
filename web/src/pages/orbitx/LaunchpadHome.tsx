@@ -12,7 +12,7 @@ import {
   TrendingUp, Droplets, BarChart3, ArrowRight, Wand2, UserCircle2, Satellite,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { ORBITX_FEE_USD, fmtUsd } from "@/lib/orbitx/fee";
+import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 import { listTokens, type FeedKind, type OrbitxToken } from "@/lib/orbitx/registry";
 import { TokenCard } from "./_shared";
@@ -107,6 +107,11 @@ function Hero() {
               ◈ {b}
             </span>
           ))}
+          {isLaunchFeePromoActive() && (
+            <span className="rounded-md border border-[hsl(var(--og-gold))]/50 bg-[hsl(var(--og-gold))]/10 px-2 py-0.5 font-mono text-[9px] font-black uppercase tracking-widest text-[hsl(var(--og-gold))] shadow-[0_0_16px_-4px_hsl(var(--og-gold)/0.7)]">
+              ★ Free launches — {launchFeePromoDaysLeft()} days left
+            </span>
+          )}
         </div>
         <h1 className="font-display text-3xl font-black leading-tight tracking-tight sm:text-[2.6rem]">
           LAUNCH A<br />
@@ -125,7 +130,7 @@ function Hero() {
           </Link>
         </div>
         <div className="mt-4 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          {fmtUsd(ORBITX_FEE_USD)} flat fee · pump + custom lanes · Solana mainnet
+          {isLaunchFeePromoActive() ? <><s className="opacity-50">{fmtUsd(BASE_LAUNCH_FEE_USD)}</s> <span className="font-bold text-[hsl(var(--og-gold))]">FREE for {launchFeePromoDaysLeft()} days</span> · pump + custom lanes · Solana mainnet</> : <>{fmtUsd(ORBITX_FEE_USD)} flat fee · pump + custom lanes · Solana mainnet</>}
         </div>
       </div>
     </div>
@@ -212,7 +217,7 @@ function LaunchPreview() {
         <KV k="Supply" v="1,000,000,000" />
         <KV k="Decimals" v="9" />
         <KV k="Chain" v="Solana" />
-        <KV k="Launch fee" v={fmtUsd(ORBITX_FEE_USD)} tone="gold" />
+        <KV k="Launch fee" v={isLaunchFeePromoActive() ? "FREE ★" : fmtUsd(ORBITX_FEE_USD)} tone="gold" />
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {flags.map((f) => (

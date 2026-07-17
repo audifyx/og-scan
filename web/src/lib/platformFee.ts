@@ -13,7 +13,16 @@ import { PublicKey } from "@solana/web3.js";
 export const PLATFORM_WALLET = "45YR6fWxtc8uceNazGKMoX2KgK698rQsnPN4x8vD2VrE";
 export const PLATFORM_FEE_BPS = 95;           // 0.95% swap fee — pump.fun protocol-fee rate
 export const PLATFORM_FEE_ENABLED = true;     // kill-switch if a fee account issue arises
-export const LAUNCHPAD_FEE_USD = 1.5;         // flat launch fee — SAME on pump + custom lanes
+/* ── 30-DAY FREE-LAUNCH PROMO ────────────────────────────────────────
+   All launches are FREE (fee = $0) until LAUNCH_FEE_PROMO_END. After the
+   promo window passes, the flat $1.50 launch fee resumes automatically on
+   the next page load — no redeploy needed. Started 2026-07-17. */
+export const BASE_LAUNCH_FEE_USD = 1.5;      // normal flat launch fee — SAME on pump + custom lanes
+export const LAUNCH_FEE_PROMO_END = Date.parse("2026-08-16T23:59:59Z"); // 30 days from promo start
+export const isLaunchFeePromoActive = (): boolean => Date.now() < LAUNCH_FEE_PROMO_END;
+export const launchFeePromoDaysLeft = (): number =>
+  Math.max(0, Math.ceil((LAUNCH_FEE_PROMO_END - Date.now()) / 86_400_000));
+export const LAUNCHPAD_FEE_USD = isLaunchFeePromoActive() ? 0 : BASE_LAUNCH_FEE_USD;
 
 /** Creator fee charged on every buy/sell — pump.fun bonding-curve creator rate. */
 export const CREATOR_FEE_BPS = 30;            // 0.30%

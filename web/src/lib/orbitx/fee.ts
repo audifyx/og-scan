@@ -6,7 +6,11 @@
 // to SOL live so it stays constant in dollar terms).
 import { LAUNCHPAD_FEE_USD, CREATOR_FEE_BPS } from "@/lib/platformFee";
 
-export const ORBITX_FEE_USD = LAUNCHPAD_FEE_USD; // flat Orbitx launch fee — same on pump + custom lanes
+export const ORBITX_FEE_USD = LAUNCHPAD_FEE_USD; // flat Orbitx launch fee — same on pump + custom lanes ($0 during promo)
+export {
+  BASE_LAUNCH_FEE_USD, LAUNCH_FEE_PROMO_END,
+  isLaunchFeePromoActive, launchFeePromoDaysLeft,
+} from "@/lib/platformFee";
 export { CREATOR_FEE_BPS };                      // 0.30% per buy/sell, claimable by the creator
 
 // Real, approximate on-chain costs (mainnet). These are the user's cost, not ours.

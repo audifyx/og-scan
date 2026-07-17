@@ -2,7 +2,7 @@
 // Two lanes, identical fees. All fee numbers come from the live fee lib.
 import { Link } from "react-router-dom";
 import { Rocket, ShieldCheck, Wand2, TrendingUp, ArrowRight, Zap, HandCoins, Check } from "lucide-react";
-import { ORBITX_FEE_USD, fmtUsd } from "@/lib/orbitx/fee";
+import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 
 function Spec({ children }: { children: React.ReactNode }) {
@@ -31,7 +31,11 @@ export default function LaunchpadChoose() {
       {/* fee parity band */}
       <div className="lpx-panel lpx-panel--gold mb-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 py-3 font-mono text-[10px] uppercase tracking-widest">
         <span className="font-bold text-[hsl(var(--og-gold))]">Identical fees · both lanes</span>
-        <span className="text-muted-foreground">{fmtUsd(ORBITX_FEE_USD)} flat launch</span>
+        {isLaunchFeePromoActive() ? (
+          <span className="font-black text-[hsl(var(--og-lime))]">launches FREE — <s className="font-normal text-muted-foreground opacity-60">{fmtUsd(BASE_LAUNCH_FEE_USD)}</s> · {launchFeePromoDaysLeft()} days left</span>
+        ) : (
+          <span className="text-muted-foreground">{fmtUsd(ORBITX_FEE_USD)} flat launch</span>
+        )}
         <span className="text-muted-foreground">{creatorPct}% of every trade → you</span>
         <span className="inline-flex items-center gap-1 text-[hsl(var(--og-lime))]"><HandCoins className="h-3.5 w-3.5" /> claim in-app</span>
       </div>
@@ -86,7 +90,7 @@ export default function LaunchpadChoose() {
           <ul className="relative mb-6 space-y-2">
             <Spec>Own Token-2022 mint + on-chain metadata</Spec>
             <Spec>{creatorPct}% creator fee enforced on-chain — claim in-app</Spec>
-            <Spec>Liquidity optional — launch for ~0.01 SOL + {fmtUsd(ORBITX_FEE_USD)}</Spec>
+            <Spec>Liquidity optional — launch for ~0.01 SOL{isLaunchFeePromoActive() ? " network cost · launch fee FREE" : ` + ${fmtUsd(ORBITX_FEE_USD)}`}</Spec>
             <Spec>Revoke mint/freeze · burn LP · browser-side <span className="font-bold text-[hsl(var(--og-gold))]">OBX</span> vanity grind</Spec>
           </ul>
           <Link to="/orbitxlaunch/create/custom" className="lp-cta relative mt-auto inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-5 py-3 font-display text-xs font-black uppercase tracking-wider">
