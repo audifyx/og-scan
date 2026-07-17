@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { ArrowRightLeft, Zap, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,7 +37,7 @@ export function SellAllTool() {
     try {
       setLoading(true);
       const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
-        programId: new (await import("@solana/spl-token")).TOKEN_PROGRAM_ID,
+        programId: TOKEN_PROGRAM_ID,
       });
 
       const balances: TokenBalance[] = [];
