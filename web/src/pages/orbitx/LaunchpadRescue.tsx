@@ -24,9 +24,10 @@ import {
 import {
   scanEmptyTokenAccounts, totalReclaimableSol, buildCloseAccountsTransactions,
   buildSolToUsdcSwapTransaction, scanBurnableTokens, resolvePercentBurnAmount,
-  parseManualBurnAmount, buildBurnTransaction, buildSellAllQuotes, SOL_MINT, USDC_MINT,
+  parseManualBurnAmount, buildBurnTransaction, buildSellAllQuotes, fetchBurnTokenMeta, SOL_MINT, USDC_MINT,
   type EmptyTokenAccount, type BurnableToken,
 } from "@/lib/orbitx/rescue";
+import { supabase } from "@/lib/supabase";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const BURN_PRESETS = [10, 25, 35, 50, 75, 100];
@@ -211,6 +212,33 @@ export default function LaunchpadRescue() {
       await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
       setBurnSig(sig);
       toast.success("Tokens burned");
+
+      // Fire-and-forget: log the verified burn with token metadata so every
+      // page's BurnAnnouncementListener can show the "thanks for burning" card.
+      (async () => {
+        try {
+          const meta = await fetchBurnTokenMeta(selectedToken.mint);
+          const divisor = 10 ** selectedToken.decimals;
+          const supplyBefore = Number(selectedToken.supplyRaw) / divisor;
+          const supplyAfter = Number(selectedToken.supplyRaw - burnAmountRaw) / divisor;
+          const percentOfSupply = (Number(burnAmountRaw) / Number(selectedToken.supplyRaw)) * 100;
+          await supabase.from("burn_events").insert({
+            mint: selectedToken.mint,
+            token_name: meta.name,
+            token_symbol: meta.symbol,
+            token_logo_url: meta.logoUrl,
+            wallet: publicKey.toBase58(),
+            amount_burned: burnAmountUi,
+            supply_before: supplyBefore,
+            supply_after: supplyAfter,
+            percent_of_supply: percentOfSupply,
+            tx_signature: sig,
+          });
+        } catch (e) {
+          console.error("[rescue] failed to log burn event", e);
+        }
+      })();
+
       setManualAmount("");
       setPercent(null);
       scanBurn();

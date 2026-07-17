@@ -3,10 +3,7 @@ import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import {
   LedgerWalletAdapter,
-  SlopeWalletAdapter,
   SolflareWalletAdapter,
-  SolletExtensionWalletAdapter,
-  SolletWalletAdapter,
   TorusWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
 import { HELIUS_RPC } from "@/lib/og";
@@ -22,9 +19,6 @@ export const SolanaWalletProvider: FC<Props> = ({ children }) => {
       new SolflareWalletAdapter(), // Works on mobile
       new TorusWalletAdapter(), // Web wallet, works on mobile
       new LedgerWalletAdapter(),
-      new SlopeWalletAdapter(),
-      new SolletWalletAdapter(),
-      new SolletExtensionWalletAdapter(),
     ],
     []
   );

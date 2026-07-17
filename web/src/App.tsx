@@ -70,6 +70,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
+import { BurnAnnouncementListener } from "./components/burn/BurnAnnouncementListener";
 import Games from "./pages/Games";
 import AdvancedIntelligence from "./pages/AdvancedIntelligence";
 import EnhancedAdvancedIntelligence from "./pages/EnhancedAdvancedIntelligence";
@@ -154,6 +155,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <NotificationListener />
+        <BurnAnnouncementListener />
         <PushNotificationPrompt />
         <PresenceHeartbeat />
         <SecurityTracker />

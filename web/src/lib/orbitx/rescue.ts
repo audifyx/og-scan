@@ -233,6 +233,29 @@ export function parseManualBurnAmount(input: string, decimals: number): bigint {
   return BigInt(combined || "0");
 }
 
+export type BurnTokenMeta = { name: string; symbol: string; logoUrl: string | null };
+
+/**
+ * Best-effort name/symbol/logo lookup for the "thanks for burning" announcement.
+ * Uses Jupiter's public token metadata endpoint (no API key required); falls
+ * back to a short mint-based label if the mint isn't in Jupiter's list yet.
+ */
+export async function fetchBurnTokenMeta(mint: string): Promise<BurnTokenMeta> {
+  try {
+    const res = await fetch(`https://lite-api.jup.ag/tokens/v1/token/${mint}`);
+    if (res.ok) {
+      const j = await res.json();
+      if (j?.symbol) {
+        return { name: j.name || j.symbol, symbol: j.symbol, logoUrl: j.logoURI || null };
+      }
+    }
+  } catch {
+    // fall through to fallback below
+  }
+  const short = `${mint.slice(0, 4)}…${mint.slice(-4)}`;
+  return { name: short, symbol: short, logoUrl: null };
+}
+
 export function buildBurnTransaction(
   owner: PublicKey,
   token: BurnableToken,

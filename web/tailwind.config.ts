@@ -117,6 +117,27 @@ export default {
         blink: {
           "50%": { opacity: "0" },
         },
+        "burn-card-in": {
+          "0%": { transform: "translateY(-24px) scale(0.92)", opacity: "0" },
+          "60%": { transform: "translateY(4px) scale(1.02)", opacity: "1" },
+          "100%": { transform: "translateY(0) scale(1)", opacity: "1" },
+        },
+        "burn-card-out": {
+          "0%": { transform: "translateY(0) scale(1)", opacity: "1" },
+          "100%": { transform: "translateY(-16px) scale(0.96)", opacity: "0" },
+        },
+        "burn-ember-rise": {
+          "0%": { transform: "translateY(0) translateX(0) scale(1)", opacity: "0.9" },
+          "100%": { transform: "translateY(-90px) translateX(var(--ember-drift, 12px)) scale(0.3)", opacity: "0" },
+        },
+        "burn-glow-pulse": {
+          "0%, 100%": { boxShadow: "0 0 0 1px hsl(var(--og-blood) / 0.5), 0 0 40px -8px hsl(var(--og-blood) / 0.55)" },
+          "50%": { boxShadow: "0 0 0 1px hsl(var(--og-gold) / 0.6), 0 0 60px -6px hsl(var(--og-gold) / 0.55)" },
+        },
+        "burn-ring-expand": {
+          "0%": { transform: "scale(0.7)", opacity: "0.6" },
+          "100%": { transform: "scale(2.4)", opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -129,6 +150,11 @@ export default {
         "collector-pulse-ring": "collector-pulse-ring 4.8s ease-in-out infinite",
         flicker: "flicker 6s infinite",
         blink: "blink 1s steps(2) infinite",
+        "burn-card-in": "burn-card-in 0.5s cubic-bezier(0.16,1,0.3,1) forwards",
+        "burn-card-out": "burn-card-out 0.35s ease-in forwards",
+        "burn-ember-rise": "burn-ember-rise 1.6s ease-out infinite",
+        "burn-glow-pulse": "burn-glow-pulse 2.2s ease-in-out infinite",
+        "burn-ring-expand": "burn-ring-expand 1.8s ease-out infinite",
       },
       boxShadow: {
         og: "0 0 0 1px hsl(var(--og-grid)), 0 0 28px -8px hsl(var(--og-gold) / 0.38)",
