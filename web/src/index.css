@@ -1221,78 +1221,312 @@ body::before {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Orbitx Launchpad V3 — terminal / cyberpunk theme (scoped to .lp-v3)
-   Remaps the launchpad accent palette only inside /orbitxlaunch:
-   gold → electric purple #a855f7, cyan → #22d3ee, lime → #22ff88.
-   Every existing launchpad page inherits this with zero logic changes.
+   ORBITX LAUNCHPAD V3 — "MISSION CONTROL" HUD theme (scoped to .lp-v3)
+   Matrix-green command console: phosphor green primaries, gold brand
+   accents, angled HUD panels, scanlines, orbital telemetry.
+   Every /orbitxlaunch page inherits this with zero logic changes.
    ═══════════════════════════════════════════════════════════════════ */
 .lp-v3 {
-  --og-gold: 271 91% 65%;   /* electric purple #a855f7 — primary accent */
-  --og-cyan: 188 86% 53%;   /* neon cyan #22d3ee */
-  --og-lime: 148 100% 57%;  /* acid green #22ff88 */
+  --og-gold: 44 96% 56%;    /* gold — brand, crown, fees            */
+  --og-cyan: 158 92% 48%;   /* emerald green — secondary accent     */
+  --og-lime: 132 100% 54%;  /* phosphor green #17ff4d — primary     */
+  --lp-green: 132 100% 54%;
+  --lp-green-dim: 132 65% 40%;
   --lp-magenta: 300 100% 62%;
-  --lp-ink: 0 0% 4%;        /* #0a0a0a */
-  --lp-panel: 0 0% 7%;      /* #111111 */
+  --lp-ink: 140 30% 3%;
+  --lp-panel: 140 22% 5%;
+  color-scheme: dark;
 }
 
 /* CRT scanline overlay */
 .lp-scanlines {
   background: repeating-linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.022) 0px,
-    rgba(255, 255, 255, 0.022) 1px,
+    rgba(180, 255, 200, 0.02) 0px,
+    rgba(180, 255, 200, 0.02) 1px,
     transparent 1px,
     transparent 3px
   );
 }
 
-/* Subtle drifting data-stream particles */
+/* Drifting phosphor particles */
 .lp-particles {
   background-image:
-    radial-gradient(circle, hsl(var(--og-gold) / 0.33) 1px, transparent 1.6px),
-    radial-gradient(circle, hsl(var(--og-cyan) / 0.28) 1px, transparent 1.6px);
-  background-size: 96px 150px, 140px 210px;
-  animation: lp-drift 28s linear infinite;
+    radial-gradient(circle, hsl(var(--lp-green) / 0.3) 1px, transparent 1.6px),
+    radial-gradient(circle, hsl(var(--og-gold) / 0.22) 1px, transparent 1.6px);
+  background-size: 96px 150px, 150px 220px;
+  animation: lp-drift 30s linear infinite;
 }
 @keyframes lp-drift {
   from { background-position: 0 0, 48px 70px; }
-  to   { background-position: 0 600px, 48px 910px; }
+  to   { background-position: 0 600px, 48px 950px; }
 }
 
 /* Vertical terminal "code rain" columns (static, ultra-subtle) */
 .lp-rain {
   background-image:
-    repeating-linear-gradient(90deg, transparent 0 46px, hsl(var(--og-gold) / 0.045) 46px 47px),
-    repeating-linear-gradient(90deg, transparent 0 73px, hsl(var(--og-cyan) / 0.035) 73px 74px);
+    repeating-linear-gradient(90deg, transparent 0 46px, hsl(var(--lp-green) / 0.05) 46px 47px),
+    repeating-linear-gradient(90deg, transparent 0 73px, hsl(var(--og-gold) / 0.03) 73px 74px);
 }
 
-/* Primary glowing CTA */
+/* Green grid floor */
+.lp-v3 .grid-bg {
+  background-image:
+    linear-gradient(hsl(var(--lp-green) / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--lp-green) / 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* Primary glowing CTA — phosphor green */
 .lp-cta {
-  background: linear-gradient(135deg, hsl(271 91% 62%), hsl(288 92% 56%));
+  background: linear-gradient(135deg, hsl(132 100% 42%), hsl(150 100% 34%));
   box-shadow:
-    0 0 26px -6px hsl(271 91% 65% / 0.75),
-    inset 0 0 0 1px hsl(271 91% 82% / 0.35);
+    0 0 28px -6px hsl(132 100% 50% / 0.8),
+    inset 0 0 0 1px hsl(132 100% 75% / 0.4);
+  color: #02120a;
+  text-shadow: none;
   transition: box-shadow 0.25s ease, transform 0.15s ease, filter 0.2s ease;
 }
 .lp-cta:hover {
   transform: translateY(-1px);
-  filter: brightness(1.08);
+  filter: brightness(1.12);
   box-shadow:
-    0 0 46px -6px hsl(271 91% 65% / 0.95),
-    0 0 90px -30px hsl(300 100% 62% / 0.5),
-    inset 0 0 0 1px hsl(271 91% 85% / 0.5);
+    0 0 52px -6px hsl(132 100% 55% / 0.95),
+    0 0 110px -30px hsl(158 92% 48% / 0.6),
+    inset 0 0 0 1px hsl(132 100% 82% / 0.55);
 }
 
-/* Token card hover: glow + scale */
+/* ── Angled HUD panel with corner brackets ── */
+.lpx-panel {
+  position: relative;
+  border: 1px solid hsl(var(--lp-green) / 0.22);
+  background:
+    linear-gradient(180deg, hsl(var(--lp-panel) / 0.92), hsl(140 25% 3% / 0.94));
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 24px -12px hsl(var(--lp-green) / 0.25),
+    0 8px 40px -24px rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(10px);
+}
+.lpx-panel::before,
+.lpx-panel::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+.lpx-panel::before {
+  top: -1px; left: -1px;
+  border-top: 2px solid hsl(var(--lp-green) / 0.85);
+  border-left: 2px solid hsl(var(--lp-green) / 0.85);
+  border-top-left-radius: 10px;
+  filter: drop-shadow(0 0 5px hsl(var(--lp-green) / 0.8));
+}
+.lpx-panel::after {
+  bottom: -1px; right: -1px;
+  border-bottom: 2px solid hsl(var(--lp-green) / 0.85);
+  border-right: 2px solid hsl(var(--lp-green) / 0.85);
+  border-bottom-right-radius: 10px;
+  filter: drop-shadow(0 0 5px hsl(var(--lp-green) / 0.8));
+}
+.lpx-panel--gold { border-color: hsl(var(--og-gold) / 0.28); }
+.lpx-panel--gold::before { border-color: hsl(var(--og-gold) / 0.9); filter: drop-shadow(0 0 5px hsl(var(--og-gold) / 0.8)); }
+.lpx-panel--gold::after  { border-color: hsl(var(--og-gold) / 0.9); filter: drop-shadow(0 0 5px hsl(var(--og-gold) / 0.8)); }
+.lpx-panel--hot {
+  border-color: hsl(var(--lp-green) / 0.5);
+  box-shadow:
+    inset 0 0 34px -10px hsl(var(--lp-green) / 0.4),
+    0 0 44px -18px hsl(var(--lp-green) / 0.55);
+}
+
+/* Section header strip inside a panel */
+.lpx-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid hsl(var(--lp-green) / 0.16);
+  background: linear-gradient(90deg, hsl(var(--lp-green) / 0.09), transparent 70%);
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: hsl(var(--lp-green));
+  text-shadow: 0 0 8px hsl(var(--lp-green) / 0.6);
+  border-radius: 10px 10px 0 0;
+}
+
+/* Green text glow */
+.lpx-glow { text-shadow: 0 0 8px hsl(var(--lp-green) / 0.75), 0 0 28px hsl(var(--lp-green) / 0.35); }
+.lpx-glow-gold { text-shadow: 0 0 8px hsl(var(--og-gold) / 0.7), 0 0 24px hsl(var(--og-gold) / 0.32); }
+
+/* Outlined HUD button */
+.lpx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid hsl(var(--lp-green) / 0.45);
+  background: hsl(var(--lp-green) / 0.08);
+  color: hsl(var(--lp-green));
+  border-radius: 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.55rem 1rem;
+  transition: all 0.18s ease;
+}
+.lpx-btn:hover {
+  background: hsl(var(--lp-green) / 0.16);
+  box-shadow: 0 0 22px -6px hsl(var(--lp-green) / 0.7), inset 0 0 14px -8px hsl(var(--lp-green) / 0.6);
+  transform: translateY(-1px);
+}
+.lpx-btn--gold {
+  border-color: hsl(var(--og-gold) / 0.5);
+  background: hsl(var(--og-gold) / 0.1);
+  color: hsl(var(--og-gold));
+}
+.lpx-btn--gold:hover {
+  background: hsl(var(--og-gold) / 0.18);
+  box-shadow: 0 0 22px -6px hsl(var(--og-gold) / 0.7);
+}
+
+/* Hero scan sweep */
+@keyframes lpx-sweep {
+  0% { transform: translateY(-120%); opacity: 0; }
+  12% { opacity: 1; }
+  55% { opacity: 0.6; }
+  100% { transform: translateY(340%); opacity: 0; }
+}
+.lpx-sweep {
+  position: absolute;
+  inset-inline: 0;
+  height: 34%;
+  background: linear-gradient(180deg, transparent, hsl(var(--lp-green) / 0.09), transparent);
+  animation: lpx-sweep 7s ease-in-out infinite;
+}
+
+/* Launch beam under the hero rocket */
+.lpx-beam {
+  background:
+    radial-gradient(ellipse 60% 100% at 50% 100%, hsl(var(--lp-green) / 0.35), transparent 70%),
+    radial-gradient(ellipse 24% 60% at 50% 100%, hsl(var(--lp-green) / 0.6), transparent 70%);
+  filter: blur(2px);
+}
+
+/* Orbital telemetry rings */
+.lpx-orbit { position: relative; }
+.lpx-orbit .ring {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed hsl(var(--lp-green) / 0.35);
+  border-radius: 9999px;
+}
+.lpx-orbit .ring--spin { animation: spin 26s linear infinite; }
+.lpx-orbit .ring--spin-rev { animation: spin 40s linear infinite reverse; }
+.lpx-orbit .sat {
+  position: absolute;
+  top: -3px; left: 50%;
+  width: 6px; height: 6px;
+  margin-left: -3px;
+  border-radius: 9999px;
+  background: hsl(var(--lp-green));
+  box-shadow: 0 0 10px hsl(var(--lp-green));
+}
+
+/* Terminal window */
+.lpx-term {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.75;
+  color: hsl(var(--lp-green) / 0.92);
+  text-shadow: 0 0 6px hsl(var(--lp-green) / 0.35);
+}
+.lpx-term .dim { color: hsl(var(--lp-green) / 0.45); text-shadow: none; }
+.lpx-term .gold { color: hsl(var(--og-gold)); text-shadow: 0 0 6px hsl(var(--og-gold) / 0.4); }
+@keyframes lpx-caret { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+.lpx-caret {
+  display: inline-block;
+  width: 7px; height: 12px;
+  margin-left: 4px;
+  background: hsl(var(--lp-green));
+  box-shadow: 0 0 8px hsl(var(--lp-green));
+  vertical-align: -1px;
+  animation: lpx-caret 1s step-end infinite;
+}
+
+/* Feed row hover */
+.lpx-row {
+  transition: background 0.15s ease, border-color 0.2s ease, transform 0.15s ease;
+  border: 1px solid transparent;
+}
+.lpx-row:hover {
+  background: hsl(var(--lp-green) / 0.06);
+  border-color: hsl(var(--lp-green) / 0.3);
+  transform: translateX(2px);
+}
+
+/* Rank chip */
+.lpx-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem; height: 1.35rem;
+  border-radius: 5px;
+  border: 1px solid hsl(var(--lp-green) / 0.45);
+  background: hsl(var(--lp-green) / 0.1);
+  color: hsl(var(--lp-green));
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+/* Status LED */
+.lpx-led {
+  position: relative;
+  display: inline-flex;
+  width: 8px; height: 8px;
+  border-radius: 9999px;
+  background: hsl(var(--lp-green));
+  box-shadow: 0 0 8px hsl(var(--lp-green));
+}
+.lpx-led::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--lp-green) / 0.5);
+  animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.lpx-led--gold { background: hsl(var(--og-gold)); box-shadow: 0 0 8px hsl(var(--og-gold)); }
+.lpx-led--gold::after { border-color: hsl(var(--og-gold) / 0.5); }
+.lpx-led--red { background: hsl(var(--og-blood)); box-shadow: 0 0 8px hsl(var(--og-blood)); }
+.lpx-led--red::after { border-color: hsl(var(--og-blood) / 0.5); }
+
+/* Gauge bar */
+.lpx-gauge { height: 5px; border-radius: 9999px; background: hsl(0 0% 100% / 0.07); overflow: hidden; }
+.lpx-gauge > div {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, hsl(var(--og-cyan)), hsl(var(--lp-green)));
+  box-shadow: 0 0 10px hsl(var(--lp-green) / 0.7);
+  transition: width 0.5s ease;
+}
+
+/* Token card hover: green glow + scale */
 .lp-card {
   transition: transform 0.18s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 .lp-card:hover {
   transform: translateY(-3px) scale(1.015);
-  border-color: hsl(var(--og-gold) / 0.5);
+  border-color: hsl(var(--lp-green) / 0.5);
   box-shadow:
-    0 0 0 1px hsl(var(--og-gold) / 0.22),
-    0 14px 48px -18px hsl(var(--og-gold) / 0.55);
+    0 0 0 1px hsl(var(--lp-green) / 0.22),
+    0 14px 48px -18px hsl(var(--lp-green) / 0.55);
 }
 
 /* Graduation progress bar */
@@ -1305,13 +1539,13 @@ body::before {
 .lp-progress-fill {
   height: 100%;
   border-radius: 9999px;
-  background: linear-gradient(90deg, hsl(var(--og-gold)), hsl(var(--lp-magenta, 300 100% 62%)));
-  box-shadow: 0 0 10px hsl(var(--og-gold) / 0.6);
+  background: linear-gradient(90deg, hsl(var(--og-cyan)), hsl(var(--lp-green)));
+  box-shadow: 0 0 10px hsl(var(--lp-green) / 0.6);
   transition: width 0.4s ease;
 }
 .lp-progress-fill.is-complete {
-  background: linear-gradient(90deg, hsl(var(--og-lime)), hsl(var(--og-cyan)));
-  box-shadow: 0 0 12px hsl(var(--og-lime) / 0.65);
+  background: linear-gradient(90deg, hsl(var(--og-gold)), hsl(var(--lp-green)));
+  box-shadow: 0 0 12px hsl(var(--og-gold) / 0.65);
 }
 
 /* Neon count badge */
@@ -1322,8 +1556,175 @@ body::before {
   min-width: 1.6rem;
   padding: 0.1rem 0.45rem;
   border-radius: 0.5rem;
-  border: 1px solid hsl(var(--og-gold) / 0.4);
-  background: hsl(var(--og-gold) / 0.12);
-  color: hsl(var(--og-gold));
-  text-shadow: 0 0 8px hsl(var(--og-gold) / 0.6);
+  border: 1px solid hsl(var(--lp-green) / 0.4);
+  background: hsl(var(--lp-green) / 0.12);
+  color: hsl(var(--lp-green));
+  text-shadow: 0 0 8px hsl(var(--lp-green) / 0.6);
+}
+
+/* Wizard step rail */
+.lpx-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid hsl(0 0% 100% / 0.08);
+  background: hsl(0 0% 0% / 0.35);
+  border-radius: 9px;
+  padding: 0.55rem 0.75rem;
+  transition: all 0.18s ease;
+}
+.lpx-step:hover { border-color: hsl(var(--lp-green) / 0.35); }
+.lpx-step[data-on="true"] {
+  border-color: hsl(var(--lp-green) / 0.55);
+  background: hsl(var(--lp-green) / 0.09);
+  box-shadow: inset 0 0 18px -10px hsl(var(--lp-green) / 0.6);
+}
+.lpx-step .idx {
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: hsl(var(--lp-green) / 0.6);
+}
+.lpx-step[data-on="true"] .idx { color: hsl(var(--lp-green)); text-shadow: 0 0 8px hsl(var(--lp-green) / 0.7); }
+
+/* Reduced motion: kill decorative HUD animation */
+@media (prefers-reduced-motion: reduce) {
+  .lpx-sweep, .lpx-caret, .lp-particles, .lpx-led::after { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESCUE CONSOLE — claim celebrations, burn results, radar scan
+   (used inside .lp-v3 dialogs; keyframes global, visuals scoped)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Dialog pop-in */
+@keyframes lpx-pop {
+  0% { opacity: 0; transform: scale(0.9) translateY(10px); }
+  60% { opacity: 1; transform: scale(1.02) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.lpx-pop { animation: lpx-pop 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.2) both; }
+
+/* Big glowing counted number */
+.lpx-count {
+  font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 0 12px hsl(132 100% 54% / 0.8),
+    0 0 44px hsl(132 100% 54% / 0.4);
+}
+.lpx-count--fire {
+  text-shadow:
+    0 0 12px hsl(18 100% 55% / 0.85),
+    0 0 44px hsl(0 92% 55% / 0.45);
+}
+
+/* Confetti burst — pieces positioned/tinted inline, driven by --dx/--rot/--t */
+@keyframes lpx-confetti {
+  0%   { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, -120px)) rotate(var(--rot, 340deg)) scale(0.55); }
+}
+.lpx-confetti-piece {
+  position: absolute;
+  width: 7px;
+  height: 11px;
+  border-radius: 2px;
+  animation: lpx-confetti var(--t, 1.3s) cubic-bezier(0.15, 0.85, 0.4, 1) var(--d, 0s) both;
+  will-change: transform, opacity;
+}
+
+/* Rising embers for the burn dialog */
+@keyframes lpx-ember {
+  0%   { opacity: 0; transform: translateY(16px) scale(0.6); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-110px) translateX(var(--dx, 0px)) scale(0.2); }
+}
+.lpx-ember {
+  position: absolute;
+  bottom: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, hsl(35 100% 60%), hsl(8 100% 50%));
+  box-shadow: 0 0 8px hsl(20 100% 55% / 0.9);
+  animation: lpx-ember var(--t, 2.2s) ease-out var(--d, 0s) infinite;
+  will-change: transform, opacity;
+}
+
+/* Radar scan — rotating phosphor sweep while scanning the chain */
+.lpx-radar {
+  position: relative;
+  border-radius: 9999px;
+  border: 1px solid hsl(132 100% 54% / 0.35);
+  background:
+    radial-gradient(circle, transparent 58%, hsl(132 100% 54% / 0.06) 60%, transparent 62%),
+    radial-gradient(circle, transparent 38%, hsl(132 100% 54% / 0.06) 40%, transparent 42%),
+    radial-gradient(circle, hsl(132 100% 54% / 0.1), transparent 70%);
+  overflow: hidden;
+}
+.lpx-radar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, hsl(132 100% 54% / 0.55), transparent 70deg, transparent 360deg);
+  animation: spin 1.6s linear infinite;
+}
+.lpx-radar::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 6px; height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 9999px;
+  background: hsl(132 100% 54%);
+  box-shadow: 0 0 10px hsl(132 100% 54%);
+}
+.lpx-radar .blip {
+  position: absolute;
+  width: 5px; height: 5px;
+  border-radius: 9999px;
+  background: hsl(44 96% 56%);
+  box-shadow: 0 0 8px hsl(44 96% 56%);
+  animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Fire glow ring behind burn total */
+@keyframes lpx-flame-pulse {
+  0%, 100% { box-shadow: 0 0 34px -8px hsl(18 100% 52% / 0.7), inset 0 0 26px -12px hsl(18 100% 52% / 0.6); }
+  50%      { box-shadow: 0 0 60px -8px hsl(18 100% 55% / 0.95), inset 0 0 40px -12px hsl(18 100% 55% / 0.85); }
+}
+.lpx-flame-ring { animation: lpx-flame-pulse 1.6s ease-in-out infinite; }
+
+/* Supply before/after bar */
+.lpx-supplybar {
+  position: relative;
+  height: 10px;
+  border-radius: 9999px;
+  background: hsl(0 0% 100% / 0.08);
+  overflow: hidden;
+}
+.lpx-supplybar .keep {
+  position: absolute; inset-block: 0; left: 0;
+  background: linear-gradient(90deg, hsl(158 92% 40%), hsl(132 100% 46%));
+  box-shadow: 0 0 12px hsl(132 100% 54% / 0.5);
+  transition: width 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.lpx-supplybar .burnt {
+  position: absolute; inset-block: 0; right: 0;
+  background: repeating-linear-gradient(135deg, hsl(8 92% 46% / 0.9) 0 6px, hsl(20 100% 50% / 0.9) 6px 12px);
+  box-shadow: 0 0 12px hsl(8 92% 50% / 0.6);
+  transition: width 1.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Result row shimmer-in */
+@keyframes lpx-row-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: none; }
+}
+.lpx-row-in { animation: lpx-row-in 0.35s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lpx-confetti-piece, .lpx-ember, .lpx-radar::before, .lpx-flame-ring, .lpx-pop { animation: none; }
 }

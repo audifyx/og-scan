@@ -271,3 +271,104 @@ export function buildBurnTransaction(
   );
   return new Transaction().add(ix);
 }
+
+/* ──────────────────── OmniClaim scanner additions ──────────────────── */
+/**
+ * WRAPPED SOL (wSOL) accounts: closing a native account unwraps it — the
+ * wrapped balance AND the rent both land back in the owner's wallet.
+ */
+export type NativeSolAccount = {
+  pubkey: PublicKey;
+  programId: PublicKey;
+  /** Total lamports returned on close (wrapped balance + rent). */
+  lamports: number;
+  /** Wrapped portion only (token balance). */
+  wsolRaw: bigint;
+};
+
+/** Scan both token programs for native (wrapped-SOL) accounts owned by `owner`. */
+export async function scanNativeSolAccounts(
+  connection: Connection,
+  owner: PublicKey,
+): Promise<NativeSolAccount[]> {
+  const [legacy, token22] = await Promise.all([
+    connection.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_PROGRAM_ID }),
+    connection.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_2022_PROGRAM_ID }),
+  ]);
+  const all = [
+    ...legacy.value.map((a) => ({ ...a, programId: TOKEN_PROGRAM_ID })),
+    ...token22.value.map((a) => ({ ...a, programId: TOKEN_2022_PROGRAM_ID })),
+  ];
+  return all
+    .filter((a) => a.account.data.parsed.info.isNative === true)
+    .map((a) => ({
+      pubkey: a.pubkey,
+      programId: a.programId,
+      lamports: a.account.lamports,
+      wsolRaw: BigInt(a.account.data.parsed.info.tokenAmount.amount as string),
+    }));
+}
+
+/** Close native accounts → unwraps wSOL + refunds rent. Batched like rent claims. */
+export function buildUnwrapTransactions(
+  owner: PublicKey,
+  accounts: NativeSolAccount[],
+  batchSize = 20,
+): Transaction[] {
+  const txs: Transaction[] = [];
+  for (let i = 0; i < accounts.length; i += batchSize) {
+    const batch = accounts.slice(i, i + batchSize);
+    const tx = new Transaction();
+    for (const a of batch) {
+      tx.add(createCloseAccountInstruction(a.pubkey, owner, owner, [], a.programId));
+    }
+    txs.push(tx);
+  }
+  return txs;
+}
+
+/**
+ * Real USD estimate for held tokens via DexScreener's public pairs API.
+ * Used by the claim scanner to price "dust convertible via Sell All".
+ * Fail-soft: unpriceable mints simply aren't counted.
+ */
+export async function estimateHoldingsUsd(
+  tokens: BurnableToken[],
+): Promise<Record<string, number>> {
+  const mints = Array.from(new Set(tokens.map((t) => t.mint))).slice(0, 60);
+  if (mints.length === 0) return {};
+  const out: Record<string, number> = {};
+  try {
+    const chunks: string[][] = [];
+    for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
+    const priceByMint: Record<string, number> = {};
+    for (const chunk of chunks) {
+      const r = await fetch(`https://api.dexscreener.com/tokens/v1/solana/${chunk.join(",")}`);
+      if (!r.ok) continue;
+      const pairs = (await r.json()) as Array<{
+        baseToken?: { address?: string };
+        priceUsd?: string;
+        liquidity?: { usd?: number };
+      }>;
+      const bestLiq: Record<string, number> = {};
+      for (const p of pairs) {
+        const addr = p.baseToken?.address;
+        const price = Number(p.priceUsd);
+        const liq = p.liquidity?.usd ?? 0;
+        if (!addr || !Number.isFinite(price) || price <= 0) continue;
+        if ((bestLiq[addr] ?? -1) >= liq) continue;
+        bestLiq[addr] = liq;
+        priceByMint[addr] = price;
+      }
+    }
+    for (const t of tokens) {
+      const price = priceByMint[t.mint];
+      if (!price) continue;
+      const ui = Number(t.balanceRaw) / 10 ** t.decimals;
+      out[t.mint] = ui * price;
+    }
+  } catch {
+    /* fail soft */
+  }
+  return out;
+}
