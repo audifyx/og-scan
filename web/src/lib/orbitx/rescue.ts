@@ -90,7 +90,7 @@ export function buildCloseAccountsTransactions(
   return txs;
 }
 
-export const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111");
+export const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
 
 /** Generic Jupiter quote + swap-transaction builder. */
 export async function buildJupiterSwapTransaction(
