@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Zap, Wallet } from "lucide-react";
+import { Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Zap, Wallet, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ORBITX_FEE_USD, fmtUsd } from "@/lib/orbitx/fee";
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
@@ -14,6 +14,7 @@ const TABS = [
   { to: "/orbitxlaunch", label: "HOME", icon: Home, end: true },
   { to: "/orbitxlaunch/create", label: "LAUNCH", icon: PlusCircle, end: false },
   { to: "/orbitxlaunch/claim", label: "CLAIM FEES", icon: HandCoins, end: false, hot: true },
+  { to: "/orbitxlaunch/rescue", label: "RESCUE", icon: Flame, end: false, hot: true },
   { to: "/orbitxlaunch/profile", label: "PROFILE", icon: UserCircle2, end: false },
   { to: "/orbitxlaunch/about", label: "ABOUT", icon: Info, end: false },
 ];
