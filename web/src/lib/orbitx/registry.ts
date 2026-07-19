@@ -33,6 +33,8 @@ export type FeedKind = "new" | "graduated" | "all";
 export async function listTokens(kind: FeedKind = "new", limit = 60): Promise<OrbitxToken[]> {
   let q = supabase.from("orbitx_tokens").select("*").order("created_at", { ascending: false }).limit(limit);
   if (kind === "graduated") q = q.not("lp_pool_address", "is", null);
+  // Hide Orbitx Pro token
+  q = q.neq("mint_address", "wmo3LPaLuaqZZVngh7YLDugMTBGYRKz14QzWvmKaarc");
   const { data, error } = await q;
   if (error) throw error;
   let tokens = (data ?? []) as OrbitxToken[];
