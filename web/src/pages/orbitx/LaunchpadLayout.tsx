@@ -3,6 +3,7 @@
 // No sidebar — section nav is a slim HUD tab strip. Scoped .lp-v3 theme
 // remaps accents to phosphor green / gold for every launchpad page.
 import { useEffect, useState } from "react";
+import { AntiVampProtectionBadge } from "@/components/layout/AntiVampProtectionBadge";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
@@ -166,6 +167,7 @@ export default function LaunchpadLayout() {
 
             {/* wallet + quick deploy */}
             <div className="ml-auto flex items-center gap-2">
+              <AntiVampProtectionBadge />
               <Link to="/orbitxlaunch/create" className="pf-btn hidden md:inline-flex">
                 <Zap className="h-4 w-4" /> Start a new coin
               </Link>

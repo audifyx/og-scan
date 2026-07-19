@@ -6,7 +6,7 @@ import { getToken } from "@/lib/orbitx/registry";
 import { shortAddr, timeAgo, SectionLabel } from "./_shared";
 import {
   Loader2, Copy, Check, ExternalLink, ShieldCheck, ShieldAlert, Droplets, Flame,
-  ArrowLeft, Coins,
+  ArrowLeft, Coins, TrendingUp, BarChart3, Zap, Send,
 } from "lucide-react";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -66,17 +66,17 @@ export default function LaunchpadToken() {
       <div className="og-glass-frame relative overflow-hidden p-6">
         <div className="grid-bg pointer-events-none absolute inset-0 opacity-20" />
         <div className="relative">
-          <div className="flex items-start gap-4">
-            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-white/12 bg-white/5">
-              {t.logo_url ? <img src={t.logo_url} alt={t.ticker} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center font-display text-xl font-bold text-muted-foreground">{t.ticker?.slice(0, 2).toUpperCase()}</div>}
+          <div className="flex items-start justify-between gap-4">
+            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-white/12 bg-white/5 shadow-lg shadow-[hsl(var(--og-gold))]/10">
+              {t.logo_url ? <img src={t.logo_url} alt={t.ticker} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center font-display text-2xl font-bold text-muted-foreground">{t.ticker?.slice(0, 2).toUpperCase()}</div>}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">{t.name}</h1>
-                <span className="rounded-md bg-white/5 px-2 py-0.5 font-mono text-xs text-[hsl(var(--og-gold))]">${t.ticker}</span>
+                <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">{t.name}</h1>
+                <span className="rounded-md bg-[hsl(var(--og-gold))]/10 px-2 py-0.5 font-mono text-xs text-[hsl(var(--og-gold))] border border-[hsl(var(--og-gold))]/30">${t.ticker}</span>
                 <Pill tone={t.launch_type === "pump" ? "cyan" : "gold"}>{t.launch_type === "pump" ? "Pump launch" : "Custom launch"}</Pill>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 {graduated
                   ? <Pill tone="lime"><Droplets className="h-3 w-3" /> Graduated</Pill>
                   : <Pill tone="cyan"><Flame className="h-3 w-3" /> Fresh</Pill>}
@@ -85,6 +85,14 @@ export default function LaunchpadToken() {
                   : <Pill tone="muted"><ShieldCheck className="h-3 w-3" /> Verified unique</Pill>}
                 <Pill tone="muted">{t.cluster}</Pill>
               </div>
+            </div>
+            <div className="flex flex-col gap-2 shrink-0">
+              <button className="flex items-center gap-2 rounded-lg bg-[hsl(var(--og-lime))]/20 border border-[hsl(var(--og-lime))]/40 text-[hsl(var(--og-lime))] px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider hover:bg-[hsl(var(--og-lime))]/30 transition">
+                <TrendingUp className="h-4 w-4" /> Buy
+              </button>
+              <button className="flex items-center gap-2 rounded-lg bg-[hsl(var(--og-blood))]/20 border border-[hsl(var(--og-blood))]/40 text-[hsl(var(--og-blood))] px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider hover:bg-[hsl(var(--og-blood))]/30 transition">
+                <TrendingUp className="h-4 w-4 rotate-180" /> Sell
+              </button>
             </div>
           </div>
 
@@ -95,6 +103,31 @@ export default function LaunchpadToken() {
             <button onClick={copy} className="shrink-0 rounded-lg border border-white/10 p-1.5 hover:bg-white/5" title="Copy CA">{copied ? <Check className="h-4 w-4 text-[hsl(var(--og-lime))]" /> : <Copy className="h-4 w-4" />}</button>
             <a href={explorer} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-white/10 p-1.5 hover:bg-white/5" title="View on Solscan"><ExternalLink className="h-4 w-4" /></a>
           </div>
+        </div>
+      </div>
+
+      {/* Trading & Market Info */}
+      <div className="grid gap-4 mt-4 lg:grid-cols-3">
+        <div className="og-glass-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <BarChart3 className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Market Cap</span>
+          </div>
+          <div className="font-mono text-lg font-bold text-foreground">—</div>
+        </div>
+        <div className="og-glass-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Zap className="h-4 w-4 text-[hsl(var(--og-gold))]" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">24h Volume</span>
+          </div>
+          <div className="font-mono text-lg font-bold text-foreground">—</div>
+        </div>
+        <div className="og-glass-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Send className="h-4 w-4 text-[hsl(var(--og-lime))]" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">24h Change</span>
+          </div>
+          <div className="font-mono text-lg font-bold text-foreground">—</div>
         </div>
       </div>
 

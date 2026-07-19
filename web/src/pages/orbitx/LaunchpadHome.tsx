@@ -41,29 +41,40 @@ function humanTime(sec: number) {
 
 function Hero() {
   return (
-    <div className="pf-card p-6 text-center sm:p-8">
-      <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
-        {["100% on-chain", "Anti-vamp protected", "Built for creators"].map((b) => (
-          <span key={b} className="pf-pill pf-pill--green">{b}</span>
-        ))}
-        {isLaunchFeePromoActive() && (
-          <span className="pf-pill pf-pill--gold">★ Free launches — {launchFeePromoDaysLeft()} days left</span>
-        )}
+    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[hsl(var(--og-gold))]/10 to-transparent p-8 text-center">
+      <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[hsl(var(--og-gold))]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[hsl(var(--og-cyan))]/10 blur-3xl" />
+      <div className="pointer-events-none absolute right-8 top-1/2 hidden -translate-y-1/2 opacity-60 md:block">
+        <div className="relative h-40 w-40 animate-[spin_38s_linear_infinite] rounded-full border border-dashed border-[hsl(var(--og-gold))]/30">
+          <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-[hsl(var(--og-gold))] shadow-[0_0_12px_hsl(var(--og-gold))]" />
+          <div className="absolute inset-4 rounded-full border border-dashed border-[hsl(var(--og-cyan))]/30">
+            <span className="absolute -right-1 top-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-[hsl(var(--og-cyan))] shadow-[0_0_12px_hsl(var(--og-cyan))]" />
+          </div>
+        </div>
       </div>
-      <h1 className="text-3xl font-black leading-tight tracking-tight text-[hsl(var(--pf-ink))] sm:text-4xl">
-        launch a solana coin<br />that can't be cloned
-      </h1>
-      <p className="mx-auto mt-3 max-w-md text-sm text-[hsl(var(--pf-muted))]">
-        Unique name, ticker and CA enforced by the anti-vamp registry. OBX vanity address.
-        {" "}{(CREATOR_FEE_BPS / 100).toFixed(2)}% of every trade back to you — claimable in-app.
-      </p>
-      <div className="mt-6">
-        <Link to="/orbitxlaunch/create" className="pf-btn px-8 py-3 text-sm">
-          <Rocket className="h-4 w-4" /> start a new coin
-        </Link>
-      </div>
-      <div className="mt-3 pf-mono text-[11px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">
-        {isLaunchFeePromoActive() ? <>free for {launchFeePromoDaysLeft()} days</> : <>{fmtUsd(ORBITX_FEE_USD)} flat fee</>} · pump + custom lanes · Solana mainnet
+
+      <div className="relative z-10">
+        <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
+          <Badge className="border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 text-[hsl(var(--og-gold))]"><Rocket className="mr-1 h-3 w-3" /> Orbitx Launch</Badge>
+          <Badge variant="outline" className="border-[hsl(var(--og-cyan))]/40 text-[hsl(var(--og-cyan))]">Solana-only</Badge>
+          {isLaunchFeePromoActive() && (
+            <Badge className="border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 text-[hsl(var(--og-lime))]">★ Free launches — {launchFeePromoDaysLeft()} days left</Badge>
+          )}
+        </div>
+        <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+          Launch a token on <span className="text-[hsl(var(--og-gold))] text-glow-gold">Solana</span>
+        </h1>
+        <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+          Your own launchpad — own SPL mint, Metaplex metadata, independent DEX liquidity, on-chain protections and a custom OBX vanity address. No pump.fun.
+        </p>
+        <div className="mt-6">
+          <Link to="/orbitxlaunch/create" className="pf-btn px-8 py-3 text-sm">
+            <Rocket className="h-4 w-4" /> Start a new coin
+          </Link>
+        </div>
+        <div className="mt-3 pf-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+          {isLaunchFeePromoActive() ? <>free for {launchFeePromoDaysLeft()} days</> : <>{fmtUsd(ORBITX_FEE_USD)} flat fee</>} · pump + custom lanes · Solana mainnet
+        </div>
       </div>
     </div>
   );
@@ -99,7 +110,7 @@ function StatStrip({ stats, lpUsd, loaded }: { stats: ReturnType<typeof launchSt
 
 /* ═══════════════ live feed (recent launches list) ═══════════════ */
 
-type FeedSort = "fresh" | "trending" | "volume" | "gainers";
+type FeedSort = "fresh" | "trending" | "volume" | "gainers" | "categories";
 
 function FeedRow({ t, m, rank }: { t: OrbitxToken; m: MarketRow | undefined; rank: number }) {
   const up = (m?.ch24 ?? 0) >= 0;
@@ -151,6 +162,7 @@ function LiveFeed({ tokens, market, loading }: {
   const TABS: { id: FeedSort; label: string }[] = [
     { id: "fresh", label: "Fresh" }, { id: "trending", label: "Trending" },
     { id: "volume", label: "Volume" }, { id: "gainers", label: "Gainers" },
+    { id: "categories", label: "Categories" },
   ];
 
   return (
@@ -163,7 +175,7 @@ function LiveFeed({ tokens, market, loading }: {
         {TABS.map((t) => (
           <button key={t.id} type="button" onClick={() => setSort(t.id)}
             className={`flex-1 rounded-full px-2 py-1 pf-mono text-[9px] font-bold uppercase tracking-wide transition ${
-              sort === t.id ? "bg-[hsl(var(--pf-ink))] text-white" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]"
+              sort === t.id ? "bg-[hsl(var(--og-gold))] text-black" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--og-gold))]"
             }`}>
             {t.label}
           </button>
@@ -173,10 +185,15 @@ function LiveFeed({ tokens, market, loading }: {
         <div className="flex items-center justify-center gap-2 py-14 text-xs text-[hsl(var(--pf-muted))]">
           <Loader2 className="h-4 w-4 animate-spin" /> syncing registry…
         </div>
-      ) : rows.length === 0 ? (
+      ) : rows.length === 0 && sort !== "categories" ? (
         <div className="px-3 py-10 text-center">
           <Rocket className="mx-auto mb-2 h-6 w-6 text-[hsl(var(--pf-green))]" />
           <div className="text-xs text-[hsl(var(--pf-muted))]">Feed is empty — the first launch takes slot 01</div>
+        </div>
+      ) : sort === "categories" ? (
+        <div className="px-3 py-10 text-center">
+          <Info className="mx-auto mb-2 h-6 w-6 text-[hsl(var(--pf-cyan))]" />
+          <div className="text-xs text-[hsl(var(--pf-muted))]">Categories coming soon!</div>
         </div>
       ) : (
         <div className="space-y-0.5">
@@ -189,42 +206,7 @@ function LiveFeed({ tokens, market, loading }: {
 
 /* ═══════════════ tool cards: vanity CA + anti-vamp + claim + quick actions ═══════════════ */
 
-function VanityWidget() {
-  const [prefix, setPrefix] = useState("OBX");
-  const est = useMemo(() => vanityEstimate(prefix), [prefix]);
-  return (
-    <div className="pf-card p-3">
-      <div className="mb-2 flex items-center gap-1.5">
-        <Wand2 className="h-3.5 w-3.5 text-[hsl(var(--pf-green-dark))]" />
-        <h3 className="text-xs font-black uppercase tracking-wide">Vanity CA generator</h3>
-      </div>
-      <div className="flex gap-2">
-        <input
-          value={prefix}
-          maxLength={6}
-          onChange={(e) => setPrefix(e.target.value.replace(/[^1-9A-HJ-NP-Za-km-z]/g, ""))}
-          className="w-full rounded-full border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-3 py-2 pf-mono text-sm outline-none transition focus:border-[hsl(var(--pf-green))]"
-          placeholder="OBX"
-        />
-        <Link to="/orbitxlaunch/create/custom" className="pf-btn pf-btn--sm shrink-0">Grind it</Link>
-      </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-lg border border-[hsl(var(--pf-border))] p-1.5">
-          <div className="text-[8px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">chars</div>
-          <div className="pf-mono text-sm font-bold">{est.n || "—"}</div>
-        </div>
-        <div className="rounded-lg border border-[hsl(var(--pf-border))] p-1.5">
-          <div className="text-[8px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">est. tries</div>
-          <div className="pf-mono text-sm font-bold">{est.n ? (est.expected >= 1e6 ? est.expected.toExponential(1) : Math.round(est.expected).toLocaleString()) : "—"}</div>
-        </div>
-        <div className="rounded-lg border border-[hsl(var(--pf-border))] p-1.5">
-          <div className={`pf-mono text-sm font-bold ${est.n > 4 ? "text-[hsl(var(--pf-red))]" : "text-[hsl(var(--pf-green-dark))]"}`}>{est.n ? humanTime(est.seconds) : "—"}</div>
-          <div className="text-[8px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">est. time</div>
-        </div>
-      </div>
-    </div>
-  );
-}
+
 
 function AntiVampPanel({ stats, loaded }: { stats: ReturnType<typeof launchStats>; loaded: boolean }) {
   return (
@@ -342,12 +324,11 @@ export default function LaunchpadHome() {
           </Tabs>
         </div>
 
-        <div className="space-y-4">
-          <LiveFeed tokens={tokens} market={marketQ.data} loading={allQ.isLoading} />
-          <VanityWidget />
-          <AntiVampPanel stats={stats} loaded={allQ.isSuccess} />
-          <QuickActions />
-        </div>
+          <div className="space-y-4">
+            <LiveFeed tokens={all.data || []} market={market.data} loading={all.isLoading} />
+            <AntiVampPanel stats={stats} loaded={!all.isLoading} />
+            <QuickActions />
+          </div>
       </div>
     </div>
   );

@@ -55,7 +55,7 @@ const SECTIONS = [
   { id: "tokenomics", label: "Tokenomics", icon: Gauge },
   { id: "liquidity", label: "Liquidity", icon: Droplets },
   { id: "protections", label: "Protections", icon: ShieldCheck },
-  { id: "vanity", label: "Vanity (OBX)", icon: Wand2 },
+
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -176,7 +176,7 @@ export default function OrbitxLaunch() {
     tokenomics: allocValid,
     liquidity: Number(cfg.liquiditySol) > 0 && (cfg.burnLp || cfg.lpLockDays > 0),
     protections: cfg.antiBot || cfg.antiSandwich || cfg.sniperProtection,
-    vanity: true,
+
   }), [cfg, allocValid]);
   const readiness = useMemo(() => {
     const keys = Object.keys(sectionDone) as SectionId[];
@@ -445,38 +445,7 @@ export default function OrbitxLaunch() {
             ))}
           </div>
         );
-      case "vanity":
-        return (
-          <div className="space-y-5">
-            <SectionHeading icon={Wand2} title="Vanity Mint Address" desc="Grind a mint address that starts with your prefix — right here in your browser." />
-            <div className="flex items-start gap-2 rounded-xl border border-[hsl(var(--og-cyan))]/30 bg-[hsl(var(--og-cyan))]/10 p-3 text-xs text-muted-foreground">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--og-cyan))]" />
-              <span><b className="text-foreground">Honest math:</b> a 3-char prefix like <span className="font-mono">OBX</span> is realistic (seconds–minutes). Each extra character is ~29× harder, so <span className="font-mono">ORBITX</span> can take hours–days and isn't guaranteed. Grinding runs locally; the mint keypair never leaves your device.</span>
-            </div>
-            <div className="space-y-2"><Label>Desired prefix</Label>
-              <Input className={`${fieldClass} font-mono`} value={cfg.vanityPrefix} maxLength={8} onChange={(e) => set("vanityPrefix", e.target.value.replace(/[^1-9A-HJ-NP-Za-km-z]/g, ""))} /></div>
-            <div className="grid grid-cols-3 gap-3">
-              <StatChip label="Length" value={String(vanityEst.n)} tone="cyan" />
-              <StatChip label="Est. tries" value={vanityEst.expected >= 1e6 ? vanityEst.expected.toExponential(1) : Math.round(vanityEst.expected).toLocaleString()} tone="gold" />
-              <StatChip label="Est. time" value={humanTime(vanityEst.seconds)} tone={vanityEst.n > 4 ? "blood" : "lime"} />
-            </div>
-            <div className="flex items-center gap-3">
-              {!grinding
-                ? <Button onClick={runGrind} className="bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90"><Wand2 className="mr-2 h-4 w-4" /> Start grinding</Button>
-                : <Button onClick={() => { grindStop.current = true; }} variant="outline" className="border-[hsl(var(--og-blood))]/50 text-[hsl(var(--og-blood))]"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Stop</Button>}
-              {attempts > 0 && <span className="font-mono text-xs text-muted-foreground">{attempts.toLocaleString()} tries{rate ? ` · ${rate.toLocaleString()}/s` : ""}</span>}
-            </div>
-            {foundKey && (
-              <div className="rounded-xl border border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 p-3">
-                <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-[hsl(var(--og-lime))]"><CheckCircle2 className="h-4 w-4" /> Match found</div>
-                <div className="flex items-center gap-2">
-                  <code className="truncate font-mono text-xs">{foundKey}</code>
-                  <button onClick={() => { navigator.clipboard.writeText(foundKey); toast.success("Copied"); }} className="text-muted-foreground hover:text-foreground"><Copy className="h-3.5 w-3.5" /></button>
-                </div>
-              </div>
-            )}
-          </div>
-        );
+
     }
   };
 
