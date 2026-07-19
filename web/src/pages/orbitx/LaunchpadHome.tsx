@@ -8,6 +8,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import {
   Rocket, ShieldCheck, Zap, HandCoins, Flame, Loader2, Radar,
   TrendingUp, Droplets, ArrowRight, Wand2, UserCircle2,
