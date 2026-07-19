@@ -37,16 +37,7 @@ export async function listTokens(kind: FeedKind = "new", limit = 60): Promise<Or
   q = q.neq("mint_address", "wmo3LPaLuaqZZVngh7YLDugMTBGYRKz14QzWvmKaarc");
   const { data, error } = await q;
   if (error) throw error;
-  let tokens = (data ?? []) as OrbitxToken[];
-  
-  // Add official platform token at the top
-  const officialTokenMint = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
-  const officialToken = await getToken(officialTokenMint);
-  if (officialToken && kind !== "graduated") {
-    tokens = [officialToken, ...tokens.filter(t => t.mint_address !== officialTokenMint)];
-  }
-  
-  return tokens;
+  return (data ?? []) as OrbitxToken[];
 }
 
 export async function getToken(mint: string): Promise<OrbitxToken | null> {
