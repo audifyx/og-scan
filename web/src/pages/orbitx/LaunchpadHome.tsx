@@ -325,8 +325,8 @@ export default function LaunchpadHome() {
         </div>
 
           <div className="space-y-4">
-            <LiveFeed tokens={all.data || []} market={market.data} loading={all.isLoading} />
-            <AntiVampPanel stats={stats} loaded={!all.isLoading} />
+            <LiveFeed tokens={allQ.data || []} market={marketQ.data} loading={allQ.isLoading} />
+            <AntiVampPanel stats={stats} loaded={!allQ.isLoading} />
             <QuickActions />
           </div>
       </div>
