@@ -345,6 +345,25 @@ export default function LaunchpadHome() {
 
           <div className="space-y-4">
             <LiveFeed tokens={allQ.data || []} market={marketQ.data} loading={allQ.isLoading} />
+            
+            {/* Featured Official Platform Token */}
+            <div className="pf-card p-3">
+              <div className="mb-2 text-xs font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">Featured</div>
+              <Link to="/orbitxlaunch/token/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9" className="group flex items-center gap-2 rounded-lg hover:bg-[hsl(var(--pf-ink))/0.06] p-2 transition-colors">
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
+                  <div className="flex h-full w-full items-center justify-center text-xs font-black text-[hsl(var(--pf-muted))]">OBX</div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-[hsl(var(--pf-ink))]">
+                    OrbitX
+                    <span className="ml-1 inline-block bg-[hsl(var(--og-gold))] text-black px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider">Official</span>
+                  </div>
+                  <div className="pf-mono text-[10px] text-[hsl(var(--pf-muted))]">${marketQ.data?.['13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9']?.mcap ? `$${(marketQ.data['13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9'].mcap / 1e6).toFixed(1)}M` : '— MC'}</div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-[hsl(var(--pf-muted))] group-hover:text-[hsl(var(--pf-ink))]" />
+              </Link>
+            </div>
+            
             <AntiVampPanel stats={stats} loaded={!allQ.isLoading} />
             <QuickActions />
           </div>
