@@ -1,4 +1,4 @@
-// Shared bits for Orbitx Launchpad pages — V3 terminal/cyberpunk aesthetic.
+// Shared bits for Orbitx Launchpad pages — classic pump.fun (2023) look.
 // Exports are unchanged (shortAddr, timeAgo, SectionLabel, StatTile, TokenCard)
 // so LaunchpadHome / Profile / Token / About keep working without edits.
 import { Link } from "react-router-dom";
@@ -29,19 +29,16 @@ export function fmtMc(v?: number | null): string {
   return `$${v.toFixed(0)} MC`;
 }
 
-/* ── Terminal-style section heading ── */
-export function SectionLabel({ children, accent = "gold" }: { children: React.ReactNode; accent?: "gold" | "cyan" | "lime" }) {
-  const c = accent === "cyan" ? "og-cyan" : accent === "lime" ? "og-lime" : "og-gold";
+/* ── classic section heading: bold black label, no HUD glow ── */
+export function SectionLabel({ children }: { children: React.ReactNode; accent?: "gold" | "cyan" | "lime" }) {
   return (
     <div className="mb-3 flex items-center gap-2">
-      <span className={`h-3 w-1 rounded-full bg-[hsl(var(--${c}))] shadow-[0_0_8px_hsl(var(--${c})/0.8)]`} />
-      <span className={`font-mono text-[10px] text-[hsl(var(--${c}))]`}>{"//"}</span>
-      <h2 className="font-display text-sm font-bold uppercase tracking-[0.18em] text-foreground">{children}</h2>
+      <h2 className="text-sm font-black uppercase tracking-wide text-[hsl(var(--pf-ink))]">{children}</h2>
     </div>
   );
 }
 
-/* ── Terminal stat tile (optional neon icon) ── */
+/* ── classic stat tile: plain card, big number, small caption ── */
 export function StatTile({
   label,
   value,
@@ -53,41 +50,37 @@ export function StatTile({
   accent?: "gold" | "cyan" | "lime" | "blood";
   icon?: LucideIcon;
 }) {
-  const color = accent ? `text-[hsl(var(--og-${accent}))]` : "text-foreground";
+  const color =
+    accent === "gold" ? "text-[hsl(var(--pf-gold))]"
+    : accent === "blood" ? "text-[hsl(var(--pf-red))]"
+    : accent === "cyan" ? "text-[hsl(var(--pf-blue))]"
+    : "text-[hsl(var(--pf-green))]";
   return (
-    <div className="stat-tile relative overflow-hidden">
-      {accent && (
-        <div className={`absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--og-${accent}))]/60 to-transparent`} />
-      )}
-      <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+    <div className="pf-card p-3">
+      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--pf-muted))]">
         {Icon && <Icon className={`h-3.5 w-3.5 ${color}`} />}
         {label}
       </div>
-      <div className={`mt-1 font-display text-xl font-bold ${color}`}>{value}</div>
+      <div className={`mt-1 text-xl font-black ${color}`}>{value}</div>
     </div>
   );
 }
 
-/* ── Pill primitives ── */
+/* ── pill primitives, classic outlined badges ── */
 function Pill({ children, tone }: { children: React.ReactNode; tone: "gold" | "cyan" | "lime" | "blood" | "muted" }) {
-  const map: Record<string, string> = {
-    gold: "bg-[hsl(var(--og-gold))]/12 text-[hsl(var(--og-gold))] border-[hsl(var(--og-gold))]/25",
-    cyan: "bg-[hsl(var(--og-cyan))]/12 text-[hsl(var(--og-cyan))] border-[hsl(var(--og-cyan))]/25",
-    lime: "bg-[hsl(var(--og-lime))]/12 text-[hsl(var(--og-lime))] border-[hsl(var(--og-lime))]/25",
-    blood: "bg-[hsl(var(--og-blood))]/12 text-[hsl(var(--og-blood))] border-[hsl(var(--og-blood))]/25",
-    muted: "bg-white/5 text-muted-foreground border-white/10",
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider ${map[tone]}`}>
-      {children}
-    </span>
-  );
+  const cls =
+    tone === "gold" ? "pf-pill pf-pill--gold"
+    : tone === "blood" ? "pf-pill pf-pill--red"
+    : tone === "cyan" ? "pf-pill pf-pill--blue"
+    : tone === "lime" ? "pf-pill pf-pill--green"
+    : "pf-pill";
+  return <span className={cls}>{children}</span>;
 }
 
 /**
- * V3 token card — logo, graduated badge, name + ticker, market cap,
- * graduation progress bar, short CA, time since launch, glow-on-hover.
- * `mc` (live market cap, USD) is optional and purely presentational.
+ * Classic pump.fun-style token card — round thumbnail, name + ticker,
+ * market cap, bonding-curve progress bar, short CA, age. Light card,
+ * black border, green accents, hover lift.
  */
 export function TokenCard({ t, mc }: { t: OrbitxToken; mc?: number | null }) {
   const graduated = !!t.lp_pool_address;
@@ -100,25 +93,27 @@ export function TokenCard({ t, mc }: { t: OrbitxToken; mc?: number | null }) {
   return (
     <Link
       to={`/orbitxlaunch/token/${t.mint_address}`}
-      className="og-glass-card lp-card group flex flex-col gap-3 p-4"
+      className="pf-card group flex flex-col gap-3 p-3"
     >
       {/* header: logo + name/ticker + status badge */}
       <div className="flex items-start gap-3">
-        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/12 bg-white/5 shadow-[0_0_18px_-8px_hsl(var(--og-gold)/0.6)]">
+        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
           {t.logo_url ? (
             <img src={t.logo_url} alt={t.ticker} className="h-full w-full object-cover" loading="lazy" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center font-display text-sm font-bold text-muted-foreground">
+            <div className="flex h-full w-full items-center justify-center text-sm font-black text-[hsl(var(--pf-muted))]">
               {t.ticker?.slice(0, 2).toUpperCase()}
             </div>
           )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-display text-sm font-bold text-foreground">{t.name}</span>
-            <span className="shrink-0 rounded-md bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-[hsl(var(--og-gold))]">${t.ticker}</span>
+            <span className="truncate text-sm font-black text-[hsl(var(--pf-ink))]">{t.name}</span>
+            <span className="pf-mono shrink-0 rounded-full bg-[hsl(var(--pf-ink))/0.06] px-1.5 py-0.5 text-[10px] font-bold text-[hsl(var(--pf-green-dark))]">
+              ${t.ticker}
+            </span>
           </div>
-          <div className="mt-0.5 font-mono text-xs font-bold text-[hsl(var(--og-cyan))]">{fmtMc(mc)}</div>
+          <div className="pf-mono mt-0.5 text-xs font-bold text-[hsl(var(--pf-ink))]">{fmtMc(mc)}</div>
         </div>
         {graduated ? (
           <Pill tone="lime"><Droplets className="h-3 w-3" /> Graduated</Pill>
@@ -129,25 +124,25 @@ export function TokenCard({ t, mc }: { t: OrbitxToken; mc?: number | null }) {
 
       {/* graduation progress */}
       <div>
-        <div className="mb-1 flex items-center justify-between font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          <span>Graduation</span>
-          <span className={graduated ? "text-[hsl(var(--og-lime))]" : "text-[hsl(var(--og-gold))]"}>{pct}%</span>
+        <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--pf-muted))]">
+          <span>Bonding curve</span>
+          <span className={graduated ? "text-[hsl(var(--pf-gold))]" : "text-[hsl(var(--pf-green-dark))]"}>{pct}%</span>
         </div>
-        <div className="lp-progress">
-          <div className={`lp-progress-fill ${graduated ? "is-complete" : ""}`} style={{ width: `${pct}%` }} />
+        <div className="pf-progress">
+          <div className={`pf-progress-fill ${graduated ? "is-complete" : ""}`} style={{ width: `${pct}%` }} />
         </div>
       </div>
 
       {/* footer: CA + lane + vamp status + age */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="font-mono text-[11px] text-muted-foreground">{shortAddr(t.mint_address, 5)}</span>
+        <span className="pf-mono text-[11px] text-[hsl(var(--pf-muted))]">{shortAddr(t.mint_address, 5)}</span>
         <Pill tone={t.launch_type === "pump" ? "cyan" : "gold"}>{t.launch_type === "pump" ? "Pump" : "Custom"}</Pill>
         {t.is_vamp ? (
           <Pill tone="blood"><ShieldAlert className="h-3 w-3" /> Vamp</Pill>
         ) : (
           <Pill tone="muted"><ShieldCheck className="h-3 w-3" /> Unique</Pill>
         )}
-        <span className="ml-auto font-mono text-[10px] text-muted-foreground">{timeAgo(t.created_at)}</span>
+        <span className="pf-mono ml-auto text-[10px] text-[hsl(var(--pf-muted))]">{timeAgo(t.created_at)}</span>
       </div>
     </Link>
   );

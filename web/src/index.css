@@ -1728,3 +1728,189 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .lpx-confetti-piece, .lpx-ember, .lpx-radar::before, .lpx-flame-ring, .lpx-pop { animation: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   LP-CLASSIC — old-school pump.fun (2023) look for /orbitxlaunch/*
+   Scoped entirely under .lp-classic so it never touches the rest
+   of the app's dark cyberpunk theme. Light bg, black text, green
+   accents, chunky rounded cards, pixel-mono headline font.
+   ═══════════════════════════════════════════════════════════════ */
+.lp-classic {
+  --pf-bg: 0 0% 97%;
+  --pf-bg-2: 0 0% 100%;
+  --pf-ink: 220 15% 10%;
+  --pf-muted: 220 8% 42%;
+  --pf-border: 220 10% 85%;
+  --pf-green: 152 68% 42%;
+  --pf-green-dark: 152 72% 30%;
+  --pf-red: 356 78% 54%;
+  --pf-gold: 42 90% 50%;
+  --pf-blue: 214 88% 56%;
+
+  background: hsl(var(--pf-bg));
+  color: hsl(var(--pf-ink));
+  min-height: 100vh;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+.lp-classic .pf-mono {
+  font-family: "Courier New", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+/* card */
+.lp-classic .pf-card {
+  background: hsl(var(--pf-bg-2));
+  border: 1.5px solid hsl(var(--pf-border));
+  border-radius: 12px;
+  box-shadow: 0 1px 0 hsl(var(--pf-border));
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.lp-classic .pf-card:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--pf-green));
+  box-shadow: 0 6px 16px -8px hsl(var(--pf-green) / 0.45);
+}
+
+/* buttons */
+.lp-classic .pf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 9999px;
+  padding: 9px 18px;
+  font-weight: 800;
+  font-size: 13px;
+  border: 1.5px solid hsl(var(--pf-ink));
+  background: hsl(var(--pf-green));
+  color: hsl(0 0% 100%);
+  box-shadow: 0 3px 0 hsl(var(--pf-green-dark));
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.lp-classic .pf-btn:hover { transform: translateY(-1px); }
+.lp-classic .pf-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 hsl(var(--pf-green-dark)); }
+.lp-classic .pf-btn--ghost {
+  background: hsl(var(--pf-bg-2));
+  color: hsl(var(--pf-ink));
+  box-shadow: 0 3px 0 hsl(var(--pf-border));
+}
+.lp-classic .pf-btn--sm { padding: 5px 12px; font-size: 11px; }
+
+/* pill / badge */
+.lp-classic .pf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 9999px;
+  border: 1.5px solid hsl(var(--pf-ink));
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.lp-classic .pf-pill--green { background: hsl(var(--pf-green) / 0.15); color: hsl(var(--pf-green-dark)); border-color: hsl(var(--pf-green)); }
+.lp-classic .pf-pill--gold { background: hsl(var(--pf-gold) / 0.18); color: hsl(28 80% 32%); border-color: hsl(var(--pf-gold)); }
+.lp-classic .pf-pill--red { background: hsl(var(--pf-red) / 0.12); color: hsl(var(--pf-red)); border-color: hsl(var(--pf-red)); }
+.lp-classic .pf-pill--blue { background: hsl(var(--pf-blue) / 0.12); color: hsl(var(--pf-blue)); border-color: hsl(var(--pf-blue)); }
+
+/* bonding-curve progress bar, pump.fun-style striped green */
+.lp-classic .pf-progress {
+  position: relative;
+  height: 8px;
+  width: 100%;
+  border-radius: 9999px;
+  background: hsl(var(--pf-border));
+  overflow: hidden;
+  border: 1px solid hsl(var(--pf-ink) / 0.15);
+}
+.lp-classic .pf-progress-fill {
+  position: absolute; inset-block: 0; left: 0;
+  background: repeating-linear-gradient(45deg, hsl(var(--pf-green)) 0 8px, hsl(var(--pf-green-dark)) 8px 16px);
+  border-radius: 9999px 0 0 9999px;
+  transition: width 0.8s ease;
+}
+.lp-classic .pf-progress-fill.is-complete { border-radius: 9999px; background: hsl(var(--pf-gold)); }
+
+/* scrolling live-trade ticker, the pump.fun signature top ribbon */
+.lp-classic .pf-ticker {
+  background: hsl(var(--pf-ink));
+  color: hsl(0 0% 100%);
+  overflow: hidden;
+  white-space: nowrap;
+  border-bottom: 1.5px solid hsl(var(--pf-ink));
+}
+.lp-classic .pf-ticker-track {
+  display: inline-flex;
+  gap: 28px;
+  padding-block: 6px;
+  animation: pf-ticker-scroll 32s linear infinite;
+}
+.lp-classic .pf-ticker:hover .pf-ticker-track { animation-play-state: paused; }
+@keyframes pf-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* king of the hill banner */
+.lp-classic .pf-koth {
+  background: linear-gradient(180deg, hsl(var(--pf-gold) / 0.16), hsl(var(--pf-bg-2)));
+  border: 2px solid hsl(var(--pf-gold));
+  border-radius: 16px;
+}
+
+/* nav */
+.lp-classic .pf-nav-link {
+  font-weight: 700;
+  font-size: 13px;
+  color: hsl(var(--pf-muted));
+  padding: 6px 12px;
+  border-radius: 9999px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.lp-classic .pf-nav-link:hover { background: hsl(var(--pf-ink) / 0.06); color: hsl(var(--pf-ink)); }
+.lp-classic .pf-nav-link.active { background: hsl(var(--pf-ink)); color: hsl(0 0% 100%); }
+
+/* replace neon glass card usage inside lp-classic scope */
+.lp-classic .og-glass-card,
+.lp-classic .lpx-panel,
+.lp-classic .stat-tile {
+  background: hsl(var(--pf-bg-2)) !important;
+  border: 1.5px solid hsl(var(--pf-border)) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 0 hsl(var(--pf-border)) !important;
+  backdrop-filter: none !important;
+}
+.lp-classic .grid-bg,
+.lp-classic .lp-rain,
+.lp-classic .lp-particles,
+.lp-classic .lp-scanlines { display: none !important; }
+
+/* ── lp-classic: retint the underlying design-system vars so every
+   component built against --foreground/--muted-foreground/--border
+   (Panel, KV, Delta, stat tiles, etc.) reads correctly on a light
+   card instead of white-on-white. Also catches literal bg-black/
+   border-white/text-white utility classes used by older HUD widgets
+   via substring attribute selectors, so they don't need individual
+   rewrites to fit the classic theme. ── */
+.lp-classic {
+  --background: var(--pf-bg);
+  --foreground: var(--pf-ink);
+  --card: var(--pf-bg-2);
+  --card-foreground: var(--pf-ink);
+  --muted: 220 10% 92%;
+  --muted-foreground: var(--pf-muted);
+  --border: var(--pf-border);
+  --og-lime: var(--pf-green);
+  --og-gold: var(--pf-gold);
+  --og-cyan: var(--pf-blue);
+  --og-blood: var(--pf-red);
+}
+.lp-classic [class*="bg-black"] { background-color: hsl(var(--pf-bg-2)) !important; }
+.lp-classic [class*="border-white"] { border-color: hsl(var(--pf-border)) !important; }
+.lp-classic [class*="text-white"] { color: hsl(var(--pf-ink)) !important; }
+.lp-classic .font-display,
+.lp-classic .font-mono { font-family: "Courier New", ui-monospace, monospace !important; }
+.lp-classic .text-glow,
+.lp-classic .text-glow-gold,
+.lp-classic .lpx-glow,
+.lp-classic .lpx-glow-gold { text-shadow: none !important; }
