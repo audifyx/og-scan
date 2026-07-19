@@ -37,6 +37,23 @@ export default function LaunchpadToken() {
     queryFn: () => getToken(mint!),
     enabled: !!mint,
   });
+  
+  // Fetch market data from DexScreener
+  const { data: marketData } = useQuery({
+    queryKey: ["market-data", mint],
+    queryFn: async () => {
+      if (!mint) return null;
+      try {
+        const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`);
+        const json = await res.json();
+        return json.pairs?.[0] ?? null;
+      } catch (e) {
+        console.error("Failed to fetch market data", e);
+        return null;
+      }
+    },
+    enabled: !!mint,
+  });
 
   const copy = () => {
     if (!mint) return;
@@ -106,6 +123,19 @@ export default function LaunchpadToken() {
         </div>
       </div>
 
+      {/* Bonding Curve Progress */}
+      {!graduated && (
+        <div className="og-glass-card mt-4 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Bonding Curve Progress</span>
+            <span className="font-mono text-sm font-bold text-[hsl(var(--og-lime))]">{marketData?.marketCap ? Math.min(99, Math.round((Number(marketData.marketCap) / 69000) * 100)) : 3}%</span>
+          </div>
+          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-[hsl(var(--og-lime))] to-[hsl(var(--og-gold))]" style={{ width: `${marketData?.marketCap ? Math.min(99, Math.round((Number(marketData.marketCap) / 69000) * 100)) : 3}%` }} />
+          </div>
+        </div>
+      )}
+
       {/* Trading & Market Info */}
       <div className="grid gap-4 mt-4 lg:grid-cols-3">
         <div className="og-glass-card p-4">
@@ -113,21 +143,21 @@ export default function LaunchpadToken() {
             <BarChart3 className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
             <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Market Cap</span>
           </div>
-          <div className="font-mono text-lg font-bold text-foreground">—</div>
+          <div className="font-mono text-lg font-bold text-foreground">{marketData?.marketCap ? `$${(Number(marketData.marketCap) / 1e6).toFixed(2)}M` : "—"}</div>
         </div>
         <div className="og-glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
             <Zap className="h-4 w-4 text-[hsl(var(--og-gold))]" />
             <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">24h Volume</span>
           </div>
-          <div className="font-mono text-lg font-bold text-foreground">—</div>
+          <div className="font-mono text-lg font-bold text-foreground">{marketData?.volume?.h24 ? `$${(Number(marketData.volume.h24) / 1e6).toFixed(2)}M` : "—"}</div>
         </div>
         <div className="og-glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
             <Send className="h-4 w-4 text-[hsl(var(--og-lime))]" />
             <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">24h Change</span>
           </div>
-          <div className="font-mono text-lg font-bold text-foreground">—</div>
+          <div className={`font-mono text-lg font-bold ${Number(marketData?.priceChange?.h24 ?? 0) >= 0 ? "text-[hsl(var(--og-lime))]" : "text-[hsl(var(--og-blood))]"}`}>{marketData?.priceChange?.h24 ? `${Number(marketData.priceChange.h24).toFixed(2)}%` : "—"}</div>
         </div>
       </div>
 
