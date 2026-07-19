@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getToken } from "@/lib/orbitx/registry";
+import { getToken, type OrbitxToken } from "@/lib/orbitx/registry";
 import { shortAddr, timeAgo, SectionLabel } from "./_shared";
 import {
   Loader2, Copy, Check, ExternalLink, ShieldCheck, ShieldAlert, Droplets, Flame,
@@ -29,14 +29,39 @@ function Pill({ children, tone }: { children: React.ReactNode; tone: "gold" | "c
   return <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider ${map[tone]}`}>{children}</span>;
 }
 
+const OFFICIAL_TOKEN_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+const OFFICIAL_TOKEN: OrbitxToken = {
+  id: "official-platform-token",
+  mint_address: OFFICIAL_TOKEN_MINT,
+  name: "OrbitX",
+  ticker: "OBX",
+  creator_wallet: "official",
+  decimals: 6,
+  supply: 1000000000,
+  dex: "Raydium",
+  lp_pool_address: null,
+  lp_signature: null,
+  mint_signature: null,
+  metadata_uri: null,
+  logo_url: null,
+  is_vamp: false,
+  fee_route: "orbitx_buyback",
+  cluster: "mainnet-beta",
+  launch_type: "custom",
+  created_at: new Date().toISOString(),
+};
+
 export default function LaunchpadToken() {
   const { mint } = useParams<{ mint: string }>();
   const [copied, setCopied] = useState(false);
-  const { data: t, isLoading, error } = useQuery({
+  const { data: dbToken, isLoading, error } = useQuery({
     queryKey: ["orbitx-token", mint],
     queryFn: () => getToken(mint!),
-    enabled: !!mint,
+    enabled: !!mint && mint !== OFFICIAL_TOKEN_MINT,
   });
+  
+  // Use official token if mint matches, otherwise use DB token
+  const t = mint === OFFICIAL_TOKEN_MINT ? OFFICIAL_TOKEN : dbToken;
 
   const copy = () => {
     if (!mint) return;
