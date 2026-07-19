@@ -267,6 +267,29 @@ function Board({ kind, market }: { kind: FeedKind; market: Record<string, Market
     queryFn: () => listTokens(kind),
     refetchInterval: 30_000,
   });
+  
+  // Hardcoded official platform token
+  const officialToken: OrbitxToken = {
+    id: "official-platform-token",
+    mint_address: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    name: "OrbitX",
+    ticker: "OBX",
+    creator_wallet: "official",
+    decimals: 6,
+    supply: 1000000000,
+    dex: "Raydium",
+    lp_pool_address: null,
+    lp_signature: null,
+    mint_signature: null,
+    metadata_uri: null,
+    logo_url: null,
+    is_vamp: false,
+    fee_route: "orbitx_buyback",
+    cluster: "mainnet-beta",
+    launch_type: "custom",
+    created_at: new Date().toISOString(),
+  };
+  
   if (isLoading)
     return <div className="flex items-center justify-center gap-2 py-16 text-sm text-[hsl(var(--pf-muted))]"><Loader2 className="h-5 w-5 animate-spin" /> loading launches…</div>;
   if (error)
@@ -282,9 +305,22 @@ function Board({ kind, market }: { kind: FeedKind; market: Record<string, Market
         </Link>
       </div>
     );
+  
+  // Display official token first, then other tokens
+  const displayTokens = [officialToken, ...data.filter(t => t.mint_address !== officialToken.mint_address)];
+  
   return (
     <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {data.map((t) => <TokenCard key={t.id} t={t} mc={market?.[t.mint_address]?.mcap ?? null} />)}
+      {displayTokens.map((t) => (
+        <div key={t.id} className="relative">
+          <TokenCard t={t} mc={market?.[t.mint_address]?.mcap ?? null} />
+          {t.mint_address === officialToken.mint_address && (
+            <div className="absolute -top-2 -right-2 bg-[hsl(var(--og-gold))] text-black px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+              Official Platform Token
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
