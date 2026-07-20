@@ -1,12 +1,13 @@
 /**
  * OrbitxLaunch — the Orbitx Launch Console (mounted at /orbitxlaunch).
  *
- * Premium space-themed CUSTOM Solana launchpad — own SPL mint + Metaplex
- * metadata + own independent DEX pool. NOT pump.fun. Built natively on the
- * OrbitX design system (og-* tokens, shadcn ui kit, AppLayout). Solana-only.
+ * Full Solana launchpad with token marketplace, trading, and launcher.
+ * Features: token discovery, buy/sell UI, global wallet, featured tokens,
+ * and full token creation form. Built on OrbitX design system.
  */
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
