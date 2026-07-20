@@ -5,10 +5,11 @@
 //   DexScreener             → mcap, liquidity, volume, 24h deltas, sparklines
 //   Solana mainnet RPC      → slot, TPS, RPC latency
 //   CoinGecko (60s cache)   → SOL/USD
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { updateMeta } from "@/lib/orbitx/meta";
 import {
   Rocket, ShieldCheck, Zap, HandCoins, Flame, Loader2, Radar,
   TrendingUp, Droplets, ArrowRight, Wand2, UserCircle2,
@@ -318,6 +319,15 @@ export default function LaunchpadHome() {
   const marketQ = useMarketMap(mints);
   const lpUsd = totalLpUsd(marketQ.data);
 
+  // Update meta tags for launchpad
+  useEffect(() => {
+    updateMeta({
+      title: "OrbitX Launch — Solana Token Launchpad",
+      description: `Launch your own SPL token on Solana. ${stats.total} launches, ${stats.graduated} graduated. Own mint, metadata, DEX liquidity, and custom OBX vanity address.`,
+      url: "https://ogscan.fun/orbitxlaunch",
+    });
+  }, [stats.total, stats.graduated]);
+
   return (
     <div className="space-y-5">
       <Hero />
@@ -347,22 +357,50 @@ export default function LaunchpadHome() {
             <LiveFeed tokens={allQ.data || []} market={marketQ.data} loading={allQ.isLoading} />
             
             {/* Featured Official Platform Token */}
-            <div className="pf-card p-3">
-              <div className="mb-2 text-xs font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">Featured</div>
-              <Link to="/orbitxlaunch/token/13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9" className="group flex items-center gap-2 rounded-lg hover:bg-[hsl(var(--pf-ink))/0.06] p-2 transition-colors">
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
-                  <div className="flex h-full w-full items-center justify-center text-xs font-black text-[hsl(var(--pf-muted))]">OBX</div>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-[hsl(var(--pf-ink))]">
-                    OrbitX
-                    <span className="ml-1 inline-block bg-[hsl(var(--og-gold))] text-black px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider">Official</span>
+            {(() => {
+              const OFFICIAL_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+              const officialToken = tokens.find(t => t.mint_address === OFFICIAL_MINT);
+              const marketData = marketQ.data?.[OFFICIAL_MINT];
+              if (officialToken) {
+                const up = (marketData?.ch24 ?? 0) >= 0;
+                return (
+                  <div className="pf-card p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h3 className="text-xs font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">🌟 Featured Token</h3>
+                      <span className="inline-block bg-[hsl(var(--og-gold))] text-black px-2 py-1 rounded text-[8px] font-bold uppercase tracking-wider">Official</span>
+                    </div>
+                    <Link to={`/orbitxlaunch/token/${officialToken.mint_address}`} className="group space-y-3 rounded-lg hover:bg-[hsl(var(--pf-ink))/0.06] p-3 transition-colors block">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--pf-bg))]">
+                          {officialToken.logo_url ? (
+                            <img src={officialToken.logo_url} alt={officialToken.ticker} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-xs font-black text-[hsl(var(--pf-muted))]">{officialToken.ticker.slice(0, 2)}</div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold text-[hsl(var(--pf-ink))]">{officialToken.name}</div>
+                          <div className="pf-mono text-[10px] text-[hsl(var(--pf-muted))]">${officialToken.ticker}</div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-center">
+                        <div className="rounded-lg border border-[hsl(var(--pf-border))] bg-black/40 p-2">
+                          <div className="pf-mono text-[9px] font-bold uppercase tracking-wide text-[hsl(var(--pf-muted))]">MC</div>
+                          <div className="mt-0.5 text-sm font-black text-[hsl(var(--og-gold))]">${marketData?.mcap ? (marketData.mcap / 1e6).toFixed(1) : '—'}M</div>
+                        </div>
+                        <div className="rounded-lg border border-[hsl(var(--pf-border))] bg-black/40 p-2">
+                          <div className="pf-mono text-[9px] font-bold uppercase tracking-wide text-[hsl(var(--pf-muted))]">24H</div>
+                          <div className={`mt-0.5 text-sm font-black ${up ? 'text-[hsl(var(--og-lime))]' : 'text-[hsl(var(--og-blood))]'}`}>
+                            {up ? '▲' : '▼'} {Math.abs(marketData?.ch24 ?? 0).toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
                   </div>
-                  <div className="pf-mono text-[10px] text-[hsl(var(--pf-muted))]">${marketQ.data?.['13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9']?.mcap ? `$${(marketQ.data['13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9'].mcap / 1e6).toFixed(1)}M` : '— MC'}</div>
-                </div>
-                <ArrowRight className="h-4 w-4 text-[hsl(var(--pf-muted))] group-hover:text-[hsl(var(--pf-ink))]" />
-              </Link>
-            </div>
+                );
+              }
+              return null;
+            })()}
             
             <AntiVampPanel stats={stats} loaded={!allQ.isLoading} />
             <QuickActions />

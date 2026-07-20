@@ -70,6 +70,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
+import { WalletProvider } from "./lib/orbitx/wallet-context";
 import Games from "./pages/Games";
 import AdvancedIntelligence from "./pages/AdvancedIntelligence";
 import EnhancedAdvancedIntelligence from "./pages/EnhancedAdvancedIntelligence";
@@ -182,7 +183,7 @@ const App = () => (
             <Route path="/install" element={<InstallApp />} />
 
             {/* ── Custom launchpad (Orbitx Launch Console) ── */}
-            <Route path="/orbitxlaunch" element={<LaunchpadLayout />}>
+            <Route path="/orbitxlaunch" element={<WalletProvider><LaunchpadLayout /></WalletProvider>}>
               <Route index element={<LaunchpadHome />} />
               <Route path="create" element={<LaunchpadChoose />} />
               <Route path="create/custom" element={<LaunchpadCreate />} />

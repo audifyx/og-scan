@@ -1,13 +1,18 @@
 // Orbitx Launchpad — token detail page (/orbitxlaunch/token/:mint). Glass/terminal aesthetic.
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getToken, type OrbitxToken } from "@/lib/orbitx/registry";
 import { shortAddr, timeAgo, SectionLabel } from "./_shared";
+import { updateMeta } from "@/lib/orbitx/meta";
 import {
   Loader2, Copy, Check, ExternalLink, ShieldCheck, ShieldAlert, Droplets, Flame,
-  ArrowLeft, Coins, TrendingUp, BarChart3, Zap, Send,
+  ArrowLeft, Coins, TrendingUp, BarChart3, Zap, Send, X, ArrowUpRight, ArrowDownLeft,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -29,6 +34,60 @@ function Pill({ children, tone }: { children: React.ReactNode; tone: "gold" | "c
   return <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider ${map[tone]}`}>{children}</span>;
 }
 
+function TradeDialogContent({ type, tokenName, tokenMint }: { type: "buy" | "sell"; tokenName: string; tokenMint: string }) {
+  const [amount, setAmount] = useState("");
+  const [slippage, setSlippage] = useState("1");
+
+  return (
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label className="text-xs uppercase tracking-wider">
+          {type === "buy" ? "SOL Amount" : "Token Amount"}
+        </Label>
+        <Input
+          type="number"
+          placeholder={type === "buy" ? "Enter SOL amount" : "Enter token amount"}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="bg-black/40 border-white/10"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs uppercase tracking-wider">Max Slippage (%)</Label>
+        <Input
+          type="number"
+          placeholder="1"
+          value={slippage}
+          onChange={(e) => setSlippage(e.target.value)}
+          className="bg-black/40 border-white/10"
+        />
+      </div>
+
+      <Button
+        className={`w-full font-mono font-bold uppercase ${
+          type === "buy"
+            ? "bg-[hsl(var(--og-lime))]/20 text-[hsl(var(--og-lime))] hover:bg-[hsl(var(--og-lime))]/30"
+            : "bg-[hsl(var(--og-blood))]/20 text-[hsl(var(--og-blood))] hover:bg-[hsl(var(--og-blood))]/30"
+        }`}
+      >
+        {type === "buy" ? "Buy Now" : "Sell Now"}
+      </Button>
+
+      <div className="space-y-1 rounded-lg border border-white/5 bg-white/5 p-3 text-xs text-muted-foreground">
+        <div className="flex justify-between">
+          <span>Slippage tolerance:</span>
+          <span>{slippage}%</span>
+        </div>
+        <div className="flex justify-between text-[10px] pt-1 border-t border-white/10">
+          <span>Liquidity pool:</span>
+          <span className="text-[hsl(var(--og-cyan))]">{shortAddr(tokenMint, 4)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LaunchpadToken() {
   const { mint } = useParams<{ mint: string }>();
   const [copied, setCopied] = useState(false);
@@ -37,6 +96,18 @@ export default function LaunchpadToken() {
     queryFn: () => getToken(mint!),
     enabled: !!mint,
   });
+
+  // Update meta tags when token data loads
+  useEffect(() => {
+    if (t) {
+      updateMeta({
+        title: `${t.name} (${t.ticker}) | OrbitX Launch`,
+        description: t.description || `Trade ${t.name} on OrbitX Launchpad. ${t.is_vamp ? "Vamp token." : "Verified unique token."}`,
+        image: t.logo_url,
+        url: `https://ogscan.fun/orbitxlaunch/token/${t.mint_address}`,
+      });
+    }
+  }, [t]);
   
   // Fetch market data from DexScreener
   const { data: marketData } = useQuery({
@@ -104,12 +175,36 @@ export default function LaunchpadToken() {
               </div>
             </div>
             <div className="flex flex-col gap-2 shrink-0">
-              <button className="flex items-center gap-2 rounded-lg bg-[hsl(var(--og-lime))]/20 border border-[hsl(var(--og-lime))]/40 text-[hsl(var(--og-lime))] px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider hover:bg-[hsl(var(--og-lime))]/30 transition">
-                <TrendingUp className="h-4 w-4" /> Buy
-              </button>
-              <button className="flex items-center gap-2 rounded-lg bg-[hsl(var(--og-blood))]/20 border border-[hsl(var(--og-blood))]/40 text-[hsl(var(--og-blood))] px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider hover:bg-[hsl(var(--og-blood))]/30 transition">
-                <TrendingUp className="h-4 w-4 rotate-180" /> Sell
-              </button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button className="flex items-center gap-2 rounded-lg bg-[hsl(var(--og-lime))]/20 border border-[hsl(var(--og-lime))]/40 text-[hsl(var(--og-lime))] px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider hover:bg-[hsl(var(--og-lime))]/30 transition">
+                    <ArrowUpRight className="h-4 w-4" /> Buy
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      Buy {t.ticker}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <TradeDialogContent type="buy" tokenName={t.ticker} tokenMint={t.mint_address} />
+                </DialogContent>
+              </Dialog>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button className="flex items-center gap-2 rounded-lg bg-[hsl(var(--og-blood))]/20 border border-[hsl(var(--og-blood))]/40 text-[hsl(var(--og-blood))] px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider hover:bg-[hsl(var(--og-blood))]/30 transition">
+                    <ArrowDownLeft className="h-4 w-4" /> Sell
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      Sell {t.ticker}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <TradeDialogContent type="sell" tokenName={t.ticker} tokenMint={t.mint_address} />
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 

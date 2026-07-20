@@ -7,7 +7,7 @@ import { AntiVampProtectionBadge } from "@/components/layout/AntiVampProtectionB
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
-  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Zap,
+  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Flame, Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
@@ -15,6 +15,7 @@ import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 import { HELIUS_RPC } from "@/lib/og";
 import { shortAddr } from "./_shared";
 import { useChainTelemetry, useSolUsd, fmtInt } from "./lpx";
+import { WalletConsoleButton } from "./WalletConsoleButton";
 
 const TABS = [
   { to: "/orbitxlaunch", label: "MISSION", icon: Home, end: true },
@@ -25,92 +26,7 @@ const TABS = [
   { to: "/orbitxlaunch/about", label: "ABOUT", icon: Info, end: false },
 ];
 
-/* ── Lightweight Phantom wallet console (self-contained) ── */
-type PhantomLike = {
-  isPhantom?: boolean;
-  publicKey?: { toString(): string } | null;
-  connect: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: { toString(): string } }>;
-  disconnect?: () => Promise<void>;
-};
 
-function getPhantom(): PhantomLike | null {
-  const w = window as unknown as { solana?: PhantomLike };
-  return w.solana ?? null;
-}
-
-function WalletConsole() {
-  const [addr, setAddr] = useState<string | null>(null);
-  const [sol, setSol] = useState<number | null>(null);
-
-  useEffect(() => {
-    const p = getPhantom();
-    if (!p) return;
-    p.connect({ onlyIfTrusted: true })
-      .then((r) => setAddr(r.publicKey.toString()))
-      .catch(() => undefined);
-  }, []);
-
-  // Real balance readout for the connected wallet.
-  useEffect(() => {
-    if (!addr) { setSol(null); return; }
-    let alive = true;
-    const load = async () => {
-      try {
-        const r = await fetch(HELIUS_RPC, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getBalance", params: [addr] }),
-        });
-        const j = await r.json();
-        const lamports = j?.result?.value;
-        if (alive && typeof lamports === "number") setSol(lamports / 1e9);
-      } catch { /* fail soft */ }
-    };
-    load();
-    const t = setInterval(load, 30_000);
-    return () => { alive = false; clearInterval(t); };
-  }, [addr]);
-
-  const onClick = async () => {
-    const p = getPhantom();
-    if (!p) { window.open("https://phantom.app", "_blank", "noopener,noreferrer"); return; }
-    if (addr) {
-      try { await p.disconnect?.(); } catch { /* noop */ }
-      setAddr(null);
-      return;
-    }
-    try {
-      const r = await p.connect();
-      setAddr(r.publicKey.toString());
-    } catch { /* user rejected */ }
-  };
-
-  if (!addr) {
-    return (
-      <button type="button" onClick={onClick} className="pf-btn">
-        <Wallet className="h-4 w-4" /> Connect Wallet
-      </button>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2 rounded-full border border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg-2))] px-2.5 py-1.5">
-      <span className="h-2 w-2 rounded-full bg-[hsl(var(--pf-green))]" />
-      <div className="leading-none">
-        <div className="pf-mono text-[10px] font-bold text-[hsl(var(--pf-ink))]">{shortAddr(addr)}</div>
-        <div className="mt-0.5 pf-mono text-[9px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">
-          {sol != null ? `${sol.toFixed(3)} SOL` : "wallet linked"}
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={onClick}
-        className="ml-1 rounded-full border border-[hsl(var(--pf-border))] px-2 py-1 pf-mono text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))] transition hover:border-[hsl(var(--pf-red))] hover:text-[hsl(var(--pf-red))]"
-      >
-        Disconnect
-      </button>
-    </div>
-  );
-}
 
 /* ── Live network readout (real slot / TPS / RPC latency / SOL price) ── */
 function NetworkStrip() {
@@ -171,7 +87,7 @@ export default function LaunchpadLayout() {
               <Link to="/orbitxlaunch/create" className="pf-btn hidden md:inline-flex">
                 <Zap className="h-4 w-4" /> Start a new coin
               </Link>
-              <WalletConsole />
+              <WalletConsoleButton />
             </div>
           </div>
 
