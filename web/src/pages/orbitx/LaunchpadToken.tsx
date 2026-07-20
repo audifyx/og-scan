@@ -104,7 +104,7 @@ export default function LaunchpadToken() {
         title: `${t.name} (${t.ticker}) | OrbitX Launch`,
         description: t.description || `Trade ${t.name} on OrbitX Launchpad. ${t.is_vamp ? "Vamp token." : "Verified unique token."}`,
         image: t.logo_url,
-        url: `https://ogscan.fun/orbitxlaunch/token/${t.mint_address}`,
+        url: `https://www.orbitx.world/orbitxlaunch/token/${t.mint_address}`,
       });
     }
   }, [t]);

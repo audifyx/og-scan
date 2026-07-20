@@ -324,7 +324,7 @@ export default function LaunchpadHome() {
     updateMeta({
       title: "OrbitX Launch — Solana Token Launchpad",
       description: `Launch your own SPL token on Solana. ${stats.total} launches, ${stats.graduated} graduated. Own mint, metadata, DEX liquidity, and custom OBX vanity address.`,
-      url: "https://ogscan.fun/orbitxlaunch",
+      url: "https://www.orbitx.world/orbitxlaunch",
     });
   }, [stats.total, stats.graduated]);
 
