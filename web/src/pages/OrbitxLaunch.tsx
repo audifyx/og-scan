@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
@@ -28,11 +30,39 @@ import {
   Rocket, Wallet, Globe, Twitter, Send, MessagesSquare, Upload, Image as ImageIcon,
   Coins, ShieldCheck, Droplets, Sparkles, Lock, Flame, Gauge, Timer,
   CheckCircle2, AlertTriangle, Info, Wand2, ChevronRight, Loader2, Copy, Check,
+  Home, TrendingUp, BarChart3, Zap, ArrowRight, ArrowUpRight, ArrowDownLeft, X,
 } from "lucide-react";
 
 const LAUNCH_FEE_SOL = 0.15;
 const MAX_LOGO_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMG = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const OFFICIAL_TOKEN_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
+
+// Mock market data - in production, fetch from your API
+const MOCK_TOKENS = [
+  {
+    mint: "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9",
+    name: "OrbitX",
+    ticker: "OBX",
+    logo: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23fbbf24'/%3E%3Ctext x='50' y='60' text-anchor='middle' font-size='40' font-weight='bold' fill='%23000'%3EOBX%3C/text%3E%3C/svg%3E",
+    mcap: 1250000,
+    ch24: 12.5,
+    volume: 350000,
+    holders: 2480,
+  },
+  {
+    mint: "EPjFWaLb3hyccqaB3JhriQqq6zu7YxDAKyS3uTHSfVU",
+    name: "USDC",
+    ticker: "USDC",
+    logo: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232775ca'/%3E%3Ctext x='50' y='60' text-anchor='middle' font-size='35' font-weight='bold' fill='%23fff'%3EUSDC%3C/text%3E%3C/svg%3E",
+    mcap: 32500000,
+    ch24: -0.8,
+    volume: 1250000,
+    holders: 5820,
+  },
+];
+
+type MarketToken = typeof MOCK_TOKENS[0];
 
 const LAUNCH_TYPES = [
   { value: "fair", label: "Fair Launch", hint: "No presale · everyone buys at open" },
