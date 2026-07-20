@@ -972,13 +972,9 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
             {/* Connect wallet / Launch button */}
             {!connected ? (
-              <>
-                <button onClick={handleConnectWallet}
-                  className="w-full flex items-center justify-center gap-3 rounded-xl border border-[hsl(var(--og-cyan))]/20 bg-[hsl(var(--og-cyan))]/5 px-6 py-4 text-[hsl(var(--og-cyan))] font-bold hover:bg-[hsl(var(--og-cyan))]/10 transition-all">
-                  <Wallet className="h-5 w-5" /> Connect Wallet to Launch
-                </button>
-
-              </>
+              <div className="w-full flex items-center justify-center gap-2 rounded-xl border border-[hsl(var(--pf-border))] px-6 py-4 text-sm text-[hsl(var(--pf-muted))]">
+                <Wallet className="h-4 w-4" /> Connect via the wallet button up top to launch
+              </div>
             ) : (
               <button onClick={handleLaunch} disabled={!canLaunch}
                 className={`w-full flex items-center justify-center gap-3 rounded-xl px-6 py-4 text-base font-black transition-all ${

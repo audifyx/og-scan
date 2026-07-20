@@ -1,6 +1,7 @@
 // Shared bits for Orbitx Launchpad pages — classic pump.fun (2023) look.
 // Exports are unchanged (shortAddr, timeAgo, SectionLabel, StatTile, TokenCard)
 // so LaunchpadHome / Profile / Token / About keep working without edits.
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ShieldCheck, ShieldAlert, Droplets, Flame } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -66,8 +67,46 @@ export function StatTile({
   );
 }
 
+/**
+ * Sets document.title + Open Graph / Twitter meta tags for the duration
+ * a component is mounted, restoring the previous values on unmount.
+ * Fixes token pages not carrying correct titles/share previews.
+ */
+export function useDocumentMeta(meta: { title?: string; description?: string; image?: string | null } | null) {
+  useEffect(() => {
+    if (typeof document === "undefined" || !meta?.title) return;
+    const prevTitle = document.title;
+    document.title = meta.title;
+
+    const upsert = (attr: "property" | "name", key: string, content: string) => {
+      let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
+      const existed = !!el;
+      const prevContent = el?.content ?? null;
+      if (!el) { el = document.createElement("meta"); el.setAttribute(attr, key); document.head.appendChild(el); }
+      el.content = content;
+      return { el, existed, prevContent };
+    };
+
+    const entries = [
+      upsert("property", "og:title", meta.title),
+      upsert("property", "og:description", meta.description ?? ""),
+      upsert("name", "twitter:card", "summary"),
+      upsert("name", "description", meta.description ?? ""),
+      ...(meta.image ? [upsert("property", "og:image", meta.image)] : []),
+    ];
+
+    return () => {
+      document.title = prevTitle;
+      for (const { el, existed, prevContent } of entries) {
+        if (!existed) el.remove();
+        else if (prevContent != null) el.content = prevContent;
+      }
+    };
+  }, [meta?.title, meta?.description, meta?.image]);
+}
+
 /* ── pill primitives, classic outlined badges ── */
-function Pill({ children, tone }: { children: React.ReactNode; tone: "gold" | "cyan" | "lime" | "blood" | "muted" }) {
+export function Pill({ children, tone }: { children: React.ReactNode; tone: "gold" | "cyan" | "lime" | "blood" | "muted" }) {
   const cls =
     tone === "gold" ? "pf-pill pf-pill--gold"
     : tone === "blood" ? "pf-pill pf-pill--red"

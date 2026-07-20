@@ -730,9 +730,7 @@ export default function LaunchpadRescue() {
             </p>
           </div>
           {!connected ? (
-            <button type="button" onClick={handleConnect} className="lp-cta inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider">
-              <Wallet className="h-4 w-4" /> Connect Wallet
-            </button>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect via the wallet button up top</span>
           ) : (
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1.5 rounded-lg border border-[hsl(var(--og-lime))]/35 bg-black/40 px-3 py-1.5 font-mono text-[11px] font-bold text-[hsl(var(--og-lime))]">

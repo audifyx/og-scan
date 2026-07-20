@@ -162,7 +162,7 @@ export default function LaunchpadClaim() {
             </p>
           </div>
           {!connected ? (
-            <Button onClick={handleConnect} className="bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90"><Wallet className="mr-2 h-4 w-4" /> Connect Wallet</Button>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect via the wallet button up top</span>
           ) : (
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="border-[hsl(var(--og-lime))]/40 font-mono text-[hsl(var(--og-lime))]">{publicKey ? short(publicKey.toBase58()) : ""}</Badge>

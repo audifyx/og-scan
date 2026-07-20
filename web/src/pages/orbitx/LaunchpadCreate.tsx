@@ -843,9 +843,7 @@ export default function LaunchpadCreate() {
                 <span className="lpx-led" /> {publicKey?.toBase58().slice(0, 4)}…{publicKey?.toBase58().slice(-4)}
               </span>
             ) : (
-              <button type="button" onClick={handleConnect} className="lp-cta self-start rounded-lg px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider">
-                <Wallet className="mr-2 inline h-4 w-4" /> Connect Wallet
-              </button>
+              <span className="inline-flex items-center gap-1.5 self-start rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect via the wallet button up top</span>
             )}
           </div>
         </div>
