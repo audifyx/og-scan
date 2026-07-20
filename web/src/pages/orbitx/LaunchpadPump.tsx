@@ -27,13 +27,13 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/platformFee";
-import { registerToken } from "@/lib/orbitx/registry";
+import { registerToken, vampCheck, isNameTaken } from "@/lib/orbitx/registry";
 import { Link } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import {
   Rocket, Upload, Globe, Twitter, Send,
-  Loader2, CheckCircle, Copy, ExternalLink, Wallet, AlertTriangle,
+  Loader2, CheckCircle, Copy, ExternalLink, Wallet, AlertTriangle, AlertCircle,
   Sparkles, Zap, ArrowRight, X, Info, DollarSign, Plus,
   TrendingUp, TrendingDown, Clock, BarChart3, Droplets,
   Users, ArrowLeft, RefreshCw, Search, ChevronRight,
@@ -497,6 +497,26 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const [errorMsg, setErrorMsg] = useState("");
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [metadataUri, setMetadataUri] = useState("");
+  const [nameTaken, setNameTaken] = useState(false);
+  const [checkingName, setCheckingName] = useState(false);
+  const nameCheckTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Debounced anti-vamp name check — same protection as the custom/SPL lane.
+  useEffect(() => {
+    if (!form.name.trim()) { setNameTaken(false); return; }
+    clearTimeout(nameCheckTimer.current);
+    setCheckingName(true);
+    nameCheckTimer.current = setTimeout(async () => {
+      try {
+        setNameTaken(await isNameTaken(form.name));
+      } catch (err) {
+        console.error("Name check failed:", err);
+      } finally {
+        setCheckingName(false);
+      }
+    }, 500);
+    return () => clearTimeout(nameCheckTimer.current);
+  }, [form.name]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* ─── Fetch SOL price ──────────────────────────────────────────────── */
@@ -555,12 +575,35 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const canLaunch =
     connected && publicKey && signTransaction && sendTransaction &&
     form.name.trim().length > 0 && form.symbol.trim().length > 0 &&
-    !!imageFile;
+    !!imageFile && !nameTaken && !checkingName;
 
   /* ─── Launch flow ──────────────────────────────────────────────────── */
 
   const handleLaunch = async () => {
     if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile) return;
+
+    let flagged = false;
+    try {
+      /* Step -1 — anti-vamp identity check, same protection as the custom/SPL lane.
+         Runs before any fee payment or on-chain action so a blocked clone never
+         costs the user SOL. */
+      setStep("uploading");
+      setStatusMsg("Anti-vamp check…");
+      const matches = await vampCheck(form.name, form.symbol);
+      const clone = matches.find((m) => m.sim >= 0.85);
+      if (clone) {
+        toast.error(`Blocked — "${form.name}" / ${form.symbol} is too close to ${clone.name} ($${clone.ticker}). Anti-vamp requires a unique identity.`);
+        setStep("form");
+        return;
+      }
+      if (matches.length > 0) {
+        flagged = true;
+        toast.warning(`${matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`);
+      }
+    } catch (err) {
+      console.error("[orbitx] pump anti-vamp check failed", err);
+      // fail soft — don't block a launch over a transient registry error
+    }
 
     try {
       /* Step 0 — Platform launch fee ($1.50 in SOL, Solana only) */
@@ -683,6 +726,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
       // Shared OrbitX registry — powers the Home feed + the Claim Fees page.
       try {
+        // Final server-side re-check right before writing the registry row.
+        const takenOnServer = await isNameTaken(form.name).catch(() => false);
         await registerToken({
           mint_address: mintAddr,
           name: form.name.trim(),
@@ -693,7 +738,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
           dex: "pumpfun",
           mint_signature: sig,
           metadata_uri: uri,
-          fee_route: "creator",
+          is_vamp: flagged || takenOnServer,
+          fee_route: (flagged || takenOnServer) ? "orbitx_buyback" : "creator",
           cluster: "mainnet-beta",
           launch_type: "pump",
         });
@@ -902,9 +948,15 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 {/* Name + Symbol */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Token Name *</Label>
+                    <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">Token Name * {checkingName && <Loader2 className="h-3.5 w-3.5 animate-spin text-[hsl(var(--og-gold))]" />}</Label>
                     <Input placeholder="e.g. Doge Coin" value={form.name} onChange={(e) => updateField("name", e.target.value)} maxLength={32}
-                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40" />
+                      className={`bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 ${nameTaken ? "border-[hsl(var(--og-blood))]" : ""}`} />
+                    {nameTaken && (
+                      <div className="mt-1.5 flex items-start gap-1.5 text-xs text-[hsl(var(--og-blood))]">
+                        <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                        <span>no clones — be original, use a different name</span>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Ticker *</Label>
