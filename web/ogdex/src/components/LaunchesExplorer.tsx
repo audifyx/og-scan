@@ -117,7 +117,7 @@ export default function LaunchesExplorer() {
               </div>
 
               <div className="grid grid-cols-3 gap-1.5">
-                <Link to={`/token/${t.mint}`} className="btn bg-accent/15 text-accent text-[11px] inline-flex items-center justify-center gap-1 py-1.5">Chart</Link>
+                <Link to={`/launchpad/token/${t.mint}`} className="btn bg-accent/15 text-accent text-[11px] inline-flex items-center justify-center gap-1 py-1.5">Details</Link>
                 <a href={t.links.pumpfun || t.links.explorer || "#"} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[11px] inline-flex items-center justify-center gap-1 py-1.5">pump <ExternalLink className="w-3 h-3" /></a>
                 <a href={t.links.solscan || t.links.explorer || "#"} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[11px] inline-flex items-center justify-center gap-1 py-1.5">scan <ExternalLink className="w-3 h-3" /></a>
               </div>

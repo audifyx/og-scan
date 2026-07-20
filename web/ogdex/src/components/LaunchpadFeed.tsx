@@ -258,7 +258,7 @@ export default function LaunchpadFeed() {
                 </div>
 
                 <div className="grid grid-cols-3 gap-1.5">
-                  <Link to={t.chain && t.chain !== "solana" ? `/token/${t.mint}?chain=${t.chain}` : `/token/${t.mint}`} className="btn bg-accent/15 text-accent text-[11px] inline-flex items-center justify-center gap-1 py-1.5">Chart</Link>
+                  <Link to={`/launchpad/token/${t.mint}`} className="btn bg-accent/15 text-accent text-[11px] inline-flex items-center justify-center gap-1 py-1.5">Details</Link>
                   {t.chain && t.chain !== "solana" ? (
                     <a href={t.links.explorer || "#"} target="_blank" rel="noreferrer" className="btn bg-panel2 text-white text-[11px] inline-flex items-center justify-center gap-1 py-1.5 col-span-2">explorer <ExternalLink className="w-3 h-3" /></a>
                   ) : (
