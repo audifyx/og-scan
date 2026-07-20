@@ -18,6 +18,16 @@ export function timeAgo(iso: string): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
+/** "$0.00000775" style formatting — never exponential notation. */
+export function fmtPrice(v?: number | null): string {
+  if (v == null || !Number.isFinite(v) || v <= 0) return "—";
+  if (v >= 1) return `$${v.toFixed(v >= 100 ? 2 : 4)}`;
+  const match = v.toFixed(20).match(/^0\.(0*)(\d+)/);
+  if (!match) return `$${v.toPrecision(3)}`;
+  const [, zeros, digits] = match;
+  return `$0.${zeros}${digits.slice(0, 4)}`;
+}
+
 /** Pump-style graduation target used only for the visual progress bar. */
 export const GRADUATION_MC_USD = 69_000;
 

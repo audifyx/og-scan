@@ -124,6 +124,9 @@ export interface MarketRow {
   ch1: number | null;
   ch5m: number | null;
   url: string | null;
+  pairAddress: string | null;
+  priceUsd: number | null;
+  dexId: string | null;
 }
 
 /** Best pair per mint from DexScreener — real mcap / liq / vol / Δ. */
@@ -154,6 +157,9 @@ export function useMarketMap(mints: string[]) {
             ch1: p.priceChange?.h1 ?? null,
             ch5m: p.priceChange?.m5 ?? null,
             url: p.url ?? null,
+            pairAddress: p.pairAddress ?? null,
+            priceUsd: p.priceUsd != null ? Number(p.priceUsd) : null,
+            dexId: p.dexId ?? null,
           };
         }
       } catch {
