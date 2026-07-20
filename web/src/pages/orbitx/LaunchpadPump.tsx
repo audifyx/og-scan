@@ -499,24 +499,30 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const [metadataUri, setMetadataUri] = useState("");
   const [nameTaken, setNameTaken] = useState(false);
   const [checkingName, setCheckingName] = useState(false);
+  const [blockedMatch, setBlockedMatch] = useState<{ name: string; ticker: string } | null>(null);
   const nameCheckTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Debounced anti-vamp name check — same protection as the custom/SPL lane.
+  // Debounced anti-vamp check on BOTH name and ticker — vampCheck scores
+  // similarity on both fields in one RPC call, so a duplicate ticker with a
+  // different name blocks live here too, not just at final submit.
   useEffect(() => {
-    if (!form.name.trim()) { setNameTaken(false); return; }
+    if (!form.name.trim() && !form.symbol.trim()) { setNameTaken(false); setBlockedMatch(null); return; }
     clearTimeout(nameCheckTimer.current);
     setCheckingName(true);
     nameCheckTimer.current = setTimeout(async () => {
       try {
-        setNameTaken(await isNameTaken(form.name));
+        const matches = await vampCheck(form.name, form.symbol);
+        const clone = matches.find((m) => m.sim >= 0.85);
+        setNameTaken(!!clone);
+        setBlockedMatch(clone ? { name: clone.name, ticker: clone.ticker } : null);
       } catch (err) {
-        console.error("Name check failed:", err);
+        console.error("Name/ticker check failed:", err);
       } finally {
         setCheckingName(false);
       }
     }, 500);
     return () => clearTimeout(nameCheckTimer.current);
-  }, [form.name]);
+  }, [form.name, form.symbol]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* ─── Fetch SOL price ──────────────────────────────────────────────── */
@@ -951,19 +957,19 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                     <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5">Token Name * {checkingName && <Loader2 className="h-3.5 w-3.5 animate-spin text-[hsl(var(--og-gold))]" />}</Label>
                     <Input placeholder="e.g. Doge Coin" value={form.name} onChange={(e) => updateField("name", e.target.value)} maxLength={32}
                       className={`bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 ${nameTaken ? "border-[hsl(var(--og-blood))]" : ""}`} />
-                    {nameTaken && (
-                      <div className="mt-1.5 flex items-start gap-1.5 text-xs text-[hsl(var(--og-blood))]">
-                        <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                        <span>no clones — be original, use a different name</span>
-                      </div>
-                    )}
                   </div>
                   <div>
                     <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Ticker *</Label>
                     <Input placeholder="e.g. DOGE" value={form.symbol} onChange={(e) => updateField("symbol", e.target.value.toUpperCase())} maxLength={10}
-                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 uppercase" />
+                      className={`bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 uppercase ${nameTaken ? "border-[hsl(var(--og-blood))]" : ""}`} />
                   </div>
                 </div>
+                {nameTaken && (
+                  <div className="flex items-start gap-1.5 text-xs text-[hsl(var(--og-blood))]">
+                    <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                    <span>no clones — too close to {blockedMatch?.name} (${blockedMatch?.ticker}). Change the name or ticker to launch.</span>
+                  </div>
+                )}
 
                 {/* Description */}
                 <div>

@@ -205,29 +205,35 @@ export default function LaunchpadCreate() {
   const [launched, setLaunched] = useState<LaunchedInfo | null>(null);
   const [nameTaken, setNameTaken] = useState(false);
   const [checkingName, setCheckingName] = useState(false);
+  const [blockedMatch, setBlockedMatch] = useState<{ name: string; ticker: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const nameCheckTimer = useRef<NodeJS.Timeout>();
 
-  // Debounced name duplicate check
+  // Debounced anti-vamp check on BOTH name and ticker — vampCheck scores
+  // similarity on both fields in one RPC call, so a duplicate ticker with a
+  // different name blocks live here too, not just at final submit.
   useEffect(() => {
-    if (!cfg.name.trim()) {
+    if (!cfg.name.trim() && !cfg.ticker.trim()) {
       setNameTaken(false);
+      setBlockedMatch(null);
       return;
     }
     clearTimeout(nameCheckTimer.current);
     setCheckingName(true);
     nameCheckTimer.current = setTimeout(async () => {
       try {
-        const taken = await isNameTaken(cfg.name);
-        setNameTaken(taken);
+        const matches = await vampCheck(cfg.name, cfg.ticker);
+        const clone = matches.find((m) => m.sim >= 0.85);
+        setNameTaken(!!clone);
+        setBlockedMatch(clone ? { name: clone.name, ticker: clone.ticker } : null);
       } catch (err) {
-        console.error("Name check failed:", err);
+        console.error("Name/ticker check failed:", err);
       } finally {
         setCheckingName(false);
       }
     }, 500);
     return () => clearTimeout(nameCheckTimer.current);
-  }, [cfg.name]);
+  }, [cfg.name, cfg.ticker]);
 
   const set = useCallback(<K extends keyof LaunchConfig>(key: K, value: LaunchConfig[K]) => {
     setCfg((c) => ({ ...c, [key]: value }));
@@ -536,16 +542,16 @@ export default function LaunchpadCreate() {
                   value={cfg.name} 
                   onChange={(e) => set("name", e.target.value)} 
                 />
-                {nameTaken && (
-                  <div className="flex items-start gap-2 text-sm text-[hsl(var(--og-blood))]">
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>no clones be original use a different name</span>
-                  </div>
-                )}
               </div>
               <div className="space-y-2"><Label>Ticker</Label>
-                <Input disabled={nameInvalid} className={fieldClass} placeholder="ORBIT" maxLength={10} value={cfg.ticker} onChange={(e) => set("ticker", e.target.value.toUpperCase())} /></div>
+                <Input className={`${fieldClass} ${nameTaken ? 'border-[hsl(var(--og-blood))]' : ''}`} placeholder="ORBIT" maxLength={10} value={cfg.ticker} onChange={(e) => set("ticker", e.target.value.toUpperCase())} /></div>
             </div>
+            {nameTaken && (
+              <div className="flex items-start gap-2 text-sm text-[hsl(var(--og-blood))]">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>no clones — too close to {blockedMatch?.name} (${blockedMatch?.ticker}). Change the name or ticker to launch.</span>
+              </div>
+            )}
             <div className="space-y-2"><Label>Description</Label>
               <Textarea disabled={nameInvalid} className={fieldClass} rows={4} placeholder="What is this token? Why does it exist?" value={cfg.description} onChange={(e) => set("description", e.target.value)} /></div>
             <div className="space-y-2"><Label>Logo</Label>
