@@ -80,28 +80,22 @@ function ChartPanel({ pairAddress, dexId }: { pairAddress: string | null; dexId:
     );
   }
 
-  // DexScreener embed URL — high-quality chart, real-time, 2026 modern look
   const dexScreenerUrl = `https://dexscreener.com/solana/${pairAddress}`;
-  
+
   return (
-    <div className="pf-card p-3 overflow-hidden">
+    <div className="pf-card p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="pf-mono text-xs font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">Price chart</h3>
-        <a href={dexScreenerUrl} target="_blank" rel="noreferrer" className="pf-mono text-[9px] font-bold text-[hsl(var(--pf-blue))] hover:underline">Open in DexScreener ↗</a>
+        <h3 className="pf-mono text-xs font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">Live chart</h3>
+        <a href={dexScreenerUrl} target="_blank" rel="noreferrer" className="pf-mono text-[9px] font-bold text-[hsl(var(--pf-blue))] hover:underline">Fullscreen ↗</a>
       </div>
-      {/* Embed DexScreener chart iframe — responsive, high-quality, real-time */}
-      <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+      {/* Big, touch-friendly embed: viewport-relative height so it stays large on
+          phones and gets even taller on desktop. */}
+      <div className="obx-chart-frame relative w-full h-[72vh] min-h-[460px] md:h-[680px]">
         <iframe
-          src={`https://dexscreener.com/solana/${pairAddress}?embed=1&theme=dark&info=0&trades=1&info=0`}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            borderRadius: '8px',
-          }}
+          title="price chart"
+          src={`https://dexscreener.com/solana/${pairAddress}?embed=1&theme=dark&trades=1&info=0`}
+          className="absolute inset-0 h-full w-full"
+          style={{ border: "none" }}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           loading="lazy"
         />

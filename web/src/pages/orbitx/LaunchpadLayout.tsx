@@ -15,6 +15,7 @@ import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft,
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 import { shortAddr } from "./_shared";
 import { useChainTelemetry, useSolUsd, fmtInt } from "./lpx";
+import "./orbitx-2026.css";
 
 const TABS = [
   { to: "/orbitxlaunch", label: "MISSION", icon: Home, end: true },
@@ -118,11 +119,11 @@ export default function LaunchpadLayout() {
         <NetworkStrip />
 
         {/* ── classic header: wordmark left, tabs center, wallet right ── */}
-        <div className="sticky top-0 z-20 border-b-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg-2))]">
+        <div className="obx-header sticky top-0 z-20">
           <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5">
             {/* brand */}
             <Link to="/orbitxlaunch" className="group flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-green))]">
+              <div className="obx-brand-badge flex h-9 w-9 items-center justify-center rounded-full">
                 <Rocket className="h-4.5 w-4.5 text-white" strokeWidth={2.4} />
               </div>
               <div className="leading-none">
