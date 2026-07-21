@@ -136,10 +136,10 @@ export default function LaunchpadHome() {
 
       {/* ─── Stats grid ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile label="Launches" value={stats.totalLaunches} icon={<Rocket className="h-4 w-4" />} />
+        <StatTile label="Launches" value={stats.total} icon={<Rocket className="h-4 w-4" />} />
         <StatTile label="Graduated" value={stats.graduated} icon={<Droplets className="h-4 w-4" />} />
-        <StatTile label="Total liquidity" value={fmtCompactUsd(totalLpUsd(launches, markets))} icon={<Coins className="h-4 w-4" />} />
-        <StatTile label="24h volume" value={fmtCompactUsd(stats.vol24Usd)} icon={<Activity className="h-4 w-4" />} />
+        <StatTile label="Total liquidity" value={fmtCompactUsd(totalLpUsd(markets))} icon={<Coins className="h-4 w-4" />} />
+        <StatTile label="Last 24h" value={stats.last24h} icon={<Activity className="h-4 w-4" />} />
       </div>
 
       {/* ─── Board controls ──────────────────────────────────────────────── */}
