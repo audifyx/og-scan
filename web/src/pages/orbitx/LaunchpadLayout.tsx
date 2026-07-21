@@ -127,7 +127,7 @@ export default function LaunchpadLayout() {
               </div>
               <div className="leading-none">
                 <div className="text-lg font-black tracking-tight text-[hsl(var(--pf-ink))]">
-                  orbit<span className="text-[hsl(var(--pf-green))]">x</span>.fun
+                  Orbit<span className="text-[hsl(var(--pf-green))]">X</span>.world
                 </div>
               </div>
             </Link>

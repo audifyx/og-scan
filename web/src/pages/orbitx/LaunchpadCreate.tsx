@@ -526,7 +526,9 @@ export default function LaunchpadCreate() {
                 <AlertCircle className="h-5 w-5 text-[hsl(var(--og-blood))] flex-shrink-0 mt-0.5" />
                 <div>
                   <div className="font-semibold text-[hsl(var(--og-blood))]">🚫 Name Not Available</div>
-                  <div className="text-sm text-[hsl(var(--og-blood))]/80 mt-1">no clones be original — use a different name. All other fields are locked until you find an original name.</div>
+                  <div className="text-sm text-[hsl(var(--og-blood))]/80 mt-1">
+                    no clones — be original — use a different name or ticker{blockedMatch ? <> (too close to {blockedMatch.name} — ${blockedMatch.ticker})</> : null}. All other fields are locked until you find an original identity.
+                  </div>
                 </div>
               </div>
             )}

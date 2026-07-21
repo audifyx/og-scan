@@ -924,6 +924,17 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         {/* ─── Form ──────────────────────────────────────────── */}
         {step === "form" && (
           <div className="space-y-5">
+            {nameTaken && (
+              <div className="rounded-lg border border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-[hsl(var(--og-blood))] flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-[hsl(var(--og-blood))]">🚫 Name Not Available</div>
+                  <div className="text-sm text-[hsl(var(--og-blood))]/80 mt-1">
+                    no clones — be original — use a different name or ticker{blockedMatch ? <> (too close to {blockedMatch.name} — ${blockedMatch.ticker})</> : null}. All other fields are locked until you find an original identity.
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Token Info Card */}
             <Card className="lpx-panel border-0 bg-transparent">
               <CardContent className="p-5 md:p-6 space-y-5">
