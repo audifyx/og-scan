@@ -379,3 +379,35 @@
   background: linear-gradient(120deg, transparent, hsl(152 86% 52% / 0.06), transparent);
   pointer-events: none;
 }
+
+/* ──────────────────────────────────────────────────────────────
+   CONTRAST GUARANTEE (blunt, theme-wide)
+   Kill every dark-on-dark / light-on-light spot across the whole
+   launchpad: force readable text — white on dark surfaces, black
+   on solid-light surfaces — without touching intentional accent
+   colors (green/red/gold) or the dark-on-bright primary button.
+   ────────────────────────────────────────────────────────────── */
+
+/* 1) Hardcoded DARK text utilities are invisible on the dark theme → force white */
+.lp-classic [class*="text-black"],
+.lp-classic [class*="text-gray-6"], .lp-classic [class*="text-gray-7"], .lp-classic [class*="text-gray-8"], .lp-classic [class*="text-gray-9"],
+.lp-classic [class*="text-slate-6"], .lp-classic [class*="text-slate-7"], .lp-classic [class*="text-slate-8"], .lp-classic [class*="text-slate-9"],
+.lp-classic [class*="text-zinc-6"], .lp-classic [class*="text-zinc-7"], .lp-classic [class*="text-zinc-8"], .lp-classic [class*="text-zinc-9"],
+.lp-classic [class*="text-neutral-6"], .lp-classic [class*="text-neutral-7"], .lp-classic [class*="text-neutral-8"], .lp-classic [class*="text-neutral-9"],
+.lp-classic [class*="text-stone-6"], .lp-classic [class*="text-stone-7"], .lp-classic [class*="text-stone-8"], .lp-classic [class*="text-stone-9"] {
+  color: #ffffff !important;
+}
+
+/* 2) SOLID light/white backgrounds → force dark text so light-on-light disappears.
+      Uses [class~=] (exact token) so translucent bg-white/10 etc. stay untouched. */
+.lp-classic [class~="bg-white"],
+.lp-classic [class~="bg-gray-50"], .lp-classic [class~="bg-gray-100"], .lp-classic [class~="bg-gray-200"],
+.lp-classic [class~="bg-slate-50"], .lp-classic [class~="bg-slate-100"], .lp-classic [class~="bg-slate-200"],
+.lp-classic [class~="bg-zinc-50"], .lp-classic [class~="bg-zinc-100"], .lp-classic [class~="bg-neutral-100"] {
+  color: #0a0f14 !important;
+}
+.lp-classic [class~="bg-white"] *:not([class*="text-green"]):not([class*="text-red"]):not([class*="text-emerald"]):not([class*="text-amber"]):not(svg):not(path),
+.lp-classic [class~="bg-gray-100"] *:not(svg):not(path),
+.lp-classic [class~="bg-slate-100"] *:not(svg):not(path) {
+  color: inherit !important;
+}
