@@ -1,18 +1,15 @@
-// OrbitX Launchpad — home board. Classic pump.fun (2023) layout:
-// hero up top, a real sortable/filterable board as the main event,
-// live feed + tools alongside. Every number here is real:
-//   registry (orbitx_tokens) → launches / lanes / flags / logos
-//   DexScreener             → mcap, liquidity, volume, 24h deltas
-//   Solana mainnet RPC      → slot, TPS, RPC latency (header ticker)
-//   CoinGecko (60s cache)   → SOL/USD
+// OrbitX Launchpad — home board. Modern 2026 design with real data everywhere:
+// hero up top, filterable/sortable board, live feed, analytics. Works for
+// pump.fun and custom SPL launches, real market data from DexScreener.
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Rocket, Zap, HandCoins, Flame, Loader2, Radar,
-  TrendingUp, Droplets, ArrowRight, UserCircle2, Sparkles, BadgeCheck,
+  Rocket, Zap, HandCoins, Flame, Loader2, ArrowRight, 
+  TrendingUp, Droplets, Sparkles, BadgeCheck, Search, Filter,
+  ShieldCheck, ShieldAlert, Eye, Users, Activity, Coins,
 } from "lucide-react";
-import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
+import { ORBITX_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
 import { type OrbitxToken } from "@/lib/orbitx/registry";
 import { jupGetTokens, fmtPct } from "@/lib/og";
 import { TokenCard } from "./_shared";
@@ -23,9 +20,6 @@ import {
 
 const OFFICIAL_MINT = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
-/** Featured card for the official token — pulled live from Jupiter, same
- * source the token page itself falls back to, so no data is invented and
- * the link always resolves. */
 function FeaturedOfficialToken() {
   const { data } = useQuery({
     queryKey: ["home-featured-official"],
@@ -34,17 +28,17 @@ function FeaturedOfficialToken() {
   });
   const tok = data?.[0];
   return (
-    <Link to={`/orbitxlaunch/token/${OFFICIAL_MINT}`} className="pf-card block p-3">
-      <div className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">
-        <BadgeCheck className="h-3.5 w-3.5 text-[hsl(28_80%_32%)]" /> Featured
+    <Link to={`/orbitxlaunch/token/${OFFICIAL_MINT}`} className="pf-card block p-4 hover:border-[hsl(var(--pf-green))] transition">
+      <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">
+        <BadgeCheck className="h-4 w-4 text-[hsl(28_80%_32%)]" /> Featured
       </div>
-      <div className="flex items-center gap-2.5">
-        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
-          {tok?.icon ? <img src={tok.icon} alt={tok.symbol} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-[10px] font-black text-[hsl(var(--pf-muted))]">OBX</div>}
+      <div className="flex items-center gap-3">
+        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
+          {tok?.icon ? <img src={tok.icon} alt={tok.symbol} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xs font-black text-[hsl(var(--pf-muted))]">OBX</div>}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-black text-[hsl(var(--pf-ink))]">{tok?.name ?? "OrbitX"}</div>
-          <div className="pf-mono text-[10px] text-[hsl(var(--pf-muted))]">
+          <div className="truncate text-base font-black text-[hsl(var(--pf-ink))]">{tok?.name ?? "OrbitX"}</div>
+          <div className="pf-mono text-xs text-[hsl(var(--pf-muted))]">
             {fmtCompactUsd(tok?.mcap ?? tok?.fdv)} MC
             {tok?.stats24h?.priceChange != null && <span className={tok.stats24h.priceChange >= 0 ? "text-[hsl(var(--pf-green-dark))]" : "text-[hsl(var(--pf-red))]"}> · {fmtPct(tok.stats24h.priceChange)}</span>}
           </div>
@@ -55,247 +49,186 @@ function FeaturedOfficialToken() {
   );
 }
 
-/* ═══════════════ HERO ═══════════════ */
+type BoardCategory = "new" | "graduated" | "trending" | "volume" | "gainers";
 
-function Hero() {
+export default function LaunchpadHome() {
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState<BoardCategory>("new");
+  const [hideVamps, setHideVamps] = useState(false);
+
+  const { data: launches, isLoading } = useQuery({
+    queryKey: ["orbitx-home-launches"],
+    queryFn: async () => {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/orbitx_tokens?order=created_at.desc&limit=200`, {
+        headers: { apikey: import.meta.env.VITE_SUPABASE_KEY ?? "" },
+      });
+      return (await res.json()) as OrbitxToken[];
+    },
+    staleTime: 15_000,
+  });
+
+  const mints = useMemo(() => launches?.map((t) => t.mint_address) ?? [], [launches]);
+  const { data: markets } = useMarketMap(mints);
+
+  const stats = useMemo(() => launchStats(launches), [launches]);
+
+  const filtered = useMemo(() => {
+    let items = launches ?? [];
+    if (hideVamps) items = items.filter((t) => !t.is_vamp);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      items = items.filter((t) => t.name.toLowerCase().includes(q) || t.ticker.toLowerCase().includes(q));
+    }
+    if (category === "graduated") items = items.filter((t) => !!t.lp_pool_address || (markets?.[t.mint_address]?.liq ?? 0) > 0);
+    else if (category === "trending") items = items.sort((a, b) => {
+      const aVol = markets?.[a.mint_address]?.vol24 ?? 0;
+      const aMc = markets?.[a.mint_address]?.mcap ?? 1;
+      const bVol = markets?.[b.mint_address]?.vol24 ?? 0;
+      const bMc = markets?.[b.mint_address]?.mcap ?? 1;
+      return (bVol / bMc) - (aVol / aMc);
+    });
+    else if (category === "volume") items = items.sort((a, b) => (markets?.[b.mint_address]?.vol24 ?? 0) - (markets?.[a.mint_address]?.vol24 ?? 0));
+    else if (category === "gainers") items = items.sort((a, b) => (markets?.[b.mint_address]?.ch24 ?? 0) - (markets?.[a.mint_address]?.ch24 ?? 0));
+    return items;
+  }, [launches, markets, search, category, hideVamps]);
+
+  const promoActive = isLaunchFeePromoActive();
+  const promoDaysLeft = launchFeePromoDaysLeft();
+
   return (
-    <div className="pf-card p-6 text-center sm:p-8">
-      <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
-        {["100% on-chain", "Anti-vamp protected", "Built for creators"].map((b) => (
-          <span key={b} className="pf-pill pf-pill--green">{b}</span>
-        ))}
-        {isLaunchFeePromoActive() && (
-          <span className="pf-pill pf-pill--gold">★ Free launches — {launchFeePromoDaysLeft()} days left</span>
-        )}
-      </div>
-      <h1 className="text-3xl font-black leading-tight tracking-tight text-[hsl(var(--pf-ink))] sm:text-4xl">
-        launch a solana coin<br />that can't be cloned
-      </h1>
-      <p className="mx-auto mt-3 max-w-md text-sm text-[hsl(var(--pf-muted))]">
-        Unique name, ticker and CA — enforced by the anti-vamp registry. Auto-ground vanity CA.
-        Your buy/sell fee comes straight back to your wallet, claimable in-app.
-      </p>
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-        <Link to="/orbitxlaunch/create" className="pf-btn px-8 py-3 text-sm">
-          <Rocket className="h-4 w-4" /> start a new coin
-        </Link>
-        <a href="#board" className="pf-btn pf-btn--ghost px-6 py-3 text-sm">
-          <TrendingUp className="h-4 w-4" /> browse launches
-        </a>
-      </div>
-      <div className="mt-3 pf-mono text-[11px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">
-        {isLaunchFeePromoActive() ? <>free for {launchFeePromoDaysLeft()} days</> : <>{fmtUsd(ORBITX_FEE_USD)} flat fee</>} · pump + custom lanes · Solana mainnet
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════ compact stat strip ═══════════════ */
-
-function StatStrip({ stats, lpUsd, loaded }: { stats: ReturnType<typeof launchStats>; lpUsd: number | null; loaded: boolean }) {
-  const tiles = [
-    { icon: Rocket, label: "Launches", value: loaded ? String(stats.total) : "—", tone: "green" },
-    { icon: Droplets, label: "Graduated", value: loaded ? String(stats.graduated) : "—", tone: "blue" },
-    { icon: TrendingUp, label: "Live LP", value: fmtCompactUsd(lpUsd), tone: "gold" },
-    { icon: Sparkles, label: "Last 24h", value: loaded ? String(stats.last24h) : "—", tone: "green" },
-  ];
-  const colorCls: Record<string, string> = {
-    green: "text-[hsl(var(--pf-green-dark))]", blue: "text-[hsl(var(--pf-blue))]",
-    gold: "text-[hsl(28_80%_32%)]", red: "text-[hsl(var(--pf-red))]",
-  };
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {tiles.map((t) => (
-        <div key={t.label} className="pf-card flex items-center gap-2.5 p-2.5">
-          <t.icon className={`h-4 w-4 shrink-0 ${colorCls[t.tone]}`} />
-          <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--pf-muted))]">{t.label}</div>
-            <div className={`text-base font-black leading-tight ${colorCls[t.tone]}`}>{t.value}</div>
+    <div className="space-y-6">
+      {/* ─── Hero ──────────────────────────────────────────────── */}
+      <div className="pf-card p-8 md:p-12">
+        <div className="max-w-2xl">
+          <h1 className="text-5xl md:text-6xl font-black tracking-tight text-[hsl(var(--pf-ink))] mb-3">
+            Launch your token
+          </h1>
+          <p className="text-lg md:text-xl text-[hsl(var(--pf-muted))] mb-6 leading-relaxed">
+            Build on Solana with anti-vamp protection, zero-clone guarantee, and creator-first design.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/orbitxlaunch/create" className="pf-btn">
+              <Rocket className="h-4 w-4" /> Start launch
+            </Link>
+            <a href="https://docs.orbitx.world" target="_blank" rel="noreferrer" className="pf-btn-ghost">
+              Learn more →
+            </a>
+          </div>
+          <div className="mt-8 flex flex-wrap gap-6 text-sm">
+            <div>
+              <div className="pf-mono text-xs text-[hsl(var(--pf-muted))] uppercase tracking-wider mb-1">100% on-chain</div>
+              <div className="text-lg font-black text-[hsl(var(--pf-green-dark))]">Decentralized launch</div>
+            </div>
+            <div>
+              <div className="pf-mono text-xs text-[hsl(var(--pf-muted))] uppercase tracking-wider mb-1">Anti-vamp</div>
+              <div className="text-lg font-black text-[hsl(var(--pf-green-dark))]">Zero clones</div>
+            </div>
+            <div>
+              <div className="pf-mono text-xs text-[hsl(var(--pf-muted))] uppercase tracking-wider mb-1">Creator owned</div>
+              <div className="text-lg font-black text-[hsl(var(--pf-green-dark))]">You keep control</div>
+            </div>
           </div>
         </div>
-      ))}
-    </div>
-  );
-}
-
-/* ═══════════════ live feed (recent launches list) ═══════════════ */
-
-function FeedRow({ t, m, rank }: { t: OrbitxToken; m: MarketRow | undefined; rank: number }) {
-  const up = (m?.ch24 ?? 0) >= 0;
-  return (
-    <Link to={`/orbitxlaunch/token/${t.mint_address}`} className="flex items-center gap-2.5 rounded-lg p-2 transition hover:bg-[hsl(var(--pf-ink))]/[0.04]">
-      <span className="pf-mono w-5 shrink-0 text-[10px] font-bold text-[hsl(var(--pf-muted))]">{String(rank).padStart(2, "0")}</span>
-      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))]">
-        {t.logo_url
-          ? <img src={t.logo_url} alt={t.ticker} className="h-full w-full object-cover" loading="lazy" />
-          : <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-[hsl(var(--pf-muted))]">{t.ticker.slice(0, 2)}</div>}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="truncate text-xs font-black text-[hsl(var(--pf-ink))]">{t.ticker}</span>
-          {m?.ch24 != null && (
-            <span className={`pf-mono text-[10px] font-bold ${up ? "text-[hsl(var(--pf-green-dark))]" : "text-[hsl(var(--pf-red))]"}`}>
-              {up ? "▲" : "▼"} {Math.abs(m.ch24).toFixed(1)}%
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 pf-mono text-[9px] text-[hsl(var(--pf-muted))]">
-          <span>MC {fmtCompactUsd(m?.mcap)}</span>
-          <span>VOL {fmtCompactUsd(m?.vol24)}</span>
-        </div>
-      </div>
-    </Link>
-  );
-}
 
-function LiveFeed({ tokens, market, loading }: {
-  tokens: OrbitxToken[]; market: Record<string, MarketRow> | undefined; loading: boolean;
-}) {
-  const rows = useMemo(() => [...tokens].slice(0, 8), [tokens]);
-  return (
-    <div className="pf-card p-3">
-      <div className="mb-2 flex items-center gap-1.5">
-        <Radar className="h-3.5 w-3.5 text-[hsl(var(--pf-green-dark))]" />
-        <h3 className="text-xs font-black uppercase tracking-wide">Newest launches</h3>
+      {/* ─── Featured token ──────────────────────────────────────────────── */}
+      <FeaturedOfficialToken />
+
+      {/* ─── Stats grid ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatTile label="Launches" value={stats.totalLaunches} icon={<Rocket className="h-4 w-4" />} />
+        <StatTile label="Graduated" value={stats.graduated} icon={<Droplets className="h-4 w-4" />} />
+        <StatTile label="Total liquidity" value={fmtCompactUsd(totalLpUsd(launches, markets))} icon={<Coins className="h-4 w-4" />} />
+        <StatTile label="24h volume" value={fmtCompactUsd(stats.vol24Usd)} icon={<Activity className="h-4 w-4" />} />
       </div>
-      {loading ? (
-        <div className="flex items-center justify-center gap-2 py-14 text-xs text-[hsl(var(--pf-muted))]">
-          <Loader2 className="h-4 w-4 animate-spin" /> syncing registry…
+
+      {/* ─── Board controls ──────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="pf-card p-4">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--pf-muted))]" />
+              <input
+                placeholder="Search by name or ticker…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-[hsl(var(--pf-bg))] border border-[hsl(var(--pf-border))] rounded-lg pl-10 pr-4 py-2.5 text-sm text-[hsl(var(--pf-ink))] placeholder:text-[hsl(var(--pf-muted))] focus:border-[hsl(var(--pf-green))] outline-none"
+              />
+            </div>
+            <button
+              onClick={() => setHideVamps(!hideVamps)}
+              className={`px-4 py-2 rounded-lg font-bold text-sm uppercase tracking-wide transition ${hideVamps ? "bg-[hsl(var(--pf-green))] text-white" : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))]"}`}
+            >
+              <ShieldCheck className="inline h-4 w-4 mr-1.5" />
+              {hideVamps ? "Verified only" : "Show all"}
+            </button>
+          </div>
         </div>
-      ) : rows.length === 0 ? (
-        <div className="px-3 py-10 text-center">
-          <Rocket className="mx-auto mb-2 h-6 w-6 text-[hsl(var(--pf-green))]" />
-          <div className="text-xs text-[hsl(var(--pf-muted))]">Feed is empty — the first launch takes slot 01</div>
+
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {(["new", "graduated", "trending", "volume", "gainers"] as BoardCategory[]).map((c) => (
+            <button
+              key={c}
+              onClick={() => setCategory(c)}
+              className={`px-4 py-2.5 rounded-full font-bold text-xs uppercase tracking-wide whitespace-nowrap transition ${
+                category === c
+                  ? "bg-[hsl(var(--pf-ink))] text-white"
+                  : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))]"
+              }`}
+            >
+              {c === "new" && <Sparkles className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c === "graduated" && <Droplets className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c === "trending" && <TrendingUp className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c === "volume" && <Activity className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c === "gainers" && <Flame className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Board grid ──────────────────────────────────────────────── */}
+      {isLoading ? (
+        <div className="flex items-center justify-center gap-2 py-12 text-sm text-[hsl(var(--pf-muted))]">
+          <Loader2 className="h-4 w-4 animate-spin" /> loading launches…
+        </div>
+      ) : !filtered.length ? (
+        <div className="pf-card text-center py-16">
+          <Eye className="h-12 w-12 text-[hsl(var(--pf-muted))] mx-auto mb-4 opacity-50" />
+          <div className="text-lg font-bold text-[hsl(var(--pf-muted))]">No launches found</div>
+          <p className="text-sm text-[hsl(var(--pf-muted))] mt-2">Try adjusting your filters or be the first to launch here</p>
         </div>
       ) : (
-        <div className="space-y-0.5">
-          {rows.map((t, i) => <FeedRow key={t.id} t={t} m={market?.[t.mint_address]} rank={i + 1} />)}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.slice(0, 50).map((t) => (
+            <TokenCard key={t.mint_address} token={t} market={markets?.[t.mint_address] ?? null} />
+          ))}
+        </div>
+      )}
+
+      {promoActive && (
+        <div className="pf-card border-[hsl(var(--pf-green))] bg-[hsl(var(--pf-green))]/5 p-4">
+          <div className="flex items-center gap-3">
+            <Zap className="h-5 w-5 text-[hsl(var(--pf-green))]" />
+            <div>
+              <div className="font-bold text-[hsl(var(--pf-green))]">Launch promo active</div>
+              <p className="text-xs text-[hsl(var(--pf-muted))] mt-0.5">{promoDaysLeft} day{promoDaysLeft === 1 ? "" : "s"} left — ${ORBITX_FEE_USD} to launch on any lane (custom SPL or pump.fun)</p>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function QuickActions() {
-  const items = [
-    { to: "/orbitxlaunch/claim", icon: HandCoins, label: "Claim creator fees" },
-    { to: "/orbitxlaunch/profile", icon: UserCircle2, label: "View my tokens" },
-    { to: "/orbitxlaunch/rescue", icon: Flame, label: "Claim / burn console" },
-  ];
+function StatTile({ label, value, icon }: { label: string; value: React.ReactNode; icon: React.ReactNode }) {
   return (
-    <div className="pf-card p-3">
-      <div className="mb-2 flex items-center gap-1.5">
-        <Zap className="h-3.5 w-3.5 text-[hsl(var(--pf-green-dark))]" />
-        <h3 className="text-xs font-black uppercase tracking-wide">Quick actions</h3>
+    <div className="pf-card p-4">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="pf-mono text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">{label}</span>
+        <div className="text-[hsl(var(--pf-muted))]">{icon}</div>
       </div>
-      <div className="space-y-1.5">
-        {items.map((a) => (
-          <Link key={a.label} to={a.to} className="flex items-center gap-2 rounded-lg border border-[hsl(var(--pf-border))] px-3 py-2 text-xs font-bold text-[hsl(var(--pf-ink))] transition hover:border-[hsl(var(--pf-green))]">
-            <a.icon className="h-3.5 w-3.5 text-[hsl(var(--pf-green-dark))]" /> {a.label}
-            <ArrowRight className="ml-auto h-3 w-3 text-[hsl(var(--pf-muted))]" />
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════ ALL LAUNCHES board — real category + sort tabs ═══════════════ */
-
-type BoardCategory = "new" | "graduated" | "trending" | "volume" | "gainers";
-
-const CATEGORIES: { id: BoardCategory; label: string; icon: typeof Flame }[] = [
-  { id: "new", label: "Fresh", icon: Flame },
-  { id: "graduated", label: "Graduated", icon: Droplets },
-  { id: "trending", label: "Trending", icon: Radar },
-  { id: "volume", label: "Volume", icon: TrendingUp },
-  { id: "gainers", label: "Gainers", icon: Sparkles },
-];
-
-function Board({ category, tokens, market, loading }: {
-  category: BoardCategory; tokens: OrbitxToken[]; market: Record<string, MarketRow> | undefined; loading: boolean;
-}) {
-  const rows = useMemo(() => {
-    const mOf = (t: OrbitxToken) => market?.[t.mint_address];
-    let list = tokens;
-    if (category === "graduated") list = list.filter((t) => !!t.lp_pool_address);
-    const sorted = [...list];
-    switch (category) {
-      case "trending":
-        sorted.sort((a, b) => ((mOf(b)?.vol24 ?? 0) / Math.max(1, mOf(b)?.mcap ?? 1)) - ((mOf(a)?.vol24 ?? 0) / Math.max(1, mOf(a)?.mcap ?? 1)));
-        break;
-      case "volume":
-        sorted.sort((a, b) => (mOf(b)?.vol24 ?? 0) - (mOf(a)?.vol24 ?? 0));
-        break;
-      case "gainers":
-        sorted.sort((a, b) => (mOf(b)?.ch24 ?? -Infinity) - (mOf(a)?.ch24 ?? -Infinity));
-        break;
-      default:
-        break; // "new" / "graduated" stay in registry (newest-first) order
-    }
-    return sorted;
-  }, [tokens, market, category]);
-
-  if (loading)
-    return <div className="flex items-center justify-center gap-2 py-16 text-sm text-[hsl(var(--pf-muted))]"><Loader2 className="h-5 w-5 animate-spin" /> loading launches…</div>;
-  if (rows.length === 0)
-    return (
-      <div className="pf-card flex flex-col items-center justify-center gap-3 py-14 text-center">
-        <Rocket className="h-8 w-8 text-[hsl(var(--pf-green))]" />
-        <div className="text-lg font-black">No launches yet</div>
-        <div className="max-w-sm text-sm text-[hsl(var(--pf-muted))]">Every launch gets an <span className="pf-mono">obx</span> vanity CA and passes the anti-vamp check. Be first.</div>
-        <Link to="/orbitxlaunch/create" className="pf-btn"><Rocket className="h-4 w-4" /> Launch the first token</Link>
-      </div>
-    );
-  return (
-    <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {rows.map((t) => <TokenCard key={t.id} t={t} mc={market?.[t.mint_address]?.mcap ?? null} />)}
-    </div>
-  );
-}
-
-/* ═══════════════════════ PAGE ═══════════════════════ */
-
-export default function LaunchpadHome() {
-  const [category, setCategory] = useState<BoardCategory>("new");
-  const allQ = useAllLaunches();
-  const tokens = allQ.data ?? [];
-  const stats = useMemo(() => launchStats(allQ.data), [allQ.data]);
-  const mints = useMemo(() => tokens.map((t) => t.mint_address), [tokens]);
-  const marketQ = useMarketMap(mints);
-  const lpUsd = totalLpUsd(marketQ.data);
-
-  return (
-    <div className="space-y-5">
-      <Hero />
-      <StatStrip stats={stats} lpUsd={lpUsd} loaded={allQ.isSuccess} />
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <div id="board" className="scroll-mt-24">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-black uppercase tracking-wide">
-              Launches <span className="pf-mono text-[hsl(var(--pf-muted))]">({stats.total})</span>
-            </h2>
-            <div className="flex gap-0.5 overflow-x-auto rounded-full border border-[hsl(var(--pf-border))] p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {CATEGORIES.map((c) => (
-                <button key={c.id} type="button" onClick={() => setCategory(c.id)}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 pf-mono text-[10px] font-bold uppercase tracking-wide transition ${
-                    category === c.id ? "bg-[hsl(var(--pf-ink))] text-white" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]"
-                  }`}>
-                  <c.icon className="h-3 w-3" /> {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <Board category={category} tokens={tokens} market={marketQ.data} loading={allQ.isLoading} />
-        </div>
-
-        <div className="space-y-4">
-          <FeaturedOfficialToken />
-          <LiveFeed tokens={tokens} market={marketQ.data} loading={allQ.isLoading} />
-          <QuickActions />
-        </div>
-      </div>
+      <div className="text-2xl font-black text-[hsl(var(--pf-ink))]">{value}</div>
     </div>
   );
 }

@@ -16,7 +16,6 @@ import { getToken } from "@/lib/orbitx/registry";
 import { shortAddr, timeAgo, SectionLabel, Pill, useDocumentMeta, fmtPrice, GRADUATION_MC_USD } from "./_shared";
 import { fmtCompactUsd } from "./lpx";
 import { jupGetTokens, jupQuote, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY } from "@/lib/og";
-import { CandlestickChart, type CandleDataPoint } from "@/components/trading/CandlestickChart";
 import {
   Loader2, Copy, Check, ExternalLink, ShieldCheck, ShieldAlert, Droplets, Flame,
   ArrowLeft, Coins, ArrowDownUp, Zap, BadgeCheck, TrendingUp, TrendingDown,
@@ -54,25 +53,6 @@ async function fetchBestDexPair(mint: string): Promise<DexPairFull | null> {
   } catch { return null; }
 }
 
-type Timeframe = "15m" | "1H" | "4H" | "1D";
-const TF_CONFIG: Record<Timeframe, { base: string; aggregate: number; limit: number }> = {
-  "15m": { base: "minute", aggregate: 15, limit: 96 },
-  "1H": { base: "hour", aggregate: 1, limit: 168 },
-  "4H": { base: "hour", aggregate: 4, limit: 180 },
-  "1D": { base: "day", aggregate: 1, limit: 90 },
-};
-
-async function fetchOhlcv(pairAddress: string, tf: Timeframe): Promise<CandleDataPoint[]> {
-  const cfg = TF_CONFIG[tf];
-  try {
-    const r = await fetch(`https://api.geckoterminal.com/api/v2/networks/solana/pools/${pairAddress}/ohlcv/${cfg.base}?aggregate=${cfg.aggregate}&limit=${cfg.limit}&currency=usd`);
-    if (!r.ok) return [];
-    const d = await r.json();
-    const items: number[][] = d?.data?.attributes?.ohlcv_list ?? [];
-    return items.map(([ts, o, h, l, c, v]) => ({ time: ts, open: o, high: h, low: l, close: c, volume: v })).sort((a, b) => a.time - b.time);
-  } catch { return []; }
-}
-
 /** Best-effort description/socials pulled straight from the token's own
  * metadata JSON (pump.fun-style {name,symbol,description,twitter,...}). */
 async function fetchMetaJson(uri: string | null | undefined) {
@@ -85,39 +65,46 @@ async function fetchMetaJson(uri: string | null | undefined) {
   } catch { return null; }
 }
 
-/* ═══════════════ chart panel ═══════════════ */
+/* ═══════════════ chart panel — DexScreener embed ═══════════════ */
 
-function ChartPanel({ pairAddress }: { pairAddress: string | null }) {
-  const [tf, setTf] = useState<Timeframe>("1H");
-  const { data, isFetching } = useQuery({
-    queryKey: ["token-ohlcv", pairAddress, tf],
-    queryFn: () => fetchOhlcv(pairAddress!, tf),
-    enabled: !!pairAddress,
-    refetchInterval: 30_000,
-  });
+function ChartPanel({ pairAddress, dexId }: { pairAddress: string | null; dexId: string | null }) {
+  if (!pairAddress || !dexId) {
+    return (
+      <div className="pf-card p-3">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="pf-mono text-xs font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">Price chart</h3>
+        </div>
+        <div className="flex h-[420px] items-center justify-center text-xs text-[hsl(var(--pf-muted))]">No liquidity pool yet — chart appears once trading starts</div>
+      </div>
+    );
+  }
 
+  // DexScreener embed URL — high-quality chart, real-time, 2026 modern look
+  const dexScreenerUrl = `https://dexscreener.com/solana/${pairAddress}`;
+  
   return (
-    <div className="pf-card p-3">
+    <div className="pf-card p-3 overflow-hidden">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="pf-mono text-xs font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">Price chart</h3>
-        <div className="flex gap-0.5 rounded-full border border-[hsl(var(--pf-border))] p-0.5">
-          {(["15m", "1H", "4H", "1D"] as Timeframe[]).map((t) => (
-            <button key={t} type="button" onClick={() => setTf(t)}
-              className={`rounded-full px-2.5 py-1 pf-mono text-[10px] font-bold transition ${tf === t ? "bg-[hsl(var(--pf-ink))] text-white" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]"}`}>
-              {t}
-            </button>
-          ))}
-        </div>
+        <a href={dexScreenerUrl} target="_blank" rel="noreferrer" className="pf-mono text-[9px] font-bold text-[hsl(var(--pf-blue))] hover:underline">Open in DexScreener ↗</a>
       </div>
-      {!pairAddress ? (
-        <div className="flex h-[320px] items-center justify-center text-xs text-[hsl(var(--pf-muted))]">No liquidity pool yet — chart appears once trading starts</div>
-      ) : isFetching && !data?.length ? (
-        <div className="flex h-[320px] items-center justify-center gap-2 text-xs text-[hsl(var(--pf-muted))]"><Loader2 className="h-4 w-4 animate-spin" /> loading chart…</div>
-      ) : !data?.length ? (
-        <div className="flex h-[320px] items-center justify-center text-xs text-[hsl(var(--pf-muted))]">No candle data for this timeframe yet</div>
-      ) : (
-        <CandlestickChart data={data} height={320} />
-      )}
+      {/* Embed DexScreener chart iframe — responsive, high-quality, real-time */}
+      <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+        <iframe
+          src={`https://dexscreener.com/solana/${pairAddress}?embed=1&theme=dark&info=0&trades=1&info=0`}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            borderRadius: '8px',
+          }}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          loading="lazy"
+        />
+      </div>
     </div>
   );
 }
@@ -526,7 +513,7 @@ export default function LaunchpadToken() {
       )}
 
       <div className="mt-4">
-        <ChartPanel pairAddress={pair?.pairAddress ?? null} />
+        <ChartPanel pairAddress={pair?.pairAddress ?? null} dexId={pair?.dexId ?? null} />
       </div>
 
       {/* buy / sell + position + details */}
