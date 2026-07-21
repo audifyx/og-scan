@@ -16,6 +16,7 @@ import { getToken, markGraduated } from "@/lib/orbitx/registry";
 import { shortAddr, timeAgo, SectionLabel, Pill, TokenLogo, useDocumentMeta, fmtPrice, GRADUATION_MC_USD } from "./_shared";
 import { fmtCompactUsd } from "./lpx";
 import TokenAnalytics from "./TokenAnalytics";
+import TokenChat from "./TokenChat";
 import { orbitScore } from "./orbitScore";
 import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY } from "@/lib/og";
 import { toast } from "sonner";
@@ -594,6 +595,8 @@ export default function LaunchpadToken() {
       </div>
 
       <TokenAnalytics mint={mint!} pairAddress={pair?.pairAddress ?? null} holderCount={jup?.holderCount ?? null} />
+
+      <TokenChat mint={mint!} />
 
       {/* buy / sell + position + details */}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
