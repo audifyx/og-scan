@@ -220,7 +220,7 @@ export default function LaunchpadHome() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {(filtered || []).slice(0, 50).map((t) => (
-            <TokenCard key={t.mint_address} token={t} market={markets?.[t.mint_address] ?? null} />
+            <TokenCard key={t.mint_address} t={t} mc={markets?.[t.mint_address]?.mcap ?? null} />
           ))}
         </div>
       )}
