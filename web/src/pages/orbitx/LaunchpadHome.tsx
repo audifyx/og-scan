@@ -12,7 +12,7 @@ import {
 import { ORBITX_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
 import { type OrbitxToken, listTokens } from "@/lib/orbitx/registry";
 import { jupGetTokens, fmtPct } from "@/lib/og";
-import { TokenCard } from "./_shared";
+import { TokenCard, GRADUATION_MC_USD } from "./_shared";
 import {
   useAllLaunches, launchStats, useMarketMap, totalLpUsd,
   fmtCompactUsd, type MarketRow,
@@ -85,7 +85,7 @@ export default function LaunchpadHome() {
     if (category === "graduated") {
       items = items.filter((t) => {
         if (!t) return false;
-        return !!t.lp_pool_address || (markets?.[t.mint_address]?.liq ?? 0) > 0;
+        return !!t.lp_pool_address || !!t.graduated_at || (markets?.[t.mint_address]?.mcap ?? 0) >= GRADUATION_MC_USD || (markets?.[t.mint_address]?.liq ?? 0) > 0;
       });
     } else if (category === "trending") {
       items = items.sort((a, b) => {

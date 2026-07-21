@@ -29,7 +29,7 @@ export function fmtPrice(v?: number | null): string {
 }
 
 /** Pump-style graduation target used only for the visual progress bar. */
-export const GRADUATION_MC_USD = 69_000;
+export const GRADUATION_MC_USD = 35_000;
 
 /** "$4.72M MC" style formatting. */
 export function fmtMc(v?: number | null): string {
@@ -133,7 +133,7 @@ export function Pill({ children, tone }: { children: React.ReactNode; tone: "gol
  */
 export function TokenCard({ t, mc }: { t: OrbitxToken; mc?: number | null }) {
   if (!t) return null;
-  const graduated = !!t.lp_pool_address;
+  const graduated = !!t.lp_pool_address || !!t.graduated_at || (typeof mc === "number" && mc >= GRADUATION_MC_USD);
   const pct = graduated
     ? 100
     : typeof mc === "number" && mc > 0

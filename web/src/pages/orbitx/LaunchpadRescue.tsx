@@ -1,15 +1,14 @@
 /**
- * OrbitX Rescue Console — CLAIM SCANNER + RENT REFUND + BURN + SELL ALL.
+ * OrbitX Rescue Console — CLAIM SCANNER + RENT REFUND + BURN.
  * Non-custodial. All numbers are read live from mainnet:
  *   • Claim Scanner — sweeps EVERY claimable lamport it can find for the
  *     connected wallet: rent locked in empty token accounts (SPL + Token-2022),
  *     wrapped SOL ready to unwrap, pump.fun creator fees sitting in the
  *     creator vault, plus a DexScreener-priced estimate of token dust that
- *     Sell All can convert. One CLAIM ALL sweeps the lot.
+ *     One CLAIM ALL sweeps the lot.
  *   • Rent Refund — closes empty token accounts, rent comes back as SOL/USDC.
  *   • Burn — burns held tokens, then shows a full burn report (amount, % of
  *     supply, supply before/after, tx) and logs the verified burn event.
- *   • Sell All — Jupiter-swaps every holding into SOL or USDC.
  */
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -27,9 +26,8 @@ import {
 import {
   scanEmptyTokenAccounts, totalReclaimableSol, buildCloseAccountsTransactions,
   buildSolToUsdcSwapTransaction, scanBurnableTokens, resolvePercentBurnAmount,
-  parseManualBurnAmount, buildBurnTransaction, buildSellAllQuotes, fetchBurnTokenMeta,
+  parseManualBurnAmount, buildBurnTransaction, fetchBurnTokenMeta,
   scanNativeSolAccounts, buildUnwrapTransactions, estimateHoldingsUsd,
-  SOL_MINT, USDC_MINT,
   type EmptyTokenAccount, type BurnableToken, type NativeSolAccount, type BurnTokenMeta,
 } from "@/lib/orbitx/rescue";
 import { getPumpClaimableSol, buildPumpClaimTransaction } from "@/lib/orbitx/claim";
@@ -382,7 +380,7 @@ export default function LaunchpadRescue() {
         const held = await scanBurnableTokens(connection, publicKey);
         const values = await estimateHoldingsUsd(held);
         for (const v of Object.values(values)) { dustUsd += v; dustCount++; }
-        pushLog(`[✓] holdings priced via DexScreener — ${dustCount} priceable (~$${dustUsd.toFixed(2)}) convertible via Sell All`);
+        pushLog(`[✓] holdings priced via DexScreener — ${dustCount} priceable (~$${dustUsd.toFixed(2)}) in convertible dust`);
       } catch {
         pushLog("[!] dust pricing unavailable — skipped");
       }
@@ -654,58 +652,6 @@ export default function LaunchpadRescue() {
     }
   };
 
-  /* ═══════════ SELL ALL (kept) ═══════════ */
-  const [sellTarget, setSellTarget] = useState<"SOL" | "USDC">("USDC");
-  const [selling, setSelling] = useState(false);
-  const [sellProgress, setSellProgress] = useState<{ done: number; total: number } | null>(null);
-  const [sellResults, setSellResults] = useState<{ mint: string; ok: boolean; sig?: string; error?: string }[]>([]);
-
-  const sellableCount = burnable.filter((t) => {
-    const targetMintStr = sellTarget === "SOL" ? SOL_MINT.toBase58() : USDC_MINT.toBase58();
-    return t.mint !== targetMintStr && t.balanceRaw > BigInt(0);
-  }).length;
-
-  const sellAll = async () => {
-    if (!publicKey || !signTransaction || sellableCount === 0) return;
-    setSelling(true);
-    setSellResults([]);
-    try {
-      const targetMint = sellTarget === "SOL" ? SOL_MINT : USDC_MINT;
-      const quotes = await buildSellAllQuotes(publicKey, burnable, targetMint);
-      setSellProgress({ done: 0, total: quotes.length });
-      const results: { mint: string; ok: boolean; sig?: string; error?: string }[] = [];
-      for (let i = 0; i < quotes.length; i++) {
-        const q = quotes[i];
-        if (!q.ok) {
-          const failed = q as Extract<typeof q, { ok: false }>;
-          results.push({ mint: failed.mint, ok: false, error: failed.error });
-          setSellProgress({ done: i + 1, total: quotes.length });
-          continue;
-        }
-        try {
-          const vtx = VersionedTransaction.deserialize(Buffer.from(q.swapTransactionB64, "base64"));
-          const signedVtx = signAllTransactions ? (await signAllTransactions([vtx]))[0] : vtx;
-          const sig = await connection.sendRawTransaction(signedVtx.serialize(), { skipPreflight: false, maxRetries: 3 });
-          await connection.confirmTransaction(sig, "confirmed");
-          results.push({ mint: q.mint, ok: true, sig });
-        } catch (err) {
-          results.push({ mint: q.mint, ok: false, error: err instanceof Error ? err.message : String(err) });
-        }
-        setSellProgress({ done: i + 1, total: quotes.length });
-      }
-      setSellResults(results);
-      const okCount = results.filter((r) => r.ok).length;
-      if (okCount > 0) toast.success(`Sold ${okCount}/${results.length} holdings to ${sellTarget}`);
-      else if (results.length > 0) toast.error("All sell orders failed — check per-token errors below");
-      scanBurn();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(msg || "Sell all failed");
-    } finally {
-      setSelling(false);
-    }
-  };
-
   /* ═══════════════════════ render ═══════════════════════ */
 
   const usdOf = (sol: number) => (solUsd.data ? ` ≈ $${(sol * solUsd.data.price).toFixed(2)}` : "");
@@ -750,7 +696,6 @@ export default function LaunchpadRescue() {
             <TabsTrigger value="scanner"><Radar className="mr-1.5 h-3.5 w-3.5" /> Claim Scanner</TabsTrigger>
             <TabsTrigger value="refund"><Coins className="mr-1.5 h-3.5 w-3.5" /> Rent Refund</TabsTrigger>
             <TabsTrigger value="burn"><Flame className="mr-1.5 h-3.5 w-3.5" /> Burn</TabsTrigger>
-            <TabsTrigger value="sellall"><ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" /> Sell All</TabsTrigger>
           </TabsList>
 
           {/* ══════════ CLAIM SCANNER ══════════ */}
@@ -803,9 +748,9 @@ export default function LaunchpadRescue() {
                     <div className="rounded-xl border border-white/10 bg-black/35 p-3">
                       <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground"><ArrowRightLeft className="h-3.5 w-3.5 text-[hsl(var(--og-cyan))]" /> Convertible dust</div>
                       <div className="mt-1 font-mono text-lg font-bold text-[hsl(var(--og-gold))]">~${omni.dustUsd.toFixed(2)}</div>
-                      <button type="button" onClick={() => setTab("sellall")} className="font-mono text-[10px] text-[hsl(var(--og-cyan))] underline-offset-4 hover:underline">
-                        {omni.dustCount} priced holding{omni.dustCount === 1 ? "" : "s"} → Sell All
-                      </button>
+                      <div className="font-mono text-[10px] text-muted-foreground">
+                        {omni.dustCount} priced holding{omni.dustCount === 1 ? "" : "s"}
+                      </div>
                     </div>
                   </div>
 
@@ -988,82 +933,6 @@ export default function LaunchpadRescue() {
             </Panel>
           </TabsContent>
 
-          {/* ══════════ SELL ALL ══════════ */}
-          <TabsContent value="sellall" className="mt-4">
-            <Panel title="Sell all holdings" icon={<ArrowRightLeft className="h-3.5 w-3.5" />} right={
-              <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">routes through Jupiter</span>
-            }>
-              <p className="mb-4 text-xs text-muted-foreground">
-                Swaps every token this wallet holds into one asset, in one go. A bad or illiquid mint just gets skipped — it won't block the rest.
-              </p>
-
-              {burnScanning ? (
-                <RadarScan label="loading token balances" />
-              ) : burnable.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-muted-foreground">
-                  No tokens found in this wallet.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <div className="mb-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Sell everything into</div>
-                    <div className="inline-flex rounded-lg border border-white/10 bg-black/40 p-1">
-                      {(["USDC", "SOL"] as const).map((p) => (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => setSellTarget(p)}
-                          className={`rounded-md px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-wider transition ${
-                            sellTarget === p ? "bg-[hsl(var(--og-cyan))]/15 text-[hsl(var(--og-cyan))]" : "text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Tokens to sell</div>
-                      <div className="font-mono text-2xl font-black text-[hsl(var(--og-cyan))]">{sellableCount}</div>
-                    </div>
-                    <Button onClick={sellAll} disabled={selling || sellableCount === 0}
-                      className="bg-[hsl(var(--og-cyan))] font-display text-xs font-bold uppercase tracking-wider text-black hover:bg-[hsl(var(--og-cyan))]/90 disabled:opacity-40">
-                      {selling
-                        ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Selling {sellProgress ? `${sellProgress.done}/${sellProgress.total}` : "…"}</>
-                        : <><ArrowRightLeft className="mr-2 h-4 w-4" /> Sell all → {sellTarget}</>}
-                    </Button>
-                  </div>
-
-                  {selling && sellProgress && (
-                    <div className="lpx-gauge"><div style={{ width: `${(sellProgress.done / Math.max(1, sellProgress.total)) * 100}%` }} /></div>
-                  )}
-
-                  {sellResults.length > 0 && (
-                    <>
-                      <Separator className="bg-white/10" />
-                      <div className="space-y-1.5">
-                        {sellResults.map((r, i) => (
-                          <div key={r.mint} className="lpx-row-in flex items-center justify-between font-mono text-xs" style={{ animationDelay: `${Math.min(i * 0.05, 0.5)}s` }}>
-                            <span className="text-muted-foreground">{short(r.mint)}</span>
-                            {r.ok ? (
-                              <a href={`https://solscan.io/tx/${r.sig}`} target="_blank" rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[hsl(var(--og-lime))] underline-offset-4 hover:underline">
-                                <CheckCircle2 className="h-3 w-3" /> sold <ExternalLink className="h-3 w-3" />
-                              </a>
-                            ) : (
-                              <span className="text-[hsl(var(--og-blood))]">failed — {r.error}</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </Panel>
-          </TabsContent>
         </Tabs>
       )}
     </div>

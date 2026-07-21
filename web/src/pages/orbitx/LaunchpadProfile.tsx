@@ -31,7 +31,7 @@ export default function LaunchpadProfile() {
     );
 
   const count = data?.length ?? 0;
-  const graduated = data?.filter((t) => t.lp_pool_address).length ?? 0;
+  const graduated = data?.filter((t) => t.lp_pool_address || t.graduated_at).length ?? 0;
 
   return (
     <div>

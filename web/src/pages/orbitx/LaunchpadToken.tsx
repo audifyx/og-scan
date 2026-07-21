@@ -12,7 +12,7 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { getToken } from "@/lib/orbitx/registry";
+import { getToken, markGraduated } from "@/lib/orbitx/registry";
 import { shortAddr, timeAgo, SectionLabel, Pill, useDocumentMeta, fmtPrice, GRADUATION_MC_USD } from "./_shared";
 import { fmtCompactUsd } from "./lpx";
 import { jupGetTokens, jupQuote, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY } from "@/lib/og";
@@ -408,6 +408,14 @@ export default function LaunchpadToken() {
       : null,
   );
 
+  // Sticky graduation: once market cap first crosses the threshold, persist it
+  // permanently (never un-graduates). Best-effort, fires once per crossing.
+  useEffect(() => {
+    if (mint && mcap != null && mcap >= GRADUATION_MC_USD && t && !t.graduated_at && !t.lp_pool_address) {
+      markGraduated(mint).catch(() => {});
+    }
+  }, [mint, mcap, t]);
+
   if (isLoading || pairLoading) return <div className="flex items-center justify-center gap-2 py-24 pf-mono text-sm text-[hsl(var(--pf-muted))]"><Loader2 className="h-5 w-5 animate-spin" /> loading token…</div>;
 
   if (!t && !jup && !pair)
@@ -419,7 +427,7 @@ export default function LaunchpadToken() {
       </div>
     );
 
-  const graduated = !!t?.lp_pool_address || (liq ?? 0) > 0;
+  const graduated = !!t?.lp_pool_address || !!t?.graduated_at || (mcap != null && mcap >= GRADUATION_MC_USD) || (liq ?? 0) > 0;
   const isOfficial = mint === OFFICIAL_MINT;
   const cluster = t?.cluster ?? "mainnet-beta";
   const explorer = `https://solscan.io/token/${mint}${cluster !== "mainnet-beta" ? "?cluster=devnet" : ""}`;

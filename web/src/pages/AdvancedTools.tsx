@@ -17,7 +17,6 @@ import { HolderAnalysis } from "@/components/tools/HolderAnalysis";
 import { LiquidityScanner } from "@/components/tools/LiquidityScanner";
 import { StakingCalculator } from "@/components/tools/StakingCalculator";
 import { ImpermanentLossCalculator } from "@/components/tools/ImpermanentLossCalculator";
-import { SellAllTool } from "@/components/tools/SellAllTool";
 import { JupiterRouteTracker } from "@/components/advanced-tools/JupiterRouteTracker";
 import { ProgramInteractionMonitor } from "@/components/advanced-tools/ProgramInteractionMonitor";
 import { LPPositionScanner } from "@/components/advanced-tools/LPPositionScanner";
@@ -55,7 +54,6 @@ const toolComponents: Record<string, ToolComponent> = {
   "Liquidity Scanner": LiquidityScanner,
   "Staking Calculator": StakingCalculator,
   "Impermanent Loss": ImpermanentLossCalculator,
-  "Sell All": SellAllTool,
   "Jupiter Routes": JupiterRouteTracker,
   "Program Monitor": ProgramInteractionMonitor,
   "LP Scanner": LPPositionScanner,
