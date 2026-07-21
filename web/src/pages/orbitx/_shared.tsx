@@ -4,10 +4,11 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ShieldCheck, ShieldAlert, Droplets, Flame, Zap, LineChart, TrendingUp } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Droplets, Flame, Zap, LineChart, TrendingUp, Star } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { OrbitxToken } from "@/lib/orbitx/registry";
 import { orbitScore, scoreTone } from "./orbitScore";
+import { isWatched, toggleWatch } from "./watchlist";
 
 type MarketLite = { mcap?: number | null; liq?: number | null; vol24?: number | null; ch24?: number | null; buys24?: number | null; sells24?: number | null; url?: string | null };
 
@@ -208,10 +209,19 @@ export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | nul
   const buyPct = tx > 0 ? Math.round(((buys ?? 0) / tx) * 100) : null;
   const os = orbitScore({ liq: market?.liq, mcap, vol24: market?.vol24, buys, sells, ageMs: Date.now() - new Date(t.created_at).getTime(), isVamp: t.is_vamp, graduated });
   const to = `/orbitxlaunch/token/${t.mint_address}`;
+  const [watched, setWatched] = useState(() => isWatched(t.mint_address));
 
   return (
-    <div className="pf-card group flex flex-col gap-2.5 p-3">
-      <Link to={to} className="flex items-start gap-3">
+    <div className="pf-card group relative flex flex-col gap-2.5 p-3">
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); toggleWatch(t.mint_address); setWatched((w) => !w); }}
+        className="absolute right-2 top-2 z-10 rounded-md p-1 text-[hsl(var(--pf-muted))] transition hover:text-[hsl(var(--pf-gold))]"
+        title={watched ? "Remove from watchlist" : "Add to watchlist"}
+      >
+        <Star className={`h-4 w-4 ${watched ? "fill-current text-[hsl(var(--pf-gold))]" : ""}`} />
+      </button>
+      <Link to={to} className="flex items-start gap-3 pr-6">
         <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
           <TokenLogo src={t.logo_url} metadataUri={t.metadata_uri} symbol={t.ticker} className="h-full w-full text-sm" />
         </div>

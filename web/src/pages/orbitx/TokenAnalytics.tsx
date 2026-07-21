@@ -60,7 +60,7 @@ function AuthPill({ ok, label }: { ok: boolean; label: string }) {
 }
 
 export default function TokenAnalytics({ mint, pairAddress, holderCount }: { mint: string; pairAddress: string | null; holderCount?: number | null }) {
-  const [tradeFilter, setTradeFilter] = useState<"all" | "buy" | "sell">("all");
+  const [tradeFilter, setTradeFilter] = useState<"all" | "buy" | "sell" | "whales">("all");
   const [tradeSort, setTradeSort] = useState<"recent" | "largest">("recent");
 
   const onchain = useQuery({
@@ -156,7 +156,7 @@ export default function TokenAnalytics({ mint, pairAddress, holderCount }: { min
 
   const d = onchain.data;
   const allTrades = trades.data ?? [];
-  let shown = allTrades.filter((t: { kind: string }) => tradeFilter === "all" || t.kind === tradeFilter);
+  let shown = allTrades.filter((t: { kind: string; usd: number }) => tradeFilter === "all" ? true : tradeFilter === "whales" ? t.usd >= 500 : t.kind === tradeFilter);
   if (tradeSort === "largest") shown = [...shown].sort((a: { usd: number }, b: { usd: number }) => b.usd - a.usd);
   const buyVol = allTrades.filter((t: { kind: string }) => t.kind === "buy").reduce((a: number, b: { usd: number }) => a + b.usd, 0);
   const sellVol = allTrades.filter((t: { kind: string }) => t.kind === "sell").reduce((a: number, b: { usd: number }) => a + b.usd, 0);
@@ -227,7 +227,7 @@ export default function TokenAnalytics({ mint, pairAddress, holderCount }: { min
               <Activity className="h-3.5 w-3.5 text-[hsl(var(--pf-green))]" /> Live trades
             </div>
             <div className="flex flex-wrap justify-end gap-1">
-              {(["all", "buy", "sell"] as const).map((f) => (
+              {(["all", "buy", "sell", "whales"] as const).map((f) => (
                 <button key={f} type="button" onClick={() => setTradeFilter(f)}
                   className={`rounded-full px-2 py-0.5 pf-mono text-[9px] font-bold uppercase tracking-wider transition ${tradeFilter === f ? "bg-[hsl(var(--pf-green))] text-black" : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))]"}`}>
                   {f}

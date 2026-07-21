@@ -60,6 +60,7 @@ import LaunchpadAbout from "./pages/orbitx/LaunchpadAbout";
 import LaunchpadProfile from "./pages/orbitx/LaunchpadProfile";
 import LaunchpadLeaderboard from "./pages/orbitx/LaunchpadLeaderboard";
 import LaunchpadCreator from "./pages/orbitx/LaunchpadCreator";
+import LaunchpadPortfolio from "./pages/orbitx/LaunchpadPortfolio";
 import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
 import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
 import Callouts from "./pages/Callouts";
@@ -196,6 +197,7 @@ const App = () => (
               <Route path="profile" element={<LaunchpadProfile />} />
               <Route path="leaderboard" element={<LaunchpadLeaderboard />} />
               <Route path="creator/:wallet" element={<LaunchpadCreator />} />
+              <Route path="portfolio" element={<LaunchpadPortfolio />} />
             </Route>
 
             {/* ── Terminal UI: Trading Platform Style ── */}

@@ -7,12 +7,13 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Rocket, Zap, HandCoins, Flame, Loader2, ArrowRight, 
   TrendingUp, Droplets, Sparkles, BadgeCheck, Search, Filter,
-  ShieldCheck, ShieldAlert, Eye, Users, Activity, Coins, Gem,
+  ShieldCheck, ShieldAlert, Eye, Users, Activity, Coins, Gem, Star,
 } from "lucide-react";
 import { ORBITX_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
 import { type OrbitxToken, listTokens } from "@/lib/orbitx/registry";
 import { jupGetTokens, fmtPct } from "@/lib/og";
 import { TokenCard, GRADUATION_MC_USD } from "./_shared";
+import { useWatchlist } from "./watchlist";
 import {
   useAllLaunches, launchStats, useMarketMap, totalLpUsd,
   fmtCompactUsd, type MarketRow,
@@ -49,12 +50,14 @@ function FeaturedOfficialToken() {
   );
 }
 
-type BoardCategory = "new" | "trending" | "graduating" | "volume" | "gainers" | "gems" | "graduated";
+type BoardCategory = "new" | "trending" | "graduating" | "volume" | "gainers" | "gems" | "graduated" | "watchlist";
 
 export default function LaunchpadHome() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<BoardCategory>("new");
   const [hideVamps, setHideVamps] = useState(false);
+  const { list: watchIds } = useWatchlist();
+  const watchSet = useMemo(() => new Set(watchIds), [watchIds]);
 
   const { data: launches, isLoading } = useQuery({
     queryKey: ["orbitx-home-launches"],
@@ -103,6 +106,10 @@ export default function LaunchpadHome() {
       });
     }
     
+    if (category === "watchlist") {
+      items = items.filter((t) => t && watchSet.has(t.mint_address));
+    }
+
     if (category === "graduated") {
       items = items.filter((t) => {
         if (!t) return false;
@@ -148,7 +155,7 @@ export default function LaunchpadHome() {
     }
     
     return items;
-  }, [launches, markets, search, category, hideVamps]);
+  }, [launches, markets, search, category, hideVamps, watchSet]);
 
   const promoActive = isLaunchFeePromoActive();
   const promoDaysLeft = launchFeePromoDaysLeft();
@@ -252,6 +259,7 @@ export default function LaunchpadHome() {
             { id: "gainers", label: "Gainers" },
             { id: "gems", label: "Hidden gems" },
             { id: "graduated", label: "Graduated" },
+            { id: "watchlist", label: "Watchlist" },
           ] as { id: BoardCategory; label: string }[]).map((c) => (
             <button
               key={c.id}
@@ -269,6 +277,7 @@ export default function LaunchpadHome() {
               {c.id === "gainers" && <Flame className="inline h-3.5 w-3.5 mr-1.5" />}
               {c.id === "gems" && <Gem className="inline h-3.5 w-3.5 mr-1.5" />}
               {c.id === "graduated" && <Droplets className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c.id === "watchlist" && <Star className="inline h-3.5 w-3.5 mr-1.5" />}
               {c.label}
             </button>
           ))}
