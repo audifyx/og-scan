@@ -10,7 +10,7 @@ import {
   ShieldCheck, ShieldAlert, Eye, Users, Activity, Coins,
 } from "lucide-react";
 import { ORBITX_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
-import { type OrbitxToken } from "@/lib/orbitx/registry";
+import { type OrbitxToken, listTokens } from "@/lib/orbitx/registry";
 import { jupGetTokens, fmtPct } from "@/lib/og";
 import { TokenCard } from "./_shared";
 import {
@@ -59,36 +59,69 @@ export default function LaunchpadHome() {
   const { data: launches, isLoading } = useQuery({
     queryKey: ["orbitx-home-launches"],
     queryFn: async () => {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/orbitx_tokens?order=created_at.desc&limit=200`, {
-        headers: { apikey: import.meta.env.VITE_SUPABASE_KEY ?? "" },
-      });
-      return (await res.json()) as OrbitxToken[];
+      try {
+        const tokens = await listTokens("new", 200);
+        return tokens.filter((t) => t && t.mint_address) as OrbitxToken[];
+      } catch (error) {
+        console.error("[v0] Failed to fetch launches:", error);
+        return [];
+      }
     },
     staleTime: 15_000,
   });
 
-  const mints = useMemo(() => (launches || []).map((t) => t.mint_address), [launches]);
+  const mints = useMemo(() => {
+    return (launches || [])
+      .filter((t) => t?.mint_address)
+      .map((t) => t.mint_address);
+  }, [launches]);
+  
   const { data: markets } = useMarketMap(mints);
 
   const stats = useMemo(() => launchStats(launches), [launches]);
 
   const filtered = useMemo(() => {
-    let items = (launches ?? []).filter((t) => t != null);
+    let items = (launches ?? []).filter((t) => t != null && t.mint_address);
+    
     if (hideVamps) items = items.filter((t) => !t.is_vamp);
+    
     if (search.trim()) {
       const q = search.toLowerCase();
-      items = items.filter((t) => (t.name ?? '').toLowerCase().includes(q) || (t.ticker ?? '').toLowerCase().includes(q));
+      items = items.filter((t) => {
+        const name = (t.name ?? '').toLowerCase();
+        const ticker = (t.ticker ?? '').toLowerCase();
+        return name.includes(q) || ticker.includes(q);
+      });
     }
-    if (category === "graduated") items = items.filter((t) => !!t.lp_pool_address || (markets?.[t.mint_address]?.liq ?? 0) > 0);
-    else if (category === "trending") items = items.sort((a, b) => {
-      const aVol = markets?.[a.mint_address]?.vol24 ?? 0;
-      const aMc = markets?.[a.mint_address]?.mcap ?? 1;
-      const bVol = markets?.[b.mint_address]?.vol24 ?? 0;
-      const bMc = markets?.[b.mint_address]?.mcap ?? 1;
-      return (bVol / bMc) - (aVol / aMc);
-    });
-    else if (category === "volume") items = items.sort((a, b) => (markets?.[b.mint_address]?.vol24 ?? 0) - (markets?.[a.mint_address]?.vol24 ?? 0));
-    else if (category === "gainers") items = items.sort((a, b) => (markets?.[b.mint_address]?.ch24 ?? 0) - (markets?.[a.mint_address]?.ch24 ?? 0));
+    
+    if (category === "graduated") {
+      items = items.filter((t) => {
+        const hasPool = !!t.lp_pool_address;
+        const hasLiq = (markets?.[t.mint_address]?.liq ?? 0) > 0;
+        return hasPool || hasLiq;
+      });
+    } else if (category === "trending") {
+      items = items.sort((a, b) => {
+        const aVol = markets?.[a.mint_address]?.vol24 ?? 0;
+        const aMc = markets?.[a.mint_address]?.mcap ?? 1;
+        const bVol = markets?.[b.mint_address]?.vol24 ?? 0;
+        const bMc = markets?.[b.mint_address]?.mcap ?? 1;
+        return (bVol / bMc) - (aVol / aMc);
+      });
+    } else if (category === "volume") {
+      items = items.sort((a, b) => {
+        const aVol = markets?.[a.mint_address]?.vol24 ?? 0;
+        const bVol = markets?.[b.mint_address]?.vol24 ?? 0;
+        return bVol - aVol;
+      });
+    } else if (category === "gainers") {
+      items = items.sort((a, b) => {
+        const aCh = markets?.[a.mint_address]?.ch24 ?? 0;
+        const bCh = markets?.[b.mint_address]?.ch24 ?? 0;
+        return bCh - aCh;
+      });
+    }
+    
     return items;
   }, [launches, markets, search, category, hideVamps]);
 
@@ -200,9 +233,12 @@ export default function LaunchpadHome() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(filtered || []).slice(0, 50).map((t) => (
-            <TokenCard key={t.mint_address} token={t} market={markets?.[t.mint_address] ?? null} />
-          ))}
+          {(filtered || []).slice(0, 50).map((t) => {
+            if (!t || !t.mint_address) return null;
+            return (
+              <TokenCard key={t.mint_address} t={t} mc={markets?.[t.mint_address]?.mcap ?? null} />
+            );
+          })}
         </div>
       )}
 

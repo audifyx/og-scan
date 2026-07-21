@@ -131,7 +131,9 @@ export function Pill({ children, tone }: { children: React.ReactNode; tone: "gol
  * market cap, bonding-curve progress bar, short CA, age. Light card,
  * black border, green accents, hover lift.
  */
-export function TokenCard({ t, mc }: { t: OrbitxToken; mc?: number | null }) {
+export function TokenCard({ t, mc }: { t: OrbitxToken | null | undefined; mc?: number | null }) {
+  if (!t || !t.mint_address) return null;
+  
   const graduated = !!(t?.lp_pool_address);
   const pct = graduated
     ? 100
