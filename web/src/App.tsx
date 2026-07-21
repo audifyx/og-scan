@@ -63,6 +63,7 @@ import LaunchpadCreator from "./pages/orbitx/LaunchpadCreator";
 import LaunchpadPortfolio from "./pages/orbitx/LaunchpadPortfolio";
 import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
 import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
+import LaunchpadNftHub from "./pages/orbitx/LaunchpadNftHub";
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
@@ -198,6 +199,7 @@ const App = () => (
               <Route path="leaderboard" element={<LaunchpadLeaderboard />} />
               <Route path="creator/:wallet" element={<LaunchpadCreator />} />
               <Route path="portfolio" element={<LaunchpadPortfolio />} />
+              <Route path="nft" element={<LaunchpadNftHub />} />
             </Route>
 
             {/* ── Terminal UI: Trading Platform Style ── */}
