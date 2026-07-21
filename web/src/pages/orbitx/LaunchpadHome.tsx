@@ -69,6 +69,24 @@ export default function LaunchpadHome() {
   const vol24Total = useMemo(() => (markets ? Object.values(markets).reduce((a, m) => a + (m.vol24 ?? 0), 0) : 0), [markets]);
   const trades24 = useMemo(() => (markets ? Object.values(markets).reduce((a, m) => a + ((m.buys24 ?? 0) + (m.sells24 ?? 0)), 0) : 0), [markets]);
   const originals = useMemo(() => (Array.isArray(launches) ? launches.filter((t) => !t?.is_vamp).length : 0), [launches]);
+  const trending = useMemo(() => {
+    const arr = Array.isArray(launches) ? launches.filter((t) => !!t && !t.is_vamp) : [];
+    return arr
+      .filter((t) => (markets?.[t.mint_address]?.vol24 ?? 0) > 0)
+      .sort((a, b) => ((markets?.[b.mint_address]?.vol24 ?? 0) / (markets?.[b.mint_address]?.mcap ?? 1)) - ((markets?.[a.mint_address]?.vol24 ?? 0) / (markets?.[a.mint_address]?.mcap ?? 1)))
+      .slice(0, 3);
+  }, [launches, markets]);
+  const graduating = useMemo(() => {
+    const arr = Array.isArray(launches) ? launches.filter((t) => !!t) : [];
+    return arr
+      .filter((t) => {
+        const m = markets?.[t.mint_address];
+        const grad = !!t.lp_pool_address || !!t.graduated_at || (m?.mcap ?? 0) >= GRADUATION_MC_USD;
+        return !grad && (m?.mcap ?? 0) > 0;
+      })
+      .sort((a, b) => (markets?.[b.mint_address]?.mcap ?? 0) - (markets?.[a.mint_address]?.mcap ?? 0))
+      .slice(0, 3);
+  }, [launches, markets]);
 
   const filtered = useMemo(() => {
     let items = Array.isArray(launches) ? launches.filter(t => !!t) : [];
@@ -176,8 +194,21 @@ export default function LaunchpadHome() {
         </div>
       </div>
 
-      {/* ─── Featured token ──────────────────────────────────────────────── */}
+      {/* ─── Featured token ─── */}
       <FeaturedOfficialToken />
+
+      {/* ─── Trending now ─── */}
+      {trending.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-[hsl(var(--pf-green))]" />
+            <h2 className="text-sm font-black uppercase tracking-wide text-[hsl(var(--pf-ink))]">Trending now</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {trending.map((t) => <TokenCard key={t.mint_address} t={t} mc={markets?.[t.mint_address]?.mcap ?? null} market={markets?.[t.mint_address] ?? null} />)}
+          </div>
+        </section>
+      )}
 
       {/* ─── Stats grid ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
@@ -261,6 +292,18 @@ export default function LaunchpadHome() {
             <TokenCard key={t.mint_address} t={t} mc={markets?.[t.mint_address]?.mcap ?? null} market={markets?.[t.mint_address] ?? null} />
           ))}
         </div>
+      )}
+
+      {graduating.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <Rocket className="h-4 w-4 text-[hsl(var(--pf-gold))]" />
+            <h2 className="text-sm font-black uppercase tracking-wide text-[hsl(var(--pf-ink))]">Graduating soon</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {graduating.map((t) => <TokenCard key={t.mint_address} t={t} mc={markets?.[t.mint_address]?.mcap ?? null} market={markets?.[t.mint_address] ?? null} />)}
+          </div>
+        </section>
       )}
 
       {promoActive && (

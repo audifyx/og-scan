@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ShieldCheck, ShieldAlert, Droplets, Flame, Zap, LineChart } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Droplets, Flame, Zap, LineChart, TrendingUp } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { OrbitxToken } from "@/lib/orbitx/registry";
 import { orbitScore, scoreTone } from "./orbitScore";
@@ -244,6 +244,9 @@ export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | nul
           ? <Pill tone="blood"><ShieldAlert className="h-3 w-3" /> Vamp</Pill>
           : <Pill tone="lime"><ShieldCheck className="h-3 w-3" /> Original</Pill>}
         <Pill tone={t.launch_type === "pump" ? "cyan" : "gold"}>{t.launch_type === "pump" ? "Pump" : "Custom"}</Pill>
+        {(market?.vol24 ?? 0) > 2000 && <Pill tone="cyan"><TrendingUp className="h-3 w-3" /> Trending</Pill>}
+        {buyPct != null && buyPct >= 70 && (market?.vol24 ?? 0) > 2000 && <Pill tone="blood"><Flame className="h-3 w-3" /> Viral</Pill>}
+        {os.score < 40 && <Pill tone="blood"><ShieldAlert className="h-3 w-3" /> High risk</Pill>}
         {graduated && <Pill tone="lime"><Droplets className="h-3 w-3" /> Grad</Pill>}
         <span className="pf-mono ml-auto text-[10px] text-[hsl(var(--pf-muted))]">{timeAgo(t.created_at)}</span>
       </div>
