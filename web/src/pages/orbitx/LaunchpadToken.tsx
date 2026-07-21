@@ -15,6 +15,7 @@ import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { getToken, markGraduated } from "@/lib/orbitx/registry";
 import { shortAddr, timeAgo, SectionLabel, Pill, useDocumentMeta, fmtPrice, GRADUATION_MC_USD } from "./_shared";
 import { fmtCompactUsd } from "./lpx";
+import TokenAnalytics from "./TokenAnalytics";
 import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY } from "@/lib/og";
 import { toast } from "sonner";
 import {
@@ -543,6 +544,8 @@ export default function LaunchpadToken() {
       <div className="mt-4">
         <ChartPanel pairAddress={pair?.pairAddress ?? null} dexId={pair?.dexId ?? null} />
       </div>
+
+      <TokenAnalytics mint={mint!} pairAddress={pair?.pairAddress ?? null} holderCount={jup?.holderCount ?? null} />
 
       {/* buy / sell + position + details */}
       <div className="mt-4 grid gap-4 md:grid-cols-2">
