@@ -167,3 +167,60 @@ export async function markGraduated(mint: string): Promise<void> {
   const { error } = await supabase.rpc("orbitx_mark_graduated", { p_mint: mint });
   if (error) console.error("markGraduated failed:", error);
 }
+
+
+/* ─────────────────────── wallet profiles ─────────────────────── */
+
+export interface OrbitxProfile {
+  wallet: string;
+  username: string | null;
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  banner_url: string | null;
+  twitter: string | null;
+  website: string | null;
+}
+
+/** Fetch one wallet profile. Fails soft (returns null) if the table isn't set up yet. */
+export async function getProfile(wallet: string): Promise<OrbitxProfile | null> {
+  try {
+    const { data, error } = await supabase.from("orbitx_profiles").select("*").eq("wallet", wallet).maybeSingle();
+    if (error) return null;
+    return (data as OrbitxProfile) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Batch-fetch profiles keyed by wallet. Fails soft to an empty map. */
+export async function getProfiles(wallets: string[]): Promise<Record<string, OrbitxProfile>> {
+  if (!wallets.length) return {};
+  try {
+    const { data, error } = await supabase.from("orbitx_profiles").select("*").in("wallet", wallets);
+    if (error || !data) return {};
+    const map: Record<string, OrbitxProfile> = {};
+    (data as OrbitxProfile[]).forEach((p) => { map[p.wallet] = p; });
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+/** Create/update the connected wallet's profile via the upsert RPC. */
+export async function upsertProfile(p: Partial<OrbitxProfile> & { wallet: string }): Promise<void> {
+  const { error } = await supabase.rpc("orbitx_upsert_profile", {
+    p_wallet: p.wallet,
+    p_username: p.username ?? null,
+    p_display_name: p.display_name ?? null,
+    p_bio: p.bio ?? null,
+    p_avatar_url: p.avatar_url ?? null,
+    p_banner_url: p.banner_url ?? null,
+    p_twitter: p.twitter ?? null,
+    p_website: p.website ?? null,
+  });
+  if (error) {
+    if ((error as { code?: string }).code === "23505") throw new Error("That username is already taken.");
+    throw error;
+  }
+}

@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { listByCreator } from "@/lib/orbitx/registry";
+import { listByCreator, getProfile } from "@/lib/orbitx/registry";
 import { TokenCard, shortAddr, GRADUATION_MC_USD } from "./_shared";
 import { useMarketMap, fmtCompactUsd } from "./lpx";
 import { Loader2, Wallet, Rocket, Droplets, ArrowLeft, Copy, Check, ExternalLink, Coins } from "lucide-react";
@@ -30,6 +30,7 @@ export default function LaunchpadCreator() {
     queryFn: () => listByCreator(wallet!, 100),
     enabled: !!wallet,
   });
+  const { data: profile } = useQuery({ queryKey: ["orbitx-creator-profile", wallet], queryFn: () => getProfile(wallet!), enabled: !!wallet });
   const tokens = data ?? [];
   const mints = useMemo(() => tokens.map((t) => t.mint_address), [tokens]);
   const { data: markets } = useMarketMap(mints);
@@ -50,15 +51,16 @@ export default function LaunchpadCreator() {
       <div className="pf-card p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-green))]/15">
-              <Wallet className="h-6 w-6 text-[hsl(var(--pf-green))]" />
+            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-green))]/15">
+              {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><Wallet className="h-6 w-6 text-[hsl(var(--pf-green))]" /></div>}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-black tracking-tight text-[hsl(var(--pf-ink))]">{shortAddr(wallet, 6)}</h1>
+                <h1 className="text-xl font-black tracking-tight text-[hsl(var(--pf-ink))]">{profile?.display_name || profile?.username || shortAddr(wallet, 6)}</h1>
                 {graduated >= 3 && <span className="rounded-full border border-[hsl(var(--pf-green))] px-2 py-0.5 pf-mono text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-green))]">Verified creator</span>}
               </div>
-              <div className="pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">creator profile</div>
+              <div className="pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">{profile?.username ? `@${profile.username} \u00b7 ${shortAddr(wallet, 4)}` : "creator profile"}</div>
+              {profile?.bio && <p className="mt-1 max-w-md text-xs text-[hsl(var(--pf-muted))]">{profile.bio}</p>}
             </div>
           </div>
           <div className="flex items-center gap-2">
