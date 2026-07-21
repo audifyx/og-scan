@@ -568,7 +568,7 @@ export default function LaunchpadToken() {
                 {t.is_vamp ? <ShieldAlert className="h-6 w-6 text-[hsl(var(--pf-red))]" /> : <ShieldCheck className="h-6 w-6 text-[hsl(var(--pf-green))]" />}
                 <div className="text-sm font-black text-[hsl(var(--pf-ink))]">{t.is_vamp ? "Flagged as a look-alike clone" : "Protected by OrbitX anti-vamp"}</div>
               </div>
-              <Row label="Original creator">{shortAddr(t.creator_wallet, 5)}</Row>
+              <Row label="Original creator"><Link to={`/orbitxlaunch/creator/${t.creator_wallet}`} className="text-[hsl(var(--pf-blue))] hover:underline">{shortAddr(t.creator_wallet, 5)}</Link></Row>
               <Row label="Launched">{timeAgo(t.created_at)}</Row>
               <Row label="Launch type">{t.launch_type === "pump" ? "Bonding curve" : "Custom SPL"}</Row>
               <Row label="Status">{graduated ? "Graduated" : "Bonding"}</Row>
@@ -611,7 +611,7 @@ export default function LaunchpadToken() {
                 <Row label="Decimals">{t.decimals}</Row>
                 <Row label="DEX">{pair?.dexId || t.dex || "—"}</Row>
                 <Row label="Fee routing">{t.fee_route === "orbitx_buyback" ? "OBX buyback" : t.fee_route === "og" ? "Original token" : "Creator"}</Row>
-                <Row label="Creator">{shortAddr(t.creator_wallet, 5)}</Row>
+                <Row label="Creator"><Link to={`/orbitxlaunch/creator/${t.creator_wallet}`} className="text-[hsl(var(--pf-blue))] hover:underline">{shortAddr(t.creator_wallet, 5)}</Link></Row>
                 <Row label="Launched">{timeAgo(t.created_at)}</Row>
                 {t.lp_pool_address && <Row label="LP pool">{shortAddr(t.lp_pool_address, 5)}</Row>}
                 {t.mint_signature && <Row label="Mint tx"><a className="text-[hsl(var(--pf-blue))] hover:underline" target="_blank" rel="noreferrer" href={`https://solscan.io/tx/${t.mint_signature}${cluster !== "mainnet-beta" ? "?cluster=devnet" : ""}`}>{shortAddr(t.mint_signature, 5)}</a></Row>}

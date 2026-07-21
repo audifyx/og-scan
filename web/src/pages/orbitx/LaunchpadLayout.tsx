@@ -8,7 +8,7 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
-  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Zap,
+  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Zap, Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
@@ -22,6 +22,7 @@ const TABS = [
   { to: "/orbitxlaunch/create", label: "DEPLOY", icon: PlusCircle, end: false },
   { to: "/orbitxlaunch/claim", label: "CLAIM FEES", icon: HandCoins, end: false, hot: true },
   { to: "/orbitxlaunch/rescue", label: "RESCUE", icon: Flame, end: false, hot: true },
+  { to: "/orbitxlaunch/leaderboard", label: "LEADERBOARD", icon: Trophy, end: false },
   { to: "/orbitxlaunch/profile", label: "PROFILE", icon: UserCircle2, end: false },
   { to: "/orbitxlaunch/about", label: "ABOUT", icon: Info, end: false },
 ];
