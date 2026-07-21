@@ -10,7 +10,7 @@ import {
   ShieldCheck, ShieldAlert, Eye, Users, Activity, Coins,
 } from "lucide-react";
 import { ORBITX_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
-import { type OrbitxToken } from "@/lib/orbitx/registry";
+import { type OrbitxToken, listTokens } from "@/lib/orbitx/registry";
 import { jupGetTokens, fmtPct } from "@/lib/og";
 import { TokenCard } from "./_shared";
 import {
@@ -58,18 +58,7 @@ export default function LaunchpadHome() {
 
   const { data: launches, isLoading } = useQuery({
     queryKey: ["orbitx-home-launches"],
-    queryFn: async () => {
-      try {
-        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/orbitx_tokens?order=created_at.desc&limit=200`, {
-          headers: { apikey: import.meta.env.VITE_SUPABASE_KEY ?? "" },
-        });
-        if (!res.ok) return [];
-        const data = await res.json();
-        return Array.isArray(data) ? data : [];
-      } catch {
-        return [];
-      }
-    },
+    queryFn: () => listTokens("all", 200),
     staleTime: 15_000,
   });
 
