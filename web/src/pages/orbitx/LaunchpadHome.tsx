@@ -59,21 +59,27 @@ export default function LaunchpadHome() {
   const { data: launches, isLoading } = useQuery({
     queryKey: ["orbitx-home-launches"],
     queryFn: async () => {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/orbitx_tokens?order=created_at.desc&limit=200`, {
-        headers: { apikey: import.meta.env.VITE_SUPABASE_KEY ?? "" },
-      });
-      return (await res.json()) as OrbitxToken[];
+      try {
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/orbitx_tokens?order=created_at.desc&limit=200`, {
+          headers: { apikey: import.meta.env.VITE_SUPABASE_KEY ?? "" },
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      } catch {
+        return [];
+      }
     },
     staleTime: 15_000,
   });
 
-  const mints = useMemo(() => launches?.map((t) => t.mint_address) ?? [], [launches]);
+  const mints = useMemo(() => (Array.isArray(launches) ? launches.map((t) => t.mint_address) : []), [launches]);
   const { data: markets } = useMarketMap(mints);
 
   const stats = useMemo(() => launchStats(launches), [launches]);
 
   const filtered = useMemo(() => {
-    let items = launches ?? [];
+    let items = Array.isArray(launches) ? launches : [];
     if (hideVamps) items = items.filter((t) => !t.is_vamp);
     if (search.trim()) {
       const q = search.toLowerCase();
