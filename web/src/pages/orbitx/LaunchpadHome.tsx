@@ -62,8 +62,7 @@ export default function LaunchpadHome() {
       try {
         const tokens = await listTokens("new", 200);
         return tokens.filter((t) => t && t.mint_address) as OrbitxToken[];
-      } catch (error) {
-        console.error("[v0] Failed to fetch launches:", error);
+      } catch {
         return [];
       }
     },
