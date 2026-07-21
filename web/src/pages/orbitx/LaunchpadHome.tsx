@@ -192,7 +192,7 @@ export default function LaunchpadHome() {
         <div className="flex items-center justify-center gap-2 py-12 text-sm text-[hsl(var(--pf-muted))]">
           <Loader2 className="h-4 w-4 animate-spin" /> loading launches…
         </div>
-      ) : !filtered.length ? (
+      ) : !(filtered?.length) ? (
         <div className="pf-card text-center py-16">
           <Eye className="h-12 w-12 text-[hsl(var(--pf-muted))] mx-auto mb-4 opacity-50" />
           <div className="text-lg font-bold text-[hsl(var(--pf-muted))]">No launches found</div>
