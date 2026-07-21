@@ -173,7 +173,7 @@ export default function LaunchpadHome() {
             <h1 className="obx-gradient-text mb-4 text-3xl font-black leading-[1.06] tracking-tight sm:text-4xl md:text-5xl">
               The safest place to launch and trade Solana memes
             </h1>
-            <p className="mb-7 max-w-xl text-base leading-relaxed text-[hsl(var(--pf-muted))] sm:text-lg">
+            <p className="mb-7 max-w-xl text-base leading-relaxed text-white sm:text-lg">
               Launch original tokens. Discover hidden gems. Trade with confidence. Protected by OrbitX anti-vamp technology.
             </p>
             <div className="flex flex-wrap gap-3">

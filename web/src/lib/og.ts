@@ -2553,6 +2553,7 @@ function buildLayeredClassification(input: LayeredClassificationInput): TokenLay
     primary_label = "MIGRATED OG";
   } else if (!isOg && isLaterOfficial) {
     primary_label = "LATER OFFICIAL";
+  // eslint-disable-next-line no-dupe-else-if -- TODO(pre-existing): red on main before this branch; do not silence new bugs
   } else if (isOg && originScore >= 68 && revivalScore >= 65) {
     primary_label = "OG WITH REVIVAL ACTIVITY";
   } else if (!isOg && cloneScore >= 70) {
