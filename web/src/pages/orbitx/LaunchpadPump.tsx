@@ -595,33 +595,32 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile) return;
 
     let flagged = false;
-    try {
-      /* Step -1 - OrbitX Anti-Vamp identity check (unified: OrbitX registry +
-         pump.fun + DexScreener), same protection as the custom/SPL lane.
-         Re-run fresh right before any fee payment or on-chain action - never
-         trust only the debounced live-typing result - so a blocked clone
-         never costs the user SOL. Fails CLOSED on a check error. */
-      setStep("uploading");
-      setStatusMsg("OrbitX Anti-Vamp check...");
-      const result = await checkAntiVamp(form.name, form.symbol);
-      if (result.blocked) {
-        setNameTaken(true);
-        setBlockedMatch(result.hardMatch ? { name: result.hardMatch.name, ticker: result.hardMatch.ticker } : null);
-        toast.error(
-          result.hardMatch
-            ? `Blocked - "${form.name}" / ${form.symbol} is too close to ${result.hardMatch.name} ($${result.hardMatch.ticker}). Anti-vamp requires a unique identity.`
-            : result.message || "Originality verification failed - please try again."
-        );
-        setStep("form");
-        return;
-      }
-      if (result.flagged) {
-        flagged = true;
-        toast.warning(`${result.matches.length} similar token(s) exist - launching FLAGGED: creator fees route to OBX buybacks.`);
-      }
-    } catch (err) {
+    /* Step -1 - OrbitX Anti-Vamp identity check (unified: OrbitX registry +
+       pump.fun + DexScreener), same protection as the custom/SPL lane.
+       Re-run fresh right before any fee payment or on-chain action - never
+       trust only the debounced live-typing result - so a blocked clone
+       never costs the user SOL. Fails CLOSED on a check error (matches the
+       Custom lane): a broken check must never let a duplicate slip through. */
+    setStep("uploading");
+    setStatusMsg("OrbitX Anti-Vamp check...");
+    const result = await checkAntiVamp(form.name, form.symbol).catch((err) => {
       console.error("[orbitx] pump anti-vamp check failed", err);
-      // fail soft — don't block a launch over a transient registry error
+      return { blocked: true, flagged: true, hardMatch: null, matches: [], message: "Originality verification failed - please try again." } as const;
+    });
+    if (result.blocked) {
+      setNameTaken(true);
+      setBlockedMatch(result.hardMatch ? { name: result.hardMatch.name, ticker: result.hardMatch.ticker } : null);
+      toast.error(
+        result.hardMatch
+          ? `Blocked - "${form.name}" / ${form.symbol} is too close to ${result.hardMatch.name} ($${result.hardMatch.ticker}). Anti-vamp requires a unique identity.`
+          : result.message || "Originality verification failed - please try again."
+      );
+      setStep("form");
+      return;
+    }
+    if (result.flagged) {
+      flagged = true;
+      toast.warning(`${result.matches.length} similar token(s) exist - launching FLAGGED: creator fees route to OBX buybacks.`);
     }
 
     try {

@@ -1862,12 +1862,12 @@ body::before {
 .lp-classic .pf-nav-link {
   font-weight: 700;
   font-size: 13px;
-  color: hsl(var(--pf-muted));
+  color: hsl(210 20% 75%);
   padding: 6px 12px;
   border-radius: 9999px;
   transition: background 0.12s ease, color 0.12s ease;
 }
-.lp-classic .pf-nav-link:hover { background: hsl(var(--pf-ink) / 0.06); color: hsl(var(--pf-ink)); }
+.lp-classic .pf-nav-link:hover { background: hsl(0 0% 100% / 0.08); color: hsl(0 0% 100%); }
 .lp-classic .pf-nav-link.active { background: hsl(var(--pf-ink)); color: hsl(0 0% 100%); }
 
 /* replace neon glass card usage inside lp-classic scope */
