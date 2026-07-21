@@ -1089,7 +1089,7 @@ function fileToBase64(file: File): Promise<string> {
       const result = reader.result as string;
       resolve(result.split(",")[1] || result);
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error(`Could not read the image file (${file.name || "unnamed"}, ${(file.size / 1024).toFixed(0)}KB) — try a different photo or a smaller file size.`));
     reader.readAsDataURL(file);
   });
 }
