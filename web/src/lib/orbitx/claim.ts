@@ -16,7 +16,10 @@
  */
 import {
   Connection, PublicKey, Transaction, VersionedTransaction, LAMPORTS_PER_SOL, ComputeBudgetProgram,
+  TransactionMessage, SystemProgram, type AddressLookupTableAccount,
 } from "@solana/web3.js";
+import { buildJupiterSwapTransaction, SOL_MINT } from "./rescue";
+import { computeSkim, routedFeeDestination, DEFAULT_FEE_ROUTING, type FeeRoutingConfig } from "./feeRouting";
 import {
   TOKEN_2022_PROGRAM_ID, unpackMint, unpackAccount, getTransferFeeConfig, getTransferFeeAmount,
   getAssociatedTokenAddressSync, createAssociatedTokenAccountIdempotentInstruction,
@@ -172,4 +175,131 @@ export function buildCustomClaimTransactions(
     txs.push(tx);
   }
   return txs;
+}
+
+
+/* ─────────────────── Platform fee routing (2.5% at claim) ─────────────────── */
+
+/**
+ * Append a single SystemProgram.transfer (lamports, `from` → `to`) to an
+ * already-built VersionedTransaction, preserving its payer, blockhash and any
+ * address-lookup tables. Used to skim the platform revenue-share into the
+ * routed-fee wallet atomically inside the same claim/swap the user signs.
+ * Resets signatures (the caller signs the returned tx).
+ */
+export async function appendSolTransferToVersionedTx(
+  connection: Connection,
+  vtx: VersionedTransaction,
+  from: PublicKey,
+  to: PublicKey,
+  lamports: number,
+): Promise<VersionedTransaction> {
+  if (!lamports || lamports <= 0) return vtx;
+  const lookups = vtx.message.addressTableLookups ?? [];
+  const alts: AddressLookupTableAccount[] = [];
+  for (const l of lookups) {
+    const res = await connection.getAddressLookupTable(l.accountKey);
+    if (res.value) alts.push(res.value);
+  }
+  const msg = TransactionMessage.decompile(vtx.message, { addressLookupTableAccounts: alts });
+  msg.instructions.push(SystemProgram.transfer({ fromPubkey: from, toPubkey: to, lamports: Math.floor(lamports) }));
+  return new VersionedTransaction(msg.compileToV0Message(alts));
+}
+
+export interface PumpClaimPlan {
+  tx: VersionedTransaction;
+  grossLamports: number;
+  skimLamports: number;
+  netLamports: number;
+}
+
+/**
+ * Build the pump.fun claim transaction WITH the platform revenue-share skim
+ * appended: reads the currently-claimable amount, computes the configured cut
+ * (default 2.5%), and appends a transfer of that cut to the routed-fee wallet
+ * inside the same transaction the creator signs. The creator nets the rest.
+ * Fail-closed: if the skim can't be computed/appended it throws rather than
+ * claiming without the cut.
+ */
+export async function buildPumpClaimWithSkim(
+  connection: Connection,
+  creator: PublicKey,
+  cfg: FeeRoutingConfig = DEFAULT_FEE_ROUTING,
+): Promise<PumpClaimPlan> {
+  const grossSol = await getPumpClaimableSol(connection, creator);
+  const grossLamports = Math.floor(grossSol * LAMPORTS_PER_SOL);
+  const { skimRaw, netRaw } = computeSkim(BigInt(grossLamports), cfg);
+  const skimLamports = Number(skimRaw);
+  let tx = await buildPumpClaimTransaction(creator);
+  if (skimLamports > 0) {
+    tx = await appendSolTransferToVersionedTx(connection, tx, creator, routedFeeDestination(cfg.wallet), skimLamports);
+  }
+  return { tx, grossLamports, skimLamports, netLamports: Number(netRaw) };
+}
+
+/**
+ * Build a pump.fun BUY transaction (via PumpPortal) spending `solAmount` SOL on
+ * `mint`, signed by the creator. Used for "claim + auto-buyback": after a claim
+ * settles, re-buy the creator's own coin with the freshly-claimed SOL.
+ * pool:"auto" lets PumpPortal route to the bonding curve or graduated pool.
+ */
+export async function buildPumpBuyTransaction(
+  creator: PublicKey,
+  mint: string,
+  solAmount: number,
+): Promise<VersionedTransaction> {
+  const res = await fetch("https://pumpportal.fun/api/trade-local", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      publicKey: creator.toBase58(),
+      action: "buy",
+      mint,
+      denominatedInSol: "true",
+      amount: solAmount,
+      slippage: 15,
+      priorityFee: 0.00005,
+      pool: "auto",
+    }),
+  });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(`PumpPortal buy build failed (${res.status}): ${msg || res.statusText}`);
+  }
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  return VersionedTransaction.deserialize(bytes);
+}
+
+export interface CustomSwapPlan {
+  tx: VersionedTransaction;
+  /** Expected SOL out (lamports) before skim. */
+  grossLamports: number;
+  skimLamports: number;
+  netLamports: number;
+}
+
+/**
+ * Build a Jupiter swap of `amountRaw` of a custom-lane token → SOL for the
+ * creator, WITH the platform skim appended. This is how the custom lane pays
+ * creator fees "in SOL": the on-chain fee accrues in-token (Token-2022), we
+ * withdraw it (see buildCustomClaimTransactions) and then swap it to SOL here.
+ */
+export async function buildCustomSwapToSolWithSkim(
+  connection: Connection,
+  creator: PublicKey,
+  mint: string,
+  amountRaw: bigint,
+  cfg: FeeRoutingConfig = DEFAULT_FEE_ROUTING,
+): Promise<CustomSwapPlan> {
+  const { swapTransactionB64, outAmount } = await buildJupiterSwapTransaction(
+    creator, new PublicKey(mint), SOL_MINT, amountRaw, 150,
+  );
+  const grossLamports = Number(outAmount);
+  const { skimRaw, netRaw } = computeSkim(BigInt(outAmount), cfg);
+  const skimLamports = Number(skimRaw);
+  let tx = VersionedTransaction.deserialize(Buffer.from(swapTransactionB64, "base64"));
+  if (skimLamports > 0) {
+    tx = await appendSolTransferToVersionedTx(connection, tx, creator, routedFeeDestination(cfg.wallet), skimLamports);
+  }
+  return { tx, grossLamports, skimLamports, netLamports: Number(netRaw) };
 }

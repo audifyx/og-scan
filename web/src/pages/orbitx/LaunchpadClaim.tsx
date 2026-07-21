@@ -23,8 +23,11 @@ import { listByCreator, type OrbitxToken } from "@/lib/orbitx/registry";
 import {
   getPumpClaimableSol, buildPumpClaimTransaction,
   getCustomClaimable, buildCustomClaimTransactions, type CustomClaimable,
+  buildPumpClaimWithSkim, buildPumpBuyTransaction, buildCustomSwapToSolWithSkim,
 } from "@/lib/orbitx/claim";
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
+import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -37,6 +40,8 @@ export default function LaunchpadClaim() {
   const [pumpLoading, setPumpLoading] = useState(false);
   const [pumpClaiming, setPumpClaiming] = useState(false);
   const [pumpSig, setPumpSig] = useState("");
+  const [autoBuyback, setAutoBuyback] = useState(false);
+  const [buybackMint, setBuybackMint] = useState("");
 
   /* custom lane */
   const [tokens, setTokens] = useState<OrbitxToken[]>([]);
@@ -95,12 +100,37 @@ export default function LaunchpadClaim() {
     if (!publicKey || !signTransaction) return;
     setPumpClaiming(true);
     try {
-      const tx = await buildPumpClaimTransaction(publicKey);
-      const signed = await signTransaction(tx);
+      // Claim + 2.5% platform skim, atomic in one signed tx.
+      const plan = await buildPumpClaimWithSkim(connection, publicKey);
+      if (plan.grossLamports <= 0) { toast.error("Nothing to claim right now"); return; }
+      const signed = await signTransaction(plan.tx);
       const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
       await connection.confirmTransaction(sig, "confirmed");
       setPumpSig(sig);
-      toast.success("Pump.fun creator fees claimed");
+      const netSol = plan.netLamports / LAMPORTS_PER_SOL;
+      toast.success(`Claimed ${netSol.toFixed(4)} SOL (${bpsToPct(DEFAULT_ROUTED_FEE_BPS)}% platform fee routed)`);
+
+      // Optional: use the freshly-claimed SOL to buy back your own coin.
+      if (autoBuyback) {
+        const mint = buybackMint || pumpTokens[0]?.mint_address || "";
+        const buyLamports = plan.netLamports - Math.floor(0.01 * LAMPORTS_PER_SOL); // leave gas
+        if (!mint) {
+          toast.error("Pick a coin to buy back");
+        } else if (buyLamports <= 0) {
+          toast.error("Claimed amount too small to buy back");
+        } else {
+          try {
+            const buySol = buyLamports / LAMPORTS_PER_SOL;
+            const buyTx = await buildPumpBuyTransaction(publicKey, mint, buySol);
+            const signedBuy = await signTransaction(buyTx);
+            const buySig = await connection.sendRawTransaction(signedBuy.serialize(), { skipPreflight: false, maxRetries: 3 });
+            await connection.confirmTransaction(buySig, "confirmed");
+            toast.success(`Bought back ${buySol.toFixed(4)} SOL of your coin`);
+          } catch (e) {
+            toast.error(e instanceof Error ? `Buyback failed: ${e.message}` : "Buyback failed");
+          }
+        }
+      }
       refreshPump();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -130,8 +160,20 @@ export default function LaunchpadClaim() {
         lastSig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
         await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
       }
+      // Custom-lane fees accrue in-token; swap the withdrawn amount to SOL
+      // (+2.5% platform skim) so the creator is paid in SOL like the pump lane.
+      try {
+        const plan = await buildCustomSwapToSolWithSkim(connection, publicKey, t.mint_address, info.totalRaw);
+        const signedSwap = await signTransaction(plan.tx);
+        const swapSig = await connection.sendRawTransaction(signedSwap.serialize(), { skipPreflight: false, maxRetries: 3 });
+        await connection.confirmTransaction(swapSig, "confirmed");
+        lastSig = swapSig;
+        toast.success(`${t.ticker} fees claimed & swapped to ${(plan.netLamports / LAMPORTS_PER_SOL).toFixed(4)} SOL`);
+      } catch (e) {
+        const em = e instanceof Error ? e.message : "no swap route";
+        toast.success(`${t.ticker} fees claimed as tokens (SOL swap unavailable: ${em})`);
+      }
       setClaimSigs((c) => ({ ...c, [t.mint_address]: lastSig }));
-      toast.success(`${t.ticker} creator fees claimed to your wallet`);
       const fresh = await getCustomClaimable(connection, t.mint_address).catch(() => null);
       if (fresh) setClaimables((c) => ({ ...c, [t.mint_address]: fresh }));
     } catch (err) {
@@ -189,6 +231,30 @@ export default function LaunchpadClaim() {
               <p className="mb-4 text-xs text-muted-foreground">
                 One claim collects your creator fees across <span className="text-foreground">all</span> coins this wallet created on pump.fun (bonding curve + graduated), including launches made here.
               </p>
+              <div className="mb-4 rounded-lg border border-white/10 bg-black/30 p-3 text-xs">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Platform fee on claim</span>
+                  <span className="font-mono text-foreground">{bpsToPct(DEFAULT_ROUTED_FEE_BPS)}%</span>
+                </div>
+                <label className="mt-3 flex cursor-pointer items-center gap-2">
+                  <input type="checkbox" checked={autoBuyback} onChange={(e) => setAutoBuyback(e.target.checked)}
+                    className="h-4 w-4 accent-[hsl(var(--og-gold))]" />
+                  <span className="font-semibold text-foreground">Claim &amp; auto-buyback</span>
+                </label>
+                {autoBuyback && (
+                  pumpTokens.length > 0 ? (
+                    <select value={buybackMint || pumpTokens[0].mint_address} onChange={(e) => setBuybackMint(e.target.value)}
+                      className="mt-2 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-foreground">
+                      {pumpTokens.map((t) => (
+                        <option key={t.mint_address} value={t.mint_address}>${t.ticker} · {short(t.mint_address)}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="mt-2 text-[11px] text-muted-foreground">No pump launches from this wallet to buy back yet.</p>
+                  )
+                )}
+                {autoBuyback && <p className="mt-2 text-[11px] text-muted-foreground">Right after claiming, your net SOL is used to market-buy the selected coin.</p>}
+              </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Claimable now</div>
@@ -234,7 +300,7 @@ export default function LaunchpadClaim() {
                 <Badge variant="outline" className="border-white/15 text-[10px] text-muted-foreground">Token-2022 transfer fee</Badge>
               </div>
               <p className="mb-4 text-xs text-muted-foreground">
-                Every buy/sell of your custom tokens withholds {(CREATOR_FEE_BPS / 100).toFixed(2)}% on-chain. Only your creator wallet can withdraw it. Fees are paid in your own token — swap them any time.
+                Every buy/sell of your custom tokens withholds {(CREATOR_FEE_BPS / 100).toFixed(2)}% on-chain (paid in your token). Claiming withdraws it and swaps it to <span className="text-foreground">SOL</span>, minus a {bpsToPct(DEFAULT_ROUTED_FEE_BPS)}% platform fee. Only your creator wallet can claim. If the pool is too thin to swap, you keep the tokens.
               </p>
 
               {tokensLoading ? (
