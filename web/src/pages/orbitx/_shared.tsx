@@ -1,11 +1,46 @@
 // Shared bits for Orbitx Launchpad pages — classic pump.fun (2023) look.
 // Exports are unchanged (shortAddr, timeAgo, SectionLabel, StatTile, TokenCard)
 // so LaunchpadHome / Profile / Token / About keep working without edits.
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ShieldCheck, ShieldAlert, Droplets, Flame } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { OrbitxToken } from "@/lib/orbitx/registry";
+
+/**
+ * Resolves a token image robustly: direct logo URL first, then the token's
+ * on-chain metadata JSON `image` (lazy-fetched, cached), then a clean
+ * ticker-letters placeholder. Also degrades to the placeholder if the image
+ * URL 404s / fails to load, so we never show a broken image box.
+ */
+export function TokenLogo({ src, metadataUri, symbol, className = "" }: { src?: string | null; metadataUri?: string | null; symbol?: string | null; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  const { data: metaImg } = useQuery({
+    queryKey: ["obx-token-logo", metadataUri],
+    enabled: !src && !!metadataUri,
+    staleTime: 300_000,
+    queryFn: async () => {
+      try {
+        const r = await fetch(metadataUri as string);
+        if (!r.ok) return null;
+        const j = await r.json();
+        return typeof j?.image === "string" ? j.image : null;
+      } catch {
+        return null;
+      }
+    },
+  });
+  const url = src || metaImg || null;
+  if (!url || failed) {
+    return (
+      <div className={`flex items-center justify-center bg-[hsl(var(--pf-bg))] font-black text-[hsl(var(--pf-muted))] ${className}`}>
+        {(symbol || "?").slice(0, 2).toUpperCase()}
+      </div>
+    );
+  }
+  return <img src={url} alt={symbol || ""} onError={() => setFailed(true)} loading="lazy" draggable={false} className={`h-full w-full object-cover ${className}`} />;
+}
 
 export const shortAddr = (a?: string | null, n = 4) =>
   !a ? "—" : a.length <= n * 2 + 1 ? a : `${a.slice(0, n)}…${a.slice(-n)}`;
@@ -148,13 +183,7 @@ export function TokenCard({ t, mc }: { t: OrbitxToken; mc?: number | null }) {
       {/* header: logo + name/ticker + status badge */}
       <div className="flex items-start gap-3">
         <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
-          {t.logo_url ? (
-            <img src={t.logo_url} alt={t.ticker} className="h-full w-full object-cover" loading="lazy" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-sm font-black text-[hsl(var(--pf-muted))]">
-              {t.ticker?.slice(0, 2).toUpperCase()}
-            </div>
-          )}
+          <TokenLogo src={t.logo_url} metadataUri={t.metadata_uri} symbol={t.ticker} className="h-full w-full text-sm" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">

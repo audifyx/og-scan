@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { getToken, markGraduated } from "@/lib/orbitx/registry";
-import { shortAddr, timeAgo, SectionLabel, Pill, useDocumentMeta, fmtPrice, GRADUATION_MC_USD } from "./_shared";
+import { shortAddr, timeAgo, SectionLabel, Pill, TokenLogo, useDocumentMeta, fmtPrice, GRADUATION_MC_USD } from "./_shared";
 import { fmtCompactUsd } from "./lpx";
 import TokenAnalytics from "./TokenAnalytics";
 import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY } from "@/lib/og";
@@ -412,7 +412,7 @@ export default function LaunchpadToken() {
 
   const name = t?.name ?? jup?.name;
   const ticker = t?.ticker ?? jup?.symbol;
-  const logo = t?.logo_url ?? jup?.icon ?? pair?.info?.imageUrl ?? null;
+  const logo = t?.logo_url ?? meta?.image ?? jup?.icon ?? pair?.info?.imageUrl ?? null;
   const decimals = t?.decimals ?? jup?.decimals ?? 9;
   const mcap = pair?.marketCap ?? pair?.fdv ?? jup?.mcap ?? jup?.fdv ?? null;
   const liq = pair?.liquidity?.usd ?? jup?.liquidity ?? null;
@@ -476,7 +476,7 @@ export default function LaunchpadToken() {
       <div className="pf-card p-6">
         <div className="flex items-start gap-4">
           <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
-            {logo ? <img src={logo} alt={ticker} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xl font-black text-[hsl(var(--pf-muted))]">{ticker?.slice(0, 2).toUpperCase()}</div>}
+            <TokenLogo src={logo} metadataUri={t?.metadata_uri} symbol={ticker} className="h-full w-full text-xl" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">

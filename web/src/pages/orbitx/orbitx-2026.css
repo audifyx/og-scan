@@ -186,3 +186,76 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-classic::before, .lp-classic::after, .lp-classic .obx-globe, .lp-classic .obx-glow-ring { animation: none; }
 }
+
+/* ============================================================================
+   Premium polish pass — top-tier finish across the launchpad.
+   ========================================================================== */
+
+/* smoother images + selects */
+.lp-classic img { image-rendering: auto; }
+.lp-classic ::selection { background: hsl(152 86% 52% / 0.3); color: #fff; }
+
+/* thin neon scrollbars */
+.lp-classic *::-webkit-scrollbar { width: 8px; height: 8px; }
+.lp-classic *::-webkit-scrollbar-track { background: transparent; }
+.lp-classic *::-webkit-scrollbar-thumb {
+  background: linear-gradient(hsl(152 86% 40% / 0.6), hsl(190 92% 45% / 0.5));
+  border-radius: 9999px;
+}
+.lp-classic *::-webkit-scrollbar-thumb:hover { background: hsl(152 86% 52% / 0.8); }
+
+/* card sheen + smoother hover on every glass panel */
+.lp-classic .pf-card { position: relative; overflow: hidden; }
+.lp-classic .pf-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(140deg, hsl(0 0% 100% / 0.12), transparent 40%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* section labels get a neon tick */
+.lp-classic h2 { position: relative; }
+
+/* stat tiles (home) — lift + glow on hover */
+.lp-classic .pf-card.p-3,
+.lp-classic .pf-card.p-4 { transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.lp-classic a.pf-card:hover { transform: translateY(-2px); }
+
+/* buttons: sweeping shine on hover */
+.lp-classic .pf-btn { position: relative; overflow: hidden; }
+.lp-classic .pf-btn::after {
+  content: "";
+  position: absolute;
+  top: 0; left: -120%;
+  width: 60%; height: 100%;
+  background: linear-gradient(100deg, transparent, hsl(0 0% 100% / 0.35), transparent);
+  transform: skewX(-18deg);
+  transition: left .5s ease;
+}
+.lp-classic .pf-btn:hover::after { left: 130%; }
+
+/* headings crisp */
+.lp-classic h1, .lp-classic h2, .lp-classic h3 { -webkit-font-smoothing: antialiased; letter-spacing: -0.01em; }
+
+/* network ticker → glass */
+.lp-classic .pf-ticker {
+  background: hsl(220 32% 6% / 0.6);
+  border-bottom: 1px solid hsl(var(--pf-border) / 0.5);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+/* inputs → dark glass */
+.lp-classic input {
+  background: hsl(220 30% 8% / 0.6) !important;
+  border-color: hsl(var(--pf-border) / 0.7) !important;
+  color: hsl(var(--pf-ink)) !important;
+}
+.lp-classic input:focus { border-color: hsl(var(--pf-green) / 0.6) !important; box-shadow: 0 0 0 3px hsl(152 86% 52% / 0.12); }
