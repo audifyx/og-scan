@@ -3283,6 +3283,29 @@ export async function jupQuote(input: string, output: string, amount: string, sl
   return jget<JupQuote>(url);
 }
 
+/**
+ * Build a signed-ready Jupiter swap transaction (base64) for a quote. Pass the
+ * full quote object returned by jupQuote plus the connected wallet's pubkey.
+ * The caller deserializes, signs with the wallet, and sends it — this is what
+ * powers in-app Buy/Sell (the Phantom approval popup) on the launchpad.
+ */
+export async function jupSwapTransaction(quoteResponse: JupQuote, userPublicKey: string): Promise<string> {
+  const res = await fetch(`${JUPITER_BASE}/swap/v1/swap`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      quoteResponse,
+      userPublicKey,
+      wrapAndUnwrapSol: true,
+      dynamicComputeUnitLimit: true,
+      prioritizationFeeLamports: "auto",
+    }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !j.swapTransaction) throw new Error(j.error || "Jupiter swap build failed");
+  return j.swapTransaction as string;
+}
+
 export type HeliusTx = {
   signature: string;
   timestamp: number;

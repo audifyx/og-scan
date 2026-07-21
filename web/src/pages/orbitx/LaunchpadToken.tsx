@@ -11,11 +11,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { getToken, markGraduated } from "@/lib/orbitx/registry";
 import { shortAddr, timeAgo, SectionLabel, Pill, useDocumentMeta, fmtPrice, GRADUATION_MC_USD } from "./_shared";
 import { fmtCompactUsd } from "./lpx";
-import { jupGetTokens, jupQuote, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY } from "@/lib/og";
+import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY } from "@/lib/og";
+import { toast } from "sonner";
 import {
   Loader2, Copy, Check, ExternalLink, ShieldCheck, ShieldAlert, Droplets, Flame,
   ArrowLeft, Coins, ArrowDownUp, Zap, BadgeCheck, TrendingUp, TrendingDown,
@@ -214,8 +215,10 @@ function PositionPanel({ mint, symbol, priceUsd, solUsd }: { mint: string; symbo
 /* ═══════════════ Buy / Sell — Jupiter live quote, execute via Phantom ═══════════════ */
 
 function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol: string; decimals: number; solUsd: number | null }) {
-  const { connected } = useWallet();
+  const { connected, publicKey, signTransaction } = useWallet();
+  const { connection } = useConnection();
   const balQ = usePositionBalance(mint);
+  const [executing, setExecuting] = useState(false);
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("0.5");
 
@@ -240,9 +243,30 @@ function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol
   const outDecimals = side === "buy" ? decimals : 9;
   const outAmount = quote ? (Number(quote.outAmount) / 10 ** outDecimals).toLocaleString(undefined, { maximumFractionDigits: 4 }) : "";
   const impact = quote ? Number(quote.priceImpactPct) * 100 : null;
-  const swapUrl = `https://phantom.app/ul/swap?inputMint=${inputMint}&outputMint=${outputMint}&amount=${rawAmount}`;
   const buyQuick = ["0.1", "0.5", "1", "2"];
   const sellQuick: [string, number][] = [["25%", 0.25], ["50%", 0.5], ["Max", 1]];
+
+  const execute = async () => {
+    if (!connected || !publicKey || !signTransaction) { toast.error("Connect your wallet first"); return; }
+    if (!quote || rawAmount === "0") { toast.error("Enter an amount"); return; }
+    setExecuting(true);
+    try {
+      const b64 = await jupSwapTransaction(quote, publicKey.toBase58());
+      const tx = VersionedTransaction.deserialize(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+      const signed = await signTransaction(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+      toast.success(`${side === "buy" ? "Buy" : "Sell"} submitted — confirming…`);
+      await connection.confirmTransaction(sig, "confirmed");
+      toast.success(`${side === "buy" ? "Bought" : "Sold"} $${symbol}`, { description: "View on Solscan", action: { label: "Open", onClick: () => window.open(`https://solscan.io/tx/${sig}`, "_blank") } });
+      balQ.refetch();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("User rejected") || msg.includes("rejected")) toast.error("Transaction cancelled");
+      else toast.error(msg || "Swap failed");
+    } finally {
+      setExecuting(false);
+    }
+  };
 
   useEffect(() => {
     const onFocus = () => balQ.refetch();
@@ -307,15 +331,17 @@ function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol
         </div>
       )}
 
-      <a
-        href={swapUrl}
-        target="_blank"
-        rel="noreferrer"
-        className={`pf-btn mt-3 w-full justify-center ${side === "sell" ? "!bg-[hsl(var(--pf-red))] !shadow-[0_3px_0_hsl(0_65%_35%)]" : ""}`}
+      <button
+        type="button"
+        onClick={execute}
+        disabled={!connected || !quote || isFetching || executing || rawAmount === "0"}
+        className={`pf-btn mt-3 w-full justify-center disabled:opacity-50 ${side === "sell" ? "!bg-[hsl(var(--pf-red))] !shadow-[0_3px_0_hsl(0_65%_35%)]" : ""}`}
       >
-        <Zap className="h-4 w-4" /> {side === "buy" ? "Buy" : "Sell"} on Phantom
-      </a>
-      <p className="mt-2 text-center text-[10px] text-[hsl(var(--pf-muted))]">Live quote via Jupiter · executes and settles inside your Phantom wallet · 1% slippage</p>
+        {executing
+          ? <><Loader2 className="h-4 w-4 animate-spin" /> Confirm in Phantom…</>
+          : <><Zap className="h-4 w-4" /> {!connected ? "Connect wallet to trade" : side === "buy" ? `Buy $${symbol}` : `Sell $${symbol}`}</>}
+      </button>
+      <p className="mt-2 text-center text-[10px] text-[hsl(var(--pf-muted))]">Live quote via Jupiter · signs in your connected wallet · 1% slippage</p>
       {!connected && <p className="mt-1 text-center text-[10px] text-[hsl(var(--pf-muted))]"><Wallet className="mr-1 inline h-3 w-3" />Connect via the wallet button up top to see your balance</p>}
     </div>
   );
