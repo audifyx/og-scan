@@ -259,3 +259,82 @@
   color: hsl(var(--pf-ink)) !important;
 }
 .lp-classic input:focus { border-color: hsl(var(--pf-green) / 0.6) !important; box-shadow: 0 0 0 3px hsl(152 86% 52% / 0.12); }
+
+/* ============================================================================
+   Bring the lpx-* HUD components (Create / Choose / Rescue / Claim / Terminal)
+   into the same premium glass language as the rest of the launchpad.
+   ========================================================================== */
+.lp-classic .lpx-panel {
+  background: linear-gradient(180deg, hsl(var(--obx-glass) / 0.55), hsl(220 30% 6% / 0.7)) !important;
+  border: 1px solid hsl(var(--pf-border) / 0.7) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 40px -18px hsl(152 86% 40% / 0.35), inset 0 1px 0 hsl(0 0% 100% / 0.05) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.lp-classic .lpx-panel::before,
+.lp-classic .lpx-panel::after { display: none !important; }
+.lp-classic .lpx-panel--gold {
+  border-color: hsl(var(--pf-gold) / 0.4) !important;
+  box-shadow: 0 8px 40px -18px hsl(42 90% 45% / 0.38), inset 0 1px 0 hsl(0 0% 100% / 0.05) !important;
+}
+.lp-classic .lpx-panel--hot { border-color: hsl(var(--pf-green) / 0.45) !important; }
+.lp-classic .lpx-panel-title { color: hsl(var(--pf-muted)) !important; letter-spacing: 0.02em; }
+
+/* primary HUD buttons → neon gradient (keep any per-button accent border) */
+.lp-classic .lpx-btn {
+  background: linear-gradient(180deg, hsl(152 86% 52%), hsl(152 80% 40%)) !important;
+  color: #04120b !important;
+  border-radius: 12px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 10px 30px -12px hsl(152 86% 52% / 0.6) !important;
+  position: relative;
+  overflow: hidden;
+}
+.lp-classic .lpx-btn:hover { filter: brightness(1.08); }
+.lp-classic .lpx-btn::after {
+  content: "";
+  position: absolute; top: 0; left: -120%;
+  width: 60%; height: 100%;
+  background: linear-gradient(100deg, transparent, hsl(0 0% 100% / 0.35), transparent);
+  transform: skewX(-18deg);
+  transition: left .5s ease;
+}
+.lp-classic .lpx-btn:hover::after { left: 130%; }
+.lp-classic .lpx-btn--gold {
+  background: linear-gradient(180deg, hsl(42 92% 60%), hsl(42 86% 48%)) !important;
+  color: #150e02 !important;
+}
+
+/* re-enable neon glow text in the dark theme (classic had killed it) */
+.lp-classic .lpx-glow { text-shadow: 0 0 8px hsl(var(--pf-green) / 0.75), 0 0 28px hsl(var(--pf-green) / 0.35) !important; }
+.lp-classic .lpx-glow-gold { text-shadow: 0 0 8px hsl(var(--pf-gold) / 0.7), 0 0 24px hsl(var(--pf-gold) / 0.32) !important; }
+.lp-classic .lpx-count { color: hsl(var(--pf-green)) !important; text-shadow: 0 0 18px hsl(152 86% 52% / 0.5); }
+.lp-classic .lpx-term { border-radius: 12px; }
+
+/* og-glass-card (Profile / Rescue empty states) → match glass */
+.lp-classic .og-glass-card,
+.lp-classic .og-glass-frame {
+  background: linear-gradient(180deg, hsl(var(--obx-glass) / 0.5), hsl(220 30% 6% / 0.68)) !important;
+  border: 1px solid hsl(var(--pf-border) / 0.7) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-radius: 16px !important;
+}
+
+/* animated gradient sheen on the hero border */
+.lp-classic .obx-hero::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 24px;
+  padding: 1px;
+  background: linear-gradient(120deg, hsl(152 86% 52% / 0.5), transparent 30%, transparent 70%, hsl(42 92% 60% / 0.4));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* shadcn buttons/inputs inside launchpad get sensible dark defaults */
+.lp-classic button[class*="border-white"] { border-color: hsl(var(--pf-border) / 0.7) !important; }
