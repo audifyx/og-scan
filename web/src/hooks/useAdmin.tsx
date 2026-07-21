@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "./useAuth";
 
-const OWNER_EMAIL = "audifyx@gmail.com";
+const OWNER_EMAILS = ["audifyx@gmail.com", "beatsbyaid3n@gmail.com"];
+const OWNER_EMAIL = OWNER_EMAILS[0];
 
 /**
  * Keep full admin access owner-only, but expose support-team detection
@@ -23,7 +24,7 @@ export const useAdmin = () => {
       return;
     }
 
-    const ownerMatch = user.email === OWNER_EMAIL;
+    const ownerMatch = !!user.email && OWNER_EMAILS.includes(user.email.toLowerCase());
     const officialTeamMatch = Boolean(profile?.is_official_account || profile?.affiliate_org_id);
 
     setIsOwner(ownerMatch);

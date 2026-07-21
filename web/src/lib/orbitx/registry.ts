@@ -26,6 +26,8 @@ export interface OrbitxToken {
   cluster: string;
   launch_type: "custom" | "pump";
   created_at: string;
+  is_featured?: boolean;
+  is_hidden?: boolean;
 }
 
 export type FeedKind = "new" | "graduated" | "all";
@@ -38,7 +40,16 @@ export async function listTokens(kind: FeedKind = "new", limit = 60): Promise<Or
   q = q.neq("mint_address", "wmo3LPaLuaqZZVngh7YLDugMTBGYRKz14QzWvmKaarc");
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []) as OrbitxToken[];
+  return ((data ?? []) as OrbitxToken[]).filter((t) => !t.is_hidden);
+}
+
+/** Featured tokens (admin-curated) for the public spotlight rail. */
+export async function listFeatured(limit = 12): Promise<OrbitxToken[]> {
+  const { data, error } = await supabase
+    .from("orbitx_tokens").select("*").eq("is_featured", true)
+    .order("created_at", { ascending: false }).limit(limit);
+  if (error) return [];
+  return ((data ?? []) as OrbitxToken[]).filter((t) => !t.is_hidden);
 }
 
 export async function getToken(mint: string): Promise<OrbitxToken | null> {

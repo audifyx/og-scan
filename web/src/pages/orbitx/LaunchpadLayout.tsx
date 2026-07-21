@@ -9,13 +9,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
-  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Zap, Trophy, Briefcase, Image as ImageIcon,
+  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Zap, Trophy, Briefcase, Image as ImageIcon, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 import { shortAddr } from "./_shared";
 import { redeemReferralCode } from "@/lib/orbitx/registry";
+import { useAdmin } from "@/hooks/useAdmin";
 import { useChainTelemetry, useSolUsd, fmtInt } from "./lpx";
 import "./orbitx-2026.css";
 
@@ -144,6 +145,7 @@ function ReferralCapture() {
 }
 
 export default function LaunchpadLayout() {
+  const { isAdmin } = useAdmin();
   return (
     <AppLayout>
       <div className="lp-classic relative min-h-screen">
@@ -188,6 +190,14 @@ export default function LaunchpadLayout() {
                 <t.icon className="h-3.5 w-3.5" /> {t.label}
               </NavLink>
             ))}
+            {isAdmin && (
+              <NavLink
+                to="/orbitxlaunch/admin"
+                className={({ isActive }) => cn("pf-nav-link flex items-center gap-1.5 whitespace-nowrap", isActive && "active")}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" /> ADMIN
+              </NavLink>
+            )}
           </div>
         </div>
 

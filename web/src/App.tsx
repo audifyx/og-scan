@@ -63,6 +63,7 @@ import LaunchpadCreator from "./pages/orbitx/LaunchpadCreator";
 import LaunchpadPortfolio from "./pages/orbitx/LaunchpadPortfolio";
 import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
 import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
+import LaunchpadAdmin from "./pages/orbitx/LaunchpadAdmin";
 const LaunchpadNftHub = lazy(() => import("./pages/orbitx/LaunchpadNftHub"));
 const LaunchpadNftCreate = lazy(() => import("./pages/orbitx/LaunchpadNftCreate"));
 import Callouts from "./pages/Callouts";
@@ -202,6 +203,7 @@ const App = () => (
               <Route path="portfolio" element={<LaunchpadPortfolio />} />
               <Route path="nft" element={<Suspense fallback={null}><LaunchpadNftHub /></Suspense>} />
               <Route path="nft/create" element={<Suspense fallback={null}><LaunchpadNftCreate /></Suspense>} />
+              <Route path="admin" element={<AdminRoute><LaunchpadAdmin /></AdminRoute>} />
             </Route>
 
             {/* ── Terminal UI: Trading Platform Style ── */}
