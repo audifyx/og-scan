@@ -1,16 +1,19 @@
 // OrbitX NFT Creator Studio — real on-chain NFT + collection creation.
 // Every mint here is a genuine Metaplex Token Metadata NFT signed by the
 // connected wallet (Phantom, etc.) and registered in the OrbitX NFT registry.
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { mintNft, verifyNftInCollection } from "@/lib/orbitx/nftMint";
 import { isAcceptedNftMedia, uploadNftAssets } from "./nftUpload";
-import { registerNft, registerNftCollection, listCollectionsByCreator, type OrbitxNftCollection } from "@/lib/orbitx/nftRegistry";
 import {
-  Wallet, Loader2, Upload, X, Plus, Layers, ImagePlus, Rocket, ShieldCheck, Info, Sparkles,
+  registerNft, registerNftCollection, listCollectionsByCreator, checkNftCollectionOriginality,
+  checkNftContentDuplicate, sha256Hex, type OrbitxNftCollection,
+} from "@/lib/orbitx/nftRegistry";
+import {
+  Wallet, Loader2, Upload, X, Plus, Layers, ImagePlus, Rocket, ShieldCheck, Info, Sparkles, AlertTriangle,
 } from "lucide-react";
 
 type Mode = "nft" | "collection";
@@ -54,7 +57,12 @@ export default function LaunchpadNftCreate() {
   const [attributes, setAttributes] = useState<{ trait_type: string; value: string }[]>([{ trait_type: "", value: "" }]);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [contentHash, setContentHash] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [collectionNameBlocked, setCollectionNameBlocked] = useState<{ name: string; symbol: string } | null>(null);
+  const [checkingCollectionName, setCheckingCollectionName] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const nameCheckTimer = useRef<ReturnType<typeof setTimeout>>();
 
   // ── collection-only form state ──
   const [colBanner, setColBanner] = useState<File | null>(null);
@@ -62,17 +70,37 @@ export default function LaunchpadNftCreate() {
   const [mintPrice, setMintPrice] = useState("0");
   const [mintLimit, setMintLimit] = useState("");
 
+  useEffect(() => {
+    if (mode !== "collection" || !name.trim()) { setCollectionNameBlocked(null); return; }
+    clearTimeout(nameCheckTimer.current);
+    setCheckingCollectionName(true);
+    nameCheckTimer.current = setTimeout(async () => {
+      try {
+        const matches = await checkNftCollectionOriginality(name, symbol);
+        const hard = matches.find((m) => m.sim >= 0.85);
+        setCollectionNameBlocked(hard ? { name: hard.name, symbol: hard.symbol } : null);
+      } finally { setCheckingCollectionName(false); }
+    }, 500);
+  }, [mode, name, symbol]);
+
   const selectedCollection = useMemo(() => myCollections?.find((c) => c.id === collectionId) ?? null, [myCollections, collectionId]);
 
-  const onMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onMediaSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     if (!isAcceptedNftMedia(f)) { toast.error("Use an image, GIF, video, or audio file"); return; }
     if (f.size > 25 * 1024 * 1024) { toast.error("File too large — max 25 MB"); return; }
     setMediaFile(f);
+    setDuplicateWarning(null);
     const reader = new FileReader();
     reader.onload = () => setMediaPreview(reader.result as string);
     reader.readAsDataURL(f);
+    try {
+      const hash = await sha256Hex(f);
+      setContentHash(hash);
+      const matches = await checkNftContentDuplicate(hash);
+      if (matches.length) setDuplicateWarning(`This exact file was already minted as "${matches[0].name}" by ${matches[0].creator_wallet.slice(0, 4)}…${matches[0].creator_wallet.slice(-4)}.`);
+    } catch { /* hashing/lookup is best-effort, never blocks the flow */ }
   };
 
   const addAttribute = () => setAttributes((a) => [...a, { trait_type: "", value: "" }]);
@@ -83,6 +111,7 @@ export default function LaunchpadNftCreate() {
   const createCollection = async () => {
     if (!connected || !publicKey || !wallet) { toast.error("Connect a wallet first"); return; }
     if (!name.trim() || !symbol.trim() || !colBanner) { toast.error("Name, symbol, and a banner/logo image are required"); return; }
+    if (collectionNameBlocked) { toast.error(`Too close to existing collection "${collectionNameBlocked.name}" ($${collectionNameBlocked.symbol}). Choose a different name.`); return; }
     setBusy(true);
     try {
       setStatusMsg("Uploading collection artwork…");
@@ -148,6 +177,7 @@ export default function LaunchpadNftCreate() {
         await registerNft({
           collection_id: selectedCollection?.id ?? null, mint_address: mintAddress, creator_wallet: publicKey.toBase58(),
           name: name.trim(), symbol: symbol.trim().toUpperCase() || "NFT", image_url: mediaUrl, metadata_uri: uri, royalty_bps: royaltyBps,
+          attributes: attributes.filter((a) => a.trait_type.trim() && a.value.trim()), content_hash: contentHash ?? undefined,
         });
       }
 
@@ -193,6 +223,19 @@ export default function LaunchpadNftCreate() {
           <div className="text-[11px] text-[hsl(var(--pf-muted))]">Create a verifiable on-chain collection</div>
         </button>
       </div>
+
+      {mode === "collection" && collectionNameBlocked && (
+        <div className="mb-4 flex items-start gap-3 rounded-lg border-2 border-[hsl(var(--og-blood))]/60 bg-[hsl(var(--og-blood))]/15 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-[hsl(var(--og-blood))]" />
+          <div className="text-sm text-white/90">Too close to an existing collection: <strong>{collectionNameBlocked.name}</strong> (${collectionNameBlocked.symbol}). Choose a different name or symbol.</div>
+        </div>
+      )}
+      {mode === "nft" && duplicateWarning && (
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-[hsl(var(--og-gold))]/50 bg-[hsl(var(--og-gold))]/10 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-[hsl(var(--og-gold))]" />
+          <div className="text-sm text-white/90">Possible copy: {duplicateWarning} You can still mint — this is a warning, not a block.</div>
+        </div>
+      )}
 
       <div className="pf-card space-y-4 p-5">
         {/* media upload (shared field, different label per mode) */}
