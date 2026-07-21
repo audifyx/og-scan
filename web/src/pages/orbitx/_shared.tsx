@@ -132,7 +132,7 @@ export function Pill({ children, tone }: { children: React.ReactNode; tone: "gol
  * black border, green accents, hover lift.
  */
 export function TokenCard({ t, mc }: { t: OrbitxToken; mc?: number | null }) {
-  const graduated = !!t.lp_pool_address;
+  const graduated = !!(t?.lp_pool_address);
   const pct = graduated
     ? 100
     : typeof mc === "number" && mc > 0

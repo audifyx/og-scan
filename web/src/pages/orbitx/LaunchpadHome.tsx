@@ -73,11 +73,11 @@ export default function LaunchpadHome() {
   const stats = useMemo(() => launchStats(launches), [launches]);
 
   const filtered = useMemo(() => {
-    let items = launches ?? [];
+    let items = (launches ?? []).filter((t) => t != null);
     if (hideVamps) items = items.filter((t) => !t.is_vamp);
     if (search.trim()) {
       const q = search.toLowerCase();
-      items = items.filter((t) => t.name.toLowerCase().includes(q) || t.ticker.toLowerCase().includes(q));
+      items = items.filter((t) => (t.name ?? '').toLowerCase().includes(q) || (t.ticker ?? '').toLowerCase().includes(q));
     }
     if (category === "graduated") items = items.filter((t) => !!t.lp_pool_address || (markets?.[t.mint_address]?.liq ?? 0) > 0);
     else if (category === "trending") items = items.sort((a, b) => {
