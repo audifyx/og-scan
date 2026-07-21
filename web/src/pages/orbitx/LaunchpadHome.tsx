@@ -74,16 +74,16 @@ export default function LaunchpadHome() {
       const q = search.toLowerCase();
       items = items.filter((t) => t.name.toLowerCase().includes(q) || t.ticker.toLowerCase().includes(q));
     }
-    if (category === "graduated") items = items.filter((t) => !!t.lp_pool_address || (markets?.[t.mint_address]?.liq ?? 0) > 0);
+    if (category === "graduated") items = items.filter((t) => !!t?.lp_pool_address || (markets?.[t?.mint_address]?.liq ?? 0) > 0);
     else if (category === "trending") items = items.sort((a, b) => {
-      const aVol = markets?.[a.mint_address]?.vol24 ?? 0;
-      const aMc = markets?.[a.mint_address]?.mcap ?? 1;
-      const bVol = markets?.[b.mint_address]?.vol24 ?? 0;
-      const bMc = markets?.[b.mint_address]?.mcap ?? 1;
+      const aVol = markets?.[a?.mint_address]?.vol24 ?? 0;
+      const aMc = markets?.[a?.mint_address]?.mcap ?? 1;
+      const bVol = markets?.[b?.mint_address]?.vol24 ?? 0;
+      const bMc = markets?.[b?.mint_address]?.mcap ?? 1;
       return (bVol / bMc) - (aVol / aMc);
     });
-    else if (category === "volume") items = items.sort((a, b) => (markets?.[b.mint_address]?.vol24 ?? 0) - (markets?.[a.mint_address]?.vol24 ?? 0));
-    else if (category === "gainers") items = items.sort((a, b) => (markets?.[b.mint_address]?.ch24 ?? 0) - (markets?.[a.mint_address]?.ch24 ?? 0));
+    else if (category === "volume") items = items.sort((a, b) => (markets?.[b?.mint_address]?.vol24 ?? 0) - (markets?.[a?.mint_address]?.vol24 ?? 0));
+    else if (category === "gainers") items = items.sort((a, b) => (markets?.[b?.mint_address]?.ch24 ?? 0) - (markets?.[a?.mint_address]?.ch24 ?? 0));
     return items;
   }, [launches, markets, search, category, hideVamps]);
 
