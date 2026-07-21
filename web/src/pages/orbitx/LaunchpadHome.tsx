@@ -167,7 +167,7 @@ export default function LaunchpadHome() {
               onClick={() => setCategory(c)}
               className={`px-4 py-2.5 rounded-full font-bold text-xs uppercase tracking-wide whitespace-nowrap transition ${
                 category === c
-                  ? "bg-[hsl(var(--pf-ink))] text-white"
+                  ? "bg-[hsl(var(--pf-green))] text-black shadow-lg shadow-[hsl(var(--pf-green))]/30"
                   : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))]"
               }`}
             >
