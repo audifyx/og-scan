@@ -43,6 +43,7 @@ function AuthPill({ ok, label }: { ok: boolean; label: string }) {
 
 export default function TokenAnalytics({ mint, pairAddress, holderCount }: { mint: string; pairAddress: string | null; holderCount?: number | null }) {
   const [tradeFilter, setTradeFilter] = useState<"all" | "buy" | "sell">("all");
+  const [tradeSort, setTradeSort] = useState<"recent" | "largest">("recent");
 
   const onchain = useQuery({
     queryKey: ["obx-onchain", mint],
@@ -95,7 +96,8 @@ export default function TokenAnalytics({ mint, pairAddress, holderCount }: { min
 
   const d = onchain.data;
   const allTrades = trades.data ?? [];
-  const shown = allTrades.filter((t: { kind: string }) => tradeFilter === "all" || t.kind === tradeFilter);
+  let shown = allTrades.filter((t: { kind: string }) => tradeFilter === "all" || t.kind === tradeFilter);
+  if (tradeSort === "largest") shown = [...shown].sort((a: { usd: number }, b: { usd: number }) => b.usd - a.usd);
   const buyVol = allTrades.filter((t: { kind: string }) => t.kind === "buy").reduce((a: number, b: { usd: number }) => a + b.usd, 0);
   const sellVol = allTrades.filter((t: { kind: string }) => t.kind === "sell").reduce((a: number, b: { usd: number }) => a + b.usd, 0);
   const flowTotal = buyVol + sellVol || 1;
@@ -158,11 +160,18 @@ export default function TokenAnalytics({ mint, pairAddress, holderCount }: { min
             <div className="flex items-center gap-2 pf-mono text-[10px] font-black uppercase tracking-widest text-[hsl(var(--pf-muted))]">
               <Activity className="h-3.5 w-3.5 text-[hsl(var(--pf-green))]" /> Live trades
             </div>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap justify-end gap-1">
               {(["all", "buy", "sell"] as const).map((f) => (
                 <button key={f} type="button" onClick={() => setTradeFilter(f)}
                   className={`rounded-full px-2 py-0.5 pf-mono text-[9px] font-bold uppercase tracking-wider transition ${tradeFilter === f ? "bg-[hsl(var(--pf-green))] text-black" : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))]"}`}>
                   {f}
+                </button>
+              ))}
+              <span className="mx-0.5 w-px bg-[hsl(var(--pf-border))]" />
+              {(["recent", "largest"] as const).map((sm) => (
+                <button key={sm} type="button" onClick={() => setTradeSort(sm)}
+                  className={`rounded-full px-2 py-0.5 pf-mono text-[9px] font-bold uppercase tracking-wider transition ${tradeSort === sm ? "bg-[hsl(var(--pf-gold))] text-black" : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))]"}`}>
+                  {sm}
                 </button>
               ))}
             </div>
