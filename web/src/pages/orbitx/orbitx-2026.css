@@ -35,24 +35,23 @@
   inset: 0;
   z-index: -2;
   background:
-    radial-gradient(1100px 700px at 12% -8%, hsl(152 86% 20% / 0.28), transparent 60%),
-    radial-gradient(900px 600px at 92% 6%, hsl(190 92% 26% / 0.22), transparent 60%),
-    radial-gradient(1000px 800px at 50% 118%, hsl(42 80% 30% / 0.14), transparent 55%),
+    linear-gradient(180deg, rgba(3, 5, 9, 0.74), rgba(3, 5, 9, 0.90)),
+    url("/orbitx-space-bg.png") center center / cover no-repeat,
     #04060a;
-  animation: obxAurora 18s ease-in-out infinite alternate;
 }
 .lp-classic::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
-  background-image:
-    linear-gradient(hsl(152 86% 52% / 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(152 86% 52% / 0.04) 1px, transparent 1px);
-  background-size: 46px 46px;
-  mask-image: radial-gradient(circle at 50% 30%, #000 0%, transparent 78%);
-  -webkit-mask-image: radial-gradient(circle at 50% 30%, #000 0%, transparent 78%);
-  animation: obxGridDrift 40s linear infinite;
+  background:
+    radial-gradient(1100px 700px at 12% -8%, hsl(152 86% 22% / 0.26), transparent 60%),
+    radial-gradient(900px 600px at 92% 6%, hsl(190 92% 26% / 0.20), transparent 60%),
+    radial-gradient(1000px 800px at 50% 118%, hsl(42 80% 30% / 0.12), transparent 55%),
+    linear-gradient(hsl(152 86% 52% / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(152 86% 52% / 0.035) 1px, transparent 1px);
+  background-size: auto, auto, auto, 46px 46px, 46px 46px;
+  animation: obxAurora 20s ease-in-out infinite alternate;
 }
 @keyframes obxAurora {
   0%   { filter: hue-rotate(0deg) brightness(1); }

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity, Users, ShieldCheck, ShieldAlert, Coins, ArrowUpRight, ArrowDownRight,
-  ExternalLink, Flame, Loader2,
+  ExternalLink, Flame, Loader2, Droplets,
 } from "lucide-react";
 import { HELIUS_RPC } from "@/lib/og";
 import { fmtCompactUsd } from "./lpx";
@@ -23,7 +23,25 @@ async function heliusRpc(method: string, params: unknown[]) {
   return j.result;
 }
 
-type Holder = { address: string; uiAmount: number; pct: number };
+const AMM_PROGRAMS = new Set([
+  "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8", // Raydium AMM v4
+  "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK", // Raydium CLMM
+  "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C", // Raydium CPMM
+  "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",  // PumpSwap AMM
+  "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",  // pump.fun bonding curve
+  "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",  // Meteora DLMM
+  "Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB", // Meteora Pools
+  "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",  // Orca Whirlpool
+]);
+const SYSTEM_PROGRAM = "11111111111111111111111111111111";
+const TOKEN_PROGRAMS = new Set([
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+]);
+const BURN_OWNERS = new Set(["1nc1nerator11111111111111111111111111111111"]);
+
+type HolderKind = "holder" | "lp" | "burn" | "contract" | "unknown";
+type Holder = { address: string; owner: string | null; uiAmount: number; pct: number; kind: HolderKind };
 
 function fmtAmount(n: number): string {
   if (!Number.isFinite(n)) return "—";
@@ -59,16 +77,58 @@ export default function TokenAnalytics({ mint, pairAddress, holderCount }: { min
       const supplyUi = Number(supplyRes?.value?.uiAmount ?? 0);
       const info = acct?.value?.data?.parsed?.info ?? {};
       const raw = (largest?.value ?? []).map((h: { address: string; uiAmount: number }) => ({ address: h.address, uiAmount: Number(h.uiAmount ?? 0) }));
+
+      // Resolve the WALLET that owns each large token account, then the PROGRAM
+      // that owns that wallet. This is how we tell a real holder (System-owned
+      // wallet) apart from a liquidity pool / bonding-curve vault (AMM-program
+      // owned) or a burn address.
+      const accAddrs = raw.map((r: { address: string }) => r.address);
+      let owners: (string | null)[] = raw.map(() => null);
+      try {
+        if (accAddrs.length) {
+          const parsed = await heliusRpc("getMultipleAccounts", [accAddrs, { encoding: "jsonParsed" }]);
+          owners = (parsed?.value ?? []).map((a: { data?: { parsed?: { info?: { owner?: string } } } } | null) => a?.data?.parsed?.info?.owner ?? null);
+        }
+      } catch { /* fail soft */ }
+
+      const uniqueOwners = Array.from(new Set(owners.filter(Boolean) as string[]));
+      const ownerProgram: Record<string, string | null> = {};
+      try {
+        if (uniqueOwners.length) {
+          const oi = await heliusRpc("getMultipleAccounts", [uniqueOwners, { encoding: "base64" }]);
+          (oi?.value ?? []).forEach((a: { owner?: string } | null, i: number) => { ownerProgram[uniqueOwners[i]] = a?.owner ?? null; });
+        }
+      } catch { /* fail soft */ }
+
+      const classify = (owner: string | null): HolderKind => {
+        if (!owner) return "unknown";
+        if (BURN_OWNERS.has(owner)) return "burn";
+        const prog = ownerProgram[owner] ?? null;
+        if (prog && AMM_PROGRAMS.has(prog)) return "lp";
+        if (!prog || prog === SYSTEM_PROGRAM || TOKEN_PROGRAMS.has(prog)) return "holder";
+        return "contract";
+      };
+
       const total = supplyUi || raw.reduce((a: number, b: { uiAmount: number }) => a + b.uiAmount, 0) || 1;
-      const holders: Holder[] = raw.map((h: { address: string; uiAmount: number }) => ({ ...h, pct: (h.uiAmount / total) * 100 }));
-      const top10 = holders.slice(0, 10).reduce((a, b) => a + b.pct, 0);
+      const holders: Holder[] = raw.map((h: { address: string; uiAmount: number }, i: number) => ({
+        address: h.address,
+        owner: owners[i],
+        uiAmount: h.uiAmount,
+        pct: (h.uiAmount / total) * 100,
+        kind: classify(owners[i]),
+      }));
+      const realHolders = holders.filter((h) => h.kind === "holder");
+      const top10 = realHolders.slice(0, 10).reduce((a, b) => a + b.pct, 0);
+      const lpPct = holders.filter((h) => h.kind === "lp").reduce((a, b) => a + b.pct, 0);
       return {
         decimals,
         supplyUi,
         mintRevoked: !info.mintAuthority,
         freezeRevoked: !info.freezeAuthority,
         holders,
+        realHolders,
         top10,
+        lpPct,
       };
     },
   });
@@ -131,15 +191,21 @@ export default function TokenAnalytics({ mint, pairAddress, holderCount }: { min
           </div>
           {onchain.isLoading ? (
             <div className="flex items-center gap-2 py-6 text-xs text-[hsl(var(--pf-muted))]"><Loader2 className="h-4 w-4 animate-spin" /> loading…</div>
-          ) : !d || d.holders.length === 0 ? (
+          ) : !d || d.realHolders.length === 0 ? (
             <div className="py-6 text-center text-xs text-[hsl(var(--pf-muted))]">No holder data yet</div>
           ) : (
             <div className="space-y-2">
               <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">
-                <span>Top 10 concentration</span>
+                <span>Top 10 holders (LP excluded)</span>
                 <span className={d.top10 > 50 ? "font-bold text-[hsl(var(--pf-red))]" : "font-bold text-[hsl(var(--pf-green))]"}>{d.top10.toFixed(1)}%</span>
               </div>
-              {d.holders.slice(0, 8).map((h, i) => (
+              {d.lpPct > 0 && (
+                <div style={{ borderColor: "hsl(var(--pf-blue) / 0.4)", background: "hsl(var(--pf-blue) / 0.07)" }} className="flex items-center justify-between rounded-md border px-2 py-1 pf-mono text-[10px]">
+                  <span className="inline-flex items-center gap-1 text-[hsl(var(--pf-blue))]"><Droplets className="h-3 w-3" /> Liquidity pool</span>
+                  <span className="font-bold text-[hsl(var(--pf-blue))]">{d.lpPct.toFixed(1)}%</span>
+                </div>
+              )}
+              {d.realHolders.slice(0, 8).map((h, i) => (
                 <div key={h.address} className="space-y-1">
                   <div className="flex items-center justify-between pf-mono text-[10px]">
                     <a href={`https://solscan.io/account/${h.address}`} target="_blank" rel="noreferrer" className="text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-blue))]">#{i + 1} {shortAddr(h.address, 4)}</a>

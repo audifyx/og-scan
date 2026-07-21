@@ -353,13 +353,16 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function StatBox({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "up" | "down" }) {
-  return (
-    <div className="pf-card p-3 text-center">
-      <div className="text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">{label}</div>
+function StatBox({ label, value, tone, href, hint }: { label: string; value: React.ReactNode; tone?: "up" | "down"; href?: string; hint?: string }) {
+  const body = (
+    <>
+      <div className="flex items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">{label}{href ? <ExternalLink className="h-2.5 w-2.5 opacity-50" /> : null}</div>
       <div className={`mt-1 text-base font-black ${tone === "up" ? "text-[hsl(var(--pf-green-dark))]" : tone === "down" ? "text-[hsl(var(--pf-red))]" : "text-[hsl(var(--pf-ink))]"}`}>{value}</div>
-    </div>
+      {hint ? <div className="mt-0.5 pf-mono text-[8px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">{hint}</div> : null}
+    </>
   );
+  if (href) return <a href={href} target="_blank" rel="noreferrer" className="pf-card block p-3 text-center transition">{body}</a>;
+  return <div className="pf-card p-3 text-center">{body}</div>;
 }
 
 /* ═══════════════════════ PAGE ═══════════════════════ */
@@ -519,17 +522,17 @@ export default function LaunchpadToken() {
 
       {/* market stats */}
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatBox label="Price" value={fmtPrice(priceUsd)} />
-        <StatBox label="Market cap" value={fmtCompactUsd(mcap)} />
-        <StatBox label="Liquidity" value={fmtCompactUsd(liq)} />
-        <StatBox label="24h volume" value={fmtCompactUsd(vol24)} />
+        <StatBox label="Price" value={fmtPrice(priceUsd)} href={pair?.url} hint="live chart" />
+        <StatBox label="Market cap" value={fmtCompactUsd(mcap)} href={pair?.url} hint="dexscreener" />
+        <StatBox label="Liquidity" value={fmtCompactUsd(liq)} href={pair?.url} hint="pool" />
+        <StatBox label="24h volume" value={fmtCompactUsd(vol24)} href={pair?.url} hint="dexscreener" />
       </div>
-      {(buys != null || sells != null) && (
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <StatBox label="24h buys" value={buys ?? "—"} tone="up" />
-          <StatBox label="24h sells" value={sells ?? "—"} tone="down" />
-        </div>
-      )}
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatBox label="24h buys" value={buys ?? "—"} tone="up" />
+        <StatBox label="24h sells" value={sells ?? "—"} tone="down" />
+        <StatBox label="Holders" value={jup?.holderCount != null ? jup.holderCount.toLocaleString() : "—"} href={explorer} hint="solscan" />
+        <StatBox label="Contract" value={shortAddr(mint, 4)} href={explorer} hint="solscan" />
+      </div>
 
       {!graduated && (
         <div className="pf-card mt-4 p-4">
