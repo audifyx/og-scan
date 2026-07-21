@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Rocket, Zap, HandCoins, Flame, Loader2, ArrowRight, 
   TrendingUp, Droplets, Sparkles, BadgeCheck, Search, Filter,
-  ShieldCheck, ShieldAlert, Eye, Users, Activity, Coins,
+  ShieldCheck, ShieldAlert, Eye, Users, Activity, Coins, Gem,
 } from "lucide-react";
 import { ORBITX_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
 import { type OrbitxToken, listTokens } from "@/lib/orbitx/registry";
@@ -49,7 +49,7 @@ function FeaturedOfficialToken() {
   );
 }
 
-type BoardCategory = "new" | "graduated" | "trending" | "volume" | "gainers";
+type BoardCategory = "new" | "trending" | "graduating" | "volume" | "gainers" | "gems" | "graduated";
 
 export default function LaunchpadHome() {
   const [search, setSearch] = useState("");
@@ -66,6 +66,9 @@ export default function LaunchpadHome() {
   const { data: markets } = useMarketMap(mints);
 
   const stats = useMemo(() => launchStats(launches), [launches]);
+  const vol24Total = useMemo(() => (markets ? Object.values(markets).reduce((a, m) => a + (m.vol24 ?? 0), 0) : 0), [markets]);
+  const trades24 = useMemo(() => (markets ? Object.values(markets).reduce((a, m) => a + ((m.buys24 ?? 0) + (m.sells24 ?? 0)), 0) : 0), [markets]);
+  const originals = useMemo(() => (Array.isArray(launches) ? launches.filter((t) => !t?.is_vamp).length : 0), [launches]);
 
   const filtered = useMemo(() => {
     let items = Array.isArray(launches) ? launches.filter(t => !!t) : [];
@@ -106,6 +109,24 @@ export default function LaunchpadHome() {
         if (!a || !b) return 0;
         return (markets?.[b.mint_address]?.ch24 ?? 0) - (markets?.[a.mint_address]?.ch24 ?? 0);
       });
+
+    } else if (category === "graduating") {
+      items = items
+        .filter((t) => {
+          if (!t) return false;
+          const m = markets?.[t.mint_address];
+          const grad = !!t.lp_pool_address || !!t.graduated_at || (m?.mcap ?? 0) >= GRADUATION_MC_USD;
+          return !grad && (m?.mcap ?? 0) > 0;
+        })
+        .sort((a, b) => (markets?.[b.mint_address]?.mcap ?? 0) - (markets?.[a.mint_address]?.mcap ?? 0));
+    } else if (category === "gems") {
+      items = items
+        .filter((t) => {
+          if (!t) return false;
+          const mc = markets?.[t.mint_address]?.mcap ?? 0;
+          return !t.is_vamp && mc > 1000 && mc < 20000;
+        })
+        .sort((a, b) => (markets?.[b.mint_address]?.vol24 ?? 0) - (markets?.[a.mint_address]?.vol24 ?? 0));
     }
     
     return items;
@@ -124,11 +145,11 @@ export default function LaunchpadHome() {
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] px-3 py-1 pf-mono text-[10px] font-bold uppercase tracking-widest text-[hsl(var(--pf-green))]">
               <Sparkles className="h-3.5 w-3.5" /> Next-gen Solana launchpad
             </div>
-            <h1 className="obx-gradient-text mb-4 text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
-              Launch your token into orbit
+            <h1 className="obx-gradient-text mb-4 text-3xl font-black leading-[1.06] tracking-tight sm:text-4xl md:text-5xl">
+              The safest place to launch and trade Solana memes
             </h1>
             <p className="mb-7 max-w-xl text-base leading-relaxed text-[hsl(var(--pf-muted))] sm:text-lg">
-              Build on Solana with anti-vamp protection, a zero-clone guarantee, in-app trading, and creator-first design — all in one premium terminal.
+              Launch original tokens. Discover hidden gems. Trade with confidence. Protected by OrbitX anti-vamp technology.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/orbitxlaunch/create" className="pf-btn"><Rocket className="h-4 w-4" /> Start a launch</Link>
@@ -159,11 +180,13 @@ export default function LaunchpadHome() {
       <FeaturedOfficialToken />
 
       {/* ─── Stats grid ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile label="Launches" value={stats.total} icon={<Rocket className="h-4 w-4" />} />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <StatTile label="Tokens launched" value={stats.total} icon={<Rocket className="h-4 w-4" />} />
         <StatTile label="Graduated" value={stats.graduated} icon={<Droplets className="h-4 w-4" />} />
+        <StatTile label="24h volume" value={fmtCompactUsd(vol24Total)} icon={<Activity className="h-4 w-4" />} />
         <StatTile label="Total liquidity" value={fmtCompactUsd(totalLpUsd(markets))} icon={<Coins className="h-4 w-4" />} />
-        <StatTile label="Last 24h" value={stats.last24h} icon={<Activity className="h-4 w-4" />} />
+        <StatTile label="Originals protected" value={originals} icon={<ShieldCheck className="h-4 w-4" />} />
+        <StatTile label="24h trades" value={trades24.toLocaleString()} icon={<TrendingUp className="h-4 w-4" />} />
       </div>
 
       {/* ─── Board controls ──────────────────────────────────────────────── */}
@@ -190,22 +213,32 @@ export default function LaunchpadHome() {
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {(["new", "graduated", "trending", "volume", "gainers"] as BoardCategory[]).map((c) => (
+          {([
+            { id: "new", label: "New" },
+            { id: "trending", label: "Trending" },
+            { id: "graduating", label: "Graduating" },
+            { id: "volume", label: "Top volume" },
+            { id: "gainers", label: "Gainers" },
+            { id: "gems", label: "Hidden gems" },
+            { id: "graduated", label: "Graduated" },
+          ] as { id: BoardCategory; label: string }[]).map((c) => (
             <button
-              key={c}
-              onClick={() => setCategory(c)}
+              key={c.id}
+              onClick={() => setCategory(c.id)}
               className={`px-4 py-2.5 rounded-full font-bold text-xs uppercase tracking-wide whitespace-nowrap transition ${
-                category === c
+                category === c.id
                   ? "bg-[hsl(var(--pf-green))] text-black shadow-lg shadow-[hsl(var(--pf-green))]/30"
                   : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))]"
               }`}
             >
-              {c === "new" && <Sparkles className="inline h-3.5 w-3.5 mr-1.5" />}
-              {c === "graduated" && <Droplets className="inline h-3.5 w-3.5 mr-1.5" />}
-              {c === "trending" && <TrendingUp className="inline h-3.5 w-3.5 mr-1.5" />}
-              {c === "volume" && <Activity className="inline h-3.5 w-3.5 mr-1.5" />}
-              {c === "gainers" && <Flame className="inline h-3.5 w-3.5 mr-1.5" />}
-              {c}
+              {c.id === "new" && <Sparkles className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c.id === "trending" && <TrendingUp className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c.id === "graduating" && <Rocket className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c.id === "volume" && <Activity className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c.id === "gainers" && <Flame className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c.id === "gems" && <Gem className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c.id === "graduated" && <Droplets className="inline h-3.5 w-3.5 mr-1.5" />}
+              {c.label}
             </button>
           ))}
         </div>
@@ -225,7 +258,7 @@ export default function LaunchpadHome() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {(filtered || []).slice(0, 50).map((t) => (
-            <TokenCard key={t.mint_address} t={t} mc={markets?.[t.mint_address]?.mcap ?? null} />
+            <TokenCard key={t.mint_address} t={t} mc={markets?.[t.mint_address]?.mcap ?? null} market={markets?.[t.mint_address] ?? null} />
           ))}
         </div>
       )}

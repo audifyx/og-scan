@@ -4,9 +4,40 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ShieldCheck, ShieldAlert, Droplets, Flame } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Droplets, Flame, Zap, LineChart } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { OrbitxToken } from "@/lib/orbitx/registry";
+import { orbitScore, scoreTone } from "./orbitScore";
+
+type MarketLite = { mcap?: number | null; liq?: number | null; vol24?: number | null; ch24?: number | null; buys24?: number | null; sells24?: number | null; url?: string | null };
+
+function fmtCompact(v?: number | null): string {
+  if (v == null || !Number.isFinite(v) || v <= 0) return "—";
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
+  if (v >= 1e3) return `$${(v / 1e3).toFixed(1)}K`;
+  return `$${v.toFixed(0)}`;
+}
+
+function OrbitScoreChip({ score }: { score: number }) {
+  const tone = scoreTone(score);
+  const color = tone === "lime" ? "hsl(var(--pf-green))" : tone === "gold" ? "hsl(var(--pf-gold))" : "hsl(var(--pf-red))";
+  return (
+    <div className="shrink-0 text-right" title="Orbit Score">
+      <div className="pf-mono text-[8px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Orbit</div>
+      <div className="text-lg font-black leading-none" style={{ color }}>{score}</div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "up" | "down" }) {
+  return (
+    <div className="rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-2 py-1.5 text-center">
+      <div className="pf-mono text-[8px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">{label}</div>
+      <div className={`pf-mono text-[11px] font-bold ${tone === "up" ? "text-[hsl(var(--pf-green-dark))]" : tone === "down" ? "text-[hsl(var(--pf-red))]" : "text-[hsl(var(--pf-ink))]"}`}>{value}</div>
+    </div>
+  );
+}
 
 /**
  * Resolves a token image robustly: direct logo URL first, then the token's
@@ -166,63 +197,61 @@ export function Pill({ children, tone }: { children: React.ReactNode; tone: "gol
  * market cap, bonding-curve progress bar, short CA, age. Light card,
  * black border, green accents, hover lift.
  */
-export function TokenCard({ t, mc }: { t: OrbitxToken; mc?: number | null }) {
+export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | null; market?: MarketLite | null }) {
   if (!t) return null;
-  const graduated = !!t.lp_pool_address || !!t.graduated_at || (typeof mc === "number" && mc >= GRADUATION_MC_USD);
-  const pct = graduated
-    ? 100
-    : typeof mc === "number" && mc > 0
-      ? Math.max(2, Math.min(99, Math.round((mc / GRADUATION_MC_USD) * 100)))
-      : 3;
+  const mcap = market?.mcap ?? mc ?? null;
+  const graduated = !!t.lp_pool_address || !!t.graduated_at || (typeof mcap === "number" && mcap >= GRADUATION_MC_USD);
+  const pct = graduated ? 100 : typeof mcap === "number" && mcap > 0 ? Math.max(2, Math.min(99, Math.round((mcap / GRADUATION_MC_USD) * 100))) : 3;
+  const buys = market?.buys24 ?? null;
+  const sells = market?.sells24 ?? null;
+  const tx = (buys ?? 0) + (sells ?? 0);
+  const buyPct = tx > 0 ? Math.round(((buys ?? 0) / tx) * 100) : null;
+  const os = orbitScore({ liq: market?.liq, mcap, vol24: market?.vol24, buys, sells, ageMs: Date.now() - new Date(t.created_at).getTime(), isVamp: t.is_vamp, graduated });
+  const to = `/orbitxlaunch/token/${t.mint_address}`;
 
   return (
-    <Link
-      to={`/orbitxlaunch/token/${t.mint_address}`}
-      className="pf-card group flex flex-col gap-3 p-3"
-    >
-      {/* header: logo + name/ticker + status badge */}
-      <div className="flex items-start gap-3">
-        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
+    <div className="pf-card group flex flex-col gap-2.5 p-3">
+      <Link to={to} className="flex items-start gap-3">
+        <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
           <TokenLogo src={t.logo_url} metadataUri={t.metadata_uri} symbol={t.ticker} className="h-full w-full text-sm" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-black text-[hsl(var(--pf-ink))]">{t.name}</span>
-            <span className="pf-mono shrink-0 rounded-full bg-[hsl(var(--pf-ink))/0.06] px-1.5 py-0.5 text-[10px] font-bold text-[hsl(var(--pf-green-dark))]">
-              ${t.ticker}
-            </span>
+            <span className="pf-mono shrink-0 rounded-full bg-[hsl(var(--pf-ink))/0.06] px-1.5 py-0.5 text-[10px] font-bold text-[hsl(var(--pf-green-dark))]">${t.ticker}</span>
           </div>
-          <div className="pf-mono mt-0.5 text-xs font-bold text-[hsl(var(--pf-ink))]">{fmtMc(mc)}</div>
+          <div className="pf-mono mt-0.5 text-xs font-bold text-[hsl(var(--pf-ink))]">{fmtMc(mcap)}</div>
         </div>
-        {graduated ? (
-          <Pill tone="lime"><Droplets className="h-3 w-3" /> Graduated</Pill>
-        ) : (
-          <Pill tone="cyan"><Flame className="h-3 w-3" /> Fresh</Pill>
-        )}
+        <OrbitScoreChip score={os.score} />
+      </Link>
+
+      <div className="grid grid-cols-3 gap-1.5">
+        <MiniStat label="Vol 24h" value={fmtCompact(market?.vol24)} />
+        <MiniStat label="Liq" value={fmtCompact(market?.liq)} />
+        <MiniStat label="Buys" value={buyPct != null ? `${buyPct}%` : "—"} tone={buyPct != null && buyPct >= 50 ? "up" : buyPct != null ? "down" : undefined} />
       </div>
 
-      {/* graduation progress */}
       <div>
-        <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--pf-muted))]">
-          <span>Bonding curve</span>
+        <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-[hsl(var(--pf-muted))]">
+          <span>{graduated ? "Graduated" : "Bonding curve"}</span>
           <span className={graduated ? "text-[hsl(var(--pf-gold))]" : "text-[hsl(var(--pf-green-dark))]"}>{pct}%</span>
         </div>
-        <div className="pf-progress">
-          <div className={`pf-progress-fill ${graduated ? "is-complete" : ""}`} style={{ width: `${pct}%` }} />
-        </div>
+        <div className="pf-progress"><div className={`pf-progress-fill ${graduated ? "is-complete" : ""}`} style={{ width: `${pct}%` }} /></div>
       </div>
 
-      {/* footer: CA + lane + vamp status + age */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="pf-mono text-[11px] text-[hsl(var(--pf-muted))]">{shortAddr(t.mint_address, 5)}</span>
+        {t.is_vamp
+          ? <Pill tone="blood"><ShieldAlert className="h-3 w-3" /> Vamp</Pill>
+          : <Pill tone="lime"><ShieldCheck className="h-3 w-3" /> Original</Pill>}
         <Pill tone={t.launch_type === "pump" ? "cyan" : "gold"}>{t.launch_type === "pump" ? "Pump" : "Custom"}</Pill>
-        {t.is_vamp ? (
-          <Pill tone="blood"><ShieldAlert className="h-3 w-3" /> Vamp</Pill>
-        ) : (
-          <Pill tone="muted"><ShieldCheck className="h-3 w-3" /> Unique</Pill>
-        )}
+        {graduated && <Pill tone="lime"><Droplets className="h-3 w-3" /> Grad</Pill>}
         <span className="pf-mono ml-auto text-[10px] text-[hsl(var(--pf-muted))]">{timeAgo(t.created_at)}</span>
       </div>
-    </Link>
+
+      <div className="mt-0.5 grid grid-cols-2 gap-1.5">
+        <Link to={to} className="pf-btn justify-center !py-1.5 text-xs"><Zap className="h-3.5 w-3.5" /> Trade</Link>
+        <a href={market?.url || `https://dexscreener.com/solana/${t.mint_address}`} target="_blank" rel="noreferrer" className="pf-btn-ghost justify-center !py-1.5 text-xs"><LineChart className="h-3.5 w-3.5" /> Chart</a>
+      </div>
+    </div>
   );
 }

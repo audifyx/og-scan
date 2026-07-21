@@ -16,6 +16,7 @@ import { getToken, markGraduated } from "@/lib/orbitx/registry";
 import { shortAddr, timeAgo, SectionLabel, Pill, TokenLogo, useDocumentMeta, fmtPrice, GRADUATION_MC_USD } from "./_shared";
 import { fmtCompactUsd } from "./lpx";
 import TokenAnalytics from "./TokenAnalytics";
+import { orbitScore } from "./orbitScore";
 import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BASE, HELIUS_API_KEY } from "@/lib/og";
 import { toast } from "sonner";
 import {
@@ -452,6 +453,14 @@ export default function LaunchpadToken() {
     );
 
   const graduated = !!t?.lp_pool_address || !!t?.graduated_at || (mcap != null && mcap >= GRADUATION_MC_USD) || (liq ?? 0) > 0;
+  const os = orbitScore({ liq, mcap, vol24, buys, sells, holders: jup?.holderCount ?? null, isVamp: t?.is_vamp, graduated });
+  const scoreRows = [
+    { label: "Safety", val: os.safety },
+    { label: "Liquidity", val: os.liquidity },
+    { label: "Holders", val: os.distribution },
+    { label: "Activity", val: os.activity },
+    { label: "Momentum", val: os.momentum },
+  ];
   const isOfficial = mint === OFFICIAL_MINT;
   const cluster = t?.cluster ?? "mainnet-beta";
   const explorer = `https://solscan.io/token/${mint}${cluster !== "mainnet-beta" ? "?cluster=devnet" : ""}`;
@@ -532,6 +541,42 @@ export default function LaunchpadToken() {
         <StatBox label="24h sells" value={sells ?? "—"} tone="down" />
         <StatBox label="Holders" value={jup?.holderCount != null ? jup.holderCount.toLocaleString() : "—"} href={explorer} hint="solscan" />
         <StatBox label="Contract" value={shortAddr(mint, 4)} href={explorer} hint="solscan" />
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="pf-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <SectionLabel>Orbit Score</SectionLabel>
+            <div className="text-3xl font-black leading-none" style={{ color: os.score >= 75 ? "hsl(var(--pf-green))" : os.score >= 50 ? "hsl(var(--pf-gold))" : "hsl(var(--pf-red))" }}>
+              {os.score}<span className="text-sm text-[hsl(var(--pf-muted))]">/100</span>
+            </div>
+          </div>
+          {scoreRows.map((r) => (
+            <div key={r.label} className="mb-2">
+              <div className="mb-1 flex justify-between pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))]"><span>{r.label}</span><span className="text-[hsl(var(--pf-ink))]">{r.val}%</span></div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[hsl(var(--pf-bg-2))]"><div className="h-full rounded-full bg-[hsl(var(--pf-green))]" style={{ width: `${r.val}%` }} /></div>
+            </div>
+          ))}
+          <p className="mt-2 pf-mono text-[9px] leading-relaxed text-[hsl(var(--pf-muted))]">Computed live from liquidity depth, 24h activity, buy pressure, holder spread and safety flags.</p>
+        </div>
+
+        <div className="pf-card p-4">
+          <SectionLabel>{t?.is_vamp ? "Vamp warning" : "Original token verified"}</SectionLabel>
+          {t ? (
+            <>
+              <div className="mb-3 flex items-center gap-2">
+                {t.is_vamp ? <ShieldAlert className="h-6 w-6 text-[hsl(var(--pf-red))]" /> : <ShieldCheck className="h-6 w-6 text-[hsl(var(--pf-green))]" />}
+                <div className="text-sm font-black text-[hsl(var(--pf-ink))]">{t.is_vamp ? "Flagged as a look-alike clone" : "Protected by OrbitX anti-vamp"}</div>
+              </div>
+              <Row label="Original creator">{shortAddr(t.creator_wallet, 5)}</Row>
+              <Row label="Launched">{timeAgo(t.created_at)}</Row>
+              <Row label="Launch type">{t.launch_type === "pump" ? "Bonding curve" : "Custom SPL"}</Row>
+              <Row label="Status">{graduated ? "Graduated" : "Bonding"}</Row>
+            </>
+          ) : (
+            <div className="pt-1 text-xs leading-relaxed text-[hsl(var(--pf-muted))]">External Solana token — not launched through OrbitX, so creator verification and anti-vamp protection don't apply to it.</div>
+          )}
+        </div>
       </div>
 
       {!graduated && (

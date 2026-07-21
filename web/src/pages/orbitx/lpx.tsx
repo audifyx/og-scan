@@ -119,6 +119,8 @@ export interface MarketRow {
   mcap: number | null;
   liq: number | null;
   vol24: number | null;
+  buys24: number | null;
+  sells24: number | null;
   ch24: number | null;
   ch6: number | null;
   ch1: number | null;
@@ -152,6 +154,8 @@ export function useMarketMap(mints: string[]) {
             mcap,
             liq,
             vol24,
+            buys24: p.txns?.h24?.buys ?? null,
+            sells24: p.txns?.h24?.sells ?? null,
             ch24: p.priceChange?.h24 ?? null,
             ch6: p.priceChange?.h6 ?? null,
             ch1: p.priceChange?.h1 ?? null,
