@@ -101,15 +101,15 @@ export interface LaunchStats {
 }
 
 export function launchStats(tokens: OrbitxToken[] | undefined): LaunchStats {
-  const t = tokens ?? [];
+  const t = (tokens ?? []).filter((x) => x != null);
   const dayAgo = Date.now() - 86_400_000;
   return {
     total: t.length,
-    last24h: t.filter((x) => new Date(x.created_at).getTime() >= dayAgo).length,
-    graduated: t.filter((x) => x.lp_pool_address).length,
-    flagged: t.filter((x) => x.is_vamp).length,
-    pump: t.filter((x) => x.launch_type === "pump").length,
-    custom: t.filter((x) => x.launch_type === "custom").length,
+    last24h: t.filter((x) => x?.created_at && new Date(x.created_at).getTime() >= dayAgo).length,
+    graduated: t.filter((x) => x?.lp_pool_address).length,
+    flagged: t.filter((x) => x?.is_vamp).length,
+    pump: t.filter((x) => x?.launch_type === "pump").length,
+    custom: t.filter((x) => x?.launch_type === "custom").length,
   };
 }
 

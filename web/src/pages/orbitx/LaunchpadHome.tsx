@@ -96,7 +96,8 @@ export default function LaunchpadHome() {
     
     if (category === "graduated") {
       items = items.filter((t) => {
-        const hasPool = !!t.lp_pool_address;
+        if (!t?.mint_address) return false;
+        const hasPool = !!t?.lp_pool_address;
         const hasLiq = (markets?.[t.mint_address]?.liq ?? 0) > 0;
         return hasPool || hasLiq;
       });
