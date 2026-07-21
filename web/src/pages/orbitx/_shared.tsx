@@ -263,7 +263,7 @@ export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | nul
 
       <div className="mt-0.5 grid grid-cols-2 gap-1.5">
         <Link to={to} className="pf-btn justify-center !py-1.5 text-xs"><Zap className="h-3.5 w-3.5" /> Trade</Link>
-        <a href={market?.url || `https://dexscreener.com/solana/${t.mint_address}`} target="_blank" rel="noreferrer" className="pf-btn-ghost justify-center !py-1.5 text-xs"><LineChart className="h-3.5 w-3.5" /> Chart</a>
+        <a href={market?.url || `https://dexscreener.com/solana/${t.mint_address}`} target="_blank" rel="noreferrer" className="pf-btn--ghost justify-center !py-1.5 text-xs"><LineChart className="h-3.5 w-3.5" /> Chart</a>
       </div>
     </div>
   );

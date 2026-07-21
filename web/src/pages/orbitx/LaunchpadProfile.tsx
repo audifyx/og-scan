@@ -61,7 +61,7 @@ function EditProfileModal({ wallet, profile, onClose, onSaved }: { wallet: strin
           <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
             {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-[hsl(var(--pf-muted))]"><Camera className="h-6 w-6" /></div>}
           </div>
-          <button onClick={() => fileRef.current?.click()} disabled={uploading} className="pf-btn-ghost text-xs">{uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />} Upload avatar</button>
+          <button onClick={() => fileRef.current?.click()} disabled={uploading} className="pf-btn--ghost text-xs">{uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />} Upload avatar</button>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); }} />
         </div>
         <div className="mt-4 space-y-3">
@@ -129,7 +129,7 @@ export default function LaunchpadProfile() {
               </div>
             </div>
           </div>
-          <button onClick={() => setEditing(true)} className="pf-btn-ghost self-start text-xs"><Pencil className="h-3.5 w-3.5" /> Edit profile</button>
+          <button onClick={() => setEditing(true)} className="pf-btn--ghost self-start text-xs"><Pencil className="h-3.5 w-3.5" /> Edit profile</button>
         </div>
       </div>
 
