@@ -119,8 +119,8 @@ export default function LaunchpadHome() {
       {/* ─── Hero ──────────────────────────────────────────────── */}
       {/* ─── Hero ─── */}
       <div className="obx-hero p-6 sm:p-10 md:p-14">
-        <div className="grid items-center gap-8 md:grid-cols-[1.1fr_0.9fr]">
-          <div className="max-w-2xl">
+        <div className="grid items-center gap-6 md:grid-cols-[1.1fr_0.9fr] md:gap-8">
+          <div className="order-2 max-w-2xl md:order-1">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] px-3 py-1 pf-mono text-[10px] font-bold uppercase tracking-widest text-[hsl(var(--pf-green))]">
               <Sparkles className="h-3.5 w-3.5" /> Next-gen Solana launchpad
             </div>
@@ -132,7 +132,6 @@ export default function LaunchpadHome() {
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/orbitxlaunch/create" className="pf-btn"><Rocket className="h-4 w-4" /> Start a launch</Link>
-              <a href="https://docs.orbitx.world" target="_blank" rel="noreferrer" className="pf-btn-ghost">Learn more →</a>
             </div>
             <div className="mt-8 grid max-w-md grid-cols-3 gap-3">
               <div className="rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] p-3">
@@ -149,9 +148,9 @@ export default function LaunchpadHome() {
               </div>
             </div>
           </div>
-          <div className="relative flex items-center justify-center">
+          <div className="relative order-1 flex items-center justify-center md:order-2">
             <div className="obx-glow-ring left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 sm:h-72 sm:w-72" />
-            <img src="/orbitx-globe.png" alt="OrbitX world" draggable={false} className="obx-globe relative w-52 max-w-xs select-none sm:w-72 md:w-full" />
+            <img src="/orbitx-globe.png" alt="OrbitX world" draggable={false} style={{ mixBlendMode: "screen" }} className="obx-globe relative w-44 max-w-xs select-none sm:w-64 md:w-full" />
           </div>
         </div>
       </div>
