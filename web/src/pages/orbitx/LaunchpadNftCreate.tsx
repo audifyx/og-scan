@@ -7,6 +7,7 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { mintNft, verifyNftInCollection } from "@/lib/orbitx/nftMint";
+import CreatorInventory from "@/components/orbitx/CreatorInventory";
 import { isAcceptedNftMedia, uploadNftAssets } from "./nftUpload";
 import {
   registerNft, registerNftCollection, listCollectionsByCreator, checkNftCollectionOriginality,
@@ -210,6 +211,8 @@ export default function LaunchpadNftCreate() {
         <h1 className="text-xl font-black tracking-tight text-[hsl(var(--pf-ink))]">NFT Creator Studio</h1>
       </div>
       <p className="mb-5 max-w-xl text-sm text-[hsl(var(--pf-muted))]">Mint real Solana NFTs (Metaplex Token Metadata) straight to your wallet. Every mint is a genuine on-chain transaction you approve in Phantom.</p>
+
+      {addr && <CreatorInventory wallet={addr} />}
 
       <div className="mb-5 flex gap-2">
         <button onClick={() => setMode("nft")} className={`flex-1 rounded-lg border p-3 text-left transition ${mode === "nft" ? "border-[hsl(var(--pf-green))] bg-[hsl(var(--pf-green))]/10" : "border-[hsl(var(--pf-border))]"}`}>
