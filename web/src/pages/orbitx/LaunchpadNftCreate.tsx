@@ -8,9 +8,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { mintNft, verifyNftInCollection } from "@/lib/orbitx/nftMint";
 import CreatorInventory from "@/components/orbitx/CreatorInventory";
+import { NFT_CATEGORIES } from "@/lib/orbitx/nftCategories";
 import { isAcceptedNftMedia, uploadNftAssets } from "./nftUpload";
 import {
-  registerNft, registerNftCollection, listCollectionsByCreator, checkNftCollectionOriginality,
+  registerNft, registerNftCollection, listCollectionsByCreator, checkNftCollectionOriginality, setCollectionCategory,
   checkNftContentDuplicate, sha256Hex, type OrbitxNftCollection,
 } from "@/lib/orbitx/nftRegistry";
 import {
@@ -70,6 +71,7 @@ export default function LaunchpadNftCreate() {
   const [colBannerPreview, setColBannerPreview] = useState<string | null>(null);
   const [mintPrice, setMintPrice] = useState("0");
   const [mintLimit, setMintLimit] = useState("");
+  const [category, setCategory] = useState<string>("Art");
 
   useEffect(() => {
     if (mode !== "collection" || !name.trim()) { setCollectionNameBlocked(null); return; }
@@ -129,11 +131,14 @@ export default function LaunchpadNftCreate() {
       });
 
       setStatusMsg("Registering collection…");
-      await registerNftCollection({
+      const newCollectionId = await registerNftCollection({
         creator_wallet: publicKey.toBase58(), name: name.trim(), symbol: symbol.trim().toUpperCase(),
         description: description.trim(), banner_url: mediaUrl, logo_url: mediaUrl, royalty_bps: royaltyBps,
         mint_price_sol: Number(mintPrice) || 0, mint_limit: mintLimit ? Number(mintLimit) : null, mint_address: mintAddress,
       });
+      if (category && newCollectionId) {
+        await setCollectionCategory(newCollectionId, category, publicKey.toBase58()).catch(() => undefined);
+      }
 
       toast.success("Collection minted on-chain! 🎉");
       qc.invalidateQueries({ queryKey: ["orbitx-nft-my-collections"] });
@@ -298,6 +303,11 @@ export default function LaunchpadNftCreate() {
           <div className="grid grid-cols-2 gap-3">
             <Field label="Mint price (SOL)" hint="Informational for now — public minting flow is coming"><input type="number" min="0" step="0.01" value={mintPrice} onChange={(e) => setMintPrice(e.target.value)} className={inputClass} /></Field>
             <Field label="Mint limit (optional)"><input type="number" min="1" value={mintLimit} onChange={(e) => setMintLimit(e.target.value)} placeholder="Unlimited" className={inputClass} /></Field>
+            <Field label="Category">
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputClass}>
+                {NFT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
           </div>
         )}
 

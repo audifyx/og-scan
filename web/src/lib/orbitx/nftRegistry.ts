@@ -20,6 +20,7 @@ export interface OrbitxNftCollection {
   is_official: boolean;
   floor_price_sol: number | null;
   volume_sol: number;
+  category: string | null;
   created_at: string;
 }
 
@@ -44,6 +45,8 @@ export interface OrbitxNft {
   rarity_tier: "Common" | "Rare" | "Epic" | "Legendary" | "Mythic" | null;
   is_flagged_duplicate: boolean;
   delegate_approved: boolean;
+  view_count?: number;
+  favorite_count?: number;
 }
 
 export interface OrbitxNftListing {
@@ -211,4 +214,56 @@ export async function listNft(nftId: string, sellerWallet: string, priceSol: num
 export async function cancelNftListing(nftId: string, sellerWallet: string): Promise<void> {
   const { error } = await supabase.rpc("orbitx_nft_cancel_listing", { p_nft_id: nftId, p_seller_wallet: sellerWallet });
   if (error) throw error;
+}
+
+
+/* ─────────────────────── discovery + social (Phase 1) ─────────────────────── */
+
+/** Set a collection's category (creator-only, via SECURITY DEFINER RPC). */
+export async function setCollectionCategory(collectionId: string, category: string, creator: string): Promise<void> {
+  const { error } = await supabase.rpc("orbitx_set_collection_category", {
+    p_collection_id: collectionId, p_category: category, p_creator: creator,
+  });
+  if (error) throw error;
+}
+
+/** Toggle a favorite (like) on an NFT for a wallet; returns the new favorited state. */
+export async function toggleNftFavorite(nftId: string, wallet: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("orbitx_nft_toggle_favorite", { p_nft: nftId, p_wallet: wallet });
+  if (error) throw error;
+  return !!data;
+}
+
+/** Best-effort view increment (fire-and-forget). */
+export async function incrementNftView(nftId: string): Promise<void> {
+  await supabase.rpc("orbitx_nft_increment_view", { p_nft: nftId }).then(() => undefined, () => undefined);
+}
+
+/** The set of NFT ids this wallet has favorited (for filling hearts). */
+export async function listMyFavoriteIds(wallet: string): Promise<Set<string>> {
+  const { data, error } = await supabase.from("orbitx_nft_favorites").select("nft_id").eq("wallet", wallet);
+  if (error) return new Set();
+  return new Set((data ?? []).map((r) => r.nft_id as string));
+}
+
+export interface NftSale {
+  id: string; amount_sol: number; buyer_wallet: string; seller_wallet: string; created_at: string; tx_signature: string;
+}
+/** Full sale history for one NFT (newest first) — powers per-NFT analytics. */
+export async function listSalesForNft(nftId: string): Promise<NftSale[]> {
+  const { data, error } = await supabase
+    .from("orbitx_nft_transactions").select("id,amount_sol,buyer_wallet,seller_wallet,created_at,tx_signature")
+    .eq("nft_id", nftId).order("created_at", { ascending: false });
+  if (error) return [];
+  return (data ?? []) as NftSale[];
+}
+
+/** Recently sold NFTs across the marketplace (newest first). */
+export async function listRecentSales(limit = 12): Promise<(NftSale & { nft: OrbitxNft })[]> {
+  const { data, error } = await supabase
+    .from("orbitx_nft_transactions")
+    .select("id,amount_sol,buyer_wallet,seller_wallet,created_at,tx_signature,nft:orbitx_nfts(*)")
+    .order("created_at", { ascending: false }).limit(limit);
+  if (error) return [];
+  return ((data ?? []) as unknown) as (NftSale & { nft: OrbitxNft })[];
 }

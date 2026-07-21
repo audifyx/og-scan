@@ -1,7 +1,7 @@
 // OrbitX NFT Hub — Explore, Marketplace (real atomic buy/bid via the
 // delegated-authority settlement flow), My NFTs, and Created-by-me, with
 // rarity badges and fraud/duplicate warnings throughout.
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,12 +12,15 @@ import {
   listNftCollections, listNfts, listNftsByCreator, listCollectionsByCreator,
   listNft, cancelNftListing, listActiveListings, listActiveAuctions, listOffersForNft,
   makeNftOffer, respondNftOffer, createNftAuction, placeNftBid,
-  setNftDelegateApproved, type OrbitxNft, type NftOffer,
+  setNftDelegateApproved, listMyFavoriteIds, toggleNftFavorite, listRecentSales, type OrbitxNft, type NftOffer,
 } from "@/lib/orbitx/nftRegistry";
 import { approveMarketplaceDelegate, executeSale } from "@/lib/orbitx/nftMarketplace";
+import NftDetailModal from "@/components/orbitx/NftDetailModal";
+import { NFT_CATEGORIES } from "@/lib/orbitx/nftCategories";
 import {
   Wallet, Loader2, Image as ImageIcon, Layers, Sparkles, Send, Twitter, ExternalLink,
   ShieldCheck, Plus, Tag, X, Rocket, ShoppingCart, Gavel, HandCoins, AlertTriangle, Crown,
+  Heart, Eye, Search, Flame,
 } from "lucide-react";
 
 type Tab = "explore" | "market" | "mine" | "created";
@@ -165,6 +168,8 @@ function OffersPanel({ nft }: { nft: OrbitxNft }) {
   );
 }
 
+const chipCls = (a: boolean) => `rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide transition ${a ? "bg-[hsl(var(--pf-green))] text-black" : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))]"}`;
+
 export default function LaunchpadNftHub() {
   const { connected, publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
@@ -177,6 +182,11 @@ export default function LaunchpadNftHub() {
   const [auctionNft, setAuctionNft] = useState<OrbitxNft | null>(null);
   const [bidInputs, setBidInputs] = useState<Record<string, string>>({});
   const [busySale, setBusySale] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState<string | null>(null);
+  const [exploreSort, setExploreSort] = useState<"new" | "volume" | "floor">("new");
+  const [detailNft, setDetailNft] = useState<OrbitxNft | null>(null);
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
 
   const { data: nfts, isLoading } = useWalletNfts(addr);
   const { data: collections, isLoading: loadingCollections } = useQuery({ queryKey: ["orbitx-nft-collections"], queryFn: () => listNftCollections(60) });
@@ -185,6 +195,7 @@ export default function LaunchpadNftHub() {
   const { data: createdCollections } = useQuery({ queryKey: ["orbitx-collections-created", addr], queryFn: () => listCollectionsByCreator(addr!), enabled: !!addr });
   const { data: activeListings, isLoading: loadingListings } = useQuery({ queryKey: ["orbitx-nft-active-listings"], queryFn: listActiveListings, refetchInterval: 20_000 });
   const { data: activeAuctions, isLoading: loadingAuctions } = useQuery({ queryKey: ["orbitx-nft-active-auctions"], queryFn: listActiveAuctions, refetchInterval: 15_000 });
+  const { data: recentSales } = useQuery({ queryKey: ["orbitx-nft-recent-sales"], queryFn: () => listRecentSales(12), refetchInterval: 30_000 });
 
   const ownedCollections = useMemo(() => {
     const map = new Map<string, number>();
@@ -195,6 +206,31 @@ export default function LaunchpadNftHub() {
 
   const officialCollections = (collections ?? []).filter((c) => c.is_official);
   const otherCollections = (collections ?? []).filter((c) => !c.is_official);
+
+  const q = search.trim().toLowerCase();
+  const displayCollections = useMemo(() => {
+    let list = otherCollections;
+    if (category) list = list.filter((c) => c.category === category);
+    if (q) list = list.filter((c) => c.name.toLowerCase().includes(q) || c.symbol.toLowerCase().includes(q) || c.creator_wallet.toLowerCase().includes(q));
+    if (exploreSort === "volume") list = [...list].sort((a, b) => (b.volume_sol || 0) - (a.volume_sol || 0));
+    else if (exploreSort === "floor") list = [...list].sort((a, b) => (b.floor_price_sol || 0) - (a.floor_price_sol || 0));
+    return list;
+  }, [otherCollections, category, q, exploreSort]);
+  const displayNfts = useMemo(() => {
+    let list = allNfts ?? [];
+    if (q) list = list.filter((n) => n.name.toLowerCase().includes(q) || n.mint_address.toLowerCase().includes(q) || n.creator_wallet.toLowerCase().includes(q));
+    return list;
+  }, [allNfts, q]);
+
+  useEffect(() => { if (addr) listMyFavoriteIds(addr).then(setFavIds).catch(() => undefined); }, [addr]);
+  const handleFav = async (n: OrbitxNft) => {
+    if (!addr) { toast.error("Connect a wallet to favorite"); return; }
+    try {
+      const now = await toggleNftFavorite(n.id, addr);
+      setFavIds((prev) => { const set = new Set(prev); if (now) set.add(n.id); else set.delete(n.id); return set; });
+      qc.invalidateQueries({ queryKey: ["orbitx-nfts-all"] });
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+  };
 
   const buyListing = async (listingId: string, nftId: string) => {
     if (!publicKey || !signTransaction) { toast.error("Connect a wallet first"); return; }
@@ -233,6 +269,7 @@ export default function LaunchpadNftHub() {
       {listingNft && <ListModal nft={listingNft} onClose={() => setListingNft(null)} onListed={() => qc.invalidateQueries({ queryKey: ["orbitx-nfts-created"] })} />}
       {offerNft && <OfferModal nft={offerNft} onClose={() => setOfferNft(null)} />}
       {auctionNft && <AuctionModal nft={auctionNft} onClose={() => { setAuctionNft(null); qc.invalidateQueries({ queryKey: ["orbitx-nft-active-auctions"] }); }} />}
+      {detailNft && <NftDetailModal nft={detailNft} wallet={addr} favorited={favIds.has(detailNft.id)} onClose={() => setDetailNft(null)} onToggleFavorite={(now) => setFavIds((prev) => { const set = new Set(prev); if (now) set.add(detailNft.id); else set.delete(detailNft.id); return set; })} onList={setListingNft} onOffer={setOfferNft} />}
 
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2"><Layers className="h-5 w-5 text-[hsl(var(--pf-green))]" /><h1 className="text-xl font-black tracking-tight text-[hsl(var(--pf-ink))]">NFT Hub</h1></div>
@@ -250,6 +287,19 @@ export default function LaunchpadNftHub() {
 
       {tab === "explore" && (
         <>
+          <div className="mb-4 space-y-3">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--pf-muted))]" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search NFTs, collections, creators, mint address…" className="w-full rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] py-2 pl-9 pr-3 text-sm text-[hsl(var(--pf-ink))] outline-none focus:border-[hsl(var(--pf-green))]" />
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button onClick={() => setCategory(null)} className={chipCls(!category)}>All</button>
+              {NFT_CATEGORIES.map((c) => (<button key={c} onClick={() => setCategory(category === c ? null : c)} className={chipCls(category === c)}>{c}</button>))}
+            </div>
+            <div className="flex items-center gap-1.5">
+              {(["new", "volume", "floor"] as const).map((m) => (<button key={m} onClick={() => setExploreSort(m)} className={chipCls(exploreSort === m)}>{m === "new" ? "New" : m === "volume" ? "Top volume" : "Top floor"}</button>))}
+            </div>
+          </div>
           {officialCollections.length > 0 && (
             <div className="mb-6">
               <div className="mb-2 flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-[hsl(var(--og-gold))]" /><span className="text-xs font-bold uppercase tracking-widest text-[hsl(var(--og-gold))]">OrbitX Official</span></div>
@@ -265,8 +315,8 @@ export default function LaunchpadNftHub() {
           )}
           <div className="mb-2 text-xs font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">Collections</div>
           {loadingCollections ? <div className="flex items-center justify-center gap-2 py-10 text-sm text-[hsl(var(--pf-muted))]"><Loader2 className="h-4 w-4 animate-spin" /> loading…</div>
-            : !otherCollections.length ? <div className="pf-card mb-6 py-10 text-center text-sm text-[hsl(var(--pf-muted))]">No collections minted through OrbitX yet — be the first.</div>
-            : <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">{otherCollections.map((c) => (
+            : !displayCollections.length ? <div className="pf-card mb-6 py-10 text-center text-sm text-[hsl(var(--pf-muted))]">No collections match.</div>
+            : <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">{displayCollections.map((c) => (
                 <div key={c.id} className="pf-card overflow-hidden">
                   <div className="aspect-square w-full bg-[hsl(var(--pf-bg))]">{c.logo_url ? <img src={c.logo_url} alt={c.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><ImageIcon className="h-6 w-6 text-[hsl(var(--pf-muted))]" /></div>}</div>
                   <div className="p-2"><div className="flex items-center gap-1 truncate text-xs font-bold text-[hsl(var(--pf-ink))]">{c.name} {c.verified && <ShieldCheck className="h-3 w-3 shrink-0 text-[hsl(var(--pf-green))]" />}</div><div className="pf-mono text-[9px] text-[hsl(var(--pf-muted))]">by {shortAddr(c.creator_wallet, 4)}</div></div>
@@ -275,15 +325,38 @@ export default function LaunchpadNftHub() {
           <div className="mb-2 text-xs font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">Recently minted</div>
           {loadingAllNfts ? <div className="flex items-center justify-center gap-2 py-10 text-sm text-[hsl(var(--pf-muted))]"><Loader2 className="h-4 w-4 animate-spin" /> loading…</div>
             : !allNfts?.length ? <div className="pf-card py-10 text-center text-sm text-[hsl(var(--pf-muted))]">No NFTs minted through OrbitX yet.</div>
-            : <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">{allNfts.map((n) => (
-                <a key={n.id} href={`https://solscan.io/token/${n.mint_address}`} target="_blank" rel="noreferrer" className="pf-card overflow-hidden">
-                  <div className="aspect-square w-full bg-[hsl(var(--pf-bg))]">{n.image_url ? <img src={n.image_url} alt={n.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center"><ImageIcon className="h-6 w-6 text-[hsl(var(--pf-muted))]" /></div>}</div>
-                  <div className="p-2 space-y-1">
+            : !displayNfts.length ? <div className="pf-card py-10 text-center text-sm text-[hsl(var(--pf-muted))]">No NFTs match.</div>
+            : <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">{displayNfts.map((n) => (
+                <div key={n.id} onClick={() => setDetailNft(n)} className="pf-card group relative cursor-pointer overflow-hidden transition-transform hover:-translate-y-0.5">
+                  <button onClick={(e) => { e.stopPropagation(); handleFav(n); }} title="Favorite" className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/60 p-1.5 backdrop-blur transition hover:bg-black/80">
+                    <Heart className={`h-3.5 w-3.5 ${favIds.has(n.id) ? "fill-[hsl(var(--og-blood))] text-[hsl(var(--og-blood))]" : "text-white"}`} />
+                  </button>
+                  <div className="aspect-square w-full bg-[hsl(var(--pf-bg))]">{n.image_url ? <img src={n.image_url} alt={n.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center"><ImageIcon className="h-6 w-6 text-[hsl(var(--pf-muted))]" /></div>}</div>
+                  <div className="space-y-1 p-2">
                     <div className="truncate text-xs font-bold text-[hsl(var(--pf-ink))]">{n.name}</div>
-                    <div className="flex items-center gap-1"><RarityBadge tier={n.rarity_tier} rank={n.rarity_rank} />{n.is_flagged_duplicate && <AlertTriangle className="h-3 w-3 text-[hsl(var(--og-blood))]" titleAccess="Possibly duplicated artwork" />}</div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1"><RarityBadge tier={n.rarity_tier} rank={n.rarity_rank} />{n.is_flagged_duplicate && <AlertTriangle className="h-3 w-3 text-[hsl(var(--og-blood))]" titleAccess="Possibly duplicated artwork" />}</div>
+                      <span className="inline-flex items-center gap-1 pf-mono text-[9px] text-[hsl(var(--pf-muted))]"><Eye className="h-3 w-3" /> {n.view_count ?? 0}</span>
+                    </div>
                   </div>
-                </a>
+                </div>
               ))}</div>}
+
+          {recentSales && recentSales.length > 0 && (
+            <div className="mt-6">
+              <div className="mb-2 flex items-center gap-1.5"><Flame className="h-3.5 w-3.5 text-[hsl(var(--og-gold))]" /><span className="text-xs font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">Recently sold</span></div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">{recentSales.filter((sale) => sale.nft).map((sale) => (
+                <div key={sale.id} onClick={() => sale.nft && setDetailNft(sale.nft)} className="pf-card cursor-pointer overflow-hidden">
+                  <div className="aspect-square w-full bg-[hsl(var(--pf-bg))]">{sale.nft?.image_url ? <img src={sale.nft.image_url} alt={sale.nft.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full w-full items-center justify-center"><ImageIcon className="h-6 w-6 text-[hsl(var(--pf-muted))]" /></div>}</div>
+                  <div className="space-y-0.5 p-2">
+                    <div className="truncate text-xs font-bold text-[hsl(var(--pf-ink))]">{sale.nft?.name ?? "NFT"}</div>
+                    <div className="pf-mono text-[10px] font-black text-[hsl(var(--pf-green))]">{Number(sale.amount_sol)} SOL</div>
+                    <div className="pf-mono text-[8px] text-[hsl(var(--pf-muted))]">{new Date(sale.created_at).toLocaleDateString()}</div>
+                  </div>
+                </div>
+              ))}</div>
+            </div>
+          )}
         </>
       )}
 
