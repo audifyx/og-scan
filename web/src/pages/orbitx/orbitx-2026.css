@@ -338,3 +338,44 @@
 
 /* shadcn buttons/inputs inside launchpad get sensible dark defaults */
 .lp-classic button[class*="border-white"] { border-color: hsl(var(--pf-border) / 0.7) !important; }
+
+/* ============================================================================
+   Launch wizard — premium step nav + accents to match the glass theme.
+   ========================================================================== */
+.lp-classic .lpx-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid hsl(var(--pf-border) / 0.6);
+  background: hsl(var(--obx-glass) / 0.35);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: border-color .2s ease, box-shadow .2s ease, transform .15s ease, background .2s ease;
+}
+.lp-classic .lpx-step:hover { border-color: hsl(var(--pf-green) / 0.4); transform: translateY(-1px); }
+.lp-classic .lpx-step[data-on="true"] {
+  border-color: hsl(var(--pf-green) / 0.55);
+  background: hsl(152 86% 52% / 0.1);
+  box-shadow: 0 0 22px -6px hsl(152 86% 52% / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.05);
+}
+.lp-classic .lpx-step .idx {
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: hsl(var(--pf-muted));
+}
+.lp-classic .lpx-step[data-on="true"] .idx { color: hsl(152 90% 60%); }
+.lp-classic .lpx-led {
+  height: 7px; width: 7px; border-radius: 9999px;
+  background: hsl(var(--pf-green));
+  box-shadow: 0 0 8px hsl(var(--pf-green));
+  animation: obxPulse 2.4s ease-in-out infinite;
+}
+.lp-classic .lpx-sweep {
+  position: absolute; inset: 0;
+  background: linear-gradient(120deg, transparent, hsl(152 86% 52% / 0.06), transparent);
+  pointer-events: none;
+}
