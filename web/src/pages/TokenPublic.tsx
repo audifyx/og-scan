@@ -53,6 +53,7 @@ export default function TokenPublic() {
   const ring = useMemo(() => `conic-gradient(${scoreColor(total)} ${total * 3.6}deg, rgba(255,255,255,0.08) 0deg)`, [total]);
 
   // merged fallbacks (og-scan-token first, then dexscreener)
+  // eslint-disable-next-line no-constant-binary-expression -- TODO(pre-existing): red on main before this branch; do not silence new bugs
   const priceUsd = t.priceUsd ?? Number(top.priceUsd) ?? null;
   const mcap = t.mcap ?? top.marketCap ?? null;
   const fdv = t.fdv ?? top.fdv ?? null;

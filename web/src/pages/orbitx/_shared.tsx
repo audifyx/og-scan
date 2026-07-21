@@ -34,8 +34,8 @@ function OrbitScoreChip({ score }: { score: number }) {
 function MiniStat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "up" | "down" }) {
   return (
     <div className="rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-2 py-1.5 text-center">
-      <div className="pf-mono text-[8px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">{label}</div>
-      <div className={`pf-mono text-[11px] font-bold ${tone === "up" ? "text-[hsl(var(--pf-green-dark))]" : tone === "down" ? "text-[hsl(var(--pf-red))]" : "text-[hsl(var(--pf-ink))]"}`}>{value}</div>
+      <div className="pf-mono text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-ink))]">{label}</div>
+      <div className={`pf-mono text-[12px] font-black ${tone === "up" ? "text-[hsl(var(--pf-green))]" : tone === "down" ? "text-[hsl(var(--pf-red))]" : "text-[hsl(var(--pf-ink))]"}`}>{value}</div>
     </div>
   );
 }
@@ -199,6 +199,8 @@ export function Pill({ children, tone }: { children: React.ReactNode; tone: "gol
  * black border, green accents, hover lift.
  */
 export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | null; market?: MarketLite | null }) {
+  // Hooks must run unconditionally (react-hooks/rules-of-hooks); guard for null t inside the initializer.
+  const [watched, setWatched] = useState(() => isWatched(t?.mint_address ?? ""));
   if (!t) return null;
   const mcap = market?.mcap ?? mc ?? null;
   const graduated = !!t.lp_pool_address || !!t.graduated_at || (typeof mcap === "number" && mcap >= GRADUATION_MC_USD);
@@ -209,7 +211,6 @@ export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | nul
   const buyPct = tx > 0 ? Math.round(((buys ?? 0) / tx) * 100) : null;
   const os = orbitScore({ liq: market?.liq, mcap, vol24: market?.vol24, buys, sells, ageMs: Date.now() - new Date(t.created_at).getTime(), isVamp: t.is_vamp, graduated });
   const to = `/orbitxlaunch/token/${t.mint_address}`;
-  const [watched, setWatched] = useState(() => isWatched(t.mint_address));
 
   return (
     <div className="pf-card group relative flex flex-col gap-2.5 p-3">
@@ -263,7 +264,7 @@ export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | nul
 
       <div className="mt-0.5 grid grid-cols-2 gap-1.5">
         <Link to={to} className="pf-btn justify-center !py-1.5 text-xs"><Zap className="h-3.5 w-3.5" /> Trade</Link>
-        <a href={market?.url || `https://dexscreener.com/solana/${t.mint_address}`} target="_blank" rel="noreferrer" className="pf-btn--ghost justify-center !py-1.5 text-xs"><LineChart className="h-3.5 w-3.5" /> Chart</a>
+        <a href={market?.url || `https://dexscreener.com/solana/${t.mint_address}`} target="_blank" rel="noreferrer" className="pf-btn justify-center !py-1.5 text-xs"><LineChart className="h-3.5 w-3.5" /> Chart</a>
       </div>
     </div>
   );
