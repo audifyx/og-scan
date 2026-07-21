@@ -106,7 +106,7 @@ export function launchStats(tokens: OrbitxToken[] | undefined): LaunchStats {
   return {
     total: t.length,
     last24h: t.filter((x) => new Date(x.created_at).getTime() >= dayAgo).length,
-    graduated: t.filter((x) => x.lp_pool_address).length,
+    graduated: t.filter((x) => x.lp_pool_address || x.graduated_at).length,
     flagged: t.filter((x) => x.is_vamp).length,
     pump: t.filter((x) => x.launch_type === "pump").length,
     custom: t.filter((x) => x.launch_type === "custom").length,

@@ -16,6 +16,7 @@ export interface OrbitxToken {
   supply: number;
   dex: string | null;
   lp_pool_address: string | null;
+  graduated_at: string | null;
   lp_signature: string | null;
   mint_signature: string | null;
   metadata_uri: string | null;
@@ -155,4 +156,14 @@ export async function registerToken(input: RegisterTokenInput): Promise<OrbitxTo
     throw error;
   }
   return data as OrbitxToken;
+}
+
+/**
+ * Permanently mark a token graduated once its market cap first reaches the
+ * graduation threshold. Sticky: graduated_at never clears, even if the market
+ * cap later falls. Best-effort and idempotent — safe to call repeatedly.
+ */
+export async function markGraduated(mint: string): Promise<void> {
+  const { error } = await supabase.rpc("orbitx_mark_graduated", { p_mint: mint });
+  if (error) console.error("markGraduated failed:", error);
 }
