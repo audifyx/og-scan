@@ -67,7 +67,7 @@ export default function LaunchpadHome() {
     staleTime: 15_000,
   });
 
-  const mints = useMemo(() => launches?.map((t) => t.mint_address) ?? [], [launches]);
+  const mints = useMemo(() => (launches || []).map((t) => t.mint_address), [launches]);
   const { data: markets } = useMarketMap(mints);
 
   const stats = useMemo(() => launchStats(launches), [launches]);
