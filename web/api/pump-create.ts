@@ -93,7 +93,14 @@ async function handleIpfs(body: any, res: VercelResponse) {
     description: description || "",
     image: imageUri,
     showName: true,
+    // Launchpad attribution. `createdOn` is the field pump.fun's own site and
+    // metadata-reading trackers use for the "Launchpad" badge; `platformId` is
+    // the companion field branded launchpads (bonk.fun / Believe) set so
+    // aggregators recognise the launch as a distinct platform. Both point at
+    // OrbitX so the badge + logo (from orbitx.world's favicon/og-image) read
+    // OrbitX instead of pump.fun on apps that honour off-chain metadata.
     createdOn: "https://orbitx.world",
+    platformId: "orbitx",
     website: website || "https://orbitx.world",
     twitter: twitter || "",
     telegram: telegram || "",

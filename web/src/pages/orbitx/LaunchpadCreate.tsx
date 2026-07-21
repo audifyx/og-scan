@@ -122,7 +122,9 @@ async function uploadLaunchAssets(mintAddr: string, cfg: LaunchConfig, creator: 
     description: cfg.description.trim(),
     image: logoUrl,
     showName: true,
+    // OrbitX launchpad attribution (see api/pump-create.ts for details).
     createdOn: "https://orbitx.world",
+    platformId: "orbitx",
     external_url: cfg.website || "https://orbitx.world",
     extensions: {
       website: cfg.website || undefined, twitter: cfg.twitter || undefined,

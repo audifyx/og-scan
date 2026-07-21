@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 import path from "path";
 
 // https://vitejs.dev/config/
@@ -11,17 +12,22 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Polyfill Node.js builtins + globals for the browser. Several Solana /
+    // Metaplex libs (notably umi-bundle-defaults' node-fetch-based HTTP layer)
+    // read Node builtins like `stream`/`url` and the `process`/`Buffer` globals
+    // at module-evaluation time; without these shims the lazily-loaded NFT
+    // chunks throw and trip the ErrorBoundary.
+    nodePolyfills({
+      globals: { Buffer: true, global: true, process: true },
+      protocolImports: true,
+    }),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Polyfill Node.js Buffer for browser
-      buffer: "buffer",
     },
-  },
-  define: {
-    // Make Buffer available globally in browser
-    global: "globalThis",
   },
   optimizeDeps: {
     include: ["buffer"],
