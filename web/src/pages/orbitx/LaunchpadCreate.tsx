@@ -360,19 +360,26 @@ export default function LaunchpadCreate() {
     if (!cfg.logoDataUrl) { toast.error("Upload a logo — it becomes your token image"); return; }
     setLaunching(true);
     try {
-      /* 1 — anti-vamp identity check */
+      /* 1 — anti-vamp identity check, same protection as the pump.fun lane.
+         Wrapped in its own try/catch so a transient registry error fails soft
+         instead of cancelling the whole launch (matches LaunchpadPump). */
       setPhase("checking"); setPhaseMsg("Anti-vamp check…");
       let flagged = false;
-      const matches = await vampCheck(cfg.name, cfg.ticker);
-      const clone = matches.find((m) => m.sim >= 0.85);
-      if (clone) {
-        toast.error(`Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${clone.name} ($${clone.ticker}). Anti-vamp requires a unique identity.`);
-        setPhase("idle");
-        return;
-      }
-      if (matches.length > 0) {
-        flagged = true;
-        toast.warning(`${matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`);
+      try {
+        const matches = await vampCheck(cfg.name, cfg.ticker);
+        const clone = matches.find((m) => m.sim >= 0.85);
+        if (clone) {
+          toast.error(`Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${clone.name} ($${clone.ticker}). Anti-vamp requires a unique identity.`);
+          setPhase("idle");
+          return;
+        }
+        if (matches.length > 0) {
+          flagged = true;
+          toast.warning(`${matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`);
+        }
+      } catch (err) {
+        console.error("[orbitx] custom anti-vamp check failed", err);
+        // fail soft — don't block a launch over a transient registry error
       }
 
       /* 2 — mint keypair (vanity-ground if available) */
