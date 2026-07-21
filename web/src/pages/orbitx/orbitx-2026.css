@@ -443,3 +443,138 @@
   color: hsl(var(--pf-muted)) !important;
   opacity: 1;
 }
+
+/* ============================================================================
+   AUTHORITATIVE DARK THEME + CONTRAST LOCK (v3)
+   The launchpad had two competing .lp-classic definitions (a legacy light
+   "classic" theme in index.css and this 2026 dark redesign). Bundler load
+   order made the winner nondeterministic per-property, producing dark-on-dark
+   and light-on-light text across every route. This block is scoped to
+   .lp-classic.lp-classic so it ALWAYS wins on specificity, pinning the whole
+   /orbitxlaunch/* surface to a single dark theme and remapping EVERY design
+   system token so all current and future components inherit readable colors.
+   Rule: light text on dark surfaces, dark text on bright surfaces.
+   Never dark-on-dark, never light-on-light.
+   ========================================================================== */
+.lp-classic.lp-classic {
+  /* pump-style tokens (dark) */
+  --pf-bg: 222 32% 5%;
+  --pf-bg-2: 220 28% 8%;
+  --pf-ink: 150 20% 96%;
+  --pf-muted: 210 16% 78%;
+  --pf-border: 200 22% 24%;
+  --pf-green: 152 86% 52%;
+  --pf-green-dark: 152 74% 46%;
+  --pf-red: 356 84% 62%;
+  --pf-gold: 42 92% 60%;
+  --pf-blue: 190 92% 56%;
+
+  /* shadcn / design-system semantic tokens (dark) */
+  --background: 222 32% 5%;
+  --foreground: 150 20% 96%;
+  --card: 220 28% 8%;
+  --card-foreground: 150 20% 96%;
+  --popover: 220 28% 7%;
+  --popover-foreground: 150 20% 96%;
+  --primary: 152 86% 52%;
+  --primary-foreground: 150 40% 6%;
+  --secondary: 220 20% 14%;
+  --secondary-foreground: 150 20% 96%;
+  --muted: 220 20% 14%;
+  --muted-foreground: 210 16% 76%;
+  --accent: 220 20% 16%;
+  --accent-foreground: 150 20% 96%;
+  --destructive: 356 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 200 22% 24%;
+  --input: 220 20% 16%;
+  --ring: 152 86% 52%;
+
+  /* neon accents (readable on dark) */
+  --og-lime: 152 86% 52%;
+  --og-gold: 42 92% 60%;
+  --og-cyan: 190 92% 56%;
+  --og-blood: 356 84% 62%;
+
+  background: #04060a !important;
+  color: hsl(var(--pf-ink)) !important;
+}
+
+/* 1) DARK text utilities are invisible on the dark theme -> force light.
+      (bright-surface rule below overrides this again where needed.) */
+.lp-classic.lp-classic [class*="text-black"],
+.lp-classic.lp-classic [class*="text-gray-4"], .lp-classic.lp-classic [class*="text-gray-5"],
+.lp-classic.lp-classic [class*="text-gray-6"], .lp-classic.lp-classic [class*="text-gray-7"],
+.lp-classic.lp-classic [class*="text-gray-8"], .lp-classic.lp-classic [class*="text-gray-9"],
+.lp-classic.lp-classic [class*="text-slate-4"], .lp-classic.lp-classic [class*="text-slate-5"],
+.lp-classic.lp-classic [class*="text-slate-6"], .lp-classic.lp-classic [class*="text-slate-7"],
+.lp-classic.lp-classic [class*="text-slate-8"], .lp-classic.lp-classic [class*="text-slate-9"],
+.lp-classic.lp-classic [class*="text-zinc-4"], .lp-classic.lp-classic [class*="text-zinc-5"],
+.lp-classic.lp-classic [class*="text-zinc-6"], .lp-classic.lp-classic [class*="text-zinc-7"],
+.lp-classic.lp-classic [class*="text-zinc-8"], .lp-classic.lp-classic [class*="text-zinc-9"],
+.lp-classic.lp-classic [class*="text-neutral-4"], .lp-classic.lp-classic [class*="text-neutral-5"],
+.lp-classic.lp-classic [class*="text-neutral-6"], .lp-classic.lp-classic [class*="text-neutral-7"],
+.lp-classic.lp-classic [class*="text-neutral-8"], .lp-classic.lp-classic [class*="text-neutral-9"],
+.lp-classic.lp-classic [class*="text-stone-4"], .lp-classic.lp-classic [class*="text-stone-5"],
+.lp-classic.lp-classic [class*="text-stone-6"], .lp-classic.lp-classic [class*="text-stone-7"],
+.lp-classic.lp-classic [class*="text-stone-8"], .lp-classic.lp-classic [class*="text-stone-9"] {
+  color: #eef4f2 !important;
+}
+
+/* 2) Legacy HUD utilities on the dark theme. */
+.lp-classic.lp-classic [class*="bg-black"] { background-color: hsl(var(--pf-bg-2)) !important; }
+.lp-classic.lp-classic [class*="text-white"] { color: #ffffff !important; }
+.lp-classic.lp-classic [class*="border-white"] { border-color: hsl(var(--pf-border) / 0.6) !important; }
+
+/* 3) Inputs / textareas / selects — readable value + placeholder. */
+.lp-classic.lp-classic input,
+.lp-classic.lp-classic textarea,
+.lp-classic.lp-classic select { color: hsl(var(--pf-ink)) !important; }
+.lp-classic.lp-classic input::placeholder,
+.lp-classic.lp-classic textarea::placeholder { color: hsl(var(--pf-muted)) !important; opacity: 1; }
+
+/* 4) BRIGHT OPAQUE surfaces get DARK text on themselves AND every descendant.
+      Declared LAST so it always wins -> nothing is ever light-on-light.
+      Uses [class~=] (exact token) so translucent /10 /15 variants are ignored. */
+.lp-classic.lp-classic [class~="bg-white"],
+.lp-classic.lp-classic [class~="bg-gray-50"], .lp-classic.lp-classic [class~="bg-gray-100"],
+.lp-classic.lp-classic [class~="bg-gray-200"], .lp-classic.lp-classic [class~="bg-gray-300"],
+.lp-classic.lp-classic [class~="bg-slate-50"], .lp-classic.lp-classic [class~="bg-slate-100"],
+.lp-classic.lp-classic [class~="bg-slate-200"], .lp-classic.lp-classic [class~="bg-zinc-50"],
+.lp-classic.lp-classic [class~="bg-zinc-100"], .lp-classic.lp-classic [class~="bg-zinc-200"],
+.lp-classic.lp-classic [class~="bg-neutral-50"], .lp-classic.lp-classic [class~="bg-neutral-100"],
+.lp-classic.lp-classic [class~="bg-neutral-200"], .lp-classic.lp-classic [class~="bg-stone-100"],
+.lp-classic.lp-classic [class~="bg-yellow-300"], .lp-classic.lp-classic [class~="bg-yellow-400"],
+.lp-classic.lp-classic [class~="bg-amber-300"], .lp-classic.lp-classic [class~="bg-amber-400"],
+.lp-classic.lp-classic [class~="bg-lime-300"], .lp-classic.lp-classic [class~="bg-lime-400"],
+.lp-classic.lp-classic [class~="bg-green-400"], .lp-classic.lp-classic [class~="bg-green-500"],
+.lp-classic.lp-classic [class~="bg-emerald-400"], .lp-classic.lp-classic [class~="bg-cyan-300"],
+.lp-classic.lp-classic [class~="bg-cyan-400"],
+.lp-classic.lp-classic [class~="bg-[hsl(var(--og-gold))]"], .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-gold))]"],
+.lp-classic.lp-classic [class~="bg-[hsl(var(--og-lime))]"], .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-green))]"],
+.lp-classic.lp-classic [class~="bg-[hsl(var(--pf-green-dark))]"], .lp-classic.lp-classic [class~="bg-[hsl(var(--og-cyan))]"],
+.lp-classic.lp-classic [class~="bg-[hsl(var(--pf-blue))]"], .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-ink))]"],
+.lp-classic.lp-classic [class~="bg-[hsl(var(--pf-muted))]"] {
+  color: #0a0f14 !important;
+}
+.lp-classic.lp-classic [class~="bg-white"] *, .lp-classic.lp-classic [class~="bg-gray-50"] *,
+.lp-classic.lp-classic [class~="bg-gray-100"] *, .lp-classic.lp-classic [class~="bg-gray-200"] *,
+.lp-classic.lp-classic [class~="bg-gray-300"] *, .lp-classic.lp-classic [class~="bg-slate-50"] *,
+.lp-classic.lp-classic [class~="bg-slate-100"] *, .lp-classic.lp-classic [class~="bg-slate-200"] *,
+.lp-classic.lp-classic [class~="bg-zinc-50"] *, .lp-classic.lp-classic [class~="bg-zinc-100"] *,
+.lp-classic.lp-classic [class~="bg-zinc-200"] *, .lp-classic.lp-classic [class~="bg-neutral-50"] *,
+.lp-classic.lp-classic [class~="bg-neutral-100"] *, .lp-classic.lp-classic [class~="bg-neutral-200"] *,
+.lp-classic.lp-classic [class~="bg-stone-100"] *,
+.lp-classic.lp-classic [class~="bg-yellow-300"] *, .lp-classic.lp-classic [class~="bg-yellow-400"] *,
+.lp-classic.lp-classic [class~="bg-amber-300"] *, .lp-classic.lp-classic [class~="bg-amber-400"] *,
+.lp-classic.lp-classic [class~="bg-lime-300"] *, .lp-classic.lp-classic [class~="bg-lime-400"] *,
+.lp-classic.lp-classic [class~="bg-green-400"] *, .lp-classic.lp-classic [class~="bg-green-500"] *,
+.lp-classic.lp-classic [class~="bg-emerald-400"] *, .lp-classic.lp-classic [class~="bg-cyan-300"] *,
+.lp-classic.lp-classic [class~="bg-cyan-400"] *,
+.lp-classic.lp-classic [class~="bg-[hsl(var(--og-gold))]"] *, .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-gold))]"] *,
+.lp-classic.lp-classic [class~="bg-[hsl(var(--og-lime))]"] *, .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-green))]"] *,
+.lp-classic.lp-classic [class~="bg-[hsl(var(--pf-green-dark))]"] *, .lp-classic.lp-classic [class~="bg-[hsl(var(--og-cyan))]"] *,
+.lp-classic.lp-classic [class~="bg-[hsl(var(--pf-blue))]"] *, .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-ink))]"] *,
+.lp-classic.lp-classic [class~="bg-[hsl(var(--pf-muted))]"] * {
+  color: #0a0f14 !important;
+}
