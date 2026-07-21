@@ -63,8 +63,8 @@ import LaunchpadCreator from "./pages/orbitx/LaunchpadCreator";
 import LaunchpadPortfolio from "./pages/orbitx/LaunchpadPortfolio";
 import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
 import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
-import LaunchpadNftHub from "./pages/orbitx/LaunchpadNftHub";
-import LaunchpadNftCreate from "./pages/orbitx/LaunchpadNftCreate";
+const LaunchpadNftHub = lazy(() => import("./pages/orbitx/LaunchpadNftHub"));
+const LaunchpadNftCreate = lazy(() => import("./pages/orbitx/LaunchpadNftCreate"));
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
@@ -200,8 +200,8 @@ const App = () => (
               <Route path="leaderboard" element={<LaunchpadLeaderboard />} />
               <Route path="creator/:wallet" element={<LaunchpadCreator />} />
               <Route path="portfolio" element={<LaunchpadPortfolio />} />
-              <Route path="nft" element={<LaunchpadNftHub />} />
-              <Route path="nft/create" element={<LaunchpadNftCreate />} />
+              <Route path="nft" element={<Suspense fallback={null}><LaunchpadNftHub /></Suspense>} />
+              <Route path="nft/create" element={<Suspense fallback={null}><LaunchpadNftCreate /></Suspense>} />
             </Route>
 
             {/* ── Terminal UI: Trading Platform Style ── */}
