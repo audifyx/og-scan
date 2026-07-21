@@ -121,7 +121,9 @@ async function uploadLaunchAssets(mintAddr: string, cfg: LaunchConfig, creator: 
     symbol: cfg.ticker.trim().toUpperCase(),
     description: cfg.description.trim(),
     image: logoUrl,
-    external_url: cfg.website || undefined,
+    showName: true,
+    createdOn: "https://orbitx.world",
+    external_url: cfg.website || "https://orbitx.world",
     extensions: {
       website: cfg.website || undefined, twitter: cfg.twitter || undefined,
       telegram: cfg.telegram || undefined, discord: cfg.discord || undefined,

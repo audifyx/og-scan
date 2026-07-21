@@ -55,40 +55,63 @@ async function handleIpfs(body: any, res: VercelResponse) {
     return res.status(400).json({ error: "Missing required fields: imageBase64, name, symbol" });
   }
 
+  const PINATA_JWT = process.env.PINATA_JWT;
+  if (!PINATA_JWT) {
+    throw new Error("PINATA_JWT is not configured on the server");
+  }
+
   // Convert base64 to buffer
   const imageBuffer = Buffer.from(imageBase64, "base64");
-
-  // Upload image to PumpPortal's IPFS
-  const imgForm = new FormData();
   const ext = (imageMimeType || "image/png").split("/")[1] || "png";
-  imgForm.append("file", new Blob([imageBuffer], { type: imageMimeType || "image/png" }), `token.${ext}`);
-  imgForm.append("name", name);
-  imgForm.append("symbol", symbol);
-  imgForm.append("description", description || "");
-  imgForm.append("twitter", twitter || "");
-  imgForm.append("telegram", telegram || "");
-  imgForm.append("website", website || "");
-  imgForm.append("showName", "true");
 
-  const ipfsRes = await fetch("https://pump.fun/api/ipfs", {
+  // 1 — pin the image itself to IPFS via Pinata
+  const imgForm = new FormData();
+  imgForm.append("file", new Blob([imageBuffer], { type: imageMimeType || "image/png" }), `token.${ext}`);
+  imgForm.append("pinataMetadata", JSON.stringify({ name: `${symbol}-image` }));
+
+  const imgRes = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
     method: "POST",
+    headers: { Authorization: `Bearer ${PINATA_JWT}` },
     body: imgForm,
   });
-
-  if (!ipfsRes.ok) {
-    const errText = await ipfsRes.text();
-    throw new Error(`IPFS upload failed (${ipfsRes.status}): ${errText}`);
+  if (!imgRes.ok) {
+    const errText = await imgRes.text();
+    throw new Error(`Pinata image pin failed (${imgRes.status}): ${errText}`);
   }
+  const { IpfsHash: imageHash } = await imgRes.json();
+  const imageUri = `https://gateway.pinata.cloud/ipfs/${imageHash}`;
 
-  const ipfsData = await ipfsRes.json();
-  // Returns { metadata: { name, symbol, description, image, showName, createdOn, ... }, metadataUri: "https://..." }
-  const metadataUri = ipfsData.metadataUri;
+  // 2 — build our OWN metadata JSON with OrbitX attribution baked in via
+  // `createdOn`. This is the field pump.fun's site, DexScreener-style
+  // aggregators, and third-party trading apps read to show a "Launchpad"
+  // badge — same convention bonk.fun/Believe use to brand their own launches.
+  // Hosting this ourselves (instead of pump.fun's own /api/ipfs, which sets
+  // its own attribution) is what lets that badge say OrbitX.
+  const metadata = {
+    name,
+    symbol,
+    description: description || "",
+    image: imageUri,
+    showName: true,
+    createdOn: "https://orbitx.world",
+    website: website || "https://orbitx.world",
+    twitter: twitter || "",
+    telegram: telegram || "",
+  };
 
-  if (!metadataUri) {
-    throw new Error("No metadataUri returned from IPFS upload");
+  const metaRes = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${PINATA_JWT}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ pinataMetadata: { name: `${symbol}-metadata` }, pinataContent: metadata }),
+  });
+  if (!metaRes.ok) {
+    const errText = await metaRes.text();
+    throw new Error(`Pinata metadata pin failed (${metaRes.status}): ${errText}`);
   }
+  const { IpfsHash: metaHash } = await metaRes.json();
+  const metadataUri = `https://gateway.pinata.cloud/ipfs/${metaHash}`;
 
-  return res.status(200).json({ metadataUri, metadata: ipfsData.metadata || ipfsData });
+  return res.status(200).json({ metadataUri, metadata });
 }
 
 /* ─── Step 2: Create token transaction ────────────────────────────── */
