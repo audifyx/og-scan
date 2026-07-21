@@ -101,17 +101,21 @@ returns table (id uuid, name text, symbol text, sim real)
 language sql stable set search_path = '' as $$
   select c.id, c.name, c.symbol,
     greatest(
-      similarity(lower(c.name), lower(coalesce(p_name, ''))),
-      similarity(lower(c.symbol), lower(coalesce(p_symbol, ''))),
-      case when public.orbitx_normalize(c.name) = public.orbitx_normalize(p_name)
-             or public.orbitx_normalize(c.symbol) = public.orbitx_normalize(p_symbol)
+      public.similarity(lower(c.name), lower(coalesce(p_name, ''))),
+      public.similarity(lower(c.symbol), lower(coalesce(p_symbol, ''))),
+      case when regexp_replace(lower(translate(c.name, '0134$5','oleass')), '[^a-z0-9]', '', 'g')
+                = regexp_replace(lower(translate(coalesce(p_name,''), '0134$5','oleass')), '[^a-z0-9]', '', 'g')
+             or regexp_replace(lower(translate(c.symbol, '0134$5','oleass')), '[^a-z0-9]', '', 'g')
+                = regexp_replace(lower(translate(coalesce(p_symbol,''), '0134$5','oleass')), '[^a-z0-9]', '', 'g')
            then 1.0 else 0.0 end
     )::real as sim
   from public.orbitx_nft_collections c
-  where public.orbitx_normalize(c.name) = public.orbitx_normalize(p_name)
-     or public.orbitx_normalize(c.symbol) = public.orbitx_normalize(p_symbol)
-     or similarity(lower(c.name), lower(coalesce(p_name, ''))) >= 0.55
-     or similarity(lower(c.symbol), lower(coalesce(p_symbol, ''))) >= 0.55
+  where regexp_replace(lower(translate(c.name, '0134$5','oleass')), '[^a-z0-9]', '', 'g')
+        = regexp_replace(lower(translate(coalesce(p_name,''), '0134$5','oleass')), '[^a-z0-9]', '', 'g')
+     or regexp_replace(lower(translate(c.symbol, '0134$5','oleass')), '[^a-z0-9]', '', 'g')
+        = regexp_replace(lower(translate(coalesce(p_symbol,''), '0134$5','oleass')), '[^a-z0-9]', '', 'g')
+     or public.similarity(lower(c.name), lower(coalesce(p_name, ''))) >= 0.55
+     or public.similarity(lower(c.symbol), lower(coalesce(p_symbol, ''))) >= 0.55
   order by sim desc
   limit 10;
 $$;
