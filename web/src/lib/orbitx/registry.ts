@@ -135,6 +135,39 @@ export async function isNameTaken(name: string): Promise<boolean> {
   }
 }
 
+export interface AntiVampSourceMatch { source: "orbitx" | "pumpfun" | "dexscreener"; name: string; ticker: string; sim: number }
+export interface AntiVampResult {
+  blocked: boolean;
+  flagged: boolean;
+  hardMatch: { name: string; ticker: string; source: string } | null;
+  matches: AntiVampSourceMatch[];
+  message?: string;
+}
+
+/**
+ * Unified OrbitX Anti-Vamp check — the single source of truth used by both
+ * the pump.fun lane and the custom SPL lane, live (debounced, as-you-type)
+ * and again right before any fee/on-chain action. Runs server-side (Vercel
+ * function) so the pump.fun / DexScreener cross-checks aren't dropped by
+ * browser CORS — scans OrbitX's own registry AND pump.fun AND DexScreener
+ * (i.e. effectively all Solana tokens with any market presence), not just
+ * tokens launched through OrbitX. `blocked` must hard-stop the launch;
+ * `flagged` (soft match) still allows launch but routes creator fees to the
+ * OBX buyback wallet. On a network/server failure the endpoint fails CLOSED
+ * (blocked: true) — an unverifiable name must never be allowed to launch.
+ */
+export async function checkAntiVamp(name: string, ticker: string): Promise<AntiVampResult> {
+  const res = await fetch("/api/orbitx/anti-vamp-check", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, ticker }),
+  });
+  if (!res.ok) {
+    return { blocked: true, flagged: true, hardMatch: null, matches: [], message: "Originality verification failed — please try again." };
+  }
+  return (await res.json()) as AntiVampResult;
+}
+
 export interface RegisterTokenInput {
   mint_address: string; name: string; ticker: string; creator_wallet: string;
   decimals: number; supply: number; dex?: string | null; lp_pool_address?: string | null;

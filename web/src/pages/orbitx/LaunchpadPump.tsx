@@ -27,7 +27,7 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/platformFee";
-import { registerToken, vampCheck, isNameTaken } from "@/lib/orbitx/registry";
+import { registerToken, checkAntiVamp } from "@/lib/orbitx/registry";
 import { Link } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
@@ -500,23 +500,29 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const [nameTaken, setNameTaken] = useState(false);
   const [checkingName, setCheckingName] = useState(false);
   const [blockedMatch, setBlockedMatch] = useState<{ name: string; ticker: string } | null>(null);
+  const [checkError, setCheckError] = useState(false);
   const nameCheckTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Debounced anti-vamp check on BOTH name and ticker — vampCheck scores
+  // Debounced OrbitX Anti-Vamp check on BOTH name and ticker
   // similarity on both fields in one RPC call, so a duplicate ticker with a
   // different name blocks live here too, not just at final submit.
   useEffect(() => {
-    if (!form.name.trim() && !form.symbol.trim()) { setNameTaken(false); setBlockedMatch(null); return; }
+    if (!form.name.trim() && !form.symbol.trim()) { setNameTaken(false); setBlockedMatch(null); setCheckError(false); return; }
     clearTimeout(nameCheckTimer.current);
     setCheckingName(true);
     nameCheckTimer.current = setTimeout(async () => {
       try {
-        const matches = await vampCheck(form.name, form.symbol);
-        const clone = matches.find((m) => m.sim >= 0.85);
-        setNameTaken(!!clone);
-        setBlockedMatch(clone ? { name: clone.name, ticker: clone.ticker } : null);
+        // Unified check: OrbitX registry + pump.fun + DexScreener, live as you type.
+        const result = await checkAntiVamp(form.name, form.symbol);
+        setNameTaken(result.blocked);
+        setCheckError(!!result.error);
+        setBlockedMatch(result.hardMatch ? { name: result.hardMatch.name, ticker: result.hardMatch.ticker } : null);
       } catch (err) {
-        console.error("Name/ticker check failed:", err);
+        console.error("Anti-vamp check failed:", err);
+        // Fail closed — an unverifiable name must not be allowed to launch.
+        setNameTaken(true);
+        setCheckError(true);
+        setBlockedMatch(null);
       } finally {
         setCheckingName(false);
       }
@@ -581,30 +587,37 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const canLaunch =
     connected && publicKey && signTransaction && sendTransaction &&
     form.name.trim().length > 0 && form.symbol.trim().length > 0 &&
-    !!imageFile && !nameTaken && !checkingName;
+    !!imageFile && !nameTaken && !checkingName && !checkError;
 
-  /* ─── Launch flow ──────────────────────────────────────────────────── */
+  /* Launch flow */
 
   const handleLaunch = async () => {
     if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile) return;
 
     let flagged = false;
     try {
-      /* Step -1 — anti-vamp identity check, same protection as the custom/SPL lane.
-         Runs before any fee payment or on-chain action so a blocked clone never
-         costs the user SOL. */
+      /* Step -1 - OrbitX Anti-Vamp identity check (unified: OrbitX registry +
+         pump.fun + DexScreener), same protection as the custom/SPL lane.
+         Re-run fresh right before any fee payment or on-chain action - never
+         trust only the debounced live-typing result - so a blocked clone
+         never costs the user SOL. Fails CLOSED on a check error. */
       setStep("uploading");
-      setStatusMsg("Anti-vamp check…");
-      const matches = await vampCheck(form.name, form.symbol);
-      const clone = matches.find((m) => m.sim >= 0.85);
-      if (clone) {
-        toast.error(`Blocked — "${form.name}" / ${form.symbol} is too close to ${clone.name} ($${clone.ticker}). Anti-vamp requires a unique identity.`);
+      setStatusMsg("OrbitX Anti-Vamp check...");
+      const result = await checkAntiVamp(form.name, form.symbol);
+      if (result.blocked) {
+        setNameTaken(true);
+        setBlockedMatch(result.hardMatch ? { name: result.hardMatch.name, ticker: result.hardMatch.ticker } : null);
+        toast.error(
+          result.hardMatch
+            ? `Blocked - "${form.name}" / ${form.symbol} is too close to ${result.hardMatch.name} ($${result.hardMatch.ticker}). Anti-vamp requires a unique identity.`
+            : result.message || "Originality verification failed - please try again."
+        );
         setStep("form");
         return;
       }
-      if (matches.length > 0) {
+      if (result.flagged) {
         flagged = true;
-        toast.warning(`${matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`);
+        toast.warning(`${result.matches.length} similar token(s) exist - launching FLAGGED: creator fees route to OBX buybacks.`);
       }
     } catch (err) {
       console.error("[orbitx] pump anti-vamp check failed", err);
@@ -730,10 +743,10 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         launcherWallet: publicKey.toBase58(),
       });
 
-      // Shared OrbitX registry — powers the Home feed + the Claim Fees page.
+      // Shared OrbitX registry - powers the Home feed + the Claim Fees page.
+      // The Anti-Vamp verdict was already established (and enforced) in
+      // Step -1 above, before any fee/on-chain action.
       try {
-        // Final server-side re-check right before writing the registry row.
-        const takenOnServer = await isNameTaken(form.name).catch(() => false);
         await registerToken({
           mint_address: mintAddr,
           name: form.name.trim(),
@@ -744,8 +757,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
           dex: "pumpfun",
           mint_signature: sig,
           metadata_uri: uri,
-          is_vamp: flagged || takenOnServer,
-          fee_route: (flagged || takenOnServer) ? "orbitx_buyback" : "creator",
+          is_vamp: flagged,
+          fee_route: flagged ? "orbitx_buyback" : "creator",
           cluster: "mainnet-beta",
           launch_type: "pump",
         });
@@ -925,12 +938,14 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         {step === "form" && (
           <div className="space-y-5">
             {nameTaken && (
-              <div className="rounded-lg border border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 p-4 flex items-start gap-3">
+              <div className="rounded-lg border-2 border-[hsl(var(--og-blood))]/60 bg-[hsl(var(--og-blood))]/15 p-4 flex items-start gap-3 shadow-[0_0_30px_-8px_hsl(var(--og-blood)/0.6)]">
                 <AlertCircle className="h-5 w-5 text-[hsl(var(--og-blood))] flex-shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-semibold text-[hsl(var(--og-blood))]">🚫 Name Not Available</div>
-                  <div className="text-sm text-[hsl(var(--og-blood))]/80 mt-1">
-                    no clones — be original — use a different name or ticker{blockedMatch ? <> (too close to {blockedMatch.name} — ${blockedMatch.ticker})</> : null}. All other fields are locked until you find an original identity.
+                  <div className="font-black uppercase tracking-wide text-[hsl(var(--og-blood))]">🚫 OrbitX Anti-Vamp Protection — Launch Blocked</div>
+                  <div className="text-sm text-white/90 mt-1">
+                    {checkError
+                      ? "Couldn't verify this name/ticker is original right now — retrying automatically. The launch button stays locked until verification succeeds."
+                      : <>This name or ticker is already in use{blockedMatch ? <> — too close to <strong>{blockedMatch.name}</strong> (${blockedMatch.ticker})</> : null}. Change the name or ticker to continue. All other fields are locked until this is resolved.</>}
                   </div>
                 </div>
               </div>
@@ -946,16 +961,16 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 {/* Image upload */}
                 <div>
                   <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Logo *</Label>
-                  <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={handleImageSelect} />
+                  <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={handleImageSelect} disabled={nameTaken} />
                   {imagePreview ? (
                     <div className="relative inline-block">
                       <img src={imagePreview} alt="Token logo" className="h-24 w-24 rounded-xl border-2 border-[hsl(var(--og-cyan))]/30 object-cover" />
-                      <button onClick={removeImage} className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500/80 text-white hover:bg-red-500 transition-colors">
+                      <button onClick={removeImage} disabled={nameTaken} className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500/80 text-white hover:bg-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                         <X className="h-3 w-3" />
                       </button>
                     </div>
                   ) : (
-                    <button onClick={() => fileInputRef.current?.click()} className="flex h-24 w-24 items-center justify-center rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] text-white/20 hover:border-[hsl(var(--og-cyan))]/30 hover:text-[hsl(var(--og-cyan))]/60 transition-all">
+                    <button onClick={() => fileInputRef.current?.click()} disabled={nameTaken} className="flex h-24 w-24 items-center justify-center rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] text-white/20 hover:border-[hsl(var(--og-cyan))]/30 hover:text-[hsl(var(--og-cyan))]/60 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                       <div className="text-center"><Upload className="h-5 w-5 mx-auto mb-1" /><span className="text-[9px] uppercase tracking-widest">Upload</span></div>
                     </button>
                   )}
@@ -978,15 +993,15 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 {nameTaken && (
                   <div className="flex items-start gap-1.5 text-xs text-[hsl(var(--og-blood))]">
                     <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                    <span>no clones — too close to {blockedMatch?.name} (${blockedMatch?.ticker}). Change the name or ticker to launch.</span>
+                    <span>OrbitX Anti-Vamp: too close to {blockedMatch?.name} (${blockedMatch?.ticker}). Change the name or ticker to launch.</span>
                   </div>
                 )}
 
                 {/* Description */}
                 <div>
                   <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Description</Label>
-                  <Textarea placeholder="What's your token about? (optional)" value={form.description} onChange={(e) => updateField("description", e.target.value)} maxLength={500} rows={3}
-                    className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 resize-none" />
+                  <Textarea placeholder="What's your token about? (optional)" value={form.description} onChange={(e) => updateField("description", e.target.value)} maxLength={500} rows={3} disabled={nameTaken}
+                    className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 resize-none disabled:opacity-40" />
                   <p className="text-[10px] text-white/15 text-right mt-1">{form.description.length}/500</p>
                 </div>
               </CardContent>
@@ -1003,18 +1018,18 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <Twitter className="h-4 w-4 text-white/20 shrink-0" />
-                    <Input placeholder="https://x.com/yourtoken" value={form.twitter} onChange={(e) => updateField("twitter", e.target.value)}
-                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40" />
+                    <Input placeholder="https://x.com/yourtoken" value={form.twitter} onChange={(e) => updateField("twitter", e.target.value)} disabled={nameTaken}
+                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 disabled:opacity-40" />
                   </div>
                   <div className="flex items-center gap-3">
                     <Send className="h-4 w-4 text-white/20 shrink-0" />
-                    <Input placeholder="https://t.me/yourgroup" value={form.telegram} onChange={(e) => updateField("telegram", e.target.value)}
-                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40" />
+                    <Input placeholder="https://t.me/yourgroup" value={form.telegram} onChange={(e) => updateField("telegram", e.target.value)} disabled={nameTaken}
+                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 disabled:opacity-40" />
                   </div>
                   <div className="flex items-center gap-3">
                     <Globe className="h-4 w-4 text-white/20 shrink-0" />
-                    <Input placeholder="https://yourtoken.com" value={form.website} onChange={(e) => updateField("website", e.target.value)}
-                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40" />
+                    <Input placeholder="https://yourtoken.com" value={form.website} onChange={(e) => updateField("website", e.target.value)} disabled={nameTaken}
+                      className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 disabled:opacity-40" />
                   </div>
                 </div>
               </CardContent>
@@ -1030,8 +1045,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 </div>
                 <div>
                   <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Dev Buy (SOL)</Label>
-                  <Input type="number" min="0" step="0.01" placeholder="0" value={form.devBuySol} onChange={(e) => updateField("devBuySol", e.target.value)}
-                    className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 max-w-[200px]" />
+                  <Input type="number" min="0" step="0.01" placeholder="0" value={form.devBuySol} onChange={(e) => updateField("devBuySol", e.target.value)} disabled={nameTaken}
+                    className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 max-w-[200px] disabled:opacity-40" />
                   <p className="text-[10px] text-white/20 mt-1.5 flex items-center gap-1">
                     <Info className="h-3 w-3" /> Buy your own token at launch. Set 0 for no initial buy.
                   </p>

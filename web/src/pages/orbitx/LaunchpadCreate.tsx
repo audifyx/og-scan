@@ -30,7 +30,7 @@ import {
   CheckCircle2, AlertTriangle, Info, Wand2, ChevronRight, Loader2, Copy, Check,
 } from "lucide-react";
 import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, BASE_LAUNCH_FEE_USD, type FeeBreakdown } from "@/lib/orbitx/fee";
-import { vampCheck, registerToken, isNameTaken } from "@/lib/orbitx/registry";
+import { checkAntiVamp, registerToken } from "@/lib/orbitx/registry";
 import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
 import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
 import { supabase } from "@/lib/supabase";
@@ -206,28 +206,34 @@ export default function LaunchpadCreate() {
   const [nameTaken, setNameTaken] = useState(false);
   const [checkingName, setCheckingName] = useState(false);
   const [blockedMatch, setBlockedMatch] = useState<{ name: string; ticker: string } | null>(null);
+  const [checkError, setCheckError] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const nameCheckTimer = useRef<NodeJS.Timeout>();
 
-  // Debounced anti-vamp check on BOTH name and ticker — vampCheck scores
+  // Debounced OrbitX Anti-Vamp check on BOTH name and ticker
   // similarity on both fields in one RPC call, so a duplicate ticker with a
   // different name blocks live here too, not just at final submit.
   useEffect(() => {
     if (!cfg.name.trim() && !cfg.ticker.trim()) {
       setNameTaken(false);
       setBlockedMatch(null);
+      setCheckError(false);
       return;
     }
     clearTimeout(nameCheckTimer.current);
     setCheckingName(true);
     nameCheckTimer.current = setTimeout(async () => {
       try {
-        const matches = await vampCheck(cfg.name, cfg.ticker);
-        const clone = matches.find((m) => m.sim >= 0.85);
-        setNameTaken(!!clone);
-        setBlockedMatch(clone ? { name: clone.name, ticker: clone.ticker } : null);
+        // Unified check: OrbitX registry + pump.fun + DexScreener, live as you type.
+        const result = await checkAntiVamp(cfg.name, cfg.ticker);
+        setNameTaken(result.blocked);
+        setCheckError(!!result.error);
+        setBlockedMatch(result.hardMatch ? { name: result.hardMatch.name, ticker: result.hardMatch.ticker } : null);
       } catch (err) {
-        console.error("Name/ticker check failed:", err);
+        console.error("Anti-vamp check failed:", err);
+        setNameTaken(true);
+        setCheckError(true);
+        setBlockedMatch(null);
       } finally {
         setCheckingName(false);
       }
@@ -246,7 +252,7 @@ export default function LaunchpadCreate() {
   const allocValid = allocTotal === 100;
 
   const sectionDone = useMemo<Record<SectionId, boolean>>(() => ({
-    identity: !!cfg.name.trim() && !!cfg.ticker.trim() && !!cfg.description.trim() && !!cfg.logoDataUrl && !nameTaken && !checkingName,
+    identity: !!cfg.name.trim() && !!cfg.ticker.trim() && !!cfg.description.trim() && !!cfg.logoDataUrl && !nameTaken && !checkingName && !checkError,
     socials: !!(cfg.website || cfg.twitter || cfg.telegram || cfg.discord),
     supply: /^\d+$/.test(cfg.supply) && Number(cfg.supply) > 0 && Number(cfg.initialPriceUsd) > 0,
     authorities: cfg.revokeMint && cfg.revokeFreeze,
@@ -360,26 +366,32 @@ export default function LaunchpadCreate() {
     if (!cfg.logoDataUrl) { toast.error("Upload a logo — it becomes your token image"); return; }
     setLaunching(true);
     try {
-      /* 1 — anti-vamp identity check, same protection as the pump.fun lane.
-         Wrapped in its own try/catch so a transient registry error fails soft
-         instead of cancelling the whole launch (matches LaunchpadPump). */
-      setPhase("checking"); setPhaseMsg("Anti-vamp check…");
+      /* 1 — OrbitX Anti-Vamp identity check (unified: OrbitX registry +
+         pump.fun + DexScreener), same protection as the pump.fun lane.
+         Re-run fresh right before any fee/on-chain action. Fails CLOSED on
+         a check error, so a broken check can never let a duplicate slip
+         through. */
+      setPhase("checking"); setPhaseMsg("OrbitX Anti-Vamp check…");
       let flagged = false;
-      try {
-        const matches = await vampCheck(cfg.name, cfg.ticker);
-        const clone = matches.find((m) => m.sim >= 0.85);
-        if (clone) {
-          toast.error(`Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${clone.name} ($${clone.ticker}). Anti-vamp requires a unique identity.`);
-          setPhase("idle");
-          return;
-        }
-        if (matches.length > 0) {
-          flagged = true;
-          toast.warning(`${matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`);
-        }
-      } catch (err) {
+      const preLaunchCheck = await checkAntiVamp(cfg.name, cfg.ticker).catch((err) => {
         console.error("[orbitx] custom anti-vamp check failed", err);
-        // fail soft — don't block a launch over a transient registry error
+        return { blocked: true, flagged: true, hardMatch: null, matches: [], message: "Originality verification failed — please try again." } as const;
+      });
+      if (preLaunchCheck.blocked) {
+        setNameTaken(true);
+        setBlockedMatch(preLaunchCheck.hardMatch ? { name: preLaunchCheck.hardMatch.name, ticker: preLaunchCheck.hardMatch.ticker } : null);
+        toast.error(
+          preLaunchCheck.hardMatch
+            ? `Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${preLaunchCheck.hardMatch.name} ($${preLaunchCheck.hardMatch.ticker}). Anti-vamp requires a unique identity.`
+            : preLaunchCheck.message || "Originality verification failed — please try again."
+        );
+        setPhase("idle");
+        setLaunching(false);
+        return;
+      }
+      if (preLaunchCheck.flagged) {
+        flagged = true;
+        toast.warning(`${preLaunchCheck.matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`);
       }
 
       /* 2 — mint keypair (vanity-ground if available) */
@@ -456,19 +468,10 @@ export default function LaunchpadCreate() {
         }
       }
 
-      /* 6 — register in the OrbitX index (anti-vamp registry) */
+      /* 6 — register in the OrbitX index. The Anti-Vamp verdict was already
+         established (and enforced) in Step 1, before any fee/on-chain
+         action — the mint has already landed on Solana by this point. */
       setPhase("registering"); setPhaseMsg("Registering in the OrbitX index…");
-      
-      // Server-side duplicate name check (final validation)
-      try {
-        const nameTakenOnServer = await isNameTaken(cfg.name);
-        if (nameTakenOnServer) {
-          throw new Error("no clones be original — this name is already taken. Use a different name.");
-        }
-      } catch (nameCheckErr) {
-        throw nameCheckErr;
-      }
-      
       try {
         await registerToken({
           mint_address: mintAddr,
@@ -528,13 +531,15 @@ export default function LaunchpadCreate() {
         const nameInvalid = nameTaken || checkingName;
         return (
           <div className="space-y-5">
-            {nameInvalid && (
-              <div className="rounded-lg border border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 p-4 flex items-start gap-3">
+            {nameTaken && (
+              <div className="rounded-lg border-2 border-[hsl(var(--og-blood))]/60 bg-[hsl(var(--og-blood))]/15 p-4 flex items-start gap-3 shadow-[0_0_30px_-8px_hsl(var(--og-blood)/0.6)]">
                 <AlertCircle className="h-5 w-5 text-[hsl(var(--og-blood))] flex-shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-semibold text-[hsl(var(--og-blood))]">🚫 Name Not Available</div>
-                  <div className="text-sm text-[hsl(var(--og-blood))]/80 mt-1">
-                    no clones — be original — use a different name or ticker{blockedMatch ? <> (too close to {blockedMatch.name} — ${blockedMatch.ticker})</> : null}. All other fields are locked until you find an original identity.
+                  <div className="font-black uppercase tracking-wide text-[hsl(var(--og-blood))]">🚫 OrbitX Anti-Vamp Protection — Launch Blocked</div>
+                  <div className="text-sm text-white/90 mt-1">
+                    {checkError
+                      ? "Couldn't verify this name/ticker is original right now — retrying automatically. Launch stays locked until verification succeeds."
+                      : <>This name or ticker is already in use{blockedMatch ? <> — too close to <strong>{blockedMatch.name}</strong> (${blockedMatch.ticker})</> : null}. Change the name or ticker to continue. All other fields are locked until this is resolved.</>}
                   </div>
                 </div>
               </div>
@@ -558,7 +563,7 @@ export default function LaunchpadCreate() {
             {nameTaken && (
               <div className="flex items-start gap-2 text-sm text-[hsl(var(--og-blood))]">
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>no clones — too close to {blockedMatch?.name} (${blockedMatch?.ticker}). Change the name or ticker to launch.</span>
+                <span>OrbitX Anti-Vamp: too close to {blockedMatch?.name} (${blockedMatch?.ticker}). Change the name or ticker to launch.</span>
               </div>
             )}
             <div className="space-y-2"><Label>Description</Label>
