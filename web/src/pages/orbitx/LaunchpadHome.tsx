@@ -117,35 +117,41 @@ export default function LaunchpadHome() {
   return (
     <div className="space-y-6">
       {/* ─── Hero ──────────────────────────────────────────────── */}
-      <div className="pf-card p-8 md:p-12">
-        <div className="max-w-2xl">
-          <h1 className="text-5xl md:text-6xl font-black tracking-tight text-[hsl(var(--pf-ink))] mb-3">
-            Launch your token
-          </h1>
-          <p className="text-lg md:text-xl text-[hsl(var(--pf-muted))] mb-6 leading-relaxed">
-            Build on Solana with anti-vamp protection, zero-clone guarantee, and creator-first design.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Link to="/orbitxlaunch/create" className="pf-btn">
-              <Rocket className="h-4 w-4" /> Start launch
-            </Link>
-            <a href="https://docs.orbitx.world" target="_blank" rel="noreferrer" className="pf-btn-ghost">
-              Learn more →
-            </a>
+      {/* ─── Hero ─── */}
+      <div className="obx-hero p-6 sm:p-10 md:p-14">
+        <div className="grid items-center gap-8 md:grid-cols-[1.1fr_0.9fr]">
+          <div className="max-w-2xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] px-3 py-1 pf-mono text-[10px] font-bold uppercase tracking-widest text-[hsl(var(--pf-green))]">
+              <Sparkles className="h-3.5 w-3.5" /> Next-gen Solana launchpad
+            </div>
+            <h1 className="obx-gradient-text mb-4 text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
+              Launch your token into orbit
+            </h1>
+            <p className="mb-7 max-w-xl text-base leading-relaxed text-[hsl(var(--pf-muted))] sm:text-lg">
+              Build on Solana with anti-vamp protection, a zero-clone guarantee, in-app trading, and creator-first design — all in one premium terminal.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/orbitxlaunch/create" className="pf-btn"><Rocket className="h-4 w-4" /> Start a launch</Link>
+              <a href="https://docs.orbitx.world" target="_blank" rel="noreferrer" className="pf-btn-ghost">Learn more →</a>
+            </div>
+            <div className="mt-8 grid max-w-md grid-cols-3 gap-3">
+              <div className="rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] p-3">
+                <div className="pf-mono text-[9px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">100% on-chain</div>
+                <div className="mt-1 text-sm font-black text-[hsl(var(--pf-green))]">Decentralized</div>
+              </div>
+              <div className="rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] p-3">
+                <div className="pf-mono text-[9px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Anti-vamp</div>
+                <div className="mt-1 text-sm font-black text-[hsl(var(--pf-green))]">Zero clones</div>
+              </div>
+              <div className="rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] p-3">
+                <div className="pf-mono text-[9px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Creator owned</div>
+                <div className="mt-1 text-sm font-black text-[hsl(var(--pf-green))]">Full control</div>
+              </div>
+            </div>
           </div>
-          <div className="mt-8 flex flex-wrap gap-6 text-sm">
-            <div>
-              <div className="pf-mono text-xs text-[hsl(var(--pf-muted))] uppercase tracking-wider mb-1">100% on-chain</div>
-              <div className="text-lg font-black text-[hsl(var(--pf-green-dark))]">Decentralized launch</div>
-            </div>
-            <div>
-              <div className="pf-mono text-xs text-[hsl(var(--pf-muted))] uppercase tracking-wider mb-1">Anti-vamp</div>
-              <div className="text-lg font-black text-[hsl(var(--pf-green-dark))]">Zero clones</div>
-            </div>
-            <div>
-              <div className="pf-mono text-xs text-[hsl(var(--pf-muted))] uppercase tracking-wider mb-1">Creator owned</div>
-              <div className="text-lg font-black text-[hsl(var(--pf-green-dark))]">You keep control</div>
-            </div>
+          <div className="relative flex items-center justify-center">
+            <div className="obx-glow-ring left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 sm:h-72 sm:w-72" />
+            <img src="/orbitx-globe.png" alt="OrbitX world" draggable={false} className="obx-globe relative w-52 max-w-xs select-none sm:w-72 md:w-full" />
           </div>
         </div>
       </div>
