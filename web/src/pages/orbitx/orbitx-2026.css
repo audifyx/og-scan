@@ -1,0 +1,189 @@
+/* ============================================================================
+   OrbitX Launchpad — 2026 "Deep Space" redesign.
+   Reskins the whole /orbitxlaunch/* surface by remapping the existing --pf-*
+   design tokens to a matte-black cyber palette (neon emerald + metallic gold),
+   then layering glassmorphism, an animated starfield/aurora background, and a
+   premium hero. Scoped to .lp-classic so nothing else in the app changes.
+   ========================================================================== */
+
+.lp-classic {
+  /* dark cyber token remap — every launchpad component reads these */
+  --pf-bg: 222 32% 5%;
+  --pf-bg-2: 220 28% 8%;
+  --pf-ink: 150 20% 94%;
+  --pf-muted: 210 14% 60%;
+  --pf-border: 200 25% 22%;
+  --pf-green: 152 86% 52%;
+  --pf-green-dark: 152 72% 44%;
+  --pf-red: 356 84% 62%;
+  --pf-gold: 42 92% 60%;
+  --pf-blue: 190 92% 56%;
+
+  --obx-glass: 210 40% 12%;
+  --obx-glow: 152 86% 52%;
+
+  position: relative;
+  background: #04060a;
+  color: hsl(var(--pf-ink));
+  isolation: isolate;
+}
+
+/* animated deep-space background: aurora blooms + drifting grid, all fixed */
+.lp-classic::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(1100px 700px at 12% -8%, hsl(152 86% 20% / 0.28), transparent 60%),
+    radial-gradient(900px 600px at 92% 6%, hsl(190 92% 26% / 0.22), transparent 60%),
+    radial-gradient(1000px 800px at 50% 118%, hsl(42 80% 30% / 0.14), transparent 55%),
+    #04060a;
+  animation: obxAurora 18s ease-in-out infinite alternate;
+}
+.lp-classic::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(hsl(152 86% 52% / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(152 86% 52% / 0.04) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(circle at 50% 30%, #000 0%, transparent 78%);
+  -webkit-mask-image: radial-gradient(circle at 50% 30%, #000 0%, transparent 78%);
+  animation: obxGridDrift 40s linear infinite;
+}
+@keyframes obxAurora {
+  0%   { filter: hue-rotate(0deg) brightness(1); }
+  100% { filter: hue-rotate(24deg) brightness(1.12); }
+}
+@keyframes obxGridDrift {
+  0%   { background-position: 0 0, 0 0; }
+  100% { background-position: 46px 92px, 92px 46px; }
+}
+
+/* ---- glass panels ---- */
+.lp-classic .pf-card {
+  background: linear-gradient(180deg, hsl(var(--obx-glass) / 0.55), hsl(220 30% 6% / 0.7));
+  border: 1px solid hsl(var(--pf-border) / 0.7);
+  border-radius: 16px;
+  box-shadow: 0 8px 40px -18px hsl(152 86% 40% / 0.35), inset 0 1px 0 hsl(0 0% 100% / 0.05);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  transition: border-color .25s ease, box-shadow .25s ease, transform .25s ease;
+}
+.lp-classic a.pf-card:hover,
+.lp-classic .pf-card.group:hover {
+  border-color: hsl(var(--pf-green) / 0.6);
+  box-shadow: 0 14px 50px -18px hsl(152 86% 50% / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.06);
+  transform: translateY(-2px);
+}
+
+/* ---- neon buttons ---- */
+.lp-classic .pf-btn {
+  border: 1px solid hsl(var(--pf-green) / 0.65);
+  background: linear-gradient(180deg, hsl(152 86% 52%), hsl(152 80% 40%));
+  color: #04120b;
+  border-radius: 12px;
+  font-weight: 800;
+  box-shadow: 0 0 0 1px hsl(152 86% 52% / 0.25), 0 10px 30px -12px hsl(152 86% 52% / 0.7);
+  transition: transform .15s ease, box-shadow .2s ease, filter .2s ease;
+}
+.lp-classic .pf-btn:hover { filter: brightness(1.08); box-shadow: 0 0 0 1px hsl(152 86% 52% / 0.4), 0 14px 40px -12px hsl(152 86% 52% / 0.85); }
+.lp-classic .pf-btn:active { transform: translateY(1px); }
+.lp-classic .pf-btn-ghost {
+  border: 1px solid hsl(var(--pf-border));
+  background: hsl(var(--obx-glass) / 0.4);
+  color: hsl(var(--pf-ink));
+  border-radius: 12px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: none;
+}
+.lp-classic .pf-btn-ghost:hover { border-color: hsl(var(--pf-green) / 0.6); color: hsl(var(--pf-green)); }
+
+/* ---- tab bar ---- */
+.lp-classic .pf-nav-link {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: hsl(var(--pf-muted));
+  padding: 0.4rem 0.75rem;
+  font-weight: 700;
+  transition: all .2s ease;
+}
+.lp-classic .pf-nav-link:hover { color: hsl(var(--pf-ink)); background: hsl(var(--obx-glass) / 0.5); }
+.lp-classic .pf-nav-link.active {
+  color: hsl(152 90% 60%);
+  background: hsl(152 86% 52% / 0.12);
+  border-color: hsl(152 86% 52% / 0.45);
+  box-shadow: 0 0 22px -6px hsl(152 86% 52% / 0.6);
+}
+
+/* ---- pills: fix dark-mode contrast ---- */
+.lp-classic .pf-pill { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-radius: 9999px; }
+.lp-classic .pf-pill--gold { background: hsl(var(--pf-gold) / 0.16); color: hsl(var(--pf-gold)); border-color: hsl(var(--pf-gold) / 0.55); }
+.lp-classic .pf-pill--green { background: hsl(var(--pf-green) / 0.16); color: hsl(152 90% 62%); border-color: hsl(var(--pf-green) / 0.5); }
+
+/* keep tailwind dark utilities dark inside the launchpad (undo classic flips) */
+.lp-classic [class*="bg-black"] { background-color: hsl(220 30% 6% / 0.6) !important; }
+.lp-classic [class*="border-white"] { border-color: hsl(var(--pf-border) / 0.6) !important; }
+.lp-classic [class*="text-white"] { color: hsl(var(--pf-ink)) !important; }
+
+/* progress bar → neon */
+.lp-classic .pf-progress { background: hsl(220 30% 14%); border-color: hsl(var(--pf-border)); }
+.lp-classic .pf-progress-fill { background: linear-gradient(90deg, hsl(152 86% 44%), hsl(152 90% 60%)); box-shadow: 0 0 16px hsl(152 86% 52% / 0.7); }
+
+/* header + footer glass */
+.lp-classic .obx-header {
+  background: hsl(220 32% 6% / 0.72);
+  border-bottom: 1px solid hsl(var(--pf-border) / 0.6);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.lp-classic .obx-brand-badge {
+  background: radial-gradient(circle at 30% 25%, hsl(152 90% 60%), hsl(152 80% 34%));
+  border: 1px solid hsl(152 86% 60% / 0.6);
+  box-shadow: 0 0 22px -4px hsl(152 86% 52% / 0.8);
+}
+
+/* ---- hero ---- */
+.lp-classic .obx-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid hsl(var(--pf-border) / 0.6);
+  background: linear-gradient(135deg, hsl(210 40% 10% / 0.6), hsl(220 40% 5% / 0.75));
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 30px 90px -40px hsl(152 86% 40% / 0.5);
+}
+.lp-classic .obx-gradient-text {
+  background: linear-gradient(120deg, #ffffff 0%, hsl(152 90% 66%) 45%, hsl(42 92% 66%) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lp-classic .obx-globe {
+  filter: drop-shadow(0 0 60px hsl(152 86% 45% / 0.55)) drop-shadow(0 0 120px hsl(190 90% 45% / 0.35));
+  animation: obxFloat 7s ease-in-out infinite;
+}
+@keyframes obxFloat {
+  0%, 100% { transform: translateY(-6px) rotate(-0.5deg); }
+  50%      { transform: translateY(10px) rotate(0.5deg); }
+}
+.lp-classic .obx-glow-ring {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(circle, hsl(152 86% 50% / 0.35), transparent 70%);
+  filter: blur(30px);
+  animation: obxPulse 6s ease-in-out infinite;
+}
+@keyframes obxPulse { 0%,100% { opacity: .6; transform: scale(1);} 50% { opacity: 1; transform: scale(1.08);} }
+
+/* chart chrome */
+.lp-classic .obx-chart-frame { border-radius: 12px; overflow: hidden; border: 1px solid hsl(var(--pf-border) / 0.6); background: #06090f; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-classic::before, .lp-classic::after, .lp-classic .obx-globe, .lp-classic .obx-glow-ring { animation: none; }
+}
