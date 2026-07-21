@@ -6,14 +6,14 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { listByCreator, getProfile, upsertProfile, type OrbitxProfile, type OrbitxToken } from "@/lib/orbitx/registry";
+import { listByCreator, getProfile, upsertProfile, getReferralStats, syncAchievements, getAchievementHistory, type OrbitxProfile, type OrbitxToken } from "@/lib/orbitx/registry";
 import { supabase } from "@/lib/supabase";
 import { TokenCard, shortAddr, GRADUATION_MC_USD } from "./_shared";
 import { useMarketMap, fmtCompactUsd } from "./lpx";
 import {
   Wallet, Loader2, Rocket, Pencil, X, Check, Twitter, Globe, Camera, Copy,
   ExternalLink, Download, Trophy, ShieldCheck, Droplets, Coins, Flame,
-  Award, Star, Gem, Crown, Users, ListChecks, Eye,
+  Award, Star, Gem, Crown, Users, ListChecks, Eye, Share2, Gift,
 } from "lucide-react";
 
 const goldBtn = "inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--og-gold))]/50 bg-[hsl(var(--og-gold))]/15 px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-[hsl(var(--og-gold))] transition hover:bg-[hsl(var(--og-gold))]/25";
@@ -149,6 +149,22 @@ export default function LaunchpadProfile() {
   const mints = useMemo(() => tokens.map((t) => t.mint_address), [tokens]);
   const { data: markets } = useMarketMap(mints);
 
+  const { data: referral, refetch: refetchReferral } = useQuery({
+    queryKey: ["orbitx-referral-stats", addr],
+    queryFn: () => getReferralStats(addr!),
+    enabled: !!addr,
+  });
+  useQuery({
+    queryKey: ["orbitx-achievements-sync", addr, tokens.length],
+    queryFn: () => syncAchievements(addr!),
+    enabled: !!addr && tokens.length > 0,
+  });
+  const { data: achievementHistory } = useQuery({
+    queryKey: ["orbitx-achievements-history", addr],
+    queryFn: () => getAchievementHistory(addr!),
+    enabled: !!addr,
+  });
+
   const isGrad = (t: OrbitxToken) => !!t.lp_pool_address || !!t.graduated_at || (markets?.[t.mint_address]?.mcap ?? 0) >= GRADUATION_MC_USD;
   const graduated = tokens.filter(isGrad).length;
   const totalMcap = mints.reduce((a, m) => a + (markets?.[m]?.mcap ?? 0), 0);
@@ -280,8 +296,44 @@ export default function LaunchpadProfile() {
         <Trophy className="h-4 w-4 text-[hsl(var(--pf-gold))]" />
         <h2 className="text-sm font-black uppercase tracking-wide text-[hsl(var(--pf-ink))]">Achievements</h2>
       </div>
-      <div className="mb-6 grid grid-cols-4 gap-2 sm:grid-cols-8">
+      <div className="mb-2 grid grid-cols-4 gap-2 sm:grid-cols-8">
         {achievements.map((a) => <AchievementBadge key={a.id} a={a} />)}
+      </div>
+      {!!achievementHistory?.length && (
+        <div className="mb-6 pf-mono text-[10px] text-[hsl(var(--pf-muted))]">
+          Latest unlock: {achievementHistory[achievementHistory.length - 1].achievement_id.replace(/_/g, " ")} on {new Date(achievementHistory[achievementHistory.length - 1].unlocked_at).toLocaleDateString()}
+        </div>
+      )}
+
+      {/* Referral dashboard */}
+      <div className="mb-3 flex items-center gap-2">
+        <Share2 className="h-4 w-4 text-[hsl(var(--pf-gold))]" />
+        <h2 className="text-sm font-black uppercase tracking-wide text-[hsl(var(--pf-ink))]">Referral dashboard</h2>
+      </div>
+      <div className="mb-6 pf-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="pf-mono text-[9px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Your referral link</div>
+            <div className="mt-1 pf-mono text-sm font-bold text-[hsl(var(--pf-ink))]">
+              {referral ? `orbitx.world/orbitxlaunch?ref=${referral.code}` : "…"}
+            </div>
+          </div>
+          <button
+            onClick={() => { if (referral) { navigator.clipboard.writeText(`${window.location.origin}/orbitxlaunch?ref=${referral.code}`); refetchReferral(); } }}
+            className="pf-btn-ghost shrink-0 text-xs"
+          ><Gift className="h-3.5 w-3.5" /> Copy link</button>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2">
+          <div>
+            <div className="pf-mono text-[9px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Referred creators</div>
+            <div className="text-lg font-black text-[hsl(var(--pf-ink))]">{referral?.referredCount ?? 0}</div>
+          </div>
+          <div>
+            <div className="pf-mono text-[9px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Total earned</div>
+            <div className="text-lg font-black text-[hsl(var(--pf-gold))]">{fmtCompactUsd(referral?.totalEarningsUsd ?? 0)}</div>
+          </div>
+        </div>
+        <p className="mt-3 text-[11px] leading-relaxed text-[hsl(var(--pf-muted))]">Share your link — when someone launches their first token through it, you earn 10% of their launch fee, tracked here automatically.</p>
       </div>
 
       {/* Profile tools */}

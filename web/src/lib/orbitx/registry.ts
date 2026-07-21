@@ -168,6 +168,67 @@ export async function checkAntiVamp(name: string, ticker: string): Promise<AntiV
   return (await res.json()) as AntiVampResult;
 }
 
+/* ─────────────────────── referrals ─────────────────────── */
+
+export async function getOrCreateReferralCode(wallet: string): Promise<string> {
+  const { data, error } = await supabase.rpc("orbitx_get_or_create_referral_code", { p_wallet: wallet });
+  if (error) throw error;
+  return data as string;
+}
+
+/** Redeem a referral code for a wallet that hasn't been referred yet. Safe to call every session -- a no-op once already redeemed. */
+export async function redeemReferralCode(newWallet: string, code: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("orbitx_redeem_referral_code", { p_new_wallet: newWallet, p_code: code });
+  if (error) return false;
+  return !!data;
+}
+
+export interface ReferralStats {
+  code: string;
+  referredCount: number;
+  totalEarningsUsd: number;
+  earnings: { source_wallet: string; mint_address: string | null; amount_usd: number; created_at: string }[];
+}
+
+export async function getReferralStats(wallet: string): Promise<ReferralStats> {
+  const code = await getOrCreateReferralCode(wallet);
+  const [{ count }, { data: earnings }] = await Promise.all([
+    supabase.from("orbitx_referrals").select("referred_wallet", { count: "exact", head: true }).eq("referrer_wallet", wallet),
+    supabase.from("orbitx_referral_earnings").select("source_wallet,mint_address,amount_usd,created_at").eq("referrer_wallet", wallet).order("created_at", { ascending: false }),
+  ]);
+  const rows = earnings ?? [];
+  return {
+    code,
+    referredCount: count ?? 0,
+    totalEarningsUsd: rows.reduce((a, r) => a + Number(r.amount_usd || 0), 0),
+    earnings: rows as ReferralStats["earnings"],
+  };
+}
+
+/** Credits the referrer (if any) a share of a real, just-paid launch fee. Fails soft -- never blocks a launch. */
+export async function recordReferralEarning(sourceWallet: string, mint: string, launchFeeUsd: number): Promise<void> {
+  if (!launchFeeUsd || launchFeeUsd <= 0) return;
+  try {
+    await supabase.rpc("orbitx_record_referral_earning", { p_source_wallet: sourceWallet, p_mint: mint, p_launch_fee_usd: launchFeeUsd });
+  } catch (err) {
+    console.error("[orbitx] referral earning record failed", err);
+  }
+}
+
+/* ─────────────────────── achievements ─────────────────────── */
+
+export async function syncAchievements(wallet: string): Promise<string[]> {
+  const { data, error } = await supabase.rpc("orbitx_sync_achievements", { p_wallet: wallet });
+  if (error) return [];
+  return (data ?? []) as string[];
+}
+
+export async function getAchievementHistory(wallet: string): Promise<{ achievement_id: string; unlocked_at: string }[]> {
+  const { data, error } = await supabase.from("orbitx_achievements").select("achievement_id,unlocked_at").eq("wallet", wallet).order("unlocked_at", { ascending: true });
+  if (error) return [];
+  return data ?? [];
+}
+
 export interface RegisterTokenInput {
   mint_address: string; name: string; ticker: string; creator_wallet: string;
   decimals: number; supply: number; dex?: string | null; lp_pool_address?: string | null;

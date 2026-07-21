@@ -30,7 +30,7 @@ import {
   CheckCircle2, AlertTriangle, Info, Wand2, ChevronRight, Loader2, Copy, Check,
 } from "lucide-react";
 import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, BASE_LAUNCH_FEE_USD, type FeeBreakdown } from "@/lib/orbitx/fee";
-import { checkAntiVamp, registerToken } from "@/lib/orbitx/registry";
+import { checkAntiVamp, registerToken, recordReferralEarning } from "@/lib/orbitx/registry";
 import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
 import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
 import { supabase } from "@/lib/supabase";
@@ -491,6 +491,8 @@ export default function LaunchpadCreate() {
           cluster: "mainnet-beta",
           launch_type: "custom",
         });
+        // Credit this launcher's referrer (if any) a share of the real launch fee paid.
+        await recordReferralEarning(publicKey.toBase58(), mintAddr, ORBITX_FEE_USD);
       } catch (regErr) {
         // token is live on-chain regardless — registry failure must not eat the launch
         console.warn("[orbitx] registry insert failed", regErr);

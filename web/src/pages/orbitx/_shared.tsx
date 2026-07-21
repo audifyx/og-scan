@@ -8,7 +8,7 @@ import { ShieldCheck, ShieldAlert, Droplets, Flame, Zap, LineChart, TrendingUp, 
 import type { LucideIcon } from "lucide-react";
 import type { OrbitxToken } from "@/lib/orbitx/registry";
 import { orbitScore, scoreTone } from "./orbitScore";
-import { isWatched, toggleWatch } from "./watchlist";
+import { useIsWatched } from "./watchlist";
 
 type MarketLite = { mcap?: number | null; liq?: number | null; vol24?: number | null; ch24?: number | null; buys24?: number | null; sells24?: number | null; url?: string | null };
 
@@ -200,7 +200,7 @@ export function Pill({ children, tone }: { children: React.ReactNode; tone: "gol
  */
 export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | null; market?: MarketLite | null }) {
   // Hooks must run unconditionally (react-hooks/rules-of-hooks); guard for null t inside the initializer.
-  const [watched, setWatched] = useState(() => isWatched(t?.mint_address ?? ""));
+  const { watched, toggle: toggleWatch } = useIsWatched(t?.mint_address ?? "");
   if (!t) return null;
   const mcap = market?.mcap ?? mc ?? null;
   const graduated = !!t.lp_pool_address || !!t.graduated_at || (typeof mcap === "number" && mcap >= GRADUATION_MC_USD);
@@ -216,7 +216,7 @@ export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | nul
     <div className="pf-card group relative flex flex-col gap-2.5 p-3">
       <button
         type="button"
-        onClick={(e) => { e.preventDefault(); toggleWatch(t.mint_address); setWatched((w) => !w); }}
+        onClick={(e) => { e.preventDefault(); toggleWatch(); }}
         className="absolute right-2 top-2 z-10 rounded-md p-1 text-[hsl(var(--pf-muted))] transition hover:text-[hsl(var(--pf-gold))]"
         title={watched ? "Remove from watchlist" : "Add to watchlist"}
       >

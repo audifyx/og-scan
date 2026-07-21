@@ -3,9 +3,10 @@
 // No sidebar — section nav is a slim HUD tab strip. Scoped .lp-v3 theme
 // remaps accents to phosphor green / gold for every launchpad page.
 import { AntiVampProtectionBadge } from "@/components/layout/AntiVampProtectionBadge";
-import { NavLink, Outlet, Link } from "react-router-dom";
+import { NavLink, Outlet, Link, useSearchParams } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
   Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Zap, Trophy, Briefcase, Image as ImageIcon,
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 import { shortAddr } from "./_shared";
+import { redeemReferralCode } from "@/lib/orbitx/registry";
 import { useChainTelemetry, useSolUsd, fmtInt } from "./lpx";
 import "./orbitx-2026.css";
 
@@ -114,10 +116,38 @@ function NetworkStrip() {
   );
 }
 
+function ReferralCapture() {
+  // Captures ?ref=CODE on first load (any /orbitxlaunch/* page), stores it,
+  // then redeems it as soon as a wallet connects. Self-referrals and repeat
+  // redemptions are rejected server-side (orbitx_redeem_referral_code) — safe
+  // to attempt on every connect.
+  const [params] = useSearchParams();
+  const { publicKey } = useWallet();
+  const attempted = useRef<string | null>(null);
+
+  useEffect(() => {
+    const ref = params.get("ref");
+    if (ref) localStorage.setItem("orbitx_pending_referral", ref.toUpperCase());
+  }, [params]);
+
+  useEffect(() => {
+    const wallet = publicKey?.toBase58();
+    const pending = localStorage.getItem("orbitx_pending_referral");
+    if (!wallet || !pending || attempted.current === wallet) return;
+    attempted.current = wallet;
+    redeemReferralCode(wallet, pending).finally(() => {
+      localStorage.removeItem("orbitx_pending_referral");
+    });
+  }, [publicKey]);
+
+  return null;
+}
+
 export default function LaunchpadLayout() {
   return (
     <AppLayout>
       <div className="lp-classic relative min-h-screen">
+        <ReferralCapture />
         {/* scrolling ticker — the pump.fun signature top ribbon */}
         <NetworkStrip />
 

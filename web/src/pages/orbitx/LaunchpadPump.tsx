@@ -27,7 +27,7 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/platformFee";
-import { registerToken, checkAntiVamp } from "@/lib/orbitx/registry";
+import { registerToken, checkAntiVamp, recordReferralEarning } from "@/lib/orbitx/registry";
 import { Link } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
@@ -762,6 +762,8 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
           cluster: "mainnet-beta",
           launch_type: "pump",
         });
+        // Credit this launcher's referrer (if any) a share of the real launch fee paid.
+        await recordReferralEarning(publicKey.toBase58(), mintAddr, LAUNCHPAD_FEE_USD);
       } catch (regErr) {
         // duplicate names/tickers or transient registry errors must not eat a live launch
         console.warn("[orbitx] pump registry insert failed", regErr);
