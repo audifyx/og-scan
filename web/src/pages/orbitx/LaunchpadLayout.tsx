@@ -129,7 +129,7 @@ export default function LaunchpadLayout() {
                 <Rocket className="h-4.5 w-4.5 text-white" strokeWidth={2.4} />
               </div>
               <div className="leading-none">
-                <div className="text-lg font-black tracking-tight text-white">
+                <div className="text-lg font-black tracking-tight" style={{ color: "#ffffff" }}>
                   Orbit<span className="text-[hsl(var(--pf-green))]">X</span>.world
                 </div>
               </div>

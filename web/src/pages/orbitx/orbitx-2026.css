@@ -127,7 +127,8 @@
 /* keep tailwind dark utilities dark inside the launchpad (undo classic flips) */
 .lp-classic [class*="bg-black"] { background-color: hsl(220 30% 6% / 0.6) !important; }
 .lp-classic [class*="border-white"] { border-color: hsl(var(--pf-border) / 0.6) !important; }
-.lp-classic [class*="text-white"] { color: hsl(var(--pf-ink)) !important; }
+/* text-white must stay white — do NOT override to pf-ink here */
+.lp-classic [class*="text-white"] { color: #ffffff !important; }
 
 /* progress bar → neon */
 .lp-classic .pf-progress { background: hsl(220 30% 14%); border-color: hsl(var(--pf-border)); }
@@ -443,3 +444,64 @@
   color: hsl(var(--pf-muted)) !important;
   opacity: 1;
 }
+
+/* ============================================================================
+   CONTRAST FIXES v3 — definitive overrides for every originally-reported item.
+   These rules use !important and high specificity to guarantee visibility
+   regardless of any earlier rule in this file or Tailwind utility conflicts.
+   ========================================================================== */
+
+/* 1) Header brand wordmark "orbitx.world" — always white on dark header bg */
+.lp-classic .obx-header a .leading-none div,
+.lp-classic .obx-header .leading-none div {
+  color: #ffffff !important;
+}
+
+/* 2) Hero tagline paragraph — white on dark hero backdrop */
+.lp-classic .obx-hero p {
+  color: #ffffff !important;
+}
+
+/* 3) Nav tab buttons: MISSION / DEPLOY / CLAIM FEES / RESCUE / LEADERBOARD / etc.
+      Force white so they're always legible on the glass header bg */
+.lp-classic .pf-nav-link,
+.lp-classic .pf-nav-link:link,
+.lp-classic .pf-nav-link:visited {
+  color: #ffffff !important;
+}
+.lp-classic .pf-nav-link:hover {
+  color: hsl(152 90% 80%) !important;
+}
+.lp-classic .pf-nav-link.active {
+  color: hsl(152 90% 60%) !important;
+}
+
+/* 4) Token-card stat labels (Vol 24h, Liq, Buys) and values — always white.
+      MiniStat already uses inline styles as of v3, but belt-and-suspenders: */
+.lp-classic .pf-card .pf-mono {
+  color: #ffffff !important;
+}
+/* Let explicit tone overrides win over the belt-and-suspenders rule above */
+.lp-classic .pf-card .pf-mono[style] {
+  color: revert !important;
+}
+
+/* 5) Chart button — identical neon-green to Trade button; pf-btn already
+      handles bg/border. Force the dark text so it reads on the neon bg. */
+.lp-classic a.pf-btn,
+.lp-classic a.pf-btn:link,
+.lp-classic a.pf-btn:visited {
+  color: #04120b !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 800;
+}
+.lp-classic a.pf-btn:hover {
+  color: #04120b !important;
+}
+
+/* 6) Kill the old line-130 text-white→pf-ink rule once and for all:
+      text-white should always mean ACTUAL white in this dark theme */
+/* (already patched inline above — this is a belt-and-suspenders final anchor) */
+.lp-classic [class*="text-white"] { color: #ffffff !important; }

@@ -34,8 +34,18 @@ function OrbitScoreChip({ score }: { score: number }) {
 function MiniStat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "up" | "down" }) {
   return (
     <div className="rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-2 py-1.5 text-center">
-      <div className="pf-mono text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-ink))]">{label}</div>
-      <div className={`pf-mono text-[12px] font-black ${tone === "up" ? "text-[hsl(var(--pf-green))]" : tone === "down" ? "text-[hsl(var(--pf-red))]" : "text-[hsl(var(--pf-ink))]"}`}>{value}</div>
+      {/* label — explicit white so it's always readable on the dark card bg */}
+      <div className="pf-mono text-[9px] font-bold uppercase tracking-widest" style={{ color: "#ffffff" }}>{label}</div>
+      <div
+        className="pf-mono text-[12px] font-black"
+        style={{
+          color: tone === "up"
+            ? "hsl(152 86% 52%)"
+            : tone === "down"
+            ? "hsl(356 84% 62%)"
+            : "#ffffff",
+        }}
+      >{value}</div>
     </div>
   );
 }
@@ -263,8 +273,15 @@ export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | nul
       </div>
 
       <div className="mt-0.5 grid grid-cols-2 gap-1.5">
-        <Link to={to} className="pf-btn justify-center !py-1.5 text-xs"><Zap className="h-3.5 w-3.5" /> Trade</Link>
-        <a href={market?.url || `https://dexscreener.com/solana/${t.mint_address}`} target="_blank" rel="noreferrer" className="pf-btn justify-center !py-1.5 text-xs"><LineChart className="h-3.5 w-3.5" /> Chart</a>
+        <Link to={to} className="pf-btn inline-flex items-center justify-center gap-1.5 !py-1.5 text-xs font-black"><Zap className="h-3.5 w-3.5" /> Trade</Link>
+        {/* Chart button — identical styling to Trade: same pf-btn neon-green, same layout */}
+        <a
+          href={market?.url || `https://dexscreener.com/solana/${t.mint_address}`}
+          target="_blank"
+          rel="noreferrer"
+          className="pf-btn inline-flex items-center justify-center gap-1.5 !py-1.5 text-xs font-black"
+          style={{ color: "#04120b" }}
+        ><LineChart className="h-3.5 w-3.5" /> Chart</a>
       </div>
     </div>
   );
