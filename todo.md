@@ -32,3 +32,11 @@
 - [ ] Deploy on-chain NFT-coin bonding-curve program (see docs/NFT_COIN_TRADING.md)
 - [ ] Phase 4 charts: backfill orbitx_nft_collection_stats_daily + render floor/volume charts
 - [ ] Phase 5: USDC pricing option, Transfer/Burn UI, staff-picks/featured curation
+
+## OrbitX Curve (EVM) — open pump-style bonding curve
+- [x] MIT-licensed curve factory + token (contracts/evm/OrbitXCurve.sol), no reverse-engineered source
+- [x] Keyless curve.ts lib (CREATE2 factory, deploy-if-absent, launch/buy/sell/quotes)
+- [x] /orbitxlaunch/create/curve page with all-chains + multi-wallet connect
+- [x] Retarget Pons/flap.sh to external references (no contract cloning)
+- [ ] APPLY curve migration to Supabase (20260722160000_orbitx_curve_markets.sql)
+- [ ] External audit before promoting orbitx-curve-evm from beta to live

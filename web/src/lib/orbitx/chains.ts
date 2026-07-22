@@ -121,20 +121,21 @@ export const LAUNCH_PROVIDERS: LaunchProviderDef[] = [
   },
   {
     id: "pons", name: "Pons (ex-NOXA)", chains: ["robinhood"], status: "soon",
-    api: "permissionless on-chain factory — keyless",
-    desc: "NOXA relaunched as Pons — the #1 launchpad on Robinhood Chain (~930 deploys/hr). No docs or API published; OrbitX integrates by verifying its factory contract on Blockscout. No API key either way.",
+    api: "external third-party launchpad — link out",
+    desc: "A separate launchpad on Robinhood Chain (NOXA relaunched as Pons). OrbitX does not copy or reverse-engineer its contracts; we only link out to it. For a native keyless launch, use OrbitX Curve instead.",
     docs: "https://robinhoodchain.blockscout.com",
   },
   {
     id: "flapsh", name: "flap.sh", chains: ["robinhood"], status: "soon",
-    api: "on-chain bonding-curve factory — keyless",
-    desc: "Largest bonding-curve trading volume on Robinhood Chain. Same keyless on-chain integration path as Pons.",
+    api: "external third-party launchpad — link out",
+    desc: "A separate bonding-curve launchpad on Robinhood Chain. OrbitX does not copy or reverse-engineer its contracts; we only reference it. For a native keyless launch, use OrbitX Curve instead.",
   },
   {
-    id: "orbitx-curve-evm", name: "OrbitX Curve (EVM)", chains: EVM_LIVE, status: "soon",
-    api: "audited bonding-curve factory — pump.fun economics on EVM, keyless",
-    desc: "OrbitX-owned curve factory: virtual reserves, auto-graduation to a DEX pool, on-chain creator fees — the full pump experience on every EVM chain.",
-    requires: ["factory audit", "per-chain deployment"],
+    id: "orbitx-curve-evm", name: "OrbitX Curve (EVM)", chains: EVM_LIVE, status: "beta",
+    api: "OrbitX's own bonding-curve factory — pump economics on EVM, keyless",
+    desc: "OrbitX-owned, MIT-licensed curve factory: virtual-reserve pricing, on-chain creator fees, auto-graduation. The full pump experience on every EVM chain incl. Robinhood Chain, launched straight from your wallet. Beta: the factory is unaudited pending review.",
+    requires: ["factory audit before mainnet promotion", "VITE_ORBITX_FEE_WALLET set per deploy"],
+    route: "/orbitxlaunch/create/curve",
   },
 ];
 

@@ -67,6 +67,7 @@ import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
 import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
 import LaunchpadAdmin from "./pages/orbitx/LaunchpadAdmin";
 import LaunchpadApiLaunch from "./pages/orbitx/LaunchpadApiLaunch";
+import LaunchpadCurveEvm from "./pages/orbitx/LaunchpadCurveEvm";
 const LaunchpadNftHub = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftHub"));
 const LaunchpadNftCreate = lazyWithRetry(() => import("./pages/orbitx/LaunchpadNftCreate"));
 const NftMarketLayout = lazyWithRetry(() => import("./pages/nft/MarketplaceLayout"));
@@ -208,6 +209,7 @@ const App = () => (
               <Route path="create/custom" element={<LaunchpadCreate />} />
               <Route path="create/pump" element={<LaunchpadPump />} />
               <Route path="create/api" element={<LaunchpadApiLaunch />} />
+              <Route path="create/curve" element={<LaunchpadCurveEvm />} />
               <Route path="token/:mint" element={<LaunchpadToken />} />
               <Route path="claim" element={<LaunchpadClaim />} />
               <Route path="rescue" element={<LaunchpadRescue />} />
