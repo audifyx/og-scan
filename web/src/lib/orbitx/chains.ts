@@ -1,66 +1,109 @@
 /**
  * OrbitX multi-chain launch registry — single source of truth for the API lane.
  *
- * Chains and launch-API providers are data, not code paths: the UI renders
- * whatever is registered here, and each provider flips from "soon" → "beta"
- * → "live" as its adapter + config lands. Solana is fully live today through
- * PumpPortal (pump.fun) and the OrbitX Token-2022 custom lane.
+ * Every chain with `evm` network params is LIVE for OrbitX Direct Deploy:
+ * connect any EVM wallet (EIP-6963 injected or WalletConnect — incl. Robinhood
+ * Wallet), the app switches/adds the network, and the fixed-supply ERC-20
+ * deploys straight from the user's wallet. No third-party API needed.
+ * Bonding-curve providers (PumpPortal on Solana today; Clanker on Base next)
+ * are registered separately and flip live per adapter + config.
  */
 
 export type ChainFamily = "svm" | "evm";
 export type RolloutStatus = "live" | "beta" | "soon";
+
+export interface EvmNetworkParams {
+  chainIdHex: string;
+  chainName: string;
+  nativeCurrency: { name: string; symbol: string; decimals: number };
+  rpcUrls: string[];
+  blockExplorerUrls: string[];
+}
 
 export interface ChainDef {
   id: string;
   name: string;
   symbol: string;
   family: ChainFamily;
-  /** EVM chain id (hex) where applicable. */
-  chainIdHex?: string;
   explorer: string;
-  /** Brand accent for chips/rails. */
   color: string;
   status: RolloutStatus;
+  evm?: EvmNetworkParams;
   note?: string;
 }
 
 export const CHAINS: ChainDef[] = [
-  { id: "solana",    name: "Solana",          symbol: "SOL",  family: "svm", explorer: "https://solscan.io",              color: "#14F195", status: "live" },
-  { id: "base",      name: "Base",            symbol: "ETH",  family: "evm", chainIdHex: "0x2105",  explorer: "https://basescan.org",       color: "#0052FF", status: "beta" },
-  { id: "ethereum",  name: "Ethereum",        symbol: "ETH",  family: "evm", chainIdHex: "0x1",     explorer: "https://etherscan.io",       color: "#627EEA", status: "beta" },
-  { id: "bnb",       name: "BNB Chain",       symbol: "BNB",  family: "evm", chainIdHex: "0x38",    explorer: "https://bscscan.com",        color: "#F0B90B", status: "beta" },
-  { id: "arbitrum",  name: "Arbitrum One",    symbol: "ETH",  family: "evm", chainIdHex: "0xa4b1",  explorer: "https://arbiscan.io",        color: "#28A0F0", status: "soon" },
-  { id: "robinhood", name: "Robinhood Chain", symbol: "ETH",  family: "evm", explorer: "",                                 color: "#00C805", status: "soon", note: "Arbitrum Orbit L2 — adapter lands as public mainnet APIs open" },
-  { id: "optimism",  name: "OP Mainnet",      symbol: "ETH",  family: "evm", chainIdHex: "0xa",     explorer: "https://optimistic.etherscan.io", color: "#FF0420", status: "soon" },
-  { id: "polygon",   name: "Polygon PoS",     symbol: "POL",  family: "evm", chainIdHex: "0x89",    explorer: "https://polygonscan.com",    color: "#8247E5", status: "soon" },
-  { id: "avalanche", name: "Avalanche C",     symbol: "AVAX", family: "evm", chainIdHex: "0xa86a",  explorer: "https://snowtrace.io",       color: "#E84142", status: "soon" },
-  { id: "blast",     name: "Blast",           symbol: "ETH",  family: "evm", chainIdHex: "0x13e31", explorer: "https://blastscan.io",       color: "#FCFC03", status: "soon" },
-  { id: "monad",     name: "Monad",           symbol: "MON",  family: "evm", explorer: "",                                 color: "#836EF9", status: "soon" },
-  { id: "sonic",     name: "Sonic",           symbol: "S",    family: "evm", chainIdHex: "0x92",    explorer: "https://sonicscan.org",      color: "#4CC9F0", status: "soon" },
-  { id: "hyperevm",  name: "HyperEVM",        symbol: "HYPE", family: "evm", explorer: "https://hyperevmscan.io",          color: "#97FCE4", status: "soon" },
+  { id: "solana", name: "Solana", symbol: "SOL", family: "svm", explorer: "https://solscan.io", color: "#14F195", status: "live" },
+  {
+    id: "base", name: "Base", symbol: "ETH", family: "evm", explorer: "https://basescan.org", color: "#0052FF", status: "live",
+    evm: { chainIdHex: "0x2105", chainName: "Base", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: ["https://mainnet.base.org"], blockExplorerUrls: ["https://basescan.org"] },
+  },
+  {
+    id: "ethereum", name: "Ethereum", symbol: "ETH", family: "evm", explorer: "https://etherscan.io", color: "#627EEA", status: "live",
+    evm: { chainIdHex: "0x1", chainName: "Ethereum Mainnet", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: ["https://eth.llamarpc.com", "https://cloudflare-eth.com"], blockExplorerUrls: ["https://etherscan.io"] },
+  },
+  {
+    id: "bnb", name: "BNB Chain", symbol: "BNB", family: "evm", explorer: "https://bscscan.com", color: "#F0B90B", status: "live",
+    evm: { chainIdHex: "0x38", chainName: "BNB Smart Chain", nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 }, rpcUrls: ["https://bsc-dataseed.bnbchain.org"], blockExplorerUrls: ["https://bscscan.com"] },
+  },
+  {
+    id: "arbitrum", name: "Arbitrum One", symbol: "ETH", family: "evm", explorer: "https://arbiscan.io", color: "#28A0F0", status: "live",
+    evm: { chainIdHex: "0xa4b1", chainName: "Arbitrum One", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: ["https://arb1.arbitrum.io/rpc"], blockExplorerUrls: ["https://arbiscan.io"] },
+  },
+  {
+    id: "optimism", name: "OP Mainnet", symbol: "ETH", family: "evm", explorer: "https://optimistic.etherscan.io", color: "#FF0420", status: "live",
+    evm: { chainIdHex: "0xa", chainName: "OP Mainnet", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: ["https://mainnet.optimism.io"], blockExplorerUrls: ["https://optimistic.etherscan.io"] },
+  },
+  {
+    id: "polygon", name: "Polygon PoS", symbol: "POL", family: "evm", explorer: "https://polygonscan.com", color: "#8247E5", status: "live",
+    evm: { chainIdHex: "0x89", chainName: "Polygon PoS", nativeCurrency: { name: "POL", symbol: "POL", decimals: 18 }, rpcUrls: ["https://polygon-rpc.com"], blockExplorerUrls: ["https://polygonscan.com"] },
+  },
+  {
+    id: "avalanche", name: "Avalanche C", symbol: "AVAX", family: "evm", explorer: "https://snowtrace.io", color: "#E84142", status: "live",
+    evm: { chainIdHex: "0xa86a", chainName: "Avalanche C-Chain", nativeCurrency: { name: "AVAX", symbol: "AVAX", decimals: 18 }, rpcUrls: ["https://api.avax.network/ext/bc/C/rpc"], blockExplorerUrls: ["https://snowtrace.io"] },
+  },
+  {
+    id: "blast", name: "Blast", symbol: "ETH", family: "evm", explorer: "https://blastscan.io", color: "#FCFC03", status: "live",
+    evm: { chainIdHex: "0x13e31", chainName: "Blast", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: ["https://rpc.blast.io"], blockExplorerUrls: ["https://blastscan.io"] },
+  },
+  {
+    id: "sonic", name: "Sonic", symbol: "S", family: "evm", explorer: "https://sonicscan.org", color: "#4CC9F0", status: "live",
+    evm: { chainIdHex: "0x92", chainName: "Sonic", nativeCurrency: { name: "Sonic", symbol: "S", decimals: 18 }, rpcUrls: ["https://rpc.soniclabs.com"], blockExplorerUrls: ["https://sonicscan.org"] },
+  },
+  {
+    id: "hyperevm", name: "HyperEVM", symbol: "HYPE", family: "evm", explorer: "https://hyperevmscan.io", color: "#97FCE4", status: "live",
+    evm: { chainIdHex: "0x3e7", chainName: "HyperEVM", nativeCurrency: { name: "HYPE", symbol: "HYPE", decimals: 18 }, rpcUrls: ["https://rpc.hyperliquid.xyz/evm"], blockExplorerUrls: ["https://hyperevmscan.io"] },
+  },
+  {
+    id: "monad", name: "Monad", symbol: "MON", family: "evm", explorer: "https://monadexplorer.com", color: "#836EF9", status: "beta",
+    evm: { chainIdHex: "0x8f", chainName: "Monad", nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 }, rpcUrls: ["https://rpc.monad.xyz"], blockExplorerUrls: ["https://monadexplorer.com"] },
+    note: "Fresh mainnet — RPC/explorer may move",
+  },
+  {
+    id: "robinhood", name: "Robinhood Chain", symbol: "ETH", family: "evm", explorer: "", color: "#00C805", status: "soon",
+    note: "Arbitrum Orbit L2 — flips live the moment public mainnet params ship (connect + deploy code is already chain-agnostic)",
+  },
 ];
 
 export interface LaunchProviderDef {
   id: string;
   name: string;
-  /** Chain ids this provider can deploy to. */
   chains: string[];
   status: RolloutStatus;
-  /** How the adapter talks to it. */
   api: string;
   desc: string;
   docs?: string;
-  /** Config that must land before this flips live (shown on the card). */
   requires?: string[];
-  /** In-app route when the provider is live. */
   route?: string;
 }
+
+const EVM_LIVE = CHAINS.filter((c) => c.family === "evm" && c.evm).map((c) => c.id);
 
 export const LAUNCH_PROVIDERS: LaunchProviderDef[] = [
   {
     id: "pumpportal", name: "PumpPortal · pump.fun", chains: ["solana"], status: "live",
     api: "trade-local — unsigned tx, you sign in-wallet",
-    desc: "The exact pump.fun bonding-curve system: zero seeded liquidity, auto-graduation, creator fees claimable in-app across all your coins.",
+    desc: "The exact pump.fun bonding-curve system: zero seeded liquidity, auto-graduation, creator fees claimable in-app — with OBX vanity CA.",
     docs: "https://pumpportal.fun", route: "/orbitxlaunch/create/pump",
   },
   {
@@ -70,16 +113,16 @@ export const LAUNCH_PROVIDERS: LaunchProviderDef[] = [
     route: "/orbitxlaunch/create/custom",
   },
   {
-    id: "clanker", name: "Clanker", chains: ["base"], status: "beta",
-    api: "REST deploy API",
-    desc: "Base's leading token deployer — Uniswap v4 pool out of the box with creator fee split.",
-    docs: "https://clanker.world", requires: ["Clanker API key", "Base RPC"],
+    id: "orbitx-direct", name: "OrbitX Direct Deploy", chains: EVM_LIVE, status: "live",
+    api: "in-wallet contract creation — no third-party API",
+    desc: "Fixed-supply ERC-20 deployed straight from your connected wallet: no owner keys, no mint function, immutable from block one. Works on every EVM chain above.",
+    route: "/orbitxlaunch/create/api",
   },
   {
-    id: "flaunch", name: "Flaunch", chains: ["base"], status: "soon",
-    api: "REST + SDK",
-    desc: "Memecoin launches on Base with programmable revenue splits.",
-    requires: ["Flaunch API key"],
+    id: "clanker", name: "Clanker", chains: ["base"], status: "beta",
+    api: "REST deploy API",
+    desc: "Base's leading bonding-curve deployer — Uniswap v4 pool out of the box with creator fee split.",
+    docs: "https://clanker.world", requires: ["VITE_CLANKER_API_KEY"],
   },
   {
     id: "fourmeme", name: "Four.meme", chains: ["bnb"], status: "soon",
@@ -94,15 +137,18 @@ export const LAUNCH_PROVIDERS: LaunchProviderDef[] = [
     requires: ["Virtuals API access"],
   },
   {
-    id: "orbitx-evm", name: "OrbitX EVM Factory",
-    chains: ["ethereum", "base", "bnb", "arbitrum", "robinhood", "optimism", "polygon", "avalanche", "blast", "monad", "sonic", "hyperevm"],
-    status: "soon",
-    api: "audited factory contract — deploy, seed LP, lock, verify in one flow",
-    desc: "One OrbitX-owned ERC-20 factory across every EVM chain: fixed or curve supply, LP lock, fee routing back to creators — the custom lane, everywhere.",
-    requires: ["per-chain RPC + deployer", "factory audit"],
+    id: "orbitx-curve-evm", name: "OrbitX Curve (EVM)", chains: EVM_LIVE, status: "soon",
+    api: "audited bonding-curve factory — pump.fun economics on EVM",
+    desc: "OrbitX-owned curve factory: virtual reserves, auto-graduation to a DEX pool, on-chain creator fees — the full pump experience on every EVM chain.",
+    requires: ["factory audit", "per-chain deployment"],
   },
 ];
 
 export const chainById = (id: string): ChainDef | undefined => CHAINS.find((c) => c.id === id);
 export const providersForChain = (chainId: string): LaunchProviderDef[] =>
   LAUNCH_PROVIDERS.filter((p) => p.chains.includes(chainId));
+export const evmChains = (): ChainDef[] => CHAINS.filter((c) => c.family === "evm" && !!c.evm);
+export const explorerTxUrl = (c: ChainDef, hash: string): string =>
+  c.evm?.blockExplorerUrls?.[0] ? `${c.evm.blockExplorerUrls[0]}/tx/${hash}` : "";
+export const explorerAddressUrl = (c: ChainDef, addr: string): string =>
+  c.evm?.blockExplorerUrls?.[0] ? `${c.evm.blockExplorerUrls[0]}/address/${addr}` : "";
