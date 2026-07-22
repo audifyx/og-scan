@@ -13,8 +13,7 @@ import {
   CHAINS, chainById, explorerTxUrl, explorerAddressUrl, type ChainDef,
 } from "@/lib/orbitx/chains";
 import {
-  discoverWallets, connectWallet, ensureChain, shortAddr, waitForReceipt,
-  type DiscoveredWallet, type Eip1193Provider,
+  ensureChain, shortAddr, waitForReceipt, type Eip1193Provider,
 } from "@/lib/evm/wallet";
 import {
   quoteBuy, quoteSell, encodeBuy, encodeSell, readMarketState, type MarketState,
@@ -24,6 +23,7 @@ import CurvePriceChart from "@/components/orbitx/CurvePriceChart";
 import CurveTradeFeed from "@/components/orbitx/CurveTradeFeed";
 import CurveInfoPanel from "@/components/orbitx/CurveInfoPanel";
 import type { CurveTradeRow } from "@/lib/orbitx/curveData";
+import { useEvmWallet } from "@/hooks/useEvmWallet";
 
 type Meta = { chain: string; name?: string; symbol?: string; creator_wallet?: string; creator_fee_bps?: number };
 
@@ -48,10 +48,7 @@ export default function LaunchpadCurveTrade() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const chain: ChainDef = chainById(meta?.chain ?? "robinhood") ?? CHAINS[0];
 
-  const [wallets, setWallets] = useState<DiscoveredWallet[]>([]);
-  const [provider, setProvider] = useState<Eip1193Provider | null>(null);
-  const [account, setAccount] = useState("");
-  const [connecting, setConnecting] = useState("");
+  const { account, provider, openConnect } = useEvmWallet();
 
   const [state, setState] = useState<MarketState | null>(null);
   const [side, setSide] = useState<Side>("buy");
@@ -71,30 +68,12 @@ export default function LaunchpadCurveTrade() {
     return () => { on = false; };
   }, [token]);
 
-  useEffect(() => {
-    let on = true;
-    discoverWallets().then((w) => { if (on) setWallets(w); });
-    return () => { on = false; };
-  }, []);
-
   const refreshState = useCallback(async (p: Eip1193Provider | null) => {
     if (!p) return;
     try { setState(await readMarketState(p, token)); } catch { /* ignore */ }
   }, [token]);
 
-  const connect = async (w: DiscoveredWallet) => {
-    setConnecting(w.info.uuid);
-    try {
-      const acct = await connectWallet(w.provider);
-      if (chain.evm) await ensureChain(w.provider, chain.evm).catch(() => {});
-      setProvider(w.provider);
-      setAccount(acct);
-      await refreshState(w.provider);
-      toast.success(`Connected ${w.info.name} · ${shortAddr(acct)}`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Wallet connection failed");
-    } finally { setConnecting(""); }
-  };
+  useEffect(() => { if (provider) refreshState(provider); }, [provider, refreshState]);
 
   // live quote as the user types
   useEffect(() => {
@@ -224,19 +203,10 @@ export default function LaunchpadCurveTrade() {
           <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             <WalletIcon className="h-3.5 w-3.5" /> Connect to trade
           </div>
-          {wallets.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No injected wallet detected — open in your wallet's in-app browser.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {wallets.map((w) => (
-                <button key={w.info.uuid} onClick={() => connect(w)} disabled={!!connecting}
-                  className="flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-sm hover:border-white/25 disabled:opacity-50">
-                  {connecting === w.info.uuid ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletIcon className="h-4 w-4" />}
-                  {w.info.name}
-                </button>
-              ))}
-            </div>
-          )}
+          <p className="mb-3 text-sm text-muted-foreground">Link your EVM wallet to trade on {chain.name}. Your Solana login stays your account.</p>
+          <button onClick={openConnect} className="inline-flex items-center gap-2 rounded-md bg-[hsl(var(--og-gold))] px-4 py-2 text-sm font-bold text-black">
+            <WalletIcon className="h-4 w-4" /> Link EVM wallet
+          </button>
         </div>
       ) : (
         <div className="lpx-panel space-y-3 p-4">

@@ -90,6 +90,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
+import { EvmWalletProvider } from "@/hooks/useEvmWallet";
 import { WalletAuthBridge } from "@/components/WalletAuthBridge";
 import Games from "./pages/Games";
 import AdvancedIntelligence from "./pages/AdvancedIntelligence";
@@ -170,6 +171,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <SolanaWalletProvider>
+      <EvmWalletProvider>
       <ThemeProvider>
       <TooltipProvider>
         <Toaster />
@@ -436,6 +438,7 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
       </ThemeProvider>
+      </EvmWalletProvider>
       </SolanaWalletProvider>
     </AuthProvider>
   </QueryClientProvider>

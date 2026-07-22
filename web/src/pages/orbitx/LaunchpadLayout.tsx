@@ -7,11 +7,13 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
+import { useEvmWallet } from "@/hooks/useEvmWallet";
+import { linkEvmToSolana } from "@/lib/orbitx/walletLink";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
-  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Zap, ArrowUpRight,
+  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Zap, ArrowUpRight, Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
@@ -78,6 +80,38 @@ function WalletConsole() {
       <button type="button" onClick={() => disconnect().catch(() => undefined)}
         className="ml-1 rounded-lg border border-[hsl(var(--pf-border))] px-2 py-1 pf-mono text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))] transition hover:border-[hsl(var(--pf-red))] hover:text-[hsl(var(--pf-red))]">
         Exit
+      </button>
+    </div>
+  );
+}
+
+/* ── EVM wallet link — secondary wallet used for EVM/curve flows ── */
+function EvmWalletButton() {
+  const { account, linkedAddress, openConnect, disconnect } = useEvmWallet();
+  const { publicKey } = useWallet();
+  const shown = account || linkedAddress;
+  useEffect(() => {
+    const sol = publicKey?.toBase58();
+    if (sol && account) linkEvmToSolana(sol, account);
+  }, [publicKey, account]);
+  if (!shown) {
+    return (
+      <button type="button" onClick={openConnect}
+        className="hidden items-center gap-1.5 rounded-xl border border-[hsl(var(--pf-border))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--pf-muted))] transition hover:border-[hsl(var(--pf-blue))]/60 hover:text-[hsl(var(--pf-ink))] md:inline-flex">
+        <Link2 className="h-3.5 w-3.5" /> Link EVM
+      </button>
+    );
+  }
+  return (
+    <div className="hidden items-center gap-2 rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] px-2.5 py-1.5 md:flex">
+      <span className="h-2 w-2 rounded-full" style={{ background: "#627EEA", boxShadow: "0 0 8px #627EEA" }} />
+      <div className="leading-none">
+        <div className="pf-mono text-[11px] font-bold text-[hsl(var(--pf-ink))]">{shortAddr(shown)}</div>
+        <div className="mt-0.5 pf-mono text-[9px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">EVM {account ? "linked" : "saved"}</div>
+      </div>
+      <button type="button" onClick={disconnect}
+        className="ml-1 rounded-lg border border-[hsl(var(--pf-border))] px-2 py-1 pf-mono text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))] transition hover:border-[hsl(var(--pf-red))] hover:text-[hsl(var(--pf-red))]">
+        Unlink
       </button>
     </div>
   );
@@ -165,6 +199,7 @@ export default function LaunchpadLayout() {
                 style={{ background: "linear-gradient(135deg, hsl(var(--pf-gold)), hsl(var(--pf-green)))" }}>
                 <Zap className="h-4 w-4" /> Launch a coin
               </Link>
+              <EvmWalletButton />
               <WalletConsole />
             </div>
           </div>
