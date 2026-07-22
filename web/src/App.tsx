@@ -20,6 +20,7 @@ import KOLTracker from "./pages/KOLTracker";
 import PnlTracker from "./pages/PnlTracker";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import AuthWallet from "./pages/AuthWallet";
 import Setup from "./pages/Setup";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
@@ -83,6 +84,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
+import { WalletAuthBridge } from "@/components/WalletAuthBridge";
 import Games from "./pages/Games";
 import AdvancedIntelligence from "./pages/AdvancedIntelligence";
 import EnhancedAdvancedIntelligence from "./pages/EnhancedAdvancedIntelligence";
@@ -175,13 +177,15 @@ const App = () => (
         <OnboardingTour />
         <BrowserRouter>
           <SupportNotificationBanner />
+          <WalletAuthBridge />
           <Routes>
             {/* ── Public routes (no auth required) ── */}
             <Route path="/" element={<Splash />} />
             <Route path="/beta" element={<BetaHome />} />
             <Route path="/splash" element={<Splash />} />
             <Route path="/waitlist" element={<OgdexRedirect to="/auth?mode=signup" />} />
-            <Route path="/auth" element={<Auth />} />
+            <Route path="/auth" element={<AuthWallet />} />
+            <Route path="/auth/email" element={<Auth />} />
             <Route path="/setup" element={<Setup />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/r/:id" element={<ReportView />} />

@@ -2,7 +2,7 @@ import { ComponentType } from "react";
 import { Menu, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { shortAddr } from "@/lib/og";
-import { AuthButton } from "@/components/AuthButton";
+import { WalletConnectButton } from "@/components/WalletConnectButton";
 
 type TabId =
   | "overview"
@@ -97,7 +97,7 @@ export const AppTopBar = ({
 
         {/* Right: search + auth */}
         <div className="absolute right-4 flex items-center gap-3">
-          <AuthButton />
+          <WalletConnectButton />
         </div>
       </div>
     </header>
