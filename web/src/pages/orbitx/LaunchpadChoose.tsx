@@ -1,7 +1,7 @@
 // OrbitX Launchpad — DEPLOYMENT LANE SELECT. V3 HUD redesign.
 // Two lanes, identical fees. All fee numbers come from the live fee lib.
 import { Link } from "react-router-dom";
-import { Rocket, ShieldCheck, Wand2, TrendingUp, ArrowRight, Zap, HandCoins, Check } from "lucide-react";
+import { Rocket, ShieldCheck, Wand2, TrendingUp, ArrowRight, Zap, HandCoins, Check, Plug } from "lucide-react";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 
@@ -97,6 +97,29 @@ export default function LaunchpadChoose() {
             <Wand2 className="h-4 w-4" /> Deploy custom <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
+      </div>
+
+
+      {/* ── API LANE (third lane — multi-chain) ── */}
+      <div className="lpx-panel group relative mt-4 flex flex-col overflow-hidden p-6 transition hover:shadow-[0_0_50px_-18px_hsl(var(--og-gold)/0.55)] md:flex-row md:items-center md:gap-6">
+        <div className="absolute right-4 top-4 rounded-md border border-[hsl(var(--og-gold))]/35 bg-[hsl(var(--og-gold))]/10 px-2 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest text-[hsl(var(--og-gold))]">
+          ⬡ New · multi-chain
+        </div>
+        <div className="mb-3 flex items-center gap-3 md:mb-0 md:min-w-[250px]">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10">
+            <Plug className="h-5 w-5 text-[hsl(var(--og-gold))]" />
+          </div>
+          <div>
+            <div className="font-display text-lg font-black">API LANE</div>
+            <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground">pump.fun-style APIs · every chain</div>
+          </div>
+        </div>
+        <p className="mb-3 flex-1 text-sm leading-relaxed text-muted-foreground md:mb-0">
+          Launch through <span className="text-foreground">provider APIs</span> — PumpPortal live on Solana today, Clanker on Base in beta, and the OrbitX EVM Factory rolling out across ETH, Base, BNB, Robinhood Chain and 9 more.
+        </p>
+        <Link to="/orbitxlaunch/create/api" className="lpx-btn mt-2 w-full !border-[hsl(var(--og-gold))]/50 !text-[hsl(var(--og-gold))] hover:!bg-[hsl(var(--og-gold))]/15 md:mt-0 md:w-auto">
+          <Plug className="h-4 w-4" /> Open API lane <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
 
       <p className="mt-6 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">

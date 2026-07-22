@@ -20,6 +20,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AdminPassGate } from "@/components/AdminPassGate";
 import type { AdminSection } from "@/components/admin/types";
 
 const OverviewSection = lazy(() => import("@/components/admin/sections/OverviewSection").then((m) => ({ default: m.OverviewSection })));
@@ -256,19 +257,7 @@ export default function Admin() {
     );
   }
   if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-[#020915] flex flex-col items-center justify-center gap-4 text-white">
-        <Shield className="h-12 w-12 text-red-500" />
-        <h1 className="text-xl font-bold">Access Denied</h1>
-        <p className="text-white/50 text-sm">You don't have permission to view this page.</p>
-        <button
-          onClick={() => navigate("/")}
-          className="mt-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm transition-colors"
-        >
-          Go Home
-        </button>
-      </div>
-    );
+    return <AdminPassGate />;
   }
   // ────────────────────────────────────────────────────────────────────────────
 
