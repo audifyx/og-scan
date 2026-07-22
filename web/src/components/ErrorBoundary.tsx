@@ -1,5 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
+import { isChunkLoadError, reloadOnce } from "@/lib/chunkReload";
 
 interface Props {
   children: ReactNode;
@@ -37,6 +38,10 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     // Log to console in dev; Sentry will pick this up in production
     console.error("[ErrorBoundary]", error, info.componentStack);
+    // Stale-chunk crash (e.g. React.lazy "reading 'default'"): auto-reload once.
+    // These are caught here, so the window-level handler in main.tsx never sees
+    // them — recover at the boundary instead of stranding the user.
+    if (isChunkLoadError(error)) reloadOnce();
   }
 
   reset = () => {
@@ -45,6 +50,21 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (!this.state.hasError) return this.props.children;
+
+    if (isChunkLoadError(this.state.error)) {
+      return (
+        <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 p-8 text-center">
+          <Loader2 className="h-6 w-6 animate-spin text-og-cyan" />
+          <p className="text-sm text-muted-foreground">Updating to the latest version…</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-1 rounded border border-og-cyan/40 bg-og-cyan/10 px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-og-cyan transition hover:bg-og-cyan/20"
+          >
+            Reload now
+          </button>
+        </div>
+      );
+    }
 
     if (this.props.fallback) return this.props.fallback;
 
@@ -59,13 +79,21 @@ export class ErrorBoundary extends Component<Props, State> {
             {this.state.error?.message ?? "An unexpected error occurred."}
           </p>
         </div>
-        <button
-          onClick={this.reset}
-          className="flex items-center gap-2 rounded border border-og-lime/40 bg-og-lime/10 px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-og-lime transition hover:bg-og-lime/20"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          {this.props.resetLabel ?? "Try again"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={this.reset}
+            className="flex items-center gap-2 rounded border border-og-lime/40 bg-og-lime/10 px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-og-lime transition hover:bg-og-lime/20"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            {this.props.resetLabel ?? "Try again"}
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="flex items-center gap-2 rounded border border-white/15 bg-white/[0.04] px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-white/70 transition hover:bg-white/[0.08]"
+          >
+            Reload app
+          </button>
+        </div>
       </div>
     );
   }
