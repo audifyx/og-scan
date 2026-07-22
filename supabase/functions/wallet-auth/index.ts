@@ -110,7 +110,10 @@ Deno.serve(async (req) => {
     }
 
     throw new Error("unknown action");
-  } catch (e) {
-    return json({ error: e instanceof Error ? e.message : "wallet-auth error" }, 400);
+  } catch (e: any) {
+    const msg = e instanceof Error ? e.message
+      : (e && typeof e === "object" && typeof e.message === "string") ? e.message
+      : (() => { try { return JSON.stringify(e); } catch { return String(e); } })();
+    return json({ error: msg || "wallet-auth error" }, 400);
   }
 });
