@@ -147,3 +147,16 @@ export const WALLETCONNECT_PROJECT_ID: string =
 export function shortAddr(a: string): string {
   return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "";
 }
+
+/** Keyless mobile connect: open this page inside a wallet's in-app browser.
+ *  No WalletConnect relay, no project id, nothing to register. */
+export function mobileWalletDeepLinks(): { name: string; url: string }[] {
+  if (typeof window === "undefined") return [];
+  const href = window.location.href;
+  const hostPath = href.replace(/^https?:\/\//, "");
+  return [
+    { name: "MetaMask", url: `https://metamask.app.link/dapp/${hostPath}` },
+    { name: "Coinbase Wallet", url: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(href)}` },
+    { name: "Trust Wallet", url: `https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(href)}` },
+  ];
+}

@@ -80,8 +80,9 @@ export const CHAINS: ChainDef[] = [
     note: "Fresh mainnet — RPC/explorer may move",
   },
   {
-    id: "robinhood", name: "Robinhood Chain", symbol: "ETH", family: "evm", explorer: "", color: "#00C805", status: "soon",
-    note: "Arbitrum Orbit L2 — flips live the moment public mainnet params ship (connect + deploy code is already chain-agnostic)",
+    id: "robinhood", name: "Robinhood Chain", symbol: "ETH", family: "evm", explorer: "https://robinhoodchain.blockscout.com", color: "#00C805", status: "live",
+    evm: { chainIdHex: "0x1237", chainName: "Robinhood Chain", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: ["https://rpc.mainnet.chain.robinhood.com"], blockExplorerUrls: ["https://robinhoodchain.blockscout.com"] },
+    note: "Arbitrum-Nitro L2, mainnet since Jul 1 2026 — public RPC, no key",
   },
 ];
 
@@ -102,43 +103,36 @@ const EVM_LIVE = CHAINS.filter((c) => c.family === "evm" && c.evm).map((c) => c.
 export const LAUNCH_PROVIDERS: LaunchProviderDef[] = [
   {
     id: "pumpportal", name: "PumpPortal · pump.fun", chains: ["solana"], status: "live",
-    api: "trade-local — unsigned tx, you sign in-wallet",
+    api: "trade-local — unsigned tx, you sign in-wallet (keyless)",
     desc: "The exact pump.fun bonding-curve system: zero seeded liquidity, auto-graduation, creator fees claimable in-app — with OBX vanity CA.",
     docs: "https://pumpportal.fun", route: "/orbitxlaunch/create/pump",
   },
   {
     id: "orbitx-token22", name: "OrbitX Custom · Token-2022", chains: ["solana"], status: "live",
-    api: "on-chain — tx built in your browser",
+    api: "on-chain — tx built in your browser (keyless)",
     desc: "Your own mint with on-chain 0.30% creator fee, revocable authorities, optional Raydium pool and OBX vanity address.",
     route: "/orbitxlaunch/create/custom",
   },
   {
     id: "orbitx-direct", name: "OrbitX Direct Deploy", chains: EVM_LIVE, status: "live",
-    api: "in-wallet contract creation — no third-party API",
-    desc: "Fixed-supply ERC-20 deployed straight from your connected wallet: no owner keys, no mint function, immutable from block one. Works on every EVM chain above.",
+    api: "in-wallet contract creation — keyless, optional CREATE2 vanity",
+    desc: "Fixed-supply ERC-20 deployed straight from your connected wallet: no owner keys, no mint function, immutable from block one. Optional hex-vanity CA via CREATE2 salt grinding.",
     route: "/orbitxlaunch/create/api",
   },
   {
-    id: "clanker", name: "Clanker", chains: ["base"], status: "beta",
-    api: "REST deploy API",
-    desc: "Base's leading bonding-curve deployer — Uniswap v4 pool out of the box with creator fee split.",
-    docs: "https://clanker.world", requires: ["VITE_CLANKER_API_KEY"],
+    id: "pons", name: "Pons (ex-NOXA)", chains: ["robinhood"], status: "soon",
+    api: "permissionless on-chain factory — keyless",
+    desc: "NOXA relaunched as Pons — the #1 launchpad on Robinhood Chain (~930 deploys/hr). No docs or API published; OrbitX integrates by verifying its factory contract on Blockscout. No API key either way.",
+    docs: "https://robinhoodchain.blockscout.com",
   },
   {
-    id: "fourmeme", name: "Four.meme", chains: ["bnb"], status: "soon",
-    api: "REST deploy API",
-    desc: "BNB Chain bonding-curve launches, pump-style.",
-    requires: ["Four.meme API access"],
-  },
-  {
-    id: "virtuals", name: "Virtuals Protocol", chains: ["base", "ethereum"], status: "soon",
-    api: "Agent launch API",
-    desc: "Agent-token launches with bonded liquidity.",
-    requires: ["Virtuals API access"],
+    id: "flapsh", name: "flap.sh", chains: ["robinhood"], status: "soon",
+    api: "on-chain bonding-curve factory — keyless",
+    desc: "Largest bonding-curve trading volume on Robinhood Chain. Same keyless on-chain integration path as Pons.",
   },
   {
     id: "orbitx-curve-evm", name: "OrbitX Curve (EVM)", chains: EVM_LIVE, status: "soon",
-    api: "audited bonding-curve factory — pump.fun economics on EVM",
+    api: "audited bonding-curve factory — pump.fun economics on EVM, keyless",
     desc: "OrbitX-owned curve factory: virtual reserves, auto-graduation to a DEX pool, on-chain creator fees — the full pump experience on every EVM chain.",
     requires: ["factory audit", "per-chain deployment"],
   },
