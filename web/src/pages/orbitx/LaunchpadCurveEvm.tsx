@@ -1,21 +1,18 @@
 // OrbitX Curve (EVM) — keyless pump-style bonding-curve launches from the user's
 // wallet, using OrbitX's OWN factory (contracts/evm/OrbitXCurve.sol). No API,
 // no server, no custody. Beta: the curve contract is unaudited.
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  ArrowRight, CheckCircle2, Copy, ExternalLink, Loader2, QrCode, Rocket,
-  ShieldCheck, Smartphone, TriangleAlert, Wallet as WalletIcon,
+  ArrowRight, CheckCircle2, ExternalLink, Loader2, Rocket,
+  ShieldCheck, TriangleAlert, Wallet as WalletIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { evmChains, chainById, explorerTxUrl, explorerAddressUrl, type ChainDef } from "@/lib/orbitx/chains";
-import {
-  discoverWallets, connectWallet, connectWalletConnect, ensureChain, shortAddr,
-  mobileWalletDeepLinks, WALLETCONNECT_PROJECT_ID,
-  type DiscoveredWallet, type Eip1193Provider,
-} from "@/lib/evm/wallet";
+import { ensureChain, shortAddr } from "@/lib/evm/wallet";
 import { launchCurveToken, readMarketState, DEFAULT_CURVE_CONFIG } from "@/lib/evm/curve";
+import { useEvmWallet } from "@/hooks/useEvmWallet";
 
 type Phase = "idle" | "deploying" | "done";
 
@@ -32,10 +29,7 @@ export default function LaunchpadCurveEvm() {
   const [chainId, setChainId] = useState("robinhood");
   const chain: ChainDef = chainById(chainId) ?? chains[0];
 
-  const [wallets, setWallets] = useState<DiscoveredWallet[]>([]);
-  const [provider, setProvider] = useState<Eip1193Provider | null>(null);
-  const [account, setAccount] = useState("");
-  const [connecting, setConnecting] = useState("");
+  const { account, provider, openConnect } = useEvmWallet();
 
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -45,45 +39,6 @@ export default function LaunchpadCurveEvm() {
   const [tokenAddr, setTokenAddr] = useState("");
 
   const feeConfigured = !!DEFAULT_CURVE_CONFIG.platform;
-
-  useEffect(() => {
-    let on = true;
-    discoverWallets().then((w) => { if (on) setWallets(w); });
-    return () => { on = false; };
-  }, []);
-
-  const pick = async (w: DiscoveredWallet) => {
-    setConnecting(w.info.uuid);
-    try {
-      const acct = await connectWallet(w.provider);
-      setProvider(w.provider);
-      setAccount(acct);
-      toast.success(`Connected ${w.info.name} · ${shortAddr(acct)}`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Wallet connection failed");
-    } finally { setConnecting(""); }
-  };
-
-  const pickWalletConnect = async () => {
-    if (!WALLETCONNECT_PROJECT_ID) { toast.error("WalletConnect needs VITE_WALLETCONNECT_PROJECT_ID"); return; }
-    setConnecting("walletconnect");
-    try {
-      const ids = chains.map((c) => parseInt(c.evm!.chainIdHex, 16));
-      const { provider: wc, account: acct } = await connectWalletConnect(WALLETCONNECT_PROJECT_ID, ids);
-      setProvider(wc);
-      setAccount(acct);
-      toast.success(`Connected · ${shortAddr(acct)}`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "WalletConnect failed");
-    } finally { setConnecting(""); }
-  };
-
-  const copyForRobinhood = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast.success("Link copied — paste it in Robinhood Wallet's in-app browser");
-    } catch { toast.error("Copy failed"); }
-  };
 
   const launch = async () => {
     if (!provider || !account || !chain.evm) return;
@@ -189,55 +144,16 @@ export default function LaunchpadCurveEvm() {
       </div>
 
       {!account ? (
-        <div className="lpx-panel space-y-4 p-4">
+        <div className="lpx-panel space-y-3 p-4">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            <WalletIcon className="h-3.5 w-3.5" /> Connect a wallet — every EVM chain, any wallet
+            <WalletIcon className="h-3.5 w-3.5" /> Link an EVM wallet to launch
           </div>
-
-          {/* Injected wallets (EIP-6963): MetaMask, Rabby, Coinbase, OKX, Brave, Robinhood extension… */}
-          <div>
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">Browser wallets</div>
-            {wallets.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No injected wallet detected — use WalletConnect or a mobile option below.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {wallets.map((w) => (
-                  <button key={w.info.uuid} onClick={() => pick(w)} disabled={!!connecting}
-                    className="flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-sm hover:border-white/25 disabled:opacity-50">
-                    {connecting === w.info.uuid
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : (w.info.icon ? <img src={w.info.icon} alt="" className="h-4 w-4 rounded" /> : <WalletIcon className="h-4 w-4" />)}
-                    {w.info.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* WalletConnect — QR / mobile deep link for Rabby, Robinhood, MetaMask mobile & more */}
-          <div>
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">Mobile & WalletConnect</div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={pickWalletConnect} disabled={connecting === "walletconnect"}
-                className="flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-sm hover:border-white/25 disabled:opacity-50">
-                {connecting === "walletconnect" ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-                WalletConnect
-              </button>
-              <button onClick={copyForRobinhood}
-                className="flex items-center gap-2 rounded-md border border-[#00C805]/30 bg-[#00C805]/5 px-3 py-2 text-sm text-[#00C805] hover:border-[#00C805]/60">
-                <Copy className="h-4 w-4" /> Robinhood Wallet link
-              </button>
-              {mobileWalletDeepLinks().map((d) => (
-                <a key={d.name} href={d.url} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-sm hover:border-white/25">
-                  <Smartphone className="h-4 w-4" /> {d.name}
-                </a>
-              ))}
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground/70">
-              On mobile, open this page inside your wallet's in-app browser (or paste the Robinhood link) for a fully keyless connect.
-            </p>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Your Solana wallet is your login. Link an EVM wallet (MetaMask, Rabby, Robinhood, WalletConnect) to deploy on {chain.name} — it's remembered across the app.
+          </p>
+          <button onClick={openConnect} className="inline-flex items-center gap-2 rounded-md bg-[hsl(var(--og-gold))] px-4 py-2 text-sm font-bold text-black">
+            <WalletIcon className="h-4 w-4" /> Link EVM wallet
+          </button>
         </div>
       ) : phase === "done" ? (
         <div className="lpx-panel p-6 text-center">
