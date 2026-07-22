@@ -38,5 +38,7 @@
 - [x] Keyless curve.ts lib (CREATE2 factory, deploy-if-absent, launch/buy/sell/quotes)
 - [x] /orbitxlaunch/create/curve page with all-chains + multi-wallet connect
 - [x] Retarget Pons/flap.sh to external references (no contract cloning)
-- [ ] APPLY curve migration to Supabase (20260722160000_orbitx_curve_markets.sql)
+- [x] APPLY curve migration to Supabase (20260722160000_orbitx_curve_markets.sql)
+- [x] Curve launch writes orbitx_curve_markets; trade page writes orbitx_curve_trades
+- [x] Curve trade page (/orbitxlaunch/curve/:token): live price, buy/sell, slippage, graduation bar
 - [ ] External audit before promoting orbitx-curve-evm from beta to live

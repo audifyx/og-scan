@@ -15,7 +15,7 @@ import {
   mobileWalletDeepLinks, WALLETCONNECT_PROJECT_ID,
   type DiscoveredWallet, type Eip1193Provider,
 } from "@/lib/evm/wallet";
-import { launchCurveToken, DEFAULT_CURVE_CONFIG } from "@/lib/evm/curve";
+import { launchCurveToken, readMarketState, DEFAULT_CURVE_CONFIG } from "@/lib/evm/curve";
 
 type Phase = "idle" | "deploying" | "done";
 
@@ -120,6 +120,27 @@ export default function LaunchpadCurveEvm() {
           cluster: "mainnet",
         });
       } catch { /* registry insert is best-effort */ }
+      try {
+        const cfg = DEFAULT_CURVE_CONFIG;
+        const st = await readMarketState(provider, res.token).catch(() => null);
+        await supabase.from("orbitx_curve_markets").insert({
+          token_address: res.token,
+          chain: chain.id,
+          factory_address: res.factory,
+          creator_wallet: account,
+          name: n,
+          symbol: s,
+          fee_bps: cfg.feeBps,
+          creator_fee_bps: cfg.creatorFeeBps,
+          virtual_native: cfg.virtualNative.toString(),
+          graduation_native: cfg.graduationNative.toString(),
+          real_native: (st?.realNative ?? 0n).toString(),
+          token_reserve: (st?.tokenReserve ?? cfg.curveSupply).toString(),
+          price_x1e18: (st?.priceX1e18 ?? 0n).toString(),
+          graduated: st?.graduated ?? false,
+          launch_tx: res.txHash,
+        });
+      } catch { /* curve market insert is best-effort */ }
     } catch (e) {
       setPhase("idle");
       toast.error(e instanceof Error ? e.message : "Launch failed");
@@ -232,6 +253,7 @@ export default function LaunchpadCurveEvm() {
             </div>
           </div>
           <div className="mt-4 flex justify-center gap-2">
+            <Link to={`/orbitxlaunch/curve/${tokenAddr}`} className="rounded-md bg-[hsl(var(--og-gold))] px-4 py-2 text-sm font-bold text-black">Trade it</Link>
             <button onClick={reset} className="rounded-md border border-white/10 px-4 py-2 text-sm hover:border-white/25">Launch another</button>
             <Link to="/orbitxlaunch" className="rounded-md border border-white/10 px-4 py-2 text-sm hover:border-white/25">Back to launchpad</Link>
           </div>
