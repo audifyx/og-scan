@@ -66,6 +66,13 @@ import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
 import LaunchpadAdmin from "./pages/orbitx/LaunchpadAdmin";
 const LaunchpadNftHub = lazy(() => import("./pages/orbitx/LaunchpadNftHub"));
 const LaunchpadNftCreate = lazy(() => import("./pages/orbitx/LaunchpadNftCreate"));
+const NftMarketLayout = lazy(() => import("./pages/nft/MarketplaceLayout"));
+const NftMarketHome = lazy(() => import("./pages/nft/MarketplaceHome"));
+const NftDrops = lazy(() => import("./pages/nft/Drops"));
+const NftActivity = lazy(() => import("./pages/nft/Activity"));
+const NftNotifications = lazy(() => import("./pages/nft/Notifications"));
+const NftCreatorProfile = lazy(() => import("./pages/nft/CreatorProfile"));
+const NftCollectionPage = lazy(() => import("./pages/nft/CollectionPage"));
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
@@ -207,6 +214,19 @@ const App = () => (
             </Route>
 
             {/* ── Terminal UI: Trading Platform Style ── */}
+            {/* ── OrbitX NFT Marketplace (dedicated /nft route) ── */}
+            <Route path="/nft" element={<Suspense fallback={null}><NftMarketLayout /></Suspense>}>
+              <Route index element={<Suspense fallback={null}><NftMarketHome /></Suspense>} />
+              <Route path="explore" element={<Suspense fallback={null}><LaunchpadNftHub /></Suspense>} />
+              <Route path="drops" element={<Suspense fallback={null}><NftDrops /></Suspense>} />
+              <Route path="activity" element={<Suspense fallback={null}><NftActivity /></Suspense>} />
+              <Route path="notifications" element={<Suspense fallback={null}><NftNotifications /></Suspense>} />
+              <Route path="create" element={<Suspense fallback={null}><LaunchpadNftCreate /></Suspense>} />
+              <Route path="me" element={<Suspense fallback={null}><NftCreatorProfile /></Suspense>} />
+              <Route path="profile/:wallet" element={<Suspense fallback={null}><NftCreatorProfile /></Suspense>} />
+              <Route path="collection/:id" element={<Suspense fallback={null}><NftCollectionPage /></Suspense>} />
+            </Route>
+
             <Route path="/terminal" element={<LaunchpadTerminal />}>
               <Route index element={<TerminalHome />} />
               <Route path="trade" element={<TerminalTrade />} />

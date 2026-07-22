@@ -1,0 +1,86 @@
+/* OrbitX NFT Marketplace — scoped theme + primitives.
+   Self-contained so the /nft route never depends on the launchpad's
+   orbitx-2026.css being loaded. Reuses the global shadcn/og-* tokens. */
+.obx-mkt {
+  --mkt-bg: 224 30% 5%;
+  --mkt-panel: 225 26% 8%;
+  --mkt-panel-2: 225 22% 11%;
+  --mkt-line: 225 18% 18%;
+  --mkt-ink: 210 20% 96%;
+  --mkt-muted: 220 12% 62%;
+  --mkt-accent: var(--og-cyan);
+  --mkt-gold: var(--og-gold);
+  --mkt-lime: var(--og-lime);
+  --mkt-red: var(--og-blood);
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 480px at 15% -8%, hsl(var(--mkt-accent) / 0.10), transparent 60%),
+    radial-gradient(1000px 420px at 92% -4%, hsl(var(--mkt-gold) / 0.07), transparent 58%),
+    hsl(var(--mkt-bg));
+  color: hsl(var(--mkt-ink));
+}
+.obx-mkt .mkt-panel { background: hsl(var(--mkt-panel)); border: 1px solid hsl(var(--mkt-line)); border-radius: 16px; }
+.obx-mkt .mkt-panel-2 { background: hsl(var(--mkt-panel-2)); border: 1px solid hsl(var(--mkt-line)); }
+.obx-mkt .mkt-hairline { border-color: hsl(var(--mkt-line)); }
+.obx-mkt .mkt-muted { color: hsl(var(--mkt-muted)); }
+
+/* header */
+.obx-mkt .mkt-header {
+  background: hsl(var(--mkt-bg) / 0.86);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid hsl(var(--mkt-line));
+}
+
+/* rolling category strip */
+.obx-mkt .mkt-rail { scrollbar-width: none; }
+.obx-mkt .mkt-rail::-webkit-scrollbar { display: none; }
+
+.obx-mkt .mkt-chip {
+  border: 1px solid hsl(var(--mkt-line));
+  background: hsl(var(--mkt-panel-2));
+  color: hsl(var(--mkt-muted));
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: all .15s ease;
+}
+.obx-mkt .mkt-chip:hover { color: hsl(var(--mkt-ink)); border-color: hsl(var(--mkt-accent) / 0.6); }
+.obx-mkt .mkt-chip.active {
+  color: hsl(var(--mkt-bg));
+  background: hsl(var(--mkt-accent));
+  border-color: hsl(var(--mkt-accent));
+  font-weight: 800;
+}
+
+.obx-mkt .mkt-nav {
+  color: hsl(var(--mkt-muted));
+  border-radius: 10px;
+  transition: all .15s ease;
+}
+.obx-mkt .mkt-nav:hover { color: hsl(var(--mkt-ink)); background: hsl(var(--mkt-panel-2)); }
+.obx-mkt .mkt-nav.active { color: hsl(var(--mkt-ink)); background: hsl(var(--mkt-panel-2)); box-shadow: inset 0 -2px 0 0 hsl(var(--mkt-accent)); }
+
+.obx-mkt .mkt-btn {
+  display: inline-flex; align-items: center; gap: .45rem;
+  border-radius: 10px; padding: .5rem .9rem; font-weight: 800; font-size: .82rem;
+  background: hsl(var(--mkt-accent)); color: hsl(var(--mkt-bg));
+  border: 1px solid hsl(var(--mkt-accent)); transition: filter .15s ease;
+}
+.obx-mkt .mkt-btn:hover { filter: brightness(1.08); }
+.obx-mkt .mkt-btn.ghost { background: transparent; color: hsl(var(--mkt-ink)); border-color: hsl(var(--mkt-line)); }
+.obx-mkt .mkt-btn.ghost:hover { border-color: hsl(var(--mkt-accent) / 0.7); }
+
+.obx-mkt .mkt-card {
+  background: hsl(var(--mkt-panel)); border: 1px solid hsl(var(--mkt-line));
+  border-radius: 14px; overflow: hidden; transition: transform .15s ease, border-color .15s ease;
+}
+.obx-mkt .mkt-card:hover { transform: translateY(-3px); border-color: hsl(var(--mkt-accent) / 0.55); }
+
+.obx-mkt .mkt-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* live sales marquee */
+.obx-mkt .mkt-marquee { overflow: hidden; }
+.obx-mkt .mkt-marquee-track { display: inline-flex; gap: 2rem; white-space: nowrap; animation: mkt-scroll 40s linear infinite; }
+.obx-mkt .mkt-marquee:hover .mkt-marquee-track { animation-play-state: paused; }
+@keyframes mkt-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+.obx-mkt .mkt-row:hover { background: hsl(var(--mkt-panel-2)); }

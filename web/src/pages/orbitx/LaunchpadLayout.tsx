@@ -27,7 +27,7 @@ const TABS = [
   { to: "/orbitxlaunch/rescue", label: "RESCUE", icon: Flame, end: false, hot: true },
   { to: "/orbitxlaunch/leaderboard", label: "LEADERBOARD", icon: Trophy, end: false },
   { to: "/orbitxlaunch/portfolio", label: "PORTFOLIO", icon: Briefcase, end: false },
-  { to: "/orbitxlaunch/nft", label: "NFT HUB", icon: ImageIcon, end: false },
+  { to: "/nft", label: "NFT MARKET", icon: ImageIcon, end: false },
   { to: "/orbitxlaunch/profile", label: "PROFILE", icon: UserCircle2, end: false },
   { to: "/orbitxlaunch/about", label: "ABOUT", icon: Info, end: false },
 ];
