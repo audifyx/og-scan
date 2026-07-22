@@ -6,6 +6,7 @@ import { NavLink, Outlet, Link, useNavigate, useSearchParams } from "react-route
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { NFT_CATEGORIES } from "@/lib/orbitx/nftCategories";
 import { useRecentSales, shortAddr, fmtSol } from "./nftMarketData";
 import {
@@ -152,7 +153,7 @@ export default function MarketplaceLayout() {
             <Link to="/nft/notifications" className="mkt-nav hidden rounded-xl p-2 sm:block" title="Notifications">
               <Bell className="h-5 w-5" />
             </Link>
-            <WalletLogin />
+            <WalletConnectButton />
           </div>
 
           {/* rolling category rail */}

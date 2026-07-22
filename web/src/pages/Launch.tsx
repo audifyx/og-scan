@@ -707,7 +707,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
   const handleConnectWallet = async () => {
     try {
-      select("Phantom" as any);
+      const __w = wallets.find(w => w.readyState === "Installed") || wallets.find(w => ["Phantom","Jupiter","Solflare","Backpack"].includes(w.adapter.name)) || wallets[0]; if (__w) select(__w.adapter.name);
       await connect();
     } catch (err) {
       console.error("Connection error:", err);

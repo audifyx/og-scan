@@ -5,7 +5,10 @@ import { AntiVampProtectionBadge } from "@/components/layout/AntiVampProtectionB
 import { NavLink, Outlet, Link, useSearchParams } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useWalletSignIn } from "@/hooks/useWalletSignIn";
+import { WalletPickerModal } from "@/components/WalletPickerModal";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
   Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Zap, ArrowUpRight,
@@ -34,7 +37,9 @@ const TABS = [
    you in globally via WalletAuthBridge (Sign-In-With-Solana). ── */
 function WalletConsole() {
   const { connection } = useConnection();
-  const { publicKey, connected, connecting, wallets, select, connect, disconnect } = useWallet();
+  const { publicKey, connected, disconnect } = useWallet();
+  const { pickable, signInWith, busy } = useWalletSignIn();
+  const [picker, setPicker] = useState(false);
   const addr = publicKey?.toBase58();
 
   const { data: sol } = useQuery({
@@ -44,21 +49,21 @@ function WalletConsole() {
     refetchInterval: 30_000,
   });
 
-  const onClick = async () => {
-    if (connected) { await disconnect().catch(() => undefined); return; }
-    const phantom = wallets.find((w) => w.adapter.name === "Phantom");
-    if (phantom) select(phantom.adapter.name);
-    try { await connect(); }
-    catch { if (!phantom) window.open("https://phantom.app", "_blank", "noopener,noreferrer"); }
+  const onPick = async (name: string) => {
+    try { await signInWith(name); setPicker(false); toast.success("Signed in with wallet"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Sign-in failed"); }
   };
 
   if (!connected || !addr) {
     return (
-      <button type="button" onClick={onClick} disabled={connecting}
-        className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-black text-black"
-        style={{ background: "linear-gradient(135deg, hsl(var(--pf-green)), hsl(var(--pf-blue)))" }}>
-        <Wallet className="h-4 w-4" /> {connecting ? "Connecting…" : "Connect Wallet"}
-      </button>
+      <>
+        <button type="button" onClick={() => setPicker(true)}
+          className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-black text-black"
+          style={{ background: "linear-gradient(135deg, hsl(var(--pf-green)), hsl(var(--pf-blue)))" }}>
+          <Wallet className="h-4 w-4" /> Connect Wallet
+        </button>
+        <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={onPick} busy={busy} />
+      </>
     );
   }
   return (
@@ -70,7 +75,7 @@ function WalletConsole() {
           {sol != null ? `${sol.toFixed(3)} SOL` : "wallet linked"}
         </div>
       </div>
-      <button type="button" onClick={onClick}
+      <button type="button" onClick={() => disconnect().catch(() => undefined)}
         className="ml-1 rounded-lg border border-[hsl(var(--pf-border))] px-2 py-1 pf-mono text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))] transition hover:border-[hsl(var(--pf-red))] hover:text-[hsl(var(--pf-red))]">
         Exit
       </button>
