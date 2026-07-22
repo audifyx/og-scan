@@ -42,3 +42,12 @@
 - [x] Curve launch writes orbitx_curve_markets; trade page writes orbitx_curve_trades
 - [x] Curve trade page (/orbitxlaunch/curve/:token): live price, buy/sell, slippage, graduation bar
 - [ ] External audit before promoting orbitx-curve-evm from beta to live
+
+## OrbitX Curve — v2 features (PR #123)
+- [x] Curve discovery grid /orbitxlaunch/curves (sort price/graduation/newest, search)
+- [x] Graduation -> DEX migration: OrbitXCurveMigrator.sol (addLiquidityETH, LP burned) + dex.ts + Seed-liquidity UI
+- [x] Live trade feed (Supabase realtime + polling) + price chart (recharts) on trade page
+- [x] Holders (from ledger) + estimated creator earnings panel
+- [ ] Set VITE_DEX_ROUTER_<chainId> per chain before enabling migration
+- [ ] Deploy migrator (CREATE2) + set VITE_ORBITX_CURVE_MIGRATOR (0xF31eF061C351dD8EBa28605fFC360c565a786CC8) and bake into factory
+- [ ] Audit OrbitXCurve.sol + OrbitXCurveMigrator.sol before mainnet

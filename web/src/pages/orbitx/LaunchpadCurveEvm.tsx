@@ -162,6 +162,7 @@ export default function LaunchpadCurveEvm() {
           OrbitX's own bonding-curve factory: virtual reserves, on-chain creator fees, auto-graduation.
           Deployed straight from your wallet — no API, no keys, no custody.
         </p>
+        <Link to="/orbitxlaunch/curves" className="mt-2 inline-block text-xs text-[hsl(var(--og-gold))] underline">Browse live curves</Link>
       </div>
 
       <div className="mb-4 flex items-start gap-2 rounded-lg border border-[hsl(var(--og-gold))]/30 bg-[hsl(var(--og-gold))]/5 p-3 text-xs text-muted-foreground">

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  ArrowDownUp, ExternalLink, Flame, Loader2, RefreshCw, ShieldCheck,
+  ArrowDownUp, Droplets, ExternalLink, Flame, Loader2, RefreshCw, ShieldCheck,
   TrendingUp, Wallet as WalletIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -19,6 +19,13 @@ import {
 import {
   quoteBuy, quoteSell, encodeBuy, encodeSell, readMarketState, type MarketState,
 } from "@/lib/evm/curve";
+import { migrateCurve, getRouter } from "@/lib/evm/dex";
+import CurvePriceChart from "@/components/orbitx/CurvePriceChart";
+import CurveTradeFeed from "@/components/orbitx/CurveTradeFeed";
+import CurveInfoPanel from "@/components/orbitx/CurveInfoPanel";
+import type { CurveTradeRow } from "@/lib/orbitx/curveData";
+
+type Meta = { chain: string; name?: string; symbol?: string; creator_wallet?: string; creator_fee_bps?: number };
 
 type Side = "buy" | "sell";
 
@@ -38,7 +45,7 @@ function fmtUnits(v: bigint, dec = 18, places = 6): string {
 
 export default function LaunchpadCurveTrade() {
   const { token = "" } = useParams();
-  const [meta, setMeta] = useState<{ chain: string; name?: string; symbol?: string } | null>(null);
+  const [meta, setMeta] = useState<Meta | null>(null);
   const chain: ChainDef = chainById(meta?.chain ?? "robinhood") ?? CHAINS[0];
 
   const [wallets, setWallets] = useState<DiscoveredWallet[]>([]);
@@ -52,12 +59,14 @@ export default function LaunchpadCurveTrade() {
   const [slippage, setSlippage] = useState("1");
   const [quoteOut, setQuoteOut] = useState<bigint | null>(null);
   const [busy, setBusy] = useState(false);
+  const [trades, setTrades] = useState<CurveTradeRow[]>([]);
+  const [migrating, setMigrating] = useState(false);
 
   // load token meta (chain/name/symbol) from the curve registry
   useEffect(() => {
     let on = true;
-    supabase.from("orbitx_curve_markets").select("chain,name,symbol").eq("token_address", token).maybeSingle()
-      .then(({ data }) => { if (on && data) setMeta(data as { chain: string; name?: string; symbol?: string }); })
+    supabase.from("orbitx_curve_markets").select("chain,name,symbol,creator_wallet,creator_fee_bps").eq("token_address", token).maybeSingle()
+      .then(({ data }) => { if (on && data) setMeta(data as Meta); })
       .catch(() => {});
     return () => { on = false; };
   }, [token]);
@@ -158,10 +167,25 @@ export default function LaunchpadCurveTrade() {
     return Math.min(100, Number((state.realNative * 10000n) / state.graduationNative) / 100);
   }, [state]);
 
+  const chainDec = chain.evm ? parseInt(chain.evm.chainIdHex, 16) : 0;
+  const routerReady = !!getRouter(chainDec);
+  const handleMigrate = async () => {
+    if (!provider || !account || !chain.evm) return;
+    setMigrating(true);
+    try {
+      await ensureChain(provider, chain.evm);
+      await migrateCurve(provider, account, token, chainDec);
+      toast.success("Liquidity seeded on the DEX");
+      await refreshState(provider);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Migration failed");
+    } finally { setMigrating(false); }
+  };
+
   const title = meta?.symbol ? `$${meta.symbol}` : shortAddr(token);
 
   return (
-    <div className="mx-auto max-w-xl">
+    <div className="mx-auto max-w-5xl">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.34em] text-[hsl(var(--og-gold))]">// orbitx curve · trade · keyless</div>
@@ -194,6 +218,7 @@ export default function LaunchpadCurveTrade() {
         </div>
       )}
 
+      <div className="grid gap-4 md:grid-cols-2">
       {!account ? (
         <div className="lpx-panel p-4">
           <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -253,6 +278,32 @@ export default function LaunchpadCurveTrade() {
           {state?.graduated && <p className="text-center text-xs text-muted-foreground">Curve closed — trade this token on its graduated DEX pool.</p>}
         </div>
       )}
+
+      <div className="space-y-4">
+        <div className="lpx-panel p-4">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Price chart</div>
+          <CurvePriceChart trades={trades} symbol={meta?.symbol} />
+        </div>
+        {state?.graduated && (
+          <div className="lpx-panel space-y-2 p-4">
+            <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground"><Droplets className="h-3.5 w-3.5 text-[hsl(var(--og-cyan))]" /> Graduation</div>
+            <p className="text-xs text-muted-foreground">This curve graduated. Seed a DEX pool with the raised {chain.symbol} and reserved tokens — LP is burned (liquidity locked). Permissionless.</p>
+            {account ? (
+              <button onClick={handleMigrate} disabled={migrating || !routerReady}
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-[hsl(var(--og-cyan))] px-4 py-2 text-sm font-bold text-black disabled:opacity-60">
+                {migrating ? <><Loader2 className="h-4 w-4 animate-spin" /> Seeding…</> : <><Droplets className="h-4 w-4" /> Seed DEX liquidity</>}
+              </button>
+            ) : <p className="text-xs text-muted-foreground">Connect a wallet to seed liquidity.</p>}
+            {!routerReady && <p className="text-[10px] text-[hsl(var(--og-gold))]">No DEX router set for {chain.name} (VITE_DEX_ROUTER_{chainDec}).</p>}
+          </div>
+        )}
+        <CurveInfoPanel trades={trades} chain={chain} symbol={meta?.symbol} creatorFeeBps={meta?.creator_fee_bps ?? 50} creatorWallet={meta?.creator_wallet} />
+      </div>
+      </div>
+
+      <div className="mt-4">
+        <CurveTradeFeed token={token} chain={chain} symbol={meta?.symbol} onTrades={setTrades} />
+      </div>
     </div>
   );
 }
