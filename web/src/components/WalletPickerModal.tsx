@@ -1,5 +1,6 @@
 // Wallet chooser — lists every wallet the adapter detects (Phantom, Jupiter,
 // Solflare, Backpack, …). Installed wallets first.
+import { createPortal } from "react-dom";
 import { X, Loader2, Wallet, ExternalLink } from "lucide-react";
 import type { PickableWallet } from "@/hooks/useWalletSignIn";
 
@@ -8,10 +9,11 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
   onPick: (name: string) => void; busy: string | null;
 }) {
   if (!open) return null;
+  if (typeof document === "undefined") return null;
   const installed = wallets.filter((w) => w.readyState === "Installed" || w.readyState === "Loadable");
   const rest = wallets.filter((w) => !(w.readyState === "Installed" || w.readyState === "Loadable"));
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0a1220] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-1 flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-base font-black text-white"><Wallet className="h-4 w-4 text-og-cyan" /> Connect a wallet</h3>
@@ -29,7 +31,8 @@ export function WalletPickerModal({ open, onClose, wallets, onPick, busy }: {
           <a href="https://jup.ag/mobile" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-og-cyan">Get Jupiter <ExternalLink className="h-3 w-3" /></a>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
