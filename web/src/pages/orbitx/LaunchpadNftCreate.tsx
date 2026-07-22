@@ -7,12 +7,12 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { mintNft, verifyNftInCollection } from "@/lib/orbitx/nftMint";
-import { enableNftCoin } from "@/pages/nft/nftCoin";
+import { launchPumpCoin } from "@/lib/orbitx/pumpLaunch";
 import CreatorInventory from "@/components/orbitx/CreatorInventory";
 import { NFT_CATEGORIES } from "@/lib/orbitx/nftCategories";
 import { isAcceptedNftMedia, uploadNftAssets } from "./nftUpload";
 import {
-  registerNft, registerNftCollection, listCollectionsByCreator, checkNftCollectionOriginality, setCollectionCategory,
+  registerNft, registerNftCollection, listCollectionsByCreator, checkNftCollectionOriginality, setCollectionCategory, setCollectionCoin,
   checkNftContentDuplicate, sha256Hex, type OrbitxNftCollection,
 } from "@/lib/orbitx/nftRegistry";
 import {
@@ -112,6 +112,9 @@ export default function LaunchpadNftCreate() {
   const updateAttribute = (i: number, key: "trait_type" | "value", v: string) =>
     setAttributes((a) => a.map((row, idx) => (idx === i ? { ...row, [key]: v } : row)));
 
+  const [launchCoin, setLaunchCoin] = useState(true);
+  const [coinDevBuy, setCoinDevBuy] = useState("0");
+
   const createCollection = async () => {
     if (!connected || !publicKey || !wallet) { toast.error("Connect a wallet first"); return; }
     if (!name.trim() || !symbol.trim() || !colBanner) { toast.error("Name, symbol, and a banner/logo image are required"); return; }
@@ -139,6 +142,29 @@ export default function LaunchpadNftCreate() {
       });
       if (category && newCollectionId) {
         await setCollectionCategory(newCollectionId, category, publicKey.toBase58()).catch(() => undefined);
+      }
+
+      // One tradeable pump.fun coin per collection (opt-in). Never per-NFT.
+      if (launchCoin && newCollectionId) {
+        try {
+          const b64 = await new Promise<string>((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(String(r.result).split(",")[1] || "");
+            r.onerror = reject; r.readAsDataURL(colBanner);
+          });
+          const { mint } = await launchPumpCoin({
+            connection, publicKey, signTransaction: wallet.adapter.signTransaction!.bind(wallet.adapter) as any,
+            imageBase64: b64, imageMimeType: colBanner.type || "image/png",
+            name: name.trim(), symbol: symbol.trim().toUpperCase(), description: description.trim(),
+            website: externalUrl.trim() || undefined, devBuySol: Number(coinDevBuy) || 0,
+            onStatus: setStatusMsg,
+          });
+          await setCollectionCoin(newCollectionId, mint, publicKey.toBase58()).catch(() => undefined);
+          toast.success("Collection coin launched on pump.fun! 🪙");
+        } catch (coinErr) {
+          console.warn("[orbitx] collection coin launch skipped:", coinErr);
+          toast.message("Collection created. Coin launch was skipped — you can launch it later from the collection page.");
+        }
       }
 
       toast.success("Collection minted on-chain! 🎉");
@@ -186,8 +212,7 @@ export default function LaunchpadNftCreate() {
           name: name.trim(), symbol: symbol.trim().toUpperCase() || "NFT", image_url: mediaUrl, metadata_uri: uri, royalty_bps: royaltyBps,
           attributes: attributes.filter((a) => a.trait_type.trim() && a.value.trim()), content_hash: contentHash ?? undefined,
         });
-        // Auto-launch a tradeable meme-coin market bound to this NFT (best-effort).
-        await enableNftCoin(nftId, publicKey.toBase58()).catch((e) => console.warn("[orbitx] coin market enable skipped:", e));
+        void nftId; // (coins are launched once per collection, not per NFT)
       }
 
       toast.success(`${copies > 1 ? `${copies} NFTs` : "NFT"} minted on-chain! 🎉`);
@@ -319,6 +344,21 @@ export default function LaunchpadNftCreate() {
           Your connected wallet becomes the verified, permanent creator wallet on-chain. It cannot be changed after minting, and there is no manual payout-wallet field to fill in.
         </div>
 
+        {mode === "collection" && (
+          <div className="mb-3 rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] p-3">
+            <label className="flex items-start gap-2 text-[13px] text-[hsl(var(--pf-ink))]">
+              <input type="checkbox" checked={launchCoin} onChange={(e) => setLaunchCoin(e.target.checked)} className="mt-0.5" />
+              <span>Also launch a tradeable coin for this collection on <b>pump.fun</b> <span className="text-[hsl(var(--pf-muted))]">(one coin per collection — costs ~0.02 SOL + your optional dev-buy; needs a second signature)</span></span>
+            </label>
+            {launchCoin && (
+              <div className="mt-2 flex items-center gap-2 text-[12px] text-[hsl(var(--pf-muted))]">
+                Dev-buy (SOL)
+                <input value={coinDevBuy} onChange={(e) => setCoinDevBuy(e.target.value)} inputMode="decimal" placeholder="0"
+                  className="w-24 rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-2 py-1 text-[hsl(var(--pf-ink))]" />
+              </div>
+            )}
+          </div>
+        )}
         <button onClick={mode === "collection" ? createCollection : createNftItems} disabled={busy}
           className="pf-btn w-full justify-center">
           {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> {statusMsg || "Minting…"}</> : <><Rocket className="h-4 w-4" /> {mode === "collection" ? "Mint collection" : "Mint NFT"}</>}

@@ -40,7 +40,9 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "
 const HELIUS_API_KEY = Deno.env.get("HELIUS_API_KEY") ?? "";
 const MARKETPLACE_AUTHORITY_SECRET_KEY = Deno.env.get("MARKETPLACE_AUTHORITY_SECRET_KEY") ?? "";
 const PLATFORM_FEE_WALLET = Deno.env.get("ORBITX_NFT_FEE_WALLET") ?? "";
-const PLATFORM_FEE_BPS = 100; // 1% OrbitX marketplace fee, per the spec's worked example
+const PLATFORM_FEE_BPS = 100; // 1% OrbitX marketplace fee
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const USDC_DECIMALS = 6;
 
 const RPC = HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}` : "https://api.mainnet-beta.solana.com";
 
@@ -79,11 +81,11 @@ Deno.serve(async (req) => {
       const { mode, sourceId, buyerWallet } = body as { mode: "listing" | "offer" | "auction"; sourceId: string; buyerWallet: string };
       if (!mode || !sourceId || !buyerWallet) return json({ error: "mode, sourceId, buyerWallet are required" }, 400);
 
-      let nftId: string, sellerWallet: string, priceSol: number;
+      let nftId: string, sellerWallet: string, priceSol: number; let currency = "SOL";
       if (mode === "listing") {
         const { data: listing, error } = await supabase.from("orbitx_nft_listings").select("*").eq("id", sourceId).eq("status", "active").single();
         if (error || !listing) return json({ error: "Listing not found or no longer active" }, 404);
-        nftId = listing.nft_id; sellerWallet = listing.seller_wallet; priceSol = Number(listing.price_sol);
+        nftId = listing.nft_id; sellerWallet = listing.seller_wallet; priceSol = Number(listing.price_sol); currency = (listing.currency ?? "SOL");
       } else if (mode === "offer") {
         const { data: offer, error } = await supabase.from("orbitx_nft_offers").select("*").eq("id", sourceId).eq("status", "accepted").single();
         if (error || !offer) return json({ error: "Offer not found or not accepted yet" }, 404);
@@ -105,11 +107,10 @@ Deno.serve(async (req) => {
       if (nft.current_owner !== sellerWallet) return json({ error: "Seller no longer owns this NFT" }, 409);
 
       const royaltyBps = Number(nft.royalty_bps) || 0;
-      const feeLamports = Math.round(priceSol * (PLATFORM_FEE_BPS / 10000) * LAMPORTS_PER_SOL);
-      const royaltyLamports = nft.creator_wallet !== sellerWallet ? Math.round(priceSol * (royaltyBps / 10000) * LAMPORTS_PER_SOL) : 0;
-      const totalLamports = Math.round(priceSol * LAMPORTS_PER_SOL);
-      const sellerLamports = totalLamports - feeLamports - royaltyLamports;
-      if (sellerLamports <= 0) return json({ error: "Fee/royalty configuration leaves nothing for the seller" }, 400);
+      const feeFrac = PLATFORM_FEE_BPS / 10000;
+      const royFrac = nft.creator_wallet !== sellerWallet ? royaltyBps / 10000 : 0;
+      const sellerFrac = 1 - feeFrac - royFrac;
+      if (sellerFrac <= 0) return json({ error: "Fee/royalty configuration leaves nothing for the seller" }, 400);
 
       const buyer = new PublicKey(buyerWallet);
       const seller = new PublicKey(sellerWallet);
@@ -121,9 +122,35 @@ Deno.serve(async (req) => {
       const buyerAta = getAssociatedTokenAddressSync(mint, buyer);
 
       const tx = new Transaction();
-      tx.add(SystemProgram.transfer({ fromPubkey: buyer, toPubkey: seller, lamports: sellerLamports }));
-      if (royaltyLamports > 0) tx.add(SystemProgram.transfer({ fromPubkey: buyer, toPubkey: creator, lamports: royaltyLamports }));
-      if (feeLamports > 0) tx.add(SystemProgram.transfer({ fromPubkey: buyer, toPubkey: feeWallet, lamports: feeLamports }));
+      if (currency === "USDC") {
+        // Pay in USDC via SPL token transfers from the buyer's USDC account.
+        const usdc = new PublicKey(USDC_MINT);
+        const unit = 10 ** USDC_DECIMALS;
+        const feeU = Math.round(priceSol * feeFrac * unit);
+        const royU = Math.round(priceSol * royFrac * unit);
+        const sellerU = Math.round(priceSol * unit) - feeU - royU;
+        const buyerUsdc = getAssociatedTokenAddressSync(usdc, buyer);
+        const sellerUsdc = getAssociatedTokenAddressSync(usdc, seller);
+        tx.add(createAssociatedTokenAccountIdempotentInstruction(buyer, sellerUsdc, seller, usdc));
+        tx.add(createTransferInstruction(buyerUsdc, sellerUsdc, buyer, sellerU));
+        if (royU > 0) {
+          const creatorUsdc = getAssociatedTokenAddressSync(usdc, creator);
+          tx.add(createAssociatedTokenAccountIdempotentInstruction(buyer, creatorUsdc, creator, usdc));
+          tx.add(createTransferInstruction(buyerUsdc, creatorUsdc, buyer, royU));
+        }
+        if (feeU > 0) {
+          const feeUsdc = getAssociatedTokenAddressSync(usdc, feeWallet);
+          tx.add(createAssociatedTokenAccountIdempotentInstruction(buyer, feeUsdc, feeWallet, usdc));
+          tx.add(createTransferInstruction(buyerUsdc, feeUsdc, buyer, feeU));
+        }
+      } else {
+        const feeLamports = Math.round(priceSol * feeFrac * LAMPORTS_PER_SOL);
+        const royaltyLamports = Math.round(priceSol * royFrac * LAMPORTS_PER_SOL);
+        const sellerLamports = Math.round(priceSol * LAMPORTS_PER_SOL) - feeLamports - royaltyLamports;
+        tx.add(SystemProgram.transfer({ fromPubkey: buyer, toPubkey: seller, lamports: sellerLamports }));
+        if (royaltyLamports > 0) tx.add(SystemProgram.transfer({ fromPubkey: buyer, toPubkey: creator, lamports: royaltyLamports }));
+        if (feeLamports > 0) tx.add(SystemProgram.transfer({ fromPubkey: buyer, toPubkey: feeWallet, lamports: feeLamports }));
+      }
       tx.add(createAssociatedTokenAccountIdempotentInstruction(buyer, buyerAta, buyer, mint));
       tx.add(createTransferInstruction(sellerAta, buyerAta, authority.publicKey, 1));
 
@@ -134,8 +161,8 @@ Deno.serve(async (req) => {
 
       const { data: pending, error: pendingErr } = await supabase.from("orbitx_nft_pending_sales").insert({
         nft_id: nftId, mode, source_id: sourceId, buyer_wallet: buyerWallet, seller_wallet: sellerWallet, creator_wallet: nft.creator_wallet,
-        seller_amount_sol: sellerLamports / LAMPORTS_PER_SOL, creator_amount_sol: royaltyLamports / LAMPORTS_PER_SOL,
-        fee_amount_sol: feeLamports / LAMPORTS_PER_SOL, total_amount_sol: priceSol,
+        seller_amount_sol: priceSol * sellerFrac, creator_amount_sol: priceSol * royFrac,
+        fee_amount_sol: priceSol * feeFrac, total_amount_sol: priceSol,
       }).select("id").single();
       if (pendingErr || !pending) return json({ error: "Failed to stage sale" }, 500);
 
@@ -143,7 +170,8 @@ Deno.serve(async (req) => {
         pendingSaleId: pending.id,
         transactionBase64: tx.serialize({ requireAllSignatures: false }).toString("base64"),
         lastValidBlockHeight,
-        breakdown: { sellerAmountSol: sellerLamports / LAMPORTS_PER_SOL, creatorRoyaltySol: royaltyLamports / LAMPORTS_PER_SOL, platformFeeSol: feeLamports / LAMPORTS_PER_SOL, totalSol: priceSol },
+        currency,
+        breakdown: { sellerAmountSol: priceSol * sellerFrac, creatorRoyaltySol: priceSol * royFrac, platformFeeSol: priceSol * feeFrac, totalSol: priceSol },
       });
     }
 

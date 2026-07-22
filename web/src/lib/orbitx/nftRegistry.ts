@@ -21,6 +21,7 @@ export interface OrbitxNftCollection {
   floor_price_sol: number | null;
   volume_sol: number;
   category: string | null;
+  coin_mint?: string | null;
   created_at: string;
 }
 
@@ -54,6 +55,7 @@ export interface OrbitxNftListing {
   nft_id: string;
   seller_wallet: string;
   price_sol: number;
+  currency?: string;
   status: "active" | "cancelled" | "sold";
   created_at: string;
 }
@@ -205,10 +207,15 @@ export async function listAuctionBids(auctionId: string): Promise<{ bidder_walle
   return data ?? [];
 }
 
-export async function listNft(nftId: string, sellerWallet: string, priceSol: number): Promise<string> {
-  const { data, error } = await supabase.rpc("orbitx_nft_list", { p_nft_id: nftId, p_seller_wallet: sellerWallet, p_price_sol: priceSol });
+export async function listNft(nftId: string, sellerWallet: string, priceSol: number, currency: "SOL" | "USDC" = "SOL"): Promise<string> {
+  const { data, error } = await supabase.rpc("orbitx_nft_list", { p_nft_id: nftId, p_seller_wallet: sellerWallet, p_price_sol: priceSol, p_currency: currency });
   if (error) throw error;
   return data as string;
+}
+
+export async function setCollectionCoin(collectionId: string, coinMint: string, creator: string): Promise<void> {
+  const { error } = await supabase.rpc("orbitx_set_collection_coin", { p_collection_id: collectionId, p_coin_mint: coinMint, p_creator: creator });
+  if (error) throw error;
 }
 
 export async function cancelNftListing(nftId: string, sellerWallet: string): Promise<void> {

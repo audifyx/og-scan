@@ -41,6 +41,7 @@ function ListModal({ nft, onClose, onListed }: { nft: OrbitxNft; onClose: () => 
   const [price, setPrice] = useState("1");
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<"idle" | "approving">("idle");
+  const [currency, setCurrency] = useState<"SOL" | "USDC">("SOL");
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const submit = async () => {
@@ -53,8 +54,8 @@ function ListModal({ nft, onClose, onListed }: { nft: OrbitxNft; onClose: () => 
         await setNftDelegateApproved(nft.id, publicKey.toBase58());
       }
       setStep("idle");
-      await listNft(nft.id, publicKey.toBase58(), Number(price));
-      toast.success(`Listed ${nft.name} for ${price} SOL`);
+      await listNft(nft.id, publicKey.toBase58(), Number(price), currency);
+      toast.success(`Listed ${nft.name} for ${price} ${currency}`);
       onListed(); onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Listing failed");
@@ -73,8 +74,15 @@ function ListModal({ nft, onClose, onListed }: { nft: OrbitxNft; onClose: () => 
             First-time listing: you'll approve OrbitX's marketplace authority as a delegate over just this 1 NFT (a normal, revocable Solana approval — it stays in your wallet). This lets a buyer complete checkout atomically later without you being online.
           </div>
         )}
-        <div className="mb-1 pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Price (SOL)</div>
-        <input type="number" min="0.01" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)}
+        <div className="mb-1 flex items-center justify-between">
+          <span className="pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Price ({currency})</span>
+          <span className="flex items-center rounded-md border border-[hsl(var(--pf-border))] p-0.5">
+            {(["SOL", "USDC"] as const).map((c) => (
+              <button key={c} type="button" onClick={() => setCurrency(c)} className={`rounded px-2 py-0.5 pf-mono text-[10px] font-bold ${currency === c ? "bg-[hsl(var(--pf-green))] text-black" : "text-[hsl(var(--pf-muted))]"}`}>{c}</button>
+            ))}
+          </span>
+        </div>
+        <input type="number" min="0" step="0.0001" value={price} onChange={(e) => setPrice(e.target.value)}
           className="w-full rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-3 py-2 text-sm text-[hsl(var(--pf-ink))] outline-none focus:border-[hsl(var(--pf-green))]" />
         <button onClick={submit} disabled={busy} className="pf-btn mt-4 w-full justify-center">
           {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> {step === "approving" ? "Approve delegate in wallet…" : "Listing…"}</> : <><Tag className="h-4 w-4" /> List for sale</>}

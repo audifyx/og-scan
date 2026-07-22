@@ -43,3 +43,20 @@ per-market via `orbitx_nft_coin_markets.creator_fee_bps / platform_fee_bps`.
 When `market_cap_sol` crosses the graduation threshold, mark `graduated=true`
 and migrate reserves to a Raydium/Meteora pool (mirror the existing token
 graduation logic).
+
+## UPDATE — pump.fun is the live coin path (supersedes the custom program)
+Per product decision, NFT coins are launched as **real pump.fun coins**, one per
+collection, via the existing `/api/pump-create` (Pinata IPFS + PumpPortal) flow —
+see `web/src/lib/orbitx/pumpLaunch.ts`. Creating a collection launches one coin
+(opt-in checkbox, ~0.02 SOL); the mint is stored on `orbitx_nft_collections.coin_mint`.
+Trading happens in-app via Jupiter Terminal (`/nft/coin/:nftId`) with a live
+DexScreener chart; creator earns pump.fun creator rewards. The custom Anchor
+program in `contracts/nft_coin/` is therefore NOT needed for launch and is kept
+only as a reference for a future fully-custom curve.
+
+## USDC settlement — LIVE (needs a real-funds smoke test)
+`supabase/functions/nft-execute-sale` now settles NFT purchases in **SOL or USDC**
+based on `orbitx_nft_listings.currency`. USDC path builds SPL token transfers
+(buyer USDC ATA → seller/creator/fee ATAs, 6 decimals) alongside the delegated
+NFT transfer. Sellers pick SOL or USDC in the list modal. Verify once on mainnet
+with a small USDC listing before promoting.
