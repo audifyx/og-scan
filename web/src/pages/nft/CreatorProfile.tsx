@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   UserCircle2, Users, Image as ImageIcon, Layers, Activity as ActivityIcon, HandCoins,
-  Copy, Wallet, BadgeCheck, Loader2, Rocket,
+  Copy, Wallet, BadgeCheck, Loader2, Rocket, MoreVertical,
 } from "lucide-react";
 import { listNftsByCreator, listCollectionsByCreator } from "@/lib/orbitx/nftRegistry";
 import { getCreatorNftStats } from "@/lib/orbitx/nftStats";
@@ -15,6 +15,7 @@ import { useWalletNfts } from "@/pages/orbitx/nfts";
 import { getFollowCounts, isFollowing, toggleFollow } from "./social";
 import { getCreatorFees, claimCreatorFees, NFT_COIN_CREATOR_FEE_BPS } from "./nftCoin";
 import { Media, Verified, RarityBadge, Empty } from "./_ui";
+import { TransferBurnModal } from "./TransferBurnModal";
 import { fmtSol, shortAddr } from "./nftMarketData";
 
 type Tab = "created" | "owned" | "collections" | "fees" | "activity";
@@ -27,6 +28,7 @@ export default function CreatorProfile() {
   const isMe = !!wallet && wallet === me;
   const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>((params.get("tab") as Tab) || "created");
+  const [managing, setManaging] = useState<{ mint: string; name: string } | null>(null);
 
   if (!wallet) {
     return (
@@ -67,8 +69,8 @@ export default function CreatorProfile() {
       </div>
 
       <div className="mt-5">
-        {tab === "created" && <NftGrid items={(created ?? []).map((n) => ({ id: n.id, name: n.name, image: n.image_url, tier: n.rarity_tier, rank: n.rarity_rank }))} empty="No NFTs created yet." />}
-        {tab === "owned" && <NftGrid items={(owned ?? []).map((n) => ({ id: n.id, name: n.name, image: n.image, tier: null, rank: null }))} empty="No NFTs held in this wallet." />}
+        {tab === "created" && <NftGrid items={(created ?? []).map((n) => ({ id: n.id, name: n.name, image: n.image_url, tier: n.rarity_tier, rank: n.rarity_rank, mint: n.mint_address }))} empty="No NFTs created yet." onManage={isMe ? (mint, name) => setManaging({ mint, name }) : undefined} />}
+        {tab === "owned" && <NftGrid items={(owned ?? []).map((n) => ({ id: n.id, name: n.name, image: n.image, tier: null, rank: null, mint: n.id }))} empty="No NFTs held in this wallet." onManage={isMe ? (mint, name) => setManaging({ mint, name }) : undefined} />}
         {tab === "collections" && (
           (collections ?? []).length === 0 ? <Empty label="No collections yet." /> : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -84,6 +86,7 @@ export default function CreatorProfile() {
         {tab === "fees" && <FeesTab wallet={wallet} isMe={isMe} />}
         {tab === "activity" && <Empty label="Per-creator activity feed lands with the v4 migration." />}
       </div>
+      {managing && <TransferBurnModal mint={managing.mint} name={managing.name} onClose={() => setManaging(null)} />}
     </div>
   );
 }
@@ -176,13 +179,19 @@ function StatCard({ label, value, tone }: { label: string; value: React.ReactNod
   return <div className="mkt-panel p-4"><div className="mkt-mono text-[10px] uppercase tracking-widest mkt-muted">{label}</div><div className={`mt-1 text-xl font-black ${color}`}>{value}</div></div>;
 }
 
-function NftGrid({ items, empty }: { items: { id: string; name: string; image: string | null; tier: string | null; rank: number | null }[]; empty: string }) {
+function NftGrid({ items, empty, onManage }: { items: { id: string; name: string; image: string | null; tier: string | null; rank: number | null; mint?: string | null }[]; empty: string; onManage?: (mint: string, name: string) => void }) {
   if (items.length === 0) return <Empty label={empty} />;
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
       {items.map((n) => (
-        <div key={n.id} className="mkt-card">
+        <div key={n.id} className="mkt-card group relative">
           <Media src={n.image} className="aspect-square w-full" />
+          {onManage && n.mint && (
+            <button onClick={() => onManage(n.mint!, n.name)} title="Transfer or burn"
+              className="absolute right-2 top-2 rounded-lg border border-white/15 bg-black/60 p-1.5 opacity-0 transition group-hover:opacity-100">
+              <MoreVertical className="h-4 w-4 text-white" />
+            </button>
+          )}
           <div className="flex items-center justify-between gap-2 p-3"><span className="truncate text-[13px] font-bold">{n.name}</span><RarityBadge tier={n.tier} rank={n.rank} /></div>
         </div>
       ))}

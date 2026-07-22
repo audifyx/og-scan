@@ -2,7 +2,7 @@
 // signed-out -> wallet picker + Sign-In-With-Solana; signed-in -> account menu.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, LogOut, Settings, Wallet, ChevronDown, Loader2, Image } from "lucide-react";
+import { User, LogOut, Settings, Wallet, ChevronDown, Loader2, Image, GitMerge } from "lucide-react";
 import { toast } from "sonner";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -77,6 +77,10 @@ export function WalletConnectButton() {
               ))}
             </div>
             <div className="border-t border-white/10 py-1">
+              <button type="button" onClick={() => { setMerge(true); setMenu(false); }}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 font-mono text-[10px] uppercase tracking-widest text-og-gold transition hover:bg-og-gold/10">
+                <GitMerge className="h-3.5 w-3.5" /> Merge old account
+              </button>
               <button type="button" onClick={doSignOut}
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 font-mono text-[10px] uppercase tracking-widest text-og-blood transition hover:bg-og-blood/10">
                 <LogOut className="h-3.5 w-3.5" /> Sign Out
@@ -85,6 +89,7 @@ export function WalletConnectButton() {
           </div>
         </>
       )}
+      <MergeAccountModal open={merge} onClose={() => setMerge(false)} />
     </div>
   );
 }

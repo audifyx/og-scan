@@ -147,7 +147,7 @@ const queryClient = new QueryClient({
     },
   },
 });
-const ArtFeedPage = lazy(() => import("./pages/ArtFeed"));
+const ArtFeedPage = lazyWithRetry(() => import("./pages/ArtFeed"));
 
 // Redirect legacy crypto/tools/coin routes into the OrbitX DEX app (/ORBITX_DEX).
 function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undefined>) => string) }) {
@@ -213,8 +213,6 @@ const App = () => (
               <Route path="leaderboard" element={<LaunchpadLeaderboard />} />
               <Route path="creator/:wallet" element={<LaunchpadCreator />} />
               <Route path="portfolio" element={<LaunchpadPortfolio />} />
-              <Route path="nft" element={<Suspense fallback={null}><LaunchpadNftHub /></Suspense>} />
-              <Route path="nft/create" element={<Suspense fallback={null}><LaunchpadNftCreate /></Suspense>} />
               <Route path="admin" element={<AdminRoute><LaunchpadAdmin /></AdminRoute>} />
             </Route>
 

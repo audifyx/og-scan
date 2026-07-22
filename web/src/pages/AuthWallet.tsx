@@ -18,15 +18,17 @@ export default function AuthWallet() {
   const next = params.get("next") || "/app";
   const [picker, setPicker] = useState(false);
   const [merge, setMerge] = useState(false);
+  const [pendingMerge, setPendingMerge] = useState(false);
 
-  useEffect(() => { if (!loading && user) navigate(next, { replace: true }); }, [user, loading, next, navigate]);
+  useEffect(() => { if (!loading && user && !merge && !pendingMerge) navigate(next, { replace: true }); }, [user, loading, next, navigate, merge, pendingMerge]);
 
   const onPick = async (name: string) => {
     try {
       const { isNew } = await signInWith(name);
       setPicker(false);
       toast.success("Signed in with wallet");
-      if (isNew) setMerge(true); else navigate(next, { replace: true });
+      if (isNew || pendingMerge) { setMerge(true); setPendingMerge(false); }
+      else navigate(next, { replace: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sign-in failed");
     }
@@ -48,15 +50,20 @@ export default function AuthWallet() {
           <h1 className="text-2xl font-black">Connect to enter</h1>
           <p className="mx-auto mt-2 max-w-xs text-[13px] text-white/50">One wallet connection unlocks the launchpad, DEX, NFT marketplace, and every tool. No email, no password.</p>
 
-          <button type="button" onClick={() => setPicker(true)} disabled={loading}
+          <button type="button" onClick={() => { setPendingMerge(false); setPicker(true); }} disabled={loading}
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-og-cyan px-5 py-3.5 text-sm font-black text-black transition hover:brightness-110 disabled:opacity-50">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />} Connect wallet
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />} Log in with wallet
+          </button>
+
+          <button type="button" onClick={() => { if (user) { setMerge(true); } else { setPendingMerge(true); setPicker(true); } }} disabled={loading}
+            className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl border border-og-gold/40 bg-og-gold/10 px-5 py-3 text-sm font-black text-og-gold transition hover:bg-og-gold/20 disabled:opacity-50">
+            <GitMerge className="h-4 w-4" /> Merge an existing account
           </button>
 
           <div className="mt-4 grid grid-cols-1 gap-2 text-left text-[12px] text-white/50">
             <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-og-lime" /> Sign a free message — no transaction, no fees</span>
             <span className="inline-flex items-center gap-2"><Wallet className="h-3.5 w-3.5 text-og-cyan" /> Phantom, Jupiter, Solflare &amp; more supported</span>
-            <button onClick={() => setMerge(true)} className="inline-flex items-center gap-2 text-left hover:text-white"><GitMerge className="h-3.5 w-3.5 text-og-gold" /> Have an old email account? Merge it once</button>
+            <span className="inline-flex items-center gap-2"><GitMerge className="h-3.5 w-3.5 text-og-gold" /> Merge links your old email account + all its data to this wallet</span>
           </div>
         </div>
 

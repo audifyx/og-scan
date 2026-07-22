@@ -12,6 +12,7 @@ import {
   Search, Wallet, Sparkles, Compass, Rocket, Activity, PlusCircle, LayoutGrid,
   Bell, ChevronRight, Twitter, Send, Github, ShieldCheck,
 } from "lucide-react";
+import { CurrencyProvider, CurrencyToggle } from "./currency";
 import "./marketplace.css";
 
 const CATS = ["All", ...NFT_CATEGORIES];
@@ -114,6 +115,7 @@ export default function MarketplaceLayout() {
 
   return (
     <AppLayout>
+      <CurrencyProvider>
       <div className="obx-mkt">
         {/* ── header ── */}
         <header className="mkt-header sticky top-0 z-30">
@@ -146,6 +148,7 @@ export default function MarketplaceLayout() {
               ))}
             </nav>
 
+            <CurrencyToggle />
             <Link to="/nft/notifications" className="mkt-nav hidden rounded-xl p-2 sm:block" title="Notifications">
               <Bell className="h-5 w-5" />
             </Link>
@@ -210,6 +213,7 @@ export default function MarketplaceLayout() {
           </div>
         </footer>
       </div>
+      </CurrencyProvider>
     </AppLayout>
   );
 }
