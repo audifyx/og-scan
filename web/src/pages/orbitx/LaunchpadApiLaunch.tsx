@@ -363,7 +363,7 @@ export default function LaunchpadApiLaunch() {
               <p className="text-sm leading-relaxed text-muted-foreground">{p.desc}</p>
               <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">API: {p.api}</p>
             </div>
-            {p.status === "live" && p.route && p.route !== "/orbitxlaunch/create/api" ? (
+            {(p.status === "live" || p.status === "beta") && p.route && p.route !== "/orbitxlaunch/create/api" ? (
               <Link to={p.route} className="lpx-btn w-full !border-[hsl(var(--og-lime))]/50 !text-[hsl(var(--og-lime))] hover:!bg-[hsl(var(--og-lime))]/15 md:w-auto">Launch now <ArrowRight className="h-4 w-4" /></Link>
             ) : p.status === "live" ? (
               <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[hsl(var(--og-lime))]/30 bg-[hsl(var(--og-lime))]/5 px-5 py-3 font-display text-xs font-black uppercase tracking-wider text-[hsl(var(--og-lime))] md:w-auto"><CheckCircle2 className="h-4 w-4" /> Console above</span>

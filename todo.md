@@ -32,3 +32,22 @@
 - [ ] Deploy on-chain NFT-coin bonding-curve program (see docs/NFT_COIN_TRADING.md)
 - [ ] Phase 4 charts: backfill orbitx_nft_collection_stats_daily + render floor/volume charts
 - [ ] Phase 5: USDC pricing option, Transfer/Burn UI, staff-picks/featured curation
+
+## OrbitX Curve (EVM) — open pump-style bonding curve
+- [x] MIT-licensed curve factory + token (contracts/evm/OrbitXCurve.sol), no reverse-engineered source
+- [x] Keyless curve.ts lib (CREATE2 factory, deploy-if-absent, launch/buy/sell/quotes)
+- [x] /orbitxlaunch/create/curve page with all-chains + multi-wallet connect
+- [x] Retarget Pons/flap.sh to external references (no contract cloning)
+- [x] APPLY curve migration to Supabase (20260722160000_orbitx_curve_markets.sql)
+- [x] Curve launch writes orbitx_curve_markets; trade page writes orbitx_curve_trades
+- [x] Curve trade page (/orbitxlaunch/curve/:token): live price, buy/sell, slippage, graduation bar
+- [ ] External audit before promoting orbitx-curve-evm from beta to live
+
+## OrbitX Curve — v2 features (PR #123)
+- [x] Curve discovery grid /orbitxlaunch/curves (sort price/graduation/newest, search)
+- [x] Graduation -> DEX migration: OrbitXCurveMigrator.sol (addLiquidityETH, LP burned) + dex.ts + Seed-liquidity UI
+- [x] Live trade feed (Supabase realtime + polling) + price chart (recharts) on trade page
+- [x] Holders (from ledger) + estimated creator earnings panel
+- [ ] Set VITE_DEX_ROUTER_<chainId> per chain before enabling migration
+- [ ] Deploy migrator (CREATE2) + set VITE_ORBITX_CURVE_MIGRATOR (0xF31eF061C351dD8EBa28605fFC360c565a786CC8) and bake into factory
+- [ ] Audit OrbitXCurve.sol + OrbitXCurveMigrator.sol before mainnet
