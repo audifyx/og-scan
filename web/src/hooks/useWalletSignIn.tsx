@@ -24,6 +24,10 @@ export function useWalletSignIn() {
     if (!w) throw new Error(`${name} not found`);
     const adapter = w.adapter as Adapter & { signMessage?: (m: Uint8Array) => Promise<Uint8Array> };
     if (!adapter.signMessage) throw new Error(`${name} does not support message signing`);
+    const rs = String((w as any).readyState);
+    if (rs !== "Installed" && rs !== "Loadable") {
+      throw new Error(`${name} isn't detected in this browser. Install the ${name} extension (or open OrbitX inside the ${name} app), then try again.`);
+    }
     setBusy(name);
     try {
       select(adapter.name);

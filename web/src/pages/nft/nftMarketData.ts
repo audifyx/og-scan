@@ -21,8 +21,12 @@ export function useAllNfts(limit = 200) {
   return useQuery({ queryKey: ["nftmkt-nfts", limit], staleTime: 30_000, queryFn: () => listNfts(limit) });
 }
 
-export const fmtSol = (n?: number | null, dp = 2): string =>
-  n == null || !Number.isFinite(n) ? "—" : `${Number(n).toFixed(dp)} SOL`;
+export const solDp = (v: number): number => (v >= 1 ? 2 : v >= 0.01 ? 3 : v >= 0.0001 ? 5 : 6);
+export const fmtSol = (n?: number | null, dp?: number): string => {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const v = Number(n);
+  return `${v.toFixed(dp ?? solDp(v))} SOL`;
+};
 
 export const fmtInt = (n?: number | null): string => {
   if (n == null || !Number.isFinite(n)) return "—";

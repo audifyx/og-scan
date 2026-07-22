@@ -4,8 +4,10 @@
 // registry — no fabricated numbers.
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Flame, Crown, Star, ArrowRight, Tag, TrendingUp, AlertTriangle } from "lucide-react";
+import { Flame, Crown, Star, ArrowRight, Tag, TrendingUp, AlertTriangle, Rocket, Eye, Heart } from "lucide-react";
 import { useMarketCollections, useActiveListings, useRecentSales, fmtSol, fmtInt, timeAgo, type OrbitxNftCollection } from "./nftMarketData";
+import { listCoinMarkets } from "./nftCoin";
+import { useQuery } from "@tanstack/react-query";
 import { Media, Verified, RarityBadge, SectionHeader, Empty } from "./_ui";
 import { PriceText } from "./currency";
 import { useNftWatchlist } from "./watchlist";
@@ -18,6 +20,13 @@ export default function MarketplaceHome() {
   const { data: collections, isLoading } = useMarketCollections();
   const { data: listings } = useActiveListings();
   const { data: sales } = useRecentSales(10);
+  const { data: coinMarkets } = useQuery({ queryKey: ["coin-markets-home"], staleTime: 20_000, queryFn: listCoinMarkets });
+  const trendingNfts = useMemo(() => {
+    return [...(listings ?? [])]
+      .filter((l) => l.nft)
+      .sort((a, b) => ((b.nft?.favorite_count ?? 0) + (b.nft?.view_count ?? 0)) - ((a.nft?.favorite_count ?? 0) + (a.nft?.view_count ?? 0)))
+      .slice(0, 10);
+  }, [listings]);
   const { ids: watched, toggle: toggleWatch } = useNftWatchlist();
 
   const [tab, setTab] = useState<TopTab>("trending");
@@ -106,6 +115,48 @@ export default function MarketplaceHome() {
           ))}
         </div>
       </section>
+
+      {/* meme markets — tradeable NFT coins */}
+      {(coinMarkets ?? []).length > 0 && (
+        <section>
+          <SectionHeader title="Meme markets" sub="NFTs you can trade like a coin — bonding curve, creator earns fees" />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {(coinMarkets ?? []).map((m: any) => (
+              <Link key={m.nft_id} to={`/nft/coin/${m.nft_id}`} className="mkt-card group">
+                <Media src={m.nft?.image_url} className="aspect-square w-full" />
+                <div className="p-3">
+                  <div className="flex items-center gap-1 truncate text-[13px] font-bold"><Rocket className="h-3 w-3 shrink-0 text-[hsl(var(--og-cyan))]" />{m.nft?.name ?? "NFT"}</div>
+                  <div className="mt-1.5 flex items-center justify-between text-[12px]">
+                    <span><span className="mkt-muted">Price </span><PriceText sol={m.last_price_sol} className="mkt-mono font-bold text-[hsl(var(--og-lime))]" /></span>
+                    <span className="mkt-muted">MC <PriceText sol={m.market_cap_sol} className="mkt-mono" /></span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* trending NFTs (individual, by engagement) */}
+      {trendingNfts.length > 0 && (
+        <section>
+          <SectionHeader title="Trending NFTs" sub="Most-viewed listed items right now" />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {trendingNfts.map((l) => (
+              <Link key={l.id} to="/nft/explore" className="mkt-card group">
+                <Media src={l.nft?.image_url} className="aspect-square w-full" />
+                <div className="p-3">
+                  <div className="flex items-center gap-1 truncate text-[13px] font-bold">{l.nft?.is_flagged_duplicate && <AlertTriangle className="h-3 w-3 shrink-0 text-[hsl(var(--og-blood))]" />}{l.nft?.name ?? "NFT"}</div>
+                  <div className="mt-1.5 flex items-center justify-between text-[12px]">
+                    <PriceText sol={l.price_sol} className="mkt-mono font-bold text-[hsl(var(--og-lime))]" />
+                    <span className="inline-flex items-center gap-2 mkt-muted"><span className="inline-flex items-center gap-0.5"><Eye className="h-3 w-3" />{fmtInt(l.nft?.view_count ?? 0)}</span><span className="inline-flex items-center gap-0.5"><Heart className="h-3 w-3" />{fmtInt(l.nft?.favorite_count ?? 0)}</span></span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* notable collections grid */}
       <section>

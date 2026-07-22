@@ -58,3 +58,45 @@ export async function getCreatorFees(wallet: string): Promise<CreatorFeeSummary>
 export async function claimCreatorFees(_wallet: string): Promise<{ amount_sol: number; signature?: string }> {
   throw new Error("Creator-fee claims go live when the OrbitX NFT-coin program is deployed. Accrual is already tracked.");
 }
+
+// ── Tradeable market (DB-tracked bonding curve) ─────────────────────────────
+export async function enableNftCoin(nftId: string, wallet: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("orbitx_nft_enable_coin", { p_nft_id: nftId, p_wallet: wallet });
+  if (error) throw error;
+  return !!data;
+}
+
+export async function listCoinMarkets(): Promise<(NftCoinMarket & { nft: any })[]> {
+  try {
+    const { data } = await supabase.from("orbitx_nft_coin_markets").select("*, nft:orbitx_nfts(*)").eq("enabled", true).order("market_cap_sol", { ascending: false }).limit(60);
+    return (data ?? []) as any;
+  } catch { return []; }
+}
+
+export async function getMarketWithNft(nftId: string): Promise<(NftCoinMarket & { nft: any }) | null> {
+  try {
+    const { data } = await supabase.from("orbitx_nft_coin_markets").select("*, nft:orbitx_nfts(*)").eq("nft_id", nftId).maybeSingle();
+    return (data as any) ?? null;
+  } catch { return null; }
+}
+
+export async function getHoldings(nftId: string, wallet: string): Promise<number> {
+  try {
+    const { data } = await supabase.from("orbitx_nft_coin_holdings").select("tokens").eq("nft_id", nftId).eq("wallet", wallet).maybeSingle();
+    return Number(data?.tokens ?? 0);
+  } catch { return 0; }
+}
+
+export interface CoinTrade { id: string; trader_wallet: string; side: string; sol_amount: number; token_amount: number; price_sol: number; created_at: string }
+export async function listCoinTrades(nftId: string, limit = 30): Promise<CoinTrade[]> {
+  try {
+    const { data } = await supabase.from("orbitx_nft_coin_trades").select("*").eq("nft_id", nftId).order("created_at", { ascending: false }).limit(limit);
+    return (data ?? []) as CoinTrade[];
+  } catch { return []; }
+}
+
+export async function tradeCoin(nftId: string, wallet: string, side: "buy" | "sell", amount: number): Promise<any> {
+  const { data, error } = await supabase.rpc("orbitx_nft_coin_trade", { p_nft_id: nftId, p_wallet: wallet, p_side: side, p_amount: amount });
+  if (error) throw error;
+  return data;
+}

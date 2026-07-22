@@ -7,6 +7,7 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { mintNft, verifyNftInCollection } from "@/lib/orbitx/nftMint";
+import { enableNftCoin } from "@/pages/nft/nftCoin";
 import CreatorInventory from "@/components/orbitx/CreatorInventory";
 import { NFT_CATEGORIES } from "@/lib/orbitx/nftCategories";
 import { isAcceptedNftMedia, uploadNftAssets } from "./nftUpload";
@@ -142,7 +143,7 @@ export default function LaunchpadNftCreate() {
 
       toast.success("Collection minted on-chain! 🎉");
       qc.invalidateQueries({ queryKey: ["orbitx-nft-my-collections"] });
-      navigate("/orbitxlaunch/nft");
+      navigate("/nft");
     } catch (err) {
       console.error("[orbitx] collection mint failed", err);
       toast.error(err instanceof Error ? err.message : "Collection mint failed");
@@ -180,15 +181,17 @@ export default function LaunchpadNftCreate() {
         }
 
         setStatusMsg("Registering NFT…");
-        await registerNft({
+        const nftId = await registerNft({
           collection_id: selectedCollection?.id ?? null, mint_address: mintAddress, creator_wallet: publicKey.toBase58(),
           name: name.trim(), symbol: symbol.trim().toUpperCase() || "NFT", image_url: mediaUrl, metadata_uri: uri, royalty_bps: royaltyBps,
           attributes: attributes.filter((a) => a.trait_type.trim() && a.value.trim()), content_hash: contentHash ?? undefined,
         });
+        // Auto-launch a tradeable meme-coin market bound to this NFT (best-effort).
+        await enableNftCoin(nftId, publicKey.toBase58()).catch((e) => console.warn("[orbitx] coin market enable skipped:", e));
       }
 
       toast.success(`${copies > 1 ? `${copies} NFTs` : "NFT"} minted on-chain! 🎉`);
-      navigate("/orbitxlaunch/nft");
+      navigate("/nft");
     } catch (err) {
       console.error("[orbitx] NFT mint failed", err);
       toast.error(err instanceof Error ? err.message : "NFT mint failed");
@@ -324,7 +327,7 @@ export default function LaunchpadNftCreate() {
 
       <div className="mt-4 flex items-start gap-2 rounded-lg border border-[hsl(var(--og-gold))]/25 bg-[hsl(var(--og-gold))]/5 p-3 text-[11px] text-[hsl(var(--pf-muted))]">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[hsl(var(--og-gold))]" />
-        Buying/selling on the marketplace (escrowed listings, offers, auctions) is being built on Metaplex Auction House and isn't live yet — minting and ownership here are fully real today. <Link to="/orbitxlaunch/nft" className="underline">Back to NFT Hub</Link>
+        Buying/selling on the marketplace (escrowed listings, offers, auctions) is being built on Metaplex Auction House and isn't live yet — minting and ownership here are fully real today. <Link to="/nft" className="underline">Back to NFT Market</Link>
       </div>
     </div>
   );

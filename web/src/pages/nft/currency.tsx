@@ -21,14 +21,15 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
 export function useCurrency() { return useContext(CurrencyCtx); }
 
-export function PriceText({ sol, dp = 2, className = "" }: { sol?: number | null; dp?: number; className?: string }) {
+export function PriceText({ sol, dp, className = "" }: { sol?: number | null; dp?: number; className?: string }) {
   const { unit, solUsd } = useCurrency();
   if (sol == null || !Number.isFinite(sol)) return <span className={className}>—</span>;
   if (unit === "USD" && solUsd) {
     const usd = sol * solUsd;
     return <span className={className}>${usd >= 1000 ? usd.toLocaleString(undefined, { maximumFractionDigits: 0 }) : usd.toFixed(2)}</span>;
   }
-  return <span className={className}>{sol.toFixed(dp)} SOL</span>;
+  const d = dp ?? (sol >= 1 ? 2 : sol >= 0.01 ? 3 : sol >= 0.0001 ? 5 : 6);
+  return <span className={className}>{sol.toFixed(d)} SOL</span>;
 }
 
 export function CurrencyToggle() {

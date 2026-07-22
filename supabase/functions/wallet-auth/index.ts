@@ -90,10 +90,11 @@ Deno.serve(async (req) => {
       const authz = req.headers.get("Authorization") || "";
       const token = authz.replace(/^Bearer\s+/i, "");
       if (!token) throw new Error("wallet session required");
-      const asWallet = createClient(SUPABASE_URL, ANON, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } });
-      const { data: me } = await asWallet.auth.getUser();
-      const newId = me.user?.id;
-      if (!newId) throw new Error("invalid wallet session");
+      // Validate the wallet's JWT explicitly (getUser() with no arg ignores the
+      // Authorization header and returns null — that was the "auth issue").
+      const { data: me, error: meErr } = await db.auth.getUser(token);
+      if (meErr || !me?.user?.id) throw new Error("wallet session invalid — reconnect your wallet and try again");
+      const newId = me.user.id;
 
       // verify legacy credentials
       const verifier = createClient(SUPABASE_URL, ANON, { auth: { persistSession: false } });

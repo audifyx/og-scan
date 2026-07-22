@@ -128,6 +128,7 @@ const ALL_APPS: App[] = [
   { key: "koltracker", name: "KOL Tracker", caption: "Wallet Alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
   { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <div style={{ fontSize: "20px" }}>📈</div> },
   { key: "launchpad", name: "Launchpad", caption: "Launch a token", href: "/orbitxlaunch", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFC53D, #B8860B)", glyph: Glyph.launchpad },
+  { key: "nft", name: "NFT Market", caption: "Mint & trade NFTs", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(135deg, #00FFA3, #00C776)", glyph: <div style={{ fontSize: "20px" }}>🖼️</div> },
 ];
 
 const CENTER_TABS: { key: string; name: string; href?: string; action: "profile" | "settings" | "logout" | "wallpaper"; tone: string; glyph: JSX.Element }[] = [

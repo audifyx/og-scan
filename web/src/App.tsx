@@ -75,6 +75,7 @@ const NftActivity = lazyWithRetry(() => import("./pages/nft/Activity"));
 const NftNotifications = lazyWithRetry(() => import("./pages/nft/Notifications"));
 const NftCreatorProfile = lazyWithRetry(() => import("./pages/nft/CreatorProfile"));
 const NftCollectionPage = lazyWithRetry(() => import("./pages/nft/CollectionPage"));
+const NftCoinTrade = lazyWithRetry(() => import("./pages/nft/CoinTradePage"));
 import Callouts from "./pages/Callouts";
 import Charts from "./pages/Charts";
 import LiveFeed from "./pages/LiveFeed";
@@ -228,6 +229,7 @@ const App = () => (
               <Route path="me" element={<Suspense fallback={null}><NftCreatorProfile /></Suspense>} />
               <Route path="profile/:wallet" element={<Suspense fallback={null}><NftCreatorProfile /></Suspense>} />
               <Route path="collection/:id" element={<Suspense fallback={null}><NftCollectionPage /></Suspense>} />
+              <Route path="coin/:nftId" element={<Suspense fallback={null}><NftCoinTrade /></Suspense>} />
             </Route>
 
             <Route path="/terminal" element={<LaunchpadTerminal />}>
