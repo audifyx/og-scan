@@ -22,3 +22,15 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
   needed. Always curl https://ai-gateway.vercel.sh/v1/models first; never trust model IDs from memory
 - For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
 <!-- VERCEL BEST PRACTICES END -->
+
+## OrbitX repository skills
+
+Load the matching skill before working in these areas:
+
+- `.cursor/skills/orbitx-aether-web/SKILL.md` — websites, UI, responsive design, and visual polish
+- `.cursor/skills/orbitx-react-vercel/SKILL.md` — React, Vite, Supabase, Vercel, routes, and deployment
+- `.cursor/skills/orbitx-dex-intelligence/SKILL.md` — DEX APIs, token/wallet intelligence, forensics, and MCP
+- `.cursor/skills/orbitx-game-builder/SKILL.md` — native web games, predictions, leaderboards, and partner embeds
+- `.cursor/skills/orbitx-agent-engineering/SKILL.md` — prompts, RAG, model routing, tools, and agent evaluation
+
+If more than one area applies, combine the relevant skills. Repository code and current external documentation outrank stale examples in a skill.
