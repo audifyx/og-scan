@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -154,6 +154,7 @@ const queryClient = new QueryClient({
   },
 });
 const ArtFeedPage = lazyWithRetry(() => import("./pages/ArtFeed"));
+const OrbitxCityPage = lazyWithRetry(() => import("./pages/orbitxcity/OrbitxCityPage"));
 
 // Redirect legacy crypto/tools/coin routes into the OrbitX DEX app (/ORBITX_DEX).
 function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undefined>) => string) }) {
@@ -205,6 +206,17 @@ const App = () => (
 
             {/* ── Public: App install page ── */}
             <Route path="/install" element={<InstallApp />} />
+
+            {/* ── OrbitX City (3D world demo) ── */}
+            <Route
+              path="/Orbitxcity"
+              element={
+                <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#04070f] font-mono text-xs uppercase tracking-[0.2em] text-[#17ff4d]">Loading OrbitX City…</div>}>
+                  <OrbitxCityPage />
+                </Suspense>
+              }
+            />
+            <Route path="/orbitxcity" element={<Navigate to="/Orbitxcity" replace />} />
 
             {/* ── Custom launchpad (Orbitx Launch Console) ── */}
             <Route path="/orbitxlaunch" element={<LaunchpadLayout />}>
