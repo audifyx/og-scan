@@ -1,12 +1,44 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Gem } from "lucide-react";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { fetchCityMarketSnapshot, fmtPct } from "@/lib/orbitxcity/marketData";
 import { CityPanelHost, PANEL_NAV } from "./CityPanels";
+import { Minimap } from "./Minimap";
+
+function TickerBar() {
+  const { data } = useQuery({
+    queryKey: ["orbitxcity-market"],
+    queryFn: fetchCityMarketSnapshot,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+  const rows = data?.trending ?? [];
+  if (rows.length === 0) return null;
+  const loop = [...rows, ...rows];
+
+  return (
+    <div className="oxc-tickerbar" aria-hidden>
+      <div className="oxc-ticker-track">
+        {loop.map((r, i) => {
+          const ch = Number(r.change24h);
+          return (
+            <span key={`${r.symbol ?? "?"}-${i}`} className="oxc-tick-item">
+              <b>${(r.symbol ?? "???").toUpperCase()}</b>
+              <em className={Number.isFinite(ch) && ch < 0 ? "down" : "up"}>{fmtPct(r.change24h)}</em>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function CityHUD() {
-  const { openPanel, closePanel, panel, prompt, interact, avatar, playerPos } = useCity();
+  const { openPanel, closePanel, panel, prompt, interact, avatar, playerPos, shards } = useCity();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -40,9 +72,16 @@ export function CityHUD() {
           </div>
         </div>
         <div className="oxc-top-actions">
+          <div className="oxc-shards" title="OBX shards collected">
+            <Gem className="h-3.5 w-3.5" />
+            <span>{shards}</span>
+          </div>
           <WalletConnectButton />
         </div>
       </header>
+
+      <TickerBar />
+      <Minimap />
 
       <nav className="oxc-dock" aria-label="City panels">
         {PANEL_NAV.map((item) => {
@@ -76,9 +115,9 @@ export function CityHUD() {
       )}
 
       <div className="oxc-help">
-        <span>WASD / Arrows</span>
-        <span>E Interact</span>
-        <span>Esc Close</span>
+        <span>WASD / Arrows · Shift sprint</span>
+        <span>Space jump · Wheel zoom</span>
+        <span>E Interact · Esc Close</span>
       </div>
 
       <CityPanelHost />

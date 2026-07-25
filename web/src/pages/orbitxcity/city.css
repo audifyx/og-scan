@@ -381,8 +381,9 @@ body.oxc-lock {
 
 .oxc-help {
   position: absolute;
-  left: 1rem;
+  right: 1rem;
   bottom: 1rem;
+  text-align: right;
   display: none;
   flex-direction: column;
   gap: 0.25rem;
@@ -395,6 +396,108 @@ body.oxc-lock {
 
 @media (min-width: 768px) {
   .oxc-help { display: flex; }
+}
+
+/* ── Live ticker bar ── */
+.oxc-tickerbar {
+  position: absolute;
+  top: 3.55rem;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  border-top: 1px solid rgba(23, 255, 77, 0.14);
+  border-bottom: 1px solid rgba(23, 255, 77, 0.14);
+  background: rgba(4, 8, 14, 0.62);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.oxc-ticker-track {
+  display: inline-flex;
+  gap: 1.6rem;
+  padding: 0.3rem 0;
+  white-space: nowrap;
+  animation: oxc-marquee 32s linear infinite;
+}
+
+@keyframes oxc-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.oxc-tick-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.oxc-tick-item b {
+  color: var(--oxc-text);
+  font-weight: 700;
+}
+
+.oxc-tick-item em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.oxc-tick-item em.up { color: var(--oxc-lime); }
+.oxc-tick-item em.down { color: #ff6b6b; }
+
+/* ── Minimap ── */
+.oxc-minimap {
+  position: absolute;
+  top: 6.4rem;
+  left: 1rem;
+  display: none;
+  flex-direction: column;
+  gap: 0.3rem;
+  border: 1px solid var(--oxc-line);
+  background: rgba(5, 10, 18, 0.7);
+  padding: 0.4rem;
+  backdrop-filter: blur(8px);
+}
+
+.oxc-minimap canvas {
+  display: block;
+}
+
+.oxc-minimap span {
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--oxc-muted);
+  text-align: center;
+}
+
+@media (min-width: 900px) {
+  .oxc-minimap { display: flex; }
+}
+
+/* ── Shard counter ── */
+.oxc-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.oxc-shards {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--oxc-gold) 45%, transparent);
+  background: color-mix(in srgb, var(--oxc-gold) 10%, transparent);
+  color: var(--oxc-gold);
+  padding: 0.45rem 0.7rem;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.oxc-inv-item.shard {
+  border-color: color-mix(in srgb, var(--oxc-gold) 45%, transparent);
 }
 
 /* ── Panels ── */

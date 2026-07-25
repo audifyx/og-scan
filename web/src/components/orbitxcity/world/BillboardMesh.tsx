@@ -1,13 +1,26 @@
-import { useMemo } from "react";
-import { Text } from "@react-three/drei";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { BillboardDefinition } from "@/lib/orbitxcity/types";
+import { hashSeed } from "@/lib/orbitxcity/collision";
+import { createAdTexture } from "@/lib/orbitxcity/textures";
 
-/** Procedural neon ad board — projects can later bind token/logo textures. */
+/** Neon ad board with a procedural screen texture + electrical flicker. */
 export function BillboardMesh({ board }: { board: BillboardDefinition }) {
   const { position, rotationY, width, height, title, subtitle, accent } = board;
 
   const frameColor = useMemo(() => new THREE.Color(accent).multiplyScalar(0.35).getStyle(), [accent]);
+  const screenTex = useMemo(
+    () => createAdTexture(title, subtitle, accent, hashSeed(board.id)),
+    [title, subtitle, accent, board.id],
+  );
+  const screenMat = useRef<THREE.MeshBasicMaterial>(null);
+
+  useFrame(() => {
+    if (!screenMat.current) return;
+    // Occasional CRT-style flicker
+    screenMat.current.opacity = Math.random() < 0.03 ? 0.68 : 1;
+  });
 
   return (
     <group position={[position.x, position.y, position.z]} rotation={[0, rotationY, 0]}>
@@ -23,40 +36,31 @@ export function BillboardMesh({ board }: { board: BillboardDefinition }) {
         <meshStandardMaterial color={frameColor} metalness={0.55} roughness={0.3} emissive={accent} emissiveIntensity={0.15} />
       </mesh>
 
-      {/* Screen */}
+      {/* Procedural ad screen */}
       <mesh position={[0, 0, 0.1]}>
         <planeGeometry args={[width, height]} />
-        <meshStandardMaterial color="#05070d" metalness={0.2} roughness={0.55} emissive={accent} emissiveIntensity={0.08} />
+        <meshBasicMaterial ref={screenMat} map={screenTex} transparent toneMapped={false} />
       </mesh>
 
-      {/* Glow rim */}
-      <mesh position={[0, 0, 0.09]}>
-        <planeGeometry args={[width + 0.05, height + 0.05]} />
-        <meshBasicMaterial color={accent} transparent opacity={0.12} />
-      </mesh>
-
-      <Text
-        position={[0, 0.35, 0.12]}
-        fontSize={Math.min(0.55, width / 8)}
-        color={accent}
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.02}
-        outlineColor="#000"
-        maxWidth={width * 0.9}
-      >
-        {title}
-      </Text>
-      <Text
-        position={[0, -0.45, 0.12]}
-        fontSize={Math.min(0.28, width / 16)}
-        color="#d7e7ff"
-        anchorX="center"
-        anchorY="middle"
-        maxWidth={width * 0.85}
-      >
-        {subtitle}
-      </Text>
+      {/* Neon rim tubes */}
+      {[
+        [0, height / 2 + 0.16, width + 0.3, 0.07] as const,
+        [0, -height / 2 - 0.16, width + 0.3, 0.07] as const,
+      ].map(([x, ty, w, h], i) => (
+        <mesh key={i} position={[x, ty, 0.06]}>
+          <boxGeometry args={[w, h, 0.07]} />
+          <meshBasicMaterial color={accent} toneMapped={false} />
+        </mesh>
+      ))}
+      {[
+        [-width / 2 - 0.16, 0, 0.07, height + 0.3] as const,
+        [width / 2 + 0.16, 0, 0.07, height + 0.3] as const,
+      ].map(([x, ty, w, h], i) => (
+        <mesh key={`v-${i}`} position={[x, ty, 0.06]}>
+          <boxGeometry args={[w, h, 0.07]} />
+          <meshBasicMaterial color={accent} toneMapped={false} />
+        </mesh>
+      ))}
     </group>
   );
 }

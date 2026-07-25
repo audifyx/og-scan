@@ -87,11 +87,16 @@ function MapPanel() {
 }
 
 function InventoryPanel() {
-  const { inventory } = useCity();
+  const { inventory, shards } = useCity();
   return (
     <div className="oxc-stack">
       <p className="oxc-muted">Inventory expands with holder keys, ad slots, and community badges.</p>
       <div className="oxc-inv-grid">
+        <div className="oxc-inv-item shard">
+          <div className="oxc-inv-kind">currency</div>
+          <div className="oxc-tile-title">OBX Shards ◈ {shards}</div>
+          <div className="oxc-muted">Collected on the streets — walk over glowing coins.</div>
+        </div>
         {inventory.map((item) => (
           <div key={item.id} className="oxc-inv-item">
             <div className="oxc-inv-kind">{item.kind}</div>

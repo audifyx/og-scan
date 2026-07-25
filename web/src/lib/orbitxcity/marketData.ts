@@ -41,15 +41,18 @@ export function normalizeScreenerRows(payload: unknown): ScreenerRow[] {
 
   return raw.map((item) => {
     const r = item as Record<string, unknown>;
+    const priceChange = r.priceChange as { h24?: number } | undefined;
+    const volume = r.volume as { h24?: number } | undefined;
+    const liquidity = r.liquidity as number | { usd?: number } | undefined;
     return {
       mint: (r.mint ?? r.address ?? r.tokenAddress ?? r.baseMint) as string | undefined,
       address: (r.address ?? r.mint) as string | undefined,
       symbol: (r.symbol ?? r.ticker ?? r.baseSymbol) as string | undefined,
       name: (r.name ?? r.tokenName) as string | undefined,
       priceUsd: num(r.priceUsd ?? r.price ?? r.price_usd),
-      change24h: num(r.change24h ?? r.priceChange24h ?? r.priceChange?.h24 ?? (r.priceChange as { h24?: number })?.h24),
-      volume24h: num(r.volume24h ?? r.volume?.h24 ?? (r.volume as { h24?: number })?.h24),
-      liquidity: num(r.liquidity ?? r.liquidityUsd ?? (r.liquidity as { usd?: number })?.usd),
+      change24h: num(r.change24h ?? r.priceChange24h ?? priceChange?.h24),
+      volume24h: num(r.volume24h ?? volume?.h24),
+      liquidity: num(typeof liquidity === "object" && liquidity !== null ? liquidity.usd : liquidity ?? r.liquidityUsd),
       imageUrl: (r.imageUrl ?? r.logo ?? r.icon ?? r.image) as string | undefined,
       logo: (r.logo ?? r.imageUrl) as string | undefined,
     };

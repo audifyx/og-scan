@@ -30,12 +30,15 @@ interface CityContextValue {
   avatar: AvatarAppearance;
   setAvatar: (a: AvatarAppearance) => void;
   inventory: InventoryItem[];
+  shards: number;
+  collectShard: () => void;
   selectedMint: string | null;
   setSelectedMint: (mint: string | null) => void;
   prompt: { label: string; hint: string } | null;
 }
 
-const CityContext = createContext<CityContextValue | null>(null);
+/** Exported so the R3F canvas can bridge this context across renderers. */
+export const CityContext = createContext<CityContextValue | null>(null);
 
 const DEFAULT_AVATAR: AvatarAppearance = {
   bodyColor: "#1a2438",
@@ -76,10 +79,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [playerPos, setPlayerPos] = useState<Vec3>(NYC_DEMO_BLOCK.spawn);
   const [avatar, setAvatar] = useState<AvatarAppearance>(DEFAULT_AVATAR);
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
+  const [shards, setShards] = useState(0);
   const inventory = STARTER_INVENTORY;
 
   const openPanel = useCallback((p: HudPanel) => setPanel(p), []);
   const closePanel = useCallback(() => setPanel("none"), []);
+  const collectShard = useCallback(() => setShards((s) => s + 1), []);
 
   const interact = useCallback(() => {
     if (!activeZone) return;
@@ -106,6 +111,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       avatar,
       setAvatar,
       inventory,
+      shards,
+      collectShard,
       selectedMint,
       setSelectedMint,
       prompt,
@@ -120,6 +127,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       playerPos,
       avatar,
       inventory,
+      shards,
+      collectShard,
       selectedMint,
       prompt,
     ],
