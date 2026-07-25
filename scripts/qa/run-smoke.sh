@@ -5,7 +5,10 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 echo "==> Conflict marker scan"
-if git grep -n '<<<<<<<' -- ':!*.md' ':!docs/agents/**' 2>/dev/null | head -20; then
+# Only scan source/config — not docs/scripts that mention the marker string.
+HITS="$(git grep -n '^<<<<<<< ' -- 'web/**' 'supabase/**' 'api/**' ':!**/node_modules/**' 2>/dev/null || true)"
+if [[ -n "$HITS" ]]; then
+  echo "$HITS" | head -20
   echo "FAIL: unresolved conflict markers present"
   exit 1
 fi
