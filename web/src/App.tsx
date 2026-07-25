@@ -230,21 +230,22 @@ const App = () => (
             />
             <Route path="/orbitxcity" element={<Navigate to="/Orbitxcity" replace />} />
 
-<<<<<<< HEAD
             {/* ── OrbitX OS (frontend experience shell) ── */}
             <Route
               path="/os/*"
               element={
                 <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#05080c] font-mono text-xs uppercase tracking-[0.2em] text-[#17ff4d]">Loading OrbitX OS…</div>}>
                   <OsApp />
-=======
+                </Suspense>
+              }
+            />
+
             {/* ── OrbitX Gaming Studio ── */}
             <Route
               path="/play/*"
               element={
                 <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#06090f] font-mono text-xs uppercase tracking-[0.2em] text-[#17ff4d]">Loading Play Studio…</div>}>
                   <PlayApp />
->>>>>>> origin/cursor/orbitx-gaming-studio-6aed
                 </Suspense>
               }
             />
