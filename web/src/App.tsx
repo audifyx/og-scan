@@ -66,6 +66,19 @@ const WhaleIntel = lazyWithRetry(() => import("./crypto/pages/WhaleIntel"));
 const SentimentIntel = lazyWithRetry(() => import("./crypto/pages/SentimentIntel"));
 const LaunchStudio = lazyWithRetry(() => import("./crypto/pages/LaunchStudio"));
 const WalletTracker = lazyWithRetry(() => import("./crypto/pages/WalletTracker"));
+const SocialLayout = lazyWithRetry(() => import("./social/pages/SocialLayout"));
+const SocialHomeHq = lazyWithRetry(() => import("./social/pages/SocialHome"));
+const NetworkFeed = lazyWithRetry(() => import("./social/pages/NetworkFeed"));
+const CommunitiesHub = lazyWithRetry(() => import("./social/pages/CommunitiesHub"));
+const TradingCommunities = lazyWithRetry(() => import("./social/pages/TradingCommunities"));
+const VoiceSpaces = lazyWithRetry(() => import("./social/pages/VoiceSpaces"));
+const GrowthCenter = lazyWithRetry(() => import("./social/pages/GrowthCenter"));
+const LeaderboardsPage = lazyWithRetry(() => import("./social/pages/LeaderboardsPage"));
+const CreatorProgram = lazyWithRetry(() => import("./social/pages/CreatorProgram"));
+const NotificationsPage = lazyWithRetry(() => import("./social/pages/NotificationsPage"));
+const ProfileView = lazyWithRetry(() => import("./social/pages/ProfileView"));
+const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
+const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
 import LaunchpadToken from "./pages/orbitx/LaunchpadToken";
 import LaunchpadAbout from "./pages/orbitx/LaunchpadAbout";
@@ -307,6 +320,23 @@ const App = () => (
               <Route path="wallet/:address" element={<Suspense fallback={null}><WalletTracker /></Suspense>} />
             </Route>
 
+            {/* ── OrbitX Social HQ (Social + Growth Team) ── */}
+            <Route path="/hq" element={<Suspense fallback={null}><SocialLayout /></Suspense>}>
+              <Route index element={<Suspense fallback={null}><SocialHomeHq /></Suspense>} />
+              <Route path="feed" element={<Suspense fallback={null}><NetworkFeed /></Suspense>} />
+              <Route path="communities" element={<Suspense fallback={null}><CommunitiesHub /></Suspense>} />
+              <Route path="trading" element={<Suspense fallback={null}><TradingCommunities /></Suspense>} />
+              <Route path="voice" element={<Suspense fallback={null}><VoiceSpaces /></Suspense>} />
+              <Route path="growth" element={<Suspense fallback={null}><GrowthCenter /></Suspense>} />
+              <Route path="leaderboards" element={<Suspense fallback={null}><LeaderboardsPage /></Suspense>} />
+              <Route path="creators" element={<Suspense fallback={null}><CreatorProgram /></Suspense>} />
+              <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
+              <Route path="profile" element={<Suspense fallback={null}><ProfileView /></Suspense>} />
+              <Route path="profile/:userId" element={<Suspense fallback={null}><ProfileView /></Suspense>} />
+              <Route path="admin" element={<Suspense fallback={null}><ModerationAdmin /></Suspense>} />
+              <Route path="invite" element={<Suspense fallback={null}><InviteLanding /></Suspense>} />
+            </Route>
+
             {/* ── Protected: App shell ── */}
             <Route path="/app" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
             <Route path="/koltelebot" element={<ProtectedRoute><KOLTracker /></ProtectedRoute>} />
@@ -346,12 +376,12 @@ const App = () => (
             <Route path="/memes" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/art-feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/spaces" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/social" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/orbitx-social" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/social" element={<Navigate to="/hq" replace />} />
+            <Route path="/orbitx-social" element={<Navigate to="/hq" replace />} />
             <Route path="/listings" element={<OgdexRedirect to="/ORBITX_DEX/store" />} />
             <Route path="/listings/:mintAddress" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mintAddress}`} />} />
             <Route path="/token-manager" element={<OgdexRedirect to="/ORBITX_DEX/metadata" />} />
-            <Route path="/social-hub" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/social-hub" element={<Navigate to="/hq" replace />} />
             <Route path="/community-classic" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
             <Route path="/community-hub" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
             <Route path="/voice-rooms" element={<ProtectedRoute><Index /></ProtectedRoute>} />
