@@ -22,11 +22,11 @@ const LINKS = {
 };
 
 const PRODUCT_SHOTS = [
-  { src: "/ogscan-shot-screener.jpg", label: "OrbitX DEX", depth: 0 },
-  { src: "/ogscan-shot-scanner.jpg", label: "Scanner", depth: 1 },
-  { src: "/ogscan-shot-deck.jpg", label: "Command deck", depth: 2 },
-  { src: "/ogscan-shot-track.jpg", label: "Track record", depth: 3 },
-  { src: "/ogscan-shot-mobile.jpg", label: "Mobile", depth: 4 },
+  { src: "/ogscan-shot-screener.jpg", label: "OrbitX DEX" },
+  { src: "/ogscan-shot-scanner.jpg", label: "Scanner" },
+  { src: "/ogscan-shot-deck.jpg", label: "Command deck" },
+  { src: "/ogscan-shot-track.jpg", label: "Track record" },
+  { src: "/ogscan-shot-mobile.jpg", label: "Mobile" },
 ] as const;
 
 const GALLERY = [
@@ -211,10 +211,11 @@ export default function Splash() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const heroRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const touchX = useRef<number | null>(null);
   const [heroReady, setHeroReady] = useState(false);
   const [activeShot, setActiveShot] = useState(0);
+  const [deckPaused, setDeckPaused] = useState(false);
   const [stats, setStats] = useState<LiveStats>(STATS_FALLBACK);
   const [statsLive, setStatsLive] = useState(false);
 
@@ -235,9 +236,23 @@ export default function Splash() {
       setStats(s);
       setStatsLive(s.users > 0 || s.kols > 0);
     });
-    const cycle = setInterval(() => setActiveShot((i) => (i + 1) % PRODUCT_SHOTS.length), 3800);
-    return () => { clearTimeout(ready); clearInterval(cycle); };
+    // Decode all deck art up front so card flips never pop in blurry.
+    PRODUCT_SHOTS.forEach((s) => { const im = new Image(); im.decoding = "async"; im.src = s.src; });
+    return () => clearTimeout(ready);
   }, []);
+
+  const goShot = useCallback((dir: number) => {
+    setActiveShot((i) => (i + dir + PRODUCT_SHOTS.length) % PRODUCT_SHOTS.length);
+  }, []);
+
+  // Auto-advance; restarts on manual navigation, pauses on hover / hidden tab.
+  useEffect(() => {
+    if (deckPaused) return;
+    const cycle = setInterval(() => {
+      if (!document.hidden) setActiveShot((i) => (i + 1) % PRODUCT_SHOTS.length);
+    }, 4500);
+    return () => clearInterval(cycle);
+  }, [deckPaused, activeShot]);
 
   useEffect(() => {
     const io = new IntersectionObserver((es) => es.forEach((e) => {
@@ -253,34 +268,31 @@ export default function Splash() {
   }, []);
 
   useEffect(() => {
-    const onScroll = () => {
-      const y = window.scrollY;
+    // Batch scroll + pointer parallax into one rAF write per frame.
+    let raf = 0;
+    let mx = 0, my = 0, sy = 0;
+    const apply = () => {
+      raf = 0;
       if (heroRef.current) {
-        heroRef.current.style.setProperty("--py", `${y * 0.18}px`);
-        heroRef.current.style.setProperty("--pf", `${Math.max(0, 1 - y / 560)}`);
+        heroRef.current.style.setProperty("--mx", `${(mx * 18).toFixed(1)}px`);
+        heroRef.current.style.setProperty("--my", `${(my * 12).toFixed(1)}px`);
+        heroRef.current.style.setProperty("--py", `${(sy * 0.18).toFixed(1)}px`);
+        heroRef.current.style.setProperty("--pf", `${Math.max(0, 1 - sy / 560).toFixed(3)}`);
       }
-      document.querySelector(".sp-nav")?.classList.toggle("scrolled", y > 12);
+      document.querySelector(".sp-nav")?.classList.toggle("scrolled", sy > 12);
     };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(apply); };
+    const onScroll = () => { sy = window.scrollY; schedule(); };
     const onMove = (e: MouseEvent) => {
-      const x = (e.clientX / window.innerWidth - 0.5) * 2;
-      const y = (e.clientY / window.innerHeight - 0.5) * 2;
-      if (heroRef.current) {
-        heroRef.current.style.setProperty("--mx", `${x * 18}px`);
-        heroRef.current.style.setProperty("--my", `${y * 12}px`);
-        heroRef.current.style.setProperty("--rx", `${(-y * 7).toFixed(2)}deg`);
-        heroRef.current.style.setProperty("--ry", `${(x * 10).toFixed(2)}deg`);
-      }
-      if (stageRef.current) {
-        stageRef.current.style.setProperty("--tx", `${(x * 28).toFixed(1)}px`);
-        stageRef.current.style.setProperty("--ty", `${(y * 18).toFixed(1)}px`);
-        stageRef.current.style.setProperty("--srx", `${(-y * 9).toFixed(2)}deg`);
-        stageRef.current.style.setProperty("--sry", `${(x * 14).toFixed(2)}deg`);
-      }
+      mx = (e.clientX / window.innerWidth - 0.5) * 2;
+      my = (e.clientY / window.innerHeight - 0.5) * 2;
+      schedule();
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("mousemove", onMove, { passive: true });
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("mousemove", onMove);
     };
@@ -350,32 +362,51 @@ export default function Splash() {
             </div>
           </div>
 
-          {/* 3D product stage — real site art */}
-          <div className="sp-stage-wrap" aria-hidden>
-            <div className="sp-stage" ref={stageRef}>
-              <div className="sp-stage-floor" />
+          {/* Card-deck slideshow — real site art */}
+          <div className="sp-deck-wrap">
+            <div
+              className="sp-deck"
+              onMouseEnter={() => setDeckPaused(true)}
+              onMouseLeave={() => setDeckPaused(false)}
+              onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+              onTouchEnd={(e) => {
+                if (touchX.current == null) return;
+                const dx = e.changedTouches[0].clientX - touchX.current;
+                touchX.current = null;
+                if (Math.abs(dx) > 40) goShot(dx < 0 ? 1 : -1);
+              }}
+            >
               {PRODUCT_SHOTS.map((shot, i) => {
-                const offset = i - activeShot;
-                const abs = Math.abs(offset);
+                const n = PRODUCT_SHOTS.length;
+                // Wrap the offset so the deck cycles smoothly (…-2,-1,0,1,2…).
+                let off = i - activeShot;
+                if (off > n / 2) off -= n;
+                if (off < -n / 2) off += n;
+                const abs = Math.abs(off);
                 return (
                   <figure
                     key={shot.src}
-                    className={`sp-panel ${i === activeShot ? "is-active" : ""}`}
+                    className={`sp-cardp ${off === 0 ? "is-active" : ""}`}
                     style={{
-                      ["--i" as string]: String(i),
-                      ["--off" as string]: String(offset),
+                      ["--off" as string]: String(off),
                       ["--abs" as string]: String(abs),
-                      zIndex: 20 - abs,
+                      zIndex: 10 - abs,
                     }}
-                    onClick={() => setActiveShot(i)}
+                    onClick={() => { if (off !== 0) goShot(off > 0 ? 1 : -1); }}
                   >
-                    <img src={shot.src} alt="" loading={i === 0 ? "eager" : "lazy"} decoding="async" />
+                    <img src={shot.src} alt={shot.label} loading="eager" decoding="async" draggable={false} />
                     <figcaption>{shot.label}</figcaption>
                   </figure>
                 );
               })}
+              <button type="button" className="sp-deck-arrow sp-deck-prev" aria-label="Previous screenshot" onClick={() => goShot(-1)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="m14.5 6-6 6 6 6" /></svg>
+              </button>
+              <button type="button" className="sp-deck-arrow sp-deck-next" aria-label="Next screenshot" onClick={() => goShot(1)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="m9.5 6 6 6-6 6" /></svg>
+              </button>
             </div>
-            <div className="sp-stage-dots">
+            <div className="sp-deck-dots">
               {PRODUCT_SHOTS.map((s, i) => (
                 <button
                   key={s.src}
@@ -731,7 +762,7 @@ const css = `
   .sp-hero-shell { grid-template-columns: 1fr; text-align: center; padding-top: 12px; }
 }
 .sp-hero-ready .sp-hero-copy { animation: riseIn .95s cubic-bezier(0.16,1,0.3,1) both; }
-.sp-hero-ready .sp-stage-wrap { animation: riseIn 1.1s cubic-bezier(0.16,1,0.3,1) .12s both; }
+.sp-hero-ready .sp-deck-wrap { animation: riseIn 1.1s cubic-bezier(0.16,1,0.3,1) .12s both; }
 @keyframes riseIn {
   from { opacity: 0; transform: translateY(32px); filter: blur(8px); }
   to { opacity: 1; transform: none; filter: none; }
@@ -778,86 +809,91 @@ const css = `
 .sp-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
 @media(max-width:980px) { .sp-hero-actions { justify-content: center; } }
 
-/* ── 3D stage ── */
-.sp-stage-wrap {
+/* ── Card deck slideshow ── */
+.sp-deck-wrap {
   position: relative;
-  min-height: clamp(320px, 48vw, 480px);
-  perspective: 1400px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 18px 0 0;
 }
-.sp-stage {
+.sp-deck {
   position: relative;
   width: min(560px, 92vw);
-  height: clamp(280px, 40vw, 400px);
-  transform-style: preserve-3d;
-  transform:
-    rotateX(calc(12deg + var(--srx, 0deg)))
-    rotateY(calc(-18deg + var(--sry, 0deg)))
-    translate3d(var(--tx, 0px), var(--ty, 0px), 0);
-  transition: transform .12s linear;
+  aspect-ratio: 16 / 10;
 }
-.sp-stage-floor {
-  position: absolute; left: 5%; right: 5%; bottom: -8%;
-  height: 40%;
-  background: radial-gradient(ellipse at 50% 0%, rgba(56,189,248,0.28), transparent 70%);
-  filter: blur(28px);
-  transform: rotateX(75deg) translateZ(-40px);
+/* soft glow under the deck — pre-blurred gradient, no filter cost */
+.sp-deck::before {
+  content: ""; position: absolute; left: 8%; right: 8%; bottom: -12%; height: 32%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(56,189,248,0.22), transparent 70%);
   pointer-events: none;
 }
-.sp-panel {
-  position: absolute; inset: 0;
-  margin: 0;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.14);
+.sp-cardp {
+  position: absolute; inset: 0; margin: 0;
+  border-radius: 18px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12);
   background: #0a1220;
-  box-shadow:
-    0 40px 80px -30px rgba(0,0,0,0.85),
-    0 0 0 1px rgba(255,255,255,0.04) inset,
-    0 0 60px -20px rgba(56,189,248,0.35);
   cursor: pointer;
+  box-shadow: 0 30px 60px -28px rgba(0,0,0,0.85);
   transform:
-    translate3d(
-      calc(var(--off) * 42px),
-      calc(var(--abs) * 10px),
-      calc(var(--off) * -70px - var(--abs) * 30px)
-    )
-    rotateY(calc(var(--off) * -14deg))
-    scale(calc(1 - var(--abs) * 0.07));
-  opacity: calc(1 - var(--abs) * 0.28);
-  transition: transform .7s cubic-bezier(0.16,1,0.3,1), opacity .7s, box-shadow .4s;
-  will-change: transform, opacity;
+    translate3d(calc(var(--off) * 7.5%), calc(var(--abs) * -14px), 0)
+    rotate(calc(var(--off) * 2deg))
+    scale(calc(1 - var(--abs) * 0.06));
+  opacity: calc(1 - var(--abs) * 0.18);
+  filter: brightness(calc(1 - var(--abs) * 0.32));
+  transition:
+    transform .65s cubic-bezier(0.22,1,0.36,1),
+    opacity .65s ease,
+    filter .65s ease,
+    box-shadow .4s ease;
+  will-change: transform;
 }
-.sp-panel.is-active {
+.sp-cardp.is-active {
+  cursor: default;
+  border-color: rgba(103,232,249,0.35);
   box-shadow:
-    0 50px 100px -28px rgba(0,0,0,0.9),
-    0 0 80px -10px rgba(34,211,238,0.45),
-    0 0 0 1px rgba(255,255,255,0.08) inset;
+    0 40px 80px -30px rgba(0,0,0,0.9),
+    0 0 44px -8px rgba(34,211,238,0.3);
 }
-.sp-panel img {
+.sp-cardp img {
   width: 100%; height: 100%;
   object-fit: cover; object-position: top center;
   display: block;
-  filter: saturate(1.08) contrast(1.04);
+  user-select: none; -webkit-user-drag: none;
 }
-.sp-panel figcaption {
+.sp-cardp figcaption {
   position: absolute; left: 12px; bottom: 12px;
   font-family: var(--font-mono);
   font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
   color: #fff;
   padding: 6px 10px; border-radius: 8px;
-  background: rgba(2,5,12,0.65);
+  background: rgba(2,5,12,0.78);
   border: 1px solid rgba(255,255,255,0.1);
-  backdrop-filter: blur(8px);
+  opacity: 0; transform: translateY(4px);
+  transition: opacity .4s ease .15s, transform .4s ease .15s;
 }
-.sp-stage-dots {
-  display: flex; gap: 8px; margin-top: 22px; position: relative; z-index: 5;
+.sp-cardp.is-active figcaption { opacity: 1; transform: none; }
+.sp-deck-arrow {
+  position: absolute; top: 50%; z-index: 20;
+  width: 36px; height: 36px; margin-top: -18px;
+  display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid var(--line-bright);
+  background: rgba(2,5,12,0.7); color: rgba(255,255,255,0.85);
+  cursor: pointer; opacity: 0;
+  transition: opacity .25s, background .2s, border-color .2s;
 }
-.sp-stage-dots button {
+.sp-deck-arrow svg { width: 17px; height: 17px; }
+.sp-deck-prev { left: -14px; }
+.sp-deck-next { right: -14px; }
+.sp-deck:hover .sp-deck-arrow { opacity: 1; }
+.sp-deck-arrow:hover { background: rgba(34,211,238,0.16); border-color: rgba(34,211,238,0.5); }
+@media(hover: none) { .sp-deck-arrow { opacity: 1; } }
+.sp-deck-dots {
+  display: flex; gap: 8px; margin-top: 26px; position: relative; z-index: 5;
+}
+.sp-deck-dots button {
   width: 8px; height: 8px; border-radius: 50%; border: none; padding: 0;
   background: rgba(255,255,255,0.22); cursor: pointer; transition: all .25s;
 }
-.sp-stage-dots button.on {
+.sp-deck-dots button.on {
   width: 22px; border-radius: 999px; background: var(--accent2);
 }
 
@@ -1123,6 +1159,7 @@ const css = `
 .sp ::selection { background: rgba(34,211,238,0.28); color: #fff; }
 @media (prefers-reduced-motion: no-preference) { .sp { scroll-behavior: smooth; } }
 @media (prefers-reduced-motion: reduce) {
-  .sp-cosmos, .sp-beam, .sp-live-dot, .sp-marquee-track, .sp-stage { animation: none !important; transition: none !important; }
+  .sp-cosmos, .sp-beam, .sp-live-dot, .sp-marquee-track { animation: none !important; }
+  .sp-cardp { transition: opacity .3s ease !important; }
 }
 `;
