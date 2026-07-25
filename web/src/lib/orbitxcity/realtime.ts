@@ -20,6 +20,94 @@ export interface CityIdentity {
   skinColor: string;
 }
 
+export interface LobbyDescriptor {
+  /** Realtime channel id (already includes the password hash for private lobbies). */
+  id: string;
+  /** Human-readable name shown in the directory and HUD. */
+  label: string;
+  isPrivate: boolean;
+}
+
+export const MAIN_LOBBY: LobbyDescriptor = {
+  id: "oxc-world-nyc",
+  label: "Main Lobby · NYC",
+  isPrivate: false,
+};
+
+function slugify(name: string): string {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "lobby";
+}
+
+function tinyHash(s: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+/**
+ * Build a lobby descriptor. Private lobbies mix the password into the channel
+ * id, so only players who know name+password land in the same room — no
+ * server-side gate needed for a social lobby.
+ */
+export function makeLobby(name: string, password?: string): LobbyDescriptor {
+  const slug = slugify(name);
+  const isPrivate = Boolean(password && password.trim());
+  const id = isPrivate
+    ? `oxc-lobby-${slug}-${tinyHash(`${slug}:${password!.trim()}`)}`
+    : `oxc-lobby-${slug}-open`;
+  return { id, label: name.trim().slice(0, 32) || "Custom Lobby", isPrivate };
+}
+
+export interface DirectoryLobby {
+  id: string;
+  label: string;
+  isPrivate: boolean;
+  count: number;
+}
+
+/**
+ * Live lobby directory: every connected player also tracks presence on a
+ * shared directory channel carrying their lobby's metadata. Aggregating that
+ * presence state yields the public lobby list with player counts.
+ */
+export function watchLobbyDirectory(cb: (lobbies: DirectoryLobby[]) => void): () => void {
+  if (!REALTIME_ENABLED) {
+    cb([{ ...MAIN_LOBBY, count: 0 }]);
+    return () => {};
+  }
+  const ch = supabase.channel("oxc-lobby-directory", {
+    config: { presence: { key: `watch-${Math.random().toString(36).slice(2, 10)}` } },
+  });
+  ch.on("presence", { event: "sync" }, () => {
+    const state = ch.presenceState<{ lobbyId?: string; label?: string; isPrivate?: boolean }>();
+    const byId = new Map<string, DirectoryLobby>();
+    byId.set(MAIN_LOBBY.id, { ...MAIN_LOBBY, count: 0 });
+    for (const metas of Object.values(state)) {
+      const meta = metas[0] as { lobbyId?: string; label?: string; isPrivate?: boolean } | undefined;
+      if (!meta?.lobbyId) continue;
+      const existing = byId.get(meta.lobbyId);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        byId.set(meta.lobbyId, {
+          id: meta.lobbyId,
+          label: meta.label ?? "Custom Lobby",
+          isPrivate: Boolean(meta.isPrivate),
+          count: 1,
+        });
+      }
+    }
+    cb(Array.from(byId.values()).sort((a, b) => b.count - a.count));
+  });
+  ch.subscribe();
+  return () => {
+    supabase.removeChannel(ch);
+  };
+}
+
 export interface RemotePlayerState {
   id: string;
   name: string;

@@ -65,6 +65,10 @@ const DEFAULT_AVATAR: AvatarAppearance = {
   accentColor: "#17ff4d",
   skinColor: "#e8d5c0",
   name: "Traveler",
+  hairStyle: "short",
+  hairColor: "#1a1a1a",
+  outfit: "street",
+  faceStyle: "cool",
 };
 
 const STARTER_INVENTORY: InventoryItem[] = [

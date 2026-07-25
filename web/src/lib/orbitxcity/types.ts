@@ -127,7 +127,15 @@ export type HudPanel =
   | "voice"
   | "social"
   | "games"
-  | "nft";
+  | "nft"
+  | "settings"
+  | "help"
+  | "lobbies"
+  | "character";
+
+export type HairStyle = "short" | "long" | "buzz" | "bun" | "mohawk";
+export type OutfitStyle = "street" | "suit" | "sport" | "neon";
+export type FaceStyle = "neutral" | "cool" | "smile";
 
 export interface StreetSegment {
   /** "h" runs along X at z=at; "v" runs along Z at x=at. */
@@ -145,6 +153,11 @@ export interface AvatarAppearance {
   accentColor: string;
   skinColor: string;
   name: string;
+  /** Sims-style customization — Avatar team renders these on CharacterMesh. */
+  hairStyle: HairStyle;
+  hairColor: string;
+  outfit: OutfitStyle;
+  faceStyle: FaceStyle;
 }
 
 export interface InventoryItem {
