@@ -986,6 +986,71 @@ button.oxc-token-row {
   font: inherit;
 }
 
+/* ── Meme Market store ── */
+.oxc-store-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.oxc-store-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--oxc-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--oxc-muted);
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.oxc-store-tab.active {
+  color: var(--oxc-lime);
+  border-color: color-mix(in srgb, var(--oxc-lime) 50%, transparent);
+  background: color-mix(in srgb, var(--oxc-lime) 10%, transparent);
+}
+
+.oxc-store-search {
+  border: 1px solid var(--oxc-line);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--oxc-text);
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+  font-size: 13px;
+  width: 100%;
+}
+
+.oxc-store-id {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.oxc-store-id img,
+.oxc-store-fallback {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--oxc-line);
+  flex-shrink: 0;
+}
+
+.oxc-store-fallback {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--oxc-lime) 14%, transparent);
+  color: var(--oxc-lime);
+  font-weight: 800;
+}
+
 .oxc-teleport-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

@@ -86,7 +86,8 @@ export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget, emo
   }, [teleportTarget, onMove]);
 
   useFrame(({ clock }, rawDt) => {
-    const t = Math.min(rawDt, 0.05);
+    // Allow up to 120ms steps so low-FPS devices keep full movement speed
+    const t = Math.min(rawDt, 0.12);
     let inputX = 0;
     let inputZ = 0;
     if (keys.has("KeyW") || keys.has("ArrowUp")) inputZ -= 1;

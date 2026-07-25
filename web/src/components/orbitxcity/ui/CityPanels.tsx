@@ -16,13 +16,14 @@ import { TokenBuyPanel } from "./TokenBuyPanel";
 import { ChatPanel } from "./ChatPanel";
 import { SocialFeedPanel } from "./SocialFeedPanel";
 import { VoicePanel } from "./VoicePanel";
+import { MemeStorePanel } from "./MemeStorePanel";
 import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic, Gamepad2, Image as ImageIcon, Dices } from "lucide-react";
 
 const TITLES: Record<Exclude<HudPanel, "none">, string> = {
   map: "World Map",
   inventory: "Inventory",
   profile: "Profile",
-  marketplace: "Meme Market",
+  marketplace: "Meme Market · Store",
   live: "Live OrbitX Data",
   community: "Social District",
   events: "Event Calendar",
@@ -55,7 +56,7 @@ export function CityPanelHost() {
         {panel === "map" && <MapPanel />}
         {panel === "inventory" && <InventoryPanel />}
         {panel === "profile" && <ProfilePanel />}
-        {panel === "marketplace" && <MarketplacePanel />}
+        {panel === "marketplace" && <MemeStorePanel />}
         {panel === "live" && <LiveDataPanel />}
         {panel === "community" && <CommunityPanel />}
         {panel === "events" && <EventsPanel />}
@@ -223,58 +224,6 @@ function useMarket() {
   });
 }
 
-function MarketplacePanel() {
-  const { openToken } = useCity();
-  const { data, isLoading, isError } = useMarket();
-  const launches = data?.launches ?? [];
-  const featured = data?.featured ?? [];
-
-  return (
-    <div className="oxc-stack">
-      <p className="oxc-muted">
-        Virtual storefronts backed by OrbitX launch registry — real mints, not in-game IOUs. Tap a row to buy in-world.
-      </p>
-      {isLoading && <div className="oxc-muted">Syncing OrbitX market…</div>}
-      {isError && <div className="oxc-warn">Live registry unavailable — retry shortly.</div>}
-
-      {featured.length > 0 && (
-        <>
-          <div className="oxc-section-label"><Store className="h-3.5 w-3.5" /> Featured</div>
-          <div className="oxc-token-list">
-            {featured.slice(0, 6).map((t) => (
-              <TokenRow
-                key={t.id}
-                name={t.name}
-                symbol={t.ticker}
-                mint={t.mint_address}
-                onOpen={() => openToken(t.mint_address)}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      <div className="oxc-section-label"><Rocket className="h-3.5 w-3.5" /> Recent launches</div>
-      <div className="oxc-token-list">
-        {launches.slice(0, 10).map((t) => (
-          <TokenRow
-            key={t.id}
-            name={t.name}
-            symbol={t.ticker}
-            mint={t.mint_address}
-            meta={t.launch_type}
-            onOpen={() => openToken(t.mint_address)}
-          />
-        ))}
-        {!isLoading && launches.length === 0 && <div className="oxc-muted">No launches indexed yet.</div>}
-      </div>
-      <Link className="oxc-btn primary" to="/orbitxlaunch">
-        Open Launchpad <ExternalLink className="h-3.5 w-3.5" />
-      </Link>
-    </div>
-  );
-}
-
 function LiveDataPanel() {
   const { openToken } = useCity();
   const { data, isLoading } = useMarket();
@@ -344,7 +293,7 @@ function LaunchPanel() {
           <p className="oxc-muted">Create and launch tokens live. Projects can host launch events inside the arena.</p>
         </div>
       </div>
-      <MarketplacePanel />
+      <MemeStorePanel />
       <Link className="oxc-btn primary" to="/orbitxlaunch/create">
         Launch a token <ExternalLink className="h-3.5 w-3.5" />
       </Link>
@@ -398,30 +347,6 @@ function EventsPanel() {
         </div>
       ))}
     </div>
-  );
-}
-
-function TokenRow({
-  name,
-  symbol,
-  mint,
-  meta,
-  onOpen,
-}: {
-  name: string;
-  symbol: string;
-  mint: string;
-  meta?: string;
-  onOpen: () => void;
-}) {
-  return (
-    <button type="button" className="oxc-token-row link" onClick={onOpen}>
-      <div>
-        <div className="oxc-tile-title">{name} <span className="oxc-sym">${symbol}</span></div>
-        <div className="oxc-muted">{shortMint(mint)}{meta ? ` · ${meta}` : ""}</div>
-      </div>
-      <ExternalLink className="h-3.5 w-3.5 opacity-50" />
-    </button>
   );
 }
 
