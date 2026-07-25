@@ -1,12 +1,14 @@
 import { useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
+import { citySound } from "@/lib/orbitxcity/sound";
 
 export function EnterScreen() {
-  const { setEntered, avatar, setAvatar } = useCity();
+  const { setEntered, avatar, setAvatar, soundEnabled, toggleSound } = useCity();
   const { user, profile } = useAuth();
   const { connected, publicKey } = useWallet();
   const [name, setName] = useState(profile?.username ?? avatar.name);
@@ -20,6 +22,8 @@ export function EnterScreen() {
       name: name.trim() || profile?.username || "Traveler",
       accentColor: accent,
     });
+    citySound.play("enter");
+    citySound.startAmbient();
     setEntered(true);
   };
 
@@ -27,6 +31,15 @@ export function EnterScreen() {
     <div className="oxc-enter">
       <div className="oxc-enter-bg" aria-hidden />
       <div className="oxc-enter-card">
+        <button
+          type="button"
+          className="oxc-sound-toggle"
+          onClick={toggleSound}
+          aria-label={soundEnabled ? "Mute sound" : "Enable sound"}
+          title={soundEnabled ? "Sound on" : "Sound off"}
+        >
+          {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+        </button>
         <div className="oxc-kicker">OrbitX World · Milestone 1</div>
         <h1 className="oxc-brand">
           OrbitX<span>City</span>
@@ -71,9 +84,17 @@ export function EnterScreen() {
           </button>
         </div>
 
+        <div className="oxc-controls">
+          <span><b>WASD</b> move</span>
+          <span><b>Shift</b> sprint</span>
+          <span><b>Drag</b> look</span>
+          <span><b>E</b> interact</span>
+          <span><b>Esc</b> close</span>
+        </div>
+
         <div className="oxc-enter-meta">
           <span>{connected && publicKey ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}` : "Wallet offline"}</span>
-          <span>WASD move · E interact · Esc close panels</span>
+          <span>Collect all 10 $OBX shards hidden in the block</span>
         </div>
       </div>
     </div>

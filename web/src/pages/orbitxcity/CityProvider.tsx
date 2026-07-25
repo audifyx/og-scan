@@ -15,6 +15,7 @@ import type {
   Vec3,
 } from "@/lib/orbitxcity/types";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { citySound } from "@/lib/orbitxcity/sound";
 
 interface CityContextValue {
   entered: boolean;
@@ -33,6 +34,12 @@ interface CityContextValue {
   selectedMint: string | null;
   setSelectedMint: (mint: string | null) => void;
   prompt: { label: string; hint: string } | null;
+  soundEnabled: boolean;
+  toggleSound: () => void;
+  shardTotal: number;
+  shardsCollected: number;
+  collectedShards: Set<string>;
+  collectShard: (id: string) => void;
 }
 
 const CityContext = createContext<CityContextValue | null>(null);
@@ -76,13 +83,41 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [playerPos, setPlayerPos] = useState<Vec3>(NYC_DEMO_BLOCK.spawn);
   const [avatar, setAvatar] = useState<AvatarAppearance>(DEFAULT_AVATAR);
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(citySound.enabled);
+  const [collectedShards, setCollectedShards] = useState<Set<string>>(() => new Set());
   const inventory = STARTER_INVENTORY;
+  const shardTotal = NYC_DEMO_BLOCK.shards?.length ?? 0;
 
-  const openPanel = useCallback((p: HudPanel) => setPanel(p), []);
+  const openPanel = useCallback((p: HudPanel) => {
+    citySound.play("open");
+    setPanel(p);
+  }, []);
   const closePanel = useCallback(() => setPanel("none"), []);
 
+  const toggleSound = useCallback(() => {
+    const next = citySound.toggle();
+    setSoundEnabled(next);
+    if (next) {
+      citySound.play("click");
+      citySound.startAmbient();
+    }
+  }, []);
+
+  const collectShard = useCallback((id: string) => {
+    setCollectedShards((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      citySound.play("pickup");
+      return next;
+    });
+  }, []);
+
   const interact = useCallback(() => {
-    if (!activeZone) return;
+    if (!activeZone) {
+      citySound.play("deny");
+      return;
+    }
     openPanel(zoneToPanel(activeZone.kind));
   }, [activeZone, openPanel]);
 
@@ -109,6 +144,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
       selectedMint,
       setSelectedMint,
       prompt,
+      soundEnabled,
+      toggleSound,
+      shardTotal,
+      shardsCollected: collectedShards.size,
+      collectedShards,
+      collectShard,
     }),
     [
       entered,
@@ -122,6 +163,11 @@ export function CityProvider({ children }: { children: ReactNode }) {
       inventory,
       selectedMint,
       prompt,
+      soundEnabled,
+      toggleSound,
+      shardTotal,
+      collectedShards,
+      collectShard,
     ],
   );
 

@@ -12,6 +12,7 @@ import {
 } from "@/lib/orbitxcity/marketData";
 import type { HudPanel } from "@/lib/orbitxcity/types";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
+import { citySound } from "@/lib/orbitxcity/sound";
 import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio } from "lucide-react";
 
 const TITLES: Record<Exclude<HudPanel, "none">, string> = {
@@ -38,7 +39,15 @@ export function CityPanelHost() {
           <div className="oxc-kicker">{TITLES[panel]}</div>
           <h2>{TITLES[panel]}</h2>
         </div>
-        <button type="button" className="oxc-icon-btn" onClick={closePanel} aria-label="Close">
+        <button
+          type="button"
+          className="oxc-icon-btn"
+          onClick={() => {
+            citySound.play("close");
+            closePanel();
+          }}
+          aria-label="Close"
+        >
           <X className="h-4 w-4" />
         </button>
       </header>

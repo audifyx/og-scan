@@ -3,8 +3,10 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { AvatarAppearance, Vec3 } from "@/lib/orbitxcity/types";
 import { NYC_DEMO_BLOCK, buildingColliders } from "@/lib/orbitxcity/demoBlock";
+import { citySound } from "@/lib/orbitxcity/sound";
 
 const SPEED = 7.5;
+const SPRINT_MULT = 1.7;
 const keys = new Set<string>();
 
 function useKeyboard() {
@@ -51,15 +53,47 @@ interface PlayerAvatarProps {
 export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
   const group = useRef<THREE.Group>(null);
   const bob = useRef(0);
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   useKeyboard();
 
   const spawn = NYC_DEMO_BLOCK.spawn;
   const pos = useRef(new THREE.Vector3(spawn.x, 0, spawn.z));
   const yaw = useRef(0);
+  const camYaw = useRef(0);
   const vel = useRef(new THREE.Vector3());
   const reportAcc = useRef(0);
+  const stepAcc = useRef(0);
   const lastReported = useRef({ x: spawn.x, z: spawn.z });
+
+  // Drag-to-orbit camera (mouse look). Only drags that start on the 3D canvas
+  // rotate the view, so HUD buttons stay clickable.
+  useEffect(() => {
+    const el = gl.domElement;
+    let dragging = false;
+    let lastX = 0;
+    const down = (e: PointerEvent) => {
+      dragging = true;
+      lastX = e.clientX;
+    };
+    const move = (e: PointerEvent) => {
+      if (!dragging) return;
+      const dx = e.clientX - lastX;
+      lastX = e.clientX;
+      camYaw.current -= dx * 0.005;
+    };
+    const stop = () => {
+      dragging = false;
+    };
+    el.style.touchAction = "none";
+    el.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+  }, [gl]);
 
   useFrame((_, dt) => {
     const t = Math.min(dt, 0.05);
@@ -70,11 +104,18 @@ export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
     if (keys.has("KeyA") || keys.has("ArrowLeft")) inputX -= 1;
     if (keys.has("KeyD") || keys.has("ArrowRight")) inputX += 1;
 
+    const sprinting = keys.has("ShiftLeft") || keys.has("ShiftRight");
+    const speed = SPEED * (sprinting ? SPRINT_MULT : 1);
     const moving = inputX !== 0 || inputZ !== 0;
     if (moving) {
       const len = Math.hypot(inputX, inputZ) || 1;
-      const nx = (inputX / len) * SPEED;
-      const nz = (inputZ / len) * SPEED;
+      const dirX = inputX / len;
+      const dirZ = inputZ / len;
+      // Rotate movement into camera space so W is always "away from camera".
+      const cos = Math.cos(camYaw.current);
+      const sin = Math.sin(camYaw.current);
+      const nx = (dirX * cos + dirZ * sin) * speed;
+      const nz = (-dirX * sin + dirZ * cos) * speed;
       vel.current.set(nx, 0, nz);
       yaw.current = Math.atan2(nx, nz);
 
@@ -82,10 +123,19 @@ export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
       const nextZ = pos.current.z + nz * t;
       if (!collides(nextX, pos.current.z)) pos.current.x = nextX;
       if (!collides(pos.current.x, nextZ)) pos.current.z = nextZ;
-      bob.current += t * 10;
+      bob.current += t * (sprinting ? 16 : 10);
+
+      // Footstep ticks — quicker cadence while sprinting.
+      stepAcc.current += t;
+      const cadence = sprinting ? 0.24 : 0.34;
+      if (stepAcc.current >= cadence) {
+        stepAcc.current = 0;
+        citySound.play("step");
+      }
     } else {
       vel.current.multiplyScalar(0.8);
       bob.current *= 0.9;
+      stepAcc.current = 0;
     }
 
     if (group.current) {
@@ -98,8 +148,9 @@ export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
       if (legR) legR.rotation.x = -swing;
     }
 
-    // Third-person chase cam
-    const camOffset = new THREE.Vector3(0, 5.2, 7.5);
+    // Third-person chase cam, orbiting with camYaw (mouse look).
+    const cy = camYaw.current;
+    const camOffset = new THREE.Vector3(Math.sin(cy) * 7.5, 5.2, Math.cos(cy) * 7.5);
     const target = new THREE.Vector3(pos.current.x, 1.4, pos.current.z);
     const desired = target.clone().add(camOffset);
     camera.position.lerp(desired, 1 - Math.pow(0.001, t));

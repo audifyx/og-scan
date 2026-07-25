@@ -3,6 +3,7 @@ import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { Ground } from "./Ground";
 import { BuildingMesh } from "./BuildingMesh";
 import { BillboardMesh } from "./BillboardMesh";
+import { FloatingTraffic } from "./FloatingTraffic";
 
 /** Static scenic layer — districts, buildings, billboards, sky. */
 export function CityEnvironment() {
@@ -27,6 +28,8 @@ export function CityEnvironment() {
       <pointLight position={[0, 8, 16]} intensity={0.4} color="#3de7ff" distance={24} />
 
       <Stars radius={80} depth={40} count={1200} factor={3} saturation={0} fade speed={0.4} />
+
+      <FloatingTraffic count={8} />
 
       <Ground />
 

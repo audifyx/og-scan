@@ -6,6 +6,7 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { CityEnvironment } from "./world/CityEnvironment";
 import { PlayerAvatar } from "./world/PlayerAvatar";
 import { InteractionMarkers } from "./world/InteractionMarkers";
+import { Collectibles } from "./world/Collectibles";
 
 function WorldScene() {
   const { avatar, setPlayerPos, setActiveZone, activeZone, playerPos } = useCity();
@@ -20,6 +21,7 @@ function WorldScene() {
   return (
     <>
       <CityEnvironment />
+      <Collectibles />
       <PlayerAvatar appearance={avatar} onMove={onMove} />
       <InteractionMarkers
         zones={NYC_DEMO_BLOCK.zones}

@@ -95,6 +95,11 @@ export interface InteractionZone {
   tokenMint?: string;
 }
 
+export interface ShardSpawn {
+  id: string;
+  position: Vec3;
+}
+
 export interface WorldBlockConfig {
   cityId: CityId;
   name: string;
@@ -104,6 +109,7 @@ export interface WorldBlockConfig {
   buildings: BuildingDefinition[];
   billboards: BillboardDefinition[];
   zones: InteractionZone[];
+  shards?: ShardSpawn[];
 }
 
 export type HudPanel =

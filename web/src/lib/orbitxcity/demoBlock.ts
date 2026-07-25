@@ -245,6 +245,20 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       buildingId: "b-social",
     },
   ],
+  // Collectible $OBX shards scattered on walkable streets/plaza. Positions are
+  // kept clear of building footprints so they are always reachable.
+  shards: [
+    { id: "sh-1", position: { x: 0, y: 1.1, z: 4 } },
+    { id: "sh-2", position: { x: 0, y: 1.1, z: -4 } },
+    { id: "sh-3", position: { x: -6, y: 1.1, z: 0 } },
+    { id: "sh-4", position: { x: 6, y: 1.1, z: 0 } },
+    { id: "sh-5", position: { x: -8, y: 1.1, z: 8 } },
+    { id: "sh-6", position: { x: 8, y: 1.1, z: 8 } },
+    { id: "sh-7", position: { x: -8, y: 1.1, z: -8 } },
+    { id: "sh-8", position: { x: 8, y: 1.1, z: -8 } },
+    { id: "sh-9", position: { x: -22, y: 1.1, z: 0 } },
+    { id: "sh-10", position: { x: 22, y: 1.1, z: 0 } },
+  ],
 };
 
 /** Simple AABB colliders derived from buildings (expanded footprint). */
