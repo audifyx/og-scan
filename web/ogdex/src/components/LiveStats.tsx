@@ -32,7 +32,14 @@ export async function fetchPlatformStats(): Promise<PlatformStats> {
     if (!r.ok) throw new Error(`${r.status}`);
     const d = await r.json();
     if (d.ok) {
-      _cache = { activeUsers: d.activeUsers, telegram: d.telegram, xFollowers: d.xFollowers, tokenCount: d.tokenCount, volume: d.volume, daysLive: d.daysLive };
+      _cache = {
+        activeUsers: d.users ?? d.activeUsers,
+        telegram: d.telegram,
+        xFollowers: d.xFollowers,
+        tokenCount: d.tokens ?? d.tokenCount,
+        volume: d.volume,
+        daysLive: d.daysLive,
+      };
       _cacheAt = Date.now();
       return _cache;
     }

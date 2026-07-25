@@ -37,6 +37,13 @@ const Setup = () => {
     }
   }, [user, profile, loading, navigate]);
 
+  // Prefill wallet when user signed up via wallet auth
+  useEffect(() => {
+    const linked = (profile as { sol_wallet?: string | null; wallet_address?: string | null } | null)?.sol_wallet
+      || (profile as { sol_wallet?: string | null; wallet_address?: string | null } | null)?.wallet_address;
+    if (linked && !walletAddress) setWalletAddress(linked);
+  }, [profile, walletAddress]);
+
   // Check username availability
   useEffect(() => {
     const checkUsername = async () => {
@@ -107,15 +114,16 @@ const Setup = () => {
 
     setIsSubmitting(true);
 
-    const updateData: { username: string; wallet_address?: string } = {
+    const updateData: Record<string, string> = {
       username: cleanUsername,
     };
 
     if (walletAddress) {
       updateData.wallet_address = walletAddress;
+      updateData.sol_wallet = walletAddress;
     }
 
-    const { error } = await updateProfile(updateData);
+    const { error } = await updateProfile(updateData as Parameters<typeof updateProfile>[0]);
 
     if (error) {
       toast({ title: "Failed to set username", description: error.message, variant: "destructive" });
