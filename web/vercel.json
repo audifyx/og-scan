@@ -7,6 +7,10 @@
       "destination": "https://ffjipnkhcebjvttliptb.supabase.co/functions/v1/$1"
     },
     {
+      "source": "/api/orbitx-world/(.*)",
+      "destination": "/api/orbitx-world?path=$1"
+    },
+    {
       "source": "/api/ogdex/(.*)",
       "destination": "/api/ogdex?path=$1"
     },

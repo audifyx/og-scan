@@ -1,0 +1,78 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OrbitX World API",
+    "version": "1.0.0",
+    "description": "Backend HTTP surface for OrbitX World. Auth via Supabase SIWS Bearer token."
+  },
+  "servers": [{ "url": "/api/orbitx-world" }],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/bootstrap": {
+      "post": {
+        "summary": "Ensure player rows + return bootstrap payload",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Bootstrap payload" } }
+      }
+    },
+    "/me/progression": {
+      "get": {
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Progression" } }
+      }
+    },
+    "/me/inventory": {
+      "get": {
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Inventory" } }
+      }
+    },
+    "/me/settings": {
+      "get": {
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Settings" } }
+      },
+      "patch": {
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Updated settings" } }
+      }
+    },
+    "/lobbies": {
+      "get": {
+        "responses": { "200": { "description": "Public lobbies" } }
+      },
+      "post": {
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Created lobby" } }
+      }
+    },
+    "/presence": {
+      "post": {
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Presence upserted" } }
+      }
+    },
+    "/trades/record": {
+      "post": {
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Trade recorded" } }
+      }
+    },
+    "/token-intel/{mint}": {
+      "get": {
+        "parameters": [{ "name": "mint", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Cached intel" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    }
+  }
+}
