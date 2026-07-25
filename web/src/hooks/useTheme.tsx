@@ -12,10 +12,6 @@ import { type AnimatedWallpaperPreset, ANIMATED_WALLPAPERS } from "@/data/animat
 
 export type { ThemePreset } from "./themePresets";
 
-
-// Combined built-in presets (base + extra). Fixes "THEME_PRESETS is not defined".
-const THEME_PRESETS: ThemePreset[] = [...BASE_PRESETS, ...THEME_PRESETS_EXTRA];
-
 const CUSTOM_KEY = "og-custom-themes";
 const ANIMATED_WALLPAPER_KEY = "og-animated-wallpaper";
 const TAB_WALLPAPERS_KEY = "og-tab-wallpapers";
@@ -83,6 +79,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     registerCustomThemes(loaded);
     return loaded;
   });
+  const basePlusExtra = useMemo(() => [...BASE_PRESETS, ...THEME_PRESETS_EXTRA], []);
   const [animatedWallpaper, setAnimatedWallpaperState] = useState<string | null>(() => {
     return loadAnimatedWallpaper();
   });
@@ -125,7 +122,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     setCurrentTheme(themeId);
     localStorage.setItem("sol-theme", themeId);
     applyThemeVars(themeId);
-    const allNow = [...THEME_PRESETS, ...customThemes];
+    const allNow = [...basePlusExtra, ...customThemes];
     const _preset = allNow.find(t => t.id === themeId);
     setThemeGradient(_preset?.gradient ?? null);
     if (user) {
@@ -185,7 +182,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentTheme, setTheme]);
 
-  const allThemes = useMemo(() => [...THEME_PRESETS, ...customThemes], [customThemes]);
+  const allThemes = useMemo(() => [...basePlusExtra, ...customThemes], [customThemes]);
 
   return (
     <ThemeContext.Provider value={{
