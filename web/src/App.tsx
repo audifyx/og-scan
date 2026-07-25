@@ -155,6 +155,7 @@ const queryClient = new QueryClient({
 });
 const ArtFeedPage = lazyWithRetry(() => import("./pages/ArtFeed"));
 const OrbitxCityPage = lazyWithRetry(() => import("./pages/orbitxcity/OrbitxCityPage"));
+const PlayApp = lazyWithRetry(() => import("./gaming/PlayApp"));
 
 // Redirect legacy crypto/tools/coin routes into the OrbitX DEX app (/ORBITX_DEX).
 function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undefined>) => string) }) {
@@ -217,6 +218,16 @@ const App = () => (
               }
             />
             <Route path="/orbitxcity" element={<Navigate to="/Orbitxcity" replace />} />
+
+            {/* ── OrbitX Gaming Studio ── */}
+            <Route
+              path="/play/*"
+              element={
+                <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#06090f] font-mono text-xs uppercase tracking-[0.2em] text-[#17ff4d]">Loading Play Studio…</div>}>
+                  <PlayApp />
+                </Suspense>
+              }
+            />
 
             {/* ── Custom launchpad (Orbitx Launch Console) ── */}
             <Route path="/orbitxlaunch" element={<LaunchpadLayout />}>
