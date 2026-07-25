@@ -9,6 +9,7 @@ Last applied: 2026-07-25 (production Supabase project `ffjipnkhcebjvttliptb` / S
 | `20260725190000_oxw_world_platform.sql` | Applied + recorded in `schema_migrations` |
 | `20260725190100_oxw_rls_and_rpcs.sql` | Applied + recorded |
 | `20260725220000_oxw_record_trade_ownership.sql` | Applied + recorded (`oxw_record_trade` rejects cross-user signature reuse) |
+| `20260726010000_backend_security_hardening.sql` | Applied + recorded (RLS / grants / membership helpers) |
 | Edge functions `oxw-award-xp`, `oxw-lobby-sync`, `oxw-trade-ingest`, `oxw-notification-dispatch`, `oxw-token-scan` | Deployed |
 | `OXW_WORKER_SECRET` | Set on Supabase project secrets (value not stored in git) |
 | Duplicate `[functions.wallet-auth]` in `supabase/config.toml` | Removed (CLI link/push blocker) |
@@ -19,10 +20,11 @@ Vercel CLI is not authenticated here (device OAuth required). Set these in the V
 
 | Env var | Notes |
 |---------|-------|
-| `ADMIN_PASS` | ≥8 chars; required after OMEGA (hardcoded `0129` removed) |
-| `VITE_ADMIN_PASS` | Same value as `ADMIN_PASS` for client gate |
+| `ADMIN_PASS` | ≥8 chars; **server-only** — never put this in any `VITE_*` var |
+| `VITE_ADMIN_PASS` | Optional soft UI gate only; use a **different** value from `ADMIN_PASS` (or omit). Real admin auth is `ADMIN_PASS` on the API |
 | `CRON_SECRET` | Required for `alerts-run` cron (`Authorization: Bearer …`) |
 | `OXW_WORKER_SECRET` | Must match the value set on Supabase secrets |
+| `HELIUS_WEBHOOK_SECRET` | Required for `/api/kol/webhook` (fail-closed if unset) |
 
 Cron callers must hit `alerts-run` with `CRON_SECRET` (or `OXW_WORKER_SECRET`). Do not call unprotected.
 

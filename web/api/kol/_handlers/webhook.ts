@@ -40,15 +40,16 @@ async function getKolDirectory(origin: string): Promise<Record<string, string>> 
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "POST only" });
-  if (WEBHOOK_SECRET) {
-    const auth = String(req.headers["authorization"] || req.headers["x-webhook-secret"] || "");
-    if (auth !== WEBHOOK_SECRET && auth !== `Bearer ${WEBHOOK_SECRET}`) {
-      return res.status(401).json({ ok: false, error: "unauthorized" });
-    }
+  if (!WEBHOOK_SECRET || WEBHOOK_SECRET.length < 8) {
+    return res.status(503).json({ ok: false, error: "HELIUS_WEBHOOK_SECRET not configured" });
+  }
+  const auth = String(req.headers["authorization"] || req.headers["x-webhook-secret"] || "");
+  if (auth !== WEBHOOK_SECRET && auth !== `Bearer ${WEBHOOK_SECRET}`) {
+    return res.status(401).json({ ok: false, error: "unauthorized" });
   }
   if (!SERVICE_KEY) {
     // Without service credentials we cannot resolve trackers server-side.
-    return res.status(200).json({ ok: false, error: "SUPABASE_SERVICE_ROLE_KEY not configured — set it in Vercel env to enable webhook alerts" });
+    return res.status(503).json({ ok: false, error: "SUPABASE_SERVICE_ROLE_KEY not configured — set it in Vercel env to enable webhook alerts" });
   }
 
   const txs: any[] = Array.isArray(req.body) ? req.body : [req.body].filter(Boolean);

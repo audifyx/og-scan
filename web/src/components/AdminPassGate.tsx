@@ -1,6 +1,5 @@
-// Passcode gate for admin dashboards.
-// Passcode must come from VITE_ADMIN_PASS (no hardcoded default).
-// UI gate is not a security boundary — API routes enforce ADMIN_PASS server-side.
+// Soft UI gate only — NOT a security boundary. Use a different value from server ADMIN_PASS.
+// Never set VITE_ADMIN_PASS equal to ADMIN_PASS (Vite inlines client env into the SPA).
 import { useState } from "react";
 import { Lock } from "lucide-react";
 import { setAdminUnlocked } from "@/hooks/useAdmin";

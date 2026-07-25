@@ -1,4 +1,5 @@
 import { callFn, send, cache, dbSelect, dbInsert, dbUpdate, readBody, adminAuthorized, hasAdminPass } from "../_lib.js";
+import { eqFilter } from "../_walletProof.js";
 import { parseSwap } from "../_swap.js";
 import { enrichTokens } from "../_market.js";
 import { computePnl } from "../_pnl.js";
@@ -55,12 +56,12 @@ async function list(res) {
 async function profile(res, address) {
   cache(res, 30, 120);
   try {
-    const dir = await dbSelect("ogdex_kol_directory", `select=*&address=eq.${address}&limit=1`);
+    const dir = await dbSelect("ogdex_kol_directory", `select=*&address=eq.${eqFilter(address)}&limit=1`);
     if (!dir.length) return send(res, 200, { ok: false, error: "not a tracked KOL" });
     const kolId = dir[0].kol_id;
     const [prof, wallets] = await Promise.all([
-      dbSelect("kol_profiles", `id=eq.${kolId}&limit=1`),
-      dbSelect("kol_wallets", `kol_id=eq.${kolId}&select=wallet_address,label,is_primary`),
+      dbSelect("kol_profiles", `id=eq.${eqFilter(kolId)}&limit=1`),
+      dbSelect("kol_wallets", `kol_id=eq.${eqFilter(kolId)}&select=wallet_address,label,is_primary`),
     ]);
     const p = prof[0] || dir[0];
     return send(res, 200, { ok: true, kol: pub({ ...p, kol_id: kolId }), wallets: wallets.map((w) => ({ address: w.wallet_address, label: w.label, primary: w.is_primary })) });
@@ -126,9 +127,9 @@ async function feed(res, sp) {
   } catch {}
   try {
     let q = `select=*&order=tx_timestamp.desc&limit=${limit}`;
-    if (side) q += `&tx_type=eq.${side}`;
-    if (kolId) q += `&kol_id=eq.${kolId}`;
-    if (token) q += `&or=(token_in.eq.${token},token_out.eq.${token})`;
+    if (side) q += `&tx_type=eq.${eqFilter(side)}`;
+    if (kolId) q += `&kol_id=eq.${eqFilter(kolId)}`;
+    if (token) q += `&or=(token_in.eq.${eqFilter(token)},token_out.eq.${eqFilter(token)})`;
     const rows = await dbSelect("ogdex_kol_feed", q);
 
     // Enrich ONLY mints that are genuinely missing symbol/name in the DB
@@ -229,7 +230,7 @@ async function pnlRefresh(res, sp) {
     const kols = await dbSelect("kol_profiles", `select=id,wallet_address&order=name.asc&offset=${offset}&limit=${batch}`);
     let n = 0;
     for (const k of kols) {
-      try { const r = await computePnl(k.wallet_address, 40); await dbUpdate("kol_profiles", `id=eq.${k.id}`, { pnl: Math.round(r.realizedPnlUsd * 100) / 100, win_rate: r.winRate }); n++; } catch {}
+      try { const r = await computePnl(k.wallet_address, 40); await dbUpdate("kol_profiles", `id=eq.${eqFilter(k.id)}`, { pnl: Math.round(r.realizedPnlUsd * 100) / 100, win_rate: r.winRate }); n++; } catch {}
     }
     return send(res, 200, { ok: true, updated: n, offset, batch });
   } catch (e) { return send(res, 200, { ok: false, error: String(e?.message || e) }); }

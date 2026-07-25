@@ -50,14 +50,16 @@ const ROUTES = {
   waitlist,
 };
 
-const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "track", "llms", "llms.txt"]);
-const LIMITS = { chat: 12, forensics: 20, report: 10 };
+const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "llms", "llms.txt"]);
+const LIMITS = { chat: 12, forensics: 20, report: 10, track: 30, rpc: 40, alerts: 20, watchlist: 20, admin: 30 };
 const DEFAULT_LIMIT = 60;
 const WINDOW_MS = 10_000;
+/** Soft API keys get a higher cap — never unlimited. */
+const SOFT_KEY_MULT = 5;
 
 const buckets = new Map();
-function rateLimit(ip, seg) {
-  const limit = LIMITS[seg] ?? DEFAULT_LIMIT;
+function rateLimit(ip, seg, mult = 1) {
+  const limit = Math.max(1, Math.floor((LIMITS[seg] ?? DEFAULT_LIMIT) * mult));
   const now = Date.now();
   const key = `${ip}:${seg}`;
   let b = buckets.get(key);
@@ -76,7 +78,8 @@ function clientIp(req) {
 function hasSoftKey(req, u) {
   const allow = (process.env.ORBITX_DEX_API_KEYS || "").split(",").map((s) => s.trim()).filter(Boolean);
   if (!allow.length) return false;
-  const k = req.headers["x-ogdex-key"] || u.searchParams.get("key") || "";
+  // Header-only — query `?key=` leaks to access logs / Referer
+  const k = req.headers["x-ogdex-key"] || "";
   return !!k && allow.includes(String(k));
 }
 
@@ -102,8 +105,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (!NO_LIMIT.has(seg) && req.method !== "OPTIONS" && !hasSoftKey(req, u)) {
-    const rl = rateLimit(clientIp(req), seg);
+  if (!NO_LIMIT.has(seg) && req.method !== "OPTIONS") {
+    const soft = hasSoftKey(req, u);
+    const rl = rateLimit(clientIp(req), seg, soft ? SOFT_KEY_MULT : 1);
     res.setHeader("X-RateLimit-Limit", String(rl.limit));
     res.setHeader("X-RateLimit-Remaining", String(rl.remaining));
     if (!rl.ok) {
