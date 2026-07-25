@@ -66,7 +66,7 @@ export function WorldCanvas({ tickerRows }: { tickerRows: ScreenerRow[] }) {
       <Canvas
         shadows
         dpr={[1, 1.6]}
-        camera={{ position: [0, 6, 14], fov: 55, near: 0.1, far: 160 }}
+        camera={{ position: [0, 6, 14], fov: 55, near: 0.1, far: 240 }}
         gl={{ antialias: true, powerPreference: "high-performance" }}
       >
         <ContextBridge>

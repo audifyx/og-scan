@@ -91,6 +91,10 @@ function zoneToPanel(kind: InteractionKind): HudPanel {
       return "live";
     case "voice":
       return "voice";
+    case "games":
+      return "games";
+    case "nft":
+      return "nft";
     default:
       return "live";
   }

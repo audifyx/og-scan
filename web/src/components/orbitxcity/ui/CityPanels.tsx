@@ -16,7 +16,7 @@ import { TokenBuyPanel } from "./TokenBuyPanel";
 import { ChatPanel } from "./ChatPanel";
 import { SocialFeedPanel } from "./SocialFeedPanel";
 import { VoicePanel } from "./VoicePanel";
-import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic } from "lucide-react";
+import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic, Gamepad2, Image as ImageIcon, Dices } from "lucide-react";
 
 const TITLES: Record<Exclude<HudPanel, "none">, string> = {
   map: "World Map",
@@ -32,6 +32,8 @@ const TITLES: Record<Exclude<HudPanel, "none">, string> = {
   chat: "World Chat",
   voice: "Voice Plaza",
   social: "Social Feed",
+  games: "Gaming District",
+  nft: "NFT Gallery",
 };
 
 export function CityPanelHost() {
@@ -63,8 +65,62 @@ export function CityPanelHost() {
         {panel === "chat" && <ChatPanel />}
         {panel === "voice" && <VoicePanel />}
         {panel === "social" && <SocialFeedPanel />}
+        {panel === "games" && <GamesPanel />}
+        {panel === "nft" && <NftPanel />}
       </div>
     </aside>
+  );
+}
+
+function GamesPanel() {
+  return (
+    <div className="oxc-stack">
+      <div className="oxc-hero-tile launch">
+        <Dices className="h-5 w-5" />
+        <div>
+          <div className="oxc-tile-title">Royal Orbit · Gaming District</div>
+          <p className="oxc-muted">Casino, arcade, and the Prediction Center — powered by OrbitX games.</p>
+        </div>
+      </div>
+      <div className="oxc-tile on">
+        <div className="oxc-tile-title">Degen Tower</div>
+        <p>Climb floors, cash out before the rug. Real SOL stakes.</p>
+      </div>
+      <div className="oxc-tile on">
+        <div className="oxc-tile-title">Market Predictions</div>
+        <p>Call the next candle. Win the pot. Prediction Center rails.</p>
+      </div>
+      <div className="oxc-actions">
+        <Link className="oxc-btn primary" to="/games">
+          <Gamepad2 className="h-3.5 w-3.5" /> Open Games
+        </Link>
+        <Link className="oxc-btn ghost" to="/ORBITX_DEX">Trade instead</Link>
+      </div>
+    </div>
+  );
+}
+
+function NftPanel() {
+  return (
+    <div className="oxc-stack">
+      <div className="oxc-hero-tile social">
+        <ImageIcon className="h-5 w-5" />
+        <div>
+          <div className="oxc-tile-title">NFT Gallery</div>
+          <p className="oxc-muted">The OrbitX NFT marketplace — mint, list, bid, and claim creator fees.</p>
+        </div>
+      </div>
+      <ul className="oxc-list">
+        <li>Magic-Eden-style home with trending collections</li>
+        <li>Drops with countdowns and phases</li>
+        <li>NFT-coin bonding-curve trading</li>
+      </ul>
+      <div className="oxc-actions">
+        <Link className="oxc-btn primary" to="/nft">Open marketplace</Link>
+        <Link className="oxc-btn ghost" to="/nft/drops">Drops</Link>
+        <Link className="oxc-btn ghost" to="/nft/create">Create</Link>
+      </div>
+    </div>
   );
 }
 

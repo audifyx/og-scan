@@ -32,7 +32,9 @@ export type InteractionKind =
   | "billboard"
   | "hq"
   | "token"
-  | "voice";
+  | "voice"
+  | "games"
+  | "nft";
 
 export interface Vec3 {
   x: number;
@@ -123,7 +125,20 @@ export type HudPanel =
   | "launch"
   | "chat"
   | "voice"
-  | "social";
+  | "social"
+  | "games"
+  | "nft";
+
+export interface StreetSegment {
+  /** "h" runs along X at z=at; "v" runs along Z at x=at. */
+  o: "h" | "v";
+  at: number;
+  from: number;
+  to: number;
+  w: number;
+  curbA: string;
+  curbB: string;
+}
 
 export interface AvatarAppearance {
   bodyColor: string;

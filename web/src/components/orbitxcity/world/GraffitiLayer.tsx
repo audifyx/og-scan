@@ -37,6 +37,10 @@ const ALLEY_WALLS: Array<{ x: number; z: number; rotY: number; len: number }> = 
   { x: 25, z: -12, rotY: -Math.PI / 2, len: 9 },
   { x: -6, z: 25, rotY: Math.PI, len: 11 },
   { x: 9, z: -25, rotY: 0, len: 11 },
+  { x: 34, z: 40, rotY: Math.PI / 2, len: 9 },
+  { x: -34, z: 44, rotY: -Math.PI / 2, len: 9 },
+  { x: 34, z: -40, rotY: Math.PI / 2, len: 8 },
+  { x: -20, z: -50, rotY: 0, len: 10 },
 ];
 
 export function GraffitiLayer() {

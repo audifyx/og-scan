@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { Text } from "@react-three/drei";
 import { mulberry32 } from "@/lib/orbitxcity/collision";
 
-const TOWER_COUNT = 44;
+const TOWER_COUNT = 56;
 const ACCENTS = ["#17ff4d", "#3de7ff", "#ff4d9a", "#f5c542", "#a78bfa"];
 
 /** Distant instanced tower ring — silhouettes the block like a real metropolis. */
@@ -22,7 +22,7 @@ export function Skyline() {
     const color = new THREE.Color();
     for (let i = 0; i < TOWER_COUNT; i++) {
       const angle = (i / TOWER_COUNT) * Math.PI * 2 + rand() * 0.14;
-      const radius = 42 + rand() * 30;
+      const radius = 72 + rand() * 36;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
       const w = 3 + rand() * 5;
@@ -50,8 +50,8 @@ export function Skyline() {
 
       {/* Skyline hero signs — bloom picks these up */}
       <Text
-        position={[0, 24, -54]}
-        fontSize={5.2}
+        position={[0, 26, -86]}
+        fontSize={5.6}
         color="#17ff4d"
         anchorX="center"
         anchorY="middle"
@@ -63,9 +63,9 @@ export function Skyline() {
         ORBITX CITY
       </Text>
       <Text
-        position={[0, 20, 56]}
+        position={[0, 22, 88]}
         rotation-y={Math.PI}
-        fontSize={4}
+        fontSize={4.2}
         color="#3de7ff"
         anchorX="center"
         anchorY="middle"

@@ -1,29 +1,50 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { STREETS } from "@/lib/orbitxcity/demoBlock";
+import { collidesAt } from "@/lib/orbitxcity/collision";
 
-const LAMP_SPOTS: Array<[number, number]> = [
-  [4.5, 4.5],
-  [-4.5, 4.5],
-  [4.5, -4.5],
-  [-4.5, -4.5],
-  [12, 4.5],
-  [-12, -4.5],
-  [4.5, 14],
-  [-4.5, -14],
-];
+const LAMP_SPACING = 16;
 
-function StreetLamp({ x, z }: { x: number; z: number }) {
+/** Instanced street lamps generated along every street segment. */
+function LampField() {
+  const { poles, heads } = useMemo(() => {
+    const spots: Array<[number, number]> = [];
+    for (const s of STREETS) {
+      const off = s.w / 2 + 1;
+      for (let t = s.from + 6; t <= s.to - 4; t += LAMP_SPACING) {
+        const a: [number, number] = s.o === "h" ? [t, s.at + off] : [s.at + off, t];
+        const b: [number, number] = s.o === "h" ? [t + LAMP_SPACING / 2, s.at - off] : [s.at - off, t + LAMP_SPACING / 2];
+        for (const p of [a, b]) {
+          if (!collidesAt(p[0], p[1], 0.4)) spots.push(p);
+        }
+      }
+    }
+
+    const poleGeo = new THREE.CylinderGeometry(0.07, 0.1, 4.8, 8);
+    const poleMat = new THREE.MeshStandardMaterial({ color: "#1a2232", metalness: 0.75, roughness: 0.3 });
+    const polesMesh = new THREE.InstancedMesh(poleGeo, poleMat, spots.length);
+
+    const headGeo = new THREE.BoxGeometry(0.5, 0.16, 0.24);
+    const headMat = new THREE.MeshBasicMaterial({ color: "#cfe8ff", toneMapped: false });
+    const headsMesh = new THREE.InstancedMesh(headGeo, headMat, spots.length);
+
+    const m = new THREE.Matrix4();
+    spots.forEach(([x, z], i) => {
+      m.setPosition(x, 2.4, z);
+      polesMesh.setMatrixAt(i, m);
+      m.setPosition(x, 4.85, z);
+      headsMesh.setMatrixAt(i, m);
+    });
+    polesMesh.instanceMatrix.needsUpdate = true;
+    headsMesh.instanceMatrix.needsUpdate = true;
+    return { poles: polesMesh, heads: headsMesh };
+  }, []);
+
   return (
-    <group position={[x, 0, z]}>
-      <mesh position={[0, 2.4, 0]} castShadow>
-        <cylinderGeometry args={[0.07, 0.1, 4.8, 8]} />
-        <meshStandardMaterial color="#1a2232" metalness={0.75} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, 4.85, 0]}>
-        <boxGeometry args={[0.5, 0.16, 0.24]} />
-        <meshBasicMaterial color="#cfe8ff" toneMapped={false} />
-      </mesh>
+    <group>
+      <primitive object={poles} />
+      <primitive object={heads} />
     </group>
   );
 }
@@ -50,32 +71,17 @@ function HoloPillar({ x, z, color }: { x: number; z: number; color: string }) {
   );
 }
 
-/** Neon curb strips + lamps + holo pillars — the "wet cyberpunk street" kit. */
+/** Street furniture: instanced lamps + plaza holo pillars. */
 export function StreetProps() {
   return (
     <group>
-      {/* Neon curb strips along both streets */}
-      {[-3.3, 3.3].map((x, i) => (
-        <mesh key={`curb-v-${x}`} position={[x, 0.05, 0]}>
-          <boxGeometry args={[0.12, 0.07, 52]} />
-          <meshBasicMaterial color={i === 0 ? "#17ff4d" : "#3de7ff"} toneMapped={false} />
-        </mesh>
-      ))}
-      {[-3.3, 3.3].map((z, i) => (
-        <mesh key={`curb-h-${z}`} position={[0, 0.06, z]}>
-          <boxGeometry args={[52, 0.07, 0.12]} />
-          <meshBasicMaterial color={i === 0 ? "#ff4d9a" : "#f5c542"} toneMapped={false} />
-        </mesh>
-      ))}
-
-      {LAMP_SPOTS.map(([x, z]) => (
-        <StreetLamp key={`lamp-${x}-${z}`} x={x} z={z} />
-      ))}
-
+      <LampField />
       <HoloPillar x={6.5} z={6.5} color="#3de7ff" />
       <HoloPillar x={-6.5} z={6.5} color="#17ff4d" />
       <HoloPillar x={6.5} z={-6.5} color="#f5c542" />
       <HoloPillar x={-6.5} z={-6.5} color="#ff4d9a" />
+      <HoloPillar x={40} z={22} color="#f5c542" />
+      <HoloPillar x={-14} z={35} color="#ff4d9a" />
     </group>
   );
 }
