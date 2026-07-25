@@ -22,3 +22,27 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
   needed. Always curl https://ai-gateway.vercel.sh/v1/models first; never trust model IDs from memory
 - For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
 <!-- VERCEL BEST PRACTICES END -->
+
+## Cursor Cloud specific instructions
+
+This is a single Vercel-deployed product (OrbitX / OG Scan). All app code, dependencies, and dev servers live under `web/`. There is a nested sub-app in `web/ogdex/` (the OrbitX DEX SPA served at `/ORBITX_DEX/`).
+
+### Package manager
+- Dependency install is handled by the startup update script, so you normally don't need to reinstall.
+- If you must install `web/` deps manually, use `pnpm install --frozen-lockfile` (matches Vercel and resolves cleanly). Plain `npm install` in `web/` FAILS on a `@react-three` / `react-native` peer-dep conflict — use `npm install --legacy-peer-deps` if you must use npm.
+- `web/ogdex/` installs cleanly with plain `npm install` (this is what `vercel.json` uses for the sub-build).
+
+### Services (dev commands, from `web/`)
+- Main hub SPA: `npm run dev` → Vite on port `8080` (SPA entry is `/app.html`; `/` is a marketing splash). Lint: `npm run lint`. Tests: `npm run test` (Vitest). Build: `npm run build`.
+- OrbitX DEX SPA (`web/ogdex/`): `npm run dev` → Vite on port `5173` at `/ORBITX_DEX/`.
+
+### Non-obvious gotchas
+- The main hub at `:8080/app.html` is gated by a mandatory "Connect to enter" wallet-auth modal — you cannot reach hub features in a headless browser without a Solana wallet. The DEX SPA (`:5173`) is the app you can exercise without auth.
+- `.env.example` uses legacy `REACT_APP_*` names, but the code reads `VITE_*`. Missing `VITE_SUPABASE_*` only logs a warning; a hosted Supabase fallback is compiled in, so the app still runs. Lint/test/dev do not require any secrets.
+- The DEX frontend fetches `/api/ogdex/*`, which in prod is the Vercel function `web/api/ogdex.js`. Under plain `vite` those calls 404 (screener/scanner/search show no data). There is no local `vercel dev` flow (the CLI isn't installed and would require login). To get live data locally, run the two dev helpers together (see below).
+
+### Running the DEX with live data locally (no keys needed)
+From `web/ogdex/`, run both:
+- `node dev-api-server.mjs` — serves `web/api/ogdex.js` on `http://localhost:3001`. Most routes (health, screener, token, search, ath, chart) work against public APIs (Jupiter/GeckoTerminal/DexScreener) with no secrets.
+- `npm run dev -- --config vite.config.proxy.ts` — same as the normal DEX dev server but proxies `/api` → `:3001`.
+Then open `http://localhost:5173/ORBITX_DEX/`; the screener populates with live tokens. (`vite.config.proxy.ts` and `dev-api-server.mjs` are dev-only helpers used only for this local flow.)
