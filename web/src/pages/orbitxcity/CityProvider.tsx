@@ -49,6 +49,12 @@ interface CityContextValue {
   setVoiceOpen: (v: boolean) => void;
   teleportTarget: { x: number; z: number; seq: number } | null;
   teleport: (x: number, z: number) => void;
+  touchControls: boolean;
+  setTouchControls: (v: boolean) => void;
+  quality: "high" | "lite";
+  setQuality: (q: "high" | "lite") => void;
+  emoteAt: number;
+  triggerEmote: () => void;
 }
 
 /** Exported so the R3F canvas can bridge this context across renderers. */
@@ -85,6 +91,10 @@ function zoneToPanel(kind: InteractionKind): HudPanel {
       return "live";
     case "voice":
       return "voice";
+    case "games":
+      return "games";
+    case "nft":
+      return "nft";
     default:
       return "live";
   }
@@ -100,6 +110,9 @@ function makePlayerId(userId?: string | null, wallet?: string | null): string {
   return id;
 }
 
+const IS_COARSE_POINTER =
+  typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
+
 export function CityProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { publicKey } = useWallet();
@@ -114,6 +127,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [realtime, setRealtime] = useState<CityRealtimeClient | null>(null);
   const [teleportTarget, setTeleportTarget] = useState<{ x: number; z: number; seq: number } | null>(null);
+  const [touchControls, setTouchControls] = useState(IS_COARSE_POINTER);
+  const [quality, setQuality] = useState<"high" | "lite">(IS_COARSE_POINTER ? "lite" : "high");
+  const [emoteAt, setEmoteAt] = useState(0);
   const inventory = STARTER_INVENTORY;
 
   const playerId = useMemo(
@@ -128,6 +144,11 @@ export function CityProvider({ children }: { children: ReactNode }) {
     setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
     setPanel("none");
   }, []);
+
+  const triggerEmote = useCallback(() => {
+    setEmoteAt(Date.now());
+    realtime?.sendEmote();
+  }, [realtime]);
 
   const openToken = useCallback(
     (mint: string) => {
@@ -224,6 +245,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
       setVoiceOpen,
       teleportTarget,
       teleport,
+      touchControls,
+      setTouchControls,
+      quality,
+      setQuality,
+      emoteAt,
+      triggerEmote,
     }),
     [
       entered,
@@ -246,6 +273,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
       voiceOpen,
       teleportTarget,
       teleport,
+      touchControls,
+      quality,
+      emoteAt,
+      triggerEmote,
     ],
   );
 

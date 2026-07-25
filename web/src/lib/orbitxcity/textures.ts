@@ -58,6 +58,103 @@ function toTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
   return tex;
 }
 
+/**
+ * Procedural skyscraper facade: window grid with lit/dark variance, floor
+ * bands, entrance level, grime gradient. Used as both color map and emissive
+ * map so lit windows bloom at night. One texture per building tier.
+ */
+export function createFacadeTexture(
+  seed: number,
+  widthUnits: number,
+  heightUnits: number,
+  baseColor: string,
+  accent: string,
+  groundFloor: boolean,
+): THREE.CanvasTexture {
+  const cols = Math.max(2, Math.round(widthUnits / 1.35));
+  const rows = Math.max(2, Math.round(heightUnits / 1.7));
+  const W = Math.min(512, Math.max(128, cols * 36));
+  const H = Math.min(1024, Math.max(128, rows * 44));
+  const canvas = makeCanvas(W, H);
+  const ctx = canvas.getContext("2d")!;
+  const rand = mulberry32(seed);
+
+  // Wall base with vertical shading + grime near the ground
+  const wall = ctx.createLinearGradient(0, 0, 0, H);
+  wall.addColorStop(0, baseColor);
+  wall.addColorStop(0.75, baseColor);
+  wall.addColorStop(1, "#05070c");
+  ctx.fillStyle = wall;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle panel seams
+  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+  ctx.lineWidth = 1;
+  for (let c = 1; c < cols; c++) {
+    const x = (c / cols) * W;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+
+  const cellW = W / cols;
+  const cellH = H / rows;
+  const winW = cellW * 0.56;
+  const winH = cellH * 0.6;
+  const litPalette = [accent, "#ffd9a0", "#cfe8ff", accent];
+
+  const groundRows = groundFloor ? 1 : 0;
+  for (let r = 0; r < rows - groundRows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = c * cellW + (cellW - winW) / 2;
+      const y = r * cellH + (cellH - winH) / 2;
+      const roll = rand();
+      if (roll < 0.3) {
+        // Dark window
+        ctx.fillStyle = "#04060b";
+        ctx.fillRect(x, y, winW, winH);
+        ctx.fillStyle = "rgba(120,160,220,0.08)";
+        ctx.fillRect(x, y, winW, winH * 0.35);
+      } else {
+        const color = litPalette[Math.floor(rand() * litPalette.length)];
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.55 + rand() * 0.45;
+        ctx.fillRect(x, y, winW, winH);
+        // Interior depth hint
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(x, y + winH * 0.55, winW, winH * 0.45);
+        ctx.globalAlpha = 1;
+      }
+      // Frame
+      ctx.strokeStyle = "rgba(0,0,0,0.55)";
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(x, y, winW, winH);
+    }
+  }
+
+  // Ground level: dark storefront band + accent sign strip + door glow
+  if (groundFloor) {
+    const gy = (rows - 1) * cellH;
+    ctx.fillStyle = "#04060b";
+    ctx.fillRect(0, gy, W, cellH);
+    ctx.fillStyle = `${accent}44`;
+    ctx.fillRect(0, gy, W, 4);
+    const doorW = cellW * 0.7;
+    ctx.fillStyle = `${accent}66`;
+    ctx.fillRect(W / 2 - doorW / 2, gy + cellH * 0.25, doorW, cellH * 0.75);
+    // Storefront windows
+    for (let c = 0; c < cols; c++) {
+      if (Math.abs(c - (cols - 1) / 2) < 0.7) continue;
+      ctx.fillStyle = "rgba(140,190,255,0.14)";
+      ctx.fillRect(c * cellW + cellW * 0.15, gy + cellH * 0.3, cellW * 0.7, cellH * 0.55);
+    }
+  }
+
+  return toTexture(canvas);
+}
+
 /** Multi-layer spray-paint tag: halo, outline, gradient fill, drips, splatter. */
 export function createGraffitiTexture(text: string, seed: number): THREE.CanvasTexture {
   const W = 512;

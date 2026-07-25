@@ -13,7 +13,7 @@ function RemoteAvatar({ player }: { player: RemotePlayerState }) {
   const [chat, setChat] = useState<string | null>(null);
   const lastChat = useRef<string | null>(null);
 
-  useFrame((_, rawDt) => {
+  useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     const g = group.current;
     if (!g) return;
@@ -26,8 +26,10 @@ function RemoteAvatar({ player }: { player: RemotePlayerState }) {
     while (dy < -Math.PI) dy += Math.PI * 2;
     display.current.yaw += dy * a;
 
-    g.position.set(display.current.x, 0, display.current.z);
-    g.rotation.y = display.current.yaw;
+    const dancing = player.emoteAt > 0 && Date.now() - player.emoteAt < 2600;
+    const hop = dancing ? Math.abs(Math.sin(clock.elapsedTime * 9)) * 0.28 : 0;
+    g.position.set(display.current.x, hop, display.current.z);
+    g.rotation.y = dancing ? clock.elapsedTime * 9 : display.current.yaw;
 
     const show = player.chatText && Date.now() - player.chatAt < CHAT_TTL_MS ? player.chatText : null;
     if (show !== lastChat.current) {

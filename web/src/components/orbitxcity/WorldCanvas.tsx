@@ -23,6 +23,8 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
     collectShard,
     realtime,
     teleportTarget,
+    quality,
+    emoteAt,
   } = useCity();
 
   const onMove = useCallback(
@@ -36,7 +38,13 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
   return (
     <>
       <CityEnvironment tickerRows={tickerRows} />
-      <PlayerAvatar appearance={avatar} onMove={onMove} realtime={realtime} teleportTarget={teleportTarget} />
+      <PlayerAvatar
+        appearance={avatar}
+        onMove={onMove}
+        realtime={realtime}
+        teleportTarget={teleportTarget}
+        emoteAt={emoteAt}
+      />
       <RemoteAvatars client={realtime} />
       <InteractionMarkers
         zones={NYC_DEMO_BLOCK.zones}
@@ -45,7 +53,7 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
         onNearest={setActiveZone}
       />
       <CoinField playerPos={playerPos} onCollect={collectShard} />
-      <FXPipeline />
+      {quality === "high" && <FXPipeline />}
     </>
   );
 }
@@ -58,7 +66,7 @@ export function WorldCanvas({ tickerRows }: { tickerRows: ScreenerRow[] }) {
       <Canvas
         shadows
         dpr={[1, 1.6]}
-        camera={{ position: [0, 6, 14], fov: 55, near: 0.1, far: 160 }}
+        camera={{ position: [0, 6, 14], fov: 55, near: 0.1, far: 240 }}
         gl={{ antialias: true, powerPreference: "high-performance" }}
       >
         <ContextBridge>

@@ -126,7 +126,7 @@ function TraderNPC({ seed }: { seed: number }) {
   );
 }
 
-const NPC_SEEDS = [11, 47, 83, 129, 211, 307, 401, 509];
+const NPC_SEEDS = [11, 47, 83, 129, 211, 307, 401, 509, 613, 727, 829, 941];
 
 /** Ambient trader crowd wandering the block. */
 export function NPCs() {

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { NYC_DEMO_BLOCK, STREETS } from "@/lib/orbitxcity/demoBlock";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const SIZE = 148;
@@ -29,10 +29,15 @@ export function Minimap() {
     ctx.fillStyle = "rgba(5, 10, 18, 0.92)";
     ctx.fillRect(0, 0, SIZE, SIZE);
 
-    // Streets
+    // Streets from config
     ctx.fillStyle = "rgba(23, 255, 77, 0.12)";
-    ctx.fillRect(toX(-3), 0, 6 * sx, SIZE);
-    ctx.fillRect(0, toY(-3), SIZE, 6 * sz);
+    for (const s of STREETS) {
+      if (s.o === "h") {
+        ctx.fillRect(toX(s.from), toY(s.at - s.w / 2), (s.to - s.from) * sx, s.w * sz);
+      } else {
+        ctx.fillRect(toX(s.at - s.w / 2), toY(s.from), s.w * sx, (s.to - s.from) * sz);
+      }
+    }
 
     // Buildings
     for (const b of NYC_DEMO_BLOCK.buildings) {
@@ -76,7 +81,7 @@ export function Minimap() {
   return (
     <div className="oxc-minimap" aria-hidden>
       <canvas ref={canvasRef} width={SIZE} height={SIZE} />
-      <span>NYC · MIDTOWN</span>
+      <span>NYC · DOWNTOWN</span>
     </div>
   );
 }
