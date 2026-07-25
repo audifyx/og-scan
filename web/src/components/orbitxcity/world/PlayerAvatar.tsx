@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import { Billboard, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarAppearance, Vec3 } from "@/lib/orbitxcity/types";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt, pointInBuilding } from "@/lib/orbitxcity/collision";
+import type { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
 
 const WALK_SPEED = 7.5;
 const SPRINT_SPEED = 11.8;
@@ -38,10 +40,11 @@ function useKeyboard() {
 
 interface PlayerAvatarProps {
   appearance: AvatarAppearance;
-  onMove: (pos: Vec3) => void;
+  onMove: (pos: Vec3, yaw: number) => void;
+  realtime?: CityRealtimeClient | null;
 }
 
-export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
+export function PlayerAvatar({ appearance, onMove, realtime }: PlayerAvatarProps) {
   const group = useRef<THREE.Group>(null);
   const flame = useRef<THREE.Mesh>(null);
   const bob = useRef(0);
@@ -55,7 +58,8 @@ export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
   const yPos = useRef(0);
   const camDist = useRef(9);
   const reportAcc = useRef(0);
-  const lastReported = useRef({ x: spawn.x, z: spawn.z });
+  const lastReported = useRef({ x: spawn.x, z: spawn.z, yaw: 0 });
+  const [chat, setChat] = useState<string | null>(null);
 
   // Mouse-wheel camera zoom
   useEffect(() => {
@@ -150,11 +154,16 @@ export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
       reportAcc.current = 0;
       const dx = pos.current.x - lastReported.current.x;
       const dz = pos.current.z - lastReported.current.z;
-      if (dx * dx + dz * dz > 0.0025) {
-        lastReported.current = { x: pos.current.x, z: pos.current.z };
-        onMove({ x: pos.current.x, y: 0, z: pos.current.z });
+      const dyaw = Math.abs(yaw.current - lastReported.current.yaw);
+      if (dx * dx + dz * dz > 0.0025 || dyaw > 0.05) {
+        lastReported.current = { x: pos.current.x, z: pos.current.z, yaw: yaw.current };
+        onMove({ x: pos.current.x, y: 0, z: pos.current.z }, yaw.current);
       }
     }
+
+    const lc = realtime?.localChat;
+    const show = lc && Date.now() - lc.at < 4500 ? lc.text : null;
+    if (show !== chat) setChat(show);
   });
 
   return (
@@ -167,7 +176,7 @@ export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
       {/* Head */}
       <mesh position={[0, 2.05, 0]} castShadow>
         <sphereGeometry args={[0.32, 16, 16]} />
-        <meshStandardMaterial color="#e8d5c0" metalness={0.1} roughness={0.65} />
+        <meshStandardMaterial color={appearance.skinColor ?? "#e8d5c0"} metalness={0.1} roughness={0.65} />
       </mesh>
       {/* Visor */}
       <mesh position={[0, 2.08, 0.22]}>
@@ -197,6 +206,14 @@ export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
         <ringGeometry args={[0.45, 0.55, 32]} />
         <meshBasicMaterial color={appearance.accentColor} transparent opacity={0.55} toneMapped={false} />
       </mesh>
+
+      {chat && (
+        <Billboard position={[0, 2.9, 0]}>
+          <Text fontSize={0.26} color="#e8f1ff" anchorX="center" maxWidth={3.2} outlineWidth={0.04} outlineColor="#04070f">
+            {chat}
+          </Text>
+        </Billboard>
+      )}
     </group>
   );
 }

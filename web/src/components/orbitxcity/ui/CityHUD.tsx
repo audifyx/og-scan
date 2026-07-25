@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Gem } from "lucide-react";
+import { Gem, Users } from "lucide-react";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
@@ -37,6 +37,21 @@ function TickerBar() {
   );
 }
 
+function OnlineBadge() {
+  const { realtime } = useCity();
+  const snap = useSyncExternalStore(
+    realtime?.subscribe ?? ((cb: () => void) => { cb(); return () => {}; }),
+    realtime?.getSnapshot ?? (() => ({ online: 1, chat: [], connected: false })),
+  );
+  return (
+    <div className="oxc-online" title={snap.connected ? "Realtime connected" : "Local / connecting"}>
+      <Users className="h-3.5 w-3.5" />
+      <span>{snap.online}</span>
+      <i className={snap.connected ? "on" : ""} />
+    </div>
+  );
+}
+
 export function CityHUD() {
   const { openPanel, closePanel, panel, prompt, interact, avatar, playerPos, shards } = useCity();
 
@@ -48,6 +63,10 @@ export function CityHUD() {
         e.preventDefault();
         interact();
       }
+      if (e.code === "Enter") {
+        e.preventDefault();
+        openPanel("chat");
+      }
       if (e.code === "Escape") {
         e.preventDefault();
         closePanel();
@@ -55,7 +74,7 @@ export function CityHUD() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [interact, closePanel]);
+  }, [interact, closePanel, openPanel]);
 
   return (
     <div className="oxc-hud">
@@ -72,6 +91,7 @@ export function CityHUD() {
           </div>
         </div>
         <div className="oxc-top-actions">
+          <OnlineBadge />
           <div className="oxc-shards" title="OBX shards collected">
             <Gem className="h-3.5 w-3.5" />
             <span>{shards}</span>
@@ -115,9 +135,8 @@ export function CityHUD() {
       )}
 
       <div className="oxc-help">
-        <span>WASD / Arrows · Shift sprint</span>
-        <span>Space jump · Wheel zoom</span>
-        <span>E Interact · Esc Close</span>
+        <span>WASD · Shift sprint · Space jump</span>
+        <span>E Interact · Enter Chat · Esc Close</span>
       </div>
 
       <CityPanelHost />

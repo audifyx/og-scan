@@ -1,4 +1,5 @@
 import type { WorldBlockConfig } from "./types";
+import { FARTCOIN_CANONICAL_MINT, OGSCAN_TOKEN_MINT } from "@/lib/og";
 
 /**
  * OrbitX NYC — Milestone 1 playable city block.
@@ -160,9 +161,11 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       width: 6,
       height: 3.2,
       title: "ORBITX",
-      subtitle: "Trade the metaverse",
+      subtitle: "Official token · real wallets",
       accent: "#17ff4d",
       projectName: "OrbitX",
+      tokenMint: OGSCAN_TOKEN_MINT,
+      website: "https://orbitx.world",
     },
     {
       id: "bb-2",
@@ -170,10 +173,11 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       rotationY: -Math.PI / 5,
       width: 5.5,
       height: 3,
-      title: "MEME MARKET",
-      subtitle: "Real coins · real wallets",
+      title: "FARTCOIN",
+      subtitle: "Sponsored · Trading District",
       accent: "#ff4d9a",
-      projectName: "Meme Market",
+      projectName: "Fartcoin",
+      tokenMint: FARTCOIN_CANONICAL_MINT,
     },
     {
       id: "bb-3",
@@ -196,6 +200,7 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       subtitle: "Origin intel before you ape",
       accent: "#3de7ff",
       projectName: "OrbitX Scanner",
+      website: "https://orbitx.world/ORBITX_DEX/scanner",
     },
   ],
   zones: [
@@ -239,10 +244,36 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       id: "z-social",
       kind: "community",
       label: "Social Hub",
-      hint: "Communities & conversations",
+      hint: "Communities, feed & voice plaza",
       position: { x: -16, y: 0, z: 16 },
       radius: 4,
       buildingId: "b-social",
+    },
+    {
+      id: "z-voice",
+      kind: "voice",
+      label: "Voice Plaza",
+      hint: "Join the live OrbitX City voice channel",
+      position: { x: 0, y: 0, z: 0 },
+      radius: 3.5,
+    },
+    {
+      id: "z-bb-orbitx",
+      kind: "token",
+      label: "OrbitX Billboard",
+      hint: "View live token · buy with wallet",
+      position: { x: -8, y: 0, z: -8 },
+      radius: 3.5,
+      tokenMint: OGSCAN_TOKEN_MINT,
+    },
+    {
+      id: "z-bb-fart",
+      kind: "token",
+      label: "Fartcoin Billboard",
+      hint: "View live token · buy with wallet",
+      position: { x: 8, y: 0, z: -6 },
+      radius: 3.5,
+      tokenMint: FARTCOIN_CANONICAL_MINT,
     },
   ],
 };

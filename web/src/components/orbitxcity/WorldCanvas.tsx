@@ -7,24 +7,36 @@ import type { ScreenerRow } from "@/lib/orbitxcity/marketData";
 import { CityContext, useCity } from "@/pages/orbitxcity/CityProvider";
 import { CityEnvironment } from "./world/CityEnvironment";
 import { PlayerAvatar } from "./world/PlayerAvatar";
+import { RemoteAvatars } from "./world/RemoteAvatars";
 import { InteractionMarkers } from "./world/InteractionMarkers";
 import { CoinField } from "./world/CoinField";
 import { FXPipeline } from "./world/FXPipeline";
 
 function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
-  const { avatar, setPlayerPos, setActiveZone, activeZone, playerPos, collectShard } = useCity();
+  const {
+    avatar,
+    setPlayerPos,
+    setPlayerYaw,
+    setActiveZone,
+    activeZone,
+    playerPos,
+    collectShard,
+    realtime,
+  } = useCity();
 
   const onMove = useCallback(
-    (p: Vec3) => {
+    (p: Vec3, yaw: number) => {
       setPlayerPos(p);
+      setPlayerYaw(yaw);
     },
-    [setPlayerPos],
+    [setPlayerPos, setPlayerYaw],
   );
 
   return (
     <>
       <CityEnvironment tickerRows={tickerRows} />
-      <PlayerAvatar appearance={avatar} onMove={onMove} />
+      <PlayerAvatar appearance={avatar} onMove={onMove} realtime={realtime} />
+      <RemoteAvatars client={realtime} />
       <InteractionMarkers
         zones={NYC_DEMO_BLOCK.zones}
         playerPos={playerPos}

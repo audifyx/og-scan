@@ -20,7 +20,7 @@ export interface CityMarketSnapshot {
   fetchedAt: number;
 }
 
-function num(v: unknown): number | undefined {
+export function num(v: unknown): number | undefined {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
   return undefined;

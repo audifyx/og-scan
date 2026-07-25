@@ -144,14 +144,88 @@ body.oxc-lock {
   opacity: 0.45;
 }
 
-.oxc-enter-row {
+.oxc-creator {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  grid-template-columns: 140px 1fr;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
 }
 
-.oxc-enter-row label {
+@media (max-width: 560px) {
+  .oxc-creator { grid-template-columns: 1fr; }
+}
+
+.oxc-avatar-stage {
+  border: 1px solid var(--oxc-line);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 180px;
+}
+
+.oxc-avatar-preview-3d {
+  position: relative;
+  width: 72px;
+  height: 110px;
+  margin-top: 0.4rem;
+}
+
+.oxc-av-head {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.oxc-av-visor {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  width: 22px;
+  height: 7px;
+  transform: translateX(-50%);
+}
+
+.oxc-av-body {
+  position: absolute;
+  left: 50%;
+  top: 36px;
+  width: 40px;
+  height: 52px;
+  border-radius: 20px;
+  transform: translateX(-50%);
+}
+
+.oxc-av-pack {
+  position: absolute;
+  left: 50%;
+  top: 48px;
+  width: 28px;
+  height: 18px;
+  transform: translateX(-50%);
+  opacity: 0.85;
+}
+
+.oxc-av-name {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--oxc-lime);
+}
+
+.oxc-creator-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.oxc-creator-fields label,
+.oxc-field {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -161,8 +235,9 @@ body.oxc-lock {
   color: var(--oxc-muted);
 }
 
-.oxc-enter-row input[type="text"],
-.oxc-enter-row input:not([type]) {
+.oxc-creator-fields input,
+.oxc-field input,
+.oxc-chat-form input {
   border: 1px solid var(--oxc-line);
   background: rgba(0, 0, 0, 0.35);
   color: var(--oxc-text);
@@ -173,12 +248,41 @@ body.oxc-lock {
   text-transform: none;
 }
 
-.oxc-enter-row input[type="color"] {
-  width: 3.25rem;
-  height: 2.5rem;
+.oxc-swatch-block span {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--oxc-muted);
+  margin-bottom: 0.3rem;
+}
+
+.oxc-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.oxc-swatches button {
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  padding: 0;
+}
+
+.oxc-swatches button.on {
+  outline: 2px solid var(--oxc-lime);
+  outline-offset: 1px;
+}
+
+.oxc-swatches input[type="color"] {
+  width: 1.6rem;
+  height: 1.6rem;
   border: 1px solid var(--oxc-line);
   background: transparent;
-  padding: 0.2rem;
+  padding: 0;
 }
 
 .oxc-enter-actions {
@@ -483,7 +587,8 @@ body.oxc-lock {
   gap: 0.6rem;
 }
 
-.oxc-shards {
+.oxc-shards,
+.oxc-online {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -494,6 +599,25 @@ body.oxc-lock {
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.oxc-online {
+  border-color: color-mix(in srgb, var(--oxc-cyan) 45%, transparent);
+  background: color-mix(in srgb, var(--oxc-cyan) 10%, transparent);
+  color: var(--oxc-cyan);
+  position: relative;
+}
+
+.oxc-online i {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #5b708c;
+}
+
+.oxc-online i.on {
+  background: var(--oxc-lime);
+  box-shadow: 0 0 6px var(--oxc-lime);
 }
 
 .oxc-inv-item.shard {
@@ -724,6 +848,141 @@ body.oxc-lock {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.oxc-token-hero {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.oxc-token-icon {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.4rem;
+  object-fit: cover;
+  border: 1px solid var(--oxc-line);
+}
+
+.oxc-token-icon.placeholder {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--oxc-lime) 15%, transparent);
+  color: var(--oxc-lime);
+  font-weight: 800;
+}
+
+.oxc-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.oxc-stat-row div {
+  border: 1px solid var(--oxc-line);
+  padding: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.oxc-stat-row small {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--oxc-muted);
+}
+
+.oxc-stat-row b {
+  font-size: 12px;
+}
+
+.oxc-spark {
+  width: 100%;
+  height: 48px;
+  border: 1px solid var(--oxc-line);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.oxc-buy-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.oxc-btn.active-preset {
+  border-color: color-mix(in srgb, var(--oxc-lime) 50%, transparent);
+  color: var(--oxc-lime);
+}
+
+.oxc-chat-log {
+  max-height: 220px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 1px solid var(--oxc-line);
+  padding: 0.55rem;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.oxc-chat-line {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 12px;
+}
+
+.oxc-chat-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem;
+}
+
+.oxc-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.oxc-feed-item {
+  border: 1px solid var(--oxc-line);
+  padding: 0.6rem;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.oxc-feed-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 11px;
+  margin-bottom: 0.3rem;
+}
+
+.oxc-feed-head span {
+  color: var(--oxc-muted);
+}
+
+.oxc-feed-item p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.oxc-voice-shell {
+  border: 1px solid var(--oxc-line);
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  max-height: 320px;
+  overflow: auto;
+}
+
+button.oxc-token-row {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
 }
 
 @media (max-width: 640px) {

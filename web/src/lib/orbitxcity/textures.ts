@@ -1,12 +1,14 @@
 /**
  * OrbitX City — procedural texture factory.
- * Spray-paint graffiti, neon ad screens, and the live-market mega screen are
+ * Spray-paint graffiti, neon ad screens, and live-token billboards are
  * all generated on 2D canvases at runtime (zero binary assets, fully themable).
  */
 import * as THREE from "three";
 import { mulberry32 } from "./collision";
 import type { ScreenerRow } from "./marketData";
-import { fmtPct, fmtUsd } from "./marketData";
+import { fmtPct, fmtUsd, shortMint } from "./marketData";
+import type { ChartCandle } from "./tokenApi";
+import type { TokenDetail } from "./types";
 
 export const GRAFFITI_TAGS = [
   "WAGMI",
@@ -70,7 +72,6 @@ export function createGraffitiTexture(text: string, seed: number): THREE.CanvasT
   ctx.translate(W / 2, H / 2);
   ctx.rotate((rand() - 0.5) * 0.16);
 
-  // Fit font size to canvas
   let fontSize = 118;
   const italic = rand() > 0.5 ? "italic " : "";
   do {
@@ -82,7 +83,6 @@ export function createGraffitiTexture(text: string, seed: number): THREE.CanvasT
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  // 1 — soft spray halo
   ctx.shadowColor = colorA;
   ctx.shadowBlur = 34;
   ctx.strokeStyle = colorA;
@@ -92,26 +92,22 @@ export function createGraffitiTexture(text: string, seed: number): THREE.CanvasT
   ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
 
-  // 2 — hard dark outline
   ctx.strokeStyle = "#05070d";
   ctx.lineWidth = 12;
   ctx.strokeText(text, 0, 0);
 
-  // 3 — vertical neon gradient fill
   const grad = ctx.createLinearGradient(0, -fontSize / 2, 0, fontSize / 2);
   grad.addColorStop(0, colorB);
   grad.addColorStop(1, colorA);
   ctx.fillStyle = grad;
   ctx.fillText(text, 0, 0);
 
-  // 4 — white shine pass
   ctx.globalAlpha = 0.4;
   ctx.strokeStyle = "#ffffff";
   ctx.lineWidth = 2;
   ctx.strokeText(text, -3, -4);
   ctx.globalAlpha = 1;
 
-  // 5 — paint drips from the baseline
   const dripCount = 4 + Math.floor(rand() * 5);
   const baseY = fontSize * 0.3;
   for (let i = 0; i < dripCount; i++) {
@@ -126,7 +122,6 @@ export function createGraffitiTexture(text: string, seed: number): THREE.CanvasT
     ctx.fill();
   }
 
-  // 6 — splatter field
   for (let i = 0; i < 46; i++) {
     const sx = (rand() - 0.5) * (tw + 120);
     const sy = (rand() - 0.5) * fontSize * 1.7;
@@ -138,7 +133,6 @@ export function createGraffitiTexture(text: string, seed: number): THREE.CanvasT
   }
   ctx.globalAlpha = 1;
 
-  // 7 — underline swoosh
   ctx.strokeStyle = colorB;
   ctx.lineWidth = 6;
   ctx.globalAlpha = 0.8;
@@ -165,21 +159,18 @@ export function createAdTexture(
   const ctx = canvas.getContext("2d")!;
   const rand = mulberry32(seed);
 
-  // Backdrop
   const bg = ctx.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, "#070d18");
   bg.addColorStop(1, "#03050a");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Ambient glow blob
   const glow = ctx.createRadialGradient(W * 0.75, H * 0.3, 10, W * 0.75, H * 0.3, 220);
   glow.addColorStop(0, `${accent}33`);
   glow.addColorStop(1, "transparent");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
 
-  // Sparkline (fake pump chart)
   ctx.strokeStyle = accent;
   ctx.lineWidth = 3;
   ctx.globalAlpha = 0.75;
@@ -193,7 +184,6 @@ export function createAdTexture(
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Title
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.font = `900 54px ${GRAFFITI_FONT}`;
@@ -208,28 +198,126 @@ export function createAdTexture(
   ctx.strokeText(title, 22, 86);
   ctx.globalAlpha = 1;
 
-  // Subtitle
   ctx.font = `700 22px ${MONO_FONT}`;
   ctx.fillStyle = "#dce9ff";
   ctx.fillText(subtitle, 24, 126);
 
-  // Footer strip
   ctx.fillStyle = `${accent}22`;
   ctx.fillRect(0, H - 34, W, 34);
   ctx.font = `700 14px ${MONO_FONT}`;
   ctx.fillStyle = accent;
   ctx.fillText("SPONSORED · ORBITX ADNET", 22, H - 12);
 
-  // Scanlines
   ctx.fillStyle = "rgba(0,0,0,0.22)";
   for (let sy = 0; sy < H; sy += 4) ctx.fillRect(0, sy, W, 1.4);
 
-  // Border
   ctx.strokeStyle = `${accent}88`;
   ctx.lineWidth = 3;
   ctx.strokeRect(2, 2, W - 4, H - 4);
 
   return toTexture(canvas);
+}
+
+/** Draw a live token ad into an existing canvas (price, mcap, sparkline, QR-ish block). */
+export function drawLiveTokenBoard(
+  ctx: CanvasRenderingContext2D,
+  token: TokenDetail | null,
+  candles: ChartCandle[],
+  accent: string,
+  fallbackTitle: string,
+): void {
+  const W = ctx.canvas.width;
+  const H = ctx.canvas.height;
+
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#050b14");
+  bg.addColorStop(1, "#02040a");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const glow = ctx.createRadialGradient(W * 0.2, 40, 8, W * 0.2, 40, 180);
+  glow.addColorStop(0, `${accent}40`);
+  glow.addColorStop(1, "transparent");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  const title = token ? `$${token.symbol.toUpperCase()}` : fallbackTitle;
+  const name = token?.name ?? "Loading…";
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `900 48px ${GRAFFITI_FONT}`;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = accent;
+  ctx.fillText(title.slice(0, 12), 22, 62);
+  ctx.shadowBlur = 0;
+
+  ctx.font = `700 18px ${MONO_FONT}`;
+  ctx.fillStyle = "#c8d8f0";
+  ctx.fillText(name.slice(0, 28), 24, 92);
+
+  // Stats row
+  ctx.font = `700 22px ${MONO_FONT}`;
+  ctx.fillStyle = "#e8f1ff";
+  ctx.fillText(fmtUsd(token?.priceUsd), 24, 140);
+  const ch = Number(token?.change24h);
+  ctx.fillStyle = Number.isFinite(ch) && ch < 0 ? "#ff5d5d" : "#17ff4d";
+  ctx.fillText(fmtPct(token?.change24h), 200, 140);
+
+  ctx.fillStyle = "#9fb6d4";
+  ctx.font = `700 15px ${MONO_FONT}`;
+  ctx.fillText(`MC ${fmtUsd(token?.mcap)}`, 24, 172);
+  ctx.fillText(`VOL ${fmtUsd(token?.volume24h)}`, 200, 172);
+  if (token?.mint) ctx.fillText(shortMint(token.mint, 4), 360, 172);
+
+  // Sparkline from candles
+  if (candles.length > 1) {
+    const closes = candles.map((c) => c.close);
+    const min = Math.min(...closes);
+    const max = Math.max(...closes);
+    const range = max - min || 1;
+    const left = 22;
+    const right = W - 110;
+    const top = 195;
+    const bottom = H - 52;
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    closes.forEach((c, i) => {
+      const x = left + (i / (closes.length - 1)) * (right - left);
+      const y = bottom - ((c - min) / range) * (bottom - top);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+
+  // QR-style block (visual affordance — click opens token panel)
+  const qx = W - 88;
+  const qy = H - 96;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(qx, qy, 68, 68);
+  ctx.fillStyle = "#05070d";
+  for (let r = 0; r < 7; r++) {
+    for (let c = 0; c < 7; c++) {
+      if ((r + c * 3 + (token?.symbol?.length ?? 0)) % 3 !== 0) {
+        ctx.fillRect(qx + 6 + c * 8, qy + 6 + r * 8, 7, 7);
+      }
+    }
+  }
+
+  ctx.fillStyle = `${accent}22`;
+  ctx.fillRect(0, H - 34, W, 34);
+  ctx.font = `700 13px ${MONO_FONT}`;
+  ctx.fillStyle = accent;
+  ctx.fillText("TAP / [E] · BUY WITH WALLET · ORBITX ADNET", 22, H - 12);
+
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  for (let sy = 0; sy < H; sy += 4) ctx.fillRect(0, sy, W, 1.4);
+  ctx.strokeStyle = `${accent}88`;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(2, 2, W - 4, H - 4);
 }
 
 /** Live market mega-screen renderer — call on a persistent canvas. */
@@ -247,7 +335,6 @@ export function drawMegaScreen(
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Header
   ctx.fillStyle = "#0a1a12";
   ctx.fillRect(0, 0, W, 74);
   ctx.font = `900 44px ${GRAFFITI_FONT}`;
@@ -269,7 +356,6 @@ export function drawMegaScreen(
   ctx.fillStyle = "#ff8080";
   ctx.fillText("LIVE", W - 98, 47);
 
-  // Rows
   const list = rows.slice(0, 7);
   const rowH = 62;
   const startY = 118;
@@ -293,19 +379,12 @@ export function drawMegaScreen(
     ctx.fillText(fmtPct(r.change24h), W * 0.72, y);
   });
 
-  // Footer
   ctx.fillStyle = "#0a1420";
   ctx.fillRect(0, H - 44, W, 44);
   ctx.font = `700 20px ${MONO_FONT}`;
   ctx.fillStyle = "#3de7ff";
   ctx.fillText("ORBITX ADNET · REAL WALLETS · REAL MARKETS · /ORBITX_DEX", 26, H - 15);
 
-  // Scanlines + vignette
   ctx.fillStyle = "rgba(0,0,0,0.2)";
   for (let sy = 0; sy < H; sy += 5) ctx.fillRect(0, sy, W, 1.6);
-  const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, H);
-  vg.addColorStop(0, "transparent");
-  vg.addColorStop(1, "rgba(0,0,0,0.55)");
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, W, H);
 }
