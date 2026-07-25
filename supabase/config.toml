@@ -113,9 +113,6 @@ verify_jwt = false
 [functions.ogdex-xray]
 verify_jwt = false
 
-[functions.wallet-auth]
-verify_jwt = false
-
 # OrbitX World platform workers (service secret, not end-user JWT)
 [functions.oxw-award-xp]
 verify_jwt = false
