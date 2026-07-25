@@ -18,12 +18,12 @@ export function FloatingTraffic({ count = 7 }: { count?: number }) {
   const drones = useMemo<Drone[]>(
     () =>
       Array.from({ length: count }).map((_, i) => ({
-        radius: 14 + (i % 4) * 4.5,
-        height: 9 + ((i * 3) % 7),
-        speed: 0.12 + (i % 5) * 0.05 * (i % 2 === 0 ? 1 : -1),
+        radius: 11 + (i % 4) * 3.5,
+        height: 6.5 + ((i * 2) % 5),
+        speed: 0.16 + (i % 5) * 0.06 * (i % 2 === 0 ? 1 : -1),
         phase: (i / count) * Math.PI * 2,
         color: PALETTE[i % PALETTE.length],
-        scale: 0.7 + (i % 3) * 0.25,
+        scale: 1.2 + (i % 3) * 0.35,
       })),
     [count],
   );
@@ -58,25 +58,31 @@ function DroneMesh({ drone }: { drone: Drone }) {
 
   return (
     <group ref={ref} scale={drone.scale}>
+      {/* Body — emits its own accent so it reads against the night sky. */}
       <mesh>
-        <capsuleGeometry args={[0.18, 0.6, 4, 8]} />
+        <capsuleGeometry args={[0.22, 0.7, 4, 8]} />
         <meshStandardMaterial
-          color="#0b1220"
+          color={drone.color}
           emissive={drone.color}
-          emissiveIntensity={0.5}
-          metalness={0.6}
+          emissiveIntensity={1.4}
+          metalness={0.5}
           roughness={0.3}
         />
       </mesh>
-      {/* Under-glow */}
-      <mesh position={[0, -0.28, 0]}>
-        <sphereGeometry args={[0.14, 8, 8]} />
+      {/* Halo */}
+      <mesh scale={2.1}>
+        <sphereGeometry args={[0.3, 10, 10]} />
+        <meshBasicMaterial color={drone.color} transparent opacity={0.16} />
+      </mesh>
+      {/* Under-glow beacon */}
+      <mesh position={[0, -0.34, 0]}>
+        <sphereGeometry args={[0.18, 8, 8]} />
         <meshBasicMaterial color={drone.color} />
       </mesh>
       {/* Light trail */}
-      <mesh ref={trail} position={[0, 0, -0.7]} rotation={[Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.12, 1.4, 8]} />
-        <meshBasicMaterial color={drone.color} transparent opacity={0.28} />
+      <mesh ref={trail} position={[0, 0, -0.9]} rotation={[Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.16, 1.8, 8]} />
+        <meshBasicMaterial color={drone.color} transparent opacity={0.35} />
       </mesh>
     </group>
   );

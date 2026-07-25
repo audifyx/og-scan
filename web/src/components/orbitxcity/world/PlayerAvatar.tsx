@@ -45,6 +45,18 @@ function collides(x: number, z: number, radius = 0.45): boolean {
   return false;
 }
 
+/** True if the chase camera would sit inside a building footprint (+ margin). */
+function cameraBlocked(x: number, z: number): boolean {
+  const boxes = buildingColliders(NYC_DEMO_BLOCK);
+  const m = 0.9;
+  for (const b of boxes) {
+    if (x > b.minX - m && x < b.maxX + m && z > b.minZ - m && z < b.maxZ + m) return true;
+  }
+  return false;
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
 interface PlayerAvatarProps {
   appearance: AvatarAppearance;
   onMove: (pos: Vec3) => void;
@@ -148,11 +160,23 @@ export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
       if (legR) legR.rotation.x = -swing;
     }
 
-    // Third-person chase cam, orbiting with camYaw (mouse look).
+    // Third-person chase cam, orbiting with camYaw (mouse look). Pull the camera
+    // in if it would clip into a building, and keep it inside world bounds so it
+    // never ends up staring through a wall.
     const cy = camYaw.current;
-    const camOffset = new THREE.Vector3(Math.sin(cy) * 7.5, 5.2, Math.cos(cy) * 7.5);
-    const target = new THREE.Vector3(pos.current.x, 1.4, pos.current.z);
-    const desired = target.clone().add(camOffset);
+    const px = pos.current.x;
+    const pz = pos.current.z;
+    let dist = 8.5;
+    for (; dist > 3; dist -= 0.5) {
+      const cx = px + Math.sin(cy) * dist;
+      const cz = pz + Math.cos(cy) * dist;
+      if (!cameraBlocked(cx, cz)) break;
+    }
+    const { bounds } = NYC_DEMO_BLOCK;
+    const camX = clamp(px + Math.sin(cy) * dist, bounds.minX + 1, bounds.maxX - 1);
+    const camZ = clamp(pz + Math.cos(cy) * dist, bounds.minZ + 1, bounds.maxZ - 1);
+    const desired = new THREE.Vector3(camX, 6.5, camZ);
+    const target = new THREE.Vector3(px, 1.4, pz);
     camera.position.lerp(desired, 1 - Math.pow(0.001, t));
     camera.lookAt(target);
 
