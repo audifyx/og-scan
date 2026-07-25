@@ -1,3 +1,19 @@
+## OrbitX agent skills (repo-trained)
+
+Project skills live in `.cursor/skills/*/SKILL.md`. Agents should load the matching skill before non-trivial work:
+
+| Skill | Use for |
+|---|---|
+| `orbitx-skill-finder` | Routing any task to the right skill |
+| `orbitx-repo-map` | Dual app placement (main SPA vs `/ORBITX_DEX`) |
+| `orbitx-websites-ui` | Themes, glass UI, splash, launchpad/terminal skins |
+| `orbitx-coding-conventions` | React/Query/auth/Hub `*-20x` patterns |
+| `orbitx-web3-launchpad` | Fees, pump/custom/EVM launches, Jupiter, NFT settle |
+| `orbitx-backend-edge` | Supabase edge, `web/api`, RLS, bots, Grim AI |
+| `orbitx-games-interactive` | Games iframes, BackgroundFX, phone shell, vibe-code |
+
+Hard rules: fee source of truth is `web/src/lib/platformFee.ts`; vanity suffix is `obx`; auth is Solana SIWS → Supabase; never ship service keys to the client.
+
 <!-- VERCEL BEST PRACTICES START -->
 ## Best practices for developing on Vercel
 
