@@ -32,6 +32,7 @@ export interface RemotePlayerState {
   updatedAt: number;
   chatText: string | null;
   chatAt: number;
+  emoteAt: number;
 }
 
 export interface WorldChatMessage {
@@ -118,6 +119,7 @@ export class CityRealtimeClient {
             updatedAt: Date.now(),
             chatText: null,
             chatAt: 0,
+            emoteAt: 0,
           });
         }
       }
@@ -133,6 +135,13 @@ export class CityRealtimeClient {
       if (typeof p.z === "number") player.z = p.z;
       if (typeof p.yaw === "number") player.yaw = p.yaw;
       player.updatedAt = Date.now();
+    });
+
+    ch.on("broadcast", { event: "emote" }, ({ payload }) => {
+      const p = payload as { id?: string; at?: number };
+      if (!p?.id || p.id === this.identity.id) return;
+      const player = this.players.get(p.id);
+      if (player) player.emoteAt = p.at ?? Date.now();
     });
 
     ch.on("broadcast", { event: "chat" }, ({ payload }) => {
@@ -179,6 +188,14 @@ export class CityRealtimeClient {
       type: "broadcast",
       event: "pos",
       payload: { id: this.identity.id, x: round2(x), z: round2(z), yaw: round2(yaw) },
+    });
+  }
+
+  sendEmote(): void {
+    this.channel?.send({
+      type: "broadcast",
+      event: "emote",
+      payload: { id: this.identity.id, at: Date.now() },
     });
   }
 

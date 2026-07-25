@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Gem, Users } from "lucide-react";
+import { Gamepad2, Gem, Sparkles, Users } from "lucide-react";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
@@ -9,6 +9,7 @@ import { fetchCityMarketSnapshot, fmtPct } from "@/lib/orbitxcity/marketData";
 import { emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
 import { CityPanelHost, PANEL_NAV } from "./CityPanels";
 import { Minimap } from "./Minimap";
+import { TouchControls } from "./TouchControls";
 
 function TickerBar() {
   const { data } = useQuery({
@@ -54,7 +55,21 @@ function OnlineBadge() {
 }
 
 export function CityHUD() {
-  const { openPanel, closePanel, panel, prompt, interact, avatar, playerPos, shards } = useCity();
+  const {
+    openPanel,
+    closePanel,
+    panel,
+    prompt,
+    interact,
+    avatar,
+    playerPos,
+    shards,
+    touchControls,
+    setTouchControls,
+    quality,
+    setQuality,
+    triggerEmote,
+  } = useCity();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -63,6 +78,10 @@ export function CityHUD() {
       if (e.code === "KeyE") {
         e.preventDefault();
         interact();
+      }
+      if (e.code === "KeyB") {
+        e.preventDefault();
+        triggerEmote();
       }
       if (e.code === "Enter") {
         e.preventDefault();
@@ -75,7 +94,7 @@ export function CityHUD() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [interact, closePanel, openPanel]);
+  }, [interact, closePanel, openPanel, triggerEmote]);
 
   return (
     <div className="oxc-hud">
@@ -92,6 +111,24 @@ export function CityHUD() {
           </div>
         </div>
         <div className="oxc-top-actions">
+          <button
+            type="button"
+            className={`oxc-toggle-btn ${touchControls ? "on" : ""}`}
+            onClick={() => setTouchControls(!touchControls)}
+            title={touchControls ? "Hide touch controls" : "Show touch controls"}
+            aria-pressed={touchControls}
+          >
+            <Gamepad2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            className={`oxc-toggle-btn ${quality === "high" ? "on" : ""}`}
+            onClick={() => setQuality(quality === "high" ? "lite" : "high")}
+            title={`Graphics: ${quality === "high" ? "High (FX on)" : "Lite (fast)"}`}
+            aria-pressed={quality === "high"}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </button>
           <OnlineBadge />
           <div className="oxc-shards" title="OBX shards collected">
             <Gem className="h-3.5 w-3.5" />
@@ -136,9 +173,11 @@ export function CityHUD() {
       )}
 
       <div className="oxc-help">
-        <span>WASD · Shift sprint · Space jump</span>
+        <span>WASD · Shift sprint · Space jump · B dance</span>
         <span>E Interact · Enter Chat · Esc Close</span>
       </div>
+
+      {touchControls && <TouchControls />}
 
       <CityPanelHost />
     </div>

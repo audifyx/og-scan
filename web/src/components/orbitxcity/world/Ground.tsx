@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { MeshReflectorMaterial } from "@react-three/drei";
 import * as THREE from "three";
+import { useCity } from "@/pages/orbitxcity/CityProvider";
 
-/** Wet neon streets: real-time reflections + grid + lane glow. */
+/** Wet neon streets: real-time reflections + grid + lane glow (lite mode skips the mirror pass). */
 export function Ground() {
+  const { quality } = useCity();
   const grid = useMemo(() => {
     const size = 64;
     const divisions = 32;
@@ -19,22 +21,26 @@ export function Ground() {
 
   return (
     <group>
-      {/* Reflective wet asphalt */}
+      {/* Reflective wet asphalt (mirror pass costs a full scene render — skip on lite) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[64, 64]} />
-        <MeshReflectorMaterial
-          blur={[280, 90]}
-          resolution={512}
-          mixBlur={1}
-          mixStrength={1.5}
-          roughness={0.8}
-          depthScale={0.5}
-          minDepthThreshold={0.6}
-          maxDepthThreshold={1.6}
-          color="#080d15"
-          metalness={0.5}
-          mirror={0.3}
-        />
+        {quality === "high" ? (
+          <MeshReflectorMaterial
+            blur={[280, 90]}
+            resolution={512}
+            mixBlur={1}
+            mixStrength={1.5}
+            roughness={0.8}
+            depthScale={0.5}
+            minDepthThreshold={0.6}
+            maxDepthThreshold={1.6}
+            color="#080d15"
+            metalness={0.5}
+            mirror={0.3}
+          />
+        ) : (
+          <meshStandardMaterial color="#0a1019" metalness={0.5} roughness={0.75} />
+        )}
       </mesh>
 
       {/* Street overlays */}

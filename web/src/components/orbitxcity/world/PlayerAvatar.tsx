@@ -5,6 +5,7 @@ import * as THREE from "three";
 import type { AvatarAppearance, Vec3 } from "@/lib/orbitxcity/types";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt, pointInBuilding } from "@/lib/orbitxcity/collision";
+import { consumeZoom, virtualInput } from "@/lib/orbitxcity/input";
 import type { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
 
 const WALK_SPEED = 7.5;
@@ -43,9 +44,10 @@ interface PlayerAvatarProps {
   onMove: (pos: Vec3, yaw: number) => void;
   realtime?: CityRealtimeClient | null;
   teleportTarget?: { x: number; z: number; seq: number } | null;
+  emoteAt?: number;
 }
 
-export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget }: PlayerAvatarProps) {
+export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget, emoteAt = 0 }: PlayerAvatarProps) {
   const group = useRef<THREE.Group>(null);
   const flame = useRef<THREE.Mesh>(null);
   const bob = useRef(0);
@@ -83,7 +85,7 @@ export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget }: P
     onMove({ x: teleportTarget.x, y: 0, z: teleportTarget.z }, yaw.current);
   }, [teleportTarget, onMove]);
 
-  useFrame((_, rawDt) => {
+  useFrame(({ clock }, rawDt) => {
     const t = Math.min(rawDt, 0.05);
     let inputX = 0;
     let inputZ = 0;
@@ -92,9 +94,15 @@ export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget }: P
     if (keys.has("KeyA") || keys.has("ArrowLeft")) inputX -= 1;
     if (keys.has("KeyD") || keys.has("ArrowRight")) inputX += 1;
 
-    const sprinting = keys.has("ShiftLeft") || keys.has("ShiftRight");
+    // Merge touch joystick (analog) with keyboard (digital)
+    inputX += virtualInput.axisX;
+    inputZ += virtualInput.axisZ;
+    inputX = Math.max(-1, Math.min(1, inputX));
+    inputZ = Math.max(-1, Math.min(1, inputZ));
+
+    const sprinting = keys.has("ShiftLeft") || keys.has("ShiftRight") || virtualInput.sprint;
     const speed = sprinting ? SPRINT_SPEED : WALK_SPEED;
-    const moving = inputX !== 0 || inputZ !== 0;
+    const moving = Math.abs(inputX) > 0.08 || Math.abs(inputZ) > 0.08;
 
     if (moving) {
       const len = Math.hypot(inputX, inputZ) || 1;
@@ -111,20 +119,31 @@ export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget }: P
       bob.current *= 0.9;
     }
 
-    // Jump / gravity
+    // Jump / gravity (touch jumps are buffered until grounded)
     const grounded = yPos.current <= 0.001;
-    if (keys.has("Space") && grounded) vy.current = JUMP_VELOCITY;
+    if ((keys.has("Space") || virtualInput.jumpQueued) && grounded) {
+      vy.current = JUMP_VELOCITY;
+      virtualInput.jumpQueued = false;
+    }
     vy.current -= GRAVITY * t;
     yPos.current = Math.max(0, yPos.current + vy.current * t);
     if (yPos.current === 0 && vy.current < 0) vy.current = 0;
     const airborne = yPos.current > 0.05;
 
+    // Dance emote: spin + hop for a short window
+    const dancing = emoteAt > 0 && Date.now() - emoteAt < 2600;
+
     if (group.current) {
-      group.current.position.set(pos.current.x, yPos.current, pos.current.z);
-      group.current.rotation.y = yaw.current;
+      const hop = dancing && grounded ? Math.abs(Math.sin(clock.elapsedTime * 9)) * 0.28 : 0;
+      group.current.position.set(pos.current.x, yPos.current + hop, pos.current.z);
+      group.current.rotation.y = dancing ? clock.elapsedTime * 9 : yaw.current;
       const leg = group.current.getObjectByName("legL");
       const legR = group.current.getObjectByName("legR");
-      const swing = moving && !airborne ? Math.sin(bob.current) * (sprinting ? 0.6 : 0.45) : 0;
+      const swing = dancing
+        ? Math.sin(clock.elapsedTime * 14) * 0.7
+        : moving && !airborne
+          ? Math.sin(bob.current) * (sprinting ? 0.6 : 0.45)
+          : 0;
       if (leg) leg.rotation.x = swing;
       if (legR) legR.rotation.x = -swing;
     }
@@ -138,6 +157,7 @@ export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget }: P
     }
 
     // Third-person chase cam with zoom + building occlusion
+    camDist.current = Math.min(14, Math.max(5, camDist.current + consumeZoom()));
     const dist = camDist.current;
     const camOffset = new THREE.Vector3(0, dist * 0.62, dist * 0.85);
     const target = new THREE.Vector3(pos.current.x, 1.4 + yPos.current * 0.6, pos.current.z);
