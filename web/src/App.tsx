@@ -56,6 +56,16 @@ import TerminalHome from "./pages/orbitx/TerminalHome";
 import TerminalTrade from "./pages/orbitx/TerminalTrade";
 import TerminalPortfolio from "./pages/orbitx/TerminalPortfolio";
 import TerminalLaunch from "./pages/orbitx/TerminalLaunch";
+const IntelLayout = lazyWithRetry(() => import("./crypto/pages/IntelLayout"));
+const IntelHome = lazyWithRetry(() => import("./crypto/pages/IntelHome"));
+const TokenScanner = lazyWithRetry(() => import("./crypto/pages/TokenScanner"));
+const TradeDesk = lazyWithRetry(() => import("./crypto/pages/TradeDesk"));
+const PortfolioDesk = lazyWithRetry(() => import("./crypto/pages/PortfolioDesk"));
+const TrendingIntel = lazyWithRetry(() => import("./crypto/pages/TrendingIntel"));
+const WhaleIntel = lazyWithRetry(() => import("./crypto/pages/WhaleIntel"));
+const SentimentIntel = lazyWithRetry(() => import("./crypto/pages/SentimentIntel"));
+const LaunchStudio = lazyWithRetry(() => import("./crypto/pages/LaunchStudio"));
+const WalletTracker = lazyWithRetry(() => import("./crypto/pages/WalletTracker"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
 import LaunchpadToken from "./pages/orbitx/LaunchpadToken";
 import LaunchpadAbout from "./pages/orbitx/LaunchpadAbout";
@@ -280,6 +290,20 @@ const App = () => (
               <Route path="trade" element={<TerminalTrade />} />
               <Route path="portfolio" element={<TerminalPortfolio />} />
               <Route path="launch" element={<TerminalLaunch />} />
+            </Route>
+
+            {/* ── OrbitX Crypto Intelligence Command Center ── */}
+            <Route path="/intel" element={<Suspense fallback={null}><IntelLayout /></Suspense>}>
+              <Route index element={<Suspense fallback={null}><IntelHome /></Suspense>} />
+              <Route path="scan" element={<Suspense fallback={null}><TokenScanner /></Suspense>} />
+              <Route path="scan/:mint" element={<Suspense fallback={null}><TokenScanner /></Suspense>} />
+              <Route path="trade" element={<Suspense fallback={null}><TradeDesk /></Suspense>} />
+              <Route path="portfolio" element={<Suspense fallback={null}><PortfolioDesk /></Suspense>} />
+              <Route path="trending" element={<Suspense fallback={null}><TrendingIntel /></Suspense>} />
+              <Route path="whales" element={<Suspense fallback={null}><WhaleIntel /></Suspense>} />
+              <Route path="sentiment" element={<Suspense fallback={null}><SentimentIntel /></Suspense>} />
+              <Route path="launch" element={<Suspense fallback={null}><LaunchStudio /></Suspense>} />
+              <Route path="wallet/:address" element={<Suspense fallback={null}><WalletTracker /></Suspense>} />
             </Route>
 
             {/* ── Protected: App shell ── */}

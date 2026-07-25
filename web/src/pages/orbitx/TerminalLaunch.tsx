@@ -38,6 +38,18 @@ export default function TerminalLaunch() {
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
       <div className="bg-black/50 border border-green-500/20 rounded p-6">
+        <h2 className="text-lg font-bold text-green-400 mb-2">Launch Token</h2>
+        <p className="text-xs text-gray-500 mb-3">
+          For anti-clone checks, authority controls, and creator fees, use the{" "}
+          <a href="/intel/launch" className="text-amber-400 hover:underline">
+            Intel Launchpad Studio
+          </a>{" "}
+          or{" "}
+          <a href="/orbitxlaunch/create" className="text-amber-400 hover:underline">
+            full create flow
+          </a>
+          .
+        </p>
         <h2 className="text-3xl font-bold text-green-400 mb-2">LAUNCH A TOKEN</h2>
         <p className="text-gray-500">No coding. No vectors. Just your vision.</p>
       </div>

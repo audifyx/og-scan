@@ -1,0 +1,421 @@
+/**
+ * OrbitX Crypto Intelligence — design tokens & layout.
+ * Direction: deep void + signal cyan / amber caution (not purple-on-white).
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap");
+
+.oxc-root {
+  --oxc-bg: #070b10;
+  --oxc-bg-elev: #0d141c;
+  --oxc-bg-panel: rgba(12, 20, 30, 0.92);
+  --oxc-line: rgba(94, 234, 212, 0.14);
+  --oxc-text: #e8f1f4;
+  --oxc-muted: #7a8f9c;
+  --oxc-cyan: #2ee6c5;
+  --oxc-cyan-dim: rgba(46, 230, 197, 0.15);
+  --oxc-amber: #f0b429;
+  --oxc-red: #ff5c5c;
+  --oxc-green: #3dd68c;
+  --oxc-font: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --oxc-display: "Syne", "IBM Plex Sans", sans-serif;
+
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(46, 230, 197, 0.08), transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, rgba(240, 180, 41, 0.06), transparent 50%),
+    linear-gradient(180deg, #05080c 0%, var(--oxc-bg) 40%, #060a0f 100%);
+  color: var(--oxc-text);
+  font-family: var(--oxc-font);
+}
+
+.oxc-root * {
+  box-sizing: border-box;
+}
+
+.oxc-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+@media (max-width: 900px) {
+  .oxc-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oxc-nav {
+  border-right: 1px solid var(--oxc-line);
+  background: rgba(5, 9, 14, 0.85);
+  backdrop-filter: blur(12px);
+  padding: 1.25rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .oxc-nav {
+    position: relative;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--oxc-line);
+  }
+}
+
+.oxc-brand {
+  font-family: var(--oxc-display);
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+  color: var(--oxc-cyan);
+  padding: 0.4rem 0.6rem 1rem;
+  line-height: 1.1;
+}
+
+.oxc-brand span {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--oxc-muted);
+  margin-top: 0.25rem;
+}
+
+.oxc-nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 6px;
+  color: var(--oxc-muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.oxc-nav a:hover {
+  color: var(--oxc-text);
+  background: var(--oxc-cyan-dim);
+}
+
+.oxc-nav a.active {
+  color: var(--oxc-cyan);
+  background: var(--oxc-cyan-dim);
+}
+
+.oxc-main {
+  padding: 1.5rem 1.75rem 3rem;
+  overflow-x: hidden;
+}
+
+.oxc-hero {
+  margin-bottom: 1.75rem;
+  animation: oxc-rise 0.55s ease-out both;
+}
+
+.oxc-hero h1 {
+  font-family: var(--oxc-display);
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.4rem;
+  line-height: 1.1;
+}
+
+.oxc-hero p {
+  margin: 0;
+  max-width: 36rem;
+  color: var(--oxc-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.oxc-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.oxc-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.oxc-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .oxc-grid-2,
+  .oxc-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oxc-panel {
+  background: var(--oxc-bg-panel);
+  border: 1px solid var(--oxc-line);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  animation: oxc-fade 0.45s ease-out both;
+}
+
+.oxc-panel h2,
+.oxc-panel h3 {
+  font-family: var(--oxc-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.oxc-muted {
+  color: var(--oxc-muted);
+}
+
+.oxc-input-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.oxc-input {
+  flex: 1;
+  min-width: 200px;
+  background: var(--oxc-bg-elev);
+  border: 1px solid var(--oxc-line);
+  border-radius: 6px;
+  color: var(--oxc-text);
+  padding: 0.65rem 0.85rem;
+  font-family: ui-monospace, "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+}
+
+.oxc-input:focus {
+  outline: 1px solid var(--oxc-cyan);
+  border-color: var(--oxc-cyan);
+}
+
+.oxc-btn {
+  appearance: none;
+  border: 1px solid var(--oxc-cyan);
+  background: var(--oxc-cyan);
+  color: #04110e;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.65rem 1.1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--oxc-font);
+  transition: transform 0.12s, filter 0.12s;
+}
+
+.oxc-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.oxc-btn-ghost {
+  background: transparent;
+  color: var(--oxc-cyan);
+}
+
+.oxc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.oxc-gauge {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.oxc-gauge-ring {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--oxc-ring, var(--oxc-cyan)) calc(var(--oxc-pct, 0) * 1%), rgba(255, 255, 255, 0.06) 0);
+  position: relative;
+}
+
+.oxc-gauge-ring::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: var(--oxc-bg-elev);
+}
+
+.oxc-gauge-val {
+  position: relative;
+  z-index: 1;
+  font-family: var(--oxc-display);
+  font-weight: 800;
+  font-size: 1.35rem;
+}
+
+.oxc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.oxc-tone-good {
+  --oxc-ring: var(--oxc-green);
+  color: var(--oxc-green);
+  background: rgba(61, 214, 140, 0.12);
+}
+
+.oxc-tone-ok {
+  --oxc-ring: #7dd3a0;
+  color: #7dd3a0;
+  background: rgba(125, 211, 160, 0.12);
+}
+
+.oxc-tone-warn {
+  --oxc-ring: var(--oxc-amber);
+  color: var(--oxc-amber);
+  background: rgba(240, 180, 41, 0.12);
+}
+
+.oxc-tone-bad,
+.oxc-tone-critical {
+  --oxc-ring: var(--oxc-red);
+  color: var(--oxc-red);
+  background: rgba(255, 92, 92, 0.12);
+}
+
+.oxc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.oxc-table th {
+  text-align: left;
+  color: var(--oxc-muted);
+  font-weight: 600;
+  padding: 0.45rem 0.35rem;
+  border-bottom: 1px solid var(--oxc-line);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.oxc-table td {
+  padding: 0.55rem 0.35rem;
+  border-bottom: 1px solid rgba(94, 234, 212, 0.06);
+  font-variant-numeric: tabular-nums;
+}
+
+.oxc-mono {
+  font-family: ui-monospace, "IBM Plex Mono", monospace;
+  font-size: 0.75rem;
+}
+
+.oxc-link {
+  color: var(--oxc-cyan);
+  text-decoration: none;
+}
+
+.oxc-link:hover {
+  text-decoration: underline;
+}
+
+.oxc-factor {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid rgba(94, 234, 212, 0.06);
+  font-size: 0.82rem;
+}
+
+.oxc-factor:last-child {
+  border-bottom: none;
+}
+
+.oxc-stat {
+  text-align: left;
+}
+
+.oxc-stat .label {
+  font-size: 0.7rem;
+  color: var(--oxc-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.25rem;
+}
+
+.oxc-stat .value {
+  font-family: var(--oxc-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.oxc-empty {
+  color: var(--oxc-muted);
+  font-size: 0.9rem;
+  padding: 1.5rem 0;
+}
+
+.oxc-trade-wrap {
+  height: calc(100vh - 2rem);
+  margin: -0.5rem -0.75rem;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--oxc-line);
+  animation: oxc-fade 0.4s ease-out both;
+}
+
+@keyframes oxc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oxc-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.oxc-pulse {
+  animation: oxc-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes oxc-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
