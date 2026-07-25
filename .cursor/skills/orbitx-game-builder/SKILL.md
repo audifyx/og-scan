@@ -1,6 +1,6 @@
 ---
 name: orbitx-game-builder
-description: Build polished web games, prediction experiences, leaderboards, or game partnerships inside OrbitX. Use for game mechanics, canvas/WebGL/DOM gameplay, multiplayer or provably-fair design, scoring, achievements, iframe integrations, and game UI.
+description: Build web games, prediction experiences, leaderboards, or game partnerships inside OrbitX. Use for gameplay, multiplayer or provably-fair design, scoring, achievements, iframe integrations, and game UI.
 ---
 
 # OrbitX Web Game Builder
