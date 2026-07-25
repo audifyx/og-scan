@@ -49,4 +49,10 @@ Agent briefs: `docs/agents/qa/` and `.cursor/agents/qa/`.
 | SCRIBE | Reports / flakes |
 
 Smoke: `bash scripts/qa/run-smoke.sh`
+
+## Full system audit (20-agent review)
+
+- CTO report: `docs/audit/FULL_SYSTEM_AUDIT.md`
+- Bug backlog: `docs/audit/BUG_BACKLOG.md`
+- 30/60/90 roadmap: `docs/audit/ROADMAP_30_60_90.md`
 <!-- ORBITX PLATFORM + QA SWARM END -->
