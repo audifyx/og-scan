@@ -8,9 +8,9 @@ import "../orbitx-os.css";
 const DOCK = [
   { to: "/os", icon: Home, end: true },
   { to: "/os/dashboard", icon: LayoutGrid },
-  { to: "/os/trading", icon: Compass },
-  { to: "/os/games", icon: Gamepad2 },
-  { to: "/os/hub", icon: UserRound },
+  { to: "/intel", icon: Compass },
+  { to: "/play", icon: Gamepad2 },
+  { to: "/hq", icon: UserRound },
 ] as const;
 
 export function OsShell() {
