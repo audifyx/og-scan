@@ -22,3 +22,31 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
   needed. Always curl https://ai-gateway.vercel.sh/v1/models first; never trust model IDs from memory
 - For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
 <!-- VERCEL BEST PRACTICES END -->
+
+<!-- ORBITX PLATFORM + QA SWARM -->
+## OrbitX platform (agents must load this)
+
+- Platform map: `docs/ORBITX_PLATFORM.md`
+- Team docs: `docs/backend`, `docs/frontend`, `docs/gaming`, `docs/crypto`, `docs/social`
+- Primary routes: `/Orbitxcity`, `/os`, `/play`, `/intel`, `/hq`, `/ORBITX_DEX`
+
+## OrbitX QA Swarm (10 agents)
+
+Bug checks, testing, and error triage. Roster + doctrine: `docs/agents/QA_SWARM.md`.
+Agent briefs: `docs/agents/qa/` and `.cursor/agents/qa/`.
+
+| Agent | Role |
+|-------|------|
+| AEGIS | Lead / triage |
+| FORGE | Backend / RLS / workers |
+| NEON | OS `/os` UX |
+| RAID | Gaming `/play` |
+| ORACLE | Crypto `/intel` |
+| PULSE | Social `/hq` |
+| ATLAS | City 3D |
+| WARDEN | Security |
+| CIRCUIT | CI / Vitest / smoke |
+| SCRIBE | Reports / flakes |
+
+Smoke: `bash scripts/qa/run-smoke.sh`
+<!-- ORBITX PLATFORM + QA SWARM END -->
