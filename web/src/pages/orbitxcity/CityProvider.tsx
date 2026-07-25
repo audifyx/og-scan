@@ -10,6 +10,7 @@ import {
 } from "react";
 import type {
   AvatarAppearance,
+  CityGate,
   HudPanel,
   InteractionKind,
   InteractionZone,
@@ -22,6 +23,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 interface CityContextValue {
+  /** AAA gate: main menu → character select → world */
+  gate: CityGate;
+  setGate: (g: CityGate) => void;
   entered: boolean;
   setEntered: (v: boolean) => void;
   panel: HudPanel;
@@ -61,10 +65,11 @@ interface CityContextValue {
 export const CityContext = createContext<CityContextValue | null>(null);
 
 const DEFAULT_AVATAR: AvatarAppearance = {
-  bodyColor: "#1a2438",
-  accentColor: "#17ff4d",
+  bodyColor: "#12181f",
+  accentColor: "#00ff9f",
   skinColor: "#e8d5c0",
   name: "Traveler",
+  classId: "trader",
 };
 
 const STARTER_INVENTORY: InventoryItem[] = [
@@ -116,7 +121,8 @@ const IS_COARSE_POINTER =
 export function CityProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { publicKey } = useWallet();
-  const [entered, setEntered] = useState(false);
+  const [gate, setGateState] = useState<CityGate>("menu");
+  const [entered, setEnteredState] = useState(false);
   const [panel, setPanel] = useState<HudPanel>("none");
   const [activeZone, setActiveZone] = useState<InteractionZone | null>(null);
   const [playerPos, setPlayerPos] = useState<Vec3>(NYC_DEMO_BLOCK.spawn);
@@ -131,6 +137,17 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [quality, setQuality] = useState<"high" | "lite">(IS_COARSE_POINTER ? "lite" : "high");
   const [emoteAt, setEmoteAt] = useState(0);
   const inventory = STARTER_INVENTORY;
+
+  const setGate = useCallback((g: CityGate) => {
+    setGateState(g);
+    if (g !== "world") setEnteredState(false);
+  }, []);
+
+  const setEntered = useCallback((v: boolean) => {
+    setEnteredState(v);
+    if (v) setGateState("world");
+    else setGateState((prev) => (prev === "world" ? "menu" : prev));
+  }, []);
 
   const playerId = useMemo(
     () => makePlayerId(user?.id, publicKey?.toBase58() ?? null),
@@ -218,6 +235,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<CityContextValue>(
     () => ({
+      gate,
+      setGate,
       entered,
       setEntered,
       panel,
@@ -253,7 +272,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
       triggerEmote,
     }),
     [
+      gate,
+      setGate,
       entered,
+      setEntered,
       panel,
       openPanel,
       closePanel,

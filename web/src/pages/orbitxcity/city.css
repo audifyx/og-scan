@@ -1,21 +1,29 @@
-/* OrbitX City — scoped immersive theme (cyber / neon / space) */
+/* OrbitX City — scoped immersive theme (AAA matte black · neon green · gold) */
+
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
 
 body.oxc-lock {
   overflow: hidden;
 }
 
 .oxc-root {
-  --oxc-bg: #04070f;
-  --oxc-panel: rgba(8, 14, 24, 0.88);
-  --oxc-line: rgba(255, 255, 255, 0.1);
-  --oxc-text: #e8f1ff;
-  --oxc-muted: rgba(210, 224, 245, 0.58);
-  --oxc-lime: #17ff4d;
+  --oxc-bg: #0a0a0a;
+  --oxc-bg-deep: #050505;
+  --oxc-panel: rgba(8, 16, 12, 0.72);
+  --oxc-panel-soft: rgba(10, 18, 14, 0.45);
+  --oxc-line: rgba(0, 255, 159, 0.18);
+  --oxc-line-gold: rgba(197, 162, 111, 0.45);
+  --oxc-text: #f2fff8;
+  --oxc-muted: rgba(200, 230, 210, 0.55);
+  --oxc-lime: #00ff9f;
+  --oxc-lime-hot: #39ff14;
   --oxc-cyan: #3de7ff;
-  --oxc-gold: #f5c542;
+  --oxc-gold: #c5a26f;
+  --oxc-gold-bright: #ffd700;
   --oxc-pink: #ff4d9a;
-  --oxc-font-display: "Space Mono", "JetBrains Mono", ui-monospace, monospace;
-  --oxc-font-body: "JetBrains Mono", ui-monospace, monospace;
+  --oxc-font-display: "Orbitron", "Sora", sans-serif;
+  --oxc-font-body: "Sora", "JetBrains Mono", sans-serif;
+  --oxc-font-mono: "JetBrains Mono", ui-monospace, monospace;
   position: fixed;
   inset: 0;
   z-index: 80;
@@ -1260,5 +1268,730 @@ button.oxc-token-row {
   @keyframes oxc-panel-in {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AAA Main Menu + Character Chamber (art direction v1)
+   ═══════════════════════════════════════════════════════════ */
+
+.oxc-cosmic {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 255, 159, 0.14), transparent 55%),
+    radial-gradient(ellipse 40% 30% at 85% 70%, rgba(197, 162, 111, 0.1), transparent 50%),
+    linear-gradient(180deg, #0c0c0c 0%, #0a0a0a 40%, #050505 100%);
+}
+
+.oxc-cosmic--chamber {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0, 255, 159, 0.12), transparent 55%),
+    radial-gradient(circle at 50% 100%, rgba(0, 255, 159, 0.08), transparent 45%),
+    linear-gradient(180deg, #0b0d0c 0%, #070807 50%, #040404 100%);
+}
+
+.oxc-cosmic-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.55;
+}
+
+.oxc-cosmic-glow--a {
+  width: 42vw;
+  height: 42vw;
+  left: 50%;
+  top: -12%;
+  transform: translateX(-50%);
+  background: rgba(0, 255, 159, 0.22);
+  animation: oxc-pulse-glow 5.5s ease-in-out infinite;
+}
+
+.oxc-cosmic-glow--b {
+  width: 28vw;
+  height: 28vw;
+  right: -5%;
+  bottom: 10%;
+  background: rgba(57, 255, 20, 0.12);
+}
+
+.oxc-cosmic-glow--gold {
+  width: 22vw;
+  height: 22vw;
+  left: 8%;
+  bottom: 18%;
+  background: rgba(197, 162, 111, 0.14);
+}
+
+.oxc-cosmic-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 255, 159, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 159, 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 40%, black 15%, transparent 70%);
+  animation: oxc-grid-drift 22s linear infinite;
+}
+
+.oxc-cosmic-rays {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      -18deg,
+      transparent 0 18px,
+      rgba(0, 255, 159, 0.015) 18px 19px
+    );
+  opacity: 0.7;
+}
+
+.oxc-cosmic-spark {
+  position: absolute;
+  border-radius: 50%;
+  background: #00ff9f;
+  box-shadow: 0 0 6px #00ff9f, 0 0 12px rgba(0, 255, 159, 0.5);
+  animation: oxc-spark 3.8s ease-in-out infinite;
+  opacity: 0.35;
+}
+
+@keyframes oxc-pulse-glow {
+  0%, 100% { opacity: 0.4; transform: translateX(-50%) scale(1); }
+  50% { opacity: 0.7; transform: translateX(-50%) scale(1.08); }
+}
+
+@keyframes oxc-spark {
+  0%, 100% { opacity: 0.15; transform: scale(0.8); }
+  50% { opacity: 0.85; transform: scale(1.35); }
+}
+
+/* ── Main menu ── */
+.oxc-menu {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.75rem;
+  padding: 1.5rem 1.25rem 1.75rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+
+.oxc-menu.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.oxc-menu-brand {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.oxc-menu-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.oxc-menu-logo-orbit {
+  font-family: var(--oxc-font-display);
+  font-weight: 800;
+  font-size: clamp(2.6rem, 8vw, 4.4rem);
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+  background: linear-gradient(180deg, #ffe9a8 0%, #c5a26f 40%, #8a6a38 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 18px rgba(0, 255, 159, 0.55)) drop-shadow(0 0 40px rgba(0, 255, 159, 0.25));
+  animation: oxc-logo-breathe 4s ease-in-out infinite;
+}
+
+.oxc-menu-logo-x {
+  color: transparent;
+  background: linear-gradient(180deg, #00ff9f, #39ff14);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 12px rgba(0, 255, 159, 0.9));
+}
+
+.oxc-menu-logo-city {
+  font-family: var(--oxc-font-display);
+  font-weight: 600;
+  font-size: clamp(0.85rem, 2.4vw, 1.15rem);
+  letter-spacing: 0.55em;
+  color: rgba(242, 255, 248, 0.88);
+  text-indent: 0.55em;
+}
+
+.oxc-menu-tag {
+  margin-top: 0.85rem;
+  font-size: 0.92rem;
+  color: var(--oxc-muted);
+  letter-spacing: 0.02em;
+}
+
+@keyframes oxc-logo-breathe {
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(0, 255, 159, 0.45)) drop-shadow(0 0 28px rgba(197, 162, 111, 0.2)); }
+  50% { filter: drop-shadow(0 0 26px rgba(0, 255, 159, 0.75)) drop-shadow(0 0 48px rgba(0, 255, 159, 0.3)); }
+}
+
+.oxc-menu-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: min(720px, 100%);
+}
+
+.oxc-menu-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-height: 92px;
+  padding: 1rem 1rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 255, 159, 0.22);
+  background:
+    linear-gradient(160deg, rgba(12, 22, 16, 0.72), rgba(6, 10, 8, 0.55));
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow:
+    0 0 0 1px rgba(197, 162, 111, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 40px rgba(0, 0, 0, 0.45);
+  color: var(--oxc-text);
+  cursor: pointer;
+  text-align: left;
+  opacity: 0;
+  transform: translateY(12px);
+  animation: oxc-tile-in 0.5s ease forwards;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.oxc-menu-tile:hover:not(:disabled),
+.oxc-menu-tile:focus-visible {
+  border-color: rgba(0, 255, 159, 0.65);
+  box-shadow:
+    0 0 0 1px rgba(0, 255, 159, 0.25),
+    0 0 28px rgba(0, 255, 159, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: translateY(-3px);
+  outline: none;
+}
+
+.oxc-menu-tile.is-primary {
+  border-color: rgba(0, 255, 159, 0.45);
+  background:
+    linear-gradient(160deg, rgba(0, 255, 159, 0.16), rgba(8, 16, 12, 0.7));
+  box-shadow:
+    0 0 24px rgba(0, 255, 159, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.oxc-menu-tile.is-soon {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+}
+
+.oxc-menu-tile-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9px;
+  color: var(--oxc-lime);
+  background: rgba(0, 255, 159, 0.1);
+  border: 1px solid rgba(0, 255, 159, 0.25);
+}
+
+.oxc-menu-tile-label {
+  font-family: var(--oxc-font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.oxc-menu-tile-badge {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  color: var(--oxc-gold);
+  border: 1px solid var(--oxc-line-gold);
+  border-radius: 999px;
+  padding: 0.15rem 0.45rem;
+}
+
+.oxc-menu-tile-frame {
+  position: absolute;
+  inset: 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(197, 162, 111, 0.12);
+  pointer-events: none;
+}
+
+@keyframes oxc-tile-in {
+  to { opacity: 1; transform: none; }
+}
+
+.oxc-menu-foot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.oxc-menu-demo {
+  background: transparent;
+  border: none;
+  color: var(--oxc-muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0.35rem 0.75rem;
+  transition: color 0.2s ease;
+}
+
+.oxc-menu-demo:hover {
+  color: var(--oxc-lime);
+}
+
+.oxc-menu-meta {
+  font-family: var(--oxc-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: rgba(200, 230, 210, 0.4);
+}
+
+/* ── Character chamber ── */
+.oxc-chars {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.75rem;
+  padding: 1rem 1rem 1.25rem;
+  overflow: auto;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.oxc-chars.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.oxc-chars-head {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding-top: 0.25rem;
+}
+
+.oxc-chars-back {
+  position: absolute;
+  left: 0;
+  top: 0.35rem;
+  background: transparent;
+  border: 1px solid rgba(0, 255, 159, 0.25);
+  color: var(--oxc-muted);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.oxc-chars-back:hover {
+  color: var(--oxc-lime);
+  border-color: rgba(0, 255, 159, 0.55);
+}
+
+.oxc-chars-title {
+  font-family: var(--oxc-font-display);
+  font-weight: 800;
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  letter-spacing: 0.18em;
+  margin: 0;
+  color: #fff;
+  text-shadow: 0 0 24px rgba(0, 255, 159, 0.35);
+}
+
+.oxc-chars-title-x {
+  color: var(--oxc-lime);
+  text-shadow: 0 0 18px rgba(0, 255, 159, 0.85);
+}
+
+.oxc-chars-sub {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--oxc-muted);
+}
+
+.oxc-pod-rail {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+  align-items: end;
+  min-height: 0;
+}
+
+.oxc-pod {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.4rem 0.75rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0;
+  transform: translateY(16px);
+  animation: oxc-tile-in 0.55s ease forwards;
+}
+
+.oxc-pod-class {
+  font-family: var(--oxc-font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(242, 255, 248, 0.75);
+}
+
+.oxc-pod.is-on .oxc-pod-class {
+  color: var(--pod-neon, var(--oxc-lime));
+  text-shadow: 0 0 12px color-mix(in srgb, var(--pod-neon, #00ff9f) 70%, transparent);
+}
+
+.oxc-pod-avatar {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 0.72;
+  max-height: 220px;
+  display: grid;
+  place-items: end center;
+  isolation: isolate;
+}
+
+.oxc-pod-beam {
+  position: absolute;
+  inset: 0 18% 12%;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--pod-neon, #00ff9f) 35%, transparent), transparent 75%);
+  filter: blur(8px);
+  opacity: 0.55;
+  border-radius: 40% 40% 20% 20%;
+  z-index: 0;
+  transition: opacity 0.25s ease;
+}
+
+.oxc-pod.is-on .oxc-pod-beam {
+  opacity: 0.95;
+}
+
+.oxc-pod-halo {
+  position: absolute;
+  top: 6%;
+  left: 50%;
+  width: 58%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--pod-gold, #c5a26f) 70%, transparent);
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--pod-neon, #00ff9f) 45%, transparent),
+    inset 0 0 12px color-mix(in srgb, var(--pod-neon, #00ff9f) 25%, transparent);
+  z-index: 1;
+}
+
+.oxc-pod-figure {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12%;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--pod-neon, #00ff9f) 40%, transparent));
+}
+
+.oxc-pod-head {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--pod-skin, #e8d5c0);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.oxc-pod-visor {
+  width: 22px;
+  height: 6px;
+  margin-top: -8px;
+  border-radius: 2px;
+  background: var(--pod-neon, #00ff9f);
+  box-shadow: 0 0 10px var(--pod-neon, #00ff9f);
+  z-index: 1;
+}
+
+.oxc-pod-torso {
+  width: 36px;
+  height: 48px;
+  margin-top: 4px;
+  border-radius: 8px 8px 6px 6px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--pod-neon, #00ff9f) 35%, var(--pod-body, #12181f)), var(--pod-body, #12181f));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--pod-gold, #c5a26f) 40%, transparent),
+    0 0 14px color-mix(in srgb, var(--pod-neon, #00ff9f) 30%, transparent);
+}
+
+.oxc-pod-legs {
+  display: flex;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.oxc-pod-legs span {
+  width: 12px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--pod-body, #12181f);
+  box-shadow: inset 0 0 0 1px rgba(0, 255, 159, 0.2);
+}
+
+.oxc-pod-ring {
+  position: absolute;
+  bottom: 4%;
+  left: 50%;
+  width: 72%;
+  height: 14%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px solid var(--pod-neon, #00ff9f);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--pod-neon, #00ff9f) 55%, transparent),
+    inset 0 0 10px color-mix(in srgb, var(--pod-neon, #00ff9f) 25%, transparent);
+  background: radial-gradient(ellipse at center, rgba(0, 255, 159, 0.18), transparent 65%);
+  z-index: 1;
+}
+
+.oxc-pod.is-on .oxc-pod-ring {
+  border-color: var(--pod-gold, #c5a26f);
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--pod-neon, #00ff9f) 70%, transparent),
+    0 0 8px color-mix(in srgb, var(--pod-gold, #c5a26f) 50%, transparent);
+}
+
+.oxc-pod-card {
+  width: 100%;
+  padding: 0.55rem 0.5rem 0.6rem;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 255, 159, 0.2);
+  background: linear-gradient(165deg, rgba(10, 18, 14, 0.85), rgba(5, 8, 6, 0.75));
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  text-align: left;
+}
+
+.oxc-pod.is-on .oxc-pod-card {
+  border-color: color-mix(in srgb, var(--pod-neon, #00ff9f) 55%, transparent);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--pod-neon, #00ff9f) 22%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--pod-gold, #c5a26f) 25%, transparent);
+}
+
+.oxc-pod-card-top strong {
+  display: block;
+  font-family: var(--oxc-font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+}
+
+.oxc-pod-card-top small {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.62rem;
+  color: var(--oxc-muted);
+  line-height: 1.3;
+}
+
+.oxc-pod-stats {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.28rem;
+}
+
+.oxc-pod-stats li {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--oxc-muted);
+}
+
+.oxc-pod-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.oxc-pod-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--pod-neon, #00ff9f), var(--pod-gold, #c5a26f));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--pod-neon, #00ff9f) 60%, transparent);
+}
+
+.oxc-chars-dock {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.oxc-chars-preview.glass {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 255, 159, 0.28);
+  background: linear-gradient(145deg, rgba(10, 18, 14, 0.8), rgba(5, 8, 6, 0.7));
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 0 0 1px rgba(197, 162, 111, 0.12),
+    0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.oxc-chars-preview-fig {
+  width: 88px;
+  flex-shrink: 0;
+}
+
+.oxc-chars-preview-fig .oxc-pod-avatar {
+  max-height: 110px;
+}
+
+.oxc-chars-preview-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.oxc-chars-preview-meta label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--oxc-muted);
+}
+
+.oxc-chars-preview-meta input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 255, 159, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--oxc-text);
+  padding: 0.55rem 0.7rem;
+  font-family: var(--oxc-font-body);
+  font-size: 0.95rem;
+}
+
+.oxc-chars-preview-meta input:focus {
+  outline: none;
+  border-color: var(--oxc-lime);
+  box-shadow: 0 0 0 2px rgba(0, 255, 159, 0.15);
+}
+
+.oxc-chars-preview-meta p {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  color: var(--oxc-muted);
+}
+
+.oxc-chars-gold {
+  color: var(--oxc-gold);
+}
+
+.oxc-chars-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.oxc-chars-enter {
+  width: 100%;
+}
+
+.oxc-chars-wallet {
+  grid-column: 1 / -1;
+  font-family: var(--oxc-font-mono);
+  font-size: 11px;
+  color: rgba(200, 230, 210, 0.45);
+  text-align: center;
+}
+
+@media (max-width: 980px) {
+  .oxc-menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .oxc-pod-rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .oxc-chars-dock {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .oxc-menu-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .oxc-pod-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .oxc-chars-back {
+    position: static;
+    margin-bottom: 0.5rem;
   }
 }

@@ -69,6 +69,7 @@ export function CityHUD() {
     quality,
     setQuality,
     triggerEmote,
+    setGate,
   } = useCity();
 
   useEffect(() => {
@@ -111,6 +112,14 @@ export function CityHUD() {
           </div>
         </div>
         <div className="oxc-top-actions">
+          <button
+            type="button"
+            className="oxc-toggle-btn"
+            onClick={() => setGate("menu")}
+            title="Return to main menu"
+          >
+            Menu
+          </button>
           <button
             type="button"
             className={`oxc-toggle-btn ${touchControls ? "on" : ""}`}

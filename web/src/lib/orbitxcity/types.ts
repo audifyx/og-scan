@@ -145,7 +145,13 @@ export interface AvatarAppearance {
   accentColor: string;
   skinColor: string;
   name: string;
+  /** Selected class from character pods (optional for legacy avatars). */
+  classId?: "trader" | "builder" | "gamer" | "creator" | "explorer";
 }
+
+/** Pre-world gate screens for AAA menu flow. */
+export type CityGate = "menu" | "characters" | "world";
+
 
 export interface InventoryItem {
   id: string;
