@@ -2,7 +2,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -15,6 +17,9 @@ import type {
   Vec3,
 } from "@/lib/orbitxcity/types";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
+import { useAuth } from "@/hooks/useAuth";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 interface CityContextValue {
   entered: boolean;
@@ -27,69 +32,168 @@ interface CityContextValue {
   interact: () => void;
   playerPos: Vec3;
   setPlayerPos: (p: Vec3) => void;
+  playerYaw: number;
+  setPlayerYaw: (y: number) => void;
   avatar: AvatarAppearance;
   setAvatar: (a: AvatarAppearance) => void;
   inventory: InventoryItem[];
+  shards: number;
+  collectShard: () => void;
   selectedMint: string | null;
+  openToken: (mint: string) => void;
   setSelectedMint: (mint: string | null) => void;
   prompt: { label: string; hint: string } | null;
+  realtime: CityRealtimeClient | null;
+  playerId: string;
+  voiceOpen: boolean;
+  setVoiceOpen: (v: boolean) => void;
+  teleportTarget: { x: number; z: number; seq: number } | null;
+  teleport: (x: number, z: number) => void;
 }
 
-const CityContext = createContext<CityContextValue | null>(null);
+/** Exported so the R3F canvas can bridge this context across renderers. */
+export const CityContext = createContext<CityContextValue | null>(null);
 
 const DEFAULT_AVATAR: AvatarAppearance = {
   bodyColor: "#1a2438",
   accentColor: "#17ff4d",
+  skinColor: "#e8d5c0",
   name: "Traveler",
 };
 
 const STARTER_INVENTORY: InventoryItem[] = [
-  { id: "badge-pioneer", kind: "badge", label: "City Pioneer", detail: "OrbitX City demo access" },
+  { id: "badge-pioneer", kind: "badge", label: "City Pioneer", detail: "OrbitX City Phase 1 access" },
   { id: "key-nyc", kind: "key", label: "NYC Block Key", detail: "Midtown demo district" },
-  { id: "ad-slot", kind: "ad_slot", label: "Billboard Slot", detail: "Advertising District (coming soon)" },
+  { id: "ad-slot", kind: "ad_slot", label: "Billboard Slot", detail: "1 SOL · 7 days · Advertising District" },
 ];
 
 function zoneToPanel(kind: InteractionKind): HudPanel {
   switch (kind) {
     case "marketplace":
-    case "token":
       return "marketplace";
+    case "token":
+      return "token";
     case "trading":
       return "trading";
     case "launch":
       return "launch";
     case "community":
-      return "community";
+      return "social";
     case "hq":
       return "map";
     case "billboard":
       return "live";
+    case "voice":
+      return "voice";
     default:
       return "live";
   }
 }
 
+function makePlayerId(userId?: string | null, wallet?: string | null): string {
+  if (userId) return `u:${userId}`;
+  if (wallet) return `w:${wallet.slice(0, 12)}`;
+  const cached = sessionStorage.getItem("oxc_guest_id");
+  if (cached) return cached;
+  const id = `g:${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`;
+  sessionStorage.setItem("oxc_guest_id", id);
+  return id;
+}
+
 export function CityProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const { publicKey } = useWallet();
   const [entered, setEntered] = useState(false);
   const [panel, setPanel] = useState<HudPanel>("none");
   const [activeZone, setActiveZone] = useState<InteractionZone | null>(null);
   const [playerPos, setPlayerPos] = useState<Vec3>(NYC_DEMO_BLOCK.spawn);
+  const [playerYaw, setPlayerYaw] = useState(0);
   const [avatar, setAvatar] = useState<AvatarAppearance>(DEFAULT_AVATAR);
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
+  const [shards, setShards] = useState(0);
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [realtime, setRealtime] = useState<CityRealtimeClient | null>(null);
+  const [teleportTarget, setTeleportTarget] = useState<{ x: number; z: number; seq: number } | null>(null);
   const inventory = STARTER_INVENTORY;
+
+  const playerId = useMemo(
+    () => makePlayerId(user?.id, publicKey?.toBase58() ?? null),
+    [user?.id, publicKey],
+  );
 
   const openPanel = useCallback((p: HudPanel) => setPanel(p), []);
   const closePanel = useCallback(() => setPanel("none"), []);
+  const collectShard = useCallback(() => setShards((s) => s + 1), []);
+  const teleport = useCallback((x: number, z: number) => {
+    setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
+    setPanel("none");
+  }, []);
+
+  const openToken = useCallback(
+    (mint: string) => {
+      setSelectedMint(mint);
+      setPanel("token");
+    },
+    [],
+  );
 
   const interact = useCallback(() => {
     if (!activeZone) return;
+    if (activeZone.tokenMint) {
+      openToken(activeZone.tokenMint);
+      return;
+    }
+    if (activeZone.kind === "voice") {
+      setVoiceOpen(true);
+      openPanel("voice");
+      return;
+    }
     openPanel(zoneToPanel(activeZone.kind));
-  }, [activeZone, openPanel]);
+  }, [activeZone, openPanel, openToken]);
 
   const prompt = useMemo(() => {
     if (!activeZone || panel !== "none") return null;
     return { label: activeZone.label, hint: activeZone.hint };
   }, [activeZone, panel]);
+
+  // Connect realtime when entering the world
+  useEffect(() => {
+    if (!entered) {
+      setRealtime((prev) => {
+        prev?.disconnect();
+        return null;
+      });
+      return;
+    }
+    const client = new CityRealtimeClient(
+      {
+        id: playerId,
+        name: avatar.name,
+        accentColor: avatar.accentColor,
+        bodyColor: avatar.bodyColor,
+        skinColor: avatar.skinColor,
+      },
+      "oxc-world-nyc",
+    );
+    client.connect();
+    setRealtime(client);
+    return () => {
+      client.disconnect();
+      setRealtime(null);
+    };
+    // Reconnect only when identity/session changes — not every avatar keystroke
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entered, playerId]);
+
+  // Broadcast position at ~6Hz while in world
+  const lastBroadcast = useRef(0);
+  useEffect(() => {
+    if (!realtime || !entered) return;
+    const now = performance.now();
+    if (now - lastBroadcast.current < 160) return;
+    lastBroadcast.current = now;
+    realtime.sendPosition(playerPos.x, playerPos.z, playerYaw);
+  }, [realtime, entered, playerPos, playerYaw]);
 
   const value = useMemo<CityContextValue>(
     () => ({
@@ -103,12 +207,23 @@ export function CityProvider({ children }: { children: ReactNode }) {
       interact,
       playerPos,
       setPlayerPos,
+      playerYaw,
+      setPlayerYaw,
       avatar,
       setAvatar,
       inventory,
+      shards,
+      collectShard,
       selectedMint,
+      openToken,
       setSelectedMint,
       prompt,
+      realtime,
+      playerId,
+      voiceOpen,
+      setVoiceOpen,
+      teleportTarget,
+      teleport,
     }),
     [
       entered,
@@ -118,10 +233,19 @@ export function CityProvider({ children }: { children: ReactNode }) {
       activeZone,
       interact,
       playerPos,
+      playerYaw,
       avatar,
       inventory,
+      shards,
+      collectShard,
       selectedMint,
+      openToken,
       prompt,
+      realtime,
+      playerId,
+      voiceOpen,
+      teleportTarget,
+      teleport,
     ],
   );
 

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
-import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { NYC_DEMO_BLOCK, TELEPORT_POINTS } from "@/lib/orbitxcity/demoBlock";
 import {
   fetchCityMarketSnapshot,
   fmtPct,
@@ -12,7 +12,11 @@ import {
 } from "@/lib/orbitxcity/marketData";
 import type { HudPanel } from "@/lib/orbitxcity/types";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
-import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio } from "lucide-react";
+import { TokenBuyPanel } from "./TokenBuyPanel";
+import { ChatPanel } from "./ChatPanel";
+import { SocialFeedPanel } from "./SocialFeedPanel";
+import { VoicePanel } from "./VoicePanel";
+import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic } from "lucide-react";
 
 const TITLES: Record<Exclude<HudPanel, "none">, string> = {
   map: "World Map",
@@ -22,9 +26,12 @@ const TITLES: Record<Exclude<HudPanel, "none">, string> = {
   live: "Live OrbitX Data",
   community: "Social District",
   events: "Event Calendar",
-  token: "Token",
+  token: "Token · Buy",
   trading: "Trading Floor",
   launch: "Launch Arena",
+  chat: "World Chat",
+  voice: "Voice Plaza",
+  social: "Social Feed",
 };
 
 export function CityPanelHost() {
@@ -52,16 +59,35 @@ export function CityPanelHost() {
         {panel === "events" && <EventsPanel />}
         {panel === "trading" && <TradingPanel />}
         {panel === "launch" && <LaunchPanel />}
-        {panel === "token" && <MarketplacePanel />}
+        {panel === "token" && <TokenBuyPanel />}
+        {panel === "chat" && <ChatPanel />}
+        {panel === "voice" && <VoicePanel />}
+        {panel === "social" && <SocialFeedPanel />}
       </div>
     </aside>
   );
 }
 
 function MapPanel() {
+  const { teleport } = useCity();
   return (
     <div className="oxc-stack">
-      <p className="oxc-muted">Four cities planned. Milestone 1 unlocks the NYC midtown demo block.</p>
+      <div className="oxc-section-label"><Map className="h-3.5 w-3.5" /> Fast travel</div>
+      <div className="oxc-teleport-grid">
+        {TELEPORT_POINTS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className="oxc-teleport-btn"
+            style={{ ["--tp" as string]: p.accent }}
+            onClick={() => teleport(p.x, p.z)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      <p className="oxc-muted">Four cities planned. Phase 1 unlocks the NYC midtown block.</p>
       <div className="oxc-grid-2">
         {ORBITX_CITIES.map((c) => (
           <div key={c.id} className={`oxc-tile ${c.unlocked ? "on" : ""}`} style={{ borderColor: c.accent }}>
@@ -87,11 +113,16 @@ function MapPanel() {
 }
 
 function InventoryPanel() {
-  const { inventory } = useCity();
+  const { inventory, shards } = useCity();
   return (
     <div className="oxc-stack">
       <p className="oxc-muted">Inventory expands with holder keys, ad slots, and community badges.</p>
       <div className="oxc-inv-grid">
+        <div className="oxc-inv-item shard">
+          <div className="oxc-inv-kind">currency</div>
+          <div className="oxc-tile-title">OBX Shards ◈ {shards}</div>
+          <div className="oxc-muted">Collected on the streets — walk over glowing coins.</div>
+        </div>
         {inventory.map((item) => (
           <div key={item.id} className="oxc-inv-item">
             <div className="oxc-inv-kind">{item.kind}</div>
@@ -137,6 +168,7 @@ function useMarket() {
 }
 
 function MarketplacePanel() {
+  const { openToken } = useCity();
   const { data, isLoading, isError } = useMarket();
   const launches = data?.launches ?? [];
   const featured = data?.featured ?? [];
@@ -144,7 +176,7 @@ function MarketplacePanel() {
   return (
     <div className="oxc-stack">
       <p className="oxc-muted">
-        Virtual storefronts backed by OrbitX launch registry — real mints, not in-game IOUs.
+        Virtual storefronts backed by OrbitX launch registry — real mints, not in-game IOUs. Tap a row to buy in-world.
       </p>
       {isLoading && <div className="oxc-muted">Syncing OrbitX market…</div>}
       {isError && <div className="oxc-warn">Live registry unavailable — retry shortly.</div>}
@@ -159,7 +191,7 @@ function MarketplacePanel() {
                 name={t.name}
                 symbol={t.ticker}
                 mint={t.mint_address}
-                href={`/orbitxlaunch/token/${t.mint_address}`}
+                onOpen={() => openToken(t.mint_address)}
               />
             ))}
           </div>
@@ -175,7 +207,7 @@ function MarketplacePanel() {
             symbol={t.ticker}
             mint={t.mint_address}
             meta={t.launch_type}
-            href={`/orbitxlaunch/token/${t.mint_address}`}
+            onOpen={() => openToken(t.mint_address)}
           />
         ))}
         {!isLoading && launches.length === 0 && <div className="oxc-muted">No launches indexed yet.</div>}
@@ -188,26 +220,36 @@ function MarketplacePanel() {
 }
 
 function LiveDataPanel() {
+  const { openToken } = useCity();
   const { data, isLoading } = useMarket();
   const rows = data?.trending ?? [];
   return (
     <div className="oxc-stack">
-      <p className="oxc-muted">Live screener feed from OrbitX DEX APIs.</p>
+      <p className="oxc-muted">Live screener feed from OrbitX DEX APIs. Tap a row to open the in-world buy panel.</p>
       <div className="oxc-section-label"><Radio className="h-3.5 w-3.5" /> Trending · 24h</div>
       {isLoading && <div className="oxc-muted">Loading tape…</div>}
       <div className="oxc-token-list">
-        {rows.map((r, i) => (
-          <div key={`${r.mint ?? r.symbol ?? i}`} className="oxc-token-row">
-            <div>
-              <div className="oxc-tile-title">${r.symbol ?? "???"}</div>
-              <div className="oxc-muted">{r.name ?? shortMint(r.mint ?? r.address)}</div>
-            </div>
-            <div className="oxc-token-stats">
-              <span>{fmtUsd(r.priceUsd)}</span>
-              <span className={Number(r.change24h) >= 0 ? "up" : "down"}>{fmtPct(r.change24h)}</span>
-            </div>
-          </div>
-        ))}
+        {rows.map((r, i) => {
+          const mint = r.mint ?? r.address;
+          return (
+            <button
+              key={`${mint ?? r.symbol ?? i}`}
+              type="button"
+              className="oxc-token-row link"
+              onClick={() => mint && openToken(mint)}
+              disabled={!mint}
+            >
+              <div>
+                <div className="oxc-tile-title">${r.symbol ?? "???"}</div>
+                <div className="oxc-muted">{r.name ?? shortMint(mint)}</div>
+              </div>
+              <div className="oxc-token-stats">
+                <span>{fmtUsd(r.priceUsd)}</span>
+                <span className={Number(r.change24h) >= 0 ? "up" : "down"}>{fmtPct(r.change24h)}</span>
+              </div>
+            </button>
+          );
+        })}
         {!isLoading && rows.length === 0 && <div className="oxc-muted">Screener quiet — check /ORBITX_DEX.</div>}
       </div>
       <Link className="oxc-btn ghost" to="/ORBITX_DEX">
@@ -255,22 +297,28 @@ function LaunchPanel() {
 }
 
 function CommunityPanel() {
+  const { openPanel, setVoiceOpen } = useCity();
   return (
     <div className="oxc-stack">
       <div className="oxc-hero-tile social">
         <Users className="h-5 w-5" />
         <div>
           <div className="oxc-tile-title">Social District</div>
-          <p className="oxc-muted">Communities, spaces, and holder rooms — OrbitX social as a place you walk into.</p>
+          <p className="oxc-muted">Feed, world chat, and voice plaza — OrbitX social as a place you walk into.</p>
         </div>
       </div>
+      <div className="oxc-actions">
+        <button type="button" className="oxc-btn primary" onClick={() => openPanel("social")}>Social feed</button>
+        <button type="button" className="oxc-btn ghost" onClick={() => openPanel("chat")}>World chat</button>
+        <button type="button" className="oxc-btn ghost" onClick={() => { setVoiceOpen(true); openPanel("voice"); }}>Voice plaza</button>
+      </div>
       <ul className="oxc-list">
-        <li>Join token communities from project buildings</li>
-        <li>Attend launches and AMAs in-world</li>
-        <li>Holder-only lounges (gated by wallet balance)</li>
+        <li>Post to the live OrbitX social feed</li>
+        <li>Chat with traders in the Midtown block</li>
+        <li>Join the city voice channel (LiveKit)</li>
       </ul>
       <div className="oxc-actions">
-        <Link className="oxc-btn primary" to="/orbitx-social">Open Social</Link>
+        <Link className="oxc-btn ghost" to="/orbitx-social">Open Social</Link>
         <Link className="oxc-btn ghost" to="/spaces">Spaces</Link>
       </div>
     </div>
@@ -302,22 +350,22 @@ function TokenRow({
   symbol,
   mint,
   meta,
-  href,
+  onOpen,
 }: {
   name: string;
   symbol: string;
   mint: string;
   meta?: string;
-  href: string;
+  onOpen: () => void;
 }) {
   return (
-    <Link to={href} className="oxc-token-row link">
+    <button type="button" className="oxc-token-row link" onClick={onOpen}>
       <div>
         <div className="oxc-tile-title">{name} <span className="oxc-sym">${symbol}</span></div>
         <div className="oxc-muted">{shortMint(mint)}{meta ? ` · ${meta}` : ""}</div>
       </div>
       <ExternalLink className="h-3.5 w-3.5 opacity-50" />
-    </Link>
+    </button>
   );
 }
 
@@ -325,6 +373,9 @@ export const PANEL_NAV = [
   { id: "map" as const, label: "Map", icon: Map },
   { id: "live" as const, label: "Live", icon: Radio },
   { id: "marketplace" as const, label: "Market", icon: Store },
+  { id: "chat" as const, label: "Chat", icon: MessageSquare },
+  { id: "social" as const, label: "Social", icon: Users },
+  { id: "voice" as const, label: "Voice", icon: Mic },
   { id: "events" as const, label: "Events", icon: Rocket },
   { id: "inventory" as const, label: "Bag", icon: Backpack },
   { id: "profile" as const, label: "Profile", icon: UserRound },

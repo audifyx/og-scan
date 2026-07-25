@@ -31,7 +31,8 @@ export type InteractionKind =
   | "community"
   | "billboard"
   | "hq"
-  | "token";
+  | "token"
+  | "voice";
 
 export interface Vec3 {
   x: number;
@@ -80,8 +81,10 @@ export interface BillboardDefinition {
   title: string;
   subtitle: string;
   accent: string;
+  /** When set, board becomes a live token ad (price / mcap / chart / QR). */
   tokenMint?: string;
   projectName?: string;
+  website?: string;
 }
 
 export interface InteractionZone {
@@ -117,11 +120,15 @@ export type HudPanel =
   | "events"
   | "token"
   | "trading"
-  | "launch";
+  | "launch"
+  | "chat"
+  | "voice"
+  | "social";
 
 export interface AvatarAppearance {
   bodyColor: string;
   accentColor: string;
+  skinColor: string;
   name: string;
 }
 
@@ -131,4 +138,21 @@ export interface InventoryItem {
   label: string;
   detail?: string;
   mint?: string;
+}
+
+export interface TokenDetail {
+  mint: string;
+  name: string;
+  symbol: string;
+  icon?: string;
+  priceUsd?: number;
+  mcap?: number;
+  fdv?: number;
+  liquidity?: number;
+  volume24h?: number;
+  change24h?: number;
+  holderCount?: number;
+  decimals?: number;
+  website?: string;
+  twitter?: string;
 }

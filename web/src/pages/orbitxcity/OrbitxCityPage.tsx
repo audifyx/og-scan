@@ -1,12 +1,23 @@
 import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { CityProvider, useCity } from "./CityProvider";
 import { WorldCanvas } from "@/components/orbitxcity/WorldCanvas";
 import { EnterScreen } from "@/components/orbitxcity/ui/EnterScreen";
 import { CityHUD } from "@/components/orbitxcity/ui/CityHUD";
+import { fetchCityMarketSnapshot } from "@/lib/orbitxcity/marketData";
 import "./city.css";
 
 function CityShell() {
   const { entered } = useCity();
+
+  // Live market feed shared by HUD panels + in-world jumbotrons
+  const { data: market } = useQuery({
+    queryKey: ["orbitxcity-market"],
+    queryFn: fetchCityMarketSnapshot,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+    enabled: entered,
+  });
 
   useEffect(() => {
     document.body.classList.add("oxc-lock");
@@ -19,7 +30,7 @@ function CityShell() {
         <EnterScreen />
       ) : (
         <>
-          <WorldCanvas />
+          <WorldCanvas tickerRows={market?.trending ?? []} />
           <CityHUD />
         </>
       )}

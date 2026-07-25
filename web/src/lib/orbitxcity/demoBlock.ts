@@ -1,4 +1,5 @@
 import type { WorldBlockConfig } from "./types";
+import { FARTCOIN_CANONICAL_MINT, OGSCAN_TOKEN_MINT } from "@/lib/og";
 
 /**
  * OrbitX NYC — Milestone 1 playable city block.
@@ -74,7 +75,7 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       name: "OrbitX HQ",
       position: { x: 0, y: 0, z: -16 },
       size: { width: 10, height: 14, depth: 8 },
-      color: "#0a1628",
+      color: "#16294a",
       accent: "#17ff4d",
       interaction: "hq",
       label: "HQ",
@@ -86,7 +87,7 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       name: "Meme Market",
       position: { x: -16, y: 0, z: -2 },
       size: { width: 9, height: 7, depth: 9 },
-      color: "#12101a",
+      color: "#2a2140",
       accent: "#ff4d9a",
       interaction: "marketplace",
       label: "MARKET",
@@ -98,7 +99,7 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       name: "Token Boutique",
       position: { x: -16, y: 0, z: 10 },
       size: { width: 5, height: 5, depth: 5 },
-      color: "#151820",
+      color: "#232c40",
       accent: "#3de7ff",
       interaction: "marketplace",
       label: "SHOP",
@@ -110,7 +111,7 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       name: "Launch Arena",
       position: { x: 16, y: 0, z: -2 },
       size: { width: 10, height: 9, depth: 10 },
-      color: "#140f08",
+      color: "#332a12",
       accent: "#f5c542",
       interaction: "launch",
       label: "LAUNCH",
@@ -122,7 +123,7 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       name: "Trading Floor",
       position: { x: 0, y: 0, z: 18 },
       size: { width: 12, height: 8, depth: 8 },
-      color: "#081418",
+      color: "#132e38",
       accent: "#3de7ff",
       interaction: "trading",
       label: "TRADE",
@@ -134,7 +135,7 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       name: "Social Hub",
       position: { x: -16, y: 0, z: 20 },
       size: { width: 7, height: 6, depth: 7 },
-      color: "#10141c",
+      color: "#20283c",
       accent: "#a78bfa",
       interaction: "community",
       label: "SOCIAL",
@@ -146,7 +147,7 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       name: "Ad Tower",
       position: { x: 18, y: 0, z: 18 },
       size: { width: 5, height: 16, depth: 5 },
-      color: "#0c0c14",
+      color: "#1d1d30",
       accent: "#17ff4d",
       interaction: "billboard",
       label: "ADS",
@@ -160,9 +161,11 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       width: 6,
       height: 3.2,
       title: "ORBITX",
-      subtitle: "Trade the metaverse",
+      subtitle: "Official token · real wallets",
       accent: "#17ff4d",
       projectName: "OrbitX",
+      tokenMint: OGSCAN_TOKEN_MINT,
+      website: "https://orbitx.world",
     },
     {
       id: "bb-2",
@@ -170,10 +173,11 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       rotationY: -Math.PI / 5,
       width: 5.5,
       height: 3,
-      title: "MEME MARKET",
-      subtitle: "Real coins · real wallets",
+      title: "FARTCOIN",
+      subtitle: "Sponsored · Trading District",
       accent: "#ff4d9a",
-      projectName: "Meme Market",
+      projectName: "Fartcoin",
+      tokenMint: FARTCOIN_CANONICAL_MINT,
     },
     {
       id: "bb-3",
@@ -196,6 +200,7 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       subtitle: "Origin intel before you ape",
       accent: "#3de7ff",
       projectName: "OrbitX Scanner",
+      website: "https://orbitx.world/ORBITX_DEX/scanner",
     },
   ],
   zones: [
@@ -239,13 +244,49 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
       id: "z-social",
       kind: "community",
       label: "Social Hub",
-      hint: "Communities & conversations",
+      hint: "Communities, feed & voice plaza",
       position: { x: -16, y: 0, z: 16 },
       radius: 4,
       buildingId: "b-social",
     },
+    {
+      id: "z-voice",
+      kind: "voice",
+      label: "Voice Plaza",
+      hint: "Join the live OrbitX City voice channel",
+      position: { x: 0, y: 0, z: 0 },
+      radius: 3.5,
+    },
+    {
+      id: "z-bb-orbitx",
+      kind: "token",
+      label: "OrbitX Billboard",
+      hint: "View live token · buy with wallet",
+      position: { x: -8, y: 0, z: -8 },
+      radius: 3.5,
+      tokenMint: OGSCAN_TOKEN_MINT,
+    },
+    {
+      id: "z-bb-fart",
+      kind: "token",
+      label: "Fartcoin Billboard",
+      hint: "View live token · buy with wallet",
+      position: { x: 8, y: 0, z: -6 },
+      radius: 3.5,
+      tokenMint: FARTCOIN_CANONICAL_MINT,
+    },
   ],
 };
+
+/** Safe fast-travel landing spots per district (clear of colliders). */
+export const TELEPORT_POINTS: Array<{ id: string; label: string; x: number; z: number; accent: string }> = [
+  { id: "hq", label: "OrbitX HQ", x: 0, z: -9, accent: "#17ff4d" },
+  { id: "meme", label: "Meme Market", x: -14, z: 4, accent: "#ff4d9a" },
+  { id: "launch", label: "Launch Arena", x: 14, z: 4, accent: "#f5c542" },
+  { id: "trading", label: "Trading Floor", x: 0, z: 11, accent: "#3de7ff" },
+  { id: "social", label: "Social Hub", x: -14, z: 14, accent: "#a78bfa" },
+  { id: "ads", label: "Ad District", x: 13, z: 13, accent: "#17ff4d" },
+];
 
 /** Simple AABB colliders derived from buildings (expanded footprint). */
 export function buildingColliders(block: WorldBlockConfig) {
