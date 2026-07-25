@@ -3,7 +3,15 @@ export const SUPA_URL = process.env.SUPABASE_URL || "https://ffjipnkhcebjvttlipt
 export const SUPA_FN = process.env.SUPABASE_FN_URL || SUPA_URL + "/functions/v1";
 export const ANON = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmamlwbmtoY2VianZ0dGxpcHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1Mjc5NDgsImV4cCI6MjA5MzEwMzk0OH0.aXu8bbpVVwc8KOJf1-lHqO3cz_0GZD10_TE0GlKQ1BI";
 export const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-export const ADMIN_PASS = process.env.ADMIN_PASS || "0129";
+export const ADMIN_PASS = process.env.ADMIN_PASS || "";
+/** True when ADMIN_PASS is configured (no hardcoded default). */
+export function hasAdminPass() {
+  return typeof ADMIN_PASS === "string" && ADMIN_PASS.length >= 8;
+}
+export function adminAuthorized(provided) {
+  if (!hasAdminPass()) return false;
+  return String(provided || "") === ADMIN_PASS;
+}
 export const PAY_WALLET = "CicbPxARTDrwQ4XcxWsn6SYeG4FMJHirS633cZUJeQDh";
 // Platform fee wallet — launchpad fee + trading fee route here specifically
 // (kept distinct from PAY_WALLET, which is used for boosts/listings).

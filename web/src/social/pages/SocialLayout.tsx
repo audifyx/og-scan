@@ -54,7 +54,7 @@ export default function SocialLayout() {
             </NavLink>
           ))}
           <div style={{ marginTop: "auto", padding: "1rem 0.55rem 0.2rem", fontSize: "0.72rem" }}>
-            <a href="/community" className="oxs-link">
+            <a href="/community-classic" className="oxs-link">
               Full community app →
             </a>
             <br />

@@ -140,7 +140,7 @@ export default function ModerationAdmin() {
             <button className="oxs-btn oxs-btn-ghost" type="button" onClick={() => resetSocialDemo()}>
               Reset demo graph
             </button>
-            <a href="/community" className="oxs-btn" style={{ textDecoration: "none" }}>
+            <a href="/community-classic" className="oxs-btn" style={{ textDecoration: "none" }}>
               Live community app
             </a>
           </div>

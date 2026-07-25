@@ -50,7 +50,7 @@ const ROUTES = {
   waitlist,
 };
 
-const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "track", "admin", "alerts-run", "llms", "llms.txt"]);
+const NO_LIMIT = new Set(["openapi", "openapi.json", "health", "track", "llms", "llms.txt"]);
 const LIMITS = { chat: 12, forensics: 20, report: 10 };
 const DEFAULT_LIMIT = 60;
 const WINDOW_MS = 10_000;

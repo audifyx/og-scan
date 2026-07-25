@@ -69,6 +69,19 @@ async function deliver(a, price) {
 }
 
 export default async function handler(req, res) {
+  // Cron / worker secret required — public invocation was an abuse vector.
+  const secret = process.env.CRON_SECRET || process.env.OXW_WORKER_SECRET || "";
+  const hdr =
+    req.headers["authorization"] ||
+    req.headers["x-cron-secret"] ||
+    req.headers["x-oxw-worker-secret"] ||
+    "";
+  const bearer = String(hdr).replace(/^Bearer\s+/i, "").trim();
+  const q = new URL(req.url, "http://x").searchParams.get("secret") || "";
+  if (!secret || (bearer !== secret && q !== secret)) {
+    return send(res, 401, { ok: false, error: "unauthorized" });
+  }
+
   const objs = await kvList("alerts/");
   let checked = 0, fired = 0;
   for (const o of objs) {

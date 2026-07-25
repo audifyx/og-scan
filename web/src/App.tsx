@@ -181,6 +181,15 @@ const OrbitxCityPage = lazyWithRetry(() => import("./pages/orbitxcity/OrbitxCity
 const OsApp = lazyWithRetry(() => import("./os/OsApp"));
 const PlayApp = lazyWithRetry(() => import("./gaming/PlayApp"));
 
+function RouteFallback({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center bg-[#05080c] font-mono text-xs uppercase tracking-[0.18em] text-white/45">
+      Loading {label}…
+    </div>
+  );
+}
+
+
 // Redirect legacy crypto/tools/coin routes into the OrbitX DEX app (/ORBITX_DEX).
 function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undefined>) => string) }) {
   const params = useParams();
@@ -307,34 +316,34 @@ const App = () => (
             </Route>
 
             {/* ── OrbitX Crypto Intelligence Command Center ── */}
-            <Route path="/intel" element={<Suspense fallback={null}><IntelLayout /></Suspense>}>
-              <Route index element={<Suspense fallback={null}><IntelHome /></Suspense>} />
-              <Route path="scan" element={<Suspense fallback={null}><TokenScanner /></Suspense>} />
-              <Route path="scan/:mint" element={<Suspense fallback={null}><TokenScanner /></Suspense>} />
-              <Route path="trade" element={<Suspense fallback={null}><TradeDesk /></Suspense>} />
-              <Route path="portfolio" element={<Suspense fallback={null}><PortfolioDesk /></Suspense>} />
-              <Route path="trending" element={<Suspense fallback={null}><TrendingIntel /></Suspense>} />
-              <Route path="whales" element={<Suspense fallback={null}><WhaleIntel /></Suspense>} />
-              <Route path="sentiment" element={<Suspense fallback={null}><SentimentIntel /></Suspense>} />
-              <Route path="launch" element={<Suspense fallback={null}><LaunchStudio /></Suspense>} />
-              <Route path="wallet/:address" element={<Suspense fallback={null}><WalletTracker /></Suspense>} />
+            <Route path="/intel" element={<Suspense fallback={<RouteFallback label="Intel" />}><IntelLayout /></Suspense>}>
+              <Route index element={<Suspense fallback={<RouteFallback label="Intel" />}><IntelHome /></Suspense>} />
+              <Route path="scan" element={<Suspense fallback={<RouteFallback label="Scanner" />}><TokenScanner /></Suspense>} />
+              <Route path="scan/:mint" element={<Suspense fallback={<RouteFallback label="Scanner" />}><TokenScanner /></Suspense>} />
+              <Route path="trade" element={<Suspense fallback={<RouteFallback label="Trade" />}><TradeDesk /></Suspense>} />
+              <Route path="portfolio" element={<Suspense fallback={<RouteFallback label="Portfolio" />}><PortfolioDesk /></Suspense>} />
+              <Route path="trending" element={<Suspense fallback={<RouteFallback label="Trending" />}><TrendingIntel /></Suspense>} />
+              <Route path="whales" element={<Suspense fallback={<RouteFallback label="Whales" />}><WhaleIntel /></Suspense>} />
+              <Route path="sentiment" element={<Suspense fallback={<RouteFallback label="Sentiment" />}><SentimentIntel /></Suspense>} />
+              <Route path="launch" element={<Suspense fallback={<RouteFallback label="Launch" />}><LaunchStudio /></Suspense>} />
+              <Route path="wallet/:address" element={<Suspense fallback={<RouteFallback label="Wallet" />}><WalletTracker /></Suspense>} />
             </Route>
 
             {/* ── OrbitX Social HQ (Social + Growth Team) ── */}
-            <Route path="/hq" element={<Suspense fallback={null}><SocialLayout /></Suspense>}>
-              <Route index element={<Suspense fallback={null}><SocialHomeHq /></Suspense>} />
-              <Route path="feed" element={<Suspense fallback={null}><NetworkFeed /></Suspense>} />
-              <Route path="communities" element={<Suspense fallback={null}><CommunitiesHub /></Suspense>} />
-              <Route path="trading" element={<Suspense fallback={null}><TradingCommunities /></Suspense>} />
-              <Route path="voice" element={<Suspense fallback={null}><VoiceSpaces /></Suspense>} />
-              <Route path="growth" element={<Suspense fallback={null}><GrowthCenter /></Suspense>} />
-              <Route path="leaderboards" element={<Suspense fallback={null}><LeaderboardsPage /></Suspense>} />
-              <Route path="creators" element={<Suspense fallback={null}><CreatorProgram /></Suspense>} />
-              <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
-              <Route path="profile" element={<Suspense fallback={null}><ProfileView /></Suspense>} />
-              <Route path="profile/:userId" element={<Suspense fallback={null}><ProfileView /></Suspense>} />
-              <Route path="admin" element={<Suspense fallback={null}><ModerationAdmin /></Suspense>} />
-              <Route path="invite" element={<Suspense fallback={null}><InviteLanding /></Suspense>} />
+            <Route path="/hq" element={<Suspense fallback={<RouteFallback label="Social HQ" />}><SocialLayout /></Suspense>}>
+              <Route index element={<Suspense fallback={<RouteFallback label="HQ" />}><SocialHomeHq /></Suspense>} />
+              <Route path="feed" element={<Suspense fallback={<RouteFallback label="Feed" />}><NetworkFeed /></Suspense>} />
+              <Route path="communities" element={<Suspense fallback={<RouteFallback label="Communities" />}><CommunitiesHub /></Suspense>} />
+              <Route path="trading" element={<Suspense fallback={<RouteFallback label="Trading rooms" />}><TradingCommunities /></Suspense>} />
+              <Route path="voice" element={<Suspense fallback={<RouteFallback label="Voice" />}><VoiceSpaces /></Suspense>} />
+              <Route path="growth" element={<Suspense fallback={<RouteFallback label="Growth" />}><GrowthCenter /></Suspense>} />
+              <Route path="leaderboards" element={<Suspense fallback={<RouteFallback label="Leaderboards" />}><LeaderboardsPage /></Suspense>} />
+              <Route path="creators" element={<Suspense fallback={<RouteFallback label="Creators" />}><CreatorProgram /></Suspense>} />
+              <Route path="notifications" element={<Suspense fallback={<RouteFallback label="Alerts" />}><NotificationsPage /></Suspense>} />
+              <Route path="profile" element={<Suspense fallback={<RouteFallback label="Profile" />}><ProfileView /></Suspense>} />
+              <Route path="profile/:userId" element={<Suspense fallback={<RouteFallback label="Profile" />}><ProfileView /></Suspense>} />
+              <Route path="admin" element={<Suspense fallback={<RouteFallback label="Moderation" />}><ModerationAdmin /></Suspense>} />
+              <Route path="invite" element={<Suspense fallback={<RouteFallback label="Invite" />}><InviteLanding /></Suspense>} />
             </Route>
 
             {/* ── Protected: App shell ── */}
@@ -382,6 +391,7 @@ const App = () => (
             <Route path="/listings/:mintAddress" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mintAddress}`} />} />
             <Route path="/token-manager" element={<OgdexRedirect to="/ORBITX_DEX/metadata" />} />
             <Route path="/social-hub" element={<Navigate to="/hq" replace />} />
+            <Route path="/community" element={<Navigate to="/community-classic" replace />} />
             <Route path="/community-classic" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
             <Route path="/community-hub" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
             <Route path="/voice-rooms" element={<ProtectedRoute><Index /></ProtectedRoute>} />

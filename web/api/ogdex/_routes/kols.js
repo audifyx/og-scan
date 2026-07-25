@@ -1,4 +1,4 @@
-import { callFn, send, cache, dbSelect, dbInsert, dbUpdate, readBody, ADMIN_PASS } from "../_lib.js";
+import { callFn, send, cache, dbSelect, dbInsert, dbUpdate, readBody, adminAuthorized, hasAdminPass } from "../_lib.js";
 import { parseSwap } from "../_swap.js";
 import { enrichTokens } from "../_market.js";
 import { computePnl } from "../_pnl.js";
@@ -222,7 +222,7 @@ async function ingestBatch(sp) {
 }
 
 async function pnlRefresh(res, sp) {
-  if (sp.get("pass") !== String(ADMIN_PASS)) return send(res, 401, { ok: false, error: "unauthorized" });
+  if (!hasAdminPass() || !adminAuthorized(sp.get("pass"))) return send(res, 401, { ok: false, error: "unauthorized" });
   const batch = Math.min(Number(sp.get("batch")) || 10, 14);
   const offset = Number(sp.get("offset")) || 0;
   try {
@@ -238,7 +238,7 @@ async function pnlRefresh(res, sp) {
 async function add(req, res) {
   try {
     const b = await readBody(req);
-    if (!b.pass || String(b.pass) !== String(ADMIN_PASS)) return send(res, 401, { ok: false, error: "unauthorized" });
+    if (!hasAdminPass() || !adminAuthorized(b.pass)) return send(res, 401, { ok: false, error: "unauthorized" });
     const address = String(b.address || "").trim();
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) return send(res, 400, { ok: false, error: "valid Solana address required" });
     const row = { name: b.name || address.slice(0, 6), x_handle: b.twitter || null, x_url: b.twitter ? `https://x.com/${String(b.twitter).replace(/^@/, "")}` : null,
