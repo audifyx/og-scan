@@ -144,7 +144,7 @@ export function RocketShow() {
       <group ref={beamA} position={[PAD.x - 4, 0.3, PAD.z + 3]}>
         <mesh position={[0, 9, 0]} rotation-z={Math.PI}>
           <coneGeometry args={[1.5, 18, 12, 1, true]} />
-          <meshBasicMaterial color="#f5c542" transparent opacity={0.07} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
+          <meshBasicMaterial color="#f5c542" transparent opacity={0.05} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
         </mesh>
       </group>
       <group ref={beamB} position={[PAD.x + 4, 0.3, PAD.z - 3]}>

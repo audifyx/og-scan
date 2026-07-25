@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import QRCode from "qrcode";
 import type { BillboardDefinition } from "@/lib/orbitxcity/types";
 import { hashSeed } from "@/lib/orbitxcity/collision";
 import { createAdTexture, drawLiveTokenBoard } from "@/lib/orbitxcity/textures";
@@ -59,10 +60,7 @@ function LiveTokenBillboard({ board }: { board: BillboardDefinition }) {
 
   const [token, setToken] = useState<TokenDetail | null>(null);
   const [candles, setCandles] = useState<ChartCandle[]>([]);
-  const tokenRef = useRef(token);
-  const candlesRef = useRef(candles);
-  tokenRef.current = token;
-  candlesRef.current = candles;
+  const [qrImage, setQrImage] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
     if (!tokenMint) return;
@@ -81,12 +79,33 @@ function LiveTokenBillboard({ board }: { board: BillboardDefinition }) {
     };
   }, [tokenMint]);
 
+  // Real scannable QR → token page on OrbitX DEX
+  useEffect(() => {
+    if (!tokenMint) return;
+    let live = true;
+    QRCode.toDataURL(`${window.location.origin}/ORBITX_DEX/token/${tokenMint}`, {
+      margin: 1,
+      width: 136,
+      color: { dark: "#05070d", light: "#ffffff" },
+    })
+      .then((url) => {
+        if (!live) return;
+        const img = new Image();
+        img.onload = () => live && setQrImage(img);
+        img.src = url;
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [tokenMint]);
+
   useEffect(() => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    drawLiveTokenBoard(ctx, token, candles, accent, title);
+    drawLiveTokenBoard(ctx, token, candles, accent, title, qrImage);
     texture.needsUpdate = true;
-  }, [canvas, texture, token, candles, accent, title]);
+  }, [canvas, texture, token, candles, accent, title, qrImage]);
 
   const screenMat = useRef<THREE.MeshBasicMaterial>(null);
   useFrame(() => {

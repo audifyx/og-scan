@@ -97,7 +97,10 @@ export function TokenBuyPanel() {
     return <div className="oxc-muted">Select a token from a billboard or the marketplace.</div>;
   }
 
-  const outUi = quote ? (Number(quote.outAmount) / 1e6).toFixed(2) : "—";
+  const decimals = token?.decimals ?? 6;
+  const outUi = quote
+    ? (Number(quote.outAmount) / 10 ** decimals).toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : "—";
   const spark = candles ?? [];
 
   return (

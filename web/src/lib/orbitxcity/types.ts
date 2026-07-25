@@ -152,6 +152,7 @@ export interface TokenDetail {
   volume24h?: number;
   change24h?: number;
   holderCount?: number;
+  decimals?: number;
   website?: string;
   twitter?: string;
 }

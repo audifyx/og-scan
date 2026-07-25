@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
-import { REALTIME_ENABLED } from "@/lib/orbitxcity/realtime";
+import { REALTIME_ENABLED, emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
 import { Send } from "lucide-react";
 
 /** World chat — broadcast over the city realtime channel. */
@@ -10,8 +10,8 @@ export function ChatPanel() {
   const bottom = useRef<HTMLDivElement>(null);
 
   const snap = useSyncExternalStore(
-    realtime?.subscribe ?? ((cb: () => void) => { cb(); return () => {}; }),
-    realtime?.getSnapshot ?? (() => ({ online: 1, chat: [], connected: false })),
+    realtime?.subscribe ?? noopSubscribe,
+    realtime?.getSnapshot ?? emptySnapshotGetter,
   );
 
   useEffect(() => {

@@ -47,6 +47,8 @@ interface CityContextValue {
   playerId: string;
   voiceOpen: boolean;
   setVoiceOpen: (v: boolean) => void;
+  teleportTarget: { x: number; z: number; seq: number } | null;
+  teleport: (x: number, z: number) => void;
 }
 
 /** Exported so the R3F canvas can bridge this context across renderers. */
@@ -111,6 +113,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [shards, setShards] = useState(0);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [realtime, setRealtime] = useState<CityRealtimeClient | null>(null);
+  const [teleportTarget, setTeleportTarget] = useState<{ x: number; z: number; seq: number } | null>(null);
   const inventory = STARTER_INVENTORY;
 
   const playerId = useMemo(
@@ -121,6 +124,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const openPanel = useCallback((p: HudPanel) => setPanel(p), []);
   const closePanel = useCallback(() => setPanel("none"), []);
   const collectShard = useCallback(() => setShards((s) => s + 1), []);
+  const teleport = useCallback((x: number, z: number) => {
+    setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
+    setPanel("none");
+  }, []);
 
   const openToken = useCallback(
     (mint: string) => {
@@ -215,6 +222,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       playerId,
       voiceOpen,
       setVoiceOpen,
+      teleportTarget,
+      teleport,
     }),
     [
       entered,
@@ -235,6 +244,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       realtime,
       playerId,
       voiceOpen,
+      teleportTarget,
+      teleport,
     ],
   );
 

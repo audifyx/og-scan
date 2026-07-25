@@ -278,6 +278,16 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
   ],
 };
 
+/** Safe fast-travel landing spots per district (clear of colliders). */
+export const TELEPORT_POINTS: Array<{ id: string; label: string; x: number; z: number; accent: string }> = [
+  { id: "hq", label: "OrbitX HQ", x: 0, z: -9, accent: "#17ff4d" },
+  { id: "meme", label: "Meme Market", x: -14, z: 4, accent: "#ff4d9a" },
+  { id: "launch", label: "Launch Arena", x: 14, z: 4, accent: "#f5c542" },
+  { id: "trading", label: "Trading Floor", x: 0, z: 11, accent: "#3de7ff" },
+  { id: "social", label: "Social Hub", x: -14, z: 14, accent: "#a78bfa" },
+  { id: "ads", label: "Ad District", x: 13, z: 13, accent: "#17ff4d" },
+];
+
 /** Simple AABB colliders derived from buildings (expanded footprint). */
 export function buildingColliders(block: WorldBlockConfig) {
   return block.buildings.map((b) => ({

@@ -218,13 +218,14 @@ export function createAdTexture(
   return toTexture(canvas);
 }
 
-/** Draw a live token ad into an existing canvas (price, mcap, sparkline, QR-ish block). */
+/** Draw a live token ad into an existing canvas (price, mcap, sparkline, QR). */
 export function drawLiveTokenBoard(
   ctx: CanvasRenderingContext2D,
   token: TokenDetail | null,
   candles: ChartCandle[],
   accent: string,
   fallbackTitle: string,
+  qrImage?: CanvasImageSource | null,
 ): void {
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
@@ -293,16 +294,20 @@ export function drawLiveTokenBoard(
     ctx.stroke();
   }
 
-  // QR-style block (visual affordance — click opens token panel)
+  // QR code linking to the token's DEX page (scannable from stream/screenshots)
   const qx = W - 88;
   const qy = H - 96;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(qx, qy, 68, 68);
-  ctx.fillStyle = "#05070d";
-  for (let r = 0; r < 7; r++) {
-    for (let c = 0; c < 7; c++) {
-      if ((r + c * 3 + (token?.symbol?.length ?? 0)) % 3 !== 0) {
-        ctx.fillRect(qx + 6 + c * 8, qy + 6 + r * 8, 7, 7);
+  if (qrImage) {
+    ctx.drawImage(qrImage, qx, qy, 68, 68);
+  } else {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(qx, qy, 68, 68);
+    ctx.fillStyle = "#05070d";
+    for (let r = 0; r < 7; r++) {
+      for (let c = 0; c < 7; c++) {
+        if ((r + c * 3 + (token?.symbol?.length ?? 0)) % 3 !== 0) {
+          ctx.fillRect(qx + 6 + c * 8, qy + 6 + r * 8, 7, 7);
+        }
       }
     }
   }

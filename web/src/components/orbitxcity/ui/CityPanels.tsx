@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
-import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { NYC_DEMO_BLOCK, TELEPORT_POINTS } from "@/lib/orbitxcity/demoBlock";
 import {
   fetchCityMarketSnapshot,
   fmtPct,
@@ -69,9 +69,25 @@ export function CityPanelHost() {
 }
 
 function MapPanel() {
+  const { teleport } = useCity();
   return (
     <div className="oxc-stack">
-      <p className="oxc-muted">Four cities planned. Milestone 1 unlocks the NYC midtown demo block.</p>
+      <div className="oxc-section-label"><Map className="h-3.5 w-3.5" /> Fast travel</div>
+      <div className="oxc-teleport-grid">
+        {TELEPORT_POINTS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className="oxc-teleport-btn"
+            style={{ ["--tp" as string]: p.accent }}
+            onClick={() => teleport(p.x, p.z)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      <p className="oxc-muted">Four cities planned. Phase 1 unlocks the NYC midtown block.</p>
       <div className="oxc-grid-2">
         {ORBITX_CITIES.map((c) => (
           <div key={c.id} className={`oxc-tile ${c.unlocked ? "on" : ""}`} style={{ borderColor: c.accent }}>

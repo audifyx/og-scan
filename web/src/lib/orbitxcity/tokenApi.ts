@@ -35,6 +35,7 @@ export async function fetchTokenDetail(mint: string): Promise<TokenDetail | null
       volume24h: pickNum(t.volume24h, (t.volume as { h24?: number })?.h24, t.volume),
       change24h: pickNum(t.change24h, t.priceChange24h, (t.priceChange as { h24?: number })?.h24),
       holderCount: pickNum(t.holderCount, t.holders) as number | undefined,
+      decimals: pickNum(t.decimals, meta.decimals),
       website: (t.website ?? meta.website) as string | undefined,
       twitter: (t.twitter ?? meta.twitter) as string | undefined,
     };

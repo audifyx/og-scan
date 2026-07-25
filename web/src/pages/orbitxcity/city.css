@@ -985,6 +985,30 @@ button.oxc-token-row {
   font: inherit;
 }
 
+.oxc-teleport-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem;
+}
+
+.oxc-teleport-btn {
+  border: 1px solid color-mix(in srgb, var(--tp, var(--oxc-lime)) 45%, transparent);
+  background: color-mix(in srgb, var(--tp, var(--oxc-lime)) 9%, transparent);
+  color: var(--tp, var(--oxc-lime));
+  padding: 0.55rem 0.5rem;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.oxc-teleport-btn:hover {
+  background: color-mix(in srgb, var(--tp, var(--oxc-lime)) 20%, transparent);
+}
+
 @media (max-width: 640px) {
   .oxc-panel {
     top: auto;

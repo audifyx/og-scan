@@ -14,6 +14,7 @@ import { NPCs } from "./NPCs";
 import { Drones } from "./Drones";
 import { RocketShow } from "./RocketShow";
 import { MegaScreen } from "./MegaScreen";
+import { OxiGuide } from "./OxiGuide";
 
 function HqHologram() {
   const ring = useRef<THREE.Mesh>(null);
@@ -101,6 +102,7 @@ export function CityEnvironment({ tickerRows }: { tickerRows: ScreenerRow[] }) {
       <RocketShow />
       <NPCs />
       <Drones />
+      <OxiGuide />
 
       {/* Central plaza hologram disc */}
       <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>

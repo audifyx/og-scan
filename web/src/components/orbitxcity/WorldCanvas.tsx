@@ -22,6 +22,7 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
     playerPos,
     collectShard,
     realtime,
+    teleportTarget,
   } = useCity();
 
   const onMove = useCallback(
@@ -35,7 +36,7 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
   return (
     <>
       <CityEnvironment tickerRows={tickerRows} />
-      <PlayerAvatar appearance={avatar} onMove={onMove} realtime={realtime} />
+      <PlayerAvatar appearance={avatar} onMove={onMove} realtime={realtime} teleportTarget={teleportTarget} />
       <RemoteAvatars client={realtime} />
       <InteractionMarkers
         zones={NYC_DEMO_BLOCK.zones}

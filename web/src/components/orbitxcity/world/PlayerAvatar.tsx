@@ -42,9 +42,10 @@ interface PlayerAvatarProps {
   appearance: AvatarAppearance;
   onMove: (pos: Vec3, yaw: number) => void;
   realtime?: CityRealtimeClient | null;
+  teleportTarget?: { x: number; z: number; seq: number } | null;
 }
 
-export function PlayerAvatar({ appearance, onMove, realtime }: PlayerAvatarProps) {
+export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget }: PlayerAvatarProps) {
   const group = useRef<THREE.Group>(null);
   const flame = useRef<THREE.Mesh>(null);
   const bob = useRef(0);
@@ -69,6 +70,18 @@ export function PlayerAvatar({ appearance, onMove, realtime }: PlayerAvatarProps
     window.addEventListener("wheel", onWheel, { passive: true });
     return () => window.removeEventListener("wheel", onWheel);
   }, []);
+
+  // Fast travel — snap position + report immediately
+  const lastTeleportSeq = useRef(0);
+  useEffect(() => {
+    if (!teleportTarget || teleportTarget.seq === lastTeleportSeq.current) return;
+    lastTeleportSeq.current = teleportTarget.seq;
+    pos.current.set(teleportTarget.x, 0, teleportTarget.z);
+    yPos.current = 0;
+    vy.current = 0;
+    lastReported.current = { x: teleportTarget.x, z: teleportTarget.z, yaw: yaw.current };
+    onMove({ x: teleportTarget.x, y: 0, z: teleportTarget.z }, yaw.current);
+  }, [teleportTarget, onMove]);
 
   useFrame((_, rawDt) => {
     const t = Math.min(rawDt, 0.05);

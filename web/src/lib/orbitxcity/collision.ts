@@ -34,18 +34,34 @@ export function hashSeed(s: string): number {
   return h >>> 0;
 }
 
-const cameraSolids = NYC_DEMO_BLOCK.buildings.map((b) => ({
-  minX: b.position.x - b.size.width / 2 - 0.3,
-  maxX: b.position.x + b.size.width / 2 + 0.3,
-  minZ: b.position.z - b.size.depth / 2 - 0.3,
-  maxZ: b.position.z + b.size.depth / 2 + 0.3,
-  maxY: b.size.height + 0.7,
-}));
+const cameraSolids = [
+  ...NYC_DEMO_BLOCK.buildings.map((b) => ({
+    minX: b.position.x - b.size.width / 2 - 0.3,
+    maxX: b.position.x + b.size.width / 2 + 0.3,
+    minZ: b.position.z - b.size.depth / 2 - 0.3,
+    maxZ: b.position.z + b.size.depth / 2 + 0.3,
+    minY: 0,
+    maxY: b.size.height + 0.7,
+  })),
+  // Billboards are rotated thin planes — use a conservative square footprint
+  // so the chase camera never parks inside their neon glow.
+  ...NYC_DEMO_BLOCK.billboards.map((bb) => {
+    const half = bb.width / 2 + 0.4;
+    return {
+      minX: bb.position.x - half,
+      maxX: bb.position.x + half,
+      minZ: bb.position.z - half,
+      maxZ: bb.position.z + half,
+      minY: bb.position.y - bb.height / 2 - 0.5,
+      maxY: bb.position.y + bb.height / 2 + 0.5,
+    };
+  }),
+];
 
-/** 3D point-in-building test used for chase-camera occlusion. */
+/** 3D point-in-solid test used for chase-camera occlusion. */
 export function pointInBuilding(x: number, y: number, z: number): boolean {
   for (const s of cameraSolids) {
-    if (x > s.minX && x < s.maxX && z > s.minZ && z < s.maxZ && y < s.maxY) return true;
+    if (x > s.minX && x < s.maxX && z > s.minZ && z < s.maxZ && y > s.minY && y < s.maxY) return true;
   }
   return false;
 }

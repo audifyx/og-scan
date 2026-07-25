@@ -229,3 +229,12 @@ export class CityRealtimeClient {
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+/** Stable fallbacks for useSyncExternalStore when the client isn't ready. */
+export const EMPTY_REALTIME_SNAPSHOT: { online: number; chat: WorldChatMessage[]; connected: boolean } = {
+  online: 1,
+  chat: [],
+  connected: false,
+};
+export const noopSubscribe = (): (() => void) => () => {};
+export const emptySnapshotGetter = () => EMPTY_REALTIME_SNAPSHOT;

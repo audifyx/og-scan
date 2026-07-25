@@ -6,6 +6,7 @@ import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { fetchCityMarketSnapshot, fmtPct } from "@/lib/orbitxcity/marketData";
+import { emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
 import { CityPanelHost, PANEL_NAV } from "./CityPanels";
 import { Minimap } from "./Minimap";
 
@@ -40,8 +41,8 @@ function TickerBar() {
 function OnlineBadge() {
   const { realtime } = useCity();
   const snap = useSyncExternalStore(
-    realtime?.subscribe ?? ((cb: () => void) => { cb(); return () => {}; }),
-    realtime?.getSnapshot ?? (() => ({ online: 1, chat: [], connected: false })),
+    realtime?.subscribe ?? noopSubscribe,
+    realtime?.getSnapshot ?? emptySnapshotGetter,
   );
   return (
     <div className="oxc-online" title={snap.connected ? "Realtime connected" : "Local / connecting"}>
