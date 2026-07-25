@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
-import { NYC_DEMO_BLOCK, TELEPORT_POINTS } from "@/lib/orbitxcity/demoBlock";
+import { getTeleportPoints, getWorldBlock } from "@/lib/orbitxcity/worlds";
 import {
   fetchCityMarketSnapshot,
   fmtPct,
@@ -19,7 +19,7 @@ import { VoicePanel } from "./VoicePanel";
 import { MemeStorePanel } from "./MemeStorePanel";
 import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic, Gamepad2, Image as ImageIcon, Dices } from "lucide-react";
 
-const TITLES: Record<Exclude<HudPanel, "none">, string> = {
+const TITLES: Partial<Record<Exclude<HudPanel, "none">, string>> = {
   map: "World Map",
   inventory: "Inventory",
   profile: "Profile",
@@ -35,6 +35,10 @@ const TITLES: Record<Exclude<HudPanel, "none">, string> = {
   social: "Social Feed",
   games: "Gaming District",
   nft: "NFT Gallery",
+  settings: "Settings",
+  help: "Help",
+  lobbies: "Lobbies",
+  character: "Character",
 };
 
 export function CityPanelHost() {
@@ -126,12 +130,14 @@ function NftPanel() {
 }
 
 function MapPanel() {
-  const { teleport } = useCity();
+  const { teleport, selectedCityId } = useCity();
+  const block = getWorldBlock(selectedCityId);
+  const teleports = getTeleportPoints(selectedCityId);
   return (
     <div className="oxc-stack">
       <div className="oxc-section-label"><Map className="h-3.5 w-3.5" /> Fast travel</div>
       <div className="oxc-teleport-grid">
-        {TELEPORT_POINTS.map((p) => (
+        {teleports.map((p) => (
           <button
             key={p.id}
             type="button"
@@ -144,7 +150,7 @@ function MapPanel() {
         ))}
       </div>
 
-      <p className="oxc-muted">Four cities planned. Phase 1 unlocks the NYC midtown block.</p>
+      <p className="oxc-muted">NYC, Miami, and LA are playable. Boston unlocks later.</p>
       <div className="oxc-grid-2">
         {ORBITX_CITIES.map((c) => (
           <div key={c.id} className={`oxc-tile ${c.unlocked ? "on" : ""}`} style={{ borderColor: c.accent }}>
@@ -156,9 +162,9 @@ function MapPanel() {
         ))}
       </div>
       <div className="oxc-tile on">
-        <div className="oxc-tile-title">{NYC_DEMO_BLOCK.name}</div>
+        <div className="oxc-tile-title">{block.name}</div>
         <ul className="oxc-list">
-          {NYC_DEMO_BLOCK.districts.map((d) => (
+          {block.districts.map((d) => (
             <li key={d.id}>
               <strong>{d.name}</strong> — {d.description}
             </li>

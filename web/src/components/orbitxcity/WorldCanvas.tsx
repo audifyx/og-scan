@@ -1,9 +1,9 @@
 import { Suspense, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
 import { useContextBridge } from "@react-three/drei";
-import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import type { Vec3 } from "@/lib/orbitxcity/types";
 import type { ScreenerRow } from "@/lib/orbitxcity/marketData";
+import { getWorldBlock } from "@/lib/orbitxcity/worlds";
 import { CityContext, useCity } from "@/pages/orbitxcity/CityProvider";
 import { CityEnvironment } from "./world/CityEnvironment";
 import { PlayerAvatar } from "./world/PlayerAvatar";
@@ -25,7 +25,9 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
     teleportTarget,
     quality,
     emoteAt,
+    selectedCityId,
   } = useCity();
+  const block = getWorldBlock(selectedCityId);
 
   const onMove = useCallback(
     (p: Vec3, yaw: number) => {
@@ -37,17 +39,18 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
 
   return (
     <>
-      <CityEnvironment tickerRows={tickerRows} />
+      <CityEnvironment tickerRows={tickerRows} block={block} />
       <PlayerAvatar
         appearance={avatar}
         onMove={onMove}
         realtime={realtime}
         teleportTarget={teleportTarget}
         emoteAt={emoteAt}
+        block={block}
       />
       <RemoteAvatars client={realtime} />
       <InteractionMarkers
-        zones={NYC_DEMO_BLOCK.zones}
+        zones={block.zones}
         playerPos={playerPos}
         activeZoneId={activeZone?.id ?? null}
         onNearest={setActiveZone}

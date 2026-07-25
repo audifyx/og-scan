@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
+import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { GRAFFITI_TAGS, createGraffitiTexture } from "@/lib/orbitxcity/textures";
 
 interface DecalSpec {
@@ -43,11 +44,23 @@ const ALLEY_WALLS: Array<{ x: number; z: number; rotY: number; len: number }> = 
   { x: -20, z: -50, rotY: 0, len: 10 },
 ];
 
-export function GraffitiLayer() {
+function alleyWallsFor(block: WorldBlockConfig): Array<{ x: number; z: number; rotY: number; len: number }> {
+  if (block.cityId === "nyc") return ALLEY_WALLS;
+
+  const { minX, maxX, minZ, maxZ } = block.bounds;
+  return [
+    { x: minX + 18, z: maxZ - 8, rotY: Math.PI, len: 9 },
+    { x: maxX - 18, z: maxZ - 8, rotY: Math.PI, len: 9 },
+    { x: minX + 10, z: minZ + 18, rotY: Math.PI / 2, len: 8 },
+    { x: maxX - 10, z: minZ + 18, rotY: -Math.PI / 2, len: 8 },
+  ];
+}
+
+export function GraffitiLayer({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
   const { buildingDecals, wallDecals } = useMemo(() => {
     const bDecals: DecalSpec[] = [];
 
-    for (const b of NYC_DEMO_BLOCK.buildings) {
+    for (const b of block.buildings) {
       const rand = mulberry32(hashSeed(`graffiti-${b.id}`));
       const faces: Array<"left" | "right" | "back"> = [];
       if (rand() > 0.35) faces.push(rand() > 0.5 ? "left" : "right");
@@ -73,8 +86,8 @@ export function GraffitiLayer() {
       }
     }
 
-    const wDecals: Array<{ wall: (typeof ALLEY_WALLS)[number]; decals: DecalSpec[] }> = ALLEY_WALLS.map((wall, wi) => {
-      const rand = mulberry32(hashSeed(`wall-${wi}`));
+    const wDecals: Array<{ wall: (typeof ALLEY_WALLS)[number]; decals: DecalSpec[] }> = alleyWallsFor(block).map((wall, wi) => {
+      const rand = mulberry32(hashSeed(`${block.cityId}-wall-${wi}`));
       const decals: DecalSpec[] = [0, 1].map((di) => {
         const tag = GRAFFITI_TAGS[Math.floor(rand() * GRAFFITI_TAGS.length)];
         return {
@@ -90,7 +103,7 @@ export function GraffitiLayer() {
     });
 
     return { buildingDecals: bDecals, wallDecals: wDecals };
-  }, []);
+  }, [block]);
 
   return (
     <group>

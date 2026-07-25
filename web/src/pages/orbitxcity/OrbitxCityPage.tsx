@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CityProvider, useCity } from "./CityProvider";
 import { WorldCanvas } from "@/components/orbitxcity/WorldCanvas";
-import { EnterScreen } from "@/components/orbitxcity/ui/EnterScreen";
+import { MainMenu } from "@/components/orbitxcity/ui/MainMenu";
 import { CityHUD } from "@/components/orbitxcity/ui/CityHUD";
 import { fetchCityMarketSnapshot } from "@/lib/orbitxcity/marketData";
 import "./city.css";
@@ -27,7 +27,7 @@ function CityShell() {
   return (
     <div className="oxc-root">
       {!entered ? (
-        <EnterScreen />
+        <MainMenu />
       ) : (
         <>
           <WorldCanvas tickerRows={market?.trending ?? []} />

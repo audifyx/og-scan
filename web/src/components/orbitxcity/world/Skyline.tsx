@@ -2,12 +2,14 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { Text } from "@react-three/drei";
 import { mulberry32 } from "@/lib/orbitxcity/collision";
+import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 
 const TOWER_COUNT = 56;
 const ACCENTS = ["#17ff4d", "#3de7ff", "#ff4d9a", "#f5c542", "#a78bfa"];
 
 /** Distant instanced tower ring — silhouettes the block like a real metropolis. */
-export function Skyline() {
+export function Skyline({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
   const { towers, caps } = useMemo(() => {
     const rand = mulberry32(0x0b17c17);
     const towerGeo = new THREE.BoxGeometry(1, 1, 1);
@@ -43,6 +45,14 @@ export function Skyline() {
     return { towers: towersMesh, caps: capsMesh };
   }, []);
 
+  const subtitle =
+    block.cityId === "miami"
+      ? "MIAMI · COASTAL COMMUNITY"
+      : block.cityId === "la"
+        ? "LA · CREATOR STRIP"
+        : "NYC · FINANCIAL DISTRICT";
+  const subtitleColor = block.cityId === "miami" ? "#3de7ff" : block.cityId === "la" ? "#ff4d9a" : "#3de7ff";
+
   return (
     <group>
       <primitive object={towers} />
@@ -66,7 +76,7 @@ export function Skyline() {
         position={[0, 22, 88]}
         rotation-y={Math.PI}
         fontSize={4.2}
-        color="#3de7ff"
+        color={subtitleColor}
         anchorX="center"
         anchorY="middle"
         letterSpacing={0.1}
@@ -74,7 +84,7 @@ export function Skyline() {
         outlineWidth={0.1}
         outlineColor="#03131a"
       >
-        NYC · FINANCIAL DISTRICT
+        {subtitle}
       </Text>
     </group>
   );

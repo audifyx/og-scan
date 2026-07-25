@@ -18,7 +18,14 @@ body.oxc-lock {
   --oxc-font-body: "JetBrains Mono", ui-monospace, monospace;
   position: fixed;
   inset: 0;
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
   z-index: 80;
+  overflow: hidden;
+  overflow-x: hidden;
+  touch-action: pan-y;
   background: var(--oxc-bg);
   color: var(--oxc-text);
   font-family: var(--oxc-font-body);
@@ -27,6 +34,10 @@ body.oxc-lock {
 .oxc-canvas {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  touch-action: none;
 }
 
 .oxc-canvas canvas {
@@ -1260,5 +1271,978 @@ button.oxc-token-row {
   @keyframes oxc-panel-in {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* === Main Menu / Lobby === */
+.oxc-main-menu {
+  position: relative;
+  min-height: 100%;
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: var(--oxc-text);
+  background: #03060d;
+  isolation: isolate;
+  -webkit-overflow-scrolling: touch;
+}
+
+.oxc-menu-bg,
+.oxc-menu-stars {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.oxc-menu-bg {
+  background:
+    radial-gradient(circle at 20% 12%, rgba(23, 255, 77, 0.24), transparent 28rem),
+    radial-gradient(circle at 86% 18%, rgba(61, 231, 255, 0.18), transparent 22rem),
+    radial-gradient(circle at 62% 86%, rgba(245, 197, 66, 0.16), transparent 20rem),
+    linear-gradient(180deg, #07111d 0%, #03060d 55%, #010208 100%);
+}
+
+.oxc-menu-bg::before {
+  content: "";
+  position: absolute;
+  inset: auto -12% 0;
+  height: 44vh;
+  background:
+    linear-gradient(rgba(23, 255, 77, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 255, 77, 0.08) 1px, transparent 1px);
+  background-size: 42px 42px;
+  transform: perspective(560px) rotateX(62deg);
+  transform-origin: bottom;
+  opacity: 0.9;
+}
+
+.oxc-menu-stars {
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.65) 0 1px, transparent 1.4px),
+    radial-gradient(circle, rgba(61, 231, 255, 0.65) 0 1px, transparent 1.5px);
+  background-size: 82px 82px, 137px 137px;
+  mask-image: linear-gradient(180deg, black, transparent 74%);
+  opacity: 0.38;
+}
+
+.oxc-menu-hero,
+.oxc-menu-body {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding-inline: clamp(1rem, 4vw, 2rem);
+}
+
+.oxc-menu-hero {
+  display: grid;
+  gap: 1.1rem;
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-bottom: 0.75rem;
+}
+
+.oxc-menu-brand-block {
+  padding-top: clamp(1rem, 6vh, 4rem);
+}
+
+.oxc-menu-brand {
+  margin: 0;
+  font-family: var(--oxc-font-display);
+  font-size: clamp(3.3rem, 18vw, 8.8rem);
+  line-height: 0.82;
+  letter-spacing: -0.08em;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 24px rgba(23, 255, 77, 0.18),
+    0 0 56px rgba(61, 231, 255, 0.12);
+}
+
+.oxc-menu-brand span {
+  color: var(--oxc-lime);
+}
+
+.oxc-menu-brand-block p {
+  max-width: 58ch;
+  margin: 1rem 0 0;
+  color: rgba(232, 241, 255, 0.74);
+  font-size: clamp(0.86rem, 2.8vw, 1rem);
+  line-height: 1.55;
+}
+
+.oxc-menu-status {
+  display: grid;
+  gap: 0.35rem;
+  align-self: end;
+  border-left: 2px solid var(--oxc-lime);
+  padding: 0.75rem 0 0.75rem 0.8rem;
+  background: linear-gradient(90deg, rgba(23, 255, 77, 0.09), transparent);
+}
+
+.oxc-menu-status span,
+.oxc-menu-status em {
+  color: var(--oxc-muted);
+  font-size: 0.68rem;
+  font-style: normal;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.oxc-menu-status strong {
+  color: var(--oxc-gold);
+  font-size: 0.85rem;
+}
+
+.oxc-menu-body {
+  display: grid;
+  gap: 1rem;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+}
+
+.oxc-menu-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.oxc-menu-action {
+  min-height: 5.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025)),
+    rgba(4, 8, 15, 0.58);
+  color: var(--oxc-text);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "icon title"
+    "icon meta";
+  align-items: center;
+  gap: 0.1rem 0.7rem;
+  padding: 0.95rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  backdrop-filter: blur(12px);
+}
+
+.oxc-menu-action svg {
+  grid-area: icon;
+  color: var(--oxc-cyan);
+  filter: drop-shadow(0 0 8px rgba(61, 231, 255, 0.35));
+}
+
+.oxc-menu-action span {
+  grid-area: title;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.oxc-menu-action small {
+  grid-area: meta;
+  color: var(--oxc-muted);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.oxc-menu-action.primary {
+  grid-column: 1 / -1;
+  min-height: 5.8rem;
+  border-color: color-mix(in srgb, var(--oxc-lime) 58%, transparent);
+  background:
+    radial-gradient(circle at 16% 15%, rgba(23, 255, 77, 0.28), transparent 54%),
+    linear-gradient(135deg, rgba(23, 255, 77, 0.16), rgba(245, 197, 66, 0.09));
+}
+
+.oxc-menu-action.primary svg,
+.oxc-menu-action.primary span {
+  color: var(--oxc-lime);
+}
+
+.oxc-menu-action:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.oxc-menu-panel {
+  min-height: 18rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(160deg, rgba(8, 14, 24, 0.76), rgba(3, 6, 13, 0.9)),
+    rgba(3, 6, 13, 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 24px 70px rgba(0, 0, 0, 0.35);
+  padding: 1rem;
+  backdrop-filter: blur(16px);
+}
+
+.oxc-menu-back {
+  min-height: 2.75rem;
+  border: 1px solid color-mix(in srgb, var(--oxc-cyan) 35%, transparent);
+  background: rgba(61, 231, 255, 0.08);
+  color: var(--oxc-cyan);
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 0.9rem;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.oxc-menu-section-head {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.95rem;
+}
+
+.oxc-menu-section-head h2 {
+  margin: 0;
+  font-family: var(--oxc-font-display);
+  font-size: clamp(1.45rem, 7vw, 2.45rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.oxc-menu-section-head p {
+  margin: 0;
+  color: var(--oxc-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.oxc-menu-wallet,
+.oxc-menu-pulse {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-top: 0.9rem;
+}
+
+.oxc-menu-pulse {
+  color: var(--oxc-gold);
+  font-size: 0.67rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.oxc-world-select {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
+}
+
+.oxc-world-chip {
+  --city: var(--oxc-lime);
+  min-height: 4.8rem;
+  border: 1px solid color-mix(in srgb, var(--city) 42%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--city) 13%, transparent), rgba(255, 255, 255, 0.025));
+  color: var(--oxc-text);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.18rem 0.6rem;
+  align-items: center;
+  padding: 0.85rem;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.oxc-world-chip strong {
+  font-size: 0.86rem;
+}
+
+.oxc-world-chip span {
+  color: var(--oxc-muted);
+  font-size: 0.68rem;
+}
+
+.oxc-world-chip em {
+  grid-row: 1 / 3;
+  grid-column: 2;
+  color: var(--city);
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.oxc-world-chip.on {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--city) 60%, transparent), 0 0 26px color-mix(in srgb, var(--city) 16%, transparent);
+}
+
+.oxc-world-chip.locked {
+  opacity: 0.62;
+}
+
+.oxc-lobby-browser,
+.oxc-character,
+.oxc-settings-panel,
+.oxc-help-panel,
+.oxc-world-panel,
+.oxc-menu-home {
+  min-width: 0;
+}
+
+.oxc-lobby-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--oxc-gold) 42%, transparent);
+  background: color-mix(in srgb, var(--oxc-gold) 9%, transparent);
+  padding: 0.8rem;
+  margin-bottom: 0.75rem;
+}
+
+.oxc-lobby-current div {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.oxc-lobby-current span,
+.oxc-api-note {
+  color: var(--oxc-muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.oxc-lobby-current strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--oxc-gold);
+}
+
+.oxc-lobby-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.oxc-lobby-card,
+.oxc-help-card,
+.oxc-settings-row {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 0.85rem;
+}
+
+.oxc-lobby-card.private {
+  border-color: color-mix(in srgb, var(--oxc-cyan) 38%, transparent);
+}
+
+.oxc-lobby-list,
+.oxc-settings-list,
+.oxc-control-list,
+.oxc-character-controls {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.oxc-lobby-row {
+  width: 100%;
+  min-height: 4rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.oxc-lobby-row.on {
+  border-color: var(--oxc-lime);
+  background: color-mix(in srgb, var(--oxc-lime) 11%, transparent);
+}
+
+.oxc-lobby-row span {
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.oxc-lobby-row strong,
+.oxc-settings-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.oxc-lobby-row small {
+  color: var(--oxc-muted);
+  font-size: 0.62rem;
+}
+
+.oxc-lobby-row em {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--oxc-cyan);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.oxc-menu-field,
+.oxc-menu-control {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.oxc-menu-field span,
+.oxc-menu-control > span {
+  color: var(--oxc-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.oxc-menu-field input {
+  width: 100%;
+  min-height: 2.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--oxc-text);
+  padding: 0.75rem;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.oxc-menu-field input:focus {
+  outline: 2px solid color-mix(in srgb, var(--oxc-lime) 42%, transparent);
+  outline-offset: 1px;
+}
+
+.oxc-menu-wide {
+  width: 100%;
+  min-height: 2.9rem;
+}
+
+.oxc-character-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.oxc-character-preview {
+  --skin: #e8d5c0;
+  --body: #1a2438;
+  --accent: #17ff4d;
+  --hair: #101014;
+  min-height: 18rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  background:
+    radial-gradient(circle at 50% 22%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 45%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.24), rgba(0, 0, 0, 0.5));
+  overflow: hidden;
+}
+
+.oxc-character-doll {
+  position: relative;
+  width: 8rem;
+  height: 13.5rem;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 28%, transparent));
+}
+
+.oxc-char-head {
+  position: absolute;
+  left: 50%;
+  top: 2rem;
+  width: 3rem;
+  height: 3.15rem;
+  transform: translateX(-50%);
+  border-radius: 44% 44% 48% 48%;
+  background: var(--skin);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  z-index: 2;
+}
+
+.oxc-char-hair {
+  position: absolute;
+  left: 50%;
+  top: 1.55rem;
+  width: 3.35rem;
+  height: 1.35rem;
+  transform: translateX(-50%);
+  border-radius: 55% 55% 18% 18%;
+  background: var(--hair);
+  z-index: 3;
+}
+
+.oxc-character-doll.hair-long .oxc-char-hair {
+  height: 3.2rem;
+  border-radius: 48% 48% 40% 40%;
+}
+
+.oxc-character-doll.hair-buzz .oxc-char-hair {
+  height: 0.75rem;
+  top: 1.8rem;
+}
+
+.oxc-character-doll.hair-bun .oxc-char-hair::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -0.72rem;
+  width: 1rem;
+  height: 1rem;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: var(--hair);
+}
+
+.oxc-character-doll.hair-mohawk .oxc-char-hair {
+  width: 1rem;
+  height: 2rem;
+  top: 0.9rem;
+  border-radius: 55% 55% 20% 20%;
+}
+
+.oxc-char-eye {
+  position: absolute;
+  top: 1.35rem;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 50%;
+  background: #05070b;
+}
+
+.oxc-char-eye.left { left: 0.85rem; }
+.oxc-char-eye.right { right: 0.85rem; }
+
+.oxc-character-doll.face-cool .oxc-char-eye {
+  width: 0.55rem;
+  height: 0.18rem;
+  border-radius: 0;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.oxc-char-mouth {
+  position: absolute;
+  left: 50%;
+  bottom: 0.72rem;
+  width: 0.8rem;
+  height: 0.28rem;
+  transform: translateX(-50%);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.48);
+}
+
+.oxc-character-doll.face-smile .oxc-char-mouth {
+  width: 1rem;
+  height: 0.45rem;
+  border-radius: 0 0 1rem 1rem;
+}
+
+.oxc-char-neck {
+  position: absolute;
+  left: 50%;
+  top: 4.85rem;
+  width: 1rem;
+  height: 0.7rem;
+  transform: translateX(-50%);
+  background: var(--skin);
+}
+
+.oxc-char-body,
+.oxc-char-arm,
+.oxc-char-leg {
+  position: absolute;
+  background: var(--body);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.oxc-char-body {
+  left: 50%;
+  top: 5.35rem;
+  width: 3.7rem;
+  height: 4.4rem;
+  transform: translateX(-50%);
+  border-radius: 1.05rem 1.05rem 0.7rem 0.7rem;
+  overflow: hidden;
+}
+
+.oxc-char-jacket {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 44%, color-mix(in srgb, var(--accent) 70%, transparent) 45% 55%, transparent 56%),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 26%, transparent), transparent 55%);
+}
+
+.oxc-character-doll.outfit-suit .oxc-char-jacket {
+  background:
+    linear-gradient(135deg, transparent 48%, color-mix(in srgb, var(--accent) 65%, transparent) 49% 52%, transparent 53%),
+    linear-gradient(225deg, transparent 48%, color-mix(in srgb, var(--accent) 65%, transparent) 49% 52%, transparent 53%);
+}
+
+.oxc-character-doll.outfit-sport .oxc-char-body {
+  border-radius: 0.65rem;
+}
+
+.oxc-character-doll.outfit-neon .oxc-char-jacket {
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.oxc-char-arm {
+  top: 5.75rem;
+  width: 0.85rem;
+  height: 3.9rem;
+  border-radius: 0.6rem;
+}
+
+.oxc-char-arm.left { left: 1.45rem; transform: rotate(9deg); }
+.oxc-char-arm.right { right: 1.45rem; transform: rotate(-9deg); }
+
+.oxc-char-leg {
+  top: 9.45rem;
+  width: 1.05rem;
+  height: 3.45rem;
+  border-radius: 0.45rem;
+}
+
+.oxc-char-leg.left { left: 2.65rem; }
+.oxc-char-leg.right { right: 2.65rem; }
+
+.oxc-character-name {
+  color: var(--oxc-lime);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.oxc-character-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.oxc-character-tags span {
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  color: color-mix(in srgb, var(--accent) 82%, white);
+  padding: 0.22rem 0.45rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.oxc-menu-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  align-items: center;
+}
+
+.oxc-menu-swatches button {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0;
+  cursor: pointer;
+}
+
+.oxc-menu-swatches button.on {
+  outline: 2px solid var(--oxc-lime);
+  outline-offset: 2px;
+}
+
+.oxc-menu-swatches input[type="color"] {
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--oxc-line);
+  background: transparent;
+  padding: 0;
+}
+
+.oxc-menu-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.oxc-menu-segmented button {
+  min-height: 2.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--oxc-muted);
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.oxc-menu-segmented.compact {
+  flex-wrap: nowrap;
+}
+
+.oxc-menu-segmented button.on {
+  border-color: var(--oxc-lime);
+  background: color-mix(in srgb, var(--oxc-lime) 13%, transparent);
+  color: var(--oxc-lime);
+}
+
+.oxc-settings-row {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.oxc-settings-row.accent {
+  border-color: color-mix(in srgb, var(--oxc-gold) 40%, transparent);
+}
+
+.oxc-settings-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--oxc-text);
+  margin-bottom: 0.3rem;
+}
+
+.oxc-settings-title svg {
+  color: var(--oxc-lime);
+}
+
+.oxc-settings-row p,
+.oxc-help-card p,
+.oxc-menu-list {
+  margin: 0;
+  color: var(--oxc-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.oxc-switch {
+  justify-self: start;
+  min-width: 5.8rem;
+  min-height: 2.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--oxc-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.65rem;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.oxc-switch span {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: #526078;
+}
+
+.oxc-switch.on {
+  border-color: var(--oxc-lime);
+  color: var(--oxc-lime);
+  background: color-mix(in srgb, var(--oxc-lime) 12%, transparent);
+}
+
+.oxc-switch.on span {
+  background: var(--oxc-lime);
+  box-shadow: 0 0 10px var(--oxc-lime);
+}
+
+.oxc-help-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.oxc-help-card.cyan { border-color: color-mix(in srgb, var(--oxc-cyan) 36%, transparent); }
+.oxc-help-card.gold { border-color: color-mix(in srgb, var(--oxc-gold) 36%, transparent); }
+.oxc-help-card.lime { border-color: color-mix(in srgb, var(--oxc-lime) 36%, transparent); }
+
+.oxc-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.45rem 0;
+  color: var(--oxc-muted);
+  font-size: 0.74rem;
+}
+
+.oxc-control-row:last-child {
+  border-bottom: 0;
+}
+
+.oxc-control-row kbd {
+  min-width: 4.4rem;
+  border: 1px solid color-mix(in srgb, var(--oxc-cyan) 42%, transparent);
+  background: rgba(61, 231, 255, 0.08);
+  color: var(--oxc-cyan);
+  padding: 0.28rem 0.45rem;
+  text-align: center;
+  font: inherit;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.oxc-menu-list {
+  padding-left: 1rem;
+}
+
+.oxc-lobby-chip,
+.oxc-exit-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.1rem;
+  border: 1px solid color-mix(in srgb, var(--oxc-cyan) 42%, transparent);
+  background: color-mix(in srgb, var(--oxc-cyan) 9%, transparent);
+  color: var(--oxc-cyan);
+  padding: 0.45rem 0.65rem;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.oxc-lobby-chip span {
+  max-width: 9.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oxc-exit-menu-btn {
+  border-color: color-mix(in srgb, var(--oxc-gold) 42%, transparent);
+  background: color-mix(in srgb, var(--oxc-gold) 9%, transparent);
+  color: var(--oxc-gold);
+}
+
+.oxc-menu-overlay .oxc-panel-body {
+  padding: 0.9rem;
+}
+
+@media (min-width: 700px) {
+  .oxc-menu-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.32fr);
+    align-items: end;
+  }
+
+  .oxc-menu-body {
+    grid-template-columns: minmax(250px, 0.35fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .oxc-menu-actions {
+    grid-template-columns: 1fr;
+    position: sticky;
+    top: 1rem;
+  }
+
+  .oxc-menu-action.primary {
+    grid-column: auto;
+  }
+
+  .oxc-world-select {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .oxc-lobby-grid,
+  .oxc-help-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .oxc-lobby-card.wide {
+    grid-column: 1 / -1;
+  }
+
+  .oxc-character-layout {
+    grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .oxc-settings-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+
+@media (min-width: 1040px) {
+  .oxc-menu-body {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+
+  .oxc-menu-panel {
+    min-height: 30rem;
+    padding: 1.25rem;
+  }
+
+  .oxc-lobby-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr) minmax(220px, 0.8fr);
+  }
+
+  .oxc-lobby-card.wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .oxc-top-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 58vw;
+  }
+
+  .oxc-lobby-chip span,
+  .oxc-exit-menu-btn span {
+    display: none;
+  }
+
+  .oxc-menu-overlay {
+    max-height: 58vh;
+  }
+}
+
+@media (max-width: 460px) {
+  .oxc-menu-actions {
+    gap: 0.55rem;
+  }
+
+  .oxc-menu-action {
+    min-height: 4.85rem;
+    padding: 0.78rem;
+  }
+
+  .oxc-menu-action span {
+    font-size: 0.78rem;
+  }
+
+  .oxc-lobby-current {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

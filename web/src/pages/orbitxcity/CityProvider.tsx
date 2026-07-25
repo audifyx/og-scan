@@ -10,6 +10,7 @@ import {
 } from "react";
 import type {
   AvatarAppearance,
+  CityId,
   HudPanel,
   InteractionKind,
   InteractionZone,
@@ -17,13 +18,19 @@ import type {
   Vec3,
 } from "@/lib/orbitxcity/types";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
-import { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
+import { getWorldBlock } from "@/lib/orbitxcity/worlds";
+import { CityRealtimeClient, MAIN_LOBBY, type LobbyDescriptor } from "@/lib/orbitxcity/realtime";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 interface CityContextValue {
   entered: boolean;
   setEntered: (v: boolean) => void;
+  exitToMenu: () => void;
+  lobby: LobbyDescriptor;
+  setLobby: (lobby: LobbyDescriptor) => void;
+  selectedCityId: CityId;
+  setSelectedCityId: (cityId: CityId) => void;
   panel: HudPanel;
   openPanel: (p: HudPanel) => void;
   closePanel: () => void;
@@ -121,6 +128,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { publicKey } = useWallet();
   const [entered, setEntered] = useState(false);
+  const [lobby, setLobby] = useState<LobbyDescriptor>(MAIN_LOBBY);
+  const [selectedCityId, setSelectedCityId] = useState<CityId>("nyc");
   const [panel, setPanel] = useState<HudPanel>("none");
   const [activeZone, setActiveZone] = useState<InteractionZone | null>(null);
   const [playerPos, setPlayerPos] = useState<Vec3>(NYC_DEMO_BLOCK.spawn);
@@ -144,6 +153,28 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const openPanel = useCallback((p: HudPanel) => setPanel(p), []);
   const closePanel = useCallback(() => setPanel("none"), []);
   const collectShard = useCallback(() => setShards((s) => s + 1), []);
+  const exitToMenu = useCallback(() => {
+    setRealtime((prev) => {
+      prev?.disconnect();
+      return null;
+    });
+    setPanel("none");
+    setActiveZone(null);
+    setEntered(false);
+  }, []);
+
+  const enterWorld = useCallback(
+    (v: boolean) => {
+      if (v) {
+        const spawn = getWorldBlock(selectedCityId).spawn;
+        setPlayerPos(spawn);
+        setPlayerYaw(0);
+        setPanel("none");
+      }
+      setEntered(v);
+    },
+    [selectedCityId],
+  );
   const teleport = useCallback((x: number, z: number) => {
     setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
     setPanel("none");
@@ -197,8 +228,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
         accentColor: avatar.accentColor,
         bodyColor: avatar.bodyColor,
         skinColor: avatar.skinColor,
+        hairStyle: avatar.hairStyle,
+        hairColor: avatar.hairColor,
+        outfit: avatar.outfit,
+        faceStyle: avatar.faceStyle,
       },
-      "oxc-world-nyc",
+      lobby,
     );
     client.connect();
     setRealtime(client);
@@ -206,9 +241,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
       client.disconnect();
       setRealtime(null);
     };
-    // Reconnect only when identity/session changes — not every avatar keystroke
+    // Reconnect only when identity/session or lobby changes — not every avatar keystroke
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entered, playerId]);
+  }, [entered, playerId, lobby.id]);
 
   // Broadcast position at ~6Hz while in world
   const lastBroadcast = useRef(0);
@@ -223,7 +258,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const value = useMemo<CityContextValue>(
     () => ({
       entered,
-      setEntered,
+      setEntered: enterWorld,
+      exitToMenu,
+      lobby,
+      setLobby,
+      selectedCityId,
+      setSelectedCityId,
       panel,
       openPanel,
       closePanel,
@@ -258,6 +298,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
     }),
     [
       entered,
+      enterWorld,
+      exitToMenu,
+      lobby,
+      selectedCityId,
       panel,
       openPanel,
       closePanel,

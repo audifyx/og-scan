@@ -1,15 +1,29 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Gamepad2, Gem, Sparkles, Users } from "lucide-react";
+import { Gamepad2, Gem, HelpCircle, LogOut, Settings, Shirt, Sparkles, Users, X } from "lucide-react";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
-import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { getWorldBlock } from "@/lib/orbitxcity/worlds";
 import { fetchCityMarketSnapshot, fmtPct } from "@/lib/orbitxcity/marketData";
-import { emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
+import { MAIN_LOBBY, emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
+import type { HudPanel } from "@/lib/orbitxcity/types";
 import { CityPanelHost, PANEL_NAV } from "./CityPanels";
+import { CharacterCreator } from "./CharacterCreator";
+import { HelpPanel } from "./HelpPanel";
+import { LobbyBrowser } from "./LobbyBrowser";
+import { SettingsPanel } from "./SettingsPanel";
 import { Minimap } from "./Minimap";
 import { TouchControls } from "./TouchControls";
+
+const HUD_MENU_PANELS = ["lobbies", "character", "settings", "help"];
+
+const HUD_EXTRA_NAV = [
+  { id: "lobbies" as const, label: "Lobby", icon: Users },
+  { id: "character" as const, label: "Look", icon: Shirt },
+  { id: "settings" as const, label: "Config", icon: Settings },
+  { id: "help" as const, label: "Help", icon: HelpCircle },
+];
 
 function TickerBar() {
   const { data } = useQuery({
@@ -69,7 +83,14 @@ export function CityHUD() {
     quality,
     setQuality,
     triggerEmote,
+    lobby,
+    exitToMenu,
+    selectedCityId,
   } = useCity();
+
+  const isHudMenuPanel = HUD_MENU_PANELS.includes(panel);
+  const activeLobby = lobby ?? MAIN_LOBBY;
+  const world = getWorldBlock(selectedCityId);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -104,7 +125,7 @@ export function CityHUD() {
             OrbitX<span>City</span>
           </Link>
           <div className="oxc-loc">
-            <strong>{NYC_DEMO_BLOCK.name}</strong>
+            <strong>{world.name}</strong>
             <span>
               {playerPos.x.toFixed(0)}, {playerPos.z.toFixed(0)} · @{avatar.name}
             </span>
@@ -129,12 +150,25 @@ export function CityHUD() {
           >
             <Sparkles className="h-3.5 w-3.5" />
           </button>
+          <button
+            type="button"
+            className="oxc-lobby-chip"
+            onClick={() => openPanel("lobbies")}
+            title={`Lobby: ${activeLobby.label}`}
+          >
+            <Users className="h-3.5 w-3.5" />
+            <span>{activeLobby.label}</span>
+          </button>
           <OnlineBadge />
           <div className="oxc-shards" title="OBX shards collected">
             <Gem className="h-3.5 w-3.5" />
             <span>{shards}</span>
           </div>
           <WalletConnectButton />
+          <button type="button" className="oxc-exit-menu-btn" onClick={exitToMenu} title="Exit to Main Menu">
+            <LogOut className="h-3.5 w-3.5" />
+            <span>Menu</span>
+          </button>
         </div>
       </header>
 
@@ -142,7 +176,7 @@ export function CityHUD() {
       <Minimap />
 
       <nav className="oxc-dock" aria-label="City panels">
-        {PANEL_NAV.map((item) => {
+        {[...PANEL_NAV, ...HUD_EXTRA_NAV].map((item) => {
           const Icon = item.icon;
           const active = panel === item.id;
           return (
@@ -179,7 +213,49 @@ export function CityHUD() {
 
       {touchControls && <TouchControls />}
 
-      <CityPanelHost />
+      {!isHudMenuPanel && <CityPanelHost />}
+      {isHudMenuPanel && (
+        <HudMenuPanel panel={panel} onClose={closePanel}>
+          {panel === "lobbies" && <LobbyBrowser startAfterJoin={false} />}
+          {panel === "character" && <CharacterCreator />}
+          {panel === "settings" && <SettingsPanel />}
+          {panel === "help" && <HelpPanel />}
+        </HudMenuPanel>
+      )}
     </div>
+  );
+}
+
+function HudMenuPanel({
+  panel,
+  onClose,
+  children,
+}: {
+  panel: HudPanel;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const title =
+    panel === "lobbies"
+      ? "Lobby Browser"
+      : panel === "character"
+        ? "Character"
+        : panel === "settings"
+          ? "Settings"
+          : "Help";
+
+  return (
+    <aside className="oxc-panel oxc-menu-overlay" role="dialog" aria-label={title}>
+      <header className="oxc-panel-head">
+        <div>
+          <div className="oxc-kicker">{title}</div>
+          <h2>{title}</h2>
+        </div>
+        <button type="button" className="oxc-icon-btn" onClick={onClose} aria-label="Close">
+          <X className="h-4 w-4" />
+        </button>
+      </header>
+      <div className="oxc-panel-body">{children}</div>
+    </aside>
   );
 }
