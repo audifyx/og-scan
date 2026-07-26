@@ -1,0 +1,36 @@
+name: OrbitX QA Smoke
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+      - name: Unit + contract tests
+        run: |
+          pnpm test -- --run \
+            src/gaming/systems/progression.test.ts \
+            src/crypto/risk/composeRisk.test.ts \
+            src/crypto/api/client.contract.test.ts \
+            src/social/growth/growth.test.ts \
+            src/qa/routeManifest.test.ts
+      - name: Repo smoke script
+        working-directory: .
+        run: bash scripts/qa/run-smoke.sh

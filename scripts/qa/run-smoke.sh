@@ -35,6 +35,7 @@ cd "$ROOT/web"
 npm test -- --run \
   src/gaming/systems/progression.test.ts \
   src/crypto/risk/composeRisk.test.ts \
+  src/crypto/api/client.contract.test.ts \
   src/social/growth/growth.test.ts \
   src/qa/routeManifest.test.ts
 

@@ -1,10 +1,10 @@
-// Passcode gate for admin dashboards — same pattern as the DEX admin.
-// Unlocks every admin surface for the browser session; no wallet or login required.
+// Soft UI gate only — NOT a security boundary. Use a different value from server ADMIN_PASS.
+// Never set VITE_ADMIN_PASS equal to ADMIN_PASS (Vite inlines client env into the SPA).
 import { useState } from "react";
 import { Lock } from "lucide-react";
 import { setAdminUnlocked } from "@/hooks/useAdmin";
 
-const ADMIN_PASSCODE = "0129";
+const ADMIN_PASSCODE = (import.meta.env.VITE_ADMIN_PASS as string | undefined)?.trim() || "";
 
 export function AdminPassGate({ children }: { children?: React.ReactNode }) {
   const [unlocked, setUnlockedLocal] = useState(false);
@@ -13,6 +13,10 @@ export function AdminPassGate({ children }: { children?: React.ReactNode }) {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!ADMIN_PASSCODE || ADMIN_PASSCODE.length < 8) {
+      setError("Admin pass is not configured in this environment.");
+      return;
+    }
     if (code === ADMIN_PASSCODE) {
       setAdminUnlocked(true);
       setUnlockedLocal(true);
@@ -38,15 +42,14 @@ export function AdminPassGate({ children }: { children?: React.ReactNode }) {
         <form onSubmit={submit} className="space-y-3">
           <input
             type="password"
-            inputMode="numeric"
-            autoFocus
             value={code}
             onChange={(e) => setCode(e.target.value)}
+            className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none focus:border-og-lime/50"
             placeholder="Passcode"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-center text-lg tracking-[0.5em] text-white outline-none placeholder:tracking-normal placeholder:text-white/25 focus:border-og-lime/50"
+            autoComplete="current-password"
           />
-          {error && <p className="text-center text-sm text-red-400">{error}</p>}
-          <button type="submit" className="w-full rounded-xl bg-og-lime px-4 py-3 text-sm font-black text-black hover:bg-og-lime/90">
+          {error && <p className="text-sm text-red-400">{error}</p>}
+          <button type="submit" className="w-full rounded-xl bg-og-lime/90 py-3 text-sm font-bold text-black hover:bg-og-lime">
             Unlock
           </button>
         </form>

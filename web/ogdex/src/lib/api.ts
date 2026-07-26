@@ -80,9 +80,11 @@ export const track = (type: string, extra: any = {}) => {
  try { navigator.sendBeacon?.("/api/ogdex/track", JSON.stringify({ type, ...extra })); }
  catch { fetch("/api/ogdex/track", { method: "POST", body: JSON.stringify({ type, ...extra }), keepalive: true }); }
 };
-export const adminGet = (pass: string) => j(`/api/ogdex/admin?pass=${encodeURIComponent(pass)}`);
+export const adminGet = (pass: string) =>
+  j("/api/ogdex/admin", { headers: { Authorization: `Bearer ${pass}`, "x-admin-pass": pass } });
 export const adminAction = (pass: string, action: string, id?: string, extra: any = {}) =>
  postJson(`/api/ogdex/admin`, { pass, action, id, ...extra }) as Promise<{ ok: boolean; error?: string }>;
+
 
 export function fmtUsd(n?: number | null, opts: { compact?: boolean } = {}): string {
  if (n == null || !isFinite(n)) return "—";
@@ -127,17 +129,70 @@ export function toggleWatch(addr: string): boolean {
  return list.includes(addr);
 }
 
+/** Solana wallet ownership proof for alerts/watchlist APIs (cached ~4 min). */
+type WalletProof = { wallet: string; ts: number; sig: string };
+let _proofCache: { proof: WalletProof; at: number } | null = null;
+
+function bytesToBs58(bytes: Uint8Array): string {
+  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let zeros = 0;
+  while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
+  const size = Math.ceil(bytes.length * 138 / 100) + 1;
+  const b = new Uint8Array(size);
+  let length = 0;
+  for (let i = zeros; i < bytes.length; i++) {
+    let carry = bytes[i];
+    let j = size - 1;
+    while (j >= 0 && (carry || j >= size - length)) {
+      carry += 256 * b[j];
+      b[j] = carry % 58;
+      carry = (carry / 58) | 0;
+      j--;
+    }
+    length = size - 1 - j;
+  }
+  let out = "1".repeat(zeros);
+  for (let i = size - length; i < size; i++) out += alphabet[b[i]];
+  return out;
+}
+
+export async function signWalletProof(wallet: string): Promise<WalletProof> {
+  if (_proofCache && _proofCache.proof.wallet === wallet && Date.now() - _proofCache.at < 4 * 60_000) {
+    return _proofCache.proof;
+  }
+  const { getProvider } = await import("./wallet");
+  const p = getProvider();
+  if (!p?.signMessage) throw new Error("Wallet does not support message signing");
+  const ts = Date.now();
+  const msg = new TextEncoder().encode(`orbitx-dex:ogdex-wallet:${wallet}:${ts}`);
+  const signed = await p.signMessage(msg, "utf8");
+  const raw: Uint8Array = signed?.signature || signed;
+  const sig = bytesToBs58(raw instanceof Uint8Array ? raw : new Uint8Array(raw));
+  const proof = { wallet, ts, sig };
+  _proofCache = { proof, at: Date.now() };
+  return proof;
+}
+
 // ── Cross-device watchlist sync (keyed by connected Phantom wallet) ──
 let _syncWallet: string | null = null;
 function setLocalWatchlist(items: string[]) { localStorage.setItem(WL_KEY, JSON.stringify(items.slice(0, 50))); }
 async function pushWatchlist() {
  if (!_syncWallet) return;
- try { await fetch("/api/ogdex/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet: _syncWallet, items: getWatchlist() }) }); } catch { /* offline */ }
+ try {
+  const proof = await signWalletProof(_syncWallet);
+  await fetch("/api/ogdex/watchlist", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wallet: _syncWallet, items: getWatchlist(), ts: proof.ts, sig: proof.sig }),
+  });
+ } catch { /* offline / user rejected sign */ }
 }
 export async function pullWatchlist(wallet: string): Promise<string[]> {
  try {
-  const r = await fetch(`/api/ogdex/watchlist?wallet=${wallet}`);
+  const proof = await signWalletProof(wallet);
+  const r = await fetch(`/api/ogdex/watchlist?wallet=${encodeURIComponent(wallet)}&ts=${proof.ts}&sig=${encodeURIComponent(proof.sig)}`);
   const d = await r.json();
+  if (!r.ok || d.ok === false) return getWatchlist();
   const server: string[] = d.items || [];
   const merged = Array.from(new Set([...getWatchlist(), ...server]));
   setLocalWatchlist(merged);
@@ -148,6 +203,23 @@ export function setWatchlistWallet(wallet: string | null) {
  _syncWallet = wallet;
  if (wallet) { pullWatchlist(wallet).then(() => pushWatchlist()); }
 }
+
+export async function fetchAlerts(wallet: string) {
+  const proof = await signWalletProof(wallet);
+  const r = await fetch(`/api/ogdex/alerts?wallet=${encodeURIComponent(wallet)}&ts=${proof.ts}&sig=${encodeURIComponent(proof.sig)}`);
+  return r.json();
+}
+
+export async function mutateAlerts(wallet: string, body: Record<string, unknown>) {
+  const proof = await signWalletProof(wallet);
+  const r = await fetch("/api/ogdex/alerts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, wallet, ts: proof.ts, sig: proof.sig }),
+  });
+  return r.json();
+}
+
 /* ---- Token Launcher ---- */
 export interface LaunchConfig {
   ok: boolean; feeUsd: number; payWallet: string; solPrice: number | null;

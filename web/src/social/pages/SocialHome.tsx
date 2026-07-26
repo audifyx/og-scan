@@ -81,7 +81,7 @@ export default function SocialHome() {
             { t: "Trading communities", d: "Token rooms, holder gates, trader rankings.", href: "/hq/trading" },
             { t: "Voice spaces", d: "Live rooms with moderation tools.", href: "/hq/voice" },
             { t: "Growth & referrals", d: "XP, invites, creator program.", href: "/hq/growth" },
-            { t: "Classic Discord hub", d: "Existing LiveKit community app.", href: "/community" },
+            { t: "Classic Discord hub", d: "Existing LiveKit community app.", href: "/community-classic" },
           ].map((x) => (
             <Link
               key={x.href}

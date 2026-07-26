@@ -94,12 +94,6 @@ export default function Layout() {
   useEffect(() => { track("page_view", { path: loc.pathname }); setWatch(getWatchlist()); setWatchOpen(false); }, [loc.pathname]);
   useEffect(() => { fetchPlatformStats().then(setPstats).catch(() => {}); }, []);
   useEffect(() => {
-    try {
-      const last = Number(localStorage.getItem("ogdex_alerts_run") || 0);
-      if (Date.now() - last > 60000) { localStorage.setItem("ogdex_alerts_run", String(Date.now())); fetch("/api/ogdex/alerts-run").catch(() => {}); }
-    } catch { /* noop */ }
-  }, []);
-  useEffect(() => {
     const h = (e: MouseEvent) => { const t = e.target as Node; if (ref.current && !ref.current.contains(t) && (!dropRef.current || !dropRef.current.contains(t))) setWatchOpen(false); };
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);

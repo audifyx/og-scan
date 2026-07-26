@@ -3,7 +3,7 @@ import { Scanlines } from "@/components/Scanlines";
 import { Shield, Lock, Wrench, KeyRound } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-const ADMIN_CODE = "0129";
+const ADMIN_CODE = (import.meta.env.VITE_ADMIN_PASS as string | undefined)?.trim() || "";
 const BETA_CODE = "OG";
 const SESSION_KEY = "ogscan_admin_unlocked";
 
@@ -72,7 +72,7 @@ export function MaintenanceLock({ children }: { children: React.ReactNode }) {
 
   const tryUnlock = (value: string) => {
     const upper = value.trim().toUpperCase();
-    if (upper === BETA_CODE || upper === ADMIN_CODE) {
+    if (upper === BETA_CODE || (ADMIN_CODE.length >= 8 && upper === ADMIN_CODE.toUpperCase())) {
       sessionStorage.setItem(SESSION_KEY, "true");
       setUnlocked(true);
     } else {

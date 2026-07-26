@@ -59,7 +59,7 @@ export default function CommunitiesHub() {
           Existing production community apps remain available:
         </p>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", fontSize: "0.85rem" }}>
-          <a className="oxs-link" href="/community">
+          <a className="oxs-link" href="/community-classic">
             X-style community →
           </a>
           <a className="oxs-link" href="/community-classic">

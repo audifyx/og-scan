@@ -6,6 +6,19 @@
  */
 import { send, kvGet, kvPut, kvList, jup, callFn } from "../_lib.js";
 import { parseSwap } from "../_swap.js";
+import { isSafeWebhookUrl } from "../_walletProof.js";
+
+async function safeFetchWebhook(url, body) {
+  if (!isSafeWebhookUrl(url)) return false;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    redirect: "error",
+    signal: AbortSignal.timeout(8_000),
+  });
+  return r.ok || r.status < 500;
+}
 
 async function priceOf(mint) {
   try { const d = await jup(`/price/v3?ids=${mint}`); return Number(d?.[mint]?.usdPrice) || null; } catch { return null; }
@@ -33,7 +46,10 @@ async function deliverWalletTrade(a, swap) {
     try { const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: a.target, text }) }); const d = await r.json().catch(() => ({})); return !!d.ok; } catch { return false; }
   }
   const msg = { source: "ORBITX_DEX Alerts", kind: "wallet_trade", watch: a.watch, label: a.label, side: swap.side, mint: swap.mint, solAmount: swap.solAmount, txHash: swap.txHash, url: `https://ogscan.fun/ORBITX_DEX/token/${swap.mint}`, text, content: text };
-  try { await fetch(a.target, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(msg) }); return true; } catch { return false; }
+  try {
+    if (!(await safeFetchWebhook(a.target, msg))) return false;
+    return true;
+  } catch { return false; }
 }
 function triggered(a, price) {
   if (price == null) return false;
@@ -64,11 +80,24 @@ async function deliver(a, price) {
     // common webhook shapes (Discord/Slack accept "content"/"text")
     content: `🔔 ORBITX_DEX: ${a.symbol || a.mint.slice(0,6)} hit ${a.type.replace("_"," ")} ${a.value}${a.type.startsWith("pct")?"%":""} — now $${price}. https://ogscan.fun/ORBITX_DEX/token/${a.mint}`,
   };
-  try { await fetch(a.target, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(msg) }); return true; }
-  catch { return false; }
+  try {
+    return await safeFetchWebhook(a.target, msg);
+  } catch { return false; }
 }
 
 export default async function handler(req, res) {
+  // Cron / worker secret required — header only (no ?secret= — leaks to access logs).
+  const secret = process.env.CRON_SECRET || process.env.OXW_WORKER_SECRET || "";
+  const hdr =
+    req.headers["authorization"] ||
+    req.headers["x-cron-secret"] ||
+    req.headers["x-oxw-worker-secret"] ||
+    "";
+  const bearer = String(hdr).replace(/^Bearer\s+/i, "").trim();
+  if (!secret || bearer !== secret) {
+    return send(res, 401, { ok: false, error: "unauthorized" });
+  }
+
   const objs = await kvList("alerts/");
   let checked = 0, fired = 0;
   for (const o of objs) {
