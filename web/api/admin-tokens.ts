@@ -13,7 +13,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://ffjipnkhcebjvttliptb.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-const OWNER_EMAILS = ["audifyx@gmail.com", "beatsbyaid3n@gmail.com"];
+const OWNER_EMAILS = ["audifyx@gmail.com"];
 
 async function emailFromToken(token: string): Promise<string | null> {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {

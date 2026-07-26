@@ -102,7 +102,7 @@ const routeToNav: Record<string, string> = {
 
   "/notifications": "/profile",
 
-  "/admin": "/profile",
+  "/ox-desk-m4k9q": "/profile",
 };
 
 const triggerHaptic = () => {

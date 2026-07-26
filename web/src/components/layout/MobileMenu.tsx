@@ -98,12 +98,12 @@ export const MobileMenu = () => {
           <div className="mt-4 space-y-1.5">
             {isAdmin && (
               <SheetClose asChild>
-                <NavLink to="/admin" className={({ isActive }) => cn(
+                <NavLink to="/ox-desk-m4k9q" className={({ isActive }) => cn(
                   "flex items-center gap-3 p-2.5 rounded-lg transition-all",
                   isActive ? "bg-destructive/10 border border-destructive/20 text-destructive" : "bg-muted/15 border border-border/20 text-muted-foreground active:bg-white/[0.04]"
                 )}>
                   <Shield className="h-3.5 w-3.5" />
-                  <span className="font-semibold text-[10px] font-display tracking-wider">ADMIN</span>
+                  <span className="font-semibold text-[10px] font-display tracking-wider">DESK</span>
                 </NavLink>
               </SheetClose>
             )}

@@ -290,7 +290,8 @@ const App = () => (
               <Route path="leaderboard" element={<LaunchpadLeaderboard />} />
               <Route path="creator/:wallet" element={<LaunchpadCreator />} />
               <Route path="portfolio" element={<LaunchpadPortfolio />} />
-              <Route path="admin" element={<AdminRoute><LaunchpadAdmin /></AdminRoute>} />
+              <Route path="ox-desk-m4k9q" element={<AdminRoute><LaunchpadAdmin /></AdminRoute>} />
+              <Route path="admin" element={<NotFound />} />
             </Route>
 
             {/* ── Terminal UI: Trading Platform Style ── */}
@@ -342,7 +343,8 @@ const App = () => (
               <Route path="notifications" element={<Suspense fallback={<RouteFallback label="Alerts" />}><NotificationsPage /></Suspense>} />
               <Route path="profile" element={<Suspense fallback={<RouteFallback label="Profile" />}><ProfileView /></Suspense>} />
               <Route path="profile/:userId" element={<Suspense fallback={<RouteFallback label="Profile" />}><ProfileView /></Suspense>} />
-              <Route path="admin" element={<Suspense fallback={<RouteFallback label="Moderation" />}><ModerationAdmin /></Suspense>} />
+              <Route path="ox-desk-m4k9q" element={<AdminRoute><Suspense fallback={<RouteFallback label="Moderation" />}><ModerationAdmin /></Suspense></AdminRoute>} />
+              <Route path="admin" element={<NotFound />} />
               <Route path="invite" element={<Suspense fallback={<RouteFallback label="Invite" />}><InviteLanding /></Suspense>} />
             </Route>
 
@@ -441,8 +443,10 @@ const App = () => (
             <Route path="/pumpv5" element={<OgdexRedirect to="/ORBITX_DEX/launchpad" />} />
             <Route path="/launch" element={<OgdexRedirect to="/ORBITX_DEX/launchpad" />} />
 
-            {/* ── Protected: Admin ── */}
-            <Route path="/admin" element={<OgdexRedirect to="/ORBITX_DEX/admin" />} />
+            {/* ── Owner desk (obscure path; not linked in product chrome) ── */}
+            <Route path="/ox-desk-m4k9q" element={<AdminRoute><Admin /></AdminRoute>} />
+            {/* Legacy /admin must NOT redirect to the desk */}
+            <Route path="/admin" element={<NotFound />} />
             <Route path="/art" element={<ProtectedRoute><Suspense fallback={null}><ArtFeedPage /></Suspense></ProtectedRoute>} />
 
             {/* ── Public: Project/legal ── */}
@@ -528,7 +532,8 @@ const App = () => (
             <Route path="/intelligence" element={<OgdexRedirect to="/ORBITX_DEX/tools" />} />
             <Route path="/intelligence/:mint" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mint}`} />} />
             <Route path="/advanced/:mint" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mint}`} />} />
-            <Route path="/intelligence-admin" element={<AdminRoute><IntelligenceAdmin /></AdminRoute>} />
+            <Route path="/intelligence-admin" element={<NotFound />} />
+            <Route path="/ox-desk-m4k9q/intel" element={<AdminRoute><IntelligenceAdmin /></AdminRoute>} />
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />

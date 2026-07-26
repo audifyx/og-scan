@@ -188,7 +188,7 @@ const APP_CHIPS = [
 export default function Admin() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isAdmin, loading: adminLoading } = useAdmin();
+  const { isAdmin, deskUnlocked, loading: adminLoading } = useAdmin();
   const [section, setSection] = useState<AdminSection>("overview");
   const [badges, setBadges] = useState<Partial<Record<AdminSection, number>>>({});
   const [pulse, setPulse] = useState<{ users: number; posts24: number; liveSpaces: number; online: number } | null>(null);
@@ -256,8 +256,22 @@ export default function Admin() {
       </div>
     );
   }
-  if (!isAdmin) {
+  if (!deskUnlocked) {
     return <AdminPassGate />;
+  }
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-[#020915] flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
+          <h1 className="mb-2 text-lg font-bold text-white">Unavailable</h1>
+          <p className="text-sm text-white/45">
+            {user?.email
+              ? "This surface is limited to the owner account."
+              : "Sign in as the owner account, then reopen this page."}
+          </p>
+        </div>
+      </div>
+    );
   }
   // ────────────────────────────────────────────────────────────────────────────
 

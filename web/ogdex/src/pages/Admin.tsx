@@ -97,11 +97,12 @@ export default function Admin() {
   if (!authed) return (
     <div className="max-w-sm mx-auto card p-6 mt-16">
       <div className="flex items-center gap-2 font-semibold mb-4">
-        <Lock className="w-4 h-4 text-accent" /> Admin access
+        <Lock className="w-4 h-4 text-accent" /> API password
       </div>
+      <p className="text-xs text-muted mb-3">Server ADMIN_PASS (not the desk unlock code).</p>
       <form onSubmit={(e) => { e.preventDefault(); load(input); }}>
         <input type="password" value={input} onChange={(e) => setInput(e.target.value)}
-          placeholder="Enter password"
+          placeholder="API password"
           className="w-full bg-panel2 border border-line rounded-lg px-3 py-2.5 text-sm outline-none focus:border-accent/60"
           autoFocus />
         {err && <div className="text-down text-xs mt-2">{err}</div>}

@@ -5,7 +5,6 @@ import {
   Home,
   LayoutDashboard,
   MessageSquare,
-  Shield,
   Sparkles,
   Trophy,
   Users,
@@ -27,7 +26,6 @@ const NAV = [
   { to: "/hq/creators", end: false, label: "Creators", icon: Gift },
   { to: "/hq/notifications", end: false, label: "Alerts", icon: Bell },
   { to: "/hq/profile", end: false, label: "Profile", icon: UserRound },
-  { to: "/hq/admin", end: false, label: "Moderation", icon: Shield },
 ];
 
 export default function SocialLayout() {

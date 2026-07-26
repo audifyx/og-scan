@@ -40,6 +40,7 @@ const CopyTracking = lazy(() => import("./pages/CopyTracking"));
 const CommunityKols = lazy(() => import("./pages/CommunityKols"));
 const Embed = lazy(() => import("./pages/Embed"));
 const More = lazy(() => import("./pages/More"));
+const OwnerDeskGate = lazy(() => import("./components/OwnerDeskGate"));
 
 function PageFallback() {
   return <div className="grid place-items-center py-24 text-muted"><Loader2 className="w-5 h-5 animate-spin" /></div>;
@@ -74,8 +75,19 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="wallet/:address" element={<Suspense fallback={<PageFallback />}><Wallet /></Suspense>} />
           <Route path="kol" element={<Suspense fallback={<PageFallback />}><KolScanner /></Suspense>} />
           <Route path="kol/:address" element={<Suspense fallback={<PageFallback />}><KolProfile /></Suspense>} />
-          <Route path="thispageisfordev" element={<Suspense fallback={<PageFallback />}><Admin /></Suspense>} />
-          <Route path="admin" element={<Suspense fallback={<PageFallback />}><Admin /></Suspense>} />
+          <Route
+            path="ox-desk-m4k9q"
+            element={
+              <Suspense fallback={<PageFallback />}>
+                <OwnerDeskGate>
+                  <Admin />
+                </OwnerDeskGate>
+              </Suspense>
+            }
+          />
+          {/* Legacy admin URLs intentionally dead — do not redirect to the desk */}
+          <Route path="admin" element={<Navigate to="/" replace />} />
+          <Route path="thispageisfordev" element={<Navigate to="/" replace />} />
           <Route path="terms" element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
           <Route path="privacy" element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
           <Route path="whitepaper" element={<Suspense fallback={<PageFallback />}><Whitepaper /></Suspense>} />
