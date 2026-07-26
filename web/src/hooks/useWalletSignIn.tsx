@@ -33,6 +33,9 @@ export function useWalletSignIn() {
       // expose signMessage after connect, so checking it earlier false-fails
       // with "does not support message signing".
       select(adapter.name);
+      // Let WalletProvider adopt the selection before connect so useWallet()
+      // reports connected/publicKey for buy flows immediately after SIWS.
+      await new Promise((r) => setTimeout(r, 60));
       if (!adapter.connected) await adapter.connect();
       if (typeof adapter.signMessage !== "function") {
         throw new Error(`${name} can't sign the login message here. Open OrbitX inside the ${name} app, or try another wallet.`);

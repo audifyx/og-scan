@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { jupQuote, jupSwapTransaction, SOL_MINT, type JupQuote } from "@/lib/og";
 import { fetchTokenChart, fetchTokenDetail } from "@/lib/orbitxcity/tokenApi";
 import { fmtPct, fmtUsd, shortMint } from "@/lib/orbitxcity/marketData";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
+import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { Link } from "react-router-dom";
 
 const PRESETS = [0.1, 0.25, 0.5, 1];
@@ -16,11 +17,14 @@ const PRESETS = [0.1, 0.25, 0.5, 1];
 export function TokenBuyPanel() {
   const { selectedMint } = useCity();
   const { connection } = useConnection();
-  const { publicKey, connected, signTransaction } = useWallet();
+  const { publicKey, connected, signTransaction, sendTransaction, wallet, connect, connecting } = useWallet();
   const [amount, setAmount] = useState("0.1");
   const [quote, setQuote] = useState<JupQuote | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [buying, setBuying] = useState(false);
+
+  const canSign = Boolean(signTransaction || sendTransaction);
+  const walletReady = Boolean(connected && publicKey && canSign);
 
   const { data: token, isLoading } = useQuery({
     queryKey: ["oxc-token", selectedMint],
@@ -63,10 +67,35 @@ export function TokenBuyPanel() {
     };
   }, [selectedMint, amount]);
 
+  const ensureWallet = async (): Promise<boolean> => {
+    if (connected && publicKey && canSign) return true;
+    if (wallet && !connected) {
+      try {
+        await connect();
+        // Adapter is connected even if React state hasn't flushed yet
+        const pk = wallet.adapter.publicKey;
+        if (!pk) {
+          toast.error("Wallet reconnected but no public key yet — try Buy again");
+          return false;
+        }
+        return true;
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Reconnect your wallet to buy");
+        return false;
+      }
+    }
+    toast.error("Connect your wallet to buy");
+    return false;
+  };
+
   const buy = async () => {
     if (!selectedMint) return;
-    if (!connected || !publicKey || !signTransaction) {
-      toast.error("Connect your wallet to buy");
+    const ok = await ensureWallet();
+    if (!ok) return;
+
+    const pk = publicKey ?? wallet?.adapter.publicKey ?? null;
+    if (!pk) {
+      toast.error("Wallet connected but no public key yet — try Buy again");
       return;
     }
     if (!quote) {
@@ -75,10 +104,28 @@ export function TokenBuyPanel() {
     }
     setBuying(true);
     try {
-      const b64 = await jupSwapTransaction(quote, publicKey.toBase58());
+      const b64 = await jupSwapTransaction(quote, pk.toBase58());
       const tx = VersionedTransaction.deserialize(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
-      const signed = await signTransaction(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+
+      let sig: string;
+      if (signTransaction) {
+        const signed = await signTransaction(tx);
+        sig = await connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+      } else if (sendTransaction) {
+        sig = await sendTransaction(tx, connection, { skipPreflight: false, maxRetries: 3 });
+      } else if (wallet?.adapter && "signTransaction" in wallet.adapter && typeof (wallet.adapter as { signTransaction?: unknown }).signTransaction === "function") {
+        const signed = await (wallet.adapter as { signTransaction: (t: VersionedTransaction) => Promise<VersionedTransaction> }).signTransaction(tx);
+        sig = await connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+      } else {
+        throw new Error("This wallet can't sign transactions here — open OrbitX in your wallet app or try Phantom/Solflare");
+      }
+
       toast.success(`Bought $${token?.symbol ?? "token"}`, {
         description: `sig ${sig.slice(0, 8)}…`,
         action: {
@@ -148,6 +195,28 @@ export function TokenBuyPanel() {
       )}
 
       <div className="oxc-section-label">Buy with SOL · Jupiter</div>
+
+      {!walletReady && (
+        <div className="oxc-tile on">
+          <div className="oxc-tile-title">Wallet needed to buy</div>
+          <p className="oxc-muted">
+            {wallet
+              ? "Your account is signed in, but the Solana wallet session dropped — reconnect to approve the swap."
+              : "Connect a Solana wallet (Phantom, Solflare, …) to buy. Signing in alone isn’t enough for on-chain swaps."}
+          </p>
+          <div className="oxc-actions" style={{ marginTop: "0.6rem" }}>
+            {wallet ? (
+              <button type="button" className="oxc-btn primary" onClick={() => void ensureWallet()} disabled={connecting}>
+                <Wallet className="h-3.5 w-3.5" />
+                {connecting ? "Reconnecting…" : "Reconnect wallet"}
+              </button>
+            ) : (
+              <WalletConnectButton />
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="oxc-buy-presets">
         {PRESETS.map((p) => (
           <button key={p} type="button" className={`oxc-btn ghost compact ${amount === String(p) ? "active-preset" : ""}`} onClick={() => setAmount(String(p))}>
@@ -164,8 +233,21 @@ export function TokenBuyPanel() {
         {quote?.priceImpactPct ? ` · impact ${Number(quote.priceImpactPct).toFixed(2)}%` : ""}
       </div>
 
-      <button type="button" className="oxc-btn primary" onClick={buy} disabled={buying || !quote || !connected}>
-        {buying ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Confirming…</> : connected ? `Buy $${token?.symbol ?? "TOKEN"}` : "Connect wallet to buy"}
+      <button
+        type="button"
+        className="oxc-btn primary"
+        onClick={buy}
+        disabled={buying || !quote || (!walletReady && !wallet)}
+      >
+        {buying ? (
+          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Confirming…</>
+        ) : walletReady ? (
+          `Buy $${token?.symbol ?? "TOKEN"}`
+        ) : wallet ? (
+          "Reconnect wallet to buy"
+        ) : (
+          "Connect wallet to buy"
+        )}
       </button>
 
       <div className="oxc-actions">

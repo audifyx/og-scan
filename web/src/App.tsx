@@ -115,6 +115,7 @@ import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
 import { EvmWalletProvider } from "@/hooks/useEvmWallet";
 import { WalletAuthBridge } from "@/components/WalletAuthBridge";
+import { UsernameClaimGate } from "@/components/UsernameClaimModal";
 import Games from "./pages/Games";
 import AdvancedIntelligence from "./pages/AdvancedIntelligence";
 import EnhancedAdvancedIntelligence from "./pages/EnhancedAdvancedIntelligence";
@@ -221,6 +222,7 @@ const App = () => (
         <BrowserRouter>
           <SupportNotificationBanner />
           <WalletAuthBridge />
+          <UsernameClaimGate />
           <Routes>
             {/* ── Public routes (no auth required) ── */}
             <Route path="/" element={<Splash />} />
