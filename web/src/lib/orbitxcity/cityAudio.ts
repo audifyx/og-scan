@@ -9,6 +9,15 @@
 
 type ThemeMode = "menu" | "world" | "off";
 
+export interface AudioSnapshot {
+  unlocked: boolean;
+  musicOn: boolean;
+  sfxOn: boolean;
+  musicVol: number;
+  sfxVol: number;
+  mode: ThemeMode;
+}
+
 const MUSIC_KEY = "oxc_music_on";
 const SFX_KEY = "oxc_sfx_on";
 const MUSIC_VOL_KEY = "oxc_music_vol";
@@ -81,6 +90,9 @@ class CityAudioEngine {
   private sfxOn = readBool(SFX_KEY, true);
   private musicVol = readNum(MUSIC_VOL_KEY, 0.45);
   private sfxVol = readNum(SFX_VOL_KEY, 0.7);
+  // Cached immutable snapshot for useSyncExternalStore. MUST be a stable
+  // reference between changes — rebuilt only inside notify() when state mutates.
+  private snapshot: AudioSnapshot = this.buildSnapshot();
   private listeners = new Set<Listener>();
   /** BPM for the OrbitX City theme */
   private readonly bpm = 92;
@@ -91,10 +103,15 @@ class CityAudioEngine {
   };
 
   private notify() {
+    // Rebuild the cached snapshot BEFORE notifying so subscribers (React's
+    // useSyncExternalStore) read the fresh immutable object. getState() must
+    // otherwise return a stable reference on every call, or React re-renders
+    // endlessly ("Maximum update depth exceeded").
+    this.snapshot = this.buildSnapshot();
     for (const cb of this.listeners) cb();
   }
 
-  getState() {
+  private buildSnapshot(): AudioSnapshot {
     return {
       unlocked: this.unlocked,
       musicOn: this.musicOn,
@@ -103,6 +120,10 @@ class CityAudioEngine {
       sfxVol: this.sfxVol,
       mode: this.mode,
     };
+  }
+
+  getState(): AudioSnapshot {
+    return this.snapshot;
   }
 
   async unlock(): Promise<void> {
