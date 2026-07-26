@@ -2599,5 +2599,32 @@ button.oxc-token-row {
     transform: scale(0.85);
     transform-origin: top right;
   }
+
+  .oxc-audio-toggles .oxc-toggle-btn:last-child {
+    font-size: 8px;
+    letter-spacing: 0.06em;
+    padding: 0.3rem 0.45rem;
+  }
+}
+
+/* City audio controls */
+.oxc-audio-toggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.oxc-menu-audio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.oxc-slider {
+  width: min(160px, 40vw);
+  accent-color: var(--oxc-lime, #00ff9f);
 }
 

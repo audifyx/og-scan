@@ -7,6 +7,7 @@ import {
   type DirectoryLobby,
   type LobbyDescriptor,
 } from "@/lib/orbitxcity/realtime";
+import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 export function LobbyBrowser({
@@ -31,6 +32,7 @@ export function LobbyBrowser({
   );
 
   const selectLobby = (lobby: LobbyDescriptor) => {
+    cityAudio.play(startAfterJoin ? "enter" : "confirm");
     setPrepared(lobby);
     setLobby(lobby);
     onJoined?.(lobby);

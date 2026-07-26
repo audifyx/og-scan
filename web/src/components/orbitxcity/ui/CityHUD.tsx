@@ -7,10 +7,12 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { fetchCityMarketSnapshot, fmtPct } from "@/lib/orbitxcity/marketData";
 import { emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
+import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { CityPanelHost, PANEL_NAV } from "./CityPanels";
 import { Minimap } from "./Minimap";
 import { TouchControls } from "./TouchControls";
 import { ChatToastHost } from "./ChatToastHost";
+import { AudioToggle } from "./AudioToggle";
 
 function TickerBar() {
   const { data } = useQuery({
@@ -80,18 +82,22 @@ export function CityHUD() {
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.code === "KeyE") {
         e.preventDefault();
+        cityAudio.play("interact");
         interact();
       }
       if (e.code === "KeyB") {
         e.preventDefault();
+        cityAudio.play("whoosh");
         triggerEmote();
       }
       if (e.code === "Enter") {
         e.preventDefault();
+        cityAudio.play("ui");
         openPanel("chat");
       }
       if (e.code === "Escape") {
         e.preventDefault();
+        cityAudio.play("ui");
         closePanel();
       }
     };
@@ -148,6 +154,7 @@ export function CityHUD() {
           >
             <Sparkles className="h-3.5 w-3.5" />
           </button>
+          <AudioToggle />
           <OnlineBadge />
           <div className="oxc-shards" title="OBX shards collected">
             <Gem className="h-3.5 w-3.5" />
@@ -169,7 +176,10 @@ export function CityHUD() {
               key={item.id}
               type="button"
               className={`oxc-dock-btn ${active ? "active" : ""}`}
-              onClick={() => (active ? closePanel() : openPanel(item.id))}
+              onClick={() => {
+                cityAudio.play("ui");
+                active ? closePanel() : openPanel(item.id);
+              }}
             >
               <Icon className="h-4 w-4" />
               <span>{item.label}</span>

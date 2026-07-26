@@ -19,7 +19,9 @@ import {
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
 import type { CityId } from "@/lib/orbitxcity/types";
+import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { CosmicBackdrop } from "./CosmicBackdrop";
+import { AudioToggle } from "./AudioToggle";
 
 type MenuAction =
   | "play"
@@ -64,7 +66,12 @@ export function MainMenu() {
   }, []);
 
   const onTile = (tile: MenuTile) => {
-    if (tile.soon) return;
+    if (tile.soon) {
+      cityAudio.play("deny");
+      return;
+    }
+    void cityAudio.unlock();
+    cityAudio.play(tile.primary ? "confirm" : "ui");
     switch (tile.id) {
       case "play":
       case "characters":
@@ -74,16 +81,19 @@ export function MainMenu() {
         setGate("lobbies");
         break;
       case "marketplace":
+        cityAudio.play("enter");
         setGate("world");
         setEntered(true);
         openPanel("marketplace");
         break;
       case "inventory":
+        cityAudio.play("enter");
         setGate("world");
         setEntered(true);
         openPanel("inventory");
         break;
       case "settings":
+        cityAudio.play("enter");
         setGate("world");
         setEntered(true);
         openPanel("settings");
@@ -105,6 +115,22 @@ export function MainMenu() {
           <span className="oxc-menu-logo-city">CITY</span>
         </div>
         <p className="oxc-menu-tag">Enter a persistent crypto-native city.</p>
+        <div className="oxc-menu-audio">
+          <AudioToggle />
+          <button
+            type="button"
+            className="oxc-btn ghost compact"
+            onClick={() => {
+              void cityAudio.unlock().then(() => {
+                cityAudio.setMusicOn(true);
+                cityAudio.setTheme("menu");
+                cityAudio.play("confirm");
+              });
+            }}
+          >
+            ▶ Play theme
+          </button>
+        </div>
       </header>
 
       <div className="oxc-menu-cities" role="group" aria-label="City server">
@@ -151,6 +177,7 @@ export function MainMenu() {
           type="button"
           className="oxc-menu-demo"
           onClick={() => {
+            cityAudio.play("enter");
             setGate("world");
             setEntered(true);
           }}

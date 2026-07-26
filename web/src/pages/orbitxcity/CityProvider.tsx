@@ -20,6 +20,7 @@ import type {
 } from "@/lib/orbitxcity/types";
 import { getWorldBlock } from "@/lib/orbitxcity/worlds";
 import { CityRealtimeClient, MAIN_LOBBY, type LobbyDescriptor } from "@/lib/orbitxcity/realtime";
+import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 
@@ -224,7 +225,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
 
   const openPanel = useCallback((p: HudPanel) => setPanel(p), []);
   const closePanel = useCallback(() => setPanel("none"), []);
-  const collectShard = useCallback(() => setShards((s) => s + 1), []);
+  const collectShard = useCallback(() => {
+    cityAudio.play("coin");
+    setShards((s) => s + 1);
+  }, []);
   const teleport = useCallback((x: number, z: number) => {
     setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
     setPanel("none");

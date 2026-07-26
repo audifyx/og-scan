@@ -12,6 +12,7 @@ import {
   appearanceFromClass,
   type CharacterClassDef,
 } from "@/lib/orbitxcity/characterClasses";
+import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { CosmicBackdrop } from "./CosmicBackdrop";
 
 function HoloAvatar({ cls, selected }: { cls: CharacterClassDef; selected: boolean }) {
@@ -68,14 +69,22 @@ export function CharacterSelect() {
 
   const commitAndEnter = (forceDemo = false) => {
     setAvatar(appearanceFromClass(selected, name));
-    if (!forceDemo && !ready) return;
+    if (!forceDemo && !ready) {
+      cityAudio.play("deny");
+      return;
+    }
+    cityAudio.play("confirm");
     // Route through lobbies so voice/lobby join actually happens before world
     setGate("lobbies");
   };
 
   const commitAndSkipLobby = (forceDemo = false) => {
     setAvatar(appearanceFromClass(selected, name));
-    if (!forceDemo && !ready) return;
+    if (!forceDemo && !ready) {
+      cityAudio.play("deny");
+      return;
+    }
+    cityAudio.play("enter");
     setGate("world");
     setEntered(true);
   };
@@ -109,7 +118,10 @@ export function CharacterSelect() {
                 ["--pod-neon" as string]: cls.neon,
                 ["--pod-gold" as string]: cls.gold,
               }}
-              onClick={() => setSelectedId(cls.id)}
+              onClick={() => {
+                cityAudio.play("ui");
+                setSelectedId(cls.id);
+              }}
             >
               <span className="oxc-pod-class">{cls.name}</span>
               <HoloAvatar cls={cls} selected={on} />
