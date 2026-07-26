@@ -1,5 +1,5 @@
-/**
- * OrbitX City — Main Game Menu (AAA).
+﻿/**
+ * OrbitX City ΓÇö Main Game Menu (AAA).
  * Full-bleed brand + glass tile grid over cosmic field.
  */
 import { useEffect, useState } from "react";
@@ -59,10 +59,19 @@ const TILES: MenuTile[] = [
 export function MainMenu() {
   const { setGate, setEntered, openPanel, selectedCityId, setSelectedCityId } = useCity();
   const [visible, setVisible] = useState(false);
+  const [isTouch, setIsTouch] = useState(
+    () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches,
+  );
 
   useEffect(() => {
     const t = requestAnimationFrame(() => setVisible(true));
-    return () => cancelAnimationFrame(t);
+    const mq = window.matchMedia?.("(pointer: coarse)");
+    const onChange = () => setIsTouch(Boolean(mq?.matches));
+    mq?.addEventListener?.("change", onChange);
+    return () => {
+      cancelAnimationFrame(t);
+      mq?.removeEventListener?.("change", onChange);
+    };
   }, []);
 
   const onTile = (tile: MenuTile) => {
@@ -128,7 +137,7 @@ export function MainMenu() {
               });
             }}
           >
-            ▶ Play theme
+            Play theme
           </button>
           <button
             type="button"
@@ -195,7 +204,11 @@ export function MainMenu() {
         >
           Explore demo
         </button>
-        <span className="oxc-menu-meta">WASD · E interact · Shift sprint · Space jump</span>
+        <span className="oxc-menu-meta">
+          {isTouch
+            ? "Joystick ┬╖ Jump ┬╖ Sprint ┬╖ Tap E to interact"
+            : "WASD ┬╖ E interact ┬╖ Shift sprint ┬╖ Space jump"}
+        </span>
       </footer>
     </div>
   );

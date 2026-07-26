@@ -106,7 +106,7 @@ export function CityHUD() {
   }, [interact, closePanel, openPanel, triggerEmote]);
 
   return (
-    <div className="oxc-hud">
+    <div className={`oxc-hud ${touchControls ? "oxc-hud--touch" : ""}`}>
       <header className="oxc-topbar">
         <div className="oxc-brand-lockup">
           <Link to="/" className="oxc-mini-brand">
@@ -114,15 +114,16 @@ export function CityHUD() {
           </Link>
           <div className="oxc-loc">
             <strong>{NYC_DEMO_BLOCK.name}</strong>
-            <span>
+            <span className="oxc-loc-detail">
               {playerPos.x.toFixed(0)}, {playerPos.z.toFixed(0)} · @{avatar.name}
             </span>
+            <span className="oxc-loc-mobile">@{avatar.name}</span>
           </div>
         </div>
         <div className="oxc-top-actions">
           <button
             type="button"
-            className="oxc-lobby-chip"
+            className="oxc-lobby-chip oxc-hide-xs"
             onClick={() => openPanel("lobbies")}
             title={lobby.label}
           >
@@ -147,24 +148,32 @@ export function CityHUD() {
           </button>
           <button
             type="button"
-            className={`oxc-toggle-btn ${quality === "high" ? "on" : ""}`}
+            className={`oxc-toggle-btn oxc-hide-xs ${quality === "high" ? "on" : ""}`}
             onClick={() => setQuality(quality === "high" ? "lite" : "high")}
             title={`Graphics: ${quality === "high" ? "High (FX on)" : "Lite (fast)"}`}
             aria-pressed={quality === "high"}
           >
             <Sparkles className="h-3.5 w-3.5" />
           </button>
-          <AudioToggle />
-          <OnlineBadge />
+          <span className="oxc-hide-xs">
+            <AudioToggle />
+          </span>
+          <span className="oxc-hide-sm">
+            <OnlineBadge />
+          </span>
           <div className="oxc-shards" title="OBX shards collected">
             <Gem className="h-3.5 w-3.5" />
             <span>{shards}</span>
           </div>
-          <WalletConnectButton />
+          <div className="oxc-wallet-slot">
+            <WalletConnectButton />
+          </div>
         </div>
       </header>
 
-      <TickerBar />
+      <div className="oxc-ticker-wrap">
+        <TickerBar />
+      </div>
       <Minimap />
 
       <nav className="oxc-dock" aria-label="City panels">

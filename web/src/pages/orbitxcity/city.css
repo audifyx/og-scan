@@ -1,4 +1,4 @@
-/* OrbitX City — scoped immersive theme (AAA matte black · neon green · gold) */
+﻿/* OrbitX City ΓÇö scoped immersive theme (AAA matte black ┬╖ neon green ┬╖ gold) */
 
 @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
 
@@ -25,12 +25,20 @@ body.oxc-lock {
   --oxc-font-display: "Orbitron", "Sora", sans-serif;
   --oxc-font-body: "Sora", "JetBrains Mono", sans-serif;
   --oxc-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --oxc-safe-top: env(safe-area-inset-top, 0px);
+  --oxc-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --oxc-safe-left: env(safe-area-inset-left, 0px);
+  --oxc-safe-right: env(safe-area-inset-right, 0px);
+  --oxc-dock-h: 4.25rem;
   position: fixed;
   inset: 0;
   z-index: 80;
   background: var(--oxc-bg);
   color: var(--oxc-text);
   font-family: var(--oxc-font-body);
+  /* Avoid iOS rubber-band / overscroll fighting the canvas */
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 .oxc-canvas {
@@ -44,7 +52,7 @@ body.oxc-lock {
   height: 100% !important;
 }
 
-/* ── Enter / login ── */
+/* ΓöÇΓöÇ Enter / login ΓöÇΓöÇ */
 .oxc-enter {
   position: relative;
   height: 100%;
@@ -357,7 +365,7 @@ body.oxc-lock {
   font-size: 10px;
 }
 
-/* ── HUD ── */
+/* ΓöÇΓöÇ HUD ΓöÇΓöÇ */
 .oxc-hud {
   pointer-events: none;
   position: absolute;
@@ -519,7 +527,7 @@ body.oxc-lock {
   .oxc-help { display: flex; }
 }
 
-/* ── Live ticker bar ── */
+/* ΓöÇΓöÇ Live ticker bar ΓöÇΓöÇ */
 .oxc-tickerbar {
   position: absolute;
   top: 4.1rem;
@@ -567,7 +575,7 @@ body.oxc-lock {
 .oxc-tick-item em.up { color: var(--oxc-lime); }
 .oxc-tick-item em.down { color: #ff6b6b; }
 
-/* ── Minimap ── */
+/* ΓöÇΓöÇ Minimap ΓöÇΓöÇ */
 .oxc-minimap {
   position: absolute;
   top: 6.8rem;
@@ -598,7 +606,7 @@ body.oxc-lock {
   .oxc-minimap { display: flex; }
 }
 
-/* ── Shard counter ── */
+/* ΓöÇΓöÇ Shard counter ΓöÇΓöÇ */
 .oxc-top-actions {
   display: flex;
   align-items: center;
@@ -642,7 +650,7 @@ body.oxc-lock {
   border-color: color-mix(in srgb, var(--oxc-gold) 45%, transparent);
 }
 
-/* ── Panels ── */
+/* ΓöÇΓöÇ Panels ΓöÇΓöÇ */
 .oxc-panel {
   position: absolute;
   top: 4.5rem;
@@ -1060,7 +1068,7 @@ button.oxc-token-row {
   font: inherit;
 }
 
-/* ── Meme Market store ── */
+/* ΓöÇΓöÇ Meme Market store ΓöÇΓöÇ */
 .oxc-store-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1149,7 +1157,7 @@ button.oxc-token-row {
   background: color-mix(in srgb, var(--tp, var(--oxc-lime)) 20%, transparent);
 }
 
-/* ── HUD toggle buttons ── */
+/* ΓöÇΓöÇ HUD toggle buttons ΓöÇΓöÇ */
 .oxc-toggle-btn {
   display: inline-flex;
   align-items: center;
@@ -1169,7 +1177,7 @@ button.oxc-token-row {
   background: color-mix(in srgb, var(--oxc-lime) 10%, transparent);
 }
 
-/* ── Touch controls ── */
+/* ΓöÇΓöÇ Touch controls ΓöÇΓöÇ */
 .oxc-touch {
   position: absolute;
   inset: 0;
@@ -1301,28 +1309,7 @@ button.oxc-token-row {
 }
 
 @media (max-width: 640px) {
-  .oxc-stick,
-  .oxc-touch-actions {
-    bottom: 5.6rem;
-  }
-
-  /* Keep the interact prompt clear of the touch clusters */
-  .oxc-prompt {
-    bottom: 11rem;
-    width: min(320px, calc(100% - 1.5rem));
-  }
-}
-
-@media (max-width: 640px) {
-  .oxc-panel {
-    top: auto;
-    bottom: 4.75rem;
-    right: 0.75rem;
-    left: 0.75rem;
-    width: auto;
-    max-height: 45vh;
-  }
-
+  /* Legacy touch offsets superseded by the mobile HUD block at file end */
   .oxc-city-rail {
     grid-template-columns: 1fr;
   }
@@ -1330,16 +1317,11 @@ button.oxc-token-row {
   .oxc-enter-row {
     grid-template-columns: 1fr;
   }
-
-  @keyframes oxc-panel-in {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
 }
 
-/* ═══════════════════════════════════════════════════════════
+/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
    AAA Main Menu + Character Chamber (art direction v1)
-   ═══════════════════════════════════════════════════════════ */
+   ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */
 
 .oxc-cosmic {
   position: absolute;
@@ -1434,7 +1416,7 @@ button.oxc-token-row {
   50% { opacity: 0.85; transform: scale(1.35); }
 }
 
-/* ── Main menu ── */
+/* ΓöÇΓöÇ Main menu ΓöÇΓöÇ */
 .oxc-menu {
   position: relative;
   height: 100%;
@@ -1648,7 +1630,7 @@ button.oxc-token-row {
   color: rgba(200, 230, 210, 0.4);
 }
 
-/* ── Character chamber ── */
+/* ΓöÇΓöÇ Character chamber ΓöÇΓöÇ */
 .oxc-chars {
   position: relative;
   height: 100%;
@@ -2189,22 +2171,140 @@ button.oxc-token-row {
 }
 
 @media (max-width: 640px) {
+  .oxc-menu {
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 0.85rem;
+    padding:
+      max(0.75rem, var(--oxc-safe-top))
+      max(0.75rem, var(--oxc-safe-right))
+      max(1rem, var(--oxc-safe-bottom))
+      max(0.75rem, var(--oxc-safe-left));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .oxc-menu-logo-orbit {
+    font-size: clamp(1.85rem, 11vw, 2.6rem);
+  }
+
+  .oxc-menu-logo-city {
+    letter-spacing: 0.38em;
+    text-indent: 0.38em;
+    font-size: 0.72rem;
+  }
+
+  .oxc-menu-tag {
+    margin-top: 0.45rem;
+    font-size: 0.78rem;
+    padding: 0 0.5rem;
+  }
+
+  .oxc-menu-audio {
+    margin-top: 0.55rem;
+    gap: 0.4rem;
+  }
+
   .oxc-menu-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+    width: 100%;
+  }
+
+  .oxc-menu-tile {
+    min-height: 72px;
+    padding: 0.75rem 0.7rem 0.65rem;
+    gap: 0.45rem;
+    border-radius: 12px;
+  }
+
+  .oxc-menu-tile.is-primary {
+    grid-column: 1 / -1;
+    min-height: 78px;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .oxc-menu-tile-label {
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+  }
+
+  .oxc-menu-tile-icon {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .oxc-menu-tile-badge {
+    top: 0.45rem;
+    right: 0.45rem;
+    font-size: 8px;
+    padding: 0.1rem 0.35rem;
+  }
+
+  .oxc-menu-cities {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.4rem;
+  }
+
+  .oxc-menu-city {
+    padding: 0.45rem 0.55rem;
+    min-height: 2.75rem;
+  }
+
+  .oxc-menu-foot {
+    margin-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .oxc-menu-meta {
+    font-size: 9px;
+    text-align: center;
+    max-width: 28ch;
+    line-height: 1.4;
   }
 
   .oxc-pod-rail {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .oxc-chars {
+    padding:
+      max(0.65rem, var(--oxc-safe-top))
+      max(0.65rem, var(--oxc-safe-right))
+      max(0.85rem, var(--oxc-safe-bottom))
+      max(0.65rem, var(--oxc-safe-left));
+    gap: 0.55rem;
   }
 
   .oxc-chars-back {
     position: static;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .oxc-chars-title {
+    font-size: clamp(1.15rem, 6vw, 1.55rem);
+  }
+
+  .oxc-chars-sub {
+    font-size: 0.7rem;
+  }
+
+  .oxc-chars-preview {
+    padding: 0.65rem;
+  }
+
+  .oxc-chars-actions {
+    gap: 0.45rem;
   }
 }
 
 
-/* ══ lobby / settings / help (ported from multi-city sprint) ══ */
+/* ΓòÉΓòÉ lobby / settings / help (ported from multi-city sprint) ΓòÉΓòÉ */
 .oxc-menu-section-head {
   display: grid;
   gap: 0.35rem;
@@ -2490,7 +2590,8 @@ button.oxc-token-row {
   position: relative;
   z-index: 1;
   overflow: auto;
-  padding: 0 0.25rem 1rem;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0.25rem max(1rem, var(--oxc-safe-bottom));
   max-width: 920px;
   margin: 0 auto;
   width: 100%;
@@ -2565,20 +2666,85 @@ button.oxc-token-row {
   backdrop-filter: blur(14px);
 }
 
+.oxc-loc-mobile {
+  display: none;
+}
+
+.oxc-ticker-wrap {
+  display: contents;
+}
+
+.oxc-wallet-slot {
+  display: inline-flex;
+  max-width: 9.5rem;
+  overflow: hidden;
+}
+
+/* ΓöÇΓöÇ Mobile gameplay HUD ΓöÇΓöÇ */
 @media (max-width: 640px) {
-  .oxc-dock {
-    bottom: 0.55rem;
-    gap: 0.12rem;
-    padding: 0.28rem;
+  .oxc-hide-xs { display: none !important; }
+
+  .oxc-topbar {
+    gap: 0.35rem;
+    padding:
+      max(0.4rem, var(--oxc-safe-top))
+      max(0.45rem, var(--oxc-safe-right))
+      0.55rem
+      max(0.45rem, var(--oxc-safe-left));
+    align-items: center;
   }
 
-  .oxc-dock-btn {
-    min-width: 2.85rem;
-    padding: 0.32rem 0.18rem;
-    font-size: 8px;
+  .oxc-brand-lockup {
+    padding: 0.35rem 0.5rem;
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
-  .oxc-dock-btn span {
+  .oxc-mini-brand {
+    font-size: 0.88rem;
+  }
+
+  .oxc-loc-detail { display: none; }
+  .oxc-loc-mobile {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: none;
+    color: var(--oxc-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 42vw;
+  }
+
+  .oxc-top-actions {
+    gap: 0.28rem;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+  }
+
+  .oxc-toggle-btn,
+  .oxc-shards,
+  .oxc-online {
+    padding: 0.35rem 0.45rem;
+    min-height: 2rem;
+    font-size: 10px;
+  }
+
+  .oxc-wallet-slot {
+    max-width: 7.2rem;
+  }
+
+  .oxc-wallet-slot button,
+  .oxc-wallet-slot .wallet-adapter-button {
+    font-size: 10px !important;
+    padding: 0.35rem 0.5rem !important;
+    height: auto !important;
+    min-height: 2rem;
+  }
+
+  .oxc-ticker-wrap,
+  .oxc-tickerbar {
     display: none;
   }
 
@@ -2586,24 +2752,170 @@ button.oxc-token-row {
     display: none;
   }
 
-  .oxc-topbar {
-    gap: 0.35rem;
-    padding: 0.45rem 0.55rem;
-  }
-
-  .oxc-tickerbar {
-    opacity: 0.85;
-  }
-
   .oxc-minimap {
-    transform: scale(0.85);
-    transform-origin: top right;
+    display: none !important;
+  }
+
+  .oxc-dock {
+    left: max(0.4rem, var(--oxc-safe-left));
+    right: max(0.4rem, var(--oxc-safe-right));
+    bottom: max(0.4rem, var(--oxc-safe-bottom));
+    transform: none;
+    width: auto;
+    max-width: none;
+    justify-content: flex-start;
+    gap: 0.1rem;
+    padding: 0.28rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-radius: 14px;
+  }
+
+  .oxc-dock::-webkit-scrollbar { display: none; }
+
+  .oxc-dock-btn {
+    min-width: 2.65rem;
+    padding: 0.38rem 0.2rem;
+    font-size: 8px;
+    flex: 0 0 auto;
+  }
+
+  .oxc-dock-btn span {
+    display: none;
+  }
+
+  /* Touch clusters clear of dock + home indicator */
+  .oxc-stick,
+  .oxc-touch-actions {
+    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 0.35rem);
+  }
+
+  .oxc-stick {
+    left: max(0.7rem, var(--oxc-safe-left));
+    width: 104px;
+    height: 104px;
+  }
+
+  .oxc-stick-nub {
+    width: 40px;
+    height: 40px;
+  }
+
+  .oxc-touch-actions {
+    right: max(0.7rem, var(--oxc-safe-right));
+    gap: 0.4rem;
+  }
+
+  .oxc-touch-btn {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+
+  .oxc-touch-btn.small {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+
+  .oxc-touch-btn span {
+    font-size: 7px;
+  }
+
+  .oxc-prompt {
+    left: max(0.65rem, var(--oxc-safe-left));
+    right: max(0.65rem, var(--oxc-safe-right));
+    width: auto;
+    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 7.6rem);
+    transform: none;
+    gap: 0.55rem;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .oxc-hud--touch .oxc-prompt {
+    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 8.4rem);
+  }
+
+  .oxc-panel {
+    top: auto;
+    left: max(0.5rem, var(--oxc-safe-left));
+    right: max(0.5rem, var(--oxc-safe-right));
+    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 0.35rem);
+    width: auto;
+    max-height: min(52dvh, 420px);
+    border-radius: 16px 16px 12px 12px;
+  }
+
+  .oxc-hud--touch .oxc-panel {
+    max-height: min(42dvh, 360px);
+    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 0.35rem);
   }
 
   .oxc-audio-toggles .oxc-toggle-btn:last-child {
     font-size: 8px;
     letter-spacing: 0.06em;
     padding: 0.3rem 0.45rem;
+  }
+
+  @keyframes oxc-panel-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@media (max-width: 420px) {
+  .oxc-hide-sm { display: none !important; }
+
+  .oxc-menu-tile.is-soon .oxc-menu-tile-label {
+    font-size: 0.7rem;
+  }
+
+  .oxc-stick {
+    width: 96px;
+    height: 96px;
+  }
+
+  .oxc-touch-btn {
+    width: 3rem;
+    height: 3rem;
+  }
+}
+
+/* Landscape phones ΓÇö keep controls usable without covering the view */
+@media (max-height: 480px) and (orientation: landscape) {
+  .oxc-menu {
+    justify-content: flex-start;
+    gap: 0.55rem;
+    padding: 0.45rem 0.75rem;
+  }
+
+  .oxc-menu-logo-orbit { font-size: 1.55rem; }
+  .oxc-menu-tag { display: none; }
+  .oxc-menu-tile { min-height: 58px; padding: 0.55rem; }
+  .oxc-menu-cities { display: none; }
+
+  .oxc-ticker-wrap,
+  .oxc-tickerbar { display: none; }
+
+  .oxc-dock {
+    bottom: max(0.25rem, var(--oxc-safe-bottom));
+  }
+
+  .oxc-stick,
+  .oxc-touch-actions {
+    bottom: calc(3.4rem + var(--oxc-safe-bottom));
+  }
+
+  .oxc-stick {
+    width: 88px;
+    height: 88px;
+  }
+
+  .oxc-prompt {
+    bottom: calc(3.4rem + var(--oxc-safe-bottom) + 5.5rem);
+  }
+
+  .oxc-panel {
+    max-height: 68dvh;
   }
 }
 
