@@ -163,7 +163,7 @@ export const Sidebar = () => {
               <SectionLabel label="Admin Apps" />
               <div className="space-y-0.5">
                 <NavRow
-                  item={{ to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Dashboard + apps hub" }}
+                  item={{ to: "/ox-desk-m4k9q", icon: Shield, label: "Owner desk", eyebrow: "Private ops" }}
                   onClick={closeMobile}
                 />
               </div>

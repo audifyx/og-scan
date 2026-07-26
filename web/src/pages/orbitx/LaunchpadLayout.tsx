@@ -224,10 +224,10 @@ export default function LaunchpadLayout() {
                 </NavLink>
               ))}
               {isAdmin && (
-                <NavLink to="/orbitxlaunch/admin"
+                <NavLink to="/orbitxlaunch/ox-desk-m4k9q"
                   className={({ isActive }) => cn("flex items-center gap-1.5 whitespace-nowrap rounded-t-lg px-3.5 py-2.5 text-[12px] font-bold transition",
                     isActive ? "text-[hsl(var(--pf-ink))]" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]")}>
-                  <ShieldCheck className="h-3.5 w-3.5" /> Admin
+                  <ShieldCheck className="h-3.5 w-3.5" /> Desk
                 </NavLink>
               )}
             </nav>

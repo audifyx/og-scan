@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { useMemo, useState } from "react";
 import { useSocialStore } from "../hooks/useSocialStore";
 import { joinVoice } from "../store/localSocialStore";
 
@@ -57,11 +57,8 @@ export default function VoiceSpaces() {
       <div className="oxs-panel" style={{ marginTop: "1rem" }}>
         <h3>Moderation tools</h3>
         <p className="oxs-muted" style={{ fontSize: "0.85rem", margin: 0 }}>
-          Mute, remove, and report flows for voice + posts live in the{" "}
-          <Link className="oxs-link" to="/hq/admin">
-            moderation dashboard
-          </Link>
-          . Production audio continues via LiveKit in Voice Lobbies / SocialHub.
+          Mute, remove, and report flows for voice + posts live in the owner moderation desk
+          (private URL). Production audio continues via LiveKit in Voice Lobbies / SocialHub.
         </p>
       </div>
     </div>
