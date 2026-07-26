@@ -1,6 +1,6 @@
 import type { CityDefinition } from "./types";
 
-/** Multi-city roadmap. NYC, Miami, and LA are playable; Boston remains locked. */
+/** Four playable city districts, each backed by its own world block. */
 export const ORBITX_CITIES: CityDefinition[] = [
   {
     id: "nyc",
@@ -32,7 +32,7 @@ export const ORBITX_CITIES: CityDefinition[] = [
     tagline: "Innovation core",
     purpose: "Developers, AI labs, protocol R&D.",
     accent: "#c5a26f",
-    unlocked: false,
+    unlocked: true,
   },
 ];
 

@@ -41,7 +41,6 @@ interface MenuTile {
   label: string;
   icon: LucideIcon;
   primary?: boolean;
-  soon?: boolean;
 }
 
 const TILES: MenuTile[] = [
@@ -50,11 +49,11 @@ const TILES: MenuTile[] = [
   { id: "lobbies", label: "Lobbies", icon: RadioTower },
   { id: "marketplace", label: "Marketplace", icon: Store },
   { id: "inventory", label: "Inventory", icon: Backpack },
-  { id: "missions", label: "Missions", icon: Crosshair, soon: true },
-  { id: "leaderboards", label: "Leaderboards", icon: Trophy, soon: true },
-  { id: "friends", label: "Friends", icon: UserPlus, soon: true },
+  { id: "missions", label: "Missions", icon: Crosshair },
+  { id: "leaderboards", label: "Leaderboards", icon: Trophy },
+  { id: "friends", label: "Friends", icon: UserPlus },
   { id: "settings", label: "Settings", icon: Settings },
-  { id: "events", label: "Events", icon: CalendarDays, soon: true },
+  { id: "events", label: "Events", icon: CalendarDays },
 ];
 
 export function MainMenu() {
@@ -76,10 +75,6 @@ export function MainMenu() {
   }, []);
 
   const onTile = (tile: MenuTile) => {
-    if (tile.soon) {
-      cityAudio.play("deny");
-      return;
-    }
     void cityAudio.unlock();
     cityAudio.play(tile.primary ? "confirm" : "ui");
     switch (tile.id) {
@@ -103,10 +98,14 @@ export function MainMenu() {
         openPanel("inventory");
         break;
       case "settings":
+      case "missions":
+      case "leaderboards":
+      case "friends":
+      case "events":
         cityAudio.play("enter");
         setGate("world");
         setEntered(true);
-        openPanel("settings");
+        openPanel(tile.id);
         break;
       default:
         break;
@@ -160,13 +159,12 @@ export function MainMenu() {
           <button
             key={c.id}
             type="button"
-            className={`oxc-menu-city ${selectedCityId === c.id ? "on" : ""} ${c.unlocked ? "" : "locked"}`}
+            className={`oxc-menu-city ${selectedCityId === c.id ? "on" : ""}`}
             style={{ ["--chip" as string]: c.accent }}
-            disabled={!c.unlocked}
-            onClick={() => c.unlocked && setSelectedCityId(c.id as CityId)}
+            onClick={() => setSelectedCityId(c.id as CityId)}
           >
             <span>{c.name}</span>
-            <small>{c.unlocked ? (selectedCityId === c.id ? "LIVE" : "READY") : "SOON"}</small>
+            <small>{selectedCityId === c.id ? "LIVE" : "READY"}</small>
           </button>
         ))}
       </div>
@@ -178,16 +176,14 @@ export function MainMenu() {
             <button
               key={tile.id}
               type="button"
-              className={`oxc-menu-tile ${tile.primary ? "is-primary" : ""} ${tile.soon ? "is-soon" : ""}`}
+              className={`oxc-menu-tile ${tile.primary ? "is-primary" : ""}`}
               style={{ animationDelay: `${80 + i * 45}ms` }}
               onClick={() => onTile(tile)}
-              disabled={tile.soon}
             >
               <span className="oxc-menu-tile-icon">
                 <Icon size={20} strokeWidth={2.2} />
               </span>
               <span className="oxc-menu-tile-label">{tile.label}</span>
-              {tile.soon && <span className="oxc-menu-tile-badge">SOON</span>}
               <span className="oxc-menu-tile-frame" aria-hidden />
             </button>
           );

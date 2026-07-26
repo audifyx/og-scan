@@ -50,6 +50,8 @@ interface CityContextValue {
   inventory: InventoryItem[];
   shards: number;
   collectShard: () => void;
+  claimedMissionIds: string[];
+  claimMission: (missionId: string, reward: number) => void;
   selectedMint: string | null;
   openToken: (mint: string) => void;
   setSelectedMint: (mint: string | null) => void;
@@ -147,6 +149,13 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [avatar, setAvatar] = useState<AvatarAppearance>(DEFAULT_AVATAR);
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
   const [shards, setShards] = useState(0);
+  const [claimedMissionIds, setClaimedMissionIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("oxc_claimed_missions") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [realtime, setRealtime] = useState<CityRealtimeClient | null>(null);
   const [teleportTarget, setTeleportTarget] = useState<{ x: number; z: number; seq: number } | null>(null);
@@ -233,6 +242,20 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const collectShard = useCallback(() => {
     cityAudio.play("coin");
     setShards((s) => s + 1);
+  }, []);
+  const claimMission = useCallback((missionId: string, reward: number) => {
+    setClaimedMissionIds((current) => {
+      if (current.includes(missionId)) return current;
+      const next = [...current, missionId];
+      try {
+        localStorage.setItem("oxc_claimed_missions", JSON.stringify(next));
+      } catch {
+        /* local persistence is optional */
+      }
+      setShards((shardCount) => shardCount + reward);
+      cityAudio.play("confirm");
+      return next;
+    });
   }, []);
   const teleport = useCallback((x: number, z: number) => {
     setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
@@ -358,6 +381,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       inventory,
       shards,
       collectShard,
+      claimedMissionIds,
+      claimMission,
       selectedMint,
       openToken,
       setSelectedMint,
@@ -397,6 +422,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       inventory,
       shards,
       collectShard,
+      claimedMissionIds,
+      claimMission,
       selectedMint,
       openToken,
       prompt,
