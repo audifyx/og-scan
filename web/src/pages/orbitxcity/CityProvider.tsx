@@ -207,11 +207,16 @@ export function CityProvider({ children }: { children: ReactNode }) {
       const block = getWorldBlock(selectedCityId);
       const b = block.buildings.find((x) => x.id === buildingId);
       if (!b) return;
+      const interiorDepth = Math.max(4.5, b.size.depth - 1.2);
+      // Enter from the south-side doorway, just inside the room — never
+      // teleport through a desk or drop the player at the room's center.
+      const x = b.position.x;
+      const z = b.position.z + interiorDepth / 2 - 1.75;
       setInteriorBuildingId(buildingId);
-      setPlayerPos({ x: b.position.x, y: 0, z: b.position.z });
+      setPlayerPos({ x, y: 0, z });
       setTeleportTarget((prev) => ({
-        x: b.position.x,
-        z: b.position.z,
+        x,
+        z,
         seq: (prev?.seq ?? 0) + 1,
       }));
     },
@@ -258,9 +263,13 @@ export function CityProvider({ children }: { children: ReactNode }) {
     }
     if (activeZone.kind === "voice") {
       setVoiceOpen(true);
+      // A building is a playable space first. Keep the HUD clear so players
+      // can explore it; voice and district tools remain available from dock.
+      if (activeZone.buildingId) {
+        enterBuilding(activeZone.buildingId);
+        return;
+      }
       openPanel("voice");
-      // Nightclub / voice zones still get a walk-in when tied to a building
-      if (activeZone.buildingId) enterBuilding(activeZone.buildingId);
       return;
     }
     if (activeZone.buildingId) {
@@ -269,6 +278,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
       // Walk into mid/large buildings; tiny props just open the panel
       if (b && b.size.width >= 6 && b.size.depth >= 6) {
         enterBuilding(b.id);
+        return;
       }
     }
     openPanel(zoneToPanel(activeZone.kind));

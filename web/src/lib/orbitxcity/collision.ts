@@ -1,5 +1,5 @@
 import { NYC_DEMO_BLOCK } from "./demoBlock";
-import type { WorldBlockConfig } from "./types";
+import type { BuildingDefinition, WorldBlockConfig } from "./types";
 
 /** 2D collision against building AABBs + world bounds. */
 export function collidesAt(
@@ -21,6 +21,58 @@ export function collidesAt(
     }
   }
   return x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ;
+}
+
+/**
+ * Collision for the active building interior. Coordinates are world-space so
+ * this layers cleanly over exterior collision while the active shell is
+ * ignored. It keeps players within the furnished room and makes counters /
+ * stages solid without adding a heavyweight physics engine.
+ */
+export function collidesInInterior(
+  x: number,
+  z: number,
+  radius: number,
+  building: BuildingDefinition,
+): boolean {
+  const width = Math.max(4.5, building.size.width - 1.2);
+  const depth = Math.max(4.5, building.size.depth - 1.2);
+  const localX = x - building.position.x;
+  const localZ = z - building.position.z;
+  const halfW = width / 2;
+  const halfD = depth / 2;
+  const wall = 0.28;
+
+  if (
+    localX - radius < -halfW + wall ||
+    localX + radius > halfW - wall ||
+    localZ - radius < -halfD + wall ||
+    localZ + radius > halfD - wall
+  ) {
+    return true;
+  }
+
+  const hitsRect = (cx: number, cz: number, w: number, d: number) =>
+    localX + radius > cx - w / 2 &&
+    localX - radius < cx + w / 2 &&
+    localZ + radius > cz - d / 2 &&
+    localZ - radius < cz + d / 2;
+
+  switch (building.kind) {
+    case "trading_floor":
+      return [-1.8, 0, 1.8].some((deskX) => hitsRect(deskX, -0.35, 1.35, 0.72));
+    case "launch_arena":
+      return Math.hypot(localX, localZ + 0.1) < 1.55 + radius;
+    case "social_hub":
+      return [-1, 1].some((tableX) => hitsRect(tableX, -0.25, 1.25, 0.75));
+    case "market":
+    case "shop":
+      return hitsRect(0, -0.2, Math.min(width - 1.2, 4.2), 0.72);
+    case "hq":
+      return hitsRect(0, -0.45, Math.min(width - 1.2, 5.4), 0.9);
+    default:
+      return hitsRect(0, -0.35, Math.min(width - 1.4, 3.8), 0.72);
+  }
 }
 
 /** Deterministic PRNG so world decoration is stable across renders. */

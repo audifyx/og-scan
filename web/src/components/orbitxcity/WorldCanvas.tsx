@@ -59,6 +59,7 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
         emoteAt={emoteAt}
         block={block}
         ignoreBuildingId={interiorBuildingId}
+        interiorBuilding={interiorBuilding}
       />
       <RemoteAvatars client={realtime} />
       <InteractionMarkers

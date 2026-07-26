@@ -172,6 +172,12 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
     { id: "z-nft", kind: "nft", label: "NFT Gallery", hint: "OrbitX NFT marketplace", position: { x: -40, y: 0, z: 17 }, radius: 4.5, buildingId: "b-nft" },
     { id: "z-mall", kind: "marketplace", label: "Token Mall", hint: "Launchpad storefronts", position: { x: 0, y: 0, z: -37 }, radius: 4.5, buildingId: "b-mall" },
     { id: "z-club", kind: "voice", label: "PULSE Nightclub", hint: "Voice room · nightlife district", position: { x: -14, y: 0, z: 49 }, radius: 4.5, buildingId: "b-club" },
+    { id: "z-hotel", kind: "community", label: "Hotel Nebula", hint: "Enter the hotel lobby", position: { x: 40, y: 0, z: -8 }, radius: 4, buildingId: "b-hotel" },
+    { id: "z-bank", kind: "marketplace", label: "OrbitX Bank", hint: "Enter the bank floor", position: { x: 46, y: 0, z: 26 }, radius: 3.8, buildingId: "b-bank" },
+    { id: "z-museum", kind: "nft", label: "Museum of Memes", hint: "Enter the gallery hall", position: { x: -40, y: 0, z: -9 }, radius: 4, buildingId: "b-museum" },
+    { id: "z-ai", kind: "community", label: "AI Center", hint: "Enter the AI lab", position: { x: -46, y: 0, z: 26 }, radius: 3.8, buildingId: "b-ai" },
+    { id: "z-academy", kind: "community", label: "OrbitX Academy", hint: "Enter the academy hall", position: { x: -14, y: 0, z: -35 }, radius: 4, buildingId: "b-academy" },
+    { id: "z-cinema", kind: "community", label: "Starlight Cinema", hint: "Enter the cinema lobby", position: { x: 0, y: 0, z: 51 }, radius: 4, buildingId: "b-cinema" },
   ],
 };
 
