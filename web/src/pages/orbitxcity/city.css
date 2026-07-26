@@ -361,6 +361,9 @@ body.oxc-lock {
 }
 
 .oxc-btn.compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   padding: 0.45rem 0.7rem;
   font-size: 10px;
 }
@@ -2680,45 +2683,69 @@ button.oxc-token-row {
   overflow: hidden;
 }
 
-/* ΓöÇΓöÇ Mobile gameplay HUD ΓöÇΓöÇ */
-@media (max-width: 640px) {
-  .oxc-hide-xs { display: none !important; }
+/* ---- Mobile gameplay HUD ---- */
+.oxc-show-phone { display: none !important; }
 
-  .oxc-topbar {
-    gap: 0.35rem;
-    padding:
-      max(0.4rem, var(--oxc-safe-top))
-      max(0.45rem, var(--oxc-safe-right))
-      0.55rem
-      max(0.45rem, var(--oxc-safe-left));
-    align-items: center;
+.oxc-more-sheet {
+  display: none;
+}
+
+.oxc-prompt-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .oxc-hide-xs,
+  .oxc-hide-phone { display: none !important; }
+  .oxc-show-phone { display: inline-flex !important; }
+
+  .oxc-root {
+    --oxc-dock-h: 3.55rem;
   }
 
-  .oxc-brand-lockup {
-    padding: 0.35rem 0.5rem;
+  .oxc-hud--phone .oxc-topbar {
+    gap: 0.3rem;
+    padding:
+      max(0.35rem, var(--oxc-safe-top))
+      max(0.4rem, var(--oxc-safe-right))
+      0.4rem
+      max(0.4rem, var(--oxc-safe-left));
+    align-items: center;
+    background: linear-gradient(180deg, rgba(4, 6, 8, 0.92), rgba(4, 6, 8, 0.45), transparent);
+  }
+
+  .oxc-hud--phone .oxc-brand-lockup {
+    padding: 0.28rem 0.45rem;
     min-width: 0;
     flex: 1 1 auto;
+    max-width: 46vw;
   }
 
-  .oxc-mini-brand {
-    font-size: 0.88rem;
+  .oxc-hud--phone .oxc-mini-brand {
+    font-size: 0.8rem;
+    letter-spacing: -0.02em;
+  }
+
+  .oxc-hud--phone .oxc-loc strong {
+    display: none;
   }
 
   .oxc-loc-detail { display: none; }
   .oxc-loc-mobile {
     display: block;
     font-size: 9px;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     text-transform: none;
     color: var(--oxc-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 42vw;
+    max-width: 38vw;
   }
 
   .oxc-top-actions {
-    gap: 0.28rem;
+    gap: 0.25rem;
     flex-wrap: nowrap;
     flex-shrink: 0;
   }
@@ -2726,134 +2753,199 @@ button.oxc-token-row {
   .oxc-toggle-btn,
   .oxc-shards,
   .oxc-online {
-    padding: 0.35rem 0.45rem;
-    min-height: 2rem;
+    padding: 0.32rem 0.42rem;
+    min-height: 1.9rem;
     font-size: 10px;
+    border-radius: 10px;
   }
 
-  .oxc-wallet-slot {
-    max-width: 7.2rem;
-  }
-
-  .oxc-wallet-slot button,
-  .oxc-wallet-slot .wallet-adapter-button {
-    font-size: 10px !important;
-    padding: 0.35rem 0.5rem !important;
-    height: auto !important;
-    min-height: 2rem;
+  .oxc-shards span {
+    font-variant-numeric: tabular-nums;
   }
 
   .oxc-ticker-wrap,
-  .oxc-tickerbar {
-    display: none;
-  }
-
-  .oxc-help {
-    display: none;
-  }
-
+  .oxc-tickerbar,
+  .oxc-help,
   .oxc-minimap {
     display: none !important;
   }
 
-  .oxc-dock {
-    left: max(0.4rem, var(--oxc-safe-left));
-    right: max(0.4rem, var(--oxc-safe-right));
-    bottom: max(0.4rem, var(--oxc-safe-bottom));
+  /* Equal-width primary dock — no horizontal scroll fight with the stick */
+  .oxc-hud--phone .oxc-dock {
+    left: max(0.35rem, var(--oxc-safe-left));
+    right: max(0.35rem, var(--oxc-safe-right));
+    bottom: max(0.3rem, var(--oxc-safe-bottom));
     transform: none;
     width: auto;
     max-width: none;
-    justify-content: flex-start;
-    gap: 0.1rem;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.12rem;
     padding: 0.28rem;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    border-radius: 14px;
+    overflow: hidden;
+    border-radius: 16px;
+    background: rgba(6, 8, 10, 0.88);
   }
 
-  .oxc-dock::-webkit-scrollbar { display: none; }
-
-  .oxc-dock-btn {
-    min-width: 2.65rem;
-    padding: 0.38rem 0.2rem;
+  .oxc-hud--phone .oxc-dock-btn {
+    min-width: 0;
+    width: 100%;
+    padding: 0.42rem 0.1rem 0.32rem;
     font-size: 8px;
-    flex: 0 0 auto;
+    gap: 0.12rem;
   }
 
-  .oxc-dock-btn span {
-    display: none;
+  .oxc-hud--phone .oxc-dock-btn span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    letter-spacing: 0.04em;
   }
+
+  .oxc-more-sheet {
+    display: block;
+    position: absolute;
+    left: max(0.45rem, var(--oxc-safe-left));
+    right: max(0.45rem, var(--oxc-safe-right));
+    top: calc(max(0.35rem, var(--oxc-safe-top)) + 3.1rem);
+    z-index: 8;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    background: rgba(6, 8, 10, 0.94);
+    backdrop-filter: blur(18px);
+    padding: 0.7rem;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+    max-height: min(58dvh, 420px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .oxc-more-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .oxc-more-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 3.6rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--oxc-text);
+    font: inherit;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 0.55rem 0.3rem;
+  }
+
+  .oxc-more-btn svg { color: var(--oxc-lime); }
+
+  .oxc-more-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.65rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .oxc-more-wallet {
+    width: 100%;
+    margin-top: 0.2rem;
+  }
+
+  .oxc-more-wallet button,
+  .oxc-more-wallet .wallet-adapter-button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .oxc-install-label { margin-left: 0.25rem; }
 
   /* Touch clusters clear of dock + home indicator */
   .oxc-stick,
   .oxc-touch-actions {
-    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 0.35rem);
+    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 0.45rem);
   }
 
   .oxc-stick {
-    left: max(0.7rem, var(--oxc-safe-left));
-    width: 104px;
-    height: 104px;
+    left: max(0.55rem, var(--oxc-safe-left));
+    width: 96px;
+    height: 96px;
   }
 
   .oxc-stick-nub {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
   }
 
+  .oxc-stick-label { display: none; }
+
   .oxc-touch-actions {
-    right: max(0.7rem, var(--oxc-safe-right));
-    gap: 0.4rem;
+    right: max(0.55rem, var(--oxc-safe-right));
+    gap: 0.35rem;
   }
 
   .oxc-touch-btn {
-    width: 3.25rem;
-    height: 3.25rem;
+    width: 3.05rem;
+    height: 3.05rem;
   }
 
   .oxc-touch-btn.small {
-    width: 2.35rem;
-    height: 2.35rem;
+    width: 2.2rem;
+    height: 2.2rem;
   }
 
   .oxc-touch-btn span {
     font-size: 7px;
+    letter-spacing: 0.08em;
   }
 
   .oxc-prompt {
-    left: max(0.65rem, var(--oxc-safe-left));
-    right: max(0.65rem, var(--oxc-safe-right));
+    left: max(0.55rem, var(--oxc-safe-left));
+    right: max(0.55rem, var(--oxc-safe-right));
     width: auto;
-    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 7.6rem);
+    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 7.1rem);
     transform: none;
-    gap: 0.55rem;
-    padding: 0.55rem 0.65rem;
+    gap: 0.45rem;
+    padding: 0.5rem 0.55rem;
+    border-radius: 14px;
   }
 
   .oxc-hud--touch .oxc-prompt {
-    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 8.4rem);
+    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 7.8rem);
   }
+
+  .oxc-prompt-key {
+    width: 1.55rem;
+    height: 1.55rem;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .oxc-prompt strong { font-size: 11px; }
+  .oxc-prompt span { font-size: 9px; }
 
   .oxc-panel {
     top: auto;
-    left: max(0.5rem, var(--oxc-safe-left));
-    right: max(0.5rem, var(--oxc-safe-right));
+    left: max(0.4rem, var(--oxc-safe-left));
+    right: max(0.4rem, var(--oxc-safe-right));
     bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 0.35rem);
     width: auto;
-    max-height: min(52dvh, 420px);
+    max-height: min(50dvh, 400px);
     border-radius: 16px 16px 12px 12px;
   }
 
   .oxc-hud--touch .oxc-panel {
-    max-height: min(42dvh, 360px);
-    bottom: calc(var(--oxc-dock-h) + var(--oxc-safe-bottom) + 0.35rem);
-  }
-
-  .oxc-audio-toggles .oxc-toggle-btn:last-child {
-    font-size: 8px;
-    letter-spacing: 0.06em;
-    padding: 0.3rem 0.45rem;
+    max-height: min(40dvh, 340px);
   }
 
   @keyframes oxc-panel-in {
@@ -2870,17 +2962,21 @@ button.oxc-token-row {
   }
 
   .oxc-stick {
-    width: 96px;
-    height: 96px;
+    width: 88px;
+    height: 88px;
   }
 
   .oxc-touch-btn {
-    width: 3rem;
-    height: 3rem;
+    width: 2.85rem;
+    height: 2.85rem;
+  }
+
+  .oxc-hud--phone .oxc-dock-btn span {
+    font-size: 7px;
   }
 }
 
-/* Landscape phones ΓÇö keep controls usable without covering the view */
+/* Landscape phones — keep controls usable without covering the view */
 @media (max-height: 480px) and (orientation: landscape) {
   .oxc-menu {
     justify-content: flex-start;
@@ -2896,22 +2992,27 @@ button.oxc-token-row {
   .oxc-ticker-wrap,
   .oxc-tickerbar { display: none; }
 
+  .oxc-more-sheet {
+    top: 2.6rem;
+    max-height: 72dvh;
+  }
+
   .oxc-dock {
     bottom: max(0.25rem, var(--oxc-safe-bottom));
   }
 
   .oxc-stick,
   .oxc-touch-actions {
-    bottom: calc(3.4rem + var(--oxc-safe-bottom));
+    bottom: calc(3.2rem + var(--oxc-safe-bottom));
   }
 
   .oxc-stick {
-    width: 88px;
-    height: 88px;
+    width: 80px;
+    height: 80px;
   }
 
   .oxc-prompt {
-    bottom: calc(3.4rem + var(--oxc-safe-bottom) + 5.5rem);
+    bottom: calc(3.2rem + var(--oxc-safe-bottom) + 5.2rem);
   }
 
   .oxc-panel {
@@ -2964,8 +3065,16 @@ button.oxc-token-row {
   gap: 0.3rem;
 }
 
-.oxc-settings-row-stack {
-  display: grid;
-  gap: 0.55rem;
+.oxc-pwa-ios-hint {
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(197, 162, 111, 0.35);
+  background: rgba(197, 162, 111, 0.08);
+  color: var(--oxc-gold);
+  font-size: 10px;
+  letter-spacing: 0.04em;
 }
+
+.oxc-pwa-ios-hint b { color: #fff; }
 

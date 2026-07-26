@@ -1,14 +1,18 @@
 {
-  "name": "OrbitX — Live OG Coin Scanner",
+  "id": "/",
+  "name": "OrbitX City",
   "short_name": "OrbitX",
-  "description": "Live on-chain intel for OG coins, new pairs, migrations, whales, tape, and any Solana token.",
-  "start_url": "/app",
+  "description": "OrbitX — playable crypto city, live OG coin scanner, DEX, social, and on-chain intel.",
+  "start_url": "/Orbitxcity",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
   "theme_color": "#050806",
   "background_color": "#020915",
-  "categories": ["finance", "crypto", "tools"],
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["games", "entertainment", "finance", "social"],
   "icons": [
     {
       "src": "/icon-72x72.png",
@@ -74,6 +78,19 @@
   "screenshots": [],
   "shortcuts": [
     {
+      "name": "OrbitX City",
+      "short_name": "City",
+      "description": "Enter the playable OrbitX City world",
+      "url": "/Orbitxcity",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "OrbitX DEX",
+      "short_name": "DEX",
+      "url": "/ORBITX_DEX",
+      "icons": [{ "src": "/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
       "name": "Truth Scanner",
       "short_name": "Scanner",
       "url": "/scanner",
@@ -84,12 +101,7 @@
       "short_name": "Discover",
       "url": "/discover",
       "icons": [{ "src": "/icon-96x96.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Memes",
-      "short_name": "Memes",
-      "url": "/memes",
-      "icons": [{ "src": "/icon-96x96.png", "sizes": "96x96" }]
     }
-  ]
+  ],
+  "prefer_related_applications": false
 }

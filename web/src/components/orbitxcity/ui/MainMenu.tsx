@@ -22,6 +22,7 @@ import type { CityId } from "@/lib/orbitxcity/types";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { CosmicBackdrop } from "./CosmicBackdrop";
 import { AudioToggle } from "./AudioToggle";
+import { InstallCityPWA } from "./InstallCityPWA";
 
 type MenuAction =
   | "play"
@@ -150,6 +151,7 @@ export function MainMenu() {
           >
             Next song
           </button>
+          <InstallCityPWA />
         </div>
       </header>
 

@@ -382,3 +382,22 @@ export const PANEL_NAV = [
   { id: "inventory" as const, label: "Bag", icon: Backpack },
   { id: "profile" as const, label: "Profile", icon: UserRound },
 ];
+
+/** Phone dock — keep only the actions players need mid-run. */
+export const MOBILE_DOCK = [
+  { id: "map" as const, label: "Map", icon: Map },
+  { id: "marketplace" as const, label: "Market", icon: Store },
+  { id: "chat" as const, label: "Chat", icon: MessageSquare },
+  { id: "voice" as const, label: "Voice", icon: Mic },
+  { id: "inventory" as const, label: "Bag", icon: Backpack },
+];
+
+/** Overflow sheet on phones. */
+export const MORE_PANELS = [
+  { id: "live" as const, label: "Live", icon: Radio },
+  { id: "social" as const, label: "Social", icon: Users },
+  { id: "character" as const, label: "Look", icon: Wand2 },
+  { id: "events" as const, label: "Events", icon: Rocket },
+  { id: "profile" as const, label: "Profile", icon: UserRound },
+  { id: "help" as const, label: "Help", icon: Gamepad2 },
+];
