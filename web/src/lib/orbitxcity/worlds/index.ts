@@ -3,10 +3,12 @@ import type { CityId, StreetSegment, WorldBlockConfig } from "../types";
 import { BOSTON_BLOCK, BOSTON_STREETS, BOSTON_TELEPORT_POINTS } from "./bostonBlock";
 import { LA_BLOCK, LA_STREETS, LA_TELEPORT_POINTS } from "./laBlock";
 import { MIAMI_BLOCK, MIAMI_STREETS, MIAMI_TELEPORT_POINTS } from "./miamiBlock";
+import { NYC_OSM_BLOCK, NYC_OSM_STREETS, NYC_OSM_TELEPORT_POINTS, OSM_ATTRIBUTION } from "./nycOsmBlock";
 
 export { BOSTON_BLOCK, BOSTON_STREETS, BOSTON_TELEPORT_POINTS } from "./bostonBlock";
 export { LA_BLOCK, LA_STREETS, LA_TELEPORT_POINTS } from "./laBlock";
 export { MIAMI_BLOCK, MIAMI_STREETS, MIAMI_TELEPORT_POINTS } from "./miamiBlock";
+export { NYC_OSM_BLOCK, NYC_OSM_STREETS, NYC_OSM_TELEPORT_POINTS, OSM_ATTRIBUTION } from "./nycOsmBlock";
 
 export type TeleportPoint = { id: string; label: string; x: number; z: number; accent: string };
 
@@ -19,6 +21,7 @@ export function getWorldBlock(cityId: CityId): WorldBlockConfig {
     case "boston":
       return BOSTON_BLOCK;
     case "nyc":
+      return NYC_OSM_BLOCK;
     default:
       return NYC_DEMO_BLOCK;
   }
@@ -33,6 +36,7 @@ export function getWorldStreets(cityId: CityId): StreetSegment[] {
     case "boston":
       return BOSTON_STREETS;
     case "nyc":
+      return NYC_OSM_STREETS;
     default:
       return STREETS;
   }
@@ -47,6 +51,7 @@ export function getTeleportPoints(cityId: CityId): TeleportPoint[] {
     case "boston":
       return BOSTON_TELEPORT_POINTS;
     case "nyc":
+      return [...NYC_OSM_TELEPORT_POINTS];
     default:
       return TELEPORT_POINTS;
   }

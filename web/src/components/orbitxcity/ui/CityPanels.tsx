@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
-import { getTeleportPoints, getWorldBlock } from "@/lib/orbitxcity/worlds";
+import { getTeleportPoints, getWorldBlock, OSM_ATTRIBUTION } from "@/lib/orbitxcity/worlds";
 import {
   fetchCityMarketSnapshot,
   fmtPct,
@@ -165,6 +165,11 @@ function MapPanel() {
       </div>
 
       <p className="oxc-muted">All four OrbitX City districts are playable. Choose a district from the main menu, then fast travel between its landmarks.</p>
+      {selectedCityId === "nyc" && (
+        <p className="oxc-muted" style={{ fontSize: "0.72rem", opacity: 0.75 }}>
+          {OSM_ATTRIBUTION}
+        </p>
+      )}
       <div className="oxc-grid-2">
         {ORBITX_CITIES.map((c) => (
           <div key={c.id} className="oxc-tile on" style={{ borderColor: c.accent }}>

@@ -1,6 +1,6 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Text, Billboard } from "@react-three/drei";
+import { Text, Billboard, Clone, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { BuildingDefinition } from "@/lib/orbitxcity/types";
 import { hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
@@ -8,6 +8,12 @@ import { createFacadeTexture } from "@/lib/orbitxcity/textures";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const ROOF_MAT = new THREE.MeshStandardMaterial({ color: "#4a5158", metalness: 0.22, roughness: 0.78 });
+const CITY_MODEL_PATHS = [
+  "/orbitxcity/models/citybits/building_A.gltf",
+  "/orbitxcity/models/citybits/building_B.gltf",
+  "/orbitxcity/models/citybits/building_C.gltf",
+  "/orbitxcity/models/citybits/building_D.gltf",
+] as const;
 
 interface Tier {
   w: number;
@@ -93,13 +99,92 @@ function FacadeTier({
   );
 }
 
+/** Extrude a real OSM footprint into a textured midtown massing. */
+function FootprintShell({ building }: { building: BuildingDefinition }) {
+  const footprint = building.footprint!;
+  const height = building.size.height;
+
+  const geometry = useMemo(() => {
+    const shape = new THREE.Shape();
+    footprint.forEach((p, i) => {
+      if (i === 0) shape.moveTo(p.x, p.z);
+      else shape.lineTo(p.x, p.z);
+    });
+    shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: height,
+      bevelEnabled: false,
+      curveSegments: 1,
+      steps: 1,
+    });
+    geo.rotateX(-Math.PI / 2);
+    geo.computeVertexNormals();
+    return geo;
+  }, [footprint, height]);
+
+  const material = useMemo(() => {
+    const tex = createFacadeTexture(
+      hashSeed(`${building.id}-footprint`),
+      Math.max(building.size.width, building.size.depth),
+      height,
+      building.color,
+      building.accent,
+      true,
+    );
+    return new THREE.MeshStandardMaterial({
+      map: tex,
+      emissiveMap: tex,
+      emissive: new THREE.Color("#ffffff"),
+      emissiveIntensity: 0.14,
+      metalness: 0.22,
+      roughness: 0.72,
+    });
+  }, [building.id, building.color, building.accent, building.size.width, building.size.depth, height]);
+
+  return (
+    <>
+      <mesh geometry={geometry} material={material} castShadow receiveShadow />
+      <mesh position={[0, height + 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <shapeGeometry
+          args={[
+            (() => {
+              const s = new THREE.Shape();
+              footprint.forEach((p, i) => {
+                if (i === 0) s.moveTo(p.x, p.z);
+                else s.lineTo(p.x, p.z);
+              });
+              s.closePath();
+              return s;
+            })(),
+          ]}
+        />
+        <meshStandardMaterial color="#4e555c" metalness={0.2} roughness={0.78} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0, height + 0.14, 0]}>
+        <boxGeometry args={[Math.max(1.2, building.size.width * 0.18), 0.12, Math.max(1.2, building.size.depth * 0.18)]} />
+        <meshStandardMaterial
+          color={building.accent}
+          emissive={building.accent}
+          emissiveIntensity={0.18}
+          metalness={0.35}
+          roughness={0.5}
+        />
+      </mesh>
+    </>
+  );
+}
+
 export function BuildingMesh({ building }: { building: BuildingDefinition }) {
-  const { enterBuilding } = useCity();
+  const { enterBuilding, quality } = useCity();
   const { position, size, accent, label, name } = building;
   const rand = useMemo(() => mulberry32(hashSeed(`bld-${building.id}`)), [building.id]);
+  const modelPath = CITY_MODEL_PATHS[hashSeed(building.id) % CITY_MODEL_PATHS.length]!;
+  const { scene } = useGLTF(modelPath);
+  const hasFootprint = Boolean(building.footprint && building.footprint.length >= 3);
+  const useAssetShell = !hasFootprint && quality === "high";
   const tiers = useMemo(() => buildTiers(building, rand), [building, rand]);
   const top = tiers[tiers.length - 1]!;
-  const roofY = top.yBase + top.h;
+  const roofY = hasFootprint ? size.height : top.yBase + top.h;
   const doorW = Math.min(2.2, size.width * 0.28);
 
   const roofProps = useMemo(() => {
@@ -116,30 +201,47 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
 
   return (
     <group position={[position.x, 0, position.z]}>
-      {tiers.map((t, i) => (
-        <FacadeTier key={i} tier={t} building={building} index={i} />
-      ))}
-
-      <mesh position={[0, roofY + 0.12, 0]} castShadow>
-        <boxGeometry args={[top.w * 0.94, 0.28, top.d * 0.94]} />
-        <meshStandardMaterial color="#5a6168" metalness={0.2} roughness={0.75} />
-      </mesh>
-      <mesh position={[0, roofY + 0.28, 0]}>
-        <boxGeometry args={[top.w * 0.88, 0.08, top.d * 0.88]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.08} metalness={0.35} roughness={0.55} />
-      </mesh>
-
-      {[
-        [-size.width / 2, -size.depth / 2],
-        [size.width / 2, -size.depth / 2],
-        [-size.width / 2, size.depth / 2],
-        [size.width / 2, size.depth / 2],
-      ].map(([cx, cz], i) => (
-        <mesh key={`trim-${i}`} position={[cx!, tiers[0]!.h / 2, cz!]} castShadow>
-          <boxGeometry args={[0.12, tiers[0]!.h, 0.12]} />
-          <meshStandardMaterial color="#4e555c" metalness={0.25} roughness={0.7} />
-        </mesh>
-      ))}
+      {hasFootprint ? (
+        <FootprintShell building={building} />
+      ) : useAssetShell ? (
+        <Clone
+          object={scene}
+          scale={[size.width / 2, size.height / 1.65, size.depth / 2]}
+          castShadow
+          receiveShadow
+        />
+      ) : (
+        <>
+          {tiers.map((t, i) => (
+            <FacadeTier key={i} tier={t} building={building} index={i} />
+          ))}
+          <mesh position={[0, roofY + 0.12, 0]} castShadow>
+            <boxGeometry args={[top.w * 0.94, 0.28, top.d * 0.94]} />
+            <meshStandardMaterial color="#5a6168" metalness={0.2} roughness={0.75} />
+          </mesh>
+          <mesh position={[0, roofY + 0.28, 0]}>
+            <boxGeometry args={[top.w * 0.88, 0.08, top.d * 0.88]} />
+            <meshStandardMaterial
+              color={accent}
+              emissive={accent}
+              emissiveIntensity={0.08}
+              metalness={0.35}
+              roughness={0.55}
+            />
+          </mesh>
+          {[
+            [-size.width / 2, -size.depth / 2],
+            [size.width / 2, -size.depth / 2],
+            [-size.width / 2, size.depth / 2],
+            [size.width / 2, size.depth / 2],
+          ].map(([cx, cz], i) => (
+            <mesh key={`trim-${i}`} position={[cx!, tiers[0]!.h / 2, cz!]} castShadow>
+              <boxGeometry args={[0.12, tiers[0]!.h, 0.12]} />
+              <meshStandardMaterial color="#4e555c" metalness={0.25} roughness={0.7} />
+            </mesh>
+          ))}
+        </>
+      )}
 
       {/* Recessed entrance with awning + sidewalk apron */}
       <mesh position={[0, 1.05, size.depth / 2 + 0.04]} castShadow>
@@ -165,19 +267,19 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         <meshStandardMaterial color="#6a7178" roughness={0.92} metalness={0.05} />
       </mesh>
 
-      {roofProps.tank && (
+      {!hasFootprint && !useAssetShell && roofProps.tank && (
         <mesh position={[roofProps.tankX, roofY + 0.8, roofProps.tankZ]} castShadow>
           <cylinderGeometry args={[0.6, 0.7, 1.6, 10]} />
           <meshStandardMaterial color="#131a28" metalness={0.55} roughness={0.5} />
         </mesh>
       )}
-      {roofProps.ac && (
+      {!hasFootprint && !useAssetShell && roofProps.ac && (
         <mesh position={[roofProps.acX, roofY + 0.35, roofProps.acZ]} castShadow>
           <boxGeometry args={[1.1, 0.7, 0.9]} />
           <meshStandardMaterial color="#1a2334" metalness={0.5} roughness={0.55} />
         </mesh>
       )}
-      {size.height >= 8 && <BlinkingBeacon height={roofY} accent={accent} />}
+      {!hasFootprint && !useAssetShell && size.height >= 8 && <BlinkingBeacon height={roofY} accent={accent} />}
 
       <Billboard position={[0, roofY + 1.5, 0]}>
         <Text
@@ -195,3 +297,5 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
     </group>
   );
 }
+
+CITY_MODEL_PATHS.forEach((path) => useGLTF.preload(path));
