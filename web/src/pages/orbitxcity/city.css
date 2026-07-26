@@ -2021,6 +2021,19 @@ button.oxc-token-row {
 
 .oxc-menu-wallet,
 .oxc-menu-pulse {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-top: 0.9rem;
+}
+
+.oxc-menu-pulse {
+  color: var(--oxc-gold);
+  font-size: 0.67rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
 
 .oxc-lobby-browser,
 .oxc-character,
@@ -2171,6 +2184,38 @@ button.oxc-token-row {
   justify-self: start;
   min-width: 5.8rem;
   min-height: 2.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--oxc-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.65rem;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.oxc-switch span {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: #526078;
+}
+
+.oxc-switch.on {
+  border-color: var(--oxc-lime);
+  color: var(--oxc-lime);
+  background: color-mix(in srgb, var(--oxc-lime) 12%, transparent);
+}
+
+.oxc-switch.on span {
+  background: var(--oxc-lime);
+  box-shadow: 0 0 10px var(--oxc-lime);
+}
 
 .oxc-lobby-chip,
 .oxc-exit-menu-btn {
@@ -2199,6 +2244,9 @@ button.oxc-token-row {
 
 .oxc-exit-menu-btn {
   border-color: color-mix(in srgb, var(--oxc-gold) 42%, transparent);
+  background: color-mix(in srgb, var(--oxc-gold) 9%, transparent);
+  color: var(--oxc-gold);
+}
 
 .oxc-menu-cities {
   position: relative;
