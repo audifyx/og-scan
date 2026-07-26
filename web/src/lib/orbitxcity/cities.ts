@@ -7,7 +7,7 @@ export const ORBITX_CITIES: CityDefinition[] = [
     name: "OrbitX NYC",
     tagline: "Financial hub",
     purpose: "Trading district, launch events, Bloomberg-grade market energy.",
-    accent: "#17ff4d",
+    accent: "#00ff9f",
     unlocked: true,
   },
   {
@@ -15,7 +15,7 @@ export const ORBITX_CITIES: CityDefinition[] = [
     name: "OrbitX Miami",
     tagline: "Community coast",
     purpose: "Conferences, social plazas, community events.",
-    accent: "#3de7ff",
+    accent: "#00ffc3",
     unlocked: false,
   },
   {
@@ -23,7 +23,7 @@ export const ORBITX_CITIES: CityDefinition[] = [
     name: "OrbitX LA",
     tagline: "Creator strip",
     purpose: "Creators, marketing, entertainment stages.",
-    accent: "#ff4d9a",
+    accent: "#7dffb0",
     unlocked: false,
   },
   {
@@ -31,7 +31,7 @@ export const ORBITX_CITIES: CityDefinition[] = [
     name: "OrbitX Boston",
     tagline: "Innovation core",
     purpose: "Developers, AI labs, protocol R&D.",
-    accent: "#f5c542",
+    accent: "#c5a26f",
     unlocked: false,
   },
 ];
