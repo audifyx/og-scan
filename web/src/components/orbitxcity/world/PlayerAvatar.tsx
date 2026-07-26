@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Billboard, Text } from "@react-three/drei";
 import * as THREE from "three";
-import type { AvatarAppearance, Vec3 } from "@/lib/orbitxcity/types";
+import type { AvatarAppearance, Vec3, WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt, pointInBuilding } from "@/lib/orbitxcity/collision";
 import { consumeZoom, virtualInput } from "@/lib/orbitxcity/input";
 import type { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
+import { CharacterMesh, type CharacterAnimationState } from "./CharacterMesh";
 
 const WALK_SPEED = 7.5;
 const SPRINT_SPEED = 11.8;
@@ -45,24 +46,45 @@ interface PlayerAvatarProps {
   realtime?: CityRealtimeClient | null;
   teleportTarget?: { x: number; z: number; seq: number } | null;
   emoteAt?: number;
+  /** Active city block — spawn, collision, and camera occlusion. */
+  block?: WorldBlockConfig;
 }
 
-export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget, emoteAt = 0 }: PlayerAvatarProps) {
+export function PlayerAvatar({
+  appearance,
+  onMove,
+  realtime,
+  teleportTarget,
+  emoteAt = 0,
+  block = NYC_DEMO_BLOCK,
+}: PlayerAvatarProps) {
   const group = useRef<THREE.Group>(null);
   const flame = useRef<THREE.Mesh>(null);
   const bob = useRef(0);
   const { camera } = useThree();
   useKeyboard();
 
-  const spawn = NYC_DEMO_BLOCK.spawn;
+  const spawn = block.spawn;
+  const blockRef = useRef(block);
+  blockRef.current = block;
   const pos = useRef(new THREE.Vector3(spawn.x, 0, spawn.z));
   const yaw = useRef(0);
   const vy = useRef(0);
   const yPos = useRef(0);
   const camDist = useRef(9);
+  const characterAnimation = useRef<CharacterAnimationState>({});
   const reportAcc = useRef(0);
   const lastReported = useRef({ x: spawn.x, z: spawn.z, yaw: 0 });
   const [chat, setChat] = useState<string | null>(null);
+
+  // Respawn when the selected city block changes
+  useEffect(() => {
+    pos.current.set(spawn.x, 0, spawn.z);
+    yPos.current = 0;
+    vy.current = 0;
+    lastReported.current = { x: spawn.x, z: spawn.z, yaw: yaw.current };
+    onMove({ x: spawn.x, y: 0, z: spawn.z }, yaw.current);
+  }, [block.cityId, spawn.x, spawn.z, onMove]);
 
   // Mouse-wheel camera zoom
   useEffect(() => {
@@ -113,8 +135,9 @@ export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget, emo
 
       const nextX = pos.current.x + nx * t;
       const nextZ = pos.current.z + nz * t;
-      if (!collidesAt(nextX, pos.current.z)) pos.current.x = nextX;
-      if (!collidesAt(pos.current.x, nextZ)) pos.current.z = nextZ;
+      const world = blockRef.current;
+      if (!collidesAt(nextX, pos.current.z, 0.45, world)) pos.current.x = nextX;
+      if (!collidesAt(pos.current.x, nextZ, 0.45, world)) pos.current.z = nextZ;
       bob.current += t * (sprinting ? 14 : 10);
     } else {
       bob.current *= 0.9;
@@ -133,20 +156,15 @@ export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget, emo
 
     // Dance emote: spin + hop for a short window
     const dancing = emoteAt > 0 && Date.now() - emoteAt < 2600;
+    characterAnimation.current.time = moving && !dancing ? bob.current / 8.8 : clock.elapsedTime;
+    characterAnimation.current.moving = moving && !airborne;
+    characterAnimation.current.dancing = dancing;
+    characterAnimation.current.walkIntensity = sprinting ? 1.3 : 1;
 
     if (group.current) {
       const hop = dancing && grounded ? Math.abs(Math.sin(clock.elapsedTime * 9)) * 0.28 : 0;
       group.current.position.set(pos.current.x, yPos.current + hop, pos.current.z);
       group.current.rotation.y = dancing ? clock.elapsedTime * 9 : yaw.current;
-      const leg = group.current.getObjectByName("legL");
-      const legR = group.current.getObjectByName("legR");
-      const swing = dancing
-        ? Math.sin(clock.elapsedTime * 14) * 0.7
-        : moving && !airborne
-          ? Math.sin(bob.current) * (sprinting ? 0.6 : 0.45)
-          : 0;
-      if (leg) leg.rotation.x = swing;
-      if (legR) legR.rotation.x = -swing;
     }
 
     if (flame.current) {
@@ -173,7 +191,7 @@ export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget, emo
       const px = target.x + (desired.x - target.x) * s;
       const py = target.y + (desired.y - target.y) * s;
       const pz = target.z + (desired.z - target.z) * s;
-      if (pointInBuilding(px, py, pz)) {
+      if (pointInBuilding(px, py, pz, blockRef.current)) {
         tMax = Math.max((i - 1) / STEPS, 0.16);
         break;
       }
@@ -202,38 +220,10 @@ export function PlayerAvatar({ appearance, onMove, realtime, teleportTarget, emo
 
   return (
     <group ref={group} position={[spawn.x, 0, spawn.z]}>
-      {/* Body */}
-      <mesh position={[0, 1.15, 0]} castShadow>
-        <capsuleGeometry args={[0.35, 0.7, 6, 12]} />
-        <meshStandardMaterial color={appearance.bodyColor} metalness={0.35} roughness={0.45} />
-      </mesh>
-      {/* Head */}
-      <mesh position={[0, 2.05, 0]} castShadow>
-        <sphereGeometry args={[0.32, 16, 16]} />
-        <meshStandardMaterial color={appearance.skinColor ?? "#e8d5c0"} metalness={0.1} roughness={0.65} />
-      </mesh>
-      {/* Visor */}
-      <mesh position={[0, 2.08, 0.22]}>
-        <boxGeometry args={[0.38, 0.12, 0.08]} />
-        <meshBasicMaterial color={appearance.accentColor} toneMapped={false} />
-      </mesh>
-      {/* Jetpack */}
-      <mesh position={[0, 1.45, -0.22]}>
-        <boxGeometry args={[0.55, 0.35, 0.2]} />
-        <meshStandardMaterial color={appearance.accentColor} emissive={appearance.accentColor} emissiveIntensity={0.25} />
-      </mesh>
+      <CharacterMesh appearance={appearance} animation={characterAnimation.current} />
       <mesh ref={flame} position={[0, 1.05, -0.28]} rotation-x={Math.PI} visible={false}>
         <coneGeometry args={[0.14, 0.6, 10]} />
         <meshBasicMaterial color="#ffb054" transparent opacity={0.9} toneMapped={false} />
-      </mesh>
-      {/* Legs */}
-      <mesh name="legL" position={[-0.16, 0.45, 0]}>
-        <capsuleGeometry args={[0.12, 0.35, 4, 8]} />
-        <meshStandardMaterial color="#0d121c" />
-      </mesh>
-      <mesh name="legR" position={[0.16, 0.45, 0]}>
-        <capsuleGeometry args={[0.12, 0.35, 4, 8]} />
-        <meshStandardMaterial color="#0d121c" />
       </mesh>
       {/* Ground ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>

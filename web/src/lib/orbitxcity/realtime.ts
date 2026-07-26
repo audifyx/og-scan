@@ -9,6 +9,7 @@
  */
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase";
+import type { FaceStyle, HairStyle, OutfitStyle } from "@/lib/orbitxcity/types";
 
 export const REALTIME_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
@@ -18,6 +19,111 @@ export interface CityIdentity {
   accentColor: string;
   bodyColor: string;
   skinColor: string;
+  hairStyle?: HairStyle;
+  hairColor?: string;
+  outfit?: OutfitStyle;
+  faceStyle?: FaceStyle;
+}
+
+export interface LobbyDescriptor {
+  /** Realtime channel id (already includes the password hash for private lobbies). */
+  id: string;
+  /** Human-readable name shown in the directory and HUD. */
+  label: string;
+  isPrivate: boolean;
+}
+
+export const MAIN_LOBBY: LobbyDescriptor = {
+  id: "oxc-world-nyc",
+  label: "Main Lobby · NYC",
+  isPrivate: false,
+};
+
+function slugify(name: string): string {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "lobby";
+}
+
+function tinyHash(s: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+/**
+ * Build a lobby descriptor. Private lobbies mix the password into the channel
+ * id, so only players who know name+password land in the same room — no
+ * server-side gate needed for a social lobby.
+ */
+export function makeLobby(name: string, password?: string): LobbyDescriptor {
+  const slug = slugify(name);
+  const isPrivate = Boolean(password && password.trim());
+  const id = isPrivate
+    ? `oxc-lobby-${slug}-${tinyHash(`${slug}:${password!.trim()}`)}`
+    : `oxc-lobby-${slug}-open`;
+  return { id, label: name.trim().slice(0, 32) || "Custom Lobby", isPrivate };
+}
+
+export interface DirectoryLobby {
+  id: string;
+  label: string;
+  isPrivate: boolean;
+  count: number;
+}
+
+export type CityLobbyInput = LobbyDescriptor | string;
+export type CityLobbyMeta = Partial<Pick<LobbyDescriptor, "label" | "isPrivate">>;
+
+type PlayerPresenceMeta = Pick<CityIdentity, "name" | "accentColor" | "bodyColor" | "skinColor"> &
+  Partial<Pick<CityIdentity, "hairStyle" | "hairColor" | "outfit" | "faceStyle">>;
+
+type DirectoryPresenceMeta = {
+  lobbyId?: string;
+  label?: string;
+  isPrivate?: boolean;
+};
+
+/**
+ * Live lobby directory: every connected player also tracks presence on a
+ * shared directory channel carrying their lobby's metadata. Aggregating that
+ * presence state yields the public lobby list with player counts.
+ */
+export function watchLobbyDirectory(cb: (lobbies: DirectoryLobby[]) => void): () => void {
+  if (!REALTIME_ENABLED) {
+    cb([{ ...MAIN_LOBBY, count: 0 }]);
+    return () => {};
+  }
+  const ch = supabase.channel("oxc-lobby-directory", {
+    config: { presence: { key: `watch-${Math.random().toString(36).slice(2, 10)}` } },
+  });
+  ch.on("presence", { event: "sync" }, () => {
+    const state = ch.presenceState<DirectoryPresenceMeta>();
+    const byId = new Map<string, DirectoryLobby>();
+    byId.set(MAIN_LOBBY.id, { ...MAIN_LOBBY, count: 0 });
+    for (const metas of Object.values(state)) {
+      for (const meta of metas) {
+        if (!meta?.lobbyId) continue;
+        const existing = byId.get(meta.lobbyId);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          byId.set(meta.lobbyId, {
+            id: meta.lobbyId,
+            label: meta.label ?? "Custom Lobby",
+            isPrivate: Boolean(meta.isPrivate),
+            count: 1,
+          });
+        }
+      }
+    }
+    cb(Array.from(byId.values()).sort((a, b) => b.count - a.count));
+  });
+  ch.subscribe();
+  return () => {
+    supabase.removeChannel(ch);
+  };
 }
 
 export interface RemotePlayerState {
@@ -26,6 +132,10 @@ export interface RemotePlayerState {
   accentColor: string;
   bodyColor: string;
   skinColor: string;
+  hairStyle?: HairStyle;
+  hairColor?: string;
+  outfit?: OutfitStyle;
+  faceStyle?: FaceStyle;
   x: number;
   z: number;
   yaw: number;
@@ -54,6 +164,8 @@ export class CityRealtimeClient {
   localChat: { text: string; at: number } | null = null;
 
   private channel: RealtimeChannel | null = null;
+  private directoryChannel: RealtimeChannel | null = null;
+  private readonly lobby: LobbyDescriptor;
   private listeners = new Set<() => void>();
   private chatLog: WorldChatMessage[] = [];
   private snapshot: { online: number; chat: WorldChatMessage[]; connected: boolean } = {
@@ -64,8 +176,11 @@ export class CityRealtimeClient {
 
   constructor(
     private readonly identity: CityIdentity,
-    private readonly room = "oxc-world-nyc",
-  ) {}
+    lobby: CityLobbyInput = MAIN_LOBBY,
+    lobbyMeta: CityLobbyMeta = {},
+  ) {
+    this.lobby = normalizeLobby(lobby, lobbyMeta);
+  }
 
   connect(): void {
     if (this.channel) return;
@@ -75,17 +190,26 @@ export class CityRealtimeClient {
       return;
     }
 
-    const ch = supabase.channel(this.room, {
+    const directoryCh = supabase.channel("oxc-lobby-directory", {
+      config: { presence: { key: this.identity.id } },
+    });
+
+    directoryCh.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await directoryCh.track({
+          lobbyId: this.lobby.id,
+          label: this.lobby.label,
+          isPrivate: this.lobby.isPrivate,
+        });
+      }
+    });
+
+    const ch = supabase.channel(this.lobby.id, {
       config: { presence: { key: this.identity.id }, broadcast: { self: false } },
     });
 
     ch.on("presence", { event: "sync" }, () => {
-      const state = ch.presenceState<{
-        name?: string;
-        accentColor?: string;
-        bodyColor?: string;
-        skinColor?: string;
-      }>();
+      const state = ch.presenceState<PlayerPresenceMeta>();
       const ids = new Set(Object.keys(state));
 
       for (const id of this.players.keys()) {
@@ -98,6 +222,10 @@ export class CityRealtimeClient {
           accentColor?: string;
           bodyColor?: string;
           skinColor?: string;
+          hairStyle?: HairStyle;
+          hairColor?: string;
+          outfit?: OutfitStyle;
+          faceStyle?: FaceStyle;
         };
         const existing = this.players.get(id);
         if (existing) {
@@ -105,6 +233,10 @@ export class CityRealtimeClient {
           existing.accentColor = meta.accentColor ?? existing.accentColor;
           existing.bodyColor = meta.bodyColor ?? existing.bodyColor;
           existing.skinColor = meta.skinColor ?? existing.skinColor;
+          existing.hairStyle = meta.hairStyle ?? existing.hairStyle;
+          existing.hairColor = meta.hairColor ?? existing.hairColor;
+          existing.outfit = meta.outfit ?? existing.outfit;
+          existing.faceStyle = meta.faceStyle ?? existing.faceStyle;
         } else {
           this.players.set(id, {
             id,
@@ -112,6 +244,10 @@ export class CityRealtimeClient {
             accentColor: meta.accentColor ?? "#3de7ff",
             bodyColor: meta.bodyColor ?? "#1a2438",
             skinColor: meta.skinColor ?? "#e8d5c0",
+            hairStyle: meta.hairStyle,
+            hairColor: meta.hairColor,
+            outfit: meta.outfit,
+            faceStyle: meta.faceStyle,
             // Spawn plaza until their first position packet lands
             x: 0,
             z: 8,
@@ -159,12 +295,7 @@ export class CityRealtimeClient {
 
     ch.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
-        await ch.track({
-          name: this.identity.name,
-          accentColor: this.identity.accentColor,
-          bodyColor: this.identity.bodyColor,
-          skinColor: this.identity.skinColor,
-        });
+        await ch.track(this.playerPresence());
         this.publish({ connected: true });
       } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
         this.publish({ connected: false });
@@ -172,12 +303,18 @@ export class CityRealtimeClient {
     });
 
     this.channel = ch;
+    this.directoryChannel = directoryCh;
   }
 
   disconnect(): void {
     if (this.channel) {
       supabase.removeChannel(this.channel);
       this.channel = null;
+    }
+    if (this.directoryChannel) {
+      void this.directoryChannel.untrack();
+      supabase.removeChannel(this.directoryChannel);
+      this.directoryChannel = null;
     }
     this.players.clear();
     this.publish({ online: 1, connected: false });
@@ -223,6 +360,19 @@ export class CityRealtimeClient {
 
   getSnapshot = () => this.snapshot;
 
+  private playerPresence(): PlayerPresenceMeta {
+    return {
+      name: this.identity.name,
+      accentColor: this.identity.accentColor,
+      bodyColor: this.identity.bodyColor,
+      skinColor: this.identity.skinColor,
+      hairStyle: this.identity.hairStyle,
+      hairColor: this.identity.hairColor,
+      outfit: this.identity.outfit,
+      faceStyle: this.identity.faceStyle,
+    };
+  }
+
   private pushChat(msg: WorldChatMessage): void {
     this.chatLog = [...this.chatLog.slice(-(MAX_CHAT_LOG - 1)), msg];
     if (msg.senderId === this.identity.id) {
@@ -245,6 +395,16 @@ export class CityRealtimeClient {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function normalizeLobby(lobby: CityLobbyInput, meta: CityLobbyMeta): LobbyDescriptor {
+  if (typeof lobby !== "string") return lobby;
+  if (lobby === MAIN_LOBBY.id && !meta.label && meta.isPrivate === undefined) return MAIN_LOBBY;
+  return {
+    id: lobby,
+    label: meta.label ?? (lobby === MAIN_LOBBY.id ? MAIN_LOBBY.label : lobby),
+    isPrivate: meta.isPrivate ?? false,
+  };
 }
 
 /** Stable fallbacks for useSyncExternalStore when the client isn't ready. */

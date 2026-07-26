@@ -4,6 +4,7 @@ import { CityProvider, useCity } from "./CityProvider";
 import { WorldCanvas } from "@/components/orbitxcity/WorldCanvas";
 import { MainMenu } from "@/components/orbitxcity/ui/MainMenu";
 import { CharacterSelect } from "@/components/orbitxcity/ui/CharacterSelect";
+import { LobbiesGate } from "@/components/orbitxcity/ui/LobbiesGate";
 import { CityHUD } from "@/components/orbitxcity/ui/CityHUD";
 import { fetchCityMarketSnapshot } from "@/lib/orbitxcity/marketData";
 import "./city.css";
@@ -11,7 +12,6 @@ import "./city.css";
 function CityShell() {
   const { gate, entered } = useCity();
 
-  // Live market feed shared by HUD panels + in-world jumbotrons
   const { data: market } = useQuery({
     queryKey: ["orbitxcity-market"],
     queryFn: fetchCityMarketSnapshot,
@@ -29,6 +29,7 @@ function CityShell() {
     <div className="oxc-root">
       {gate === "menu" && <MainMenu />}
       {gate === "characters" && <CharacterSelect />}
+      {gate === "lobbies" && <LobbiesGate />}
       {gate === "world" && entered && (
         <>
           <WorldCanvas tickerRows={market?.trending ?? []} />
@@ -39,7 +40,7 @@ function CityShell() {
   );
 }
 
-/** Immersive OrbitX City — AAA menu → characters → NYC world. Mounted at /Orbitxcity */
+/** Immersive OrbitX City — AAA menu → characters/lobbies → multi-city world. */
 export default function OrbitxCityPage() {
   return (
     <CityProvider>

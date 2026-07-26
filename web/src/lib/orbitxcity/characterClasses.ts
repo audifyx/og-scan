@@ -116,5 +116,9 @@ export function appearanceFromClass(cls: CharacterClassDef, name?: string): Avat
     accentColor: cls.accentColor,
     skinColor: cls.skinColor,
     classId: cls.id,
+    hairStyle: cls.id === "explorer" ? "long" : cls.id === "gamer" ? "mohawk" : "short",
+    hairColor: cls.id === "creator" ? "#c5a26f" : "#151018",
+    outfit: cls.id === "trader" ? "suit" : cls.id === "gamer" ? "sport" : cls.id === "builder" ? "street" : "neon",
+    faceStyle: cls.id === "creator" ? "smile" : "cool",
   };
 }

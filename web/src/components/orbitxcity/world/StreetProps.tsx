@@ -1,22 +1,25 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { STREETS } from "@/lib/orbitxcity/demoBlock";
+import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt } from "@/lib/orbitxcity/collision";
+import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
+import { getWorldStreets } from "@/lib/orbitxcity/worlds";
 
 const LAMP_SPACING = 16;
 
 /** Instanced street lamps generated along every street segment. */
-function LampField() {
+function LampField({ block }: { block: WorldBlockConfig }) {
+  const streets = getWorldStreets(block.cityId);
   const { poles, heads } = useMemo(() => {
     const spots: Array<[number, number]> = [];
-    for (const s of STREETS) {
+    for (const s of streets) {
       const off = s.w / 2 + 1;
       for (let t = s.from + 6; t <= s.to - 4; t += LAMP_SPACING) {
         const a: [number, number] = s.o === "h" ? [t, s.at + off] : [s.at + off, t];
         const b: [number, number] = s.o === "h" ? [t + LAMP_SPACING / 2, s.at - off] : [s.at - off, t + LAMP_SPACING / 2];
         for (const p of [a, b]) {
-          if (!collidesAt(p[0], p[1], 0.4)) spots.push(p);
+          if (!collidesAt(p[0], p[1], 0.4, block)) spots.push(p);
         }
       }
     }
@@ -39,7 +42,7 @@ function LampField() {
     polesMesh.instanceMatrix.needsUpdate = true;
     headsMesh.instanceMatrix.needsUpdate = true;
     return { poles: polesMesh, heads: headsMesh };
-  }, []);
+  }, [block, streets]);
 
   return (
     <group>
@@ -72,16 +75,21 @@ function HoloPillar({ x, z, color }: { x: number; z: number; color: string }) {
 }
 
 /** Street furniture: instanced lamps + plaza holo pillars. */
-export function StreetProps() {
+export function StreetProps({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
   return (
     <group>
-      <LampField />
-      <HoloPillar x={6.5} z={6.5} color="#3de7ff" />
-      <HoloPillar x={-6.5} z={6.5} color="#17ff4d" />
-      <HoloPillar x={6.5} z={-6.5} color="#f5c542" />
-      <HoloPillar x={-6.5} z={-6.5} color="#ff4d9a" />
-      <HoloPillar x={40} z={22} color="#f5c542" />
-      <HoloPillar x={-14} z={35} color="#ff4d9a" />
+      <LampField block={block} />
+      {block.zones.slice(0, 6).map((zone, index) => {
+        const building = zone.buildingId ? block.buildings.find((b) => b.id === zone.buildingId) : undefined;
+        return (
+          <HoloPillar
+            key={zone.id}
+            x={zone.position.x}
+            z={zone.position.z}
+            color={building?.accent ?? ["#3de7ff", "#17ff4d", "#f5c542", "#ff4d9a", "#a78bfa", "#7fffd4"][index % 6]}
+          />
+        );
+      })}
     </group>
   );
 }
