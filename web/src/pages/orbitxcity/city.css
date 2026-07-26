@@ -9,18 +9,19 @@ body.oxc-lock {
 .oxc-root {
   --oxc-bg: #0a0a0a;
   --oxc-bg-deep: #050505;
-  --oxc-panel: rgba(8, 16, 12, 0.72);
-  --oxc-panel-soft: rgba(10, 18, 14, 0.45);
-  --oxc-line: rgba(0, 255, 159, 0.18);
-  --oxc-line-gold: rgba(197, 162, 111, 0.45);
-  --oxc-text: #f2fff8;
-  --oxc-muted: rgba(200, 230, 210, 0.55);
-  --oxc-lime: #00ff9f;
-  --oxc-lime-hot: #39ff14;
-  --oxc-cyan: #3de7ff;
+  --oxc-panel: rgba(8, 10, 12, 0.72);
+  --oxc-panel-soft: rgba(10, 12, 14, 0.5);
+  --oxc-line: rgba(255, 255, 255, 0.12);
+  --oxc-line-gold: rgba(197, 162, 111, 0.4);
+  --oxc-text: #f2f5f7;
+  --oxc-muted: rgba(210, 220, 225, 0.55);
+  --oxc-lime: #7dba88;
+  --oxc-lime-hot: #9ad4a2;
+  --oxc-cyan: #7aa0b0;
   --oxc-gold: #c5a26f;
-  --oxc-gold-bright: #ffd700;
-  --oxc-pink: #ff4d9a;
+  --oxc-gold-bright: #e0c48a;
+  --oxc-pink: #b88898;
+  --oxc-hud-glass: rgba(6, 8, 10, 0.78);
   --oxc-font-display: "Orbitron", "Sora", sans-serif;
   --oxc-font-body: "Sora", "JetBrains Mono", sans-serif;
   --oxc-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -377,19 +378,23 @@ body.oxc-lock {
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
-  padding: 0.85rem 1rem;
-  background: linear-gradient(180deg, rgba(4, 7, 15, 0.75), transparent);
+  padding: 0.65rem 0.85rem 1.2rem;
+  background: linear-gradient(180deg, rgba(4, 6, 8, 0.88), rgba(4, 6, 8, 0.35), transparent);
 }
 
 .oxc-brand-lockup {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--oxc-hud-glass);
+  backdrop-filter: blur(14px);
 }
 
 .oxc-mini-brand {
   font-family: var(--oxc-font-display);
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.03em;
   color: var(--oxc-text);
@@ -406,7 +411,7 @@ body.oxc-lock {
 }
 
 .oxc-loc strong {
-  color: var(--oxc-cyan);
+  color: #d7e0e6;
   font-weight: 700;
 }
 
@@ -416,11 +421,12 @@ body.oxc-lock {
   bottom: 1rem;
   transform: translateX(-50%);
   display: flex;
-  gap: 0.35rem;
-  padding: 0.4rem;
-  border: 1px solid var(--oxc-line);
-  background: var(--oxc-panel);
-  backdrop-filter: blur(12px);
+  gap: 0.28rem;
+  padding: 0.38rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--oxc-hud-glass);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   max-width: calc(100% - 1.5rem);
   overflow-x: auto;
 }
@@ -430,11 +436,11 @@ body.oxc-lock {
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
-  min-width: 3.6rem;
+  min-width: 3.5rem;
   border: 1px solid transparent;
   background: transparent;
   color: var(--oxc-muted);
-  padding: 0.45rem 0.35rem;
+  padding: 0.42rem 0.32rem;
   font: inherit;
   font-size: 9px;
   letter-spacing: 0.14em;
@@ -444,9 +450,9 @@ body.oxc-lock {
 
 .oxc-dock-btn.active,
 .oxc-dock-btn:hover {
-  color: var(--oxc-lime);
-  border-color: color-mix(in srgb, var(--oxc-lime) 35%, transparent);
-  background: color-mix(in srgb, var(--oxc-lime) 10%, transparent);
+  color: #eef3f6;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .oxc-prompt {
@@ -458,10 +464,11 @@ body.oxc-lock {
   align-items: center;
   gap: 0.75rem;
   width: min(420px, calc(100% - 1.5rem));
-  border: 1px solid color-mix(in srgb, var(--oxc-lime) 40%, transparent);
-  background: rgba(6, 14, 12, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--oxc-hud-glass);
   padding: 0.7rem 0.8rem;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
   animation: oxc-prompt-in 0.25s ease-out;
 }
 
@@ -475,10 +482,11 @@ body.oxc-lock {
   height: 1.8rem;
   display: grid;
   place-items: center;
-  border: 1px solid var(--oxc-lime);
-  color: var(--oxc-lime);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #eef3f6;
   font-weight: 800;
   font-size: 12px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .oxc-prompt strong {
@@ -514,14 +522,14 @@ body.oxc-lock {
 /* ── Live ticker bar ── */
 .oxc-tickerbar {
   position: absolute;
-  top: 3.55rem;
+  top: 4.1rem;
   left: 0;
   right: 0;
   overflow: hidden;
-  border-top: 1px solid rgba(23, 255, 77, 0.14);
-  border-bottom: 1px solid rgba(23, 255, 77, 0.14);
-  background: rgba(4, 8, 14, 0.62);
-  backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 8, 10, 0.55);
+  backdrop-filter: blur(8px);
   pointer-events: none;
 }
 
@@ -562,15 +570,16 @@ body.oxc-lock {
 /* ── Minimap ── */
 .oxc-minimap {
   position: absolute;
-  top: 6.4rem;
+  top: 6.8rem;
   left: 1rem;
   display: none;
   flex-direction: column;
   gap: 0.3rem;
-  border: 1px solid var(--oxc-line);
-  background: rgba(5, 10, 18, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--oxc-hud-glass);
   padding: 0.4rem;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
 }
 
 .oxc-minimap canvas {

@@ -117,15 +117,15 @@ function OutfitDetails({
       <>
         <mesh position={[0, 1.52, 0.27]} castShadow>
           <boxGeometry args={[0.48, 0.045, 0.035]} />
-          <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.55} roughness={0.38} />
+          <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.12} roughness={0.55} />
         </mesh>
         <mesh position={[-0.2, 1.25, 0.27]} castShadow>
           <boxGeometry args={[0.045, 0.48, 0.035]} />
-          <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.55} roughness={0.38} />
+          <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.12} roughness={0.55} />
         </mesh>
         <mesh position={[0.2, 1.25, 0.27]} castShadow>
           <boxGeometry args={[0.045, 0.48, 0.035]} />
-          <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.55} roughness={0.38} />
+          <meshStandardMaterial color={accentColor} emissive={accentColor} emissiveIntensity={0.12} roughness={0.55} />
         </mesh>
       </>
     );

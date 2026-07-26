@@ -1,5 +1,4 @@
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useMemo } from "react";
 import * as THREE from "three";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt } from "@/lib/orbitxcity/collision";
@@ -28,8 +27,14 @@ function LampField({ block }: { block: WorldBlockConfig }) {
     const poleMat = new THREE.MeshStandardMaterial({ color: "#1a2232", metalness: 0.75, roughness: 0.3 });
     const polesMesh = new THREE.InstancedMesh(poleGeo, poleMat, spots.length);
 
-    const headGeo = new THREE.BoxGeometry(0.5, 0.16, 0.24);
-    const headMat = new THREE.MeshBasicMaterial({ color: "#cfe8ff", toneMapped: false });
+    const headGeo = new THREE.BoxGeometry(0.55, 0.14, 0.28);
+    const headMat = new THREE.MeshStandardMaterial({
+      color: "#d8d2c0",
+      emissive: "#c4b896",
+      emissiveIntensity: 0.45,
+      metalness: 0.35,
+      roughness: 0.4,
+    });
     const headsMesh = new THREE.InstancedMesh(headGeo, headMat, spots.length);
 
     const m = new THREE.Matrix4();
@@ -52,44 +57,33 @@ function LampField({ block }: { block: WorldBlockConfig }) {
   );
 }
 
-function HoloPillar({ x, z, color }: { x: number; z: number; color: string }) {
-  const ref = useRef<THREE.Mesh>(null);
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    ref.current.rotation.y = clock.elapsedTime * 0.6;
-    const mat = ref.current.material as THREE.MeshBasicMaterial;
-    mat.opacity = 0.12 + Math.sin(clock.elapsedTime * 2.2) * 0.05;
-  });
+function ZoneMarker({ x, z }: { x: number; z: number }) {
   return (
     <group position={[x, 0, z]}>
-      <mesh position={[0, 0.12, 0]}>
-        <cylinderGeometry args={[0.7, 0.8, 0.24, 24]} />
-        <meshStandardMaterial color="#0c1220" metalness={0.6} roughness={0.35} />
+      <mesh position={[0, 0.1, 0]} receiveShadow>
+        <cylinderGeometry args={[0.85, 0.95, 0.18, 24]} />
+        <meshStandardMaterial color="#5a6168" metalness={0.2} roughness={0.75} />
       </mesh>
-      <mesh ref={ref} position={[0, 1.9, 0]}>
-        <cylinderGeometry args={[0.5, 0.5, 3.4, 6, 1, true]} />
-        <meshBasicMaterial color={color} transparent opacity={0.15} side={THREE.DoubleSide} toneMapped={false} />
+      <mesh position={[0, 1.4, 0]}>
+        <cylinderGeometry args={[0.06, 0.08, 2.6, 8]} />
+        <meshStandardMaterial color="#3a4046" metalness={0.55} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 2.85, 0]}>
+        <sphereGeometry args={[0.16, 12, 12]} />
+        <meshStandardMaterial color="#e8e2d2" emissive="#cfc6b0" emissiveIntensity={0.35} metalness={0.15} roughness={0.35} />
       </mesh>
     </group>
   );
 }
 
-/** Street furniture: instanced lamps + plaza holo pillars. */
+/** Street furniture: instanced lamps + quiet zone markers. */
 export function StreetProps({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
   return (
     <group>
       <LampField block={block} />
-      {block.zones.slice(0, 6).map((zone, index) => {
-        const building = zone.buildingId ? block.buildings.find((b) => b.id === zone.buildingId) : undefined;
-        return (
-          <HoloPillar
-            key={zone.id}
-            x={zone.position.x}
-            z={zone.position.z}
-            color={building?.accent ?? ["#3de7ff", "#17ff4d", "#f5c542", "#ff4d9a", "#a78bfa", "#7fffd4"][index % 6]}
-          />
-        );
-      })}
+      {block.zones.slice(0, 6).map((zone) => (
+        <ZoneMarker key={zone.id} x={zone.position.x} z={zone.position.z} />
+      ))}
     </group>
   );
 }

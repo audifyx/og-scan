@@ -6,7 +6,7 @@ import type { BuildingDefinition } from "@/lib/orbitxcity/types";
 import { hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
 import { createFacadeTexture } from "@/lib/orbitxcity/textures";
 
-const ROOF_MAT = new THREE.MeshStandardMaterial({ color: "#0a0e16", metalness: 0.5, roughness: 0.6 });
+const ROOF_MAT = new THREE.MeshStandardMaterial({ color: "#4a5158", metalness: 0.22, roughness: 0.78 });
 
 interface Tier {
   w: number;
@@ -50,7 +50,7 @@ function BlinkingBeacon({ height, accent }: { height: number; accent: string }) 
       </mesh>
       <mesh ref={ref} position={[0, 1.5, 0]}>
         <sphereGeometry args={[0.12, 10, 10]} />
-        <meshBasicMaterial color={accent} transparent toneMapped={false} />
+        <meshBasicMaterial color={accent} transparent opacity={0.55} toneMapped={false} />
       </mesh>
     </group>
   );
@@ -78,9 +78,9 @@ function FacadeTier({
       map: tex,
       emissiveMap: tex,
       emissive: new THREE.Color("#ffffff"),
-      emissiveIntensity: 0.75,
-      metalness: 0.35,
-      roughness: 0.55,
+      emissiveIntensity: 0.12,
+      metalness: 0.18,
+      roughness: 0.78,
     });
     // Box material order: +x, -x, +y, -y, +z, -z
     return [side, side, ROOF_MAT, ROOF_MAT, side, side];
@@ -118,29 +118,37 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         <FacadeTier key={i} tier={t} building={building} index={i} />
       ))}
 
-      {/* Accent crown on the top tier */}
-      <mesh position={[0, roofY + 0.15, 0]}>
-        <boxGeometry args={[top.w * 0.92, 0.3, top.d * 0.92]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} metalness={0.6} roughness={0.25} />
+      {/* Weathered stone crown */}
+      <mesh position={[0, roofY + 0.12, 0]} castShadow>
+        <boxGeometry args={[top.w * 0.94, 0.28, top.d * 0.94]} />
+        <meshStandardMaterial color="#5a6168" metalness={0.2} roughness={0.75} />
+      </mesh>
+      <mesh position={[0, roofY + 0.28, 0]}>
+        <boxGeometry args={[top.w * 0.88, 0.08, top.d * 0.88]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.08} metalness={0.35} roughness={0.55} />
       </mesh>
 
-      {/* Vertical neon corner tubes on the base tier */}
+      {/* Subtle corner trim — stone, not neon tubes */}
       {[
         [-size.width / 2, -size.depth / 2],
         [size.width / 2, -size.depth / 2],
         [-size.width / 2, size.depth / 2],
         [size.width / 2, size.depth / 2],
       ].map(([cx, cz], i) => (
-        <mesh key={`tube-${i}`} position={[cx, tiers[0].h / 2, cz]}>
-          <boxGeometry args={[0.09, tiers[0].h, 0.09]} />
-          <meshBasicMaterial color={accent} transparent opacity={0.85} toneMapped={false} />
+        <mesh key={`trim-${i}`} position={[cx, tiers[0].h / 2, cz]} castShadow>
+          <boxGeometry args={[0.12, tiers[0].h, 0.12]} />
+          <meshStandardMaterial color="#4e555c" metalness={0.25} roughness={0.7} />
         </mesh>
       ))}
 
-      {/* Entrance glow */}
-      <mesh position={[0, 1.1, size.depth / 2 + 0.06]}>
-        <planeGeometry args={[1.3, 2.1]} />
-        <meshBasicMaterial color={accent} transparent opacity={0.4} toneMapped={false} />
+      {/* Recessed entrance */}
+      <mesh position={[0, 1.05, size.depth / 2 + 0.04]} castShadow>
+        <boxGeometry args={[1.4, 2.2, 0.12]} />
+        <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
+      </mesh>
+      <mesh position={[0, 1.05, size.depth / 2 + 0.08]}>
+        <planeGeometry args={[1.05, 1.85]} />
+        <meshStandardMaterial color="#cfd6dc" emissive="#9aa8b2" emissiveIntensity={0.15} metalness={0.1} roughness={0.4} transparent opacity={0.55} />
       </mesh>
 
       {/* Rooftop clutter */}
@@ -158,16 +166,15 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
       )}
       {size.height >= 8 && <BlinkingBeacon height={roofY} accent={accent} />}
 
-      <Billboard position={[0, roofY + 1.6, 0]}>
+      <Billboard position={[0, roofY + 1.5, 0]}>
         <Text
-          fontSize={0.55}
-          color={accent}
+          fontSize={0.42}
+          color="#e8eef2"
           anchorX="center"
           anchorY="middle"
-          outlineWidth={0.03}
-          outlineColor="#000000"
+          outlineWidth={0.025}
+          outlineColor="#12161a"
           maxWidth={8}
-          material-toneMapped={false}
         >
           {label ?? name}
         </Text>
