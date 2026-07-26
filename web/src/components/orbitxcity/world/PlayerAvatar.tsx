@@ -48,6 +48,8 @@ interface PlayerAvatarProps {
   emoteAt?: number;
   /** Active city block — spawn, collision, and camera occlusion. */
   block?: WorldBlockConfig;
+  /** Ignore this building's collider (player is inside). */
+  ignoreBuildingId?: string | null;
 }
 
 export function PlayerAvatar({
@@ -57,6 +59,7 @@ export function PlayerAvatar({
   teleportTarget,
   emoteAt = 0,
   block = NYC_DEMO_BLOCK,
+  ignoreBuildingId = null,
 }: PlayerAvatarProps) {
   const group = useRef<THREE.Group>(null);
   const flame = useRef<THREE.Mesh>(null);
@@ -67,6 +70,8 @@ export function PlayerAvatar({
   const spawn = block.spawn;
   const blockRef = useRef(block);
   blockRef.current = block;
+  const ignoreRef = useRef(ignoreBuildingId);
+  ignoreRef.current = ignoreBuildingId;
   const pos = useRef(new THREE.Vector3(spawn.x, 0, spawn.z));
   const yaw = useRef(0);
   const vy = useRef(0);
@@ -136,8 +141,9 @@ export function PlayerAvatar({
       const nextX = pos.current.x + nx * t;
       const nextZ = pos.current.z + nz * t;
       const world = blockRef.current;
-      if (!collidesAt(nextX, pos.current.z, 0.45, world)) pos.current.x = nextX;
-      if (!collidesAt(pos.current.x, nextZ, 0.45, world)) pos.current.z = nextZ;
+      const ignore = ignoreRef.current;
+      if (!collidesAt(nextX, pos.current.z, 0.45, world, ignore)) pos.current.x = nextX;
+      if (!collidesAt(pos.current.x, nextZ, 0.45, world, ignore)) pos.current.z = nextZ;
       bob.current += t * (sprinting ? 14 : 10);
     } else {
       bob.current *= 0.9;
@@ -191,7 +197,7 @@ export function PlayerAvatar({
       const px = target.x + (desired.x - target.x) * s;
       const py = target.y + (desired.y - target.y) * s;
       const pz = target.z + (desired.z - target.z) * s;
-      if (pointInBuilding(px, py, pz, blockRef.current)) {
+      if (pointInBuilding(px, py, pz, blockRef.current, ignoreRef.current)) {
         tMax = Math.max((i - 1) / STEPS, 0.16);
         break;
       }

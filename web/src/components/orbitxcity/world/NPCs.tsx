@@ -131,10 +131,11 @@ function TraderNPC({ seed, block }: { seed: number; block: WorldBlockConfig }) {
 const NPC_SEEDS = [11, 47, 83, 129, 211, 307, 401, 509, 613, 727, 829, 941];
 
 /** Ambient trader crowd wandering the block. */
-export function NPCs({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
+export function NPCs({ block = NYC_DEMO_BLOCK, count = NPC_SEEDS.length }: { block?: WorldBlockConfig; count?: number }) {
+  const seeds = NPC_SEEDS.slice(0, Math.max(1, Math.min(count, NPC_SEEDS.length)));
   return (
     <group>
-      {NPC_SEEDS.map((s) => (
+      {seeds.map((s) => (
         <TraderNPC key={`${block.cityId}-${s}`} seed={s} block={block} />
       ))}
     </group>

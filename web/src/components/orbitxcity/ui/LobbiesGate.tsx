@@ -11,13 +11,13 @@ export function LobbiesGate() {
     <div className="oxc-chars is-in oxc-lobbies-gate">
       <CosmicBackdrop variant="chamber" />
       <header className="oxc-chars-head">
-        <button type="button" className="oxc-chars-back" onClick={() => setGate("menu")}>
-          ← Menu
+        <button type="button" className="oxc-chars-back" onClick={() => setGate("characters")}>
+          ← Characters
         </button>
         <h1 className="oxc-chars-title">
           ORBIT<span className="oxc-chars-title-x">X</span> LOBBIES
         </h1>
-        <p className="oxc-chars-sub">Public directory · private rooms · main lobby</p>
+        <p className="oxc-chars-sub">Public directory · private rooms · main lobby · voice-ready</p>
       </header>
       <div className="oxc-lobbies-body">
         <LobbyBrowser

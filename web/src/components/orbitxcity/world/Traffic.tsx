@@ -91,10 +91,11 @@ function HoverCar({ spec }: { spec: CarSpec }) {
 }
 
 /** Ambient hover-car traffic looping the ring roads. */
-export function Traffic() {
+export function Traffic({ count = CARS.length }: { count?: number }) {
+  const cars = CARS.slice(0, Math.max(1, Math.min(count, CARS.length)));
   return (
     <group>
-      {CARS.map((c, i) => (
+      {cars.map((c, i) => (
         <HoverCar key={i} spec={c} />
       ))}
     </group>

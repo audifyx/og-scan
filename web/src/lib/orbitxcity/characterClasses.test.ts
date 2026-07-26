@@ -23,5 +23,21 @@ describe("characterClasses", () => {
     expect(a.name).toBe("Nova");
     expect(a.classId).toBe("trader");
     expect(a.accentColor).toBe(trader.accentColor);
+    expect(a.outfit).toBe("suit");
+    expect(a.hairStyle).toBe("short");
+  });
+
+  it("gives each class a distinct silhouette + palette", () => {
+    const accents = new Set(CHARACTER_CLASSES.map((c) => c.accentColor));
+    expect(accents.size).toBe(5);
+    for (const cls of CHARACTER_CLASSES) {
+      expect(cls.scale.y).toBeGreaterThan(0.9);
+      const look = appearanceFromClass(cls);
+      expect(look.classId).toBe(cls.id);
+      expect(look.hairStyle).toBeTruthy();
+      expect(look.outfit).toBeTruthy();
+    }
+    expect(appearanceFromClass(getCharacterClass("gamer")).hairStyle).toBe("mohawk");
+    expect(appearanceFromClass(getCharacterClass("builder")).outfit).toBe("street");
   });
 });

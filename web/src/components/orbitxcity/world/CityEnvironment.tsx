@@ -2,6 +2,7 @@ import { Text } from "@react-three/drei";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import type { ScreenerRow } from "@/lib/orbitxcity/marketData";
 import type { CityId, WorldBlockConfig } from "@/lib/orbitxcity/types";
+import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { Ground } from "./Ground";
 import { BuildingMesh } from "./BuildingMesh";
 import { BillboardMesh } from "./BillboardMesh";
@@ -111,12 +112,14 @@ function HqBeacon({ block }: { block: WorldBlockConfig }) {
 /** Full scenic layer — env, districts, graffiti, screens, ambient life. */
 export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { tickerRows: ScreenerRow[]; block?: WorldBlockConfig }) {
   const theme = cityTheme(block.cityId);
-  const screens = marketScreensFor(block.cityId);
+  const { quality } = useCity();
+  const high = quality === "high";
+  const screens = high ? marketScreensFor(block.cityId) : marketScreensFor(block.cityId).slice(0, 1);
 
   return (
     <group>
       <color attach="background" args={[theme.background]} />
-      <fog attach="fog" args={[theme.fog, 55, 195]} />
+      <fog attach="fog" args={[theme.fog, high ? 55 : 40, high ? 195 : 130]} />
 
       <ambientLight intensity={0.42} />
       <hemisphereLight args={[theme.hemiSky, theme.hemiGround, 0.85]} />
@@ -124,23 +127,22 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
         position={[32, 48, 18]}
         intensity={1.15}
         color={theme.sun}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        castShadow={high}
+        shadow-mapSize-width={high ? 2048 : 512}
+        shadow-mapSize-height={high ? 2048 : 512}
         shadow-camera-left={-70}
         shadow-camera-right={70}
         shadow-camera-top={70}
         shadow-camera-bottom={-70}
         shadow-bias={-0.0002}
       />
-      {/* Soft fill — warm overcast bounce, not neon point washes */}
-      <directionalLight position={[-28, 22, -16]} intensity={0.28} color="#b8c4ce" />
+      {high && <directionalLight position={[-28, 22, -16]} intensity={0.28} color="#b8c4ce" />}
       <pointLight position={[block.spawn.x, 8, block.spawn.z]} intensity={0.22} color="#dfe6ea" distance={28} />
 
       <Ground block={block} />
-      <Skyline block={block} />
+      {high && <Skyline block={block} />}
       <StreetProps block={block} />
-      <GraffitiLayer block={block} />
+      {high && <GraffitiLayer block={block} />}
 
       {block.buildings.map((b) => (
         <BuildingMesh key={b.id} building={b} />
@@ -155,12 +157,12 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       ))}
 
       <HqBeacon block={block} />
-      <RocketShow />
-      <NPCs block={block} />
-      <Drones />
-      <OxiGuide />
-      {block.cityId === "nyc" && <Park />}
-      <Traffic />
+      {high && <RocketShow />}
+      <NPCs block={block} count={high ? 12 : 4} />
+      {high && <Drones />}
+      {high && <OxiGuide />}
+      {high && block.cityId === "nyc" && <Park />}
+      <Traffic count={high ? 6 : 2} />
 
       {/* Stone plaza marker — readable, not neon disc */}
       <mesh position={[block.spawn.x, 0.06, block.spawn.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>

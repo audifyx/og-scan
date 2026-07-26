@@ -15,22 +15,27 @@ import {
 import { CosmicBackdrop } from "./CosmicBackdrop";
 
 function HoloAvatar({ cls, selected }: { cls: CharacterClassDef; selected: boolean }) {
+  const outfit =
+    cls.id === "trader" ? "suit" : cls.id === "gamer" ? "sport" : cls.id === "creator" ? "neon" : "street";
   return (
     <div
-      className={`oxc-pod-avatar ${selected ? "is-selected" : ""}`}
+      className={`oxc-pod-avatar oxc-pod-${cls.id} oxc-pod-outfit-${outfit} ${selected ? "is-selected" : ""}`}
       style={{
         ["--pod-neon" as string]: cls.neon,
         ["--pod-gold" as string]: cls.gold,
         ["--pod-body" as string]: cls.bodyColor,
         ["--pod-skin" as string]: cls.skinColor,
+        ["--pod-accent" as string]: cls.accentColor,
       }}
     >
       <div className="oxc-pod-beam" />
       <div className="oxc-pod-halo" />
       <div className="oxc-pod-figure">
         <div className="oxc-pod-head" />
+        <div className="oxc-pod-hair" data-style={cls.id} />
         <div className="oxc-pod-visor" />
         <div className="oxc-pod-torso" />
+        <div className="oxc-pod-detail" />
         <div className="oxc-pod-legs">
           <span />
           <span />
@@ -62,6 +67,13 @@ export function CharacterSelect() {
   const ready = Boolean(user || connected);
 
   const commitAndEnter = (forceDemo = false) => {
+    setAvatar(appearanceFromClass(selected, name));
+    if (!forceDemo && !ready) return;
+    // Route through lobbies so voice/lobby join actually happens before world
+    setGate("lobbies");
+  };
+
+  const commitAndSkipLobby = (forceDemo = false) => {
     setAvatar(appearanceFromClass(selected, name));
     if (!forceDemo && !ready) return;
     setGate("world");
@@ -152,10 +164,10 @@ export function CharacterSelect() {
             onClick={() => commitAndEnter(false)}
             disabled={!ready}
           >
-            {ready ? "Enter OrbitX NYC" : "Connect wallet to enter"}
+            {ready ? "Continue to lobbies" : "Connect wallet to continue"}
           </button>
-          <button type="button" className="oxc-btn ghost" onClick={() => commitAndEnter(true)}>
-            Explore demo
+          <button type="button" className="oxc-btn ghost" onClick={() => commitAndSkipLobby(true)}>
+            Skip lobbies · enter demo
           </button>
         </div>
 

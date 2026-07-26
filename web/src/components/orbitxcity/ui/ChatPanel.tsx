@@ -1,12 +1,16 @@
 import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { REALTIME_ENABLED, emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
 import { Send } from "lucide-react";
+
+type LocalLine = { id: string; name: string; accentColor: string; text: string; at: number };
 
 /** World chat — broadcast over the city realtime channel. */
 export function ChatPanel() {
   const { realtime, avatar } = useCity();
   const [text, setText] = useState("");
+  const [localLines, setLocalLines] = useState<LocalLine[]>([]);
   const bottom = useRef<HTMLDivElement>(null);
 
   const snap = useSyncExternalStore(
@@ -14,18 +18,33 @@ export function ChatPanel() {
     realtime?.getSnapshot ?? emptySnapshotGetter,
   );
 
+  const lines = snap.chat.length > 0 ? snap.chat : localLines;
+
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, [snap.chat.length]);
+  }, [lines.length]);
+
+  // Toast when someone else chats is handled by ChatToastHost in the HUD
+  // (keeps popups working even when this panel is closed).
 
   const send = (e?: FormEvent) => {
     e?.preventDefault();
-    if (!text.trim()) return;
-    if (!realtime) {
-      // Offline / no supabase — still show local echo for demo
-      return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (realtime) {
+      realtime.sendChat(trimmed);
+    } else {
+      // Offline / no client — local echo for demo
+      const line: LocalLine = {
+        id: `local-${Date.now()}`,
+        name: avatar.name,
+        accentColor: avatar.accentColor,
+        text: trimmed,
+        at: Date.now(),
+      };
+      setLocalLines((prev) => [...prev.slice(-40), line]);
+      toast.message(`@${avatar.name}`, { description: trimmed, duration: 3200 });
     }
-    realtime.sendChat(text);
     setText("");
   };
 
@@ -34,14 +53,14 @@ export function ChatPanel() {
       <div className="oxc-muted">
         {REALTIME_ENABLED
           ? snap.connected
-            ? `${snap.online} online in OrbitX NYC`
+            ? `${snap.online} online · messages pop up for the whole lobby`
             : "Connecting to city channel…"
-          : "Realtime offline (set Supabase env) — local demo only"}
+          : "Realtime offline (set Supabase env) — local demo chat still works"}
       </div>
 
       <div className="oxc-chat-log">
-        {snap.chat.length === 0 && <div className="oxc-muted">Say gm — chat appears over your avatar too.</div>}
-        {snap.chat.map((m) => (
+        {lines.length === 0 && <div className="oxc-muted">Say gm — chat appears over your avatar and as a HUD toast.</div>}
+        {lines.map((m) => (
           <div key={m.id} className="oxc-chat-line">
             <b style={{ color: m.accentColor }}>@{m.name}</b>
             <span>{m.text}</span>

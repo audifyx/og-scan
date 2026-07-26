@@ -20,8 +20,17 @@ interface CoinState {
 }
 
 /** Collectible OBX shards — walk over them to bank shards in your inventory. */
-export function CoinField({ playerPos, onCollect }: { playerPos: Vec3; onCollect: () => void }) {
-  const coins = useRef<CoinState[]>(SPOTS.map(() => ({ collectedAt: null })));
+export function CoinField({
+  playerPos,
+  onCollect,
+  lite = false,
+}: {
+  playerPos: Vec3;
+  onCollect: () => void;
+  lite?: boolean;
+}) {
+  const activeSpots = useMemo(() => (lite ? SPOTS.slice(0, 10) : SPOTS), [lite]);
+  const coins = useRef<CoinState[]>(activeSpots.map(() => ({ collectedAt: null })));
   const groupRefs = useRef<Array<THREE.Group | null>>([]);
   const player = useRef(playerPos);
   player.current = playerPos;
@@ -33,10 +42,10 @@ export function CoinField({ playerPos, onCollect }: { playerPos: Vec3; onCollect
 
   useFrame(({ clock }) => {
     const now = clock.elapsedTime;
-    SPOTS.forEach(([x, z], i) => {
+    activeSpots.forEach(([x, z], i) => {
       const state = coins.current[i];
       const g = groupRefs.current[i];
-      if (!g) return;
+      if (!g || !state) return;
 
       if (state.collectedAt != null && now - state.collectedAt > RESPAWN_SECONDS) {
         state.collectedAt = null;
@@ -59,7 +68,7 @@ export function CoinField({ playerPos, onCollect }: { playerPos: Vec3; onCollect
 
   return (
     <group>
-      {SPOTS.map(([x, z], i) => (
+      {activeSpots.map(([x, z], i) => (
         <group key={i} position={[x, 0.75, z]} ref={(el) => (groupRefs.current[i] = el)}>
           <mesh rotation-x={Math.PI / 2} castShadow material={goldMat}>
             <cylinderGeometry args={[0.34, 0.34, 0.08, 24]} />
@@ -68,7 +77,6 @@ export function CoinField({ playerPos, onCollect }: { playerPos: Vec3; onCollect
             <torusGeometry args={[0.34, 0.035, 8, 24]} />
             <meshBasicMaterial color="#ffe28a" toneMapped={false} />
           </mesh>
-          {/* ground glow */}
           <mesh rotation-x={-Math.PI / 2} position={[0, -0.68, 0]}>
             <ringGeometry args={[0.3, 0.44, 24]} />
             <meshBasicMaterial color="#f5c542" transparent opacity={0.3} toneMapped={false} />

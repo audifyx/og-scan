@@ -990,10 +990,67 @@ body.oxc-lock {
 
 .oxc-voice-shell {
   border: 1px solid var(--oxc-line);
-  padding: 0.5rem;
+  padding: 0.65rem;
   background: rgba(0, 0, 0, 0.3);
-  max-height: 320px;
+  max-height: 360px;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.oxc-voice-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 12px;
+}
+
+.oxc-voice-status em {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-style: normal;
+  color: var(--oxc-muted);
+}
+
+.oxc-voice-live {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #1a221c;
+  background: #6a8f6e;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+}
+
+.oxc-voice-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 140px;
+  overflow: auto;
+}
+
+.oxc-voice-peer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--oxc-line);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12px;
+}
+
+.oxc-voice-peer.speaking {
+  border-color: color-mix(in srgb, var(--oxc-lime) 45%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--oxc-lime) 18%, transparent);
+}
+
+.oxc-voice-peer small {
+  color: var(--oxc-muted);
+  font-size: 10px;
 }
 
 button.oxc-token-row {
@@ -1756,6 +1813,145 @@ button.oxc-token-row {
   border-radius: 6px;
   background: var(--pod-skin, #e8d5c0);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  position: relative;
+  z-index: 2;
+}
+
+.oxc-pod-hair {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 30px;
+  height: 14px;
+  transform: translateX(-50%);
+  background: #151018;
+  border-radius: 8px 8px 2px 2px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.oxc-pod-trader .oxc-pod-hair {
+  background: #2a2218;
+  height: 10px;
+  border-radius: 6px 6px 0 0;
+}
+
+.oxc-pod-builder .oxc-pod-hair {
+  background: #1a1814;
+  height: 5px;
+  width: 28px;
+  top: 2px;
+  border-radius: 4px;
+}
+
+.oxc-pod-builder .oxc-pod-figure {
+  transform: scale(1.12, 1.05);
+  transform-origin: bottom center;
+}
+
+.oxc-pod-gamer .oxc-pod-hair {
+  width: 10px;
+  height: 18px;
+  top: -10px;
+  background: var(--pod-accent, #ff4d6a);
+  border-radius: 2px;
+  box-shadow:
+    -8px 6px 0 -2px var(--pod-accent, #ff4d6a),
+    8px 6px 0 -2px var(--pod-accent, #ff4d6a);
+}
+
+.oxc-pod-gamer .oxc-pod-figure {
+  transform: scale(0.9, 0.95);
+  transform-origin: bottom center;
+}
+
+.oxc-pod-creator .oxc-pod-hair {
+  background: #c5a26f;
+  height: 12px;
+  border-radius: 10px 10px 2px 2px;
+}
+
+.oxc-pod-creator .oxc-pod-hair::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: #c5a26f;
+}
+
+.oxc-pod-explorer .oxc-pod-hair {
+  background: #3a2410;
+  height: 22px;
+  width: 34px;
+  top: -4px;
+  border-radius: 12px 12px 4px 4px;
+}
+
+.oxc-pod-explorer .oxc-pod-figure {
+  transform: scale(1.04, 1.1);
+  transform-origin: bottom center;
+}
+
+.oxc-pod-detail {
+  position: absolute;
+  width: 20px;
+  height: 8px;
+  top: 42%;
+  border-radius: 2px;
+  background: var(--pod-accent, var(--pod-neon));
+  opacity: 0.85;
+  z-index: 3;
+}
+
+.oxc-pod-outfit-suit .oxc-pod-torso {
+  background:
+    linear-gradient(180deg, #2a3344 0%, #151a24 55%, #10141d 100%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--pod-gold, #c5a26f) 55%, transparent),
+    0 0 14px color-mix(in srgb, var(--pod-accent, #c5a26f) 25%, transparent);
+}
+
+.oxc-pod-outfit-suit .oxc-pod-detail {
+  width: 6px;
+  height: 28px;
+  top: 38%;
+  background: linear-gradient(180deg, #edf3ff, var(--pod-accent));
+}
+
+.oxc-pod-outfit-sport .oxc-pod-torso {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--pod-accent) 40%, #1c1420), #1c1420 70%);
+}
+
+.oxc-pod-outfit-sport .oxc-pod-detail {
+  width: 28px;
+  height: 6px;
+  top: 36%;
+}
+
+.oxc-pod-outfit-neon .oxc-pod-torso {
+  background: linear-gradient(180deg, #1a1224, #111827);
+  box-shadow:
+    inset 0 0 0 1px var(--pod-accent),
+    0 0 16px color-mix(in srgb, var(--pod-accent) 45%, transparent);
+}
+
+.oxc-pod-outfit-neon .oxc-pod-detail {
+  width: 30px;
+  height: 4px;
+  top: 34%;
+  box-shadow: 0 0 8px var(--pod-accent);
+}
+
+.oxc-pod-outfit-street .oxc-pod-detail {
+  width: 18px;
+  height: 10px;
+  top: 48%;
+  border-radius: 3px;
 }
 
 .oxc-pod-visor {
@@ -1765,7 +1961,8 @@ button.oxc-token-row {
   border-radius: 2px;
   background: var(--pod-neon, #00ff9f);
   box-shadow: 0 0 10px var(--pod-neon, #00ff9f);
-  z-index: 1;
+  z-index: 4;
+  position: relative;
 }
 
 .oxc-pod-torso {
@@ -1774,10 +1971,11 @@ button.oxc-token-row {
   margin-top: 4px;
   border-radius: 8px 8px 6px 6px;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--pod-neon, #00ff9f) 35%, var(--pod-body, #12181f)), var(--pod-body, #12181f));
+    linear-gradient(180deg, color-mix(in srgb, var(--pod-accent, var(--pod-neon, #00ff9f)) 35%, var(--pod-body, #12181f)), var(--pod-body, #12181f));
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--pod-gold, #c5a26f) 40%, transparent),
-    0 0 14px color-mix(in srgb, var(--pod-neon, #00ff9f) 30%, transparent);
+    0 0 14px color-mix(in srgb, var(--pod-accent, var(--pod-neon, #00ff9f)) 30%, transparent);
+  position: relative;
 }
 
 .oxc-pod-legs {
@@ -2359,3 +2557,47 @@ button.oxc-token-row {
 @media (max-width: 980px) {
   .oxc-menu-cities { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Chat toast polish + mobile HUD density */
+.oxc-chat-toast {
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  background: rgba(8, 10, 12, 0.92) !important;
+  backdrop-filter: blur(14px);
+}
+
+@media (max-width: 640px) {
+  .oxc-dock {
+    bottom: 0.55rem;
+    gap: 0.12rem;
+    padding: 0.28rem;
+  }
+
+  .oxc-dock-btn {
+    min-width: 2.85rem;
+    padding: 0.32rem 0.18rem;
+    font-size: 8px;
+  }
+
+  .oxc-dock-btn span {
+    display: none;
+  }
+
+  .oxc-help {
+    display: none;
+  }
+
+  .oxc-topbar {
+    gap: 0.35rem;
+    padding: 0.45rem 0.55rem;
+  }
+
+  .oxc-tickerbar {
+    opacity: 0.85;
+  }
+
+  .oxc-minimap {
+    transform: scale(0.85);
+    transform-origin: top right;
+  }
+}
+

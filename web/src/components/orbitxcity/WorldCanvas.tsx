@@ -1,4 +1,4 @@
-import { Suspense, useCallback } from "react";
+import { Suspense, useCallback, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { useContextBridge } from "@react-three/drei";
 import type { Vec3 } from "@/lib/orbitxcity/types";
@@ -11,6 +11,7 @@ import { RemoteAvatars } from "./world/RemoteAvatars";
 import { InteractionMarkers } from "./world/InteractionMarkers";
 import { CoinField } from "./world/CoinField";
 import { FXPipeline } from "./world/FXPipeline";
+import { InteriorRoom } from "./world/InteriorRoom";
 
 function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
   const {
@@ -26,8 +27,15 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
     quality,
     emoteAt,
     selectedCityId,
+    interiorBuildingId,
+    exitBuilding,
   } = useCity();
   const block = getWorldBlock(selectedCityId);
+
+  const interiorBuilding = useMemo(
+    () => (interiorBuildingId ? block.buildings.find((b) => b.id === interiorBuildingId) ?? null : null),
+    [block.buildings, interiorBuildingId],
+  );
 
   const onMove = useCallback(
     (p: Vec3, yaw: number) => {
@@ -40,6 +48,9 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
   return (
     <>
       <CityEnvironment tickerRows={tickerRows} block={block} />
+      {interiorBuilding && (
+        <InteriorRoom building={interiorBuilding} onRequestExit={exitBuilding} />
+      )}
       <PlayerAvatar
         appearance={avatar}
         onMove={onMove}
@@ -47,6 +58,7 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
         teleportTarget={teleportTarget}
         emoteAt={emoteAt}
         block={block}
+        ignoreBuildingId={interiorBuildingId}
       />
       <RemoteAvatars client={realtime} />
       <InteractionMarkers
@@ -55,7 +67,7 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
         activeZoneId={activeZone?.id ?? null}
         onNearest={setActiveZone}
       />
-      <CoinField playerPos={playerPos} onCollect={collectShard} />
+      <CoinField playerPos={playerPos} onCollect={collectShard} lite={quality === "lite"} />
       {quality === "high" && <FXPipeline />}
     </>
   );
@@ -63,14 +75,22 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
 
 export function WorldCanvas({ tickerRows }: { tickerRows: ScreenerRow[] }) {
   const ContextBridge = useContextBridge(CityContext);
+  const { quality } = useCity();
+  const high = quality === "high";
 
   return (
     <div className="oxc-canvas">
       <Canvas
-        shadows
-        dpr={[1, 1.6]}
-        camera={{ position: [0, 6, 14], fov: 55, near: 0.1, far: 240 }}
-        gl={{ antialias: true, powerPreference: "high-performance" }}
+        shadows={high}
+        dpr={high ? [1, 1.6] : [1, 1]}
+        camera={{ position: [0, 6, 14], fov: 55, near: 0.1, far: high ? 240 : 160 }}
+        gl={{
+          antialias: high,
+          powerPreference: high ? "high-performance" : "low-power",
+          // Avoid stencil/depth thrash on mobile GPUs
+          stencil: false,
+        }}
+        performance={{ min: high ? 0.5 : 0.3 }}
       >
         <ContextBridge>
           <Suspense fallback={null}>

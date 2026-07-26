@@ -154,33 +154,26 @@ function BillboardFrame({
 }) {
   return (
     <group position={[position.x, position.y, position.z]} rotation={[0, rotationY, 0]}>
+      {/* Steel pole + bolted foot */}
       <mesh position={[0, -position.y / 2, 0]} castShadow>
-        <cylinderGeometry args={[0.12, 0.16, position.y, 8]} />
-        <meshStandardMaterial color="#1a2030" metalness={0.7} roughness={0.35} />
+        <cylinderGeometry args={[0.14, 0.18, position.y, 10]} />
+        <meshStandardMaterial color="#3a4048" metalness={0.65} roughness={0.4} />
       </mesh>
+      <mesh position={[0, -position.y + 0.08, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.45, 0.55, 0.16, 10]} />
+        <meshStandardMaterial color="#4a5158" metalness={0.35} roughness={0.7} />
+      </mesh>
+      {/* Matte aluminum cabinet */}
       <mesh castShadow>
-        <boxGeometry args={[width + 0.25, height + 0.25, 0.18]} />
-        <meshStandardMaterial color={frameColor} metalness={0.55} roughness={0.3} emissive={accent} emissiveIntensity={0.15} />
+        <boxGeometry args={[width + 0.28, height + 0.28, 0.22]} />
+        <meshStandardMaterial color={frameColor} metalness={0.45} roughness={0.42} />
+      </mesh>
+      {/* Soft brand edge — not neon tubes */}
+      <mesh position={[0, height / 2 + 0.18, 0.08]}>
+        <boxGeometry args={[width + 0.2, 0.06, 0.06]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.18} roughness={0.55} metalness={0.2} />
       </mesh>
       {children}
-      {[
-        [0, height / 2 + 0.16, width + 0.3, 0.07] as const,
-        [0, -height / 2 - 0.16, width + 0.3, 0.07] as const,
-      ].map(([x, ty, w, h], i) => (
-        <mesh key={i} position={[x, ty, 0.06]}>
-          <boxGeometry args={[w, h, 0.07]} />
-          <meshBasicMaterial color={accent} toneMapped={false} />
-        </mesh>
-      ))}
-      {[
-        [-width / 2 - 0.16, 0, 0.07, height + 0.3] as const,
-        [width / 2 + 0.16, 0, 0.07, height + 0.3] as const,
-      ].map(([x, ty, w, h], i) => (
-        <mesh key={`v-${i}`} position={[x, ty, 0.06]}>
-          <boxGeometry args={[w, h, 0.07]} />
-          <meshBasicMaterial color={accent} toneMapped={false} />
-        </mesh>
-      ))}
     </group>
   );
 }

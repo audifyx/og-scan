@@ -20,7 +20,8 @@ import { MemeStorePanel } from "./MemeStorePanel";
 import { HelpPanel } from "./HelpPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { LobbyBrowser } from "./LobbyBrowser";
-import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic, Gamepad2, Image as ImageIcon, Dices } from "lucide-react";
+import { CharacterCreator } from "./CharacterCreator";
+import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic, Gamepad2, Image as ImageIcon, Dices, Wand2 } from "lucide-react";
 
 const TITLES: Partial<Record<Exclude<HudPanel, "none">, string>> = {
   map: "World Map",
@@ -78,6 +79,7 @@ export function CityPanelHost() {
         {panel === "settings" && <SettingsPanel />}
         {panel === "help" && <HelpPanel />}
         {panel === "lobbies" && <LobbyBrowser startAfterJoin={false} />}
+        {panel === "character" && <CharacterCreator onDone={() => closePanel()} />}
       </div>
     </aside>
   );
@@ -205,7 +207,7 @@ function InventoryPanel() {
 }
 
 function ProfilePanel() {
-  const { avatar } = useCity();
+  const { avatar, openPanel } = useCity();
   const { profile, user } = useAuth();
   const { publicKey, connected } = useWallet();
   return (
@@ -217,9 +219,15 @@ function ProfilePanel() {
         <div>
           <div className="oxc-tile-title">@{profile?.username ?? avatar.name}</div>
           <div className="oxc-muted">{connected && publicKey ? shortMint(publicKey.toBase58(), 6) : "Wallet not linked"}</div>
-          <div className="oxc-muted">{user ? "OrbitX account linked" : "Guest session"}</div>
+          <div className="oxc-muted">
+            {user ? "OrbitX account linked" : "Guest session"}
+            {avatar.classId ? ` · ${avatar.classId}` : ""}
+          </div>
         </div>
       </div>
+      <button type="button" className="oxc-btn primary" onClick={() => openPanel("character")}>
+        Customize character
+      </button>
       <Link className="oxc-btn ghost" to="/profile">
         Open full OrbitX profile <ExternalLink className="h-3.5 w-3.5" />
       </Link>
@@ -369,6 +377,7 @@ export const PANEL_NAV = [
   { id: "chat" as const, label: "Chat", icon: MessageSquare },
   { id: "social" as const, label: "Social", icon: Users },
   { id: "voice" as const, label: "Voice", icon: Mic },
+  { id: "character" as const, label: "Look", icon: Wand2 },
   { id: "events" as const, label: "Events", icon: Rocket },
   { id: "inventory" as const, label: "Bag", icon: Backpack },
   { id: "profile" as const, label: "Profile", icon: UserRound },

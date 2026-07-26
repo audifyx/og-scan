@@ -65,6 +65,10 @@ interface CityContextValue {
   setQuality: (q: "high" | "lite") => void;
   emoteAt: number;
   triggerEmote: () => void;
+  /** When set, player is inside this building (collision ignored + interior room). */
+  interiorBuildingId: string | null;
+  enterBuilding: (buildingId: string) => void;
+  exitBuilding: () => void;
 }
 
 /** Exported so the R3F canvas can bridge this context across renderers. */
@@ -148,6 +152,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [touchControls, setTouchControls] = useState(IS_COARSE_POINTER);
   const [quality, setQuality] = useState<"high" | "lite">(IS_COARSE_POINTER ? "lite" : "high");
   const [emoteAt, setEmoteAt] = useState(0);
+  const [interiorBuildingId, setInteriorBuildingId] = useState<string | null>(null);
   const inventory = STARTER_INVENTORY;
 
   const setGate = useCallback((g: CityGate) => {
@@ -162,6 +167,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
         setPlayerPos(spawn);
         setPlayerYaw(0);
         setPanel("none");
+        setInteriorBuildingId(null);
         setGateState("world");
       }
       setEnteredState(v);
@@ -177,9 +183,39 @@ export function CityProvider({ children }: { children: ReactNode }) {
     });
     setPanel("none");
     setActiveZone(null);
+    setInteriorBuildingId(null);
     setEnteredState(false);
     setGateState("menu");
   }, []);
+
+  const exitBuilding = useCallback(() => {
+    if (!interiorBuildingId) return;
+    const block = getWorldBlock(selectedCityId);
+    const b = block.buildings.find((x) => x.id === interiorBuildingId);
+    setInteriorBuildingId(null);
+    if (b) {
+      const x = b.position.x;
+      const z = b.position.z + b.size.depth / 2 + 1.6;
+      setPlayerPos({ x, y: 0, z });
+      setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
+    }
+  }, [interiorBuildingId, selectedCityId]);
+
+  const enterBuilding = useCallback(
+    (buildingId: string) => {
+      const block = getWorldBlock(selectedCityId);
+      const b = block.buildings.find((x) => x.id === buildingId);
+      if (!b) return;
+      setInteriorBuildingId(buildingId);
+      setPlayerPos({ x: b.position.x, y: 0, z: b.position.z });
+      setTeleportTarget((prev) => ({
+        x: b.position.x,
+        z: b.position.z,
+        seq: (prev?.seq ?? 0) + 1,
+      }));
+    },
+    [selectedCityId],
+  );
 
   const playerId = useMemo(
     () => makePlayerId(user?.id, publicKey?.toBase58() ?? null),
@@ -205,6 +241,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const interact = useCallback(() => {
+    // Inside a building: E exits (and closes the district panel)
+    if (interiorBuildingId) {
+      exitBuilding();
+      if (panel !== "none") setPanel("none");
+      return;
+    }
     if (!activeZone) return;
     if (activeZone.tokenMint) {
       openToken(activeZone.tokenMint);
@@ -213,15 +255,28 @@ export function CityProvider({ children }: { children: ReactNode }) {
     if (activeZone.kind === "voice") {
       setVoiceOpen(true);
       openPanel("voice");
+      // Nightclub / voice zones still get a walk-in when tied to a building
+      if (activeZone.buildingId) enterBuilding(activeZone.buildingId);
       return;
     }
+    if (activeZone.buildingId) {
+      const block = getWorldBlock(selectedCityId);
+      const b = block.buildings.find((x) => x.id === activeZone.buildingId);
+      // Walk into mid/large buildings; tiny props just open the panel
+      if (b && b.size.width >= 6 && b.size.depth >= 6) {
+        enterBuilding(b.id);
+      }
+    }
     openPanel(zoneToPanel(activeZone.kind));
-  }, [activeZone, openPanel, openToken]);
+  }, [activeZone, openPanel, openToken, interiorBuildingId, exitBuilding, enterBuilding, panel, selectedCityId]);
 
   const prompt = useMemo(() => {
+    if (interiorBuildingId && panel === "none") {
+      return { label: "Exit building", hint: "Press E or step on the exit pad" };
+    }
     if (!activeZone || panel !== "none") return null;
     return { label: activeZone.label, hint: activeZone.hint };
-  }, [activeZone, panel]);
+  }, [activeZone, panel, interiorBuildingId]);
 
   useEffect(() => {
     if (!entered) {
@@ -305,6 +360,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
       setQuality,
       emoteAt,
       triggerEmote,
+      interiorBuildingId,
+      enterBuilding,
+      exitBuilding,
     }),
     [
       gate,
@@ -337,6 +395,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
       quality,
       emoteAt,
       triggerEmote,
+      interiorBuildingId,
+      enterBuilding,
+      exitBuilding,
     ],
   );
 

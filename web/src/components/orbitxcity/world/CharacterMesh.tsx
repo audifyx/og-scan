@@ -54,7 +54,24 @@ function resolveCharacterProps({
     hairColor: hairColor ?? appearance?.hairColor ?? DEFAULTS.hairColor,
     outfit: outfit ?? appearance?.outfit ?? DEFAULTS.outfit,
     faceStyle: faceStyle ?? appearance?.faceStyle ?? DEFAULTS.faceStyle,
+    classId: appearance?.classId,
   };
+}
+
+function classScale(classId?: string) {
+  switch (classId) {
+    case "builder":
+      return [1.16, 1.06, 1.12] as const;
+    case "gamer":
+      return [0.9, 0.95, 0.9] as const;
+    case "creator":
+      return [0.96, 1.04, 0.96] as const;
+    case "explorer":
+      return [1.04, 1.1, 1.04] as const;
+    case "trader":
+    default:
+      return [1, 1.02, 1] as const;
+  }
 }
 
 function OutfitDetails({
@@ -342,7 +359,7 @@ export function CharacterMesh(props: CharacterMeshProps) {
   });
 
   return (
-    <group ref={root} name="characterMesh">
+    <group ref={root} name="characterMesh" scale={classScale(character.classId)}>
       <group ref={torso} name="torso">
         <mesh name="hips" position={[0, 0.9, 0]} castShadow>
           <boxGeometry args={[0.5, 0.26, 0.34]} />

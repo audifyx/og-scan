@@ -82,7 +82,6 @@ function FacadeTier({
       metalness: 0.18,
       roughness: 0.78,
     });
-    // Box material order: +x, -x, +y, -y, +z, -z
     return [side, side, ROOF_MAT, ROOF_MAT, side, side];
   }, [building.id, building.color, building.accent, tier.w, tier.d, tier.h, tier.ground, index]);
 
@@ -97,8 +96,9 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
   const { position, size, accent, label, name } = building;
   const rand = useMemo(() => mulberry32(hashSeed(`bld-${building.id}`)), [building.id]);
   const tiers = useMemo(() => buildTiers(building, rand), [building, rand]);
-  const top = tiers[tiers.length - 1];
+  const top = tiers[tiers.length - 1]!;
   const roofY = top.yBase + top.h;
+  const doorW = Math.min(2.2, size.width * 0.28);
 
   const roofProps = useMemo(() => {
     const r = mulberry32(hashSeed(`roof-${building.id}`));
@@ -118,7 +118,6 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         <FacadeTier key={i} tier={t} building={building} index={i} />
       ))}
 
-      {/* Weathered stone crown */}
       <mesh position={[0, roofY + 0.12, 0]} castShadow>
         <boxGeometry args={[top.w * 0.94, 0.28, top.d * 0.94]} />
         <meshStandardMaterial color="#5a6168" metalness={0.2} roughness={0.75} />
@@ -128,30 +127,36 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.08} metalness={0.35} roughness={0.55} />
       </mesh>
 
-      {/* Subtle corner trim — stone, not neon tubes */}
       {[
         [-size.width / 2, -size.depth / 2],
         [size.width / 2, -size.depth / 2],
         [-size.width / 2, size.depth / 2],
         [size.width / 2, size.depth / 2],
       ].map(([cx, cz], i) => (
-        <mesh key={`trim-${i}`} position={[cx, tiers[0].h / 2, cz]} castShadow>
-          <boxGeometry args={[0.12, tiers[0].h, 0.12]} />
+        <mesh key={`trim-${i}`} position={[cx!, tiers[0]!.h / 2, cz!]} castShadow>
+          <boxGeometry args={[0.12, tiers[0]!.h, 0.12]} />
           <meshStandardMaterial color="#4e555c" metalness={0.25} roughness={0.7} />
         </mesh>
       ))}
 
-      {/* Recessed entrance */}
+      {/* Recessed entrance with awning + sidewalk apron */}
       <mesh position={[0, 1.05, size.depth / 2 + 0.04]} castShadow>
-        <boxGeometry args={[1.4, 2.2, 0.12]} />
+        <boxGeometry args={[doorW + 0.35, 2.4, 0.16]} />
         <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
       </mesh>
-      <mesh position={[0, 1.05, size.depth / 2 + 0.08]}>
-        <planeGeometry args={[1.05, 1.85]} />
-        <meshStandardMaterial color="#cfd6dc" emissive="#9aa8b2" emissiveIntensity={0.15} metalness={0.1} roughness={0.4} transparent opacity={0.55} />
+      <mesh position={[0, 1.05, size.depth / 2 + 0.1]}>
+        <planeGeometry args={[doorW, 2.05]} />
+        <meshStandardMaterial color="#0c1014" metalness={0.15} roughness={0.45} />
+      </mesh>
+      <mesh position={[0, 2.35, size.depth / 2 + 0.28]} castShadow>
+        <boxGeometry args={[doorW + 0.7, 0.12, 0.55]} />
+        <meshStandardMaterial color="#3a4046" metalness={0.25} roughness={0.7} />
+      </mesh>
+      <mesh position={[0, 0.02, size.depth / 2 + 1.1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[doorW + 2.4, 2.2]} />
+        <meshStandardMaterial color="#6a7178" roughness={0.92} metalness={0.05} />
       </mesh>
 
-      {/* Rooftop clutter */}
       {roofProps.tank && (
         <mesh position={[roofProps.tankX, roofY + 0.8, roofProps.tankZ]} castShadow>
           <cylinderGeometry args={[0.6, 0.7, 1.6, 10]} />

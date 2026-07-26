@@ -10,6 +10,7 @@ import { emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
 import { CityPanelHost, PANEL_NAV } from "./CityPanels";
 import { Minimap } from "./Minimap";
 import { TouchControls } from "./TouchControls";
+import { ChatToastHost } from "./ChatToastHost";
 
 function TickerBar() {
   const { data } = useQuery({
@@ -192,11 +193,12 @@ export function CityHUD() {
 
       <div className="oxc-help">
         <span>WASD · Shift sprint · Space jump · B dance</span>
-        <span>E Interact · Enter Chat · Esc Close</span>
+        <span>E Interact / Exit · Enter Chat · Esc Close</span>
       </div>
 
       {touchControls && <TouchControls />}
 
+      <ChatToastHost />
       <CityPanelHost />
     </div>
   );

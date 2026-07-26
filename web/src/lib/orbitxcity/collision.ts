@@ -1,14 +1,22 @@
-import { NYC_DEMO_BLOCK, buildingColliders } from "./demoBlock";
+import { NYC_DEMO_BLOCK } from "./demoBlock";
 import type { WorldBlockConfig } from "./types";
 
-const defaultBoxes = buildingColliders(NYC_DEMO_BLOCK);
-
 /** 2D collision against building AABBs + world bounds. */
-export function collidesAt(x: number, z: number, radius = 0.45, block: WorldBlockConfig = NYC_DEMO_BLOCK): boolean {
-  const boxes = block === NYC_DEMO_BLOCK ? defaultBoxes : buildingColliders(block);
+export function collidesAt(
+  x: number,
+  z: number,
+  radius = 0.45,
+  block: WorldBlockConfig = NYC_DEMO_BLOCK,
+  ignoreBuildingId?: string | null,
+): boolean {
   const { bounds } = block;
-  for (const b of boxes) {
-    if (x + radius > b.minX && x - radius < b.maxX && z + radius > b.minZ && z - radius < b.maxZ) {
+  for (const b of block.buildings) {
+    if (ignoreBuildingId && b.id === ignoreBuildingId) continue;
+    const minX = b.position.x - b.size.width / 2;
+    const maxX = b.position.x + b.size.width / 2;
+    const minZ = b.position.z - b.size.depth / 2;
+    const maxZ = b.position.z + b.size.depth / 2;
+    if (x + radius > minX && x - radius < maxX && z + radius > minZ && z - radius < maxZ) {
       return true;
     }
   }
@@ -36,16 +44,18 @@ export function hashSeed(s: string): number {
   return h >>> 0;
 }
 
-function cameraSolidsFor(block: WorldBlockConfig) {
+function cameraSolidsFor(block: WorldBlockConfig, ignoreBuildingId?: string | null) {
   return [
-    ...block.buildings.map((b) => ({
-      minX: b.position.x - b.size.width / 2 - 0.3,
-      maxX: b.position.x + b.size.width / 2 + 0.3,
-      minZ: b.position.z - b.size.depth / 2 - 0.3,
-      maxZ: b.position.z + b.size.depth / 2 + 0.3,
-      minY: 0,
-      maxY: b.size.height + 0.7,
-    })),
+    ...block.buildings
+      .filter((b) => !ignoreBuildingId || b.id !== ignoreBuildingId)
+      .map((b) => ({
+        minX: b.position.x - b.size.width / 2 - 0.3,
+        maxX: b.position.x + b.size.width / 2 + 0.3,
+        minZ: b.position.z - b.size.depth / 2 - 0.3,
+        maxZ: b.position.z + b.size.depth / 2 + 0.3,
+        minY: 0,
+        maxY: b.size.height + 0.7,
+      })),
     // Billboards are rotated thin planes — use a conservative square footprint
     // so the chase camera never parks inside their neon glow.
     ...block.billboards.map((bb) => {
@@ -62,11 +72,15 @@ function cameraSolidsFor(block: WorldBlockConfig) {
   ];
 }
 
-const defaultCameraSolids = cameraSolidsFor(NYC_DEMO_BLOCK);
-
 /** 3D point-in-solid test used for chase-camera occlusion. */
-export function pointInBuilding(x: number, y: number, z: number, block: WorldBlockConfig = NYC_DEMO_BLOCK): boolean {
-  const cameraSolids = block === NYC_DEMO_BLOCK ? defaultCameraSolids : cameraSolidsFor(block);
+export function pointInBuilding(
+  x: number,
+  y: number,
+  z: number,
+  block: WorldBlockConfig = NYC_DEMO_BLOCK,
+  ignoreBuildingId?: string | null,
+): boolean {
+  const cameraSolids = cameraSolidsFor(block, ignoreBuildingId);
   for (const s of cameraSolids) {
     if (x > s.minX && x < s.maxX && z > s.minZ && z < s.maxZ && y > s.minY && y < s.maxY) return true;
   }
