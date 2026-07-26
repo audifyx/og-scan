@@ -112,6 +112,8 @@ class CityAudioEngine {
   private sfxGain: GainNode | null = null;
   private mediaEl: HTMLAudioElement | null = null;
   private mediaNode: MediaElementAudioSourceNode | null = null;
+  private graphOk = false;
+  private kickedPlay = false;
   private fadeTimer: number | null = null;
   private unlocked = false;
   private mode: ThemeMode = "off";
@@ -176,6 +178,19 @@ class CityAudioEngine {
       this.ensureMedia();
     }
 
+    // Kick the media element synchronously inside the raw gesture, before any
+    // awaits, so Safari/Chrome treat playback as user-initiated.
+    const wantTheme = this.mode === "menu" && this.musicOn;
+    if (wantTheme && this.mediaEl && this.mediaEl.paused) {
+      this.kickedPlay = true;
+      const p = this.mediaEl.play();
+      if (p) {
+        p.catch(() => {
+          this.kickedPlay = false;
+        });
+      }
+    }
+
     if (this.ctx.state === "suspended") {
       try {
         await this.ctx.resume();
@@ -186,9 +201,14 @@ class CityAudioEngine {
 
     const was = this.unlocked;
     this.unlocked = this.ctx.state === "running";
-    if (this.unlocked && !was) {
-      this.notify();
-      if (this.mode === "menu" && this.musicOn) void this.playTheme({ fadeIn: true });
+    if (this.unlocked !== was) this.notify();
+    // Retry on every gesture until the theme is actually playing — autoplay
+    // can reject media playback even when the AudioContext is running.
+    // Re-evaluate here: musicOn/mode may have changed while resume() awaited.
+    const wantThemeNow = this.mode === "menu" && this.musicOn;
+    if (this.unlocked && wantThemeNow && (this.kickedPlay || !this.mediaEl || this.mediaEl.paused)) {
+      this.kickedPlay = false;
+      void this.playTheme({ fadeIn: true });
     }
   }
 
@@ -197,14 +217,17 @@ class CityAudioEngine {
     const el = new Audio();
     el.preload = "auto";
     el.loop = true;
-    el.crossOrigin = "anonymous";
     el.src = getThemeTrack(this.trackId).src;
-    // Wire through Web Audio so volume fades stay smooth with the graph.
+    // Wire through Web Audio so volume fades stay smooth with the graph. If
+    // that fails (HMR double-connect, odd browsers) the element outputs
+    // directly and we drive el.volume instead.
     try {
       this.mediaNode = this.ctx.createMediaElementSource(el);
       this.mediaNode.connect(this.musicGain);
+      this.graphOk = true;
     } catch {
-      /* already connected in some browsers on HMR */
+      this.graphOk = false;
+      el.volume = this.musicOn ? this.musicVol : 0;
     }
     el.addEventListener("ended", () => {
       if (this.mode === "menu" && this.musicOn) void el.play().catch(() => undefined);
@@ -235,10 +258,11 @@ class CityAudioEngine {
   setMusicVol(v: number) {
     this.musicVol = Math.min(1, Math.max(0, v));
     writeNum(MUSIC_VOL_KEY, this.musicVol);
-    if (this.musicGain && this.musicOn && this.mode === "menu") {
-      this.musicGain.gain.cancelScheduledValues(this.ctx!.currentTime);
-      this.musicGain.gain.setValueAtTime(this.musicVol, this.ctx!.currentTime);
+    if (this.musicGain && this.ctx && this.musicOn && this.mode === "menu") {
+      this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.musicGain.gain.setValueAtTime(this.musicVol, this.ctx.currentTime);
     }
+    if (!this.graphOk && this.mediaEl && this.musicOn) this.mediaEl.volume = this.musicVol;
     this.notify();
   }
 
@@ -320,6 +344,10 @@ class CityAudioEngine {
     }
 
     const target = this.musicVol;
+    if (!this.graphOk) {
+      this.mediaEl.volume = target;
+      return;
+    }
     if (opts.fadeIn) {
       this.rampMusicGain(0.0001, target, FADE_MS);
     } else {
@@ -330,6 +358,9 @@ class CityAudioEngine {
 
   private async fadeThemeTo(target: number, pauseWhenSilent: boolean) {
     if (!this.musicGain || !this.ctx) return;
+    if (!this.graphOk && this.mediaEl) {
+      this.mediaEl.volume = Math.min(1, Math.max(0, target));
+    }
     const from = Math.max(0.0001, this.musicGain.gain.value || 0.0001);
     this.rampMusicGain(from, Math.max(0.0001, target), FADE_MS);
 
@@ -451,6 +482,8 @@ class CityAudioEngine {
     }
     this.mediaEl = null;
     this.mediaNode = null;
+    this.graphOk = false;
+    this.kickedPlay = false;
     void this.ctx?.close();
     this.ctx = null;
     this.master = null;
