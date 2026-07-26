@@ -102,7 +102,7 @@ export function createFacadeTexture(
   const cellH = H / rows;
   const winW = cellW * 0.56;
   const winH = cellH * 0.6;
-  const litPalette = [accent, "#ffd9a0", "#cfe8ff", accent];
+  const litPalette = ["#d9c9a8", "#c4d0d8", "#b8c4b0", "#cfc4b0"];
 
   const groundRows = groundFloor ? 1 : 0;
   for (let r = 0; r < rows - groundRows; r++) {
@@ -110,44 +110,48 @@ export function createFacadeTexture(
       const x = c * cellW + (cellW - winW) / 2;
       const y = r * cellH + (cellH - winH) / 2;
       const roll = rand();
-      if (roll < 0.3) {
-        // Dark window
-        ctx.fillStyle = "#04060b";
+      if (roll < 0.55) {
+        // Dark / reflective glass
+        ctx.fillStyle = "#12161a";
         ctx.fillRect(x, y, winW, winH);
-        ctx.fillStyle = "rgba(120,160,220,0.08)";
-        ctx.fillRect(x, y, winW, winH * 0.35);
-      } else {
+        ctx.fillStyle = "rgba(180,200,210,0.12)";
+        ctx.fillRect(x, y, winW, winH * 0.4);
+      } else if (roll < 0.82) {
+        // Soft interior light — warm realistic glow, not neon
         const color = litPalette[Math.floor(rand() * litPalette.length)];
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.55 + rand() * 0.45;
+        ctx.globalAlpha = 0.28 + rand() * 0.22;
         ctx.fillRect(x, y, winW, winH);
-        // Interior depth hint
-        ctx.globalAlpha = 0.25;
+        ctx.globalAlpha = 0.2;
         ctx.fillStyle = "#000000";
         ctx.fillRect(x, y + winH * 0.55, winW, winH * 0.45);
         ctx.globalAlpha = 1;
+      } else {
+        ctx.fillStyle = "#0a0d10";
+        ctx.fillRect(x, y, winW, winH);
       }
       // Frame
-      ctx.strokeStyle = "rgba(0,0,0,0.55)";
-      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = "rgba(0,0,0,0.45)";
+      ctx.lineWidth = 1.2;
       ctx.strokeRect(x, y, winW, winH);
     }
   }
 
-  // Ground level: dark storefront band + accent sign strip + door glow
+  // Ground level: dark storefront band + quiet accent strip + door
   if (groundFloor) {
     const gy = (rows - 1) * cellH;
-    ctx.fillStyle = "#04060b";
+    ctx.fillStyle = "#161a1e";
     ctx.fillRect(0, gy, W, cellH);
-    ctx.fillStyle = `${accent}44`;
-    ctx.fillRect(0, gy, W, 4);
+    ctx.fillStyle = `${accent}33`;
+    ctx.fillRect(0, gy, W, 3);
     const doorW = cellW * 0.7;
-    ctx.fillStyle = `${accent}66`;
-    ctx.fillRect(W / 2 - doorW / 2, gy + cellH * 0.25, doorW, cellH * 0.75);
-    // Storefront windows
+    ctx.fillStyle = "#2a3036";
+    ctx.fillRect(W / 2 - doorW / 2, gy + cellH * 0.22, doorW, cellH * 0.78);
+    ctx.fillStyle = "rgba(220,230,235,0.18)";
+    ctx.fillRect(W / 2 - doorW / 2 + 4, gy + cellH * 0.3, doorW - 8, cellH * 0.55);
     for (let c = 0; c < cols; c++) {
       if (Math.abs(c - (cols - 1) / 2) < 0.7) continue;
-      ctx.fillStyle = "rgba(140,190,255,0.14)";
+      ctx.fillStyle = "rgba(160,180,190,0.12)";
       ctx.fillRect(c * cellW + cellW * 0.15, gy + cellH * 0.3, cellW * 0.7, cellH * 0.55);
     }
   }

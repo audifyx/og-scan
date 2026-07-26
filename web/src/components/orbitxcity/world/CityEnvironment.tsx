@@ -1,7 +1,4 @@
-import { useRef } from "react";
-import { useFrame } from "@react-three/fiber";
-import { Stars, Text } from "@react-three/drei";
-import * as THREE from "three";
+import { Text } from "@react-three/drei";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import type { ScreenerRow } from "@/lib/orbitxcity/marketData";
 import type { CityId, WorldBlockConfig } from "@/lib/orbitxcity/types";
@@ -20,15 +17,43 @@ import { Park } from "./Park";
 import { Traffic } from "./Traffic";
 
 function cityTheme(cityId: CityId) {
+  // Soft overcast daylight — atmospheric haze instead of neon-night void.
   switch (cityId) {
     case "miami":
-      return { primary: "#3de7ff", secondary: "#7fffd4", warm: "#ff8bd1", background: "#04101a", fog: "#04101a" };
+      return {
+        primary: "#5ec8b8",
+        secondary: "#7a9eae",
+        warm: "#c4a574",
+        background: "#8fa6b0",
+        fog: "#9ab8c0",
+        hemiSky: "#c5d4dc",
+        hemiGround: "#3d4a3a",
+        sun: "#e8e0d0",
+      };
     case "la":
-      return { primary: "#ff4d9a", secondary: "#a78bfa", warm: "#f5c542", background: "#090612", fog: "#090612" };
+      return {
+        primary: "#b89a78",
+        secondary: "#8a7a90",
+        warm: "#d4b896",
+        background: "#9aa0a8",
+        fog: "#a8aeb4",
+        hemiSky: "#d0d4d8",
+        hemiGround: "#4a453c",
+        sun: "#efe6d4",
+      };
     case "nyc":
     case "boston":
     default:
-      return { primary: "#17ff4d", secondary: "#3de7ff", warm: "#ff4d9a", background: "#04070f", fog: "#04070f" };
+      return {
+        primary: "#6a8f6e",
+        secondary: "#7a92a0",
+        warm: "#c4a574",
+        background: "#8b9aa3",
+        fog: "#9aa7ae",
+        hemiSky: "#c8d2d8",
+        hemiGround: "#3f4a38",
+        sun: "#ebe4d6",
+      };
   }
 }
 
@@ -54,44 +79,28 @@ function marketScreensFor(cityId: CityId): Array<{ position: [number, number, nu
   }
 }
 
-function HqHologram({ block }: { block: WorldBlockConfig }) {
-  const ring = useRef<THREE.Mesh>(null);
-  const ringB = useRef<THREE.Mesh>(null);
+function HqBeacon({ block }: { block: WorldBlockConfig }) {
   const hq = block.buildings.find((b) => b.kind === "hq") ?? block.buildings[0];
   const position = hq?.position ?? block.spawn;
-  const primary = hq?.accent ?? "#17ff4d";
-  const secondary = block.cityId === "la" ? "#a78bfa" : block.cityId === "miami" ? "#7fffd4" : "#3de7ff";
-  const height = (hq?.size.height ?? 14) + 3.4;
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime;
-    if (ring.current) {
-      ring.current.rotation.z = t * 0.5;
-      ring.current.position.y = height + Math.sin(t * 1.2) * 0.3;
-    }
-    if (ringB.current) {
-      ringB.current.rotation.z = -t * 0.8;
-      ringB.current.position.y = height + Math.sin(t * 1.2) * 0.3;
-    }
-  });
+  const height = (hq?.size.height ?? 14) + 2.2;
   return (
     <group position={[position.x, 0, position.z]}>
-      <mesh ref={ring} position={[0, height, 0]}>
-        <torusGeometry args={[2.2, 0.06, 10, 48]} />
-        <meshBasicMaterial color={primary} transparent opacity={0.7} toneMapped={false} />
+      <mesh position={[0, height, 0]}>
+        <cylinderGeometry args={[0.08, 0.12, 1.8, 8]} />
+        <meshStandardMaterial color="#4a5560" metalness={0.65} roughness={0.4} />
       </mesh>
-      <mesh ref={ringB} position={[0, height, 0]} rotation-x={Math.PI / 3}>
-        <torusGeometry args={[1.6, 0.05, 10, 48]} />
-        <meshBasicMaterial color={secondary} transparent opacity={0.55} toneMapped={false} />
+      <mesh position={[0, height + 1.1, 0]}>
+        <sphereGeometry args={[0.22, 12, 12]} />
+        <meshStandardMaterial color="#d8e0e6" emissive="#a8b8c4" emissiveIntensity={0.35} metalness={0.2} roughness={0.35} />
       </mesh>
       <Text
-        position={[0, height, 0]}
-        fontSize={0.9}
-        color={primary}
+        position={[0, height + 1.8, 0]}
+        fontSize={0.55}
+        color="#e8eef2"
         anchorX="center"
         anchorY="middle"
-        material-toneMapped={false}
-        outlineWidth={0.05}
-        outlineColor="#04140a"
+        outlineWidth={0.03}
+        outlineColor="#1a2228"
       >
         ORBITX
       </Text>
@@ -107,29 +116,26 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
   return (
     <group>
       <color attach="background" args={[theme.background]} />
-      <fog attach="fog" args={[theme.fog, 38, 150]} />
+      <fog attach="fog" args={[theme.fog, 55, 195]} />
 
-      <ambientLight intensity={0.55} />
-      <hemisphereLight args={["#28406b", "#05070d", 0.6]} />
+      <ambientLight intensity={0.42} />
+      <hemisphereLight args={[theme.hemiSky, theme.hemiGround, 0.85]} />
       <directionalLight
-        position={[24, 36, 16]}
-        intensity={1.4}
+        position={[32, 48, 18]}
+        intensity={1.15}
+        color={theme.sun}
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-camera-left={-60}
-        shadow-camera-right={60}
-        shadow-camera-top={60}
-        shadow-camera-bottom={-60}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-left={-70}
+        shadow-camera-right={70}
+        shadow-camera-top={70}
+        shadow-camera-bottom={-70}
+        shadow-bias={-0.0002}
       />
-      <pointLight position={[block.spawn.x, 10, block.spawn.z]} intensity={0.6} color={theme.primary} distance={40} />
-      <pointLight position={[-16, 8, 0]} intensity={0.45} color={theme.warm} distance={24} />
-      <pointLight position={[16, 8, 0]} intensity={0.45} color="#f5c542" distance={24} />
-      <pointLight position={[0, 8, 16]} intensity={0.4} color={theme.secondary} distance={24} />
-      <pointLight position={[40, 10, 10]} intensity={0.5} color="#f5c542" distance={30} />
-      <pointLight position={[-14, 8, 42]} intensity={0.5} color="#ff4d9a" distance={28} />
-
-      <Stars radius={130} depth={60} count={2200} factor={3.6} saturation={0} fade speed={0.4} />
+      {/* Soft fill — warm overcast bounce, not neon point washes */}
+      <directionalLight position={[-28, 22, -16]} intensity={0.28} color="#b8c4ce" />
+      <pointLight position={[block.spawn.x, 8, block.spawn.z]} intensity={0.22} color="#dfe6ea" distance={28} />
 
       <Ground block={block} />
       <Skyline block={block} />
@@ -144,12 +150,11 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
         <BillboardMesh key={bb.id} board={bb} />
       ))}
 
-      {/* Live market jumbotrons */}
       {screens.map((screen, index) => (
         <MegaScreen key={`screen-${index}`} rows={tickerRows} {...screen} />
       ))}
 
-      <HqHologram block={block} />
+      <HqBeacon block={block} />
       <RocketShow />
       <NPCs block={block} />
       <Drones />
@@ -157,14 +162,14 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       {block.cityId === "nyc" && <Park />}
       <Traffic />
 
-      {/* Central plaza hologram disc */}
-      <mesh position={[block.spawn.x, 0.08, block.spawn.z]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[3.2, 48]} />
-        <meshStandardMaterial color="#0a1410" emissive={theme.primary} emissiveIntensity={0.06} metalness={0.5} roughness={0.4} transparent opacity={0.85} />
+      {/* Stone plaza marker — readable, not neon disc */}
+      <mesh position={[block.spawn.x, 0.06, block.spawn.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[3.4, 48]} />
+        <meshStandardMaterial color="#5a6168" metalness={0.15} roughness={0.82} />
       </mesh>
-      <mesh position={[block.spawn.x, 0.1, block.spawn.z]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[2.9, 3.2, 48]} />
-        <meshBasicMaterial color={theme.primary} transparent opacity={0.5} toneMapped={false} />
+      <mesh position={[block.spawn.x, 0.08, block.spawn.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[3.15, 3.4, 48]} />
+        <meshStandardMaterial color="#3e454c" metalness={0.2} roughness={0.7} />
       </mesh>
     </group>
   );

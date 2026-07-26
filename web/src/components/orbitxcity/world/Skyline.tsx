@@ -6,19 +6,14 @@ import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 
 const TOWER_COUNT = 56;
-const ACCENTS = ["#17ff4d", "#3de7ff", "#ff4d9a", "#f5c542", "#a78bfa"];
 
-/** Distant instanced tower ring — silhouettes the block like a real metropolis. */
+/** Distant tower ring — fog-softened silhouettes, no neon caps. */
 export function Skyline({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
-  const { towers, caps } = useMemo(() => {
+  const towers = useMemo(() => {
     const rand = mulberry32(0x0b17c17);
     const towerGeo = new THREE.BoxGeometry(1, 1, 1);
-    const towerMat = new THREE.MeshStandardMaterial({ color: "#0a1220", metalness: 0.5, roughness: 0.6 });
+    const towerMat = new THREE.MeshStandardMaterial({ color: "#3a424a", metalness: 0.22, roughness: 0.78 });
     const towersMesh = new THREE.InstancedMesh(towerGeo, towerMat, TOWER_COUNT);
-
-    const capGeo = new THREE.BoxGeometry(1, 1, 1);
-    const capMat = new THREE.MeshBasicMaterial({ toneMapped: false });
-    const capsMesh = new THREE.InstancedMesh(capGeo, capMat, TOWER_COUNT);
 
     const m = new THREE.Matrix4();
     const color = new THREE.Color();
@@ -33,16 +28,13 @@ export function Skyline({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }
 
       m.compose(new THREE.Vector3(x, h / 2, z), new THREE.Quaternion(), new THREE.Vector3(w, h, d));
       towersMesh.setMatrixAt(i, m);
-
-      m.compose(new THREE.Vector3(x, h + 0.25, z), new THREE.Quaternion(), new THREE.Vector3(w * 0.86, 0.5, d * 0.86));
-      capsMesh.setMatrixAt(i, m);
-      color.set(ACCENTS[Math.floor(rand() * ACCENTS.length)]).multiplyScalar(0.9);
-      capsMesh.setColorAt(i, color);
+      color.setRGB(0.22 + rand() * 0.08, 0.25 + rand() * 0.08, 0.28 + rand() * 0.08);
+      towersMesh.setColorAt(i, color);
     }
     towersMesh.instanceMatrix.needsUpdate = true;
-    capsMesh.instanceMatrix.needsUpdate = true;
-    if (capsMesh.instanceColor) capsMesh.instanceColor.needsUpdate = true;
-    return { towers: towersMesh, caps: capsMesh };
+    if (towersMesh.instanceColor) towersMesh.instanceColor.needsUpdate = true;
+    towersMesh.castShadow = true;
+    return towersMesh;
   }, []);
 
   const subtitle =
@@ -51,38 +43,35 @@ export function Skyline({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }
       : block.cityId === "la"
         ? "LA · CREATOR STRIP"
         : "NYC · FINANCIAL DISTRICT";
-  const subtitleColor = block.cityId === "miami" ? "#3de7ff" : block.cityId === "la" ? "#ff4d9a" : "#3de7ff";
 
   return (
     <group>
       <primitive object={towers} />
-      <primitive object={caps} />
 
-      {/* Skyline hero signs — bloom picks these up */}
       <Text
-        position={[0, 26, -86]}
-        fontSize={5.6}
-        color="#17ff4d"
+        position={[0, 24, -86]}
+        fontSize={3.8}
+        color="#eef2f4"
         anchorX="center"
         anchorY="middle"
-        letterSpacing={0.08}
-        material-toneMapped={false}
-        outlineWidth={0.12}
-        outlineColor="#04140a"
+        letterSpacing={0.06}
+        outlineWidth={0.08}
+        outlineColor="#2a3238"
+        fillOpacity={0.55}
       >
         ORBITX CITY
       </Text>
       <Text
-        position={[0, 22, 88]}
+        position={[0, 20.5, 88]}
         rotation-y={Math.PI}
-        fontSize={4.2}
-        color={subtitleColor}
+        fontSize={2.4}
+        color="#d8dee2"
         anchorX="center"
         anchorY="middle"
-        letterSpacing={0.1}
-        material-toneMapped={false}
-        outlineWidth={0.1}
-        outlineColor="#03131a"
+        letterSpacing={0.08}
+        outlineWidth={0.06}
+        outlineColor="#2a3238"
+        fillOpacity={0.5}
       >
         {subtitle}
       </Text>
