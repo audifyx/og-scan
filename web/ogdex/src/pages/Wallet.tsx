@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useWallet } from "../lib/wallet";
-import { getWallet, getSwaps, WalletPortfolio, WalletHolding, WalletTrade, fmtUsd, compact, short, isWatched, toggleWatch } from "../lib/api";
+import { getWallet, getSwaps, WalletPortfolio, WalletHolding, WalletTrade, fmtUsd, compact, short, isWatched, toggleWatch, mutateAlerts } from "../lib/api";
 import { timeAgo } from "../lib/format";
 import TokenLogo from "../components/TokenLogo";
 import Copyable from "../components/Copyable";
@@ -36,9 +36,7 @@ export default function Wallet() {
     setNBusy(true);
     try {
       localStorage.setItem("ogdex.alertChan", nChan); localStorage.setItem("ogdex.alertTarget", tgt);
-      const r = await fetch("/api/ogdex/alerts", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: owner, alert: { type: "wallet_trade", watch: address, label: short(address), channel: nChan, target: tgt } }) });
-      const dd = await r.json();
+      const dd = await mutateAlerts(owner, { alert: { type: "wallet_trade", watch: address, label: short(address), channel: nChan, target: tgt } });
       if (!dd.ok) throw new Error(dd.error || "Could not create alert");
       setNMsg({ ok: true, text: "You will be notified when this wallet trades" });
     } catch (e: any) { setNMsg({ ok: false, text: e?.message || "Failed" }); } finally { setNBusy(false); }

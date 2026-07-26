@@ -64,7 +64,7 @@ const CATEGORIES = ["Health", "Tech", "Business", "Music", "Education", "Finance
 function generateICS(space: ScheduledSpace): string {
   const start = new Date(space.scheduled_for);
   const end = addHours(start, 1);
-  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  const fmt = (d: Date) => d.toISOString().replaceAll("-", "").replaceAll(":", "").split(".")[0] + "Z";
   const desc = `Hosted by @${space.host_username} on OrbitX Spaces\\nhttps://ogscan.fun/space/${space.id}`;
   return [
     "BEGIN:VCALENDAR",
@@ -95,7 +95,8 @@ function downloadICS(space: ScheduledSpace) {
 function googleCalendarUrl(space: ScheduledSpace): string {
   const start = new Date(space.scheduled_for);
   const end = addHours(start, 1);
-  const fmt = (d: Date) => d.toISOString().replace(/[-:.Z]/g, "").slice(0, 15) + "Z";
+  const fmt = (d: Date) =>
+    d.toISOString().replaceAll("-", "").replaceAll(":", "").replaceAll(".", "").replaceAll("Z", "").slice(0, 15) + "Z";
   const p = new URLSearchParams({
     action: "TEMPLATE",
     text: space.title,

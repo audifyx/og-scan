@@ -1,37 +1,37 @@
 import type { CityDefinition } from "./types";
 
-/** Multi-city roadmap. Milestone 1 unlocks OrbitX NYC demo block only. */
+/** Multi-city roadmap. NYC, Miami, and LA are playable; Boston remains locked. */
 export const ORBITX_CITIES: CityDefinition[] = [
   {
     id: "nyc",
     name: "OrbitX NYC",
     tagline: "Financial hub",
     purpose: "Trading district, launch events, Bloomberg-grade market energy.",
-    accent: "#17ff4d",
+    accent: "#00ff9f",
     unlocked: true,
   },
   {
     id: "miami",
     name: "OrbitX Miami",
-    tagline: "Community coast",
-    purpose: "Conferences, social plazas, community events.",
-    accent: "#3de7ff",
-    unlocked: false,
+    tagline: "Coastal community",
+    purpose: "Beach-adjacent plazas, community events, and social zones.",
+    accent: "#00ffc3",
+    unlocked: true,
   },
   {
     id: "la",
     name: "OrbitX LA",
     tagline: "Creator strip",
-    purpose: "Creators, marketing, entertainment stages.",
-    accent: "#ff4d9a",
-    unlocked: false,
+    purpose: "Creator launches, NFT culture, games, and entertainment stages.",
+    accent: "#7dffb0",
+    unlocked: true,
   },
   {
     id: "boston",
     name: "OrbitX Boston",
     tagline: "Innovation core",
     purpose: "Developers, AI labs, protocol R&D.",
-    accent: "#f5c542",
+    accent: "#c5a26f",
     unlocked: false,
   },
 ];

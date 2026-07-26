@@ -74,8 +74,10 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
-async function checkOrbitxRegistry(name: string, ticker: string): Promise<VampSourceMatch[]> {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return [];
+type SourceResult = { matches: VampSourceMatch[]; failed: boolean };
+
+async function checkOrbitxRegistry(name: string, ticker: string): Promise<SourceResult> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return { matches: [], failed: true };
   try {
     const res = await withTimeout(
       fetch(`${SUPABASE_URL}/rest/v1/rpc/orbitx_vamp_check`, {
@@ -89,18 +91,21 @@ async function checkOrbitxRegistry(name: string, ticker: string): Promise<VampSo
       }),
       FETCH_TIMEOUT_MS
     );
-    if (!res.ok) return [];
+    if (!res.ok) return { matches: [], failed: true };
     const rows = (await res.json()) as { name: string; ticker: string; sim: number }[];
-    return (rows ?? []).map((r) => ({ source: "orbitx" as const, name: r.name, ticker: r.ticker, sim: r.sim }));
+    return {
+      matches: (rows ?? []).map((r) => ({ source: "orbitx" as const, name: r.name, ticker: r.ticker, sim: r.sim })),
+      failed: false,
+    };
   } catch (err) {
     console.error("[anti-vamp-check] orbitx registry check failed:", err);
-    return [];
+    return { matches: [], failed: true };
   }
 }
 
-async function checkPumpFun(name: string, ticker: string): Promise<VampSourceMatch[]> {
+async function checkPumpFun(name: string, ticker: string): Promise<SourceResult> {
   const q = name || ticker;
-  if (!q.trim()) return [];
+  if (!q.trim()) return { matches: [], failed: false };
   try {
     const res = await withTimeout(
       fetch(`https://frontend-api-v3.pump.fun/coins/search?searchTerm=${encodeURIComponent(q)}&limit=25&offset=0`, {
@@ -108,26 +113,29 @@ async function checkPumpFun(name: string, ticker: string): Promise<VampSourceMat
       }),
       FETCH_TIMEOUT_MS
     );
-    if (!res.ok) return [];
+    if (!res.ok) return { matches: [], failed: true };
     const data = await res.json();
     const list: any[] = Array.isArray(data) ? data : Array.isArray(data?.coins) ? data.coins : [];
-    return list
-      .map((t) => ({
-        source: "pumpfun" as const,
-        name: String(t.name ?? ""),
-        ticker: String(t.symbol ?? ""),
-        sim: scoreMatch(String(t.name ?? ""), String(t.symbol ?? ""), name, ticker),
-      }))
-      .filter((m) => m.sim >= SOFT_MATCH_SIM);
+    return {
+      matches: list
+        .map((t) => ({
+          source: "pumpfun" as const,
+          name: String(t.name ?? ""),
+          ticker: String(t.symbol ?? ""),
+          sim: scoreMatch(String(t.name ?? ""), String(t.symbol ?? ""), name, ticker),
+        }))
+        .filter((m) => m.sim >= SOFT_MATCH_SIM),
+      failed: false,
+    };
   } catch (err) {
     console.error("[anti-vamp-check] pump.fun check failed:", err);
-    return [];
+    return { matches: [], failed: true };
   }
 }
 
-async function checkDexScreener(name: string, ticker: string): Promise<VampSourceMatch[]> {
+async function checkDexScreener(name: string, ticker: string): Promise<SourceResult> {
   const q = name || ticker;
-  if (!q.trim()) return [];
+  if (!q.trim()) return { matches: [], failed: false };
   try {
     const res = await withTimeout(
       fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`, {
@@ -135,7 +143,7 @@ async function checkDexScreener(name: string, ticker: string): Promise<VampSourc
       }),
       FETCH_TIMEOUT_MS
     );
-    if (!res.ok) return [];
+    if (!res.ok) return { matches: [], failed: true };
     const data = await res.json();
     const pairs: any[] = Array.isArray(data?.pairs) ? data.pairs : [];
     const seen = new Set<string>();
@@ -150,10 +158,10 @@ async function checkDexScreener(name: string, ticker: string): Promise<VampSourc
       const sim = scoreMatch(String(bt.name ?? ""), String(bt.symbol ?? ""), name, ticker);
       if (sim >= SOFT_MATCH_SIM) out.push({ source: "dexscreener", name: String(bt.name ?? ""), ticker: String(bt.symbol ?? ""), sim });
     }
-    return out;
+    return { matches: out, failed: false };
   } catch (err) {
     console.error("[anti-vamp-check] DexScreener check failed:", err);
-    return [];
+    return { matches: [], failed: true };
   }
 }
 
@@ -178,13 +186,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    const [orbitxMatches, pumpMatches, dexMatches] = await Promise.all([
+    const [orbitxRes, pumpRes, dexRes] = await Promise.all([
       checkOrbitxRegistry(cleanName, cleanTicker),
       checkPumpFun(cleanName, cleanTicker),
       checkDexScreener(cleanName, cleanTicker),
     ]);
 
-    const all = [...orbitxMatches, ...pumpMatches, ...dexMatches].sort((a, b) => b.sim - a.sim);
+    const sourceHealth = {
+      orbitx: !orbitxRes.failed,
+      pumpfun: !pumpRes.failed,
+      dexscreener: !dexRes.failed,
+    };
+    const failedCount = [orbitxRes, pumpRes, dexRes].filter((r) => r.failed).length;
+    if (failedCount === 3) {
+      // All sources down — fail CLOSED so clones cannot slip through.
+      res.status(200).json({
+        blocked: true,
+        flagged: true,
+        hardMatch: null,
+        matches: [],
+        checked: ["orbitx", "pumpfun", "dexscreener"],
+        sourceHealth,
+        error: "verification_unavailable",
+        message: "All originality sources unavailable. Launch blocked until verification recovers.",
+      });
+      return;
+    }
+
+    const all = [...orbitxRes.matches, ...pumpRes.matches, ...dexRes.matches].sort((a, b) => b.sim - a.sim);
     const hard = all.find((m) => m.sim >= HARD_MATCH_SIM) ?? null;
     const soft = all.filter((m) => m.sim >= SOFT_MATCH_SIM);
 
@@ -194,6 +223,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       hardMatch: hard ? { name: hard.name, ticker: hard.ticker, source: hard.source } : null,
       matches: soft,
       checked: ["orbitx", "pumpfun", "dexscreener"],
+      sourceHealth,
     });
   } catch (error) {
     console.error("[anti-vamp-check]", error);

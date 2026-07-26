@@ -20,7 +20,7 @@ export interface CityMarketSnapshot {
   fetchedAt: number;
 }
 
-function num(v: unknown): number | undefined {
+export function num(v: unknown): number | undefined {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
   return undefined;
@@ -41,24 +41,53 @@ export function normalizeScreenerRows(payload: unknown): ScreenerRow[] {
 
   return raw.map((item) => {
     const r = item as Record<string, unknown>;
+    const priceChange = r.priceChange as { h24?: number } | undefined;
+    const volume = r.volume as { h24?: number } | undefined;
+    const liquidity = r.liquidity as number | { usd?: number } | undefined;
     return {
       mint: (r.mint ?? r.address ?? r.tokenAddress ?? r.baseMint) as string | undefined,
       address: (r.address ?? r.mint) as string | undefined,
       symbol: (r.symbol ?? r.ticker ?? r.baseSymbol) as string | undefined,
       name: (r.name ?? r.tokenName) as string | undefined,
       priceUsd: num(r.priceUsd ?? r.price ?? r.price_usd),
-      change24h: num(r.change24h ?? r.priceChange24h ?? r.priceChange?.h24 ?? (r.priceChange as { h24?: number })?.h24),
-      volume24h: num(r.volume24h ?? r.volume?.h24 ?? (r.volume as { h24?: number })?.h24),
-      liquidity: num(r.liquidity ?? r.liquidityUsd ?? (r.liquidity as { usd?: number })?.usd),
+      change24h: num(r.change24h ?? r.priceChange24h ?? priceChange?.h24),
+      volume24h: num(r.volume24h ?? volume?.h24),
+      liquidity: num(typeof liquidity === "object" && liquidity !== null ? liquidity.usd : liquidity ?? r.liquidityUsd),
       imageUrl: (r.imageUrl ?? r.logo ?? r.icon ?? r.image) as string | undefined,
       logo: (r.logo ?? r.imageUrl) as string | undefined,
     };
   });
 }
 
-export async function fetchScreener(limit = 12): Promise<ScreenerRow[]> {
+export async function fetchScreener(limit = 12, type = "trending"): Promise<ScreenerRow[]> {
   try {
-    const res = await fetch(`/api/ogdex/screener?type=trending&interval=24h&limit=${limit}`);
+    const res = await fetch(`/api/ogdex/screener?type=${type}&interval=24h&limit=${limit}`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return normalizeScreenerRows(json).slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/** Search every Solana token (DexScreener/GeckoTerminal via OrbitX DEX API). */
+export async function searchAllTokens(q: string): Promise<ScreenerRow[]> {
+  const query = q.trim();
+  if (!query) return [];
+  try {
+    const res = await fetch(`/api/ogdex/search?q=${encodeURIComponent(query)}`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return normalizeScreenerRows(json).slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
+/** Latest pump.fun launches tracked by the OrbitX launches feed. */
+export async function fetchPumpLaunches(limit = 20): Promise<ScreenerRow[]> {
+  try {
+    const res = await fetch(`/api/ogdex/launches?limit=${limit}`);
     if (!res.ok) return [];
     const json = await res.json();
     return normalizeScreenerRows(json).slice(0, limit);

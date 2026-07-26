@@ -16,7 +16,7 @@ const appRoutes = [
   "/leaderboard", "/settings", "/discover",
   "/callouts", "/official-token", "/profile",
   "/live-feed", "/lobbies", "/communities", "/live-trading",
-  "/support", "/admin",
+  "/support", "/ox-desk-m4k9q",
 ];
 
 const routeTitles: Record<string, string> = {
@@ -42,7 +42,7 @@ const routeTitles: Record<string, string> = {
   "/communities": "Communities",
   "/live-trading": "Live Trading",
   "/support": "Support",
-  "/admin": "Admin",
+  "/ox-desk-m4k9q": "Desk",
 };
 
 interface PhoneLayoutProps {

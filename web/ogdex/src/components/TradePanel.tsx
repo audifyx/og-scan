@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useWallet, getPhantom } from "../lib/wallet";
-import { getBalance, getSafety, SafetyCheck, fmtUsd, compact } from "../lib/api";
+import { getBalance, getSafety, SafetyCheck, fmtUsd, compact, mutateAlerts } from "../lib/api";
 import { Wallet2, Loader2, ArrowDownUp, ExternalLink, CheckCircle2, AlertTriangle, ShieldCheck, ShieldAlert, X, RefreshCw, Lock, Info, Bell, BellPlus } from "lucide-react";
 
 const BUY_PRESETS = [0.1, 0.25, 0.5, 1];
@@ -129,9 +129,7 @@ export default function TradePanel({ mint, symbol, price, icon }: { mint: string
     try {
       localStorage.setItem("ogdex.alertChan", alertChan);
       localStorage.setItem("ogdex.alertTarget", tgt);
-      const r = await fetch("/api/ogdex/alerts", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: address, alert: { mint, symbol: sym, type: ALERT_KINDS[alertKind].type, value: v, channel: alertChan, target: tgt } }) });
-      const d = await r.json();
+      const d = await mutateAlerts(address, { alert: { mint, symbol: sym, type: ALERT_KINDS[alertKind].type, value: v, channel: alertChan, target: tgt } });
       if (!d.ok) throw new Error(d.error || "Could not create alert");
       setAlertMsg({ ok: true, text: `${ALERT_KINDS[alertKind].label} alert set at $${v}` });
       setAlertPrice("");

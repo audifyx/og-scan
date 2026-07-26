@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useWallet } from "../lib/wallet";
-import { short } from "../lib/api";
+import { short, fetchAlerts, mutateAlerts } from "../lib/api";
 import { Bell, Wallet2, Loader2, Trash2, Plus, CheckCircle2, AlertTriangle, ExternalLink, Zap, TrendingDown, Users, ArrowRightLeft } from "lucide-react";
 
 interface Alert {
@@ -65,7 +65,7 @@ export default function Alerts() {
   const load = async () => {
     if (!address) return;
     setLoading(true);
-    try { const r = await fetch(`/api/ogdex/alerts?wallet=${address}`); const d = await r.json(); setAlerts(d.alerts || []); } catch {}
+    try { const d = await fetchAlerts(address); setAlerts(d.alerts || []); } catch {}
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, [address]);
@@ -90,9 +90,7 @@ export default function Alerts() {
         alert.mint = mint.trim();
         if (needsValue(type)) alert.value = Number(value);
       }
-      const r = await fetch("/api/ogdex/alerts", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: address, alert }) });
-      const d = await r.json();
+      const d = await mutateAlerts(address, { alert });
       if (!d.ok) throw new Error(d.error || "Could not create alert");
       setAlerts(d.alerts); setOk("Alert created ✓"); setValue(""); setWatch("");
     } catch (e: any) { setErr(e?.message || "Failed"); } finally { setBusy(false); }
@@ -100,8 +98,8 @@ export default function Alerts() {
 
   const remove = async (id: string) => {
     if (!address) return;
-    const r = await fetch("/api/ogdex/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet: address, remove: id }) });
-    const d = await r.json(); if (d.ok) setAlerts(d.alerts);
+    const d = await mutateAlerts(address, { remove: id });
+    if (d.ok) setAlerts(d.alerts);
   };
 
   const alertIcon = (t: string) => {

@@ -185,7 +185,7 @@ export const AppSidebar = ({
   ];
 
   const adminAppsItems: NavItem[] = [
-    { to: "/admin", icon: Shield, label: "Admin Panel", eyebrow: "Dashboard + apps hub" },
+    { to: "/ox-desk-m4k9q", icon: Shield, label: "Owner desk", eyebrow: "Private ops" },
   ];
 
   return (

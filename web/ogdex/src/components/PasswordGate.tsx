@@ -1,19 +1,31 @@
 import { useState, useEffect } from "react";
 import { Lock } from "lucide-react";
 
+// Soft UI gate only — not a security boundary. Pass from VITE_REDESIGN_PASS (no hardcoded default).
+const GATE_PASS = (import.meta.env.VITE_REDESIGN_PASS as string | undefined)?.trim() || "";
+
 export default function PasswordGate({ children }: { children: React.ReactNode }) {
   const [unlocked, setUnlocked] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!GATE_PASS) {
+      // Unconfigured → do not block the redesign surface
+      setUnlocked(true);
+      return;
+    }
     const stored = sessionStorage.getItem("og_unlocked");
     if (stored === "true") setUnlocked(true);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === "0129") {
+    if (!GATE_PASS || GATE_PASS.length < 8) {
+      setError("Redesign gate is not configured.");
+      return;
+    }
+    if (password === GATE_PASS) {
       setUnlocked(true);
       sessionStorage.setItem("og_unlocked", "true");
       setError("");

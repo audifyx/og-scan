@@ -1,58 +1,83 @@
-import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { useEffect, useRef } from "react";
+import { getWorldBlock, getWorldStreets } from "@/lib/orbitxcity/worlds";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
-const SIZE = 128;
+const SIZE = 148;
 
-/** Top-down neon minimap of the demo block: buildings, shards, and the player. */
+/** Tactical minimap — buildings, zones, and live player position. */
 export function Minimap() {
-  const { playerPos, collectedShards } = useCity();
-  const block = NYC_DEMO_BLOCK;
-  const { minX, maxX, minZ, maxZ } = block.bounds;
-  const spanX = maxX - minX;
-  const spanZ = maxZ - minZ;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { playerPos, selectedCityId } = useCity();
+  const block = getWorldBlock(selectedCityId);
+  const streets = getWorldStreets(selectedCityId);
 
-  const toX = (x: number) => ((x - minX) / spanX) * SIZE;
-  const toY = (z: number) => ((z - minZ) / spanZ) * SIZE;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  const shards = block.shards ?? [];
+    const { bounds } = block;
+    const worldW = bounds.maxX - bounds.minX;
+    const worldD = bounds.maxZ - bounds.minZ;
+    const sx = SIZE / worldW;
+    const sz = SIZE / worldD;
+    const toX = (x: number) => (x - bounds.minX) * sx;
+    const toY = (z: number) => (z - bounds.minZ) * sz;
+
+    ctx.clearRect(0, 0, SIZE, SIZE);
+
+    ctx.fillStyle = "rgba(5, 10, 18, 0.92)";
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    ctx.fillStyle = "rgba(23, 255, 77, 0.12)";
+    for (const s of streets) {
+      if (s.o === "h") {
+        ctx.fillRect(toX(s.from), toY(s.at - s.w / 2), (s.to - s.from) * sx, s.w * sz);
+      } else {
+        ctx.fillRect(toX(s.at - s.w / 2), toY(s.from), s.w * sx, (s.to - s.from) * sz);
+      }
+    }
+
+    for (const b of block.buildings) {
+      ctx.fillStyle = `${b.accent}cc`;
+      ctx.fillRect(
+        toX(b.position.x - b.size.width / 2),
+        toY(b.position.z - b.size.depth / 2),
+        b.size.width * sx,
+        b.size.depth * sz,
+      );
+    }
+
+    for (const z of block.zones) {
+      ctx.strokeStyle = "rgba(61, 231, 255, 0.5)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(toX(z.position.x), toY(z.position.z), z.radius * sx, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    const px = toX(playerPos.x);
+    const py = toY(playerPos.z);
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(px, py, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(23, 255, 77, 0.9)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(px, py, 6, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(23, 255, 77, 0.35)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, SIZE - 1, SIZE - 1);
+  }, [playerPos, block, streets]);
 
   return (
-    <div className="oxc-minimap" aria-label="City minimap">
-      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-        <rect x={0} y={0} width={SIZE} height={SIZE} rx={10} fill="#04070f" stroke="#17ff4d55" />
-        {/* Streets */}
-        <line x1={SIZE / 2} y1={4} x2={SIZE / 2} y2={SIZE - 4} stroke="#17ff4d22" strokeWidth={4} />
-        <line x1={4} y1={SIZE / 2} x2={SIZE - 4} y2={SIZE / 2} stroke="#3de7ff22" strokeWidth={4} />
-
-        {block.buildings.map((b) => {
-          const w = (b.size.width / spanX) * SIZE;
-          const h = (b.size.depth / spanZ) * SIZE;
-          return (
-            <rect
-              key={b.id}
-              x={toX(b.position.x) - w / 2}
-              y={toY(b.position.z) - h / 2}
-              width={w}
-              height={h}
-              rx={2}
-              fill={`${b.accent}33`}
-              stroke={b.accent}
-              strokeWidth={0.8}
-            />
-          );
-        })}
-
-        {shards.map((s) =>
-          collectedShards.has(s.id) ? null : (
-            <circle key={s.id} cx={toX(s.position.x)} cy={toY(s.position.z)} r={2.4} fill="#17ff4d">
-              <animate attributeName="opacity" values="1;0.3;1" dur="1.4s" repeatCount="indefinite" />
-            </circle>
-          ),
-        )}
-
-        {/* Player */}
-        <circle cx={toX(playerPos.x)} cy={toY(playerPos.z)} r={3.6} fill="#ffffff" stroke="#17ff4d" strokeWidth={1.5} />
-      </svg>
+    <div className="oxc-minimap" aria-hidden>
+      <canvas ref={canvasRef} width={SIZE} height={SIZE} />
+      <span>{block.name.toUpperCase()}</span>
     </div>
   );
 }

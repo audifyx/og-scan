@@ -1,15 +1,20 @@
-import { send, dbSelect, dbUpdate, dbDelete, dbInsert, readBody, ADMIN_PASS } from "../_lib.js";
+import { send, dbSelect, dbUpdate, dbDelete, dbInsert, readBody, adminAuthorized, hasAdminPass } from "../_lib.js";
+import { eqFilter } from "../_walletProof.js";
 
-function auth(pass) { return pass && String(pass) === String(ADMIN_PASS); }
+function auth(pass) {
+  if (!hasAdminPass()) return false;
+  return adminAuthorized(pass);
+}
 
 const OG_TOKEN = "EfnZmcFKMXofKA5V5ujvjqtSorvuQD2MzJPz3dxXpump";
 
 export default async function handler(req, res) {
   if (req.method === "POST") return action(req, res);
 
-  // GET — dashboard data
+  // GET — dashboard data (prefer Authorization / x-admin-pass; query pass deprecated)
   const url = new URL(req.url, "http://x");
-  const pass = url.searchParams.get("pass");
+  const hdr = req.headers["authorization"] || req.headers["x-admin-pass"] || "";
+  const pass = String(hdr).replace(/^Bearer\s+/i, "").trim() || url.searchParams.get("pass");
   if (!auth(pass)) return send(res, 401, { ok: false, error: "unauthorized" });
 
   try {
@@ -119,7 +124,7 @@ async function action(req, res) {
     if (!auth(b.pass)) return send(res, 401, { ok: false, error: "unauthorized" });
 
     const id = b.id;
-    const q  = id ? `id=eq.${id}` : null;
+    const q  = id ? `id=eq.${eqFilter(id)}` : null;
     const now = new Date().toISOString();
 
     switch (b.action) {
@@ -173,11 +178,11 @@ async function action(req, res) {
       }
       case "remove_kol": {
         if (b.kol_id) {
-          try { await dbDelete("kol_wallets", `kol_id=eq.${b.kol_id}`); } catch {}
-          try { await dbDelete("kol_profiles", `id=eq.${b.kol_id}`); } catch {}
+          try { await dbDelete("kol_wallets", `kol_id=eq.${eqFilter(b.kol_id)}`); } catch {}
+          try { await dbDelete("kol_profiles", `id=eq.${eqFilter(b.kol_id)}`); } catch {}
         }
         if (b.address) {
-          try { await dbDelete("ogdex_kol_directory", `address=eq.${b.address}`); } catch {}
+          try { await dbDelete("ogdex_kol_directory", `address=eq.${eqFilter(b.address)}`); } catch {}
         }
         return send(res, 200, { ok: true });
       }
@@ -188,7 +193,7 @@ async function action(req, res) {
         if (!address) return send(res, 400, { ok: false, error: "address required" });
         // Mark nomination approved
         try {
-          await dbUpdate("ogdex_kol_nominations", `address=eq.${address}`, { status: "approved", reviewed_at: now });
+          await dbUpdate("ogdex_kol_nominations", `address=eq.${eqFilter(address)}`, { status: "approved", reviewed_at: now });
         } catch {}
         // Add as KOL
         try {
@@ -204,7 +209,7 @@ async function action(req, res) {
         const address = String(b.address || "").trim();
         if (!address) return send(res, 400, { ok: false, error: "address required" });
         try {
-          await dbUpdate("ogdex_kol_nominations", `address=eq.${address}`, { status: "rejected", reviewed_at: now });
+          await dbUpdate("ogdex_kol_nominations", `address=eq.${eqFilter(address)}`, { status: "rejected", reviewed_at: now });
         } catch {}
         return send(res, 200, { ok: true });
       }
@@ -219,13 +224,13 @@ async function action(req, res) {
           });
         } catch {
           // likely duplicate — upsert
-          await dbUpdate("ogdex_pro_wallets", `address=eq.${address}`, { note: b.note || null, granted_at: now });
+          await dbUpdate("ogdex_pro_wallets", `address=eq.${eqFilter(address)}`, { note: b.note || null, granted_at: now });
         }
         return send(res, 200, { ok: true });
       }
       case "revoke_pro": {
         const address = String(b.address || "").trim();
-        await dbDelete("ogdex_pro_wallets", `address=eq.${address}`);
+        await dbDelete("ogdex_pro_wallets", `address=eq.${eqFilter(address)}`);
         return send(res, 200, { ok: true });
       }
 
@@ -254,7 +259,7 @@ async function action(req, res) {
           await dbUpsert("ogdex_config", { key: b.key, value: val, updated_at: now });
         } catch {
           try {
-            await dbUpdate("ogdex_config", `key=eq.${b.key}`, { value: val, updated_at: now });
+            await dbUpdate("ogdex_config", `key=eq.${eqFilter(b.key)}`, { value: val, updated_at: now });
           } catch {
             await dbInsert("ogdex_config", { key: b.key, value: val, updated_at: now });
           }
@@ -281,13 +286,13 @@ async function action(req, res) {
             address, reason: b.reason || null, banned_at: now, banned_by: "admin",
           });
         } catch {
-          await dbUpdate("ogdex_banned_wallets", `address=eq.${address}`, { reason: b.reason || null, banned_at: now });
+          await dbUpdate("ogdex_banned_wallets", `address=eq.${eqFilter(address)}`, { reason: b.reason || null, banned_at: now });
         }
         return send(res, 200, { ok: true });
       }
       case "unban_wallet": {
         const address = String(b.address || "").trim();
-        await dbDelete("ogdex_banned_wallets", `address=eq.${address}`);
+        await dbDelete("ogdex_banned_wallets", `address=eq.${eqFilter(address)}`);
         return send(res, 200, { ok: true });
       }
 

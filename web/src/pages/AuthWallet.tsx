@@ -5,13 +5,16 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Wallet, ShieldCheck, Sparkles, Loader2, GitMerge, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
 import { MergeAccountModal } from "@/components/MergeAccountModal";
+import { needsUsernameClaim } from "@/lib/usernameClaim";
 
 export default function AuthWallet() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
+  const { publicKey } = useWallet();
   const { pickable, signInWith, busy } = useWalletSignIn();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -20,15 +23,30 @@ export default function AuthWallet() {
   const [merge, setMerge] = useState(false);
   const [pendingMerge, setPendingMerge] = useState(false);
 
-  useEffect(() => { if (!loading && user && !merge && !pendingMerge) navigate(next, { replace: true }); }, [user, loading, next, navigate, merge, pendingMerge]);
+  const walletPk =
+    publicKey?.toBase58() ||
+    (profile as { sol_wallet?: string | null } | null)?.sol_wallet ||
+    (user?.user_metadata?.wallet as string | undefined) ||
+    null;
+  const waitingOnUsername = Boolean(user && profile && needsUsernameClaim(profile.username, walletPk));
+
+  useEffect(() => {
+    if (loading || !user || merge || pendingMerge || waitingOnUsername) return;
+    // Wait until profile is loaded so we don't skip the username gate
+    if (user && !profile) return;
+    navigate(next, { replace: true });
+  }, [user, profile, loading, next, navigate, merge, pendingMerge, waitingOnUsername]);
 
   const onPick = async (name: string) => {
     try {
       const { isNew } = await signInWith(name);
       setPicker(false);
       toast.success("Signed in with wallet");
-      if (isNew || pendingMerge) { setMerge(true); setPendingMerge(false); }
-      else navigate(next, { replace: true });
+      if (isNew || pendingMerge) {
+        setMerge(true);
+        setPendingMerge(false);
+      }
+      // UsernameClaimGate will prompt for a real username when needed
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sign-in failed");
     }
@@ -50,15 +68,21 @@ export default function AuthWallet() {
           <h1 className="text-2xl font-black">Connect to enter</h1>
           <p className="mx-auto mt-2 max-w-xs text-[13px] text-white/50">One wallet connection unlocks the launchpad, DEX, NFT marketplace, and every tool. No email, no password.</p>
 
-          <button type="button" onClick={() => { setPendingMerge(false); setPicker(true); }} disabled={loading}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-og-cyan px-5 py-3.5 text-sm font-black text-black transition hover:brightness-110 disabled:opacity-50">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />} Log in with wallet
-          </button>
+          {waitingOnUsername ? (
+            <p className="mt-6 text-[13px] text-og-lime">Pick a username in the popup to finish signing in…</p>
+          ) : (
+            <>
+              <button type="button" onClick={() => { setPendingMerge(false); setPicker(true); }} disabled={loading}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-og-cyan px-5 py-3.5 text-sm font-black text-black transition hover:brightness-110 disabled:opacity-50">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />} Log in with wallet
+              </button>
 
-          <button type="button" onClick={() => { if (user) { setMerge(true); } else { setPendingMerge(true); setPicker(true); } }} disabled={loading}
-            className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl border border-og-gold/40 bg-og-gold/10 px-5 py-3 text-sm font-black text-og-gold transition hover:bg-og-gold/20 disabled:opacity-50">
-            <GitMerge className="h-4 w-4" /> Merge an existing account
-          </button>
+              <button type="button" onClick={() => { if (user) { setMerge(true); } else { setPendingMerge(true); setPicker(true); } }} disabled={loading}
+                className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl border border-og-gold/40 bg-og-gold/10 px-5 py-3 text-sm font-black text-og-gold transition hover:bg-og-gold/20 disabled:opacity-50">
+                <GitMerge className="h-4 w-4" /> Merge an existing account
+              </button>
+            </>
+          )}
 
           <div className="mt-4 grid grid-cols-1 gap-2 text-left text-[12px] text-white/50">
             <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-og-lime" /> Sign a free message — no transaction, no fees</span>
@@ -73,7 +97,7 @@ export default function AuthWallet() {
       </div>
 
       <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={onPick} busy={busy} />
-      <MergeAccountModal open={merge} onClose={() => { setMerge(false); if (user) navigate(next, { replace: true }); }} />
+      <MergeAccountModal open={merge} onClose={() => { setMerge(false); }} />
     </div>
   );
 }

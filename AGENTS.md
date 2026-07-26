@@ -29,6 +29,40 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 - Package manager is **pnpm** (matches `web/vercel.json` `installCommand`). `npm install` fails on peer-dependency conflicts (`react-native`/`expo` transitive deps pulled by `@react-three/fiber`). Use `pnpm install --no-frozen-lockfile`. pnpm intentionally skips native build scripts (esbuild, swc, etc.) — that is fine; those ship prebuilt binaries and the dev server/build still work.
 - Run dev server: `npm run dev` → Vite on `http://localhost:8080`. `/` serves the marketing Splash (`index.html`); the React SPA is served for app routes. Good no-backend smoke test: `/Orbitxcity` (fully client-side playable 3D demo).
 - `/api/*` are Vercel serverless functions (in `web/api/` and repo-root `api/`) and are NOT served by `vite dev`; features that call them 404 locally. The app boots fine without env vars — missing `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` etc. just disable auth/data features (secrets live in Vercel env, not git).
-- Lint: `npm run lint`. There are ~4 pre-existing errors (`react-hooks/rules-of-hooks`) and ~1700 warnings that predate setup — not caused by environment work.
+- Lint: `npm run lint`. There are pre-existing warnings/errors that predate environment work.
 - Tests: `npm test` (vitest). Build: `npm run build` (multi-page: `index.html` + `app.html`).
 - `web/ogdex/` is a separate static sub-app built only for the `/ORBITX_DEX` route during the Vercel build; it is not needed for local `web` dev.
+
+<!-- ORBITX PLATFORM + QA SWARM -->
+## OrbitX platform (agents must load this)
+
+- Platform map: `docs/ORBITX_PLATFORM.md`
+- Team docs: `docs/backend`, `docs/frontend`, `docs/gaming`, `docs/crypto`, `docs/social`
+- Primary routes: `/Orbitxcity`, `/os`, `/play`, `/intel`, `/hq`, `/ORBITX_DEX`
+
+## OrbitX QA Swarm (10 agents)
+
+Bug checks, testing, and error triage. Roster + doctrine: `docs/agents/QA_SWARM.md`.
+Agent briefs: `docs/agents/qa/` and `.cursor/agents/qa/`.
+
+| Agent | Role |
+|-------|------|
+| AEGIS | Lead / triage |
+| FORGE | Backend / RLS / workers |
+| NEON | OS `/os` UX |
+| RAID | Gaming `/play` |
+| ORACLE | Crypto `/intel` |
+| PULSE | Social `/hq` |
+| ATLAS | City 3D |
+| WARDEN | Security |
+| CIRCUIT | CI / Vitest / smoke |
+| SCRIBE | Reports / flakes |
+
+Smoke: `bash scripts/qa/run-smoke.sh`
+
+## Full system audit (20-agent review)
+
+- CTO report: `docs/audit/FULL_SYSTEM_AUDIT.md`
+- Bug backlog: `docs/audit/BUG_BACKLOG.md`
+- 30/60/90 roadmap: `docs/audit/ROADMAP_30_60_90.md`
+<!-- ORBITX PLATFORM + QA SWARM END -->

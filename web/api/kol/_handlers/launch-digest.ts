@@ -60,26 +60,37 @@ async function snapshotNewPools(): Promise<number> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Manual / immediate digest
+  if (!CRON_SECRET) {
+    return res.status(503).json({ ok: false, error: "CRON_SECRET not configured" });
+  }
+  const auth = String(req.headers["authorization"] || "");
+  if (auth !== `Bearer ${CRON_SECRET}`) {
+    return res.status(401).json({ ok: false, error: "unauthorized" });
+  }
+
+  // Manual / immediate digest — uses bot config from DB by id, never client-supplied bot tokens
   if (req.method === "POST") {
-    const { botToken, chatId, threadId, minAgeHours, maxAgeHours } = (req.body || {}) as any;
-    if (!botToken || !chatId) return res.status(400).json({ ok: false, error: "botToken and chatId required" });
-    const minAge = Math.max(0, Number(minAgeHours) || 5);
-    const maxAge = Math.max(minAge + 0.5, Number(maxAgeHours) || 10);
+    if (!SERVICE_KEY) return res.status(503).json({ ok: false, error: "service role not configured" });
+    const { botId, minAgeHours, maxAgeHours } = (req.body || {}) as any;
+    if (!botId) return res.status(400).json({ ok: false, error: "botId required" });
     try {
+      const bR = await sb(`telegram_bot_configs?id=eq.${encodeURIComponent(String(botId))}&select=id,bot_token,chat_id,message_thread_id`);
+      const bots: any[] = bR.ok ? await bR.json() : [];
+      const bot = bots[0];
+      if (!bot?.bot_token || !bot?.chat_id) return res.status(404).json({ ok: false, error: "bot not found" });
+      const minAge = Math.max(0, Number(minAgeHours) || 5);
+      const maxAge = Math.max(minAge + 0.5, Number(maxAgeHours) || 10);
       const { launches, source } = await getLaunches(minAge, maxAge, 10);
       const text = buildDigestText(launches, minAge, maxAge, source);
-      const tg = await sendTelegram(String(botToken), String(chatId), text, undefined, threadId ? String(threadId) : undefined);
+      const tg = await sendTelegram(bot.bot_token, bot.chat_id, text, undefined, bot.message_thread_id || undefined);
       return res.status(tg?.ok ? 200 : 502).json({ ok: tg?.ok === true, count: launches.length, source, description: tg?.description || null });
     } catch (e: any) {
       return res.status(500).json({ ok: false, error: String(e?.message || e) });
     }
   }
 
-  // Cron path
-  if (CRON_SECRET) {
-    const auth = String(req.headers["authorization"] || "");
-    if (auth !== `Bearer ${CRON_SECRET}`) return res.status(401).json({ ok: false, error: "unauthorized" });
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return res.status(405).json({ ok: false, error: "GET or POST only" });
   }
 
   const snapshotted = await snapshotNewPools().catch(() => 0);
@@ -103,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const tg = await sendTelegram(bot.bot_token, bot.chat_id, text, undefined, bot.message_thread_id || undefined);
         if (tg?.ok) {
           digestsSent++;
-          await sb(`telegram_bot_configs?id=eq.${bot.id}`, {
+          await sb(`telegram_bot_configs?id=eq.${encodeURIComponent(String(bot.id))}`, {
             method: "PATCH", headers: { Prefer: "return=minimal" },
             body: JSON.stringify({ last_digest_at: new Date().toISOString() }),
           }).catch(() => {});

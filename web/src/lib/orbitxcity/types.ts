@@ -31,7 +31,10 @@ export type InteractionKind =
   | "community"
   | "billboard"
   | "hq"
-  | "token";
+  | "token"
+  | "voice"
+  | "games"
+  | "nft";
 
 export interface Vec3 {
   x: number;
@@ -80,8 +83,10 @@ export interface BillboardDefinition {
   title: string;
   subtitle: string;
   accent: string;
+  /** When set, board becomes a live token ad (price / mcap / chart / QR). */
   tokenMint?: string;
   projectName?: string;
+  website?: string;
 }
 
 export interface InteractionZone {
@@ -95,11 +100,6 @@ export interface InteractionZone {
   tokenMint?: string;
 }
 
-export interface ShardSpawn {
-  id: string;
-  position: Vec3;
-}
-
 export interface WorldBlockConfig {
   cityId: CityId;
   name: string;
@@ -109,7 +109,6 @@ export interface WorldBlockConfig {
   buildings: BuildingDefinition[];
   billboards: BillboardDefinition[];
   zones: InteractionZone[];
-  shards?: ShardSpawn[];
 }
 
 export type HudPanel =
@@ -123,13 +122,49 @@ export type HudPanel =
   | "events"
   | "token"
   | "trading"
-  | "launch";
+  | "launch"
+  | "chat"
+  | "voice"
+  | "social"
+  | "games"
+  | "nft"
+  | "settings"
+  | "help"
+  | "lobbies"
+  | "character";
+
+export type HairStyle = "short" | "long" | "buzz" | "bun" | "mohawk";
+export type OutfitStyle = "street" | "suit" | "sport" | "neon";
+export type FaceStyle = "neutral" | "cool" | "smile";
+
+export interface StreetSegment {
+  /** "h" runs along X at z=at; "v" runs along Z at x=at. */
+  o: "h" | "v";
+  at: number;
+  from: number;
+  to: number;
+  w: number;
+  curbA: string;
+  curbB: string;
+}
 
 export interface AvatarAppearance {
   bodyColor: string;
   accentColor: string;
+  skinColor: string;
   name: string;
+  /** Selected class from AAA character pods. */
+  classId?: "trader" | "builder" | "gamer" | "creator" | "explorer";
+  /** Sims-style cosmetics rendered by CharacterMesh. */
+  hairStyle: HairStyle;
+  hairColor: string;
+  outfit: OutfitStyle;
+  faceStyle: FaceStyle;
 }
+
+/** Pre-world gate screens for AAA menu flow. */
+export type CityGate = "menu" | "characters" | "lobbies" | "world";
+
 
 export interface InventoryItem {
   id: string;
@@ -137,4 +172,21 @@ export interface InventoryItem {
   label: string;
   detail?: string;
   mint?: string;
+}
+
+export interface TokenDetail {
+  mint: string;
+  name: string;
+  symbol: string;
+  icon?: string;
+  priceUsd?: number;
+  mcap?: number;
+  fdv?: number;
+  liquidity?: number;
+  volume24h?: number;
+  change24h?: number;
+  holderCount?: number;
+  decimals?: number;
+  website?: string;
+  twitter?: string;
 }
