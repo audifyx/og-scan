@@ -309,8 +309,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
     if (activeZone.buildingId) {
       const block = getWorldBlock(selectedCityId);
       const b = block.buildings.find((x) => x.id === activeZone.buildingId);
-      // Walk into mid/large buildings; tiny props just open the panel
-      if (b && b.size.width >= 6 && b.size.depth >= 6) {
+      // Walk into full-size venues and dedicated shops; tiny props open their
+      // panel without a separate interior.
+      if (b && ((b.size.width >= 6 && b.size.depth >= 6) || b.kind === "shop")) {
         enterBuilding(b.id);
         return;
       }

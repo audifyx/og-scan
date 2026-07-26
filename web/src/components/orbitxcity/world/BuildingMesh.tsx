@@ -5,6 +5,7 @@ import * as THREE from "three";
 import type { BuildingDefinition } from "@/lib/orbitxcity/types";
 import { hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
 import { createFacadeTexture } from "@/lib/orbitxcity/textures";
+import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const ROOF_MAT = new THREE.MeshStandardMaterial({ color: "#4a5158", metalness: 0.22, roughness: 0.78 });
 
@@ -93,6 +94,7 @@ function FacadeTier({
 }
 
 export function BuildingMesh({ building }: { building: BuildingDefinition }) {
+  const { enterBuilding } = useCity();
   const { position, size, accent, label, name } = building;
   const rand = useMemo(() => mulberry32(hashSeed(`bld-${building.id}`)), [building.id]);
   const tiers = useMemo(() => buildTiers(building, rand), [building, rand]);
@@ -144,9 +146,15 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         <boxGeometry args={[doorW + 0.35, 2.4, 0.16]} />
         <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
       </mesh>
-      <mesh position={[0, 1.05, size.depth / 2 + 0.1]}>
+      <mesh
+        position={[0, 1.05, size.depth / 2 + 0.1]}
+        onClick={(e) => {
+          e.stopPropagation();
+          enterBuilding(building.id);
+        }}
+      >
         <planeGeometry args={[doorW, 2.05]} />
-        <meshStandardMaterial color="#0c1014" metalness={0.15} roughness={0.45} />
+        <meshStandardMaterial color="#0c1014" emissive={accent} emissiveIntensity={0.08} metalness={0.15} roughness={0.45} />
       </mesh>
       <mesh position={[0, 2.35, size.depth / 2 + 0.28]} castShadow>
         <boxGeometry args={[doorW + 0.7, 0.12, 0.55]} />

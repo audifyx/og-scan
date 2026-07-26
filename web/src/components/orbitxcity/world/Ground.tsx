@@ -5,7 +5,44 @@ import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { getWorldSize, getWorldStreets } from "@/lib/orbitxcity/worlds";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
-import { mulberry32 } from "@/lib/orbitxcity/collision";
+import { collidesAt, mulberry32 } from "@/lib/orbitxcity/collision";
+
+function GrassTufts({ block, dense }: { block: WorldBlockConfig; dense: boolean }) {
+  const grass = useMemo(() => {
+    const rand = mulberry32(0x6a551 ^ block.cityId.length);
+    const count = dense ? 950 : 220;
+    const geo = new THREE.PlaneGeometry(0.075, 0.48);
+    const mat = new THREE.MeshStandardMaterial({
+      color: block.cityId === "miami" ? "#557d4f" : block.cityId === "la" ? "#718352" : "#4d6945",
+      roughness: 0.96,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.InstancedMesh(geo, mat, count);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const s = new THREE.Vector3();
+    let placed = 0;
+    for (let attempt = 0; placed < count && attempt < count * 16; attempt++) {
+      const x = block.bounds.minX + 2 + rand() * (block.bounds.maxX - block.bounds.minX - 4);
+      const z = block.bounds.minZ + 2 + rand() * (block.bounds.maxZ - block.bounds.minZ - 4);
+      if (collidesAt(x, z, 0.3, block)) continue;
+      const edgeBias = Math.max(Math.abs(x) / Math.max(Math.abs(block.bounds.minX), Math.abs(block.bounds.maxX)), Math.abs(z) / Math.max(Math.abs(block.bounds.minZ), Math.abs(block.bounds.maxZ)));
+      if (edgeBias < 0.46 && rand() > 0.16) continue;
+      const height = 0.55 + rand() * 0.85;
+      q.setFromEuler(new THREE.Euler(0, rand() * Math.PI, (rand() - 0.5) * 0.25));
+      s.set(0.65 + rand() * 0.9, height, 0.65 + rand() * 0.9);
+      m.compose(new THREE.Vector3(x, 0.19 * height, z), q, s);
+      mesh.setMatrixAt(placed++, m);
+    }
+    mesh.count = placed;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.castShadow = dense;
+    mesh.receiveShadow = true;
+    return mesh;
+  }, [block, dense]);
+  return <primitive object={grass} />;
+}
 
 function makeGrassTexture(): THREE.CanvasTexture {
   const c = document.createElement("canvas");
@@ -148,6 +185,7 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
           <meshStandardMaterial map={grassMap} color={i % 2 === 0 ? "#3d5c3a" : "#456846"} roughness={0.98} metalness={0} />
         </mesh>
       ))}
+      <GrassTufts block={block} dense={quality === "high"} />
 
       {streets.map((s, i) => {
         const len = s.to - s.from;

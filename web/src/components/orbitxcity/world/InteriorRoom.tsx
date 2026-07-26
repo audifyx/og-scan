@@ -1,10 +1,63 @@
 import { Text } from "@react-three/drei";
-import type { BuildingDefinition } from "@/lib/orbitxcity/types";
+import type { BuildingDefinition, HudPanel } from "@/lib/orbitxcity/types";
+import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 /**
  * Walk-in interiors — the exterior shell remains in the world while this
  * furnished, building-specific lobby is revealed inside it.
  */
+function InteriorTerminal({ building, height, depth }: { building: BuildingDefinition; height: number; depth: number }) {
+  const { openPanel, setVoiceOpen } = useCity();
+  const panelByKind: Record<string, HudPanel> = {
+    hq: "map",
+    marketplace: "marketplace",
+    launch: "launch",
+    trading: "trading",
+    community: "community",
+    billboard: "live",
+    voice: "voice",
+    games: "games",
+    nft: "nft",
+  };
+  const panel = building.interaction ? panelByKind[building.interaction] ?? "live" : "community";
+  const activate = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    if (building.interaction === "voice") setVoiceOpen(true);
+    openPanel(panel);
+  };
+
+  return (
+    <group position={[0, 0, -depth / 2 + 0.62]}>
+      <mesh position={[0, 0.5, 0]} castShadow onClick={activate}>
+        <boxGeometry args={[2.5, 1, 0.62]} />
+        <meshStandardMaterial color="#1a2229" metalness={0.55} roughness={0.35} />
+      </mesh>
+      <mesh position={[0, 1.08, -0.33]} rotation={[-0.16, 0, 0]} onClick={activate}>
+        <boxGeometry args={[1.82, 0.62, 0.05]} />
+        <meshStandardMaterial color="#091017" emissive={building.accent} emissiveIntensity={0.38} roughness={0.25} />
+      </mesh>
+      <mesh position={[-0.86, 0.95, -0.36]} onClick={activate}>
+        <sphereGeometry args={[0.07, 12, 12]} />
+        <meshStandardMaterial color={building.accent} emissive={building.accent} emissiveIntensity={0.6} />
+      </mesh>
+      <Text
+        position={[0, 1.52, -0.36]}
+        fontSize={0.2}
+        color="#e8f0f4"
+        anchorX="center"
+        outlineWidth={0.015}
+        outlineColor="#05080c"
+        onClick={activate}
+      >
+        TAP TERMINAL · {building.interaction?.toUpperCase() ?? "EXPLORE"}
+      </Text>
+      <Text position={[0, height - 0.9, 0]} fontSize={0.18} color={building.accent} anchorX="center">
+        {building.label ?? building.name}
+      </Text>
+    </group>
+  );
+}
+
 function InteriorFurniture({
   building,
   width,
@@ -18,6 +71,91 @@ function InteriorFurniture({
 }) {
   const accent = building.accent;
   const wallZ = -depth / 2 + 0.28;
+  const id = building.id.toLowerCase();
+
+  if (id.includes("club")) {
+    return (
+      <>
+        <mesh position={[0, 0.035, -0.2]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[Math.min(width - 1.4, 5.2), Math.min(depth - 3, 4.4)]} />
+          <meshStandardMaterial color="#17121c" emissive={accent} emissiveIntensity={0.14} metalness={0.35} roughness={0.45} />
+        </mesh>
+        {[-1.5, -0.5, 0.5, 1.5].map((x) => (
+          <mesh key={x} position={[x, 0.07, -0.2]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.04, Math.min(depth - 3.4, 3.6)]} />
+            <meshBasicMaterial color={accent} toneMapped={false} />
+          </mesh>
+        ))}
+        {[-width / 2 + 0.75, width / 2 - 0.75].map((x) => (
+          <mesh key={x} position={[x, 1.2, -depth / 2 + 0.42]}>
+            <boxGeometry args={[0.8, 2.2, 0.45]} />
+            <meshStandardMaterial color="#131822" emissive={accent} emissiveIntensity={0.18} metalness={0.5} roughness={0.38} />
+          </mesh>
+        ))}
+        <Text position={[0, height - 0.85, wallZ]} fontSize={0.34} color={accent} anchorX="center">PULSE · LIVE ROOM</Text>
+      </>
+    );
+  }
+
+  if (id.includes("casino") || id.includes("arcade")) {
+    return (
+      <>
+        {[-1.6, 0, 1.6].map((x) => (
+          <group key={x} position={[x, 0, -0.3]}>
+            <mesh position={[0, 0.55, 0]} castShadow>
+              <boxGeometry args={[0.78, 1.1, 0.68]} />
+              <meshStandardMaterial color="#20242a" metalness={0.45} roughness={0.42} />
+            </mesh>
+            <mesh position={[0, 0.78, -0.36]}>
+              <boxGeometry args={[0.54, 0.38, 0.04]} />
+              <meshStandardMaterial color="#0a1017" emissive={accent} emissiveIntensity={0.35} roughness={0.28} />
+            </mesh>
+          </group>
+        ))}
+        <Text position={[0, height - 0.85, wallZ]} fontSize={0.34} color={accent} anchorX="center">
+          {id.includes("casino") ? "ROYAL ORBIT · TABLES OPEN" : "NEON ARCADE · FREE PLAY"}
+        </Text>
+      </>
+    );
+  }
+
+  if (id.includes("cinema") || id.includes("theater")) {
+    return (
+      <>
+        <mesh position={[0, height * 0.56, -depth / 2 + 0.22]}>
+          <boxGeometry args={[Math.min(width - 1, 6.4), Math.min(height * 0.55, 2.2), 0.08]} />
+          <meshStandardMaterial color="#0c1119" emissive="#d8e4f0" emissiveIntensity={0.32} roughness={0.24} />
+        </mesh>
+        {[-1.35, 0, 1.35].map((x) => (
+          <mesh key={x} position={[x, 0.38, 0.45]} castShadow>
+            <boxGeometry args={[0.85, 0.7, 0.72]} />
+            <meshStandardMaterial color="#34283e" roughness={0.7} />
+          </mesh>
+        ))}
+        <Text position={[0, height - 0.85, wallZ]} fontSize={0.32} color={accent} anchorX="center">NOW SHOWING · ORBITX LIVE</Text>
+      </>
+    );
+  }
+
+  if (id.includes("coffee")) {
+    return (
+      <>
+        {[-0.95, 0.95].map((x) => (
+          <group key={x} position={[x, 0, -0.2]}>
+            <mesh position={[0, 0.46, 0]} castShadow>
+              <cylinderGeometry args={[0.48, 0.48, 0.08, 16]} />
+              <meshStandardMaterial color="#6d5340" roughness={0.72} />
+            </mesh>
+            <mesh position={[0, 0.23, 0]} castShadow>
+              <cylinderGeometry args={[0.05, 0.08, 0.44, 10]} />
+              <meshStandardMaterial color="#282b2e" metalness={0.7} roughness={0.35} />
+            </mesh>
+          </group>
+        ))}
+        <Text position={[0, height - 0.85, wallZ]} fontSize={0.32} color={accent} anchorX="center">ORBIT BREW · OPEN</Text>
+      </>
+    );
+  }
 
   switch (building.kind) {
     case "trading_floor":
@@ -134,7 +272,8 @@ export function InteriorRoom({
   const d = Math.max(4.5, building.size.depth - 1.2);
   const h = Math.min(4.2, Math.max(3.2, building.size.height * 0.35));
   const { x, z } = building.position;
-  const floorColor = building.kind === "launch_arena" ? "#39311c" : "#32373c";
+  const floorColor = building.kind === "launch_arena" ? "#39311c" : building.color;
+  const wallColor = building.color;
 
   return (
     <group position={[x, 0, z]}>
@@ -160,7 +299,7 @@ export function InteriorRoom({
       ].map((wall, i) => (
         <mesh key={i} position={wall.pos} castShadow receiveShadow>
           <boxGeometry args={wall.size} />
-          <meshStandardMaterial color="#414950" roughness={0.72} metalness={0.2} />
+          <meshStandardMaterial color={wallColor} roughness={0.72} metalness={0.2} />
         </mesh>
       ))}
       <mesh position={[0, h - 0.16, 0]}>
@@ -185,6 +324,7 @@ export function InteriorRoom({
         {building.name.toUpperCase()}
       </Text>
       <InteriorFurniture building={building} width={w} depth={d} height={h} />
+      <InteriorTerminal building={building} height={h} depth={d} />
       {/* Exit pad (south / street side) */}
       <mesh
         position={[0, 0.06, d / 2 - 0.9]}

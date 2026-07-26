@@ -16,6 +16,8 @@ import { MegaScreen } from "./MegaScreen";
 import { OxiGuide } from "./OxiGuide";
 import { Park } from "./Park";
 import { Traffic } from "./Traffic";
+import { SkyCycle } from "./SkyCycle";
+import { UrbanNature } from "./UrbanNature";
 
 function cityTheme(cityId: CityId) {
   // Soft overcast daylight — atmospheric haze instead of neon-night void.
@@ -121,25 +123,13 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       <color attach="background" args={[theme.background]} />
       <fog attach="fog" args={[theme.fog, high ? 55 : 40, high ? 195 : 130]} />
 
-      <ambientLight intensity={0.42} />
-      <hemisphereLight args={[theme.hemiSky, theme.hemiGround, 0.85]} />
-      <directionalLight
-        position={[32, 48, 18]}
-        intensity={1.15}
-        color={theme.sun}
-        castShadow={high}
-        shadow-mapSize-width={high ? 2048 : 512}
-        shadow-mapSize-height={high ? 2048 : 512}
-        shadow-camera-left={-70}
-        shadow-camera-right={70}
-        shadow-camera-top={70}
-        shadow-camera-bottom={-70}
-        shadow-bias={-0.0002}
-      />
+      <SkyCycle block={block} />
+      <ambientLight intensity={0.18} />
       {high && <directionalLight position={[-28, 22, -16]} intensity={0.28} color="#b8c4ce" />}
       <pointLight position={[block.spawn.x, 8, block.spawn.z]} intensity={0.22} color="#dfe6ea" distance={28} />
 
       <Ground block={block} />
+      <UrbanNature block={block} lite={!high} />
       {high && <Skyline block={block} />}
       <StreetProps block={block} />
       {high && <GraffitiLayer block={block} />}

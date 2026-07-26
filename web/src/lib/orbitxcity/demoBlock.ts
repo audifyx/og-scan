@@ -178,6 +178,7 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
     { id: "z-ai", kind: "community", label: "AI Center", hint: "Enter the AI lab", position: { x: -46, y: 0, z: 26 }, radius: 3.8, buildingId: "b-ai" },
     { id: "z-academy", kind: "community", label: "OrbitX Academy", hint: "Enter the academy hall", position: { x: -14, y: 0, z: -35 }, radius: 4, buildingId: "b-academy" },
     { id: "z-cinema", kind: "community", label: "Starlight Cinema", hint: "Enter the cinema lobby", position: { x: 0, y: 0, z: 51 }, radius: 4, buildingId: "b-cinema" },
+    { id: "z-coffee", kind: "marketplace", label: "Orbit Brew", hint: "Enter the neighborhood café", position: { x: 22, y: 0, z: 37 }, radius: 3.8, buildingId: "b-coffee" },
   ],
 };
 
