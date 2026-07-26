@@ -166,8 +166,8 @@ export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
     const cy = camYaw.current;
     const px = pos.current.x;
     const pz = pos.current.z;
-    let dist = 8.5;
-    for (; dist > 3; dist -= 0.5) {
+    let dist = 9.5;
+    for (; dist > 4.5; dist -= 0.5) {
       const cx = px + Math.sin(cy) * dist;
       const cz = pz + Math.cos(cy) * dist;
       if (!cameraBlocked(cx, cz)) break;
@@ -175,8 +175,10 @@ export function PlayerAvatar({ appearance, onMove }: PlayerAvatarProps) {
     const { bounds } = NYC_DEMO_BLOCK;
     const camX = clamp(px + Math.sin(cy) * dist, bounds.minX + 1, bounds.maxX - 1);
     const camZ = clamp(pz + Math.cos(cy) * dist, bounds.minZ + 1, bounds.maxZ - 1);
-    const desired = new THREE.Vector3(camX, 6.5, camZ);
-    const target = new THREE.Vector3(px, 1.4, pz);
+    // Higher, steeper vantage so the view looks down over the block and never
+    // grazes the ground plane / plaza from a low front angle.
+    const desired = new THREE.Vector3(camX, 9, camZ);
+    const target = new THREE.Vector3(px, 1.2, pz);
     camera.position.lerp(desired, 1 - Math.pow(0.001, t));
     camera.lookAt(target);
 

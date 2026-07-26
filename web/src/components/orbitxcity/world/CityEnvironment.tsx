@@ -41,10 +41,10 @@ export function CityEnvironment() {
         <BillboardMesh key={bb.id} board={bb} />
       ))}
 
-      {/* Central plaza hologram */}
+      {/* Central plaza hologram — subtle ring so it never dominates the view. */}
       <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[3.2, 48]} />
-        <meshStandardMaterial color="#0a1a14" emissive="#17ff4d" emissiveIntensity={0.2} metalness={0.5} roughness={0.4} />
+        <ringGeometry args={[1.9, 2.6, 48]} />
+        <meshStandardMaterial color="#0a1a14" emissive="#17ff4d" emissiveIntensity={0.25} metalness={0.5} roughness={0.4} />
       </mesh>
     </group>
   );
