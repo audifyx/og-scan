@@ -1,15 +1,19 @@
 import { useMemo } from "react";
 import { MeshReflectorMaterial } from "@react-three/drei";
 import * as THREE from "three";
-import { STREETS, WORLD_SIZE } from "@/lib/orbitxcity/demoBlock";
+import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { getWorldSize, getWorldStreets } from "@/lib/orbitxcity/worlds";
+import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 /** Street network + wet asphalt, all derived from the STREETS config. */
-export function Ground() {
+export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
   const { quality } = useCity();
+  const streets = getWorldStreets(block.cityId);
+  const worldSize = getWorldSize(block);
 
   const grid = useMemo(() => {
-    const g = new THREE.GridHelper(WORLD_SIZE, WORLD_SIZE / 2, "#17ff4d", "#0f2418");
+    const g = new THREE.GridHelper(worldSize, worldSize / 2, "#17ff4d", "#0f2418");
     g.position.y = 0.02;
     const mats = Array.isArray(g.material) ? g.material : [g.material];
     mats.forEach((m) => {
@@ -17,13 +21,13 @@ export function Ground() {
       m.opacity = 0.22;
     });
     return g;
-  }, []);
+  }, [worldSize]);
 
   return (
     <group>
       {/* Reflective wet asphalt (mirror pass costs a full scene render — skip on lite) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[WORLD_SIZE, WORLD_SIZE]} />
+        <planeGeometry args={[worldSize, worldSize]} />
         {quality === "high" ? (
           <MeshReflectorMaterial
             blur={[280, 90]}
@@ -44,7 +48,7 @@ export function Ground() {
       </mesh>
 
       {/* Streets, lane markers, and curb neon from config */}
-      {STREETS.map((s, i) => {
+      {streets.map((s, i) => {
         const len = s.to - s.from;
         const mid = (s.from + s.to) / 2;
         const horizontal = s.o === "h";

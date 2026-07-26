@@ -1995,3 +1995,310 @@ button.oxc-token-row {
     margin-bottom: 0.5rem;
   }
 }
+
+
+/* ══ lobby / settings / help (ported from multi-city sprint) ══ */
+.oxc-menu-section-head {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.95rem;
+}
+
+.oxc-menu-section-head h2 {
+  margin: 0;
+  font-family: var(--oxc-font-display);
+  font-size: clamp(1.45rem, 7vw, 2.45rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.oxc-menu-section-head p {
+  margin: 0;
+  color: var(--oxc-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.oxc-menu-wallet,
+.oxc-menu-pulse {
+
+.oxc-lobby-browser,
+.oxc-character,
+.oxc-settings-panel,
+.oxc-help-panel,
+.oxc-world-panel,
+.oxc-menu-home {
+  min-width: 0;
+}
+
+.oxc-lobby-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--oxc-gold) 42%, transparent);
+  background: color-mix(in srgb, var(--oxc-gold) 9%, transparent);
+  padding: 0.8rem;
+  margin-bottom: 0.75rem;
+}
+
+.oxc-lobby-current div {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.oxc-lobby-current span,
+.oxc-api-note {
+  color: var(--oxc-muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.oxc-lobby-current strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--oxc-gold);
+}
+
+.oxc-lobby-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.oxc-lobby-card,
+.oxc-help-card,
+.oxc-settings-row {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 0.85rem;
+}
+
+.oxc-lobby-card.private {
+  border-color: color-mix(in srgb, var(--oxc-cyan) 38%, transparent);
+}
+
+.oxc-lobby-list,
+.oxc-settings-list,
+.oxc-control-list,
+.oxc-character-controls {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.oxc-lobby-row {
+  width: 100%;
+  min-height: 4rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.oxc-lobby-row.on {
+  border-color: var(--oxc-lime);
+  background: color-mix(in srgb, var(--oxc-lime) 11%, transparent);
+}
+
+.oxc-lobby-row span {
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.oxc-lobby-row strong,
+.oxc-settings-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.oxc-lobby-row small {
+  color: var(--oxc-muted);
+  font-size: 0.62rem;
+}
+
+.oxc-lobby-row em {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--oxc-cyan);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.oxc-menu-field,
+
+.oxc-settings-row {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.oxc-settings-row.accent {
+  border-color: color-mix(in srgb, var(--oxc-gold) 40%, transparent);
+}
+
+.oxc-settings-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--oxc-text);
+  margin-bottom: 0.3rem;
+}
+
+.oxc-settings-title svg {
+  color: var(--oxc-lime);
+}
+
+.oxc-settings-row p,
+.oxc-help-card p,
+.oxc-menu-list {
+  margin: 0;
+  color: var(--oxc-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.oxc-switch {
+  justify-self: start;
+  min-width: 5.8rem;
+  min-height: 2.6rem;
+
+.oxc-lobby-chip,
+.oxc-exit-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.1rem;
+  border: 1px solid color-mix(in srgb, var(--oxc-cyan) 42%, transparent);
+  background: color-mix(in srgb, var(--oxc-cyan) 9%, transparent);
+  color: var(--oxc-cyan);
+  padding: 0.45rem 0.65rem;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.oxc-lobby-chip span {
+  max-width: 9.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oxc-exit-menu-btn {
+  border-color: color-mix(in srgb, var(--oxc-gold) 42%, transparent);
+
+.oxc-menu-cities {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  width: min(720px, 100%);
+}
+.oxc-menu-city {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 255, 159, 0.2);
+  background: rgba(8, 16, 12, 0.55);
+  color: var(--oxc-text);
+  cursor: pointer;
+  text-align: left;
+  backdrop-filter: blur(10px);
+}
+.oxc-menu-city.on {
+  border-color: var(--chip, var(--oxc-lime));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--chip, #00ff9f) 30%, transparent);
+}
+.oxc-menu-city.locked { opacity: 0.45; cursor: not-allowed; }
+.oxc-menu-city small {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--oxc-muted);
+}
+.oxc-lobbies-gate .oxc-lobbies-body {
+  position: relative;
+  z-index: 1;
+  overflow: auto;
+  padding: 0 0.25rem 1rem;
+  max-width: 920px;
+  margin: 0 auto;
+  width: 100%;
+}
+.oxc-menu-field {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.55rem 0;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--oxc-muted);
+}
+.oxc-menu-field input {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 255, 159, 0.22);
+  background: rgba(0,0,0,0.35);
+  color: var(--oxc-text);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.oxc-menu-wide { width: 100%; }
+.oxc-menu-list { margin: 0; padding-left: 1.1rem; color: var(--oxc-muted); font-size: 0.82rem; }
+.oxc-help-grid, .oxc-control-list { display: grid; gap: 0.55rem; }
+.oxc-help-card {
+  border: 1px solid rgba(0,255,159,0.18);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: rgba(8,16,12,0.55);
+}
+.oxc-control-row { display: flex; gap: 0.65rem; align-items: center; font-size: 0.8rem; color: var(--oxc-muted); }
+.oxc-control-row kbd {
+  min-width: 3.5rem;
+  text-align: center;
+  border: 1px solid rgba(0,255,159,0.3);
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+  color: var(--oxc-lime);
+  font-family: var(--oxc-font-mono);
+  font-size: 10px;
+}
+.oxc-menu-segmented {
+  display: inline-flex;
+  border: 1px solid rgba(0,255,159,0.25);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.oxc-menu-segmented button {
+  background: transparent;
+  border: none;
+  color: var(--oxc-muted);
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.oxc-menu-segmented button.on {
+  background: rgba(0,255,159,0.18);
+  color: var(--oxc-lime);
+}
+@media (max-width: 980px) {
+  .oxc-menu-cities { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

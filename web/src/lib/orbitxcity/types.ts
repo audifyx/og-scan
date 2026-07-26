@@ -127,7 +127,15 @@ export type HudPanel =
   | "voice"
   | "social"
   | "games"
-  | "nft";
+  | "nft"
+  | "settings"
+  | "help"
+  | "lobbies"
+  | "character";
+
+export type HairStyle = "short" | "long" | "buzz" | "bun" | "mohawk";
+export type OutfitStyle = "street" | "suit" | "sport" | "neon";
+export type FaceStyle = "neutral" | "cool" | "smile";
 
 export interface StreetSegment {
   /** "h" runs along X at z=at; "v" runs along Z at x=at. */
@@ -145,12 +153,17 @@ export interface AvatarAppearance {
   accentColor: string;
   skinColor: string;
   name: string;
-  /** Selected class from character pods (optional for legacy avatars). */
+  /** Selected class from AAA character pods. */
   classId?: "trader" | "builder" | "gamer" | "creator" | "explorer";
+  /** Sims-style cosmetics rendered by CharacterMesh. */
+  hairStyle: HairStyle;
+  hairColor: string;
+  outfit: OutfitStyle;
+  faceStyle: FaceStyle;
 }
 
 /** Pre-world gate screens for AAA menu flow. */
-export type CityGate = "menu" | "characters" | "world";
+export type CityGate = "menu" | "characters" | "lobbies" | "world";
 
 
 export interface InventoryItem {

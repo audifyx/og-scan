@@ -1,7 +1,6 @@
 /**
  * OrbitX City — Main Game Menu (AAA).
  * Full-bleed brand + glass tile grid over cosmic field.
- * Matches concept: glowing OrbitX CITY logo + 8 holographic actions.
  */
 import { useEffect, useState } from "react";
 import {
@@ -14,14 +13,18 @@ import {
   UserPlus,
   Settings,
   CalendarDays,
+  RadioTower,
   type LucideIcon,
 } from "lucide-react";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
+import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
+import type { CityId } from "@/lib/orbitxcity/types";
 import { CosmicBackdrop } from "./CosmicBackdrop";
 
 type MenuAction =
   | "play"
   | "characters"
+  | "lobbies"
   | "marketplace"
   | "inventory"
   | "missions"
@@ -41,6 +44,7 @@ interface MenuTile {
 const TILES: MenuTile[] = [
   { id: "play", label: "Play", icon: Play, primary: true },
   { id: "characters", label: "Characters", icon: Users },
+  { id: "lobbies", label: "Lobbies", icon: RadioTower },
   { id: "marketplace", label: "Marketplace", icon: Store },
   { id: "inventory", label: "Inventory", icon: Backpack },
   { id: "missions", label: "Missions", icon: Crosshair, soon: true },
@@ -51,7 +55,7 @@ const TILES: MenuTile[] = [
 ];
 
 export function MainMenu() {
-  const { setGate, setEntered, openPanel } = useCity();
+  const { setGate, setEntered, openPanel, selectedCityId, setSelectedCityId } = useCity();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -66,6 +70,9 @@ export function MainMenu() {
       case "characters":
         setGate("characters");
         break;
+      case "lobbies":
+        setGate("lobbies");
+        break;
       case "marketplace":
         setGate("world");
         setEntered(true);
@@ -79,7 +86,7 @@ export function MainMenu() {
       case "settings":
         setGate("world");
         setEntered(true);
-        openPanel("profile");
+        openPanel("settings");
         break;
       default:
         break;
@@ -99,6 +106,22 @@ export function MainMenu() {
         </div>
         <p className="oxc-menu-tag">Enter a persistent crypto-native city.</p>
       </header>
+
+      <div className="oxc-menu-cities" role="group" aria-label="City server">
+        {ORBITX_CITIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={`oxc-menu-city ${selectedCityId === c.id ? "on" : ""} ${c.unlocked ? "" : "locked"}`}
+            style={{ ["--chip" as string]: c.accent }}
+            disabled={!c.unlocked}
+            onClick={() => c.unlocked && setSelectedCityId(c.id as CityId)}
+          >
+            <span>{c.name}</span>
+            <small>{c.unlocked ? (selectedCityId === c.id ? "LIVE" : "READY") : "SOON"}</small>
+          </button>
+        ))}
+      </div>
 
       <nav className="oxc-menu-grid" aria-label="Main menu">
         {TILES.map((tile, i) => {
@@ -124,7 +147,14 @@ export function MainMenu() {
       </nav>
 
       <footer className="oxc-menu-foot">
-        <button type="button" className="oxc-menu-demo" onClick={() => { setGate("world"); setEntered(true); }}>
+        <button
+          type="button"
+          className="oxc-menu-demo"
+          onClick={() => {
+            setGate("world");
+            setEntered(true);
+          }}
+        >
           Explore demo
         </button>
         <span className="oxc-menu-meta">WASD · E interact · Shift sprint · Space jump</span>

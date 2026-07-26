@@ -69,7 +69,8 @@ export function CityHUD() {
     quality,
     setQuality,
     triggerEmote,
-    setGate,
+    exitToMenu,
+    lobby,
   } = useCity();
 
   useEffect(() => {
@@ -114,8 +115,16 @@ export function CityHUD() {
         <div className="oxc-top-actions">
           <button
             type="button"
+            className="oxc-lobby-chip"
+            onClick={() => openPanel("lobbies")}
+            title={lobby.label}
+          >
+            <span>{lobby.label}</span>
+          </button>
+          <button
+            type="button"
             className="oxc-toggle-btn"
-            onClick={() => setGate("menu")}
+            onClick={exitToMenu}
             title="Return to main menu"
           >
             Menu

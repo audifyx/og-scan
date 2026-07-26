@@ -11,23 +11,29 @@ import {
 import type {
   AvatarAppearance,
   CityGate,
+  CityId,
   HudPanel,
   InteractionKind,
   InteractionZone,
   InventoryItem,
   Vec3,
 } from "@/lib/orbitxcity/types";
-import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
-import { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
+import { getWorldBlock } from "@/lib/orbitxcity/worlds";
+import { CityRealtimeClient, MAIN_LOBBY, type LobbyDescriptor } from "@/lib/orbitxcity/realtime";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 interface CityContextValue {
-  /** AAA gate: main menu → character select → world */
+  /** AAA gate: menu → characters → lobbies → world */
   gate: CityGate;
   setGate: (g: CityGate) => void;
   entered: boolean;
   setEntered: (v: boolean) => void;
+  exitToMenu: () => void;
+  lobby: LobbyDescriptor;
+  setLobby: (lobby: LobbyDescriptor) => void;
+  selectedCityId: CityId;
+  setSelectedCityId: (cityId: CityId) => void;
   panel: HudPanel;
   openPanel: (p: HudPanel) => void;
   closePanel: () => void;
@@ -70,6 +76,10 @@ const DEFAULT_AVATAR: AvatarAppearance = {
   skinColor: "#e8d5c0",
   name: "Traveler",
   classId: "trader",
+  hairStyle: "short",
+  hairColor: "#151018",
+  outfit: "suit",
+  faceStyle: "cool",
 };
 
 const STARTER_INVENTORY: InventoryItem[] = [
@@ -123,9 +133,11 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const { publicKey } = useWallet();
   const [gate, setGateState] = useState<CityGate>("menu");
   const [entered, setEnteredState] = useState(false);
+  const [lobby, setLobby] = useState<LobbyDescriptor>(MAIN_LOBBY);
+  const [selectedCityId, setSelectedCityId] = useState<CityId>("nyc");
   const [panel, setPanel] = useState<HudPanel>("none");
   const [activeZone, setActiveZone] = useState<InteractionZone | null>(null);
-  const [playerPos, setPlayerPos] = useState<Vec3>(NYC_DEMO_BLOCK.spawn);
+  const [playerPos, setPlayerPos] = useState<Vec3>(getWorldBlock("nyc").spawn);
   const [playerYaw, setPlayerYaw] = useState(0);
   const [avatar, setAvatar] = useState<AvatarAppearance>(DEFAULT_AVATAR);
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
@@ -143,10 +155,30 @@ export function CityProvider({ children }: { children: ReactNode }) {
     if (g !== "world") setEnteredState(false);
   }, []);
 
-  const setEntered = useCallback((v: boolean) => {
-    setEnteredState(v);
-    if (v) setGateState("world");
-    else setGateState((prev) => (prev === "world" ? "menu" : prev));
+  const setEntered = useCallback(
+    (v: boolean) => {
+      if (v) {
+        const spawn = getWorldBlock(selectedCityId).spawn;
+        setPlayerPos(spawn);
+        setPlayerYaw(0);
+        setPanel("none");
+        setGateState("world");
+      }
+      setEnteredState(v);
+      if (!v) setGateState((prev) => (prev === "world" ? "menu" : prev));
+    },
+    [selectedCityId],
+  );
+
+  const exitToMenu = useCallback(() => {
+    setRealtime((prev) => {
+      prev?.disconnect();
+      return null;
+    });
+    setPanel("none");
+    setActiveZone(null);
+    setEnteredState(false);
+    setGateState("menu");
   }, []);
 
   const playerId = useMemo(
@@ -167,13 +199,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
     realtime?.sendEmote();
   }, [realtime]);
 
-  const openToken = useCallback(
-    (mint: string) => {
-      setSelectedMint(mint);
-      setPanel("token");
-    },
-    [],
-  );
+  const openToken = useCallback((mint: string) => {
+    setSelectedMint(mint);
+    setPanel("token");
+  }, []);
 
   const interact = useCallback(() => {
     if (!activeZone) return;
@@ -194,7 +223,6 @@ export function CityProvider({ children }: { children: ReactNode }) {
     return { label: activeZone.label, hint: activeZone.hint };
   }, [activeZone, panel]);
 
-  // Connect realtime when entering the world
   useEffect(() => {
     if (!entered) {
       setRealtime((prev) => {
@@ -210,8 +238,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
         accentColor: avatar.accentColor,
         bodyColor: avatar.bodyColor,
         skinColor: avatar.skinColor,
+        hairStyle: avatar.hairStyle,
+        hairColor: avatar.hairColor,
+        outfit: avatar.outfit,
+        faceStyle: avatar.faceStyle,
       },
-      "oxc-world-nyc",
+      lobby,
     );
     client.connect();
     setRealtime(client);
@@ -219,11 +251,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
       client.disconnect();
       setRealtime(null);
     };
-    // Reconnect only when identity/session changes — not every avatar keystroke
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entered, playerId]);
+  }, [entered, playerId, lobby.id]);
 
-  // Broadcast position at ~6Hz while in world
   const lastBroadcast = useRef(0);
   useEffect(() => {
     if (!realtime || !entered) return;
@@ -239,6 +269,11 @@ export function CityProvider({ children }: { children: ReactNode }) {
       setGate,
       entered,
       setEntered,
+      exitToMenu,
+      lobby,
+      setLobby,
+      selectedCityId,
+      setSelectedCityId,
       panel,
       openPanel,
       closePanel,
@@ -276,6 +311,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
       setGate,
       entered,
       setEntered,
+      exitToMenu,
+      lobby,
+      selectedCityId,
       panel,
       openPanel,
       closePanel,

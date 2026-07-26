@@ -23,6 +23,16 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 - For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
 <!-- VERCEL BEST PRACTICES END -->
 
+## Cursor Cloud specific instructions
+
+- Primary dev app is `web/` (Vite + React SPA). All commands below run from `web/`.
+- Package manager is **pnpm** (matches `web/vercel.json` `installCommand`). `npm install` fails on peer-dependency conflicts (`react-native`/`expo` transitive deps pulled by `@react-three/fiber`). Use `pnpm install --no-frozen-lockfile`. pnpm intentionally skips native build scripts (esbuild, swc, etc.) — that is fine; those ship prebuilt binaries and the dev server/build still work.
+- Run dev server: `npm run dev` → Vite on `http://localhost:8080`. `/` serves the marketing Splash (`index.html`); the React SPA is served for app routes. Good no-backend smoke test: `/Orbitxcity` (fully client-side playable 3D demo).
+- `/api/*` are Vercel serverless functions (in `web/api/` and repo-root `api/`) and are NOT served by `vite dev`; features that call them 404 locally. The app boots fine without env vars — missing `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` etc. just disable auth/data features (secrets live in Vercel env, not git).
+- Lint: `npm run lint`. There are pre-existing warnings/errors that predate environment work.
+- Tests: `npm test` (vitest). Build: `npm run build` (multi-page: `index.html` + `app.html`).
+- `web/ogdex/` is a separate static sub-app built only for the `/ORBITX_DEX` route during the Vercel build; it is not needed for local `web` dev.
+
 <!-- ORBITX PLATFORM + QA SWARM -->
 ## OrbitX platform (agents must load this)
 
