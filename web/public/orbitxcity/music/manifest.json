@@ -1,0 +1,112 @@
+﻿[
+    {
+        "id":  "boss-battle-overture",
+        "title":  "Boss Battle Overture",
+        "file":  "boss-battle-overture.mp3"
+    },
+    {
+        "id":  "boss-battle-overture-alt",
+        "title":  "Boss Battle Overture (Alt)",
+        "file":  "boss-battle-overture-alt.mp3"
+    },
+    {
+        "id":  "boss-door-countdown",
+        "title":  "Boss Door Countdown",
+        "file":  "boss-door-countdown.mp3"
+    },
+    {
+        "id":  "boss-door-countdown-alt",
+        "title":  "Boss Door Countdown (Alt)",
+        "file":  "boss-door-countdown-alt.mp3"
+    },
+    {
+        "id":  "boss-door-riot",
+        "title":  "Boss Door Riot",
+        "file":  "boss-door-riot.mp3"
+    },
+    {
+        "id":  "boss-door-riot-alt",
+        "title":  "Boss Door Riot (Alt)",
+        "file":  "boss-door-riot-alt.mp3"
+    },
+    {
+        "id":  "boss-fight-meme",
+        "title":  "Boss Fight Meme",
+        "file":  "boss-fight-meme.mp3"
+    },
+    {
+        "id":  "boss-fight-meme-alt",
+        "title":  "Boss Fight Meme (Alt)",
+        "file":  "boss-fight-meme-alt.mp3"
+    },
+    {
+        "id":  "boss-gate-requiem",
+        "title":  "Boss Gate Requiem",
+        "file":  "boss-gate-requiem.mp3"
+    },
+    {
+        "id":  "boss-gate-requiem-alt",
+        "title":  "Boss Gate Requiem (Alt)",
+        "file":  "boss-gate-requiem-alt.mp3"
+    },
+    {
+        "id":  "boss-meme-circuit",
+        "title":  "Boss Meme Circuit",
+        "file":  "boss-meme-circuit.mp3"
+    },
+    {
+        "id":  "boss-meme-circuit-alt",
+        "title":  "Boss Meme Circuit (Alt)",
+        "file":  "boss-meme-circuit-alt.mp3"
+    },
+    {
+        "id":  "boss-menu-mayhem",
+        "title":  "Boss Menu Mayhem",
+        "file":  "boss-menu-mayhem.mp3"
+    },
+    {
+        "id":  "boss-menu-mayhem-alt",
+        "title":  "Boss Menu Mayhem (Alt)",
+        "file":  "boss-menu-mayhem-alt.mp3"
+    },
+    {
+        "id":  "grime-boss-bounce",
+        "title":  "Grime Boss Bounce",
+        "file":  "grime-boss-bounce.mp3"
+    },
+    {
+        "id":  "grime-boss-bounce-alt",
+        "title":  "Grime Boss Bounce (Alt)",
+        "file":  "grime-boss-bounce-alt.mp3"
+    },
+    {
+        "id":  "night-menu-ritual",
+        "title":  "Night Menu Ritual",
+        "file":  "night-menu-ritual.mp3"
+    },
+    {
+        "id":  "night-menu-ritual-alt",
+        "title":  "Night Menu Ritual (Alt)",
+        "file":  "night-menu-ritual-alt.mp3"
+    },
+    {
+        "id":  "quest-actions",
+        "title":  "Quest Actions",
+        "file":  "quest-actions.mp3"
+    },
+    {
+        "id":  "quest-actions-alt",
+        "title":  "Quest Actions (Alt)",
+        "file":  "quest-actions-alt.mp3"
+    },
+    {
+        "id":  "quest-world-fx",
+        "title":  "Quest World FX",
+        "file":  "quest-world-fx.mp3"
+    },
+    {
+        "id":  "quest-world-fx-alt",
+        "title":  "Quest World FX (Alt)",
+        "file":  "quest-world-fx-alt.mp3"
+    }
+]

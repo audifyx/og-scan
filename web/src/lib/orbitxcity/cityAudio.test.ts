@@ -12,10 +12,13 @@ describe("cityAudio", () => {
     expect(s.sfxVol).toBeCloseTo(0.7);
   });
 
-  it("toggles music without throwing in node", () => {
-    const before = cityAudio.getState().musicOn;
-    cityAudio.setMusicOn(!before);
-    expect(cityAudio.getState().musicOn).toBe(!before);
-    cityAudio.setMusicOn(before);
+  it("exposes uploaded theme playlist", () => {
+    const s = cityAudio.getState();
+    expect(s.tracks.length).toBeGreaterThan(5);
+    expect(s.trackId).toBeTruthy();
+    expect(s.trackTitle).toBeTruthy();
+    cityAudio.setTrack(s.tracks[1]!.id);
+    expect(cityAudio.getState().trackId).toBe(s.tracks[1]!.id);
+    cityAudio.setTrack(s.tracks[0]!.id);
   });
 });

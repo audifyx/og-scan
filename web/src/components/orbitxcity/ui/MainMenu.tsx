@@ -130,6 +130,17 @@ export function MainMenu() {
           >
             ▶ Play theme
           </button>
+          <button
+            type="button"
+            className="oxc-btn ghost compact"
+            onClick={() => {
+              void cityAudio.unlock();
+              cityAudio.nextTrack();
+            }}
+            title="Next theme track"
+          >
+            Next song
+          </button>
         </div>
       </header>
 

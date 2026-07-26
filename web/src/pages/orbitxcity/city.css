@@ -2628,3 +2628,32 @@ button.oxc-token-row {
   accent-color: var(--oxc-lime, #00ff9f);
 }
 
+.oxc-track-select {
+  width: 100%;
+  min-height: 2.5rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 255, 159, 0.25);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--oxc-text);
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.oxc-track-now {
+  margin: 0.15rem 0 0 !important;
+  color: var(--oxc-lime) !important;
+  font-weight: 700;
+  font-size: 0.82rem !important;
+}
+
+.oxc-track-nav {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.oxc-settings-row-stack {
+  display: grid;
+  gap: 0.55rem;
+}
+
