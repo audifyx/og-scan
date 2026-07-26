@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
-import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { getWorldBlock } from "@/lib/orbitxcity/worlds";
 import { fetchCityMarketSnapshot, fmtPct } from "@/lib/orbitxcity/marketData";
 import { emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
@@ -143,9 +143,11 @@ export function CityHUD() {
     triggerEmote,
     exitToMenu,
     lobby,
+    selectedCityId,
   } = useCity();
   const isPhone = useIsPhone();
   const [moreOpen, setMoreOpen] = useState(false);
+  const locationName = getWorldBlock(selectedCityId).name;
 
   const dockItems = useMemo(
     () => (isPhone ? MOBILE_DOCK : PANEL_NAV),
@@ -200,7 +202,7 @@ export function CityHUD() {
             OrbitX<span>City</span>
           </Link>
           <div className="oxc-loc">
-            <strong>{NYC_DEMO_BLOCK.name}</strong>
+            <strong>{locationName}</strong>
             <span className="oxc-loc-detail">
               {playerPos.x.toFixed(0)}, {playerPos.z.toFixed(0)} · @{avatar.name}
             </span>

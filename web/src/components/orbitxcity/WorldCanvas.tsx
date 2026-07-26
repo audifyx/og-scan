@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { useContextBridge } from "@react-three/drei";
+import * as THREE from "three";
 import type { Vec3 } from "@/lib/orbitxcity/types";
 import type { ScreenerRow } from "@/lib/orbitxcity/marketData";
 import { getWorldBlock } from "@/lib/orbitxcity/worlds";
@@ -68,7 +69,7 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
         activeZoneId={activeZone?.id ?? null}
         onNearest={setActiveZone}
       />
-      <CoinField playerPos={playerPos} onCollect={collectShard} lite={quality === "lite"} />
+      <CoinField playerPos={playerPos} onCollect={collectShard} lite={quality === "lite"} block={block} />
       {quality === "high" && <FXPipeline />}
     </>
   );
@@ -88,6 +89,8 @@ export function WorldCanvas({ tickerRows }: { tickerRows: ScreenerRow[] }) {
         gl={{
           antialias: high,
           powerPreference: high ? "high-performance" : "low-power",
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: high ? 1.08 : 1,
           // Avoid stencil/depth thrash on mobile GPUs
           stencil: false,
         }}

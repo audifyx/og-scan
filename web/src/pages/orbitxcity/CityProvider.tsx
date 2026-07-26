@@ -165,6 +165,17 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [interiorBuildingId, setInteriorBuildingId] = useState<string | null>(null);
   const inventory = STARTER_INVENTORY;
 
+  // The public lobby follows the selected district. Custom/private lobbies
+  // remain untouched so friends can keep their room while changing views.
+  useEffect(() => {
+    setLobby((current) => {
+      if (!current.id.startsWith("oxc-world-")) return current;
+      const id = `oxc-world-${selectedCityId}`;
+      if (current.id === id) return current;
+      return { id, label: `Main Lobby · ${selectedCityId.toUpperCase()}`, isPrivate: false };
+    });
+  }, [selectedCityId]);
+
   const setGate = useCallback((g: CityGate) => {
     setGateState(g);
     if (g !== "world") setEnteredState(false);

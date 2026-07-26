@@ -76,11 +76,97 @@ function ZoneMarker({ x, z }: { x: number; z: number }) {
   );
 }
 
-/** Street furniture: instanced lamps + quiet zone markers. */
+function Crosswalks({ block }: { block: WorldBlockConfig }) {
+  const streets = getWorldStreets(block.cityId);
+  const crossings = useMemo(() => {
+    const horizontal = streets.filter((s) => s.o === "h");
+    const vertical = streets.filter((s) => s.o === "v");
+    return horizontal.flatMap((h) =>
+      vertical
+        .filter((v) => v.at >= h.from && v.at <= h.to && h.at >= v.from && h.at <= v.to)
+        .map((v) => ({ x: v.at, z: h.at, hw: h.w, vw: v.w })),
+    );
+  }, [streets]);
+
+  return (
+    <group>
+      {crossings.map((crossing, i) => (
+        <group key={`${crossing.x}-${crossing.z}`}>
+          {[-1, 1].flatMap((direction) =>
+            [-1.2, -0.4, 0.4, 1.2].map((offset) => (
+              <mesh
+                key={`${direction}-${offset}`}
+                rotation={[-Math.PI / 2, 0, 0]}
+                position={[
+                  direction * (crossing.vw / 2 - 0.5),
+                  0.072 + i * 0.001,
+                  crossing.z + offset,
+                ]}
+              >
+                <planeGeometry args={[0.42, 0.48]} />
+                <meshStandardMaterial color="#d8d0b8" transparent opacity={0.42} roughness={0.92} />
+              </mesh>
+            )),
+          )}
+          {[-1, 1].flatMap((direction) =>
+            [-1.2, -0.4, 0.4, 1.2].map((offset) => (
+              <mesh
+                key={`h-${direction}-${offset}`}
+                rotation={[-Math.PI / 2, 0, 0]}
+                position={[
+                  crossing.x + offset,
+                  0.073 + i * 0.001,
+                  direction * (crossing.hw / 2 - 0.5) + crossing.z,
+                ]}
+              >
+                <planeGeometry args={[0.48, 0.42]} />
+                <meshStandardMaterial color="#d8d0b8" transparent opacity={0.42} roughness={0.92} />
+              </mesh>
+            )),
+          )}
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function StreetFurniture({ block }: { block: WorldBlockConfig }) {
+  return (
+    <group>
+      {block.zones.slice(0, 10).map((zone, i) => {
+        const x = zone.position.x + (i % 2 === 0 ? 2.1 : -2.1);
+        const z = zone.position.z + (i % 3 === 0 ? 1.2 : -1.2);
+        if (collidesAt(x, z, 0.5, block)) return null;
+        return (
+          <group key={`street-furniture-${zone.id}`} position={[x, 0, z]} rotation-y={(i % 4) * (Math.PI / 2)}>
+            <mesh position={[0, 0.42, 0]} castShadow receiveShadow>
+              <boxGeometry args={[1.65, 0.1, 0.48]} />
+              <meshStandardMaterial color="#5a5145" metalness={0.12} roughness={0.78} />
+            </mesh>
+            <mesh position={[0, 0.76, -0.18]} castShadow>
+              <boxGeometry args={[1.65, 0.55, 0.09]} />
+              <meshStandardMaterial color="#4a433a" metalness={0.1} roughness={0.8} />
+            </mesh>
+            {[-0.65, 0.65].map((leg) => (
+              <mesh key={leg} position={[leg, 0.2, 0]} castShadow>
+                <boxGeometry args={[0.08, 0.42, 0.42]} />
+                <meshStandardMaterial color="#272d32" metalness={0.65} roughness={0.42} />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/** Street furniture: lamps, crossings, benches, and quiet zone markers. */
 export function StreetProps({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
   return (
     <group>
       <LampField block={block} />
+      <Crosswalks block={block} />
+      <StreetFurniture block={block} />
       {block.zones.slice(0, 6).map((zone) => (
         <ZoneMarker key={zone.id} x={zone.position.x} z={zone.position.z} />
       ))}
