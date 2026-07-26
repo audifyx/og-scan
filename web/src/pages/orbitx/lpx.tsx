@@ -205,10 +205,10 @@ export function Panel({
 }) {
   return (
     <section
-      className={`lpx-panel ${tone === "gold" ? "lpx-panel--gold" : ""} ${hot ? "lpx-panel--hot" : ""} ${className}`}
+      className={`ox-panel pf-card ${tone === "gold" ? "ox-panel--gold" : ""} ${hot ? "ox-panel--accent" : ""} ${className}`}
     >
       {title != null && (
-        <header className={`lpx-panel-title ${tone === "gold" ? "!text-[hsl(var(--og-gold))]" : ""}`}>
+        <header className={`ox-panel-title ${tone === "gold" ? "ox-panel-title--gold" : ""}`}>
           {icon}
           <span className="flex-1">{title}</span>
           {right}

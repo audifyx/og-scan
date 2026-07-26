@@ -7,8 +7,9 @@
  *     creator vault, plus a DexScreener-priced estimate of token dust that
  *     One CLAIM ALL sweeps the lot.
  *   • Rent Refund — closes empty token accounts, rent comes back as SOL/USDC.
- *   • Burn — burns held tokens, then shows a full burn report (amount, % of
- *     supply, supply before/after, tx) and logs the verified burn event.
+ *   • Burn — burns held tokens; when the account is emptied, closes it so
+ *     rent SOL returns to the wallet. Shows a full burn report and logs the
+ *     verified burn event.
  */
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -26,13 +27,14 @@ import {
 import {
   scanEmptyTokenAccounts, totalReclaimableSol, buildCloseAccountsTransactions,
   buildSolToUsdcSwapTransaction, scanBurnableTokens, resolvePercentBurnAmount,
-  parseManualBurnAmount, buildBurnTransaction, fetchBurnTokenMeta,
+  parseManualBurnAmount, buildBurnTransaction, burnReclaimsRent, fetchBurnTokenMeta,
   scanNativeSolAccounts, buildUnwrapTransactions, estimateHoldingsUsd,
   type EmptyTokenAccount, type BurnableToken, type NativeSolAccount, type BurnTokenMeta,
 } from "@/lib/orbitx/rescue";
 import { getPumpClaimableSol, buildPumpClaimTransaction } from "@/lib/orbitx/claim";
 import { supabase } from "@/lib/supabase";
 import { Panel, useSolUsd } from "./lpx";
+import { TabHero } from "./TabHero";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const BURN_PRESETS = [10, 25, 35, 50, 75, 100];
@@ -134,9 +136,9 @@ function RadarScan({ label }: { label: string }) {
           <span key={i} className="blip" style={{ left: b.left, top: b.top, animationDelay: b.delay }} />
         ))}
       </div>
-      <div className="lpx-term">
+      <div className="ox-term">
         {label}
-        <span className="lpx-caret" />
+        <span className="ox-caret" />
       </div>
     </div>
   );
@@ -164,17 +166,17 @@ function ClaimCelebrationDialog({
   );
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="lp-v3 lpx-pop max-w-md overflow-hidden border-[hsl(var(--og-lime))]/35 bg-[#03130a] p-0 shadow-[0_0_80px_-20px_hsl(132_100%_54%/0.5)]">
+      <DialogContent className="ox-dialog ox-dialog--success max-w-md overflow-hidden p-0">
         <ConfettiBurst />
         <div className="relative p-6 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-[hsl(var(--og-lime))]/45 bg-[hsl(var(--og-lime))]/10">
-            <PartyPopper className="h-7 w-7 text-[hsl(var(--og-lime))]" />
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-[rgba(212,175,55,0.45)] bg-[rgba(212,175,55,0.1)]">
+            <PartyPopper className="h-7 w-7 text-[#F0C75E]" />
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">{data.title}</div>
-          <div className="lpx-count mt-2 font-display text-5xl font-black text-[hsl(var(--og-lime))]">
+          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#A8B0BC]">{data.title}</div>
+          <div className="ox-stat-num mt-2 font-display text-5xl font-black text-[#F0C75E]">
             {counted}
           </div>
-          <div className="mt-1 font-mono text-sm font-bold text-[hsl(var(--og-lime))]">
+          <div className="mt-1 font-mono text-sm font-bold text-[#60A5FA]">
             SOL RECLAIMED{data.swappedToUsdc ? " → swapped to USDC" : ""}
           </div>
           {usd != null && (
@@ -183,9 +185,9 @@ function ClaimCelebrationDialog({
 
           <div className="mt-5 space-y-1.5 rounded-xl border border-white/10 bg-black/40 p-3 text-left">
             {data.breakdown.map((b, i) => (
-              <div key={i} className="lpx-row-in flex items-center justify-between font-mono text-[11px]" style={{ animationDelay: `${0.15 * i + 0.4}s` }}>
+              <div key={i} className="ox-row-in flex items-center justify-between font-mono text-[11px]" style={{ animationDelay: `${0.15 * i + 0.4}s` }}>
                 <span className="text-muted-foreground">{b.label}</span>
-                <span className="font-bold text-[hsl(var(--og-lime))]">{b.value}</span>
+                <span className="font-bold text-[#60A5FA]">{b.value}</span>
               </div>
             ))}
             {data.walletDeltaSol != null && (
@@ -212,11 +214,11 @@ function ClaimCelebrationDialog({
             <a
               href={`https://x.com/intent/tweet?text=${tweet}`}
               target="_blank" rel="noopener noreferrer"
-              className="lpx-btn lpx-btn--gold"
+              className="ox-btn ox-btn--gold"
             >
               <Share2 className="h-3.5 w-3.5" /> Share the win
             </a>
-            <button type="button" className="lpx-btn" onClick={onClose}>
+            <button type="button" className="ox-btn" onClick={onClose}>
               <CheckCircle2 className="h-3.5 w-3.5" /> Done
             </button>
           </div>
@@ -234,6 +236,8 @@ interface BurnCelebration {
   supplyBefore: number;
   supplyAfter: number;
   sig: string;
+  /** Rent SOL returned when the emptied ATA was closed in the same tx. */
+  rentReclaimedSol: number | null;
 }
 
 function BurnResultDialog({ data, onClose }: { data: BurnCelebration | null; onClose: () => void }) {
@@ -243,11 +247,13 @@ function BurnResultDialog({ data, onClose }: { data: BurnCelebration | null; onC
   const keptPct = Math.max(0, Math.min(100, (data.supplyAfter / (data.supplyBefore || 1)) * 100));
   const nf = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
   const tweet = encodeURIComponent(
-    `🔥 Just burned ${nf(data.amountUi)} $${data.meta.symbol} — ${data.pctOfSupply.toFixed(3)}% of total supply, gone forever. Verified on-chain via OrbitX Rescue. solscan.io/tx/${data.sig}`,
+    data.rentReclaimedSol != null && data.rentReclaimedSol > 0
+      ? `🔥 Just burned ${nf(data.amountUi)} $${data.meta.symbol} and reclaimed ${data.rentReclaimedSol.toFixed(4)} SOL rent via OrbitX Rescue. solscan.io/tx/${data.sig}`
+      : `🔥 Just burned ${nf(data.amountUi)} $${data.meta.symbol} — ${data.pctOfSupply.toFixed(3)}% of total supply, gone forever. Verified on-chain via OrbitX Rescue. solscan.io/tx/${data.sig}`,
   );
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="lp-v3 lpx-pop max-w-md overflow-hidden border-[hsl(var(--og-blood))]/40 bg-[#160603] p-0 shadow-[0_0_80px_-20px_hsl(8_92%_50%/0.55)]">
+      <DialogContent className="ox-dialog max-w-md overflow-hidden ox-dialog--danger p-0 shadow-[0_0_80px_-20px_hsl(8_92%_50%/0.55)]">
         <Embers />
         <div className="relative p-6 text-center">
           <div className="lpx-flame-ring mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-[hsl(var(--og-blood))]/50 bg-[hsl(var(--og-blood))]/10">
@@ -256,7 +262,7 @@ function BurnResultDialog({ data, onClose }: { data: BurnCelebration | null; onC
               : <Flame className="h-8 w-8 text-orange-400" />}
           </div>
           <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Burn confirmed on-chain</div>
-          <div className="lpx-count lpx-count--fire mt-2 font-display text-4xl font-black text-orange-400">
+          <div className="ox-stat-num ox-stat-num--fire mt-2 font-display text-4xl font-black text-orange-400">
             {Number(counted).toLocaleString(undefined, { maximumFractionDigits: 4 })}
           </div>
           <div className="mt-1 font-mono text-sm font-bold text-orange-300">
@@ -277,18 +283,24 @@ function BurnResultDialog({ data, onClose }: { data: BurnCelebration | null; onC
               <div className="burnt" style={{ width: `${100 - keptPct}%` }} />
             </div>
             <div className="mt-2 space-y-1.5 font-mono text-[11px]">
-              <div className="lpx-row-in flex items-center justify-between" style={{ animationDelay: "0.4s" }}>
+              <div className="ox-row-in flex items-center justify-between" style={{ animationDelay: "0.4s" }}>
                 <span className="text-muted-foreground">supply before</span>
                 <span className="font-bold text-foreground">{nf(data.supplyBefore)}</span>
               </div>
-              <div className="lpx-row-in flex items-center justify-between" style={{ animationDelay: "0.55s" }}>
+              <div className="ox-row-in flex items-center justify-between" style={{ animationDelay: "0.55s" }}>
                 <span className="text-muted-foreground">supply after</span>
                 <span className="font-bold text-[hsl(var(--og-lime))]">{nf(data.supplyAfter)}</span>
               </div>
-              <div className="lpx-row-in flex items-center justify-between" style={{ animationDelay: "0.7s" }}>
+              <div className="ox-row-in flex items-center justify-between" style={{ animationDelay: "0.7s" }}>
                 <span className="text-muted-foreground">token</span>
                 <span className="font-bold text-foreground">{data.meta.name} · {short(data.mint)}</span>
               </div>
+              {data.rentReclaimedSol != null && data.rentReclaimedSol > 0 && (
+                <div className="ox-row-in flex items-center justify-between" style={{ animationDelay: "0.85s" }}>
+                  <span className="text-muted-foreground">rent SOL back to wallet</span>
+                  <span className="font-bold text-[hsl(var(--og-lime))]">+{data.rentReclaimedSol.toFixed(6)} SOL</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -300,10 +312,10 @@ function BurnResultDialog({ data, onClose }: { data: BurnCelebration | null; onC
           </div>
 
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <a href={`https://x.com/intent/tweet?text=${tweet}`} target="_blank" rel="noopener noreferrer" className="lpx-btn lpx-btn--gold">
+            <a href={`https://x.com/intent/tweet?text=${tweet}`} target="_blank" rel="noopener noreferrer" className="ox-btn ox-btn--gold">
               <Share2 className="h-3.5 w-3.5" /> Share the burn
             </a>
-            <button type="button" className="lpx-btn" onClick={onClose}>
+            <button type="button" className="ox-btn" onClick={onClose}>
               <X className="h-3.5 w-3.5" /> Close
             </button>
           </div>
@@ -594,7 +606,7 @@ export default function LaunchpadRescue() {
     }
     setBurning(true);
     try {
-      const tx = buildBurnTransaction(publicKey, selectedToken, burnAmountRaw);
+      const { tx, rentLamports } = await buildBurnTransaction(connection, publicKey, selectedToken, burnAmountRaw);
       tx.feePayer = publicKey;
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
@@ -607,6 +619,7 @@ export default function LaunchpadRescue() {
       const supplyAfter = Number(selectedToken.supplyRaw - burnAmountRaw) / divisor;
       const percentOfSupply = (Number(burnAmountRaw) / Number(selectedToken.supplyRaw)) * 100;
       const amountUi = Number(burnAmountRaw) / divisor;
+      const rentReclaimedSol = rentLamports != null ? rentLamports / 1e9 : null;
 
       // Metadata for the report card (best-effort, fast).
       const meta = await fetchBurnTokenMeta(selectedToken.mint);
@@ -618,7 +631,12 @@ export default function LaunchpadRescue() {
         supplyBefore,
         supplyAfter,
         sig,
+        rentReclaimedSol,
       });
+
+      if (rentReclaimedSol != null && rentReclaimedSol > 0) {
+        toast.success(`Burned · +${rentReclaimedSol.toFixed(6)} SOL rent back to wallet`);
+      }
 
       // Fire-and-forget: log the verified burn for the global feed.
       (async () => {
@@ -643,6 +661,8 @@ export default function LaunchpadRescue() {
       setManualAmount("");
       setPercent(null);
       scanBurn();
+      scanRent();
+      omniScan();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("User rejected")) toast.error("Transaction cancelled");
@@ -661,34 +681,28 @@ export default function LaunchpadRescue() {
       <ClaimCelebrationDialog data={claimCelebration} solUsd={solUsd.data?.price ?? null} onClose={() => setClaimCelebration(null)} />
       <BurnResultDialog data={burnCelebration} onClose={() => setBurnCelebration(null)} />
 
-      {/* Hero */}
-      <Panel hot bodyClassName="p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-[hsl(var(--og-lime))]">
-              <Radar className="h-3.5 w-3.5" /> Rescue console
-            </div>
-            <h1 className="font-display text-2xl font-black tracking-tight sm:text-3xl">
-              Every claimable lamport. <span className="lpx-glow text-[hsl(var(--og-lime))]">Found and swept.</span>
-            </h1>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              Scans this wallet for rent locked in empty accounts, wrapped SOL, unclaimed pump.fun creator fees and convertible dust — then claims it all, non-custodially.
-            </p>
-          </div>
-          {!connected ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect via the wallet button up top</span>
+      <TabHero
+        icon={Radar}
+        accent="gold"
+        eyebrow="Rescue · reclaim SOL"
+        title="Every claimable lamport. Found and swept."
+        subtitle="Rent locked in empty accounts, wrapped SOL, pump creator fees, and dust — scanned and claimed non-custodially."
+        actions={
+          !connected ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect up top</span>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1.5 rounded-lg border border-[hsl(var(--og-lime))]/35 bg-black/40 px-3 py-1.5 font-mono text-[11px] font-bold text-[hsl(var(--og-lime))]">
-                <span className="lpx-led" /> {publicKey ? short(publicKey.toBase58()) : ""}
+              <span className="ox-wallet-chip">
+                <span className="ox-led" />
+                <span className="pf-mono text-[11px] font-bold text-white">{publicKey ? short(publicKey.toBase58()) : ""}</span>
               </span>
-              <button type="button" className="lpx-btn !px-2.5" onClick={() => { omniScan(); scanRent(); scanBurn(); }} title="Rescan">
+              <button type="button" className="ox-btn !px-2.5" onClick={() => { omniScan(); scanRent(); scanBurn(); }} title="Rescan">
                 <RefreshCw className="h-3.5 w-3.5" />
               </button>
             </div>
-          )}
-        </div>
-      </Panel>
+          )
+        }
+      />
 
       {connected && (
         <Tabs value={tab} onValueChange={setTab} className="w-full">
@@ -710,9 +724,9 @@ export default function LaunchpadRescue() {
               ) : omni ? (
                 <div className="space-y-4">
                   {/* headline total */}
-                  <div className="flex flex-col items-center gap-1 rounded-xl border border-[hsl(var(--og-lime))]/25 bg-[hsl(var(--og-lime))]/[0.05] py-5 text-center">
-                    <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Claimable right now</div>
-                    <div className="lpx-count font-display text-4xl font-black text-[hsl(var(--og-lime))]">
+                  <div className="ox-highlight-box">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#A8B0BC]">Claimable right now</div>
+                    <div className="ox-stat-num font-display text-4xl font-black text-[#F0C75E]">
                       {omniTotalSol.toFixed(5)} <span className="text-lg">SOL</span>
                     </div>
                     <div className="font-mono text-xs text-[hsl(var(--og-gold))]">{solUsd.data ? `≈ $${(omniTotalSol * solUsd.data.price).toFixed(2)} at live price` : ""}</div>
@@ -756,11 +770,11 @@ export default function LaunchpadRescue() {
 
                   {/* scan terminal */}
                   <div className="rounded-xl border border-[hsl(var(--og-lime))]/15 bg-black/60 p-3">
-                    <div className="lpx-term space-y-0.5">
+                    <div className="ox-term space-y-0.5">
                       {omniLog.map((l, i) => (
                         <div key={i} className={l.startsWith("$") ? "gold" : l.startsWith("[!]") ? "dim" : undefined}>{l}</div>
                       ))}
-                      {omniScanning && <span className="lpx-caret" />}
+                      {omniScanning && <span className="ox-caret" />}
                     </div>
                   </div>
 
@@ -792,7 +806,7 @@ export default function LaunchpadRescue() {
                       <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                         {emptyAccounts.length} empty account{emptyAccounts.length === 1 ? "" : "s"} found
                       </div>
-                      <div className="lpx-count font-display text-3xl font-black text-[hsl(var(--og-lime))]">
+                      <div className="ox-stat-num font-display text-3xl font-black text-[hsl(var(--og-lime))]">
                         {totalReclaimableSol(emptyAccounts).toFixed(6)} SOL
                       </div>
                       <div className="font-mono text-[11px] text-[hsl(var(--og-gold))]">{usdOf(totalReclaimableSol(emptyAccounts)).replace(" ≈ ", "≈ ")}</div>
@@ -823,7 +837,7 @@ export default function LaunchpadRescue() {
                   {emptyAccounts.length > 0 && (
                     <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-white/8 bg-black/40 p-2">
                       {emptyAccounts.map((a, i) => (
-                        <div key={a.pubkey.toBase58()} className="lpx-row lpx-row-in flex items-center justify-between rounded-md px-2 py-1 font-mono text-[11px]" style={{ animationDelay: `${Math.min(i * 0.04, 0.6)}s` }}>
+                        <div key={a.pubkey.toBase58()} className="lpx-row ox-row-in flex items-center justify-between rounded-md px-2 py-1 font-mono text-[11px]" style={{ animationDelay: `${Math.min(i * 0.04, 0.6)}s` }}>
                           <span className="text-muted-foreground">mint {short(a.mint)}</span>
                           <span className="font-bold text-[hsl(var(--og-lime))]">+{(a.lamports / 1e9).toFixed(6)} SOL</span>
                         </div>
@@ -841,7 +855,8 @@ export default function LaunchpadRescue() {
               <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">irreversible · on-chain</span>
             }>
               <p className="mb-4 text-xs text-muted-foreground">
-                Burns only what this wallet holds. Percent presets are a share of total supply, capped at your balance. You'll get a full burn report when it confirms.
+                Burns only what this wallet holds. Percent presets are a share of total supply, capped at your balance.
+                Burn your <span className="text-foreground">entire balance</span> and the empty account closes in the same tx — rent (~0.002 SOL) returns to your wallet.
               </p>
 
               {burnScanning ? (
@@ -915,6 +930,11 @@ export default function LaunchpadRescue() {
                           {burnAmountRaw && selectedToken.supplyRaw > BigInt(0) && (
                             <div className="font-mono text-[10px] text-orange-400">
                               = {((Number(burnAmountRaw) / Number(selectedToken.supplyRaw)) * 100).toFixed(4)}% of total supply
+                            </div>
+                          )}
+                          {selectedToken && burnAmountRaw && burnReclaimsRent(selectedToken, burnAmountRaw) && (
+                            <div className="mt-1 font-mono text-[10px] text-[hsl(var(--og-lime))]">
+                              + empties account → rent SOL back to wallet
                             </div>
                           )}
                         </div>

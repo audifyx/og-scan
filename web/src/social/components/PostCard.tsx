@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { SocialPost, SocialProfile } from "../store/localSocialStore";
 import { commentOnPost, fileReport, likePost } from "../store/localSocialStore";
 import { useState } from "react";
+import { Heart, MessageCircle, Repeat2, Share, Flag, BarChart2 } from "lucide-react";
 
 function initials(p?: SocialProfile | null) {
   if (!p) return "?";
@@ -31,46 +32,58 @@ export function PostCard({
 
   return (
     <article className="oxs-post">
-      <div className="oxs-avatar">{initials(author)}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", gap: "0.45rem", alignItems: "baseline", flexWrap: "wrap" }}>
-          <Link to={`/hq/profile/${post.authorId}`} className="oxs-link" style={{ fontWeight: 700, color: "inherit", textDecoration: "none" }}>
+      <Link to={`/hq/profile/${post.authorId}`} className="oxs-avatar" style={{ textDecoration: "none", color: "#fff" }}>
+        {initials(author)}
+      </Link>
+      <div className="oxs-post-body">
+        <div className="oxs-post-meta">
+          <Link to={`/hq/profile/${post.authorId}`} className="oxs-post-name">
             {author?.displayName || "Unknown"}
           </Link>
-          <span className="oxs-muted" style={{ fontSize: "0.78rem" }}>
-            @{author?.username || "anon"} · {timeAgo(post.createdAt)}
-          </span>
-          {post.pinned && <span className="oxs-badge">Pinned</span>}
-          {post.flagged && <span className="oxs-badge oxs-badge-danger">Flagged</span>}
+          <span className="oxs-post-handle">@{author?.username || "anon"}</span>
+          <span className="oxs-post-time">· {timeAgo(post.createdAt)}</span>
+          {post.pinned ? <span className="oxs-badge">Pinned</span> : null}
+          {post.flagged ? <span className="oxs-badge oxs-badge-danger">Flagged</span> : null}
         </div>
-        <p style={{ margin: "0.35rem 0 0", whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{post.content}</p>
-        <div className="oxs-actions">
-          <button type="button" className={liked ? "liked" : undefined} onClick={() => likePost(post.id)}>
-            ♥ {post.likes.length}
+        <p className="oxs-post-text">{post.content}</p>
+        <div className="oxs-post-actions">
+          <button type="button" aria-label="Comment" onClick={() => setShowComments((v) => !v)}>
+            <MessageCircle size={18} /> {post.comments.length || ""}
           </button>
-          <button type="button" onClick={() => setShowComments((v) => !v)}>
-            💬 {post.comments.length}
+          <button type="button" aria-label="Repost">
+            <Repeat2 size={18} />
+          </button>
+          <button type="button" className={liked ? "liked" : undefined} aria-label="Like" onClick={() => likePost(post.id)}>
+            <Heart size={18} fill={liked ? "currentColor" : "none"} /> {post.likes.length || ""}
+          </button>
+          <button type="button" aria-label="Views">
+            <BarChart2 size={18} />
+          </button>
+          <button type="button" aria-label="Share">
+            <Share size={18} />
           </button>
           <button
             type="button"
+            aria-label="Report"
             onClick={() => fileReport({ targetType: "post", targetId: post.id, reason: "User report" })}
           >
-            Report
+            <Flag size={16} />
           </button>
         </div>
-        {showComments && (
+        {showComments ? (
           <div style={{ marginTop: "0.65rem" }}>
             {post.comments.map((c) => (
-              <div key={c.id} className="oxs-muted" style={{ fontSize: "0.82rem", marginBottom: "0.35rem" }}>
-                <strong style={{ color: "var(--oxs-text)" }}>{c.authorId === meId ? "You" : c.authorId}</strong>: {c.content}
+              <div key={c.id} className="oxs-muted" style={{ fontSize: 14, marginBottom: 6, paddingLeft: 8, borderLeft: "2px solid #2f3336" }}>
+                <strong style={{ color: "#e7e9ea" }}>{c.authorId === meId ? "You" : c.authorId}</strong>: {c.content}
               </div>
             ))}
-            <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.4rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
               <input
-                className="oxs-input"
-                placeholder="Write a comment…"
+                className="oxs-input-box oxs-input"
+                placeholder="Post your reply"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
+                style={{ flex: 1 }}
               />
               <button
                 className="oxs-btn"
@@ -85,7 +98,7 @@ export function PostCard({
               </button>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </article>
   );

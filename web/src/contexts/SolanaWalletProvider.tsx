@@ -7,6 +7,8 @@ import {
   TorusWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
 import { HELIUS_RPC } from "@/lib/og";
+import { BackpackWalletAdapter } from "@/lib/wallets/backpackWalletAdapter";
+import { JupiterWalletAdapter } from "@/lib/wallets/jupiterWalletAdapter";
 
 interface Props {
   children: ReactNode;
@@ -16,11 +18,13 @@ export const SolanaWalletProvider: FC<Props> = ({ children }) => {
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(), // Works on mobile
-      new TorusWalletAdapter(), // Web wallet, works on mobile
+      new JupiterWalletAdapter(),
+      new SolflareWalletAdapter(),
+      new BackpackWalletAdapter(),
+      new TorusWalletAdapter(),
       new LedgerWalletAdapter(),
     ],
-    []
+    [],
   );
 
   return (

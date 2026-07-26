@@ -24,8 +24,21 @@ async function post(body: Record<string, unknown>, authToken?: string) {
 export type SignMessageFn = (message: Uint8Array) => Promise<Uint8Array>;
 
 /** Full SIWS: nonce -> sign -> verify -> setSession. Returns whether the wallet
- *  account was just created (so the UI can offer the one-time merge). */
-export async function signInWithWallet(pubkey: string, signMessage: SignMessageFn): Promise<{ isNew: boolean }> {
+ *  account was just created (so the UI can offer the one-time merge).
+ *  By default refuses to overwrite an existing non-wallet (email) session. */
+export async function signInWithWallet(
+  pubkey: string,
+  signMessage: SignMessageFn,
+  opts?: { replaceEmailSession?: boolean },
+): Promise<{ isNew: boolean }> {
+  const { data: { session: existing } } = await supabase.auth.getSession();
+  const existingEmail = existing?.user?.email || "";
+  const isEmailSession = !!existingEmail && !/@wallet\.orbitx\.app$/i.test(existingEmail);
+  if (isEmailSession && opts?.replaceEmailSession !== true) {
+    // Keep email login; caller can still use the connected wallet for txs.
+    return { isNew: false };
+  }
+
   const { message } = await post({ action: "nonce", pubkey });
   const signed = await signMessage(new TextEncoder().encode(message));
   const signature = bs58.encode(signed);

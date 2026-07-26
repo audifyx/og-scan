@@ -29,6 +29,8 @@ import {
   Wallet,
   Wrench,
   X,
+  Rocket,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OGSCAN_TOKEN_MINT, shortAddr } from "@/lib/og";
@@ -186,6 +188,10 @@ export const AppSidebar = ({
 
   const adminAppsItems: NavItem[] = [
     { to: "/ox-desk-m4k9q", icon: Shield, label: "Owner desk", eyebrow: "Private ops" },
+    { to: "/orbitxlaunch/ox-desk-m4k9q", icon: Rocket, label: "Launchpad desk", eyebrow: "Tokens & fees" },
+    { to: "/bagwork/admin", icon: Briefcase, label: "Bagwork admin", eyebrow: "Tasks · USDC" },
+    { to: "/hq/ox-desk-m4k9q", icon: Shield, label: "HQ moderation", eyebrow: "Social" },
+    { to: "/ox-desk-m4k9q/intel", icon: Radar, label: "Intel admin", eyebrow: "Crypto intel" },
   ];
 
   return (

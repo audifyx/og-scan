@@ -50,6 +50,8 @@ interface CityContextValue {
   inventory: InventoryItem[];
   shards: number;
   collectShard: () => void;
+  claimedMissionIds: string[];
+  claimMission: (missionId: string, reward: number) => void;
   selectedMint: string | null;
   openToken: (mint: string) => void;
   setSelectedMint: (mint: string | null) => void;
@@ -89,8 +91,12 @@ const DEFAULT_AVATAR: AvatarAppearance = {
 
 const STARTER_INVENTORY: InventoryItem[] = [
   { id: "badge-pioneer", kind: "badge", label: "City Pioneer", detail: "OrbitX City Phase 1 access" },
+  { id: "badge-founder", kind: "badge", label: "Founder Badge", detail: "Early OrbitX City operative" },
   { id: "key-nyc", kind: "key", label: "NYC Block Key", detail: "Midtown demo district" },
+  { id: "holder-key", kind: "key", label: "Holder Key", detail: "Unlocks VIP building interiors" },
   { id: "ad-slot", kind: "ad_slot", label: "Billboard Slot", detail: "1 SOL · 7 days · Advertising District" },
+  { id: "ad-slot-a", kind: "ad_slot", label: "Billboard Slot A", detail: "Rentable Midtown ad face" },
+  { id: "token-obx", kind: "token", label: "OBX Watchlist Slot", detail: "Pin a mint on your HUD tape" },
 ];
 
 function zoneToPanel(kind: InteractionKind): HudPanel {
@@ -106,7 +112,7 @@ function zoneToPanel(kind: InteractionKind): HudPanel {
     case "community":
       return "social";
     case "hq":
-      return "map";
+      return "live";
     case "billboard":
       return "live";
     case "voice":
@@ -147,6 +153,13 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [avatar, setAvatar] = useState<AvatarAppearance>(DEFAULT_AVATAR);
   const [selectedMint, setSelectedMint] = useState<string | null>(null);
   const [shards, setShards] = useState(0);
+  const [claimedMissionIds, setClaimedMissionIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("oxc_claimed_missions") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [realtime, setRealtime] = useState<CityRealtimeClient | null>(null);
   const [teleportTarget, setTeleportTarget] = useState<{ x: number; z: number; seq: number } | null>(null);
@@ -155,6 +168,17 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [emoteAt, setEmoteAt] = useState(0);
   const [interiorBuildingId, setInteriorBuildingId] = useState<string | null>(null);
   const inventory = STARTER_INVENTORY;
+
+  // The public lobby follows the selected district. Custom/private lobbies
+  // remain untouched so friends can keep their room while changing views.
+  useEffect(() => {
+    setLobby((current) => {
+      if (!current.id.startsWith("oxc-world-")) return current;
+      const id = `oxc-world-${selectedCityId}`;
+      if (current.id === id) return current;
+      return { id, label: `Main Lobby · ${selectedCityId.toUpperCase()}`, isPrivate: false };
+    });
+  }, [selectedCityId]);
 
   const setGate = useCallback((g: CityGate) => {
     setGateState(g);
@@ -207,13 +231,20 @@ export function CityProvider({ children }: { children: ReactNode }) {
       const block = getWorldBlock(selectedCityId);
       const b = block.buildings.find((x) => x.id === buildingId);
       if (!b) return;
+      const interiorDepth = Math.max(5.2, Math.min(14, b.size.depth - 0.8));
+      // Enter from the south-side doorway, just inside the room — never
+      // teleport through a desk or drop the player at the room's center.
+      const x = b.position.x;
+      const z = b.position.z + interiorDepth / 2 - 1.85;
       setInteriorBuildingId(buildingId);
-      setPlayerPos({ x: b.position.x, y: 0, z: b.position.z });
+      setPanel("none");
+      setPlayerPos({ x, y: 0, z });
       setTeleportTarget((prev) => ({
-        x: b.position.x,
-        z: b.position.z,
+        x,
+        z,
         seq: (prev?.seq ?? 0) + 1,
       }));
+      cityAudio.play("confirm");
     },
     [selectedCityId],
   );
@@ -228,6 +259,20 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const collectShard = useCallback(() => {
     cityAudio.play("coin");
     setShards((s) => s + 1);
+  }, []);
+  const claimMission = useCallback((missionId: string, reward: number) => {
+    setClaimedMissionIds((current) => {
+      if (current.includes(missionId)) return current;
+      const next = [...current, missionId];
+      try {
+        localStorage.setItem("oxc_claimed_missions", JSON.stringify(next));
+      } catch {
+        /* local persistence is optional */
+      }
+      setShards((shardCount) => shardCount + reward);
+      cityAudio.play("confirm");
+      return next;
+    });
   }, []);
   const teleport = useCallback((x: number, z: number) => {
     setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
@@ -258,17 +303,27 @@ export function CityProvider({ children }: { children: ReactNode }) {
     }
     if (activeZone.kind === "voice") {
       setVoiceOpen(true);
+      // A building is a playable space first. Keep the HUD clear so players
+      // can explore it; voice and district tools remain available from dock.
+      if (activeZone.buildingId) {
+        enterBuilding(activeZone.buildingId);
+        return;
+      }
       openPanel("voice");
-      // Nightclub / voice zones still get a walk-in when tied to a building
-      if (activeZone.buildingId) enterBuilding(activeZone.buildingId);
       return;
     }
     if (activeZone.buildingId) {
       const block = getWorldBlock(selectedCityId);
       const b = block.buildings.find((x) => x.id === activeZone.buildingId);
-      // Walk into mid/large buildings; tiny props just open the panel
-      if (b && b.size.width >= 6 && b.size.depth >= 6) {
+      // Any venue-sized shell (or shop / interactive landmark) is walk-in.
+      if (
+        b &&
+        (b.interaction ||
+          b.kind === "shop" ||
+          (b.size.width >= 5 && b.size.depth >= 5))
+      ) {
         enterBuilding(b.id);
+        return;
       }
     }
     openPanel(zoneToPanel(activeZone.kind));
@@ -276,10 +331,18 @@ export function CityProvider({ children }: { children: ReactNode }) {
 
   const prompt = useMemo(() => {
     if (interiorBuildingId && panel === "none") {
-      return { label: "Exit building", hint: "Press E or step on the exit pad" };
+      return {
+        label: "Inside · tap glowing stations",
+        hint: "Click a TAP station for tools · E or green pad to exit",
+      };
     }
     if (!activeZone || panel !== "none") return null;
-    return { label: activeZone.label, hint: activeZone.hint };
+    return {
+      label: activeZone.label,
+      hint: activeZone.buildingId
+        ? activeZone.hint || "Press E to walk inside · tap stations for tools"
+        : activeZone.hint || "Press E to interact",
+    };
   }, [activeZone, panel, interiorBuildingId]);
 
   useEffect(() => {
@@ -348,6 +411,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       inventory,
       shards,
       collectShard,
+      claimedMissionIds,
+      claimMission,
       selectedMint,
       openToken,
       setSelectedMint,
@@ -387,6 +452,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       inventory,
       shards,
       collectShard,
+      claimedMissionIds,
+      claimMission,
       selectedMint,
       openToken,
       prompt,

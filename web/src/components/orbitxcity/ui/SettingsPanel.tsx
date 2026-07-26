@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { Gamepad2, Gauge, Music2, Sparkles, Volume2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Gamepad2, Gauge, Music2, Sparkles, Volume2 } from "lucide-react";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 
@@ -12,7 +12,7 @@ export function SettingsPanel() {
       <div className="oxc-menu-section-head">
         <span className="oxc-kicker">Settings</span>
         <h2>Play your way</h2>
-        <p>Audio, performance, and mobile controls for OrbitX City.</p>
+        <p>Theme playlist, volume, performance, and mobile controls for OrbitX City.</p>
       </div>
 
       <div className="oxc-settings-list">
@@ -21,7 +21,7 @@ export function SettingsPanel() {
             <div className="oxc-settings-title">
               <Music2 className="h-4 w-4" /> Theme music
             </div>
-            <p>OrbitX City title theme on menus, softer ambient bed in the world.</p>
+            <p>Uploaded OrbitX tracks autoplay on menus, then fade out when you enter the city.</p>
           </div>
           <button
             type="button"
@@ -39,21 +39,76 @@ export function SettingsPanel() {
         </div>
 
         {audio.musicOn && (
-          <div className="oxc-settings-row">
-            <div>
-              <div className="oxc-settings-title">Music volume</div>
+          <>
+            <div className="oxc-settings-row">
+              <div>
+                <div className="oxc-settings-title">Now playing</div>
+                <p className="oxc-track-now">{audio.trackTitle}</p>
+              </div>
+              <div className="oxc-track-nav">
+                <button
+                  type="button"
+                  className="oxc-toggle-btn"
+                  aria-label="Previous track"
+                  onClick={() => {
+                    void cityAudio.unlock();
+                    cityAudio.prevTrack();
+                    cityAudio.play("ui");
+                  }}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className="oxc-toggle-btn"
+                  aria-label="Next track"
+                  onClick={() => {
+                    void cityAudio.unlock();
+                    cityAudio.nextTrack();
+                    cityAudio.play("ui");
+                  }}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={audio.musicVol}
-              onChange={(e) => cityAudio.setMusicVol(Number(e.target.value))}
-              aria-label="Music volume"
-              className="oxc-slider"
-            />
-          </div>
+
+            <div className="oxc-settings-row oxc-settings-row-stack">
+              <div className="oxc-settings-title">Song</div>
+              <select
+                className="oxc-track-select"
+                value={audio.trackId}
+                aria-label="Theme song"
+                onChange={(e) => {
+                  void cityAudio.unlock();
+                  cityAudio.setTrack(e.target.value);
+                  cityAudio.play("confirm");
+                }}
+              >
+                {audio.tracks.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="oxc-settings-row">
+              <div>
+                <div className="oxc-settings-title">Music volume</div>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={audio.musicVol}
+                onChange={(e) => cityAudio.setMusicVol(Number(e.target.value))}
+                aria-label="Music volume"
+                className="oxc-slider"
+              />
+            </div>
+          </>
         )}
 
         <div className="oxc-settings-row">
@@ -78,18 +133,37 @@ export function SettingsPanel() {
           </button>
         </div>
 
+        {audio.sfxOn && (
+          <div className="oxc-settings-row">
+            <div>
+              <div className="oxc-settings-title">SFX volume</div>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={audio.sfxVol}
+              onChange={(e) => cityAudio.setSfxVol(Number(e.target.value))}
+              aria-label="SFX volume"
+              className="oxc-slider"
+            />
+          </div>
+        )}
+
         {!audio.unlocked && (
           <div className="oxc-settings-row accent">
             <div>
               <div className="oxc-settings-title">Enable audio</div>
-              <p>Browsers block sound until you tap once. Tap the button to start the theme.</p>
+              <p>Browsers block sound until you tap once. Tap to start the theme playlist.</p>
             </div>
             <button
               type="button"
               className="oxc-btn primary compact"
               onClick={() => {
                 void cityAudio.unlock().then(() => {
-                  cityAudio.setTheme("world");
+                  cityAudio.setMusicOn(true);
+                  cityAudio.setTheme("menu");
                   cityAudio.play("enter");
                 });
               }}

@@ -4,10 +4,10 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ShieldCheck, ShieldAlert, Droplets, Flame, Zap, LineChart, TrendingUp, Star } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Star } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { OrbitxToken } from "@/lib/orbitx/registry";
-import { orbitScore, scoreTone } from "./orbitScore";
+import { cn } from "@/lib/utils";
 import { useIsWatched } from "./watchlist";
 
 type MarketLite = { mcap?: number | null; liq?: number | null; vol24?: number | null; ch24?: number | null; buys24?: number | null; sells24?: number | null; url?: string | null };
@@ -18,26 +18,6 @@ function fmtCompact(v?: number | null): string {
   if (v >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
   if (v >= 1e3) return `$${(v / 1e3).toFixed(1)}K`;
   return `$${v.toFixed(0)}`;
-}
-
-function OrbitScoreChip({ score }: { score: number }) {
-  const tone = scoreTone(score);
-  const color = tone === "lime" ? "hsl(var(--pf-green))" : tone === "gold" ? "hsl(var(--pf-gold))" : "hsl(var(--pf-red))";
-  return (
-    <div className="shrink-0 text-right" title="Orbit Score">
-      <div className="pf-mono text-[8px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Orbit</div>
-      <div className="text-lg font-black leading-none" style={{ color }}>{score}</div>
-    </div>
-  );
-}
-
-function MiniStat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "up" | "down" }) {
-  return (
-    <div className="rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-2 py-1.5 text-center">
-      <div className="pf-mono text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-ink))]">{label}</div>
-      <div className={`pf-mono text-[12px] font-black ${tone === "up" ? "text-[hsl(var(--pf-green))]" : tone === "down" ? "text-[hsl(var(--pf-red))]" : "text-[hsl(var(--pf-ink))]"}`}>{value}</div>
-    </div>
-  );
 }
 
 /**
@@ -194,12 +174,76 @@ export function Pill({ children, tone }: { children: React.ReactNode; tone: "gol
 }
 
 /**
- * Classic pump.fun-style token card — round thumbnail, name + ticker,
- * market cap, bonding-curve progress bar, short CA, age. Light card,
- * black border, green accents, hover lift.
+ * Terminal-style feed row — dense list view (not pump card grid).
+ */
+export function TokenFeedRow({
+  t,
+  rank,
+  mc,
+  market,
+}: {
+  t: OrbitxToken;
+  rank?: number;
+  mc?: number | null;
+  market?: MarketLite | null;
+}) {
+  const { watched, toggle: toggleWatch } = useIsWatched(t?.mint_address ?? "");
+  if (!t) return null;
+  const mcap = market?.mcap ?? mc ?? null;
+  const graduated = !!t.lp_pool_address || !!t.graduated_at || (typeof mcap === "number" && mcap >= GRADUATION_MC_USD);
+  const pct = graduated ? 100 : typeof mcap === "number" && mcap > 0 ? Math.max(2, Math.min(99, Math.round((mcap / GRADUATION_MC_USD) * 100))) : 3;
+  const ch = market?.ch24 ?? null;
+  const to = `/orbitxlaunch/token/${t.mint_address}`;
+
+  return (
+    <Link to={to} className="ox-feed-row group">
+      {rank != null && <span className="ox-feed-rank">{rank}</span>}
+      <div className="ox-feed-token">
+        <div className="ox-feed-logo">
+          <TokenLogo src={t.logo_url} metadataUri={t.metadata_uri} symbol={t.ticker} className="h-full w-full text-xs" />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="ox-feed-name truncate">{t.name}</span>
+            <span className="ox-feed-ticker">${t.ticker}</span>
+            {graduated && <span className="ox-feed-badge ox-feed-badge--grad">Grad</span>}
+            {!t.is_vamp ? (
+              <span className="ox-feed-badge ox-feed-badge--og">OG</span>
+            ) : (
+              <span className="ox-feed-badge ox-feed-badge--vamp">Vamp</span>
+            )}
+          </div>
+          <div className="ox-feed-sub pf-mono">{shortAddr(t.mint_address, 5)} · {timeAgo(t.created_at)}</div>
+        </div>
+      </div>
+      <div className="ox-feed-mc">{fmtMc(mcap).replace(" MC", "")}</div>
+      <div className={cn("ox-feed-ch", ch != null && ch >= 0 ? "ox-feed-ch--up" : "ox-feed-ch--down")}>
+        {ch != null && Number.isFinite(ch) ? `${ch >= 0 ? "+" : ""}${ch.toFixed(1)}%` : "—"}
+      </div>
+      <div className="ox-feed-vol">{fmtCompact(market?.vol24)}</div>
+      <div className="ox-feed-bond">
+        <div className="ox-feed-bond-bar">
+          <div className={`pf-progress-fill ${graduated ? "is-complete" : ""}`} style={{ width: `${pct}%` }} />
+        </div>
+        <span className="pf-mono text-[10px] text-[#A8B0BC]">{pct}%</span>
+      </div>
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWatch(); }}
+        className="ox-feed-star"
+        title={watched ? "Remove from watchlist" : "Add to watchlist"}
+      >
+        <Star className={`h-3.5 w-3.5 ${watched ? "fill-current text-[#F0C75E]" : ""}`} />
+      </button>
+    </Link>
+  );
+}
+
+/**
+ * Classic pump.fun-style coin tile — big art, MC, bonding %, age, quick trade.
+ * Dense board-first layout (not a marketing card).
  */
 export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | null; market?: MarketLite | null }) {
-  // Hooks must run unconditionally (react-hooks/rules-of-hooks); guard for null t inside the initializer.
   const { watched, toggle: toggleWatch } = useIsWatched(t?.mint_address ?? "");
   if (!t) return null;
   const mcap = market?.mcap ?? mc ?? null;
@@ -208,64 +252,60 @@ export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | nul
   const buys = market?.buys24 ?? null;
   const sells = market?.sells24 ?? null;
   const tx = (buys ?? 0) + (sells ?? 0);
-  const buyPct = tx > 0 ? Math.round(((buys ?? 0) / tx) * 100) : null;
-  const os = orbitScore({ liq: market?.liq, mcap, vol24: market?.vol24, buys, sells, ageMs: Date.now() - new Date(t.created_at).getTime(), isVamp: t.is_vamp, graduated });
+  const ch = market?.ch24 ?? null;
   const to = `/orbitxlaunch/token/${t.mint_address}`;
 
   return (
-    <div className="pf-card group relative flex flex-col gap-2.5 p-3">
+    <Link to={to} className="ox-coin">
       <button
         type="button"
-        onClick={(e) => { e.preventDefault(); toggleWatch(); }}
-        className="absolute right-2 top-2 z-10 rounded-md p-1 text-[hsl(var(--pf-muted))] transition hover:text-[hsl(var(--pf-gold))]"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWatch(); }}
+        className="ox-coin-star"
         title={watched ? "Remove from watchlist" : "Add to watchlist"}
       >
-        <Star className={`h-4 w-4 ${watched ? "fill-current text-[hsl(var(--pf-gold))]" : ""}`} />
+        <Star className={`h-3.5 w-3.5 ${watched ? "fill-current text-[#F0B429]" : ""}`} />
       </button>
-      <Link to={to} className="flex items-start gap-3 pr-6">
-        <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
-          <TokenLogo src={t.logo_url} metadataUri={t.metadata_uri} symbol={t.ticker} className="h-full w-full text-sm" />
+
+      <div className="ox-coin-art">
+        <TokenLogo src={t.logo_url} metadataUri={t.metadata_uri} symbol={t.ticker} className="h-full w-full text-lg" />
+        {graduated && <span className="ox-coin-grad-badge">Grad</span>}
+      </div>
+
+      <div className="ox-coin-body">
+        <div className="flex items-baseline gap-1.5">
+          <span className="ox-coin-name">{t.name}</span>
+          <span className="ox-coin-ticker">${t.ticker}</span>
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-black text-[hsl(var(--pf-ink))]">{t.name}</span>
-            <span className="pf-mono shrink-0 rounded-full bg-[hsl(var(--pf-ink))/0.06] px-1.5 py-0.5 text-[10px] font-bold text-[hsl(var(--pf-green-dark))]">${t.ticker}</span>
+
+        <div className="ox-coin-stats">
+          <span className="ox-coin-mc">{fmtMc(mcap)}</span>
+          {ch != null && Number.isFinite(ch) && (
+            <span className={ch >= 0 ? "ox-coin-up" : "ox-coin-down"}>
+              {ch >= 0 ? "+" : ""}{ch.toFixed(1)}%
+            </span>
+          )}
+          <span className="text-[#A8B0BC]">vol {fmtCompact(market?.vol24)}</span>
+        </div>
+
+        <div className="mt-1.5">
+          <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-[#A8B0BC]">
+            <span>{graduated ? "Graduated" : "Bonding"}</span>
+            <span className={graduated ? "text-[#F0C75E]" : "text-[#60A5FA]"}>{pct}%</span>
           </div>
-          <div className="pf-mono mt-0.5 text-xs font-bold text-[hsl(var(--pf-ink))]">{fmtMc(mcap)}</div>
+          <div className="pf-progress h-1.5"><div className={`pf-progress-fill ${graduated ? "is-complete" : ""}`} style={{ width: `${pct}%` }} /></div>
         </div>
-        <OrbitScoreChip score={os.score} />
-      </Link>
 
-      <div className="grid grid-cols-3 gap-1.5">
-        <MiniStat label="Vol 24h" value={fmtCompact(market?.vol24)} />
-        <MiniStat label="Liq" value={fmtCompact(market?.liq)} />
-        <MiniStat label="Buys" value={buyPct != null ? `${buyPct}%` : "—"} tone={buyPct != null && buyPct >= 50 ? "up" : buyPct != null ? "down" : undefined} />
-      </div>
-
-      <div>
-        <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-[hsl(var(--pf-muted))]">
-          <span>{graduated ? "Graduated" : "Bonding curve"}</span>
-          <span className={graduated ? "text-[hsl(var(--pf-gold))]" : "text-[hsl(var(--pf-green-dark))]"}>{pct}%</span>
+        <div className="ox-coin-meta">
+          {!t.is_vamp ? (
+            <span className="inline-flex items-center gap-0.5 text-[#60A5FA]"><ShieldCheck className="h-3 w-3" /> OG</span>
+          ) : (
+            <span className="inline-flex items-center gap-0.5 text-[#ff4d6d]"><ShieldAlert className="h-3 w-3" /> Vamp</span>
+          )}
+          <span className="pf-mono">{t.launch_type === "pump" ? "pump" : "custom"}</span>
+          {tx > 0 && <span className="pf-mono">{tx} tx</span>}
+          <span className="pf-mono ml-auto">{timeAgo(t.created_at)}</span>
         </div>
-        <div className="pf-progress"><div className={`pf-progress-fill ${graduated ? "is-complete" : ""}`} style={{ width: `${pct}%` }} /></div>
       </div>
-
-      <div className="flex flex-wrap items-center gap-1.5">
-        {t.is_vamp
-          ? <Pill tone="blood"><ShieldAlert className="h-3 w-3" /> Vamp</Pill>
-          : <Pill tone="lime"><ShieldCheck className="h-3 w-3" /> Original</Pill>}
-        <Pill tone={t.launch_type === "pump" ? "cyan" : "gold"}>{t.launch_type === "pump" ? "Pump" : "Custom"}</Pill>
-        {(market?.vol24 ?? 0) > 2000 && <Pill tone="cyan"><TrendingUp className="h-3 w-3" /> Trending</Pill>}
-        {buyPct != null && buyPct >= 70 && (market?.vol24 ?? 0) > 2000 && <Pill tone="blood"><Flame className="h-3 w-3" /> Viral</Pill>}
-        {os.score < 40 && <Pill tone="blood"><ShieldAlert className="h-3 w-3" /> High risk</Pill>}
-        {graduated && <Pill tone="lime"><Droplets className="h-3 w-3" /> Grad</Pill>}
-        <span className="pf-mono ml-auto text-[10px] text-[hsl(var(--pf-muted))]">{timeAgo(t.created_at)}</span>
-      </div>
-
-      <div className="mt-0.5 grid grid-cols-2 gap-1.5">
-        <Link to={to} className="pf-btn justify-center !py-1.5 text-xs"><Zap className="h-3.5 w-3.5" /> Trade</Link>
-        <a href={market?.url || `https://dexscreener.com/solana/${t.mint_address}`} target="_blank" rel="noreferrer" className="pf-btn justify-center !py-1.5 text-xs"><LineChart className="h-3.5 w-3.5" /> Chart</a>
-      </div>
-    </div>
+    </Link>
   );
 }

@@ -45,9 +45,9 @@ export function EnterScreen() {
 
         <div className="oxc-city-rail">
           {ORBITX_CITIES.map((c) => (
-            <div key={c.id} className={`oxc-city-chip ${c.unlocked ? "live" : "locked"}`} style={{ ["--chip" as string]: c.accent }}>
+            <div key={c.id} className="oxc-city-chip live" style={{ ["--chip" as string]: c.accent }}>
               <span>{c.name}</span>
-              <small>{c.unlocked ? "LIVE" : "SOON"}</small>
+              <small>LIVE</small>
             </div>
           ))}
         </div>

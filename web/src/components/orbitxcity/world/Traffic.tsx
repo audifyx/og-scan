@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
+import { Clone, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
 interface CarSpec {
@@ -44,6 +45,7 @@ function loopPoint(spec: CarSpec, t: number): { x: number; z: number; yaw: numbe
 function HoverCar({ spec }: { spec: CarSpec }) {
   const group = useRef<THREE.Group>(null);
   const t = useRef(spec.phase);
+  const { scene } = useGLTF("/orbitxcity/models/citybits/car_sedan.gltf");
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
@@ -61,16 +63,7 @@ function HoverCar({ spec }: { spec: CarSpec }) {
 
   return (
     <group ref={group}>
-      {/* Body */}
-      <mesh castShadow>
-        <boxGeometry args={[0.9, 0.32, 2]} />
-        <meshStandardMaterial color={spec.body} metalness={0.8} roughness={0.25} />
-      </mesh>
-      {/* Cabin */}
-      <mesh position={[0, 0.26, -0.1]}>
-        <boxGeometry args={[0.7, 0.24, 1]} />
-        <meshStandardMaterial color="#0a1220" metalness={0.6} roughness={0.2} emissive="#20304a" emissiveIntensity={0.4} />
-      </mesh>
+      <Clone object={scene} scale={[14, 7, 14]} position={[0, 0.18, 0]} castShadow receiveShadow />
       {/* Headlights */}
       <mesh position={[0, 0.02, 1.02]}>
         <boxGeometry args={[0.6, 0.08, 0.05]} />
@@ -89,6 +82,8 @@ function HoverCar({ spec }: { spec: CarSpec }) {
     </group>
   );
 }
+
+useGLTF.preload("/orbitxcity/models/citybits/car_sedan.gltf");
 
 /** Ambient hover-car traffic looping the ring roads. */
 export function Traffic({ count = CARS.length }: { count?: number }) {

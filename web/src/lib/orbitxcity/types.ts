@@ -72,6 +72,8 @@ export interface BuildingDefinition {
   accent: string;
   interaction?: InteractionKind;
   label?: string;
+  /** Local-space ground footprint (relative to building.position). When set, mesh uses extruded OSM outline. */
+  footprint?: Array<{ x: number; z: number }>;
 }
 
 export interface BillboardDefinition {
@@ -116,6 +118,9 @@ export type HudPanel =
   | "map"
   | "inventory"
   | "profile"
+  | "missions"
+  | "leaderboards"
+  | "friends"
   | "marketplace"
   | "live"
   | "community"

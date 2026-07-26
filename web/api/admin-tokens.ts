@@ -14,6 +14,19 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL |
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 const OWNER_EMAILS = ["audifyx@gmail.com"];
+const OWNER_WALLETS = String(process.env.OWNER_WALLETS || process.env.VITE_OWNER_WALLETS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function isOwnerEmail(email: string | null): boolean {
+  if (!email) return false;
+  const e = email.toLowerCase();
+  if (OWNER_EMAILS.includes(e)) return true;
+  const m = e.match(/^([1-9a-zA-Z]{32,44})@wallet\.orbitx\.app$/i);
+  if (m && OWNER_WALLETS.some((w) => w === m[1] || w.toLowerCase() === m[1].toLowerCase())) return true;
+  return false;
+}
 
 async function emailFromToken(token: string): Promise<string | null> {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -34,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!token) return res.status(401).json({ error: "Missing auth token" });
 
     const email = await emailFromToken(token);
-    if (!email || !OWNER_EMAILS.includes(email.toLowerCase())) {
+    if (!isOwnerEmail(email)) {
       return res.status(403).json({ error: "Not authorized" });
     }
 

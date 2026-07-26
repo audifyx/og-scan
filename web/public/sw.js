@@ -3,11 +3,13 @@
  * Provides offline caching, background sync, rich Web Push notifications, and PWA install support.
  */
 
-const CACHE_NAME = "orbitx-v8";
+const CACHE_NAME = "orbitx-v22";
 self.addEventListener("message", (e) => { if (e.data === "skipWaiting") self.skipWaiting(); });
 const STATIC_ASSETS = [
   "/",
   "/app",
+  "/Orbitxcity",
+  "/manifest.json",
   "/icon-192x192.png",
   "/icon-512x512.png",
   "/favicon.png",
@@ -168,6 +170,9 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/memes/") ||
     url.pathname.match(/\.(png|jpg|jpeg|svg|gif|webp|ico|woff2?|ttf|otf)$/)
   ) {
+    // Hashed JS/CSS: network-first so deploys aren't stuck behind stale SW cache.
+    // Images/fonts may still use cached copy while revalidating.
+    const isHashedBundle = url.pathname.startsWith("/assets/") && /\.(js|css)$/.test(url.pathname);
     event.respondWith(
       caches.match(request).then((cached) => {
         const fetchPromise = fetch(request).then((response) => {
@@ -177,6 +182,7 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         });
+        if (isHashedBundle) return fetchPromise.catch(() => cached);
         return cached || fetchPromise;
       })
     );

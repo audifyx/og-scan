@@ -5,6 +5,7 @@ import {
   Copy, Check, ExternalLink, ArrowUpRight, ArrowDownRight, Users, Clock, Layers,
 } from "lucide-react";
 import { getScreener, Row, fmtUsd, short } from "../lib/api";
+import { PageHero } from "../components/PageShell";
 
 type SortKey = "volume" | "mcap" | "liquidity" | "change" | "holders" | "newest" | "gainers" | "losers";
 type CapKey = "all" | "low" | "mid" | "high";
@@ -125,30 +126,22 @@ export default function Robinhood() {
   }, [rows, q, sort, cap]);
 
   return (
-    <div className="max-w-6xl mx-auto px-3 py-6 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-xl grid place-items-center" style={{ background: "linear-gradient(135deg,#00C805,#0a3d15)" }}>
-            <Feather className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
-              Robinhood Chain
-              <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-up/70" /><span className="relative inline-flex rounded-full h-2 w-2 bg-up" /></span>
-            </h1>
-            <div className="text-xs text-muted">Live meme coins on the Robinhood chain</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link to="/robinhood/scanner" className="btn bg-accent/15 text-accent text-[11px] inline-flex items-center gap-1.5 py-1.5 px-3 font-bold"><Crosshair className="w-3.5 h-3.5" />Scanner</Link>
+    <div className="max-w-6xl mx-auto space-y-4">
+      <PageHero
+        kicker="Robinhood chain"
+        title="Robinhood feed"
+        sub="Live meme coins on Robinhood chain — market data via GeckoTerminal."
+        icon={Feather}
+      >
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Link to="/robinhood/scanner" className="dex-btn dex-btn--blue !py-2 !text-xs"><Crosshair className="w-3.5 h-3.5" /> Scanner</Link>
           <span className="pill bg-accent/15 text-accent text-[10px] font-bold">{rows.length} coins</span>
-          {totalVol > 0 && <span className="pill bg-up/10 text-up text-[10px] font-bold">{fmtUsd(totalVol, { compact: true })} 24h vol</span>}
-          <button onClick={() => load(true)} className="btn bg-panel2 text-muted hover:text-white text-[11px] inline-flex items-center gap-1.5 py-1.5 px-3">
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />refresh
+          {totalVol > 0 && <span className="pill bg-up/10 text-up text-[10px] font-bold">{fmtUsd(totalVol, { compact: true })} 24h</span>}
+          <button type="button" onClick={() => load(true)} className="dex-btn dex-btn--ghost !py-2 !text-xs">
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
           </button>
         </div>
-      </div>
+      </PageHero>
 
       {/* Market overview */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

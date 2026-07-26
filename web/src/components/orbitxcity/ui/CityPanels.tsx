@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
-import { getTeleportPoints, getWorldBlock } from "@/lib/orbitxcity/worlds";
+import { getTeleportPoints, getWorldBlock, OSM_ATTRIBUTION } from "@/lib/orbitxcity/worlds";
 import {
   fetchCityMarketSnapshot,
   fmtPct,
@@ -21,12 +21,27 @@ import { HelpPanel } from "./HelpPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import { LobbyBrowser } from "./LobbyBrowser";
 import { CharacterCreator } from "./CharacterCreator";
+import {
+  InventorySystemPanel,
+  MissionsSystemPanel,
+  LeaderboardsSystemPanel,
+  FriendsSystemPanel,
+  EventsSystemPanel,
+  MarketplaceSystemExtras,
+  SettingsSystemExtras,
+  LobbiesSystemExtras,
+  CityDistrictCatalog,
+} from "./CitySystemPanels";
+import { FEATURES_PER_SYSTEM } from "@/lib/orbitxcity/cityFeatureCatalog";
 import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic, Gamepad2, Image as ImageIcon, Dices, Wand2 } from "lucide-react";
 
 const TITLES: Partial<Record<Exclude<HudPanel, "none">, string>> = {
   map: "World Map",
   inventory: "Inventory",
   profile: "Profile",
+  missions: "Missions",
+  leaderboards: "Leaderboards",
+  friends: "Friends",
   marketplace: "Meme Market · Store",
   live: "Live OrbitX Data",
   community: "Social District",
@@ -62,12 +77,20 @@ export function CityPanelHost() {
       </header>
       <div className="oxc-panel-body">
         {panel === "map" && <MapPanel />}
-        {panel === "inventory" && <InventoryPanel />}
+        {panel === "inventory" && <InventorySystemPanel />}
         {panel === "profile" && <ProfilePanel />}
-        {panel === "marketplace" && <MemeStorePanel />}
+        {panel === "missions" && <MissionsSystemPanel />}
+        {panel === "leaderboards" && <LeaderboardsSystemPanel />}
+        {panel === "friends" && <FriendsSystemPanel />}
+        {panel === "marketplace" && (
+          <>
+            <MemeStorePanel />
+            <MarketplaceSystemExtras />
+          </>
+        )}
         {panel === "live" && <LiveDataPanel />}
         {panel === "community" && <CommunityPanel />}
-        {panel === "events" && <EventsPanel />}
+        {panel === "events" && <EventsSystemPanel />}
         {panel === "trading" && <TradingPanel />}
         {panel === "launch" && <LaunchPanel />}
         {panel === "token" && <TokenBuyPanel />}
@@ -76,9 +99,19 @@ export function CityPanelHost() {
         {panel === "social" && <SocialFeedPanel />}
         {panel === "games" && <GamesPanel />}
         {panel === "nft" && <NftPanel />}
-        {panel === "settings" && <SettingsPanel />}
+        {panel === "settings" && (
+          <>
+            <SettingsPanel />
+            <SettingsSystemExtras />
+          </>
+        )}
         {panel === "help" && <HelpPanel />}
-        {panel === "lobbies" && <LobbyBrowser startAfterJoin={false} />}
+        {panel === "lobbies" && (
+          <>
+            <LobbyBrowser startAfterJoin={false} />
+            <LobbiesSystemExtras />
+          </>
+        )}
         {panel === "character" && <CharacterCreator onDone={() => closePanel()} />}
       </div>
     </aside>
@@ -158,14 +191,22 @@ function MapPanel() {
         ))}
       </div>
 
-      <p className="oxc-muted">NYC, Miami, and LA are playable. Boston unlocks later.</p>
+      <p className="oxc-muted">
+        All four OrbitX City districts are playable — each ships {FEATURES_PER_SYSTEM} district capabilities.
+        Choose a district from the main menu, then fast travel between its landmarks.
+      </p>
+      {selectedCityId === "nyc" && (
+        <p className="oxc-muted" style={{ fontSize: "0.72rem", opacity: 0.75 }}>
+          {OSM_ATTRIBUTION}
+        </p>
+      )}
       <div className="oxc-grid-2">
         {ORBITX_CITIES.map((c) => (
-          <div key={c.id} className={`oxc-tile ${c.unlocked ? "on" : ""}`} style={{ borderColor: c.accent }}>
+          <div key={c.id} className="oxc-tile on" style={{ borderColor: c.accent }}>
             <div className="oxc-tile-title">{c.name}</div>
             <div className="oxc-muted">{c.tagline}</div>
             <p>{c.purpose}</p>
-            <span className="oxc-pill">{c.unlocked ? "Playable" : "Locked"}</span>
+            <span className="oxc-pill on">{FEATURES_PER_SYSTEM} features</span>
           </div>
         ))}
       </div>
@@ -179,29 +220,7 @@ function MapPanel() {
           ))}
         </ul>
       </div>
-    </div>
-  );
-}
-
-function InventoryPanel() {
-  const { inventory, shards } = useCity();
-  return (
-    <div className="oxc-stack">
-      <p className="oxc-muted">Inventory expands with holder keys, ad slots, and community badges.</p>
-      <div className="oxc-inv-grid">
-        <div className="oxc-inv-item shard">
-          <div className="oxc-inv-kind">currency</div>
-          <div className="oxc-tile-title">OBX Shards ◈ {shards}</div>
-          <div className="oxc-muted">Collected on the streets — walk over glowing coins.</div>
-        </div>
-        {inventory.map((item) => (
-          <div key={item.id} className="oxc-inv-item">
-            <div className="oxc-inv-kind">{item.kind}</div>
-            <div className="oxc-tile-title">{item.label}</div>
-            <div className="oxc-muted">{item.detail}</div>
-          </div>
-        ))}
-      </div>
+      <CityDistrictCatalog city={selectedCityId} />
     </div>
   );
 }
@@ -328,44 +347,30 @@ function CommunityPanel() {
       <div className="oxc-hero-tile social">
         <Users className="h-5 w-5" />
         <div>
-          <div className="oxc-tile-title">Social District</div>
-          <p className="oxc-muted">Feed, world chat, and voice plaza — OrbitX social as a place you walk into.</p>
+          <div className="oxc-tile-title">OrbitX Communities</div>
+          <p className="oxc-muted">Live social feed, world chat, and voice — the same OrbitX community rails, inside the city.</p>
         </div>
       </div>
       <div className="oxc-actions">
         <button type="button" className="oxc-btn primary" onClick={() => openPanel("social")}>Social feed</button>
         <button type="button" className="oxc-btn ghost" onClick={() => openPanel("chat")}>World chat</button>
-        <button type="button" className="oxc-btn ghost" onClick={() => { setVoiceOpen(true); openPanel("voice"); }}>Voice plaza</button>
+        <button
+          type="button"
+          className="oxc-btn ghost"
+          onClick={() => {
+            setVoiceOpen(true);
+            openPanel("voice");
+          }}
+        >
+          Voice plaza
+        </button>
       </div>
-      <ul className="oxc-list">
-        <li>Post to the live OrbitX social feed</li>
-        <li>Chat with traders in the Midtown block</li>
-        <li>Join the city voice channel (LiveKit)</li>
-      </ul>
+      <SocialFeedPanel />
       <div className="oxc-actions">
-        <Link className="oxc-btn ghost" to="/orbitx-social">Open Social</Link>
+        <Link className="oxc-btn ghost" to="/orbitx-social">Open Social app</Link>
         <Link className="oxc-btn ghost" to="/spaces">Spaces</Link>
+        <Link className="oxc-btn ghost" to="/orbitx-social">HQ</Link>
       </div>
-    </div>
-  );
-}
-
-function EventsPanel() {
-  const events = [
-    { t: "Now", title: "NYC Demo Block open", place: "OrbitX HQ Plaza" },
-    { t: "Soon", title: "Launch Arena showcase", place: "Launch District" },
-    { t: "Soon", title: "Miami community weekend", place: "OrbitX Miami (locked)" },
-  ];
-  return (
-    <div className="oxc-stack">
-      <p className="oxc-muted">World events calendar — projects can host inside owned/rented buildings.</p>
-      {events.map((e) => (
-        <div key={e.title} className="oxc-tile">
-          <span className="oxc-pill">{e.t}</span>
-          <div className="oxc-tile-title">{e.title}</div>
-          <div className="oxc-muted">{e.place}</div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -381,4 +386,23 @@ export const PANEL_NAV = [
   { id: "events" as const, label: "Events", icon: Rocket },
   { id: "inventory" as const, label: "Bag", icon: Backpack },
   { id: "profile" as const, label: "Profile", icon: UserRound },
+];
+
+/** Phone dock — keep only the actions players need mid-run. */
+export const MOBILE_DOCK = [
+  { id: "map" as const, label: "Map", icon: Map },
+  { id: "marketplace" as const, label: "Market", icon: Store },
+  { id: "chat" as const, label: "Chat", icon: MessageSquare },
+  { id: "voice" as const, label: "Voice", icon: Mic },
+  { id: "inventory" as const, label: "Bag", icon: Backpack },
+];
+
+/** Overflow sheet on phones. */
+export const MORE_PANELS = [
+  { id: "live" as const, label: "Live", icon: Radio },
+  { id: "social" as const, label: "Social", icon: Users },
+  { id: "character" as const, label: "Look", icon: Wand2 },
+  { id: "events" as const, label: "Events", icon: Rocket },
+  { id: "profile" as const, label: "Profile", icon: UserRound },
+  { id: "help" as const, label: "Help", icon: Gamepad2 },
 ];

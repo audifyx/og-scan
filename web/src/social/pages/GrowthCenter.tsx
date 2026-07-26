@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
+import { SocialPageHeader } from "../components/SocialPageHeader";
 import { useCurrentProfile, useSocialStore } from "../hooks/useSocialStore";
 import { progressToNext, XP_REWARDS } from "../growth/xp";
 import { generateReferralCode, referralLink, scoreReferralLeaderboard } from "../growth/referrals";
@@ -40,54 +42,44 @@ export default function GrowthCenter() {
 
   return (
     <div>
-      <header className="oxs-hero">
-        <h1>Growth</h1>
-        <p>Referral programs, XP rewards, reputation progress, and invite loops that grow OrbitX.</p>
-      </header>
+      <SocialPageHeader title="Growth" subtitle="XP, referrals, and reputation — grow your OrbitX presence." />
 
-      <div className="oxs-grid oxs-grid-3" style={{ marginBottom: "1rem" }}>
-        <div className="oxs-panel oxs-stat">
+      <div className="oxs-grid oxs-grid-3">
+        <div className="oxs-stat">
           <div className="label">XP</div>
           <div className="value">{me?.xp ?? 0}</div>
           <div className="oxs-muted" style={{ fontSize: "0.78rem", marginTop: "0.35rem" }}>
-            {prog.current.title} · reputation {me?.reputation ?? 0}
+            {prog.current.title} · rep {me?.reputation ?? 0}
           </div>
-          <div className="oxs-progress" style={{ marginTop: "0.55rem" }}>
+          <div className="oxs-progress" style={{ marginTop: "0.5rem" }}>
             <span style={{ width: `${prog.pct}%` }} />
           </div>
           <button className="oxs-btn" type="button" style={{ marginTop: "0.75rem" }} onClick={() => claimDailyCheckin()}>
-            Claim daily +{XP_REWARDS.daily_checkin} XP
+            Daily +{XP_REWARDS.daily_checkin} XP
           </button>
         </div>
-        <div className="oxs-panel">
-          <h3>Your referral</h3>
-          <div className="oxs-muted" style={{ fontSize: "0.75rem", marginBottom: "0.35rem" }}>
-            Code
-          </div>
-          <div style={{ fontFamily: "var(--oxs-display)", fontWeight: 800, fontSize: "1.4rem", letterSpacing: "0.08em" }}>
-            {code}
-          </div>
-          <div className="oxs-muted" style={{ fontSize: "0.75rem", margin: "0.65rem 0 0.35rem", wordBreak: "break-all" }}>
-            {link}
-          </div>
-          <button className="oxs-btn" type="button" onClick={copy}>
-            {copied ? "Copied" : "Copy invite link"}
+        <div className="oxs-panel--card" style={{ margin: 0 }}>
+          <h3>Referral link</h3>
+          <div style={{ fontWeight: 800, fontSize: "1.25rem", letterSpacing: "0.06em" }}>{code}</div>
+          <div className="oxs-muted" style={{ fontSize: "0.78rem", margin: "0.5rem 0", wordBreak: "break-all" }}>{link}</div>
+          <button className="oxs-btn oxs-btn-tg" type="button" onClick={copy}>
+            {copied ? "Copied!" : "Copy invite"}
           </button>
         </div>
-        <div className="oxs-panel">
-          <h3>XP menu</h3>
-          <div className="oxs-muted" style={{ fontSize: "0.8rem" }}>
+        <div className="oxs-panel--card" style={{ margin: 0 }}>
+          <h3>XP rewards</h3>
+          <div className="oxs-muted" style={{ fontSize: "0.82rem" }}>
             {Object.entries(XP_REWARDS).map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "0.25rem 0" }}>
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "0.3rem 0" }}>
                 <span>{k.replace(/_/g, " ")}</span>
-                <strong>+{v}</strong>
+                <strong style={{ color: "var(--oxs-x)" }}>+{v}</strong>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="oxs-panel">
+      <div className="oxs-panel--card">
         <h3>Referral leaderboard</h3>
         <table className="oxs-table">
           <thead>
@@ -101,7 +93,9 @@ export default function GrowthCenter() {
           <tbody>
             {board.slice(0, 8).map((r) => (
               <tr key={r.ownerId}>
-                <td>@{r.ownerName}</td>
+                <td>
+                  <Link className="oxs-link" to={`/hq/profile/${r.ownerId}`}>@{r.ownerName}</Link>
+                </td>
                 <td>{r.signups}</td>
                 <td>{r.qualified}</td>
                 <td>{r.xpEarned}</td>

@@ -1,9 +1,13 @@
 import { useMemo } from "react";
+import { Clone, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt } from "@/lib/orbitxcity/collision";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { getWorldStreets } from "@/lib/orbitxcity/worlds";
+
+const BENCH_PATH = "/orbitxcity/models/citybits/bench.gltf";
+useGLTF.preload(BENCH_PATH);
 
 const LAMP_SPACING = 16;
 
@@ -76,11 +80,91 @@ function ZoneMarker({ x, z }: { x: number; z: number }) {
   );
 }
 
-/** Street furniture: instanced lamps + quiet zone markers. */
+function Crosswalks({ block }: { block: WorldBlockConfig }) {
+  const streets = getWorldStreets(block.cityId);
+  const crossings = useMemo(() => {
+    const horizontal = streets.filter((s) => s.o === "h");
+    const vertical = streets.filter((s) => s.o === "v");
+    return horizontal.flatMap((h) =>
+      vertical
+        .filter((v) => v.at >= h.from && v.at <= h.to && h.at >= v.from && h.at <= v.to)
+        .map((v) => ({ x: v.at, z: h.at, hw: h.w, vw: v.w })),
+    );
+  }, [streets]);
+
+  return (
+    <group>
+      {crossings.map((crossing, i) => (
+        <group key={`${crossing.x}-${crossing.z}`}>
+          {[-1, 1].flatMap((direction) =>
+            [-1.2, -0.4, 0.4, 1.2].map((offset) => (
+              <mesh
+                key={`${direction}-${offset}`}
+                rotation={[-Math.PI / 2, 0, 0]}
+                position={[
+                  direction * (crossing.vw / 2 - 0.5),
+                  0.072 + i * 0.001,
+                  crossing.z + offset,
+                ]}
+              >
+                <planeGeometry args={[0.42, 0.48]} />
+                <meshStandardMaterial color="#d8d0b8" transparent opacity={0.42} roughness={0.92} />
+              </mesh>
+            )),
+          )}
+          {[-1, 1].flatMap((direction) =>
+            [-1.2, -0.4, 0.4, 1.2].map((offset) => (
+              <mesh
+                key={`h-${direction}-${offset}`}
+                rotation={[-Math.PI / 2, 0, 0]}
+                position={[
+                  crossing.x + offset,
+                  0.073 + i * 0.001,
+                  direction * (crossing.hw / 2 - 0.5) + crossing.z,
+                ]}
+              >
+                <planeGeometry args={[0.48, 0.42]} />
+                <meshStandardMaterial color="#d8d0b8" transparent opacity={0.42} roughness={0.92} />
+              </mesh>
+            )),
+          )}
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function StreetFurniture({ block }: { block: WorldBlockConfig }) {
+  const { scene } = useGLTF(BENCH_PATH);
+  return (
+    <group>
+      {block.zones.slice(0, 10).map((zone, i) => {
+        const x = zone.position.x + (i % 2 === 0 ? 2.1 : -2.1);
+        const z = zone.position.z + (i % 3 === 0 ? 1.2 : -1.2);
+        if (collidesAt(x, z, 0.5, block)) return null;
+        return (
+          <Clone
+            key={`street-furniture-${zone.id}`}
+            object={scene}
+            position={[x, 0, z]}
+            rotation={[0, (i % 4) * (Math.PI / 2), 0]}
+            scale={1.35}
+            castShadow
+            receiveShadow
+          />
+        );
+      })}
+    </group>
+  );
+}
+
+/** Street furniture: lamps, crossings, benches, and quiet zone markers. */
 export function StreetProps({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
   return (
     <group>
       <LampField block={block} />
+      <Crosswalks block={block} />
+      <StreetFurniture block={block} />
       {block.zones.slice(0, 6).map((zone) => (
         <ZoneMarker key={zone.id} x={zone.position.x} z={zone.position.z} />
       ))}

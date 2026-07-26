@@ -4,7 +4,8 @@
  * Mints a Token-2022 SPL token in a single transaction:
  *   1. Flat $1.50 Orbitx launch fee -> PLATFORM_WALLET (same fee as pump lane)
  *   2. Create mint account (TransferFeeConfig + MetadataPointer extensions)
- *   3. TransferFeeConfig: 0.30% on every buy/sell — the SAME creator-fee rate
+ *   3. TransferFeeConfig: 0.45% on every buy/sell — OrbitX trading fee
+ *      (75% creator / 25% platform at claim time)
  *      pump.fun charges on its bonding curve. Fees accrue on-chain, withheld
  *      per token account, and are claimable ONLY by the creator wallet
  *      (withdraw-withheld authority) at /orbitxlaunch/claim.
@@ -53,7 +54,7 @@ export interface CustomLaunchBuild {
   tx: Transaction;
   mint: PublicKey;
   creatorAta: PublicKey;
-  feeAuthority: PublicKey;     // who can claim the 0.30% trading fees
+  feeAuthority: PublicKey;     // who can claim the 0.45% trading fees
 }
 
 const U64_MAX = BigInt("18446744073709551615");
@@ -97,13 +98,13 @@ export async function buildCustomLaunchTransaction(p: CustomLaunchParams): Promi
     programId: TOKEN_2022_PROGRAM_ID,
   }));
 
-  /* 3 — 0.30% creator fee on every transfer (pump.fun bonding-curve creator rate) */
+  /* 3 — 0.45% trading fee on every transfer (OrbitX launchpad rate) */
   tx.add(createInitializeTransferFeeConfigInstruction(
     mint,
     feeAuthority,            // can change the fee config
     feeAuthority,            // can withdraw (claim) accrued fees
-    CREATOR_FEE_BPS,         // 30 bps = 0.30%
-    U64_MAX,                 // no per-transfer fee cap — pure percentage, like pump
+    CREATOR_FEE_BPS,         // 45 bps = 0.45%
+    U64_MAX,                 // no per-transfer fee cap — pure percentage
     TOKEN_2022_PROGRAM_ID,
   ));
 

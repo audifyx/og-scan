@@ -1,11 +1,15 @@
 /**
- * OrbitX City audio — procedural theme music + UI/world SFX.
- * No external media files; everything is synthesized with Web Audio so it
- * works offline and stays under Vercel asset budgets.
- *
- * Browsers block autoplay until a user gesture — call `unlock()` from the
- * first click/key/touch on the City page.
+ * OrbitX City audio — uploaded theme MP3s + procedural UI/world SFX.
+ * Theme tracks live in /orbitxcity/music. Browsers block autoplay until a
+ * user gesture — call `unlock()` from the first click/key/touch.
  */
+
+import {
+  DEFAULT_THEME_TRACK_ID,
+  THEME_TRACKS,
+  getThemeTrack,
+  type ThemeTrack,
+} from "./themeTracks";
 
 type ThemeMode = "menu" | "world" | "off";
 
@@ -16,12 +20,18 @@ export interface AudioSnapshot {
   musicVol: number;
   sfxVol: number;
   mode: ThemeMode;
+  trackId: string;
+  trackTitle: string;
+  tracks: ThemeTrack[];
 }
 
 const MUSIC_KEY = "oxc_music_on";
 const SFX_KEY = "oxc_sfx_on";
 const MUSIC_VOL_KEY = "oxc_music_vol";
 const SFX_VOL_KEY = "oxc_sfx_vol";
+const TRACK_KEY = "oxc_theme_track";
+
+const FADE_MS = 1400;
 
 function readBool(key: string, fallback: boolean): boolean {
   try {
@@ -58,7 +68,25 @@ function writeNum(key: string, v: number) {
   }
 }
 
-/** A minor / cyber-city palette (Hz). */
+function readTrackId(): string {
+  try {
+    const v = localStorage.getItem(TRACK_KEY);
+    if (v && THEME_TRACKS.some((t) => t.id === v)) return v;
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_THEME_TRACK_ID;
+}
+
+function writeTrackId(id: string) {
+  try {
+    localStorage.setItem(TRACK_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** A minor / cyber-city palette (Hz) — used for SFX only. */
 const NOTE = {
   A2: 110,
   C3: 130.81,
@@ -82,20 +110,20 @@ class CityAudioEngine {
   private master: GainNode | null = null;
   private musicGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
+  private mediaEl: HTMLAudioElement | null = null;
+  private mediaNode: MediaElementAudioSourceNode | null = null;
+  private graphOk = false;
+  private kickedPlay = false;
+  private fadeTimer: number | null = null;
   private unlocked = false;
   private mode: ThemeMode = "off";
-  private timer: number | null = null;
-  private step = 0;
   private musicOn = readBool(MUSIC_KEY, true);
   private sfxOn = readBool(SFX_KEY, true);
   private musicVol = readNum(MUSIC_VOL_KEY, 0.45);
   private sfxVol = readNum(SFX_VOL_KEY, 0.7);
-  // Cached immutable snapshot for useSyncExternalStore. MUST be a stable
-  // reference between changes — rebuilt only inside notify() when state mutates.
+  private trackId = readTrackId();
   private snapshot: AudioSnapshot = this.buildSnapshot();
   private listeners = new Set<Listener>();
-  /** BPM for the OrbitX City theme */
-  private readonly bpm = 92;
 
   subscribe = (cb: Listener) => {
     this.listeners.add(cb);
@@ -103,15 +131,12 @@ class CityAudioEngine {
   };
 
   private notify() {
-    // Rebuild the cached snapshot BEFORE notifying so subscribers (React's
-    // useSyncExternalStore) read the fresh immutable object. getState() must
-    // otherwise return a stable reference on every call, or React re-renders
-    // endlessly ("Maximum update depth exceeded").
     this.snapshot = this.buildSnapshot();
     for (const cb of this.listeners) cb();
   }
 
   private buildSnapshot(): AudioSnapshot {
+    const track = getThemeTrack(this.trackId);
     return {
       unlocked: this.unlocked,
       musicOn: this.musicOn,
@@ -119,6 +144,9 @@ class CityAudioEngine {
       musicVol: this.musicVol,
       sfxVol: this.sfxVol,
       mode: this.mode,
+      trackId: track.id,
+      trackTitle: track.title,
+      tracks: THEME_TRACKS,
     };
   }
 
@@ -140,12 +168,27 @@ class CityAudioEngine {
       this.master.connect(this.ctx.destination);
 
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = this.musicOn ? this.musicVol : 0;
+      this.musicGain.gain.value = 0;
       this.musicGain.connect(this.master);
 
       this.sfxGain = this.ctx.createGain();
       this.sfxGain.gain.value = this.sfxOn ? this.sfxVol : 0;
       this.sfxGain.connect(this.master);
+
+      this.ensureMedia();
+    }
+
+    // Kick the media element synchronously inside the raw gesture, before any
+    // awaits, so Safari/Chrome treat playback as user-initiated.
+    const wantTheme = this.mode === "menu" && this.musicOn;
+    if (wantTheme && this.mediaEl && this.mediaEl.paused) {
+      this.kickedPlay = true;
+      const p = this.mediaEl.play();
+      if (p) {
+        p.catch(() => {
+          this.kickedPlay = false;
+        });
+      }
     }
 
     if (this.ctx.state === "suspended") {
@@ -158,21 +201,48 @@ class CityAudioEngine {
 
     const was = this.unlocked;
     this.unlocked = this.ctx.state === "running";
-    if (this.unlocked && !was) {
-      this.notify();
-      if (this.mode !== "off" && this.musicOn) this.startLoop();
+    if (this.unlocked !== was) this.notify();
+    // Retry on every gesture until the theme is actually playing — autoplay
+    // can reject media playback even when the AudioContext is running.
+    // Re-evaluate here: musicOn/mode may have changed while resume() awaited.
+    const wantThemeNow = this.mode === "menu" && this.musicOn;
+    if (this.unlocked && wantThemeNow && (this.kickedPlay || !this.mediaEl || this.mediaEl.paused)) {
+      this.kickedPlay = false;
+      void this.playTheme({ fadeIn: true });
     }
+  }
+
+  private ensureMedia() {
+    if (typeof window === "undefined" || this.mediaEl || !this.ctx || !this.musicGain) return;
+    const el = new Audio();
+    el.preload = "auto";
+    el.loop = true;
+    el.src = getThemeTrack(this.trackId).src;
+    // Wire through Web Audio so volume fades stay smooth with the graph. If
+    // that fails (HMR double-connect, odd browsers) the element outputs
+    // directly and we drive el.volume instead.
+    try {
+      this.mediaNode = this.ctx.createMediaElementSource(el);
+      this.mediaNode.connect(this.musicGain);
+      this.graphOk = true;
+    } catch {
+      this.graphOk = false;
+      el.volume = this.musicOn ? this.musicVol : 0;
+    }
+    el.addEventListener("ended", () => {
+      if (this.mode === "menu" && this.musicOn) void el.play().catch(() => undefined);
+    });
+    this.mediaEl = el;
   }
 
   setMusicOn(on: boolean) {
     this.musicOn = on;
     writeBool(MUSIC_KEY, on);
-    if (this.musicGain && this.ctx) {
-      this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
-      this.musicGain.gain.linearRampToValueAtTime(on ? this.musicVol : 0, this.ctx.currentTime + 0.2);
+    if (on && this.unlocked && this.mode === "menu") {
+      void this.playTheme({ fadeIn: true });
+    } else if (!on) {
+      void this.fadeThemeTo(0, true);
     }
-    if (on && this.unlocked && this.mode !== "off") this.startLoop();
-    if (!on) this.stopLoop();
     this.notify();
   }
 
@@ -188,7 +258,11 @@ class CityAudioEngine {
   setMusicVol(v: number) {
     this.musicVol = Math.min(1, Math.max(0, v));
     writeNum(MUSIC_VOL_KEY, this.musicVol);
-    if (this.musicGain && this.musicOn) this.musicGain.gain.value = this.musicVol;
+    if (this.musicGain && this.ctx && this.musicOn && this.mode === "menu") {
+      this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.musicGain.gain.setValueAtTime(this.musicVol, this.ctx.currentTime);
+    }
+    if (!this.graphOk && this.mediaEl && this.musicOn) this.mediaEl.volume = this.musicVol;
     this.notify();
   }
 
@@ -199,35 +273,119 @@ class CityAudioEngine {
     this.notify();
   }
 
-  /** Switch bed: menu title theme vs in-world ambient bed. */
-  setTheme(mode: ThemeMode) {
-    const prev = this.mode;
-    this.mode = mode;
-    if (mode === "off") {
-      this.stopLoop();
-    } else if (this.unlocked && this.musicOn) {
-      if (prev === "off" || !this.timer) this.startLoop();
+  setTrack(id: string) {
+    const track = getThemeTrack(id);
+    if (track.id === this.trackId && this.mediaEl) {
+      // Re-selecting current track restarts it when music is on.
+      if (this.musicOn && this.mode === "menu") void this.playTheme({ restart: true, fadeIn: true });
+      return;
+    }
+    this.trackId = track.id;
+    writeTrackId(track.id);
+    this.ensureMedia();
+    if (this.mediaEl) {
+      const wasPlaying = !this.mediaEl.paused;
+      this.mediaEl.src = track.src;
+      this.mediaEl.load();
+      if (wasPlaying || (this.musicOn && this.mode === "menu" && this.unlocked)) {
+        void this.playTheme({ restart: true, fadeIn: true });
+      }
     }
     this.notify();
   }
 
-  private startLoop() {
-    if (this.timer != null || !this.ctx) return;
-    const stepMs = (60_000 / this.bpm) / 4; // 16th notes
-    const tick = () => {
-      this.scheduleBarStep(this.step);
-      this.step = (this.step + 1) % 64; // 4 bars of 16ths
-      this.timer = window.setTimeout(tick, stepMs);
-    };
-    tick();
+  nextTrack() {
+    const idx = THEME_TRACKS.findIndex((t) => t.id === this.trackId);
+    const next = THEME_TRACKS[(idx + 1) % THEME_TRACKS.length]!;
+    this.setTrack(next.id);
   }
 
-  private stopLoop() {
-    if (this.timer != null) {
-      clearTimeout(this.timer);
-      this.timer = null;
+  prevTrack() {
+    const idx = THEME_TRACKS.findIndex((t) => t.id === this.trackId);
+    const prev = THEME_TRACKS[(idx - 1 + THEME_TRACKS.length) % THEME_TRACKS.length]!;
+    this.setTrack(prev.id);
+  }
+
+  /** Switch bed: menu plays theme; world fades it out; off stops. */
+  setTheme(mode: ThemeMode) {
+    const prev = this.mode;
+    this.mode = mode;
+    if (mode === "off") {
+      void this.fadeThemeTo(0, true);
+    } else if (mode === "world") {
+      // Fade out as the player enters the city.
+      void this.fadeThemeTo(0, true);
+    } else if (mode === "menu") {
+      if (this.unlocked && this.musicOn) {
+        void this.playTheme({ fadeIn: prev !== "menu" });
+      }
     }
-    this.step = 0;
+    this.notify();
+  }
+
+  private async playTheme(opts: { fadeIn?: boolean; restart?: boolean } = {}) {
+    this.ensureMedia();
+    if (!this.mediaEl || !this.musicGain || !this.ctx || !this.musicOn) return;
+    if (this.mode !== "menu") return;
+
+    if (opts.restart) {
+      try {
+        this.mediaEl.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    try {
+      await this.mediaEl.play();
+    } catch {
+      // Autoplay still blocked — wait for next gesture.
+      return;
+    }
+
+    const target = this.musicVol;
+    if (!this.graphOk) {
+      this.mediaEl.volume = target;
+      return;
+    }
+    if (opts.fadeIn) {
+      this.rampMusicGain(0.0001, target, FADE_MS);
+    } else {
+      this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.musicGain.gain.setValueAtTime(target, this.ctx.currentTime);
+    }
+  }
+
+  private async fadeThemeTo(target: number, pauseWhenSilent: boolean) {
+    if (!this.musicGain || !this.ctx) return;
+    if (!this.graphOk && this.mediaEl) {
+      this.mediaEl.volume = Math.min(1, Math.max(0, target));
+    }
+    const from = Math.max(0.0001, this.musicGain.gain.value || 0.0001);
+    this.rampMusicGain(from, Math.max(0.0001, target), FADE_MS);
+
+    if (this.fadeTimer != null) {
+      window.clearTimeout(this.fadeTimer);
+      this.fadeTimer = null;
+    }
+    if (pauseWhenSilent && target <= 0.001) {
+      this.fadeTimer = window.setTimeout(() => {
+        this.fadeTimer = null;
+        try {
+          this.mediaEl?.pause();
+        } catch {
+          /* ignore */
+        }
+      }, FADE_MS + 40);
+    }
+  }
+
+  private rampMusicGain(from: number, to: number, ms: number) {
+    if (!this.musicGain || !this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    this.musicGain.gain.cancelScheduledValues(t0);
+    this.musicGain.gain.setValueAtTime(Math.max(0.0001, from), t0);
+    this.musicGain.gain.linearRampToValueAtTime(Math.max(0.0001, to), t0 + ms / 1000);
   }
 
   private tone(
@@ -277,60 +435,6 @@ class CityAudioEngine {
     src.stop(t0 + dur);
   }
 
-  /** OrbitX City theme — cyber ambient loop (menu brighter, world softer). */
-  private scheduleBarStep(step: number) {
-    if (!this.ctx || !this.musicGain || !this.musicOn || this.mode === "off") return;
-    const world = this.mode === "world";
-    const mul = world ? 0.72 : 1;
-
-    // Soft pulse on beats 1 & 3
-    if (step % 8 === 0) {
-      this.tone(55, 0.18, "sine", 0.22 * mul, this.musicGain);
-      this.noiseBurst(0.06, 0.08 * mul, this.musicGain, 0, 200);
-    }
-    // Offbeat hush
-    if (step % 8 === 4) {
-      this.tone(82.4, 0.12, "triangle", 0.08 * mul, this.musicGain);
-    }
-
-    // Bass line (bar pattern)
-    const bass = [NOTE.A2, NOTE.A2, NOTE.C3, NOTE.E3, NOTE.G3, NOTE.E3, NOTE.D3, NOTE.C3];
-    if (step % 2 === 0) {
-      const idx = Math.floor(step / 2) % bass.length;
-      this.tone(bass[idx]!, 0.28, "sawtooth", 0.07 * mul, this.musicGain);
-    }
-
-    // Pad chords every half-bar
-    if (step % 16 === 0) {
-      const chords =
-        Math.floor(step / 16) % 2 === 0
-          ? [NOTE.A3, NOTE.C4, NOTE.E4]
-          : [NOTE.G3, NOTE.C4, NOTE.D4];
-      for (const f of chords) {
-        this.tone(f, 1.6, "sine", 0.045 * mul, this.musicGain);
-        this.tone(f * 2, 1.6, "triangle", 0.02 * mul, this.musicGain);
-      }
-    }
-
-    // Arpeggio sparkle
-    const arp = [NOTE.A4, NOTE.C5, NOTE.E5, NOTE.C5, NOTE.G4, NOTE.A4, NOTE.E4, NOTE.C5];
-    if (!world || step % 2 === 0) {
-      if (step % 2 === 0) {
-        const f = arp[(step / 2) % arp.length]!;
-        this.tone(f, 0.22, "triangle", (world ? 0.035 : 0.055) * mul, this.musicGain);
-      }
-    }
-
-    // Signature lead motif every 2 bars (OrbitX hook)
-    // A4 → C5 → E5 → G4 → A4
-    if (step === 0 || step === 32) {
-      const motif = [NOTE.A4, NOTE.C5, NOTE.E5, NOTE.G4, NOTE.A4];
-      motif.forEach((f, i) => {
-        this.tone(f, 0.35, "square", 0.04 * mul, this.musicGain, i * 0.18);
-      });
-    }
-  }
-
   /** One-shot SFX */
   play(kind: "ui" | "confirm" | "interact" | "coin" | "enter" | "deny" | "whoosh") {
     void this.unlock();
@@ -370,7 +474,16 @@ class CityAudioEngine {
   }
 
   dispose() {
-    this.stopLoop();
+    if (this.fadeTimer != null) window.clearTimeout(this.fadeTimer);
+    try {
+      this.mediaEl?.pause();
+    } catch {
+      /* ignore */
+    }
+    this.mediaEl = null;
+    this.mediaNode = null;
+    this.graphOk = false;
+    this.kickedPlay = false;
     void this.ctx?.close();
     this.ctx = null;
     this.master = null;

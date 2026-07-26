@@ -18,6 +18,7 @@ import {
   Wallet, Loader2, Rocket, Briefcase, Image as ImageIcon, LineChart as LineChartIcon,
   Download, TrendingUp, TrendingDown, Trophy, ExternalLink, Coins,
 } from "lucide-react";
+import { TabHero } from "./TabHero";
 
 type Tab = "assets" | "nfts" | "performance" | "launches";
 const PIE_COLORS = ["hsl(var(--pf-green))", "hsl(var(--pf-gold))", "hsl(var(--pf-blue))", "hsl(var(--pf-red))", "hsl(152 60% 65%)", "hsl(42 70% 70%)", "hsl(190 70% 65%)", "hsl(356 60% 70%)"];
@@ -108,10 +109,13 @@ export default function LaunchpadPortfolio() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-5 flex items-center gap-2">
-        <Briefcase className="h-5 w-5 text-[hsl(var(--pf-green))]" />
-        <h1 className="text-xl font-black tracking-tight text-[hsl(var(--pf-ink))]">Portfolio</h1>
-      </div>
+      <TabHero
+        icon={Briefcase}
+        accent="purple"
+        eyebrow="Portfolio · wallet native"
+        title="Your portfolio"
+        subtitle="Holdings, NFTs, realized P&L, and coins you launched — all from this wallet."
+      />
 
       <div className="pf-card mb-4 p-5">
         <div className="pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">Total portfolio value</div>
@@ -130,8 +134,8 @@ export default function LaunchpadPortfolio() {
       <div className="mb-4 flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wide transition ${
-              tab === t.id ? "bg-[hsl(var(--pf-green))] text-black" : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))]"
+            className={`ox-nav-pill inline-flex shrink-0 items-center gap-1.5 px-4 py-2 text-xs font-bold uppercase tracking-wide transition ${
+              tab === t.id ? "ox-nav-pill--on" : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))]"
             }`}>
             <t.icon className="h-3.5 w-3.5" /> {t.label}
           </button>

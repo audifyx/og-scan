@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Billboard, Text } from "@react-three/drei";
 import * as THREE from "three";
-import type { AvatarAppearance, Vec3, WorldBlockConfig } from "@/lib/orbitxcity/types";
+import type { AvatarAppearance, BuildingDefinition, Vec3, WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
-import { collidesAt, pointInBuilding } from "@/lib/orbitxcity/collision";
+import { collidesAt, collidesInInterior, pointInBuilding } from "@/lib/orbitxcity/collision";
 import { consumeZoom, virtualInput } from "@/lib/orbitxcity/input";
 import type { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
 import { CharacterMesh, type CharacterAnimationState } from "./CharacterMesh";
@@ -50,6 +50,8 @@ interface PlayerAvatarProps {
   block?: WorldBlockConfig;
   /** Ignore this building's collider (player is inside). */
   ignoreBuildingId?: string | null;
+  /** Active interior receives its own walls and furniture collision. */
+  interiorBuilding?: BuildingDefinition | null;
 }
 
 export function PlayerAvatar({
@@ -60,6 +62,7 @@ export function PlayerAvatar({
   emoteAt = 0,
   block = NYC_DEMO_BLOCK,
   ignoreBuildingId = null,
+  interiorBuilding = null,
 }: PlayerAvatarProps) {
   const group = useRef<THREE.Group>(null);
   const flame = useRef<THREE.Mesh>(null);
@@ -72,6 +75,8 @@ export function PlayerAvatar({
   blockRef.current = block;
   const ignoreRef = useRef(ignoreBuildingId);
   ignoreRef.current = ignoreBuildingId;
+  const interiorRef = useRef(interiorBuilding);
+  interiorRef.current = interiorBuilding;
   const pos = useRef(new THREE.Vector3(spawn.x, 0, spawn.z));
   const yaw = useRef(0);
   const vy = useRef(0);
@@ -142,8 +147,19 @@ export function PlayerAvatar({
       const nextZ = pos.current.z + nz * t;
       const world = blockRef.current;
       const ignore = ignoreRef.current;
-      if (!collidesAt(nextX, pos.current.z, 0.45, world, ignore)) pos.current.x = nextX;
-      if (!collidesAt(pos.current.x, nextZ, 0.45, world, ignore)) pos.current.z = nextZ;
+      const interior = interiorRef.current;
+      if (
+        !collidesAt(nextX, pos.current.z, 0.45, world, ignore) &&
+        (!interior || !collidesInInterior(nextX, pos.current.z, 0.45, interior))
+      ) {
+        pos.current.x = nextX;
+      }
+      if (
+        !collidesAt(pos.current.x, nextZ, 0.45, world, ignore) &&
+        (!interior || !collidesInInterior(pos.current.x, nextZ, 0.45, interior))
+      ) {
+        pos.current.z = nextZ;
+      }
       bob.current += t * (sprinting ? 14 : 10);
     } else {
       bob.current *= 0.9;

@@ -66,17 +66,7 @@ const WhaleIntel = lazyWithRetry(() => import("./crypto/pages/WhaleIntel"));
 const SentimentIntel = lazyWithRetry(() => import("./crypto/pages/SentimentIntel"));
 const LaunchStudio = lazyWithRetry(() => import("./crypto/pages/LaunchStudio"));
 const WalletTracker = lazyWithRetry(() => import("./crypto/pages/WalletTracker"));
-const SocialLayout = lazyWithRetry(() => import("./social/pages/SocialLayout"));
-const SocialHomeHq = lazyWithRetry(() => import("./social/pages/SocialHome"));
-const NetworkFeed = lazyWithRetry(() => import("./social/pages/NetworkFeed"));
-const CommunitiesHub = lazyWithRetry(() => import("./social/pages/CommunitiesHub"));
-const TradingCommunities = lazyWithRetry(() => import("./social/pages/TradingCommunities"));
-const VoiceSpaces = lazyWithRetry(() => import("./social/pages/VoiceSpaces"));
-const GrowthCenter = lazyWithRetry(() => import("./social/pages/GrowthCenter"));
-const LeaderboardsPage = lazyWithRetry(() => import("./social/pages/LeaderboardsPage"));
-const CreatorProgram = lazyWithRetry(() => import("./social/pages/CreatorProgram"));
-const NotificationsPage = lazyWithRetry(() => import("./social/pages/NotificationsPage"));
-const ProfileView = lazyWithRetry(() => import("./social/pages/ProfileView"));
+const SocialAppPage = lazyWithRetry(() => import("./pages/SocialAppPage"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
 const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
@@ -86,6 +76,10 @@ import LaunchpadProfile from "./pages/orbitx/LaunchpadProfile";
 import LaunchpadLeaderboard from "./pages/orbitx/LaunchpadLeaderboard";
 import LaunchpadCreator from "./pages/orbitx/LaunchpadCreator";
 import LaunchpadPortfolio from "./pages/orbitx/LaunchpadPortfolio";
+import BagworkLayout from "./pages/bagwork/BagworkLayout";
+import BagworkHome from "./pages/bagwork/BagworkHome";
+import BagworkMyWork from "./pages/bagwork/BagworkMyWork";
+import BagworkAdmin from "./pages/bagwork/BagworkAdmin";
 import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
 import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
 import LaunchpadAdmin from "./pages/orbitx/LaunchpadAdmin";
@@ -191,6 +185,8 @@ function RouteFallback({ label }: { label: string }) {
 }
 
 
+const SOCIAL_FALLBACK = <RouteFallback label="Social" />;
+
 // Redirect legacy crypto/tools/coin routes into the OrbitX DEX app (/ORBITX_DEX).
 function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undefined>) => string) }) {
   const params = useParams();
@@ -200,6 +196,7 @@ function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undef
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
+
 
 const App = () => (
   <ErrorBoundary>
@@ -296,6 +293,13 @@ const App = () => (
               <Route path="admin" element={<NotFound />} />
             </Route>
 
+            {/* ── Bagwork — earn USDC for tasks ── */}
+            <Route path="/bagwork" element={<BagworkLayout />}>
+              <Route index element={<BagworkHome />} />
+              <Route path="my" element={<BagworkMyWork />} />
+              <Route path="admin" element={<AdminRoute><BagworkAdmin /></AdminRoute>} />
+            </Route>
+
             {/* ── Terminal UI: Trading Platform Style ── */}
             {/* ── OrbitX NFT Marketplace (dedicated /nft route) ── */}
             <Route path="/nft" element={<Suspense fallback={null}><NftMarketLayout /></Suspense>}>
@@ -332,23 +336,37 @@ const App = () => (
               <Route path="wallet/:address" element={<Suspense fallback={<RouteFallback label="Wallet" />}><WalletTracker /></Suspense>} />
             </Route>
 
-            {/* ── OrbitX Social HQ (Social + Growth Team) ── */}
-            <Route path="/hq" element={<Suspense fallback={<RouteFallback label="Social HQ" />}><SocialLayout /></Suspense>}>
-              <Route index element={<Suspense fallback={<RouteFallback label="HQ" />}><SocialHomeHq /></Suspense>} />
-              <Route path="feed" element={<Suspense fallback={<RouteFallback label="Feed" />}><NetworkFeed /></Suspense>} />
-              <Route path="communities" element={<Suspense fallback={<RouteFallback label="Communities" />}><CommunitiesHub /></Suspense>} />
-              <Route path="trading" element={<Suspense fallback={<RouteFallback label="Trading rooms" />}><TradingCommunities /></Suspense>} />
-              <Route path="voice" element={<Suspense fallback={<RouteFallback label="Voice" />}><VoiceSpaces /></Suspense>} />
-              <Route path="growth" element={<Suspense fallback={<RouteFallback label="Growth" />}><GrowthCenter /></Suspense>} />
-              <Route path="leaderboards" element={<Suspense fallback={<RouteFallback label="Leaderboards" />}><LeaderboardsPage /></Suspense>} />
-              <Route path="creators" element={<Suspense fallback={<RouteFallback label="Creators" />}><CreatorProgram /></Suspense>} />
-              <Route path="notifications" element={<Suspense fallback={<RouteFallback label="Alerts" />}><NotificationsPage /></Suspense>} />
-              <Route path="profile" element={<Suspense fallback={<RouteFallback label="Profile" />}><ProfileView /></Suspense>} />
-              <Route path="profile/:userId" element={<Suspense fallback={<RouteFallback label="Profile" />}><ProfileView /></Suspense>} />
-              <Route path="ox-desk-m4k9q" element={<AdminRoute><Suspense fallback={<RouteFallback label="Moderation" />}><ModerationAdmin /></Suspense></AdminRoute>} />
-              <Route path="admin" element={<NotFound />} />
-              <Route path="invite" element={<Suspense fallback={<RouteFallback label="Invite" />}><InviteLanding /></Suspense>} />
-            </Route>
+            {/* ── OrbitX Social (live Supabase feed via XSocialApp) ── */}
+            <Route
+              path="/orbitx-social"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={SOCIAL_FALLBACK}>
+                    <SocialAppPage />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/social" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/social-hub" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/feed" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/communities" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/trading" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/voice" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/growth" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/leaderboards" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/creators" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/notifications" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/messages" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/chat" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/rooms" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/spaces" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/profile" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/profile/:userId" element={<Navigate to="/orbitx-social" replace />} />
+            <Route path="/hq/ox-desk-m4k9q" element={<AdminRoute><Suspense fallback={<RouteFallback label="Moderation" />}><ModerationAdmin /></Suspense></AdminRoute>} />
+            <Route path="/hq/invite" element={<Suspense fallback={<RouteFallback label="Invite" />}><InviteLanding /></Suspense>} />
+            <Route path="/hq/*" element={<Navigate to="/orbitx-social" replace />} />
 
             {/* ── Protected: App shell ── */}
             <Route path="/app" element={<ProtectedRoute><Hub /></ProtectedRoute>} />
@@ -389,12 +407,9 @@ const App = () => (
             <Route path="/memes" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/art-feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/spaces" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/social" element={<Navigate to="/hq" replace />} />
-            <Route path="/orbitx-social" element={<Navigate to="/hq" replace />} />
             <Route path="/listings" element={<OgdexRedirect to="/ORBITX_DEX/store" />} />
             <Route path="/listings/:mintAddress" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mintAddress}`} />} />
             <Route path="/token-manager" element={<OgdexRedirect to="/ORBITX_DEX/metadata" />} />
-            <Route path="/social-hub" element={<Navigate to="/hq" replace />} />
             <Route path="/community" element={<Navigate to="/community-classic" replace />} />
             <Route path="/community-classic" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
             <Route path="/community-hub" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
@@ -434,6 +449,8 @@ const App = () => (
             <Route path="/leaderboard" element={<OgdexRedirect to="/ORBITX_DEX/leaderboard" />} />
             <Route path="/invite" element={<ProtectedRoute><Invite /></ProtectedRoute>} />
             <Route path="/messages" element={<ProtectedRoute><DirectMessagesPage /></ProtectedRoute>} />
+            <Route path="/rooms" element={<ProtectedRoute><CommunityRooms /></ProtectedRoute>} />
+            <Route path="/community-rooms" element={<ProtectedRoute><CommunityRooms /></ProtectedRoute>} />
 
             {/* Premium removed */}
 

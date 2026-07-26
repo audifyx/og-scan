@@ -1,5 +1,9 @@
 /**
- * OrbitX fee routing — configurable platform revenue-share taken at CLAIM time.
+ * OrbitX fee routing — platform revenue-share taken at CLAIM time.
+ *
+ * Trading fee on OrbitX launches is 0.45% (CREATOR_FEE_BPS). Of every $1 claimed:
+ *   · $0.25 (25%) → ROUTED_FEE_WALLET (admin dashboard claim)
+ *   · $0.75 (75%) → token creator
  *
  * WHY claim-time (and not per-trade): on the pump lane, pump.fun credits 100%
  * of creator fees to the creator-vault PDA; we can't intercept individual
@@ -7,21 +11,26 @@
  * signs in the ClaimPad. So the platform cut is skimmed from the amount being
  * claimed, in the SAME transaction the user signs (atomic, transparent).
  *
- * All values are overridable at runtime (see loadFeeRoutingConfig) so the
+ * Custom lane Token-2022 withholds the full 0.45% on-chain; the same 25% skim
+ * applies when the creator claims + swaps to SOL.
+ *
+ * Values are overridable at runtime (see loadFeeRoutingConfig) so the
  * percentage and destination can be tuned from the admin panel without a
  * redeploy.
  */
 import { PublicKey } from "@solana/web3.js";
+import { TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
 
 /** Destination for routed platform-revenue-share fees (separate from the
  *  launch/swap PLATFORM_WALLET). */
 export const ROUTED_FEE_WALLET = "jYbHk588JspmzG5ibjPpKpCrjNP7epAjBT8Syvu7GUb";
 
-/** Default platform share skimmed from each claim, in basis points (250 = 2.5%). */
-export const DEFAULT_ROUTED_FEE_BPS = 250;
+/** Platform share skimmed from each claim, in basis points.
+ *  2500 = 25% → matches TRADE_FEE_PLATFORM_SHARE_PCT. */
+export const DEFAULT_ROUTED_FEE_BPS = TRADE_FEE_PLATFORM_SHARE_PCT * 100;
 
-/** Hard ceiling so a mis-config can never skim more than this (10%). */
-export const MAX_ROUTED_FEE_BPS = 1000;
+/** Hard ceiling so a mis-config can never skim more than this (50%). */
+export const MAX_ROUTED_FEE_BPS = 5000;
 
 export const ROUTED_FEE_ENABLED = true;
 
@@ -66,5 +75,5 @@ export function computeSkim(grossRaw: bigint, cfg: FeeRoutingConfig = DEFAULT_FE
   return { skimRaw, netRaw: grossRaw - skimRaw };
 }
 
-/** Human-readable percent for UI (e.g. 5 for 500 bps). */
+/** Human-readable percent for UI (e.g. 25 for 2500 bps). */
 export const bpsToPct = (bps: number): number => bps / 100;

@@ -26,7 +26,7 @@ import {
   SystemProgram, PublicKey, LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD } from "@/lib/platformFee";
+import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD } from "@/lib/platformFee";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import {
@@ -564,7 +564,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile) return;
 
     try {
-      /* Step 0 — Platform launch fee ($1.50 in SOL, Solana only) */
+      /* Step 0 — Platform launch fee ($0.90 in SOL, Solana only) */
       if (LAUNCHPAD_FEE_USD > 0) {
         setStep("uploading");
         setStatusMsg("Paying launch fee…");
@@ -985,7 +985,7 @@ Then try connecting again.`;
             )}
 
   <p className="text-center text-[10px] text-white/15 leading-relaxed">
-By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "obx".<br />A $1.50 platform launch fee (paid in SOL) applies on Solana, plus the standard network fee (~0.02 SOL). Other chains are free.
+By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "obx".<br />A ${BASE_LAUNCH_FEE_USD.toFixed(2)} platform launch fee (paid in SOL) applies on Solana, plus the standard network fee (~0.02 SOL). Other chains are free.
             </p>
           </div>
         )}

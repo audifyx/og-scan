@@ -1,18 +1,39 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Gamepad2, Gem, Sparkles, Users } from "lucide-react";
+import {
+  Download,
+  Ellipsis,
+  Gamepad2,
+  Gem,
+  Sparkles,
+  Users,
+  X,
+} from "lucide-react";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
-import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
+import { getWorldBlock } from "@/lib/orbitxcity/worlds";
 import { fetchCityMarketSnapshot, fmtPct } from "@/lib/orbitxcity/marketData";
 import { emptySnapshotGetter, noopSubscribe } from "@/lib/orbitxcity/realtime";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
-import { CityPanelHost, PANEL_NAV } from "./CityPanels";
+import { CityPanelHost, MOBILE_DOCK, MORE_PANELS, PANEL_NAV } from "./CityPanels";
 import { Minimap } from "./Minimap";
 import { TouchControls } from "./TouchControls";
 import { ChatToastHost } from "./ChatToastHost";
 import { AudioToggle } from "./AudioToggle";
+
+function useIsPhone() {
+  const [phone, setPhone] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const on = () => setPhone(mq.matches);
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  return phone;
+}
 
 function TickerBar() {
   const { data } = useQuery({
@@ -57,6 +78,54 @@ function OnlineBadge() {
   );
 }
 
+function InstallChip() {
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferred(e as BeforeInstallPromptEvent);
+    };
+    const onInstalled = () => {
+      setDeferred(null);
+      setHidden(true);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  if (!deferred || hidden) return null;
+  return (
+    <button
+      type="button"
+      className="oxc-toggle-btn on"
+      title="Install OrbitX app"
+      onClick={async () => {
+        try {
+          await deferred.prompt();
+          await deferred.userChoice;
+        } catch {
+          /* ignore */
+        }
+        setDeferred(null);
+      }}
+    >
+      <Download className="h-3.5 w-3.5" />
+      <span className="oxc-install-label">Install</span>
+    </button>
+  );
+}
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
 export function CityHUD() {
   const {
     openPanel,
@@ -74,7 +143,22 @@ export function CityHUD() {
     triggerEmote,
     exitToMenu,
     lobby,
+    selectedCityId,
   } = useCity();
+  const isPhone = useIsPhone();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const locationName = getWorldBlock(selectedCityId).name;
+
+  const dockItems = useMemo(
+    () => (isPhone ? MOBILE_DOCK : PANEL_NAV),
+    [isPhone],
+  );
+
+  useEffect(() => {
+    if (!isPhone) return;
+    // Phones always need the on-screen stick unless the player hides it.
+    if (!touchControls) setTouchControls(true);
+  }, [isPhone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -98,6 +182,7 @@ export function CityHUD() {
       if (e.code === "Escape") {
         e.preventDefault();
         cityAudio.play("ui");
+        setMoreOpen(false);
         closePanel();
       }
     };
@@ -105,29 +190,32 @@ export function CityHUD() {
     return () => window.removeEventListener("keydown", onKey);
   }, [interact, closePanel, openPanel, triggerEmote]);
 
+  useEffect(() => {
+    if (panel !== "none") setMoreOpen(false);
+  }, [panel]);
+
   return (
-    <div className="oxc-hud">
+    <div className={`oxc-hud ${touchControls ? "oxc-hud--touch" : ""} ${isPhone ? "oxc-hud--phone" : ""}`}>
       <header className="oxc-topbar">
         <div className="oxc-brand-lockup">
           <Link to="/" className="oxc-mini-brand">
             OrbitX<span>City</span>
           </Link>
           <div className="oxc-loc">
-            <strong>{NYC_DEMO_BLOCK.name}</strong>
-            <span>
+            <strong>{locationName}</strong>
+            <span className="oxc-loc-detail">
               {playerPos.x.toFixed(0)}, {playerPos.z.toFixed(0)} · @{avatar.name}
             </span>
+            <span className="oxc-loc-mobile">@{avatar.name}</span>
           </div>
         </div>
+
         <div className="oxc-top-actions">
-          <button
-            type="button"
-            className="oxc-lobby-chip"
-            onClick={() => openPanel("lobbies")}
-            title={lobby.label}
-          >
-            <span>{lobby.label}</span>
-          </button>
+          <div className="oxc-shards" title="OBX shards collected">
+            <Gem className="h-3.5 w-3.5" />
+            <span>{shards}</span>
+          </div>
+
           <button
             type="button"
             className="oxc-toggle-btn"
@@ -136,9 +224,19 @@ export function CityHUD() {
           >
             Menu
           </button>
+
+          {/* Desktop / tablet extras */}
           <button
             type="button"
-            className={`oxc-toggle-btn ${touchControls ? "on" : ""}`}
+            className="oxc-lobby-chip oxc-hide-phone"
+            onClick={() => openPanel("lobbies")}
+            title={lobby.label}
+          >
+            <span>{lobby.label}</span>
+          </button>
+          <button
+            type="button"
+            className={`oxc-toggle-btn oxc-hide-phone ${touchControls ? "on" : ""}`}
             onClick={() => setTouchControls(!touchControls)}
             title={touchControls ? "Hide touch controls" : "Show touch controls"}
             aria-pressed={touchControls}
@@ -147,28 +245,101 @@ export function CityHUD() {
           </button>
           <button
             type="button"
-            className={`oxc-toggle-btn ${quality === "high" ? "on" : ""}`}
+            className={`oxc-toggle-btn oxc-hide-phone ${quality === "high" ? "on" : ""}`}
             onClick={() => setQuality(quality === "high" ? "lite" : "high")}
-            title={`Graphics: ${quality === "high" ? "High (FX on)" : "Lite (fast)"}`}
+            title={`Graphics: ${quality === "high" ? "High" : "Lite"}`}
             aria-pressed={quality === "high"}
           >
             <Sparkles className="h-3.5 w-3.5" />
           </button>
-          <AudioToggle />
-          <OnlineBadge />
-          <div className="oxc-shards" title="OBX shards collected">
-            <Gem className="h-3.5 w-3.5" />
-            <span>{shards}</span>
+          <span className="oxc-hide-phone">
+            <AudioToggle />
+          </span>
+          <span className="oxc-hide-phone">
+            <OnlineBadge />
+          </span>
+          <div className="oxc-wallet-slot oxc-hide-phone">
+            <WalletConnectButton />
           </div>
-          <WalletConnectButton />
+
+          {/* Phone: one overflow button instead of a crowded top bar */}
+          <button
+            type="button"
+            className={`oxc-toggle-btn oxc-show-phone ${moreOpen ? "on" : ""}`}
+            aria-label="More"
+            aria-expanded={moreOpen}
+            onClick={() => {
+              cityAudio.play("ui");
+              setMoreOpen((v) => !v);
+            }}
+          >
+            {moreOpen ? <X className="h-3.5 w-3.5" /> : <Ellipsis className="h-3.5 w-3.5" />}
+          </button>
         </div>
       </header>
 
-      <TickerBar />
+      {moreOpen && (
+        <div className="oxc-more-sheet" role="dialog" aria-label="More controls">
+          <div className="oxc-more-grid">
+            {MORE_PANELS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="oxc-more-btn"
+                  onClick={() => {
+                    cityAudio.play("ui");
+                    setMoreOpen(false);
+                    openPanel(item.id);
+                  }}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="oxc-more-tools">
+            <InstallChip />
+            <button
+              type="button"
+              className={`oxc-toggle-btn ${quality === "high" ? "on" : ""}`}
+              onClick={() => setQuality(quality === "high" ? "lite" : "high")}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              {quality === "high" ? "High FX" : "Lite FX"}
+            </button>
+            <button
+              type="button"
+              className={`oxc-toggle-btn ${touchControls ? "on" : ""}`}
+              onClick={() => setTouchControls(!touchControls)}
+            >
+              <Gamepad2 className="h-3.5 w-3.5" />
+              Touch
+            </button>
+            <AudioToggle />
+            <OnlineBadge />
+            <button type="button" className="oxc-toggle-btn" onClick={() => { setMoreOpen(false); openPanel("lobbies"); }}>
+              Lobby
+            </button>
+            <button type="button" className="oxc-toggle-btn" onClick={() => { setMoreOpen(false); openPanel("settings"); }}>
+              Settings
+            </button>
+            <div className="oxc-more-wallet">
+              <WalletConnectButton />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="oxc-ticker-wrap">
+        <TickerBar />
+      </div>
       <Minimap />
 
       <nav className="oxc-dock" aria-label="City panels">
-        {PANEL_NAV.map((item) => {
+        {dockItems.map((item) => {
           const Icon = item.icon;
           const active = panel === item.id;
           return (
@@ -186,17 +357,30 @@ export function CityHUD() {
             </button>
           );
         })}
+        {isPhone && (
+          <button
+            type="button"
+            className={`oxc-dock-btn ${moreOpen ? "active" : ""}`}
+            onClick={() => {
+              cityAudio.play("ui");
+              setMoreOpen((v) => !v);
+            }}
+          >
+            <Ellipsis className="h-4 w-4" />
+            <span>More</span>
+          </button>
+        )}
       </nav>
 
       {prompt && (
         <div className="oxc-prompt">
           <div className="oxc-prompt-key">E</div>
-          <div>
+          <div className="oxc-prompt-copy">
             <strong>{prompt.label}</strong>
             <span>{prompt.hint}</span>
           </div>
           <button type="button" className="oxc-btn primary compact" onClick={interact}>
-            Interact
+            Go
           </button>
         </div>
       )}

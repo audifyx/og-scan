@@ -1,5 +1,13 @@
 import { NYC_DEMO_BLOCK } from "./demoBlock";
-import type { WorldBlockConfig } from "./types";
+import { furnitureSolids, resolveRoomTheme } from "./interiorLayout";
+import type { BuildingDefinition, WorldBlockConfig } from "./types";
+
+export function interiorMetrics(building: BuildingDefinition) {
+  const width = Math.max(5.2, Math.min(14, building.size.width - 0.8));
+  const depth = Math.max(5.2, Math.min(14, building.size.depth - 0.8));
+  const theme = resolveRoomTheme(building);
+  return { width, depth, theme, solids: furnitureSolids(theme, width, depth) };
+}
 
 /** 2D collision against building AABBs + world bounds. */
 export function collidesAt(
@@ -21,6 +29,47 @@ export function collidesAt(
     }
   }
   return x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ;
+}
+
+/**
+ * Collision for the active building interior. Coordinates are world-space so
+ * this layers cleanly over exterior collision while the active shell is
+ * ignored. It keeps players within the furnished room and makes counters /
+ * stages solid without adding a heavyweight physics engine.
+ */
+export function collidesInInterior(
+  x: number,
+  z: number,
+  radius: number,
+  building: BuildingDefinition,
+): boolean {
+  const { width, depth, theme, solids } = interiorMetrics(building);
+  const localX = x - building.position.x;
+  const localZ = z - building.position.z;
+  const halfW = width / 2;
+  const halfD = depth / 2;
+  const wall = 0.28;
+
+  if (
+    localX - radius < -halfW + wall ||
+    localX + radius > halfW - wall ||
+    localZ - radius < -halfD + wall ||
+    localZ + radius > halfD - wall
+  ) {
+    return true;
+  }
+
+  if (theme === "launch" && Math.hypot(localX, localZ + 0.15) < 1.45 + radius) {
+    return true;
+  }
+
+  return solids.some(
+    (s) =>
+      localX + radius > s.x - s.w / 2 &&
+      localX - radius < s.x + s.w / 2 &&
+      localZ + radius > s.z - s.d / 2 &&
+      localZ - radius < s.z + s.d / 2,
+  );
 }
 
 /** Deterministic PRNG so world decoration is stable across renders. */

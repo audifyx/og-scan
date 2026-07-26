@@ -211,13 +211,9 @@ export default function Screener() {
                 <button
                   key={cat.id}
                   onClick={() => switchCategory(cat.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border shrink-0 whitespace-nowrap
-                    ${active
-                      ? "text-white border-accent/60 shadow-glow-blue"
-                      : "text-muted border-line hover:text-white hover:border-accent/30 bg-panel"}`}
-                  style={active ? { background: "linear-gradient(135deg, rgba(0,255,163,0.22), rgba(0,209,255,0.16))" } : undefined}
+                  className={`dex-cat-pill ${active ? "dex-cat-pill--on" : ""}`}
                 >
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? "text-accent" : ""}`} />
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
                   {cat.label}
                 </button>
               );
@@ -233,13 +229,13 @@ export default function Screener() {
                 <button
                   key={t.id}
                   onClick={() => switchTab(t.id)}
-                  className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all
-                    ${active ? "text-white bg-accent/10" : "text-muted hover:text-white hover:bg-white/5"}`}
+                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
+                    ${active ? "text-white bg-white/[0.06]" : "text-muted hover:text-white hover:bg-white/5"}`}
                   title={t.desc}
                 >
                   <Icon className={`w-3 h-3 shrink-0 ${active ? "text-accent" : ""}`} />
                   {t.label}
-                  {active && <span className="absolute -bottom-px left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-accent" />}
+                  {active && <span className="absolute -bottom-px left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-[var(--ox-gold-hi)]" />}
                 </button>
               );
             })}
@@ -300,9 +296,9 @@ export default function Screener() {
       ) : tab === "listed" && !q ? (
         <ListedView listings={listings} loading={loading} />
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-hidden dex-panel !p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm" style={{ minWidth: isUnbonded ? 700 : 860 }}>
+            <table className="dex-token-table" style={{ minWidth: isUnbonded ? 700 : 860 }}>
               <thead>
                 <tr className="text-muted text-xs border-b border-line">
                   <th className="text-left font-medium px-4 py-3 w-8">#</th>
@@ -343,8 +339,7 @@ export default function Screener() {
                     <tr
                       key={(r.mint || r.poolAddress || i) + i}
                       onClick={() => isExternal ? null : nav(`/token/${r.mint}`)}
-                      className={`border-b border-line/50 transition-colors
-                        ${isExternal ? "cursor-default" : "hover:bg-panel2/60 cursor-pointer"}`}
+                      className={`dex-token-row border-b border-line/50 ${isExternal ? "cursor-default" : ""}`}
                     >
                       <td className="px-4 py-3 text-muted text-xs">{i + 1}</td>
                       <td className="px-2 py-3">

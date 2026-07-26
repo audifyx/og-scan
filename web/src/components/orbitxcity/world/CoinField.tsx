@@ -1,16 +1,8 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { Vec3 } from "@/lib/orbitxcity/types";
-
-const SPOTS: Array<[number, number]> = [
-  [0, 4], [3, -3], [-3, -6], [8, 0], [-8, 2], [0, -8],
-  [12, 10], [-12, 8], [10, -10], [-10, -12], [2, 20], [-2, -20],
-  [20, -8], [-20, -4],
-  // Outer districts
-  [34, 14], [40, -6], [-33, -6], [-42, -34], [0, -36], [14, 36],
-  [-14, 34], [46, 34], [-46, -46], [20, -40], [34, 46], [-46, 36],
-];
+import type { Vec3, WorldBlockConfig } from "@/lib/orbitxcity/types";
+import { collidesAt, randomOpenPoint, hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
 
 const RESPAWN_SECONDS = 25;
 const PICKUP_RADIUS = 1.1;
@@ -19,21 +11,51 @@ interface CoinState {
   collectedAt: number | null;
 }
 
+function buildShardSpots(block: WorldBlockConfig): Array<[number, number]> {
+  const rand = mulberry32(hashSeed(`${block.cityId}-shards`));
+  const spots: Array<[number, number]> = [];
+  // Each landmark has a nearby pickup route, then open-world nodes fill out
+  // the remaining circuit. This keeps collectibles in the active city.
+  for (const zone of block.zones) {
+    const angle = rand() * Math.PI * 2;
+    const radius = Math.max(zone.radius + 1.4, 3.4);
+    const x = zone.position.x + Math.cos(angle) * radius;
+    const z = zone.position.z + Math.sin(angle) * radius;
+    const candidate = randomOpenPoint(() => rand(), 3, block);
+    spots.push(collidesAt(x, z, 0.7, block) ? [candidate.x, candidate.z] : [x, z]);
+  }
+  while (spots.length < 24) {
+    const p = randomOpenPoint(rand, 3, block);
+    spots.push([p.x, p.z]);
+  }
+  return spots;
+}
+
 /** Collectible OBX shards — walk over them to bank shards in your inventory. */
 export function CoinField({
   playerPos,
   onCollect,
   lite = false,
+  block,
 }: {
   playerPos: Vec3;
   onCollect: () => void;
   lite?: boolean;
+  block: WorldBlockConfig;
 }) {
-  const activeSpots = useMemo(() => (lite ? SPOTS.slice(0, 10) : SPOTS), [lite]);
+  const activeSpots = useMemo(() => {
+    const spots = buildShardSpots(block);
+    return lite ? spots.slice(0, 10) : spots;
+  }, [block, lite]);
   const coins = useRef<CoinState[]>(activeSpots.map(() => ({ collectedAt: null })));
   const groupRefs = useRef<Array<THREE.Group | null>>([]);
   const player = useRef(playerPos);
   player.current = playerPos;
+
+  useEffect(() => {
+    coins.current = activeSpots.map(() => ({ collectedAt: null }));
+    groupRefs.current = [];
+  }, [activeSpots]);
 
   const goldMat = useMemo(
     () => new THREE.MeshStandardMaterial({ color: "#f5c542", emissive: "#f5a742", emissiveIntensity: 0.7, metalness: 0.85, roughness: 0.2 }),

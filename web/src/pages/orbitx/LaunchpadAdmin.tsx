@@ -4,17 +4,28 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import {
   LayoutDashboard, Coins, Rocket, Users, TrendingUp, Wallet, Star, EyeOff, Eye, Search,
-  Loader2, ExternalLink, ShieldCheck, RefreshCw, Award, Flame,
+  Loader2, ExternalLink, ShieldCheck, RefreshCw, Award, Flame, HandCoins,
 } from "lucide-react";
 import { adminListTokens, adminSetFeatured, adminSetHidden } from "@/lib/orbitx/admin";
 import { computeLaunchStats, fetchFeeWallets } from "@/lib/orbitx/adminAnalytics";
+import {
+  matchFeeSource,
+  getSweepableSol,
+  buildPlatformFeeSweepTx,
+  getPlatformPumpClaimableSol,
+  buildPlatformPumpClaimTx,
+  PLATFORM_FEE_SOURCES,
+} from "@/lib/orbitx/platformFeeClaim";
 import type { OrbitxToken } from "@/lib/orbitx/registry";
 import { useSolUsd } from "./lpx";
+import { useWalletSignIn } from "@/hooks/useWalletSignIn";
+import { WalletPickerModal } from "@/components/WalletPickerModal";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const fmtInt = (n: number) => n.toLocaleString();
@@ -41,6 +52,194 @@ function StatCard({ label, value, sub, icon: Icon, tone = "gold" }: {
 
 const chartAxis = { stroke: "rgba(255,255,255,0.4)", fontSize: 10 };
 const tooltipStyle = { background: "#0a0f1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 };
+
+function ClaimPlatformFeesPanel({ solUsd }: { solUsd: number }) {
+  const { connection } = useConnection();
+  const { publicKey, connected, signTransaction } = useWallet();
+  const { pickable, signInWith, busy: walletBusy } = useWalletSignIn();
+  const [picker, setPicker] = useState(false);
+  const [destination, setDestination] = useState("");
+  const [claiming, setClaiming] = useState<"sweep" | "pump" | null>(null);
+  const qc = useQueryClient();
+
+  const addr = publicKey?.toBase58() ?? null;
+  const source = matchFeeSource(addr);
+
+  const sweepableQ = useQuery({
+    queryKey: ["admin-fee-sweepable", addr],
+    enabled: !!source,
+    refetchInterval: 30_000,
+    queryFn: () => getSweepableSol(connection, source!.wallet),
+  });
+
+  const pumpClaimableQ = useQuery({
+    queryKey: ["admin-fee-pump-claimable", addr],
+    enabled: !!source,
+    refetchInterval: 30_000,
+    queryFn: () => getPlatformPumpClaimableSol(connection, source!.wallet),
+  });
+
+  const onPick = async (name: string) => {
+    try {
+      await signInWith(name, { connectOnly: true });
+      setPicker(false);
+      toast.success("Fee wallet connected");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Connect failed");
+    }
+  };
+
+  const claimSweep = async () => {
+    if (!source || !publicKey || !signTransaction) return;
+    const dest = destination.trim();
+    if (!dest) return toast.error("Enter a payout destination wallet");
+    setClaiming("sweep");
+    try {
+      const { tx, sol, blockhash, lastValidBlockHeight } = await buildPlatformFeeSweepTx(connection, source.wallet, dest);
+      const signed = await signTransaction(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+      await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+      toast.success(`Claimed ${sol.toFixed(4)} SOL → ${short(dest)}`, {
+        action: { label: "Solscan", onClick: () => window.open(`https://solscan.io/tx/${sig}`, "_blank") },
+      });
+      setDestination("");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["admin-fee-wallets"] }),
+        qc.invalidateQueries({ queryKey: ["admin-fee-sweepable"] }),
+      ]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Claim failed");
+    } finally {
+      setClaiming(null);
+    }
+  };
+
+  const claimPump = async () => {
+    if (!source || !publicKey || !signTransaction) return;
+    setClaiming("pump");
+    try {
+      const tx = await buildPlatformPumpClaimTx(source.wallet);
+      const signed = await signTransaction(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
+      await connection.confirmTransaction(sig, "confirmed");
+      toast.success("Claimed pump.fun creator fees into this fee wallet", {
+        action: { label: "Solscan", onClick: () => window.open(`https://solscan.io/tx/${sig}`, "_blank") },
+      });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["admin-fee-wallets"] }),
+        qc.invalidateQueries({ queryKey: ["admin-fee-sweepable"] }),
+        qc.invalidateQueries({ queryKey: ["admin-fee-pump-claimable"] }),
+      ]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Pump claim failed");
+    } finally {
+      setClaiming(null);
+    }
+  };
+
+  const sweepable = sweepableQ.data ?? 0;
+  const pumpClaimable = pumpClaimableQ.data ?? 0;
+
+  return (
+    <div className="glass-card rounded-xl border border-[hsl(var(--og-gold))]/30 bg-[hsl(var(--og-gold))]/5 p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <HandCoins className="h-4 w-4 text-[hsl(var(--og-gold))]" />
+          <div>
+            <div className="text-sm font-bold text-foreground">Claim platform fees</div>
+            <div className="text-[11px] text-muted-foreground">
+              25% of trade fees from launchpad tokens (of every $1: $0.25 here · $0.75 to creators). Connect a fee wallet, then sweep SOL to your payout address.
+            </div>
+          </div>
+        </div>
+        {!connected || !source ? (
+          <button
+            type="button"
+            onClick={() => setPicker(true)}
+            disabled={!!walletBusy}
+            className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--og-gold))]/50 bg-[hsl(var(--og-gold))]/15 px-3 py-2 text-xs font-bold text-[hsl(var(--og-gold))] hover:bg-[hsl(var(--og-gold))]/25"
+          >
+            {walletBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />}
+            Connect fee wallet
+          </button>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 px-2.5 py-1 font-mono text-[10px] font-bold text-[hsl(var(--og-lime))]">
+            {source.label.split(" ")[0]} · {short(source.wallet)}
+          </span>
+        )}
+      </div>
+
+      <div className="mb-3 grid gap-2 text-[11px] text-muted-foreground sm:grid-cols-2">
+        {PLATFORM_FEE_SOURCES.map((s) => (
+          <div key={s.id} className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+            <div className="font-semibold text-foreground/80">{s.label}</div>
+            <div className="font-mono">{short(s.wallet)}</div>
+          </div>
+        ))}
+      </div>
+
+      {source ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-4 text-sm">
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Sweepable</div>
+              <div className="font-mono text-lg font-bold text-[hsl(var(--og-gold))]">
+                {sweepableQ.isLoading ? "…" : `${fmtSol(sweepable)} SOL`}
+              </div>
+              <div className="text-[11px] text-muted-foreground">{fmtUsd(sweepable * solUsd)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Pump vault</div>
+              <div className="font-mono text-lg font-bold text-[hsl(var(--og-lime))]">
+                {pumpClaimableQ.isLoading ? "…" : `${fmtSol(pumpClaimable)} SOL`}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={destination}
+              onChange={(e) => setDestination(e.target.value.trim())}
+              placeholder="Payout destination wallet…"
+              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/50 px-3 py-2 font-mono text-xs text-foreground outline-none focus:border-[hsl(var(--og-gold))]"
+            />
+            <button
+              type="button"
+              onClick={claimSweep}
+              disabled={!!claiming || sweepable <= 0 || !destination.trim()}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[hsl(var(--og-gold))] px-4 py-2 text-sm font-black text-black disabled:opacity-40"
+            >
+              {claiming === "sweep" ? <Loader2 className="h-4 w-4 animate-spin" /> : <HandCoins className="h-4 w-4" />}
+              Claim platform fees
+            </button>
+          </div>
+
+          {pumpClaimable > 0.0001 && (
+            <button
+              type="button"
+              onClick={claimPump}
+              disabled={!!claiming}
+              className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--og-lime))]/40 px-3 py-2 text-xs font-bold text-[hsl(var(--og-lime))] hover:bg-[hsl(var(--og-lime))]/10 disabled:opacity-40"
+            >
+              {claiming === "pump" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
+              Also claim pump.fun vault ({fmtSol(pumpClaimable)} SOL)
+            </button>
+          )}
+
+          <p className="text-[10px] text-muted-foreground">
+            Leaves 0.005 SOL on the fee wallet for rent. Destination must differ from the fee source.
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Switch Phantom (or your signer) to either fee wallet above, then claim.
+        </p>
+      )}
+
+      <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={onPick} busy={walletBusy} />
+    </div>
+  );
+}
 
 export default function LaunchpadAdmin() {
   const qc = useQueryClient();
@@ -128,6 +327,8 @@ export default function LaunchpadAdmin() {
 
       {tab === "overview" && (
         <div className="space-y-6">
+          <ClaimPlatformFeesPanel solUsd={solUsd} />
+
           {/* Fee revenue */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {(feesQ.data ?? []).map((w) => (

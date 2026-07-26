@@ -2,7 +2,7 @@
  * OrbitxLaunch — the Orbitx Launch Console (mounted at /orbitxlaunch).
  *
  * Premium space-themed CUSTOM Solana launchpad — REAL on-chain launch on
- * mainnet: own Token-2022 SPL mint + on-chain metadata + 0.30% creator fee
+ * mainnet: own Token-2022 SPL mint + on-chain metadata + 0.45% creator fee
  * on every buy/sell (pump.fun's creator-fee rate, claimable in-app at
  * /orbitxlaunch/claim) + optional Raydium CPMM pool. NOT pump.fun.
  */
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Rocket, Wallet, Globe, Twitter, Send, MessagesSquare, Upload, Image as ImageIcon,
@@ -33,6 +33,7 @@ import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, 
 import { checkAntiVamp, registerToken, recordReferralEarning } from "@/lib/orbitx/registry";
 import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
 import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
+import { consumeTokenCreatePrefill, peekTokenCreatePrefill } from "@/lib/orbitx/tokenCreatePrefill";
 import { supabase } from "@/lib/supabase";
 import { Confetti } from "./lpx";
 
@@ -201,6 +202,7 @@ function humanTime(sec: number) {
 export default function LaunchpadCreate() {
   const { connected, publicKey, connect, wallets, select, signTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
+  const [params] = useSearchParams();
   const [cfg, setCfg] = useState<LaunchConfig>(DEFAULT_CONFIG);
   const [active, setActive] = useState<SectionId>("identity");
   const [launching, setLaunching] = useState(false);
@@ -211,8 +213,38 @@ export default function LaunchpadCreate() {
   const [checkingName, setCheckingName] = useState(false);
   const [blockedMatch, setBlockedMatch] = useState<{ name: string; ticker: string } | null>(null);
   const [checkError, setCheckError] = useState(false);
+  const [nftPrefillBanner, setNftPrefillBanner] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const nameCheckTimer = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    if (params.get("from") !== "nft" && !peekTokenCreatePrefill()) return;
+    const draft = consumeTokenCreatePrefill();
+    if (!draft) return;
+    setCfg((c) => ({
+      ...c,
+      name: draft.name || c.name,
+      ticker: draft.symbol || c.ticker,
+      description: draft.description || c.description,
+      website: draft.website || c.website,
+      twitter: draft.twitter || c.twitter,
+      telegram: draft.telegram || c.telegram,
+      logoDataUrl: draft.imageDataUrl || c.logoDataUrl,
+    }));
+    setNftPrefillBanner(true);
+    if (!draft.imageDataUrl && draft.imageUrl) {
+      void fetch(draft.imageUrl)
+        .then((r) => r.blob())
+        .then((blob) => {
+          const reader = new FileReader();
+          reader.onload = () => setCfg((c) => ({ ...c, logoDataUrl: reader.result as string }));
+          reader.readAsDataURL(blob);
+        })
+        .catch(() => undefined);
+    }
+    toast.success("NFT details pasted into custom create — review and launch.");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Debounced OrbitX Anti-Vamp check on BOTH name and ticker
   // similarity on both fields in one RPC call, so a duplicate ticker with a
@@ -230,12 +262,15 @@ export default function LaunchpadCreate() {
       try {
         // Unified check: OrbitX registry + pump.fun + DexScreener, live as you type.
         const result = await checkAntiVamp(cfg.name, cfg.ticker);
-        setNameTaken(result.blocked);
-        setCheckError(!!result.error);
-        setBlockedMatch(result.hardMatch ? { name: result.hardMatch.name, ticker: result.hardMatch.ticker } : null);
+        // Only hard-block on a real identity collision — never on empty "$" / degraded checks.
+        const hard = result.blocked && result.hardMatch;
+        setNameTaken(!!hard);
+        setCheckError(!!result.error || !!result.warning);
+        setBlockedMatch(hard ? { name: result.hardMatch!.name, ticker: result.hardMatch!.ticker } : null);
       } catch (err) {
         console.error("Anti-vamp check failed:", err);
-        setNameTaken(true);
+        // Fail open — verification outages must not freeze launches.
+        setNameTaken(false);
         setCheckError(true);
         setBlockedMatch(null);
       } finally {
@@ -256,7 +291,7 @@ export default function LaunchpadCreate() {
   const allocValid = allocTotal === 100;
 
   const sectionDone = useMemo<Record<SectionId, boolean>>(() => ({
-    identity: !!cfg.name.trim() && !!cfg.ticker.trim() && !!cfg.description.trim() && !!cfg.logoDataUrl && !nameTaken && !checkingName && !checkError,
+    identity: !!cfg.name.trim() && !!cfg.ticker.trim() && !!cfg.description.trim() && !!cfg.logoDataUrl && !nameTaken && !checkingName,
     socials: !!(cfg.website || cfg.twitter || cfg.telegram || cfg.discord),
     supply: /^\d+$/.test(cfg.supply) && Number(cfg.supply) > 0 && Number(cfg.initialPriceUsd) > 0,
     authorities: cfg.revokeMint && cfg.revokeFreeze,
@@ -370,24 +405,19 @@ export default function LaunchpadCreate() {
     if (!cfg.logoDataUrl) { toast.error("Upload a logo — it becomes your token image"); return; }
     setLaunching(true);
     try {
-      /* 1 — OrbitX Anti-Vamp identity check (unified: OrbitX registry +
-         pump.fun + DexScreener), same protection as the pump.fun lane.
-         Re-run fresh right before any fee/on-chain action. Fails CLOSED on
-         a check error, so a broken check can never let a duplicate slip
-         through. */
+      /* 1 — OrbitX Anti-Vamp identity check. Hard-block only on real collisions.
+         Verification outages fail OPEN so legitimate launches are not frozen. */
       setPhase("checking"); setPhaseMsg("OrbitX Anti-Vamp check…");
       let flagged = false;
       const preLaunchCheck = await checkAntiVamp(cfg.name, cfg.ticker).catch((err) => {
         console.error("[orbitx] custom anti-vamp check failed", err);
-        return { blocked: true, flagged: true, hardMatch: null, matches: [], message: "Originality verification failed — please try again." } as const;
+        return { blocked: false, flagged: true, hardMatch: null, matches: [], warning: "verification_degraded", message: "Originality verification failed — continuing with caution." } as const;
       });
-      if (preLaunchCheck.blocked) {
+      if (preLaunchCheck.blocked && preLaunchCheck.hardMatch) {
         setNameTaken(true);
-        setBlockedMatch(preLaunchCheck.hardMatch ? { name: preLaunchCheck.hardMatch.name, ticker: preLaunchCheck.hardMatch.ticker } : null);
+        setBlockedMatch({ name: preLaunchCheck.hardMatch.name, ticker: preLaunchCheck.hardMatch.ticker });
         toast.error(
-          preLaunchCheck.hardMatch
-            ? `Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${preLaunchCheck.hardMatch.name} ($${preLaunchCheck.hardMatch.ticker}). Anti-vamp requires a unique identity.`
-            : preLaunchCheck.message || "Originality verification failed — please try again."
+          `Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${preLaunchCheck.hardMatch.name} ($${preLaunchCheck.hardMatch.ticker}). Anti-vamp requires a unique identity.`
         );
         setPhase("idle");
         setLaunching(false);
@@ -395,7 +425,11 @@ export default function LaunchpadCreate() {
       }
       if (preLaunchCheck.flagged) {
         flagged = true;
-        toast.warning(`${preLaunchCheck.matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`);
+        toast.warning(
+          preLaunchCheck.matches.length
+            ? `${preLaunchCheck.matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`
+            : preLaunchCheck.message || "Anti-vamp caution — launching with elevated fee-routing.",
+        );
       }
 
       /* 2 — mint keypair (vanity-ground if available) */
@@ -543,14 +577,24 @@ export default function LaunchpadCreate() {
                 <div>
                   <div className="font-black uppercase tracking-wide text-[hsl(var(--og-blood))]">🚫 OrbitX Anti-Vamp Protection — Launch Blocked</div>
                   <div className="text-sm text-white/90 mt-1">
-                    {checkError
-                      ? "Couldn't verify this name/ticker is original right now — retrying automatically. Launch stays locked until verification succeeds."
-                      : <>This name or ticker is already in use{blockedMatch ? <> — too close to <strong>{blockedMatch.name}</strong> (${blockedMatch.ticker})</> : null}. Change the name or ticker to continue. All other fields are locked until this is resolved.</>}
+                    This name or ticker collides with an existing token
+                    {blockedMatch?.name ? <> — too close to <strong>{blockedMatch.name}</strong>{blockedMatch.ticker && blockedMatch.ticker !== "—" ? <> (${blockedMatch.ticker})</> : null}</> : null}.
+                    Change the name or ticker to continue.
                   </div>
                 </div>
               </div>
             )}
+            {checkError && !nameTaken && (
+              <div className="rounded-lg border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 p-3 text-sm text-white/80">
+                Anti-vamp verification is degraded — you can still launch. Soft matches may route creator fees to OBX buybacks.
+              </div>
+            )}
             <SectionHeading icon={Sparkles} title="Token Identity" desc="Name, ticker, story and logo — the face of your launch." />
+            {nftPrefillBanner && (
+              <div className="mb-4 rounded-xl border border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 p-3 text-sm text-white/85">
+                Filled from your NFT — name, ticker, description, and logo were pasted automatically. Review and launch when ready.
+              </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -566,10 +610,13 @@ export default function LaunchpadCreate() {
               <div className="space-y-2"><Label>Ticker</Label>
                 <Input className={`${fieldClass} ${nameTaken ? 'border-[hsl(var(--og-blood))]' : ''}`} placeholder="ORBIT" maxLength={10} value={cfg.ticker} onChange={(e) => set("ticker", e.target.value.toUpperCase())} /></div>
             </div>
-            {nameTaken && (
+            {nameTaken && blockedMatch?.name && (
               <div className="flex items-start gap-2 text-sm text-[hsl(var(--og-blood))]">
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>OrbitX Anti-Vamp: too close to {blockedMatch?.name} (${blockedMatch?.ticker}). Change the name or ticker to launch.</span>
+                <span>
+                  OrbitX Anti-Vamp: too close to {blockedMatch.name}
+                  {blockedMatch.ticker && blockedMatch.ticker !== "—" ? ` ($${blockedMatch.ticker})` : ""}. Change the name or ticker to launch.
+                </span>
               </div>
             )}
             <div className="space-y-2"><Label>Description</Label>
@@ -782,15 +829,15 @@ export default function LaunchpadCreate() {
   if (launched) {
     return (
       <div className="mx-auto max-w-2xl py-10">
-        <Card className="lpx-panel lpx-panel--hot relative overflow-hidden border-0 bg-transparent">
+        <Card className="ox-panel ox-panel--accent pf-card relative overflow-hidden border-0 bg-transparent">
           <Confetti />
           <CardContent className="relative space-y-5 p-8 text-center">
-            <div className="lpx-pop mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[hsl(var(--og-lime))]/45 bg-[hsl(var(--og-lime))]/10">
-              <CheckCircle2 className="h-9 w-9 text-[hsl(var(--og-lime))]" />
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(212,175,55,0.45)] bg-[rgba(212,175,55,0.1)]">
+              <CheckCircle2 className="h-9 w-9 text-[#F0C75E]" />
             </div>
             <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Deployment complete</div>
-              <h2 className="lpx-glow font-display text-2xl font-black text-[hsl(var(--og-lime))]">TOKEN LIVE ON MAINNET</h2>
+              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#A8B0BC]">Deployment complete</div>
+              <h2 className="font-display text-2xl font-black text-[#F0C75E]">TOKEN LIVE ON MAINNET</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {cfg.name.trim()} (${cfg.ticker.trim().toUpperCase()}) is live{launched.poolId ? " and instantly tradable on Raydium" : ""}.
               </p>
@@ -804,7 +851,7 @@ export default function LaunchpadCreate() {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
               <Badge className={launched.flagged ? "border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 text-[hsl(var(--og-blood))]" : "border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 text-[hsl(var(--og-lime))]"}>
-                0.30% creator fee → {launched.flagged ? "OBX buybacks (flagged)" : "your wallet"}
+                0.45% creator fee (75% you / 25% platform) → {launched.flagged ? "OBX buybacks (flagged)" : "your wallet"}
               </Badge>
               {launched.poolId && <Badge className="border-[hsl(var(--og-cyan))]/40 bg-[hsl(var(--og-cyan))]/10 text-[hsl(var(--og-cyan))]">Raydium pool live</Badge>}
               {launched.lpBurned && <Badge className="border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 text-[hsl(var(--og-blood))]">LP burned</Badge>}
@@ -836,13 +883,12 @@ export default function LaunchpadCreate() {
     <>
       <div className="relative mx-auto max-w-6xl px-4 pb-24 pt-6">
         {/* Deploy console header */}
-        <div className="lpx-panel lpx-panel--hot relative mb-6 overflow-hidden">
-          <div className="lpx-sweep" />
+        <div className="ox-panel ox-panel--accent pf-card relative mb-6 overflow-hidden">
           <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-xl">
-              <div className="font-mono text-[10px] uppercase tracking-[0.34em] text-[hsl(var(--og-lime))]">{"//"} deploy console — custom lane</div>
-              <h1 className="mt-1 font-display text-2xl font-black tracking-tight sm:text-3xl">
-                BUILD YOUR <span className="lpx-glow text-[hsl(var(--og-lime))]">MINT</span>
+              <div className="font-mono text-[10px] uppercase tracking-[0.34em] text-[#F0C75E]">{"//"} deploy console — custom lane</div>
+              <h1 className="mt-1 font-display text-2xl font-black tracking-tight text-white sm:text-3xl">
+                BUILD YOUR <span className="text-[#60A5FA]">MINT</span>
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Own SPL mint · Metaplex metadata · optional Raydium pool · on-chain creator fees · OBX vanity address. No pump.fun.
@@ -851,22 +897,23 @@ export default function LaunchpadCreate() {
                 <div>
                   <div className="mb-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-widest">
                     <span className="text-muted-foreground">Launch readiness</span>
-                    <span className="font-bold text-[hsl(var(--og-lime))]">{readiness}%</span>
+                    <span className="font-bold text-[#60A5FA]">{readiness}%</span>
                   </div>
-                  <div className="lpx-gauge"><div style={{ width: `${readiness}%` }} /></div>
+                  <div className="ox-gauge"><div style={{ width: `${readiness}%` }} /></div>
                 </div>
                 <div>
                   <div className="mb-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-widest">
                     <span className="text-muted-foreground">Trust score</span>
                     <span className="font-bold" style={{ color: toneHsl[trustTone] }}>{trust}/100</span>
                   </div>
-                  <div className="lpx-gauge"><div style={{ width: `${trust}%`, background: toneHsl[trustTone], boxShadow: `0 0 10px ${toneHsl[trustTone]}` }} /></div>
+                  <div className="ox-gauge"><div style={{ width: `${trust}%`, background: toneHsl[trustTone], boxShadow: `0 0 10px ${toneHsl[trustTone]}` }} /></div>
                 </div>
               </div>
             </div>
             {connected ? (
-              <span className="flex items-center gap-1.5 self-start rounded-lg border border-[hsl(var(--og-lime))]/35 bg-black/40 px-3 py-2 font-mono text-[11px] font-bold text-[hsl(var(--og-lime))]">
-                <span className="lpx-led" /> {publicKey?.toBase58().slice(0, 4)}…{publicKey?.toBase58().slice(-4)}
+              <span className="ox-wallet-chip self-start">
+                <span className="ox-led" />
+                <span className="pf-mono text-[11px] font-bold text-white">{publicKey?.toBase58().slice(0, 4)}…{publicKey?.toBase58().slice(-4)}</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 self-start rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect via the wallet button up top</span>
@@ -881,7 +928,7 @@ export default function LaunchpadCreate() {
               const Icon = s.icon; const on = active === s.id; const done = sectionDone[s.id];
               return (
                 <button key={s.id} onClick={() => setActive(s.id)} data-on={on}
-                  className="lpx-step shrink-0 lg:w-full">
+                  className="ox-step shrink-0 lg:w-full">
                   <span className="idx">{String(idx + 1).padStart(2, "0")}</span>
                   <Icon className={`h-4 w-4 shrink-0 ${on ? "text-[hsl(var(--og-lime))]" : "text-muted-foreground"}`} />
                   <span className={`flex-1 text-left font-mono text-[11px] font-bold uppercase tracking-wider ${on ? "text-[hsl(var(--og-lime))]" : "text-muted-foreground"}`}>{s.label}</span>
@@ -892,11 +939,11 @@ export default function LaunchpadCreate() {
           </nav>
 
           {/* Active section */}
-          <div className="lpx-panel"><div className="p-6">{renderSection()}</div></div>
+          <div className="ox-panel pf-card"><div className="p-6">{renderSection()}</div></div>
 
           {/* Live summary */}
           <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <div className="lpx-panel"><header className="lpx-panel-title">Launch telemetry</header><div className="p-5">
+            <div className="ox-panel pf-card"><header className="ox-panel-title">Launch telemetry</header><div className="p-5">
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   {cfg.logoDataUrl ? <img src={cfg.logoDataUrl} alt="" className="h-full w-full object-cover" /> : <Coins className="h-5 w-5 text-muted-foreground" />}
@@ -956,9 +1003,9 @@ export default function LaunchpadCreate() {
               </div>
 
               {launching && (
-                <div className="lpx-term mb-3 rounded-lg border border-[hsl(var(--og-lime))]/20 bg-black/60 p-2.5">
+                <div className="ox-term mb-3 rounded-lg border border-[hsl(var(--og-lime))]/20 bg-black/60 p-2.5">
                   <div className="gold">$ orbitx deploy --lane custom</div>
-                  <div>[{phase}] {phaseMsg || "working…"}<span className="lpx-caret" /></div>
+                  <div>[{phase}] {phaseMsg || "working…"}<span className="ox-caret" /></div>
                 </div>
               )}
               <Button onClick={handleLaunch} disabled={launching || errors.length > 0}

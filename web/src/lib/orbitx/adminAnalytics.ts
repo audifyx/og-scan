@@ -137,7 +137,7 @@ export interface FeeWallet {
 
 export async function fetchFeeWallets(): Promise<FeeWallet[]> {
   const defs = [
-    { label: "Routed revenue (2.5% claims)", wallet: ROUTED_FEE_WALLET },
+    { label: "Routed revenue (25% of trade fees)", wallet: ROUTED_FEE_WALLET },
     { label: "Platform (launch + swap fees)", wallet: PLATFORM_WALLET },
   ];
   return Promise.all(

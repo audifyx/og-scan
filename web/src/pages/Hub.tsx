@@ -1,15 +1,16 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { AIWidgetPanel, MobileWidgetGrid, aiWidgetCSS, readWidgets, writeWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
 import { loadWidgetsFromCloud, saveWidgetsToCloud } from "@/lib/widgetSync";
 import { MobileNav } from "@/components/MobileNavV2";
 import { BackgroundFX, BgCustomizeModal, readBgMode, BG_KEY, WALLPAPER_KEY, type BgMode } from "@/components/BackgroundFX";
+import { ADMIN_APPS } from "@/lib/adminApps";
+import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
 
 const BRAND = "OrbitX";
 const OS_NAME = "OrbitX";
 const VERSION = "v2.0";
-const DOCK_KEY = "og_dock_order";
 const ORBITX_CA = "13H4WJvGEg4xrrBwWn2vsQgz7xhmhxgNdw19i1QsxPX9";
 
 const wgTimeAgo = (iso: string) => {
@@ -120,16 +121,47 @@ const Glyph = {
 
 const ALL_APPS: App[] = [
   { key: "dex", name: "OrbitX DEX", caption: "Scanner & Trade", href: "/ORBITX_DEX", tone: "#2F80FF", iconBg: "linear-gradient(135deg, #1A6CFF, #0037A3)", glyph: Glyph.dex },
-  { key: "social", name: "Social", caption: "Spaces & Chat", href: "/orbitx-social", tone: "#9945FF", iconBg: "linear-gradient(135deg, #8A2BE2, #4B0082)", glyph: Glyph.social },
-  { key: "predict", name: "Predictions", caption: "Provably fair", href: "https://solno.fun", external: true, tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFB020, #D47900)", glyph: Glyph.predict },
   { key: "scanner", name: "Scanner", caption: "Forensic scan", href: "/orbitx-scanner", tone: "#14E0C8", iconBg: "linear-gradient(135deg, #00C6B8, #00766E)", glyph: Glyph.scanner },
-  { key: "gaming", name: "Gaming", caption: "Climb & Win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
-  { key: "ai", name: "AI Assistant", caption: "Help & Support", href: "/ai-chat", tone: "#14a0ff", iconBg: "linear-gradient(135deg, #14a0ff, #0077b6)", glyph: Glyph.ai },
-  { key: "koltracker", name: "KOL Tracker", caption: "Wallet Alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
-  { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <div style={{ fontSize: "20px" }}>📈</div> },
   { key: "launchpad", name: "Launchpad", caption: "Launch a token", href: "/orbitxlaunch", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFC53D, #B8860B)", glyph: Glyph.launchpad },
-  { key: "nft", name: "NFT Market", caption: "Mint & trade NFTs", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(135deg, #00FFA3, #00C776)", glyph: <div style={{ fontSize: "20px" }}>🖼️</div> },
+  { key: "koltracker", name: "KOL Tracker", caption: "Wallet alerts", href: "/app/kol-tracker", tone: "#22C55E", iconBg: "linear-gradient(135deg, #16A34A, #065F46)", glyph: Glyph.koltracker },
+  { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <div style={{ fontSize: "20px" }}>📈</div> },
+  { key: "ai", name: "AI Assistant", caption: "Help & support", href: "/ai-chat", tone: "#14a0ff", iconBg: "linear-gradient(135deg, #14a0ff, #0077b6)", glyph: Glyph.ai },
+  { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#9945FF", iconBg: "linear-gradient(135deg, #8A2BE2, #4B0082)", glyph: Glyph.social },
+  { key: "gaming", name: "Gaming", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
+  { key: "predict", name: "Predictions", caption: "Provably fair", href: "https://solno.fun", external: true, tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFB020, #D47900)", glyph: Glyph.predict },
+  { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(135deg, #00FFA3, #00C776)", glyph: <div style={{ fontSize: "20px" }}>🖼️</div> },
+  { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(135deg, #F0C75E, #B8860B)", glyph: <div style={{ fontSize: "20px" }}>💼</div> },
 ];
+
+const APP_BY_KEY = Object.fromEntries(ALL_APPS.map((a) => [a.key, a])) as Record<string, App>;
+
+type HubSection = { id: string; title: string; subtitle: string; keys: string[] };
+
+const APP_SECTIONS: HubSection[] = [
+  { id: "trade", title: "Trade & Launch", subtitle: "DEX, scanner, and fair launch", keys: ["dex", "scanner", "launchpad"] },
+  { id: "intel", title: "Intelligence", subtitle: "Track wallets, PnL, and AI", keys: ["koltracker", "pnltracker", "ai"] },
+  { id: "social", title: "Social", subtitle: "Feed, spaces, and community", keys: ["social"] },
+  { id: "play", title: "Play & Earn", subtitle: "Games, markets, NFTs, tasks", keys: ["gaming", "predict", "nft", "bagwork"] },
+];
+
+const QUICK_ACTIONS = [
+  { label: "Scan token", href: "/orbitx-scanner", tone: "#14E0C8" },
+  { label: "Open DEX", href: "/ORBITX_DEX", tone: "#2F80FF" },
+  { label: "Launch", href: "/orbitxlaunch", tone: "#FFC53D" },
+  { label: "Social feed", href: "/orbitx-social", tone: "#9945FF" },
+];
+
+/** Owner-only admin apps for /app (audifyx@gmail.com). */
+const OWNER_ADMIN_APPS: App[] = ADMIN_APPS.map((a) => ({
+  key: `admin-${a.key}`,
+  name: a.label,
+  caption: a.caption,
+  href: a.to,
+  external: a.to.startsWith("http") || a.to.startsWith("/ORBITX_DEX"),
+  tone: a.tone,
+  iconBg: a.iconBg,
+  glyph: <div style={{ fontSize: "18px" }}>{a.emoji || "🛡️"}</div>,
+}));
 
 const CENTER_TABS: { key: string; name: string; href?: string; action: "profile" | "settings" | "logout" | "wallpaper"; tone: string; glyph: JSX.Element }[] = [
   { key: "profile", name: "Profile", href: "/profile", action: "profile", tone: "#2F80FF", glyph: Glyph.profile },
@@ -158,7 +190,6 @@ export default function Hub() {
   const [trending, setTrending] = useState<{ mint: string; symbol: string; priceUsd: number | null; change24h: number | null }[]>([]);
   const [latestPosts, setLatestPosts] = useState<{ id: string; username: string | null; content: string; created_at: string }[]>([]);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
-  const [dockX, setDockX] = useState<number | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"chat" | "my" | "lib">("chat");
   const [customWidgets, setCustomWidgets] = useState<WidgetConfig[]>(readWidgets);
@@ -168,28 +199,20 @@ export default function Hub() {
   const [wallpaper, setWallpaper] = useState<string | null>(() => { try { return localStorage.getItem(WALLPAPER_KEY); } catch { return null; } });
   const [fng, setFng] = useState<{ v: number; label: string } | null>(null);
   const now = useClock();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, user } = useAuth();
   const logout = async () => { try { await signOut(); } finally { window.location.assign("/auth"); } };
 
-  const [dockOrder, setDockOrder] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(DOCK_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return Array.from(new Set(parsed));
-      }
-    } catch {}
-    return ALL_APPS.map((a) => a.key);
-  });
+  // Strict owner gate for /app admin icons — audifyx@gmail.com (or owner wallet SIWS).
+  const showAdminApps = useMemo(
+    () => isOwnerIdentity({ email: user?.email }),
+    [user?.email],
+  );
+  const searchableApps = useMemo(
+    () => (showAdminApps ? [...ALL_APPS, ...OWNER_ADMIN_APPS] : ALL_APPS),
+    [showAdminApps],
+  );
 
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem(DOCK_KEY, JSON.stringify(Array.from(new Set(dockOrder))));
-  }, [dockOrder]);
-
-  // Restore the user's saved widgets from their account on load, so custom
+  // Restore the user's saved widgets from their account on load
   // widgets persist across refresh + devices. First cloud load wins; if the
   // account has none yet but this device has local widgets, seed the cloud.
   useEffect(() => {
@@ -208,43 +231,6 @@ export default function Hub() {
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const getApps = () => {
-    const ordered = dockOrder.map((key) => ALL_APPS.find((a) => a.key === key)).filter(Boolean) as App[];
-    const missing = ALL_APPS.filter((a) => !dockOrder.includes(a.key));
-    return [...ordered, ...missing];
-  };
-
-  const onDragStart = (e: React.DragEvent, key: string) => {
-    setDragId(key);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", key);
-  };
-
-  const onDragOver = (e: React.DragEvent, key: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    setDragOverId(key);
-  };
-
-  const onDrop = (e: React.DragEvent, targetKey: string) => {
-    e.preventDefault();
-    setDragOverId(null);
-    setDragId(null);
-    if (!dragId || dragId === targetKey) return;
-    setDockOrder((prev) => {
-      const next = prev.filter((k) => k !== dragId);
-      const to = next.indexOf(targetKey);
-      if (to < 0) return prev;
-      next.splice(to, 0, dragId);
-      return next;
-    });
-  };
-
-  const onDragEnd = () => {
-    setDragId(null);
-    setDragOverId(null);
-  };
 
   useEffect(() => {
     const t = setTimeout(() => setBooted(true), 150);
@@ -389,10 +375,24 @@ export default function Hub() {
   const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
   const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
-  const apps = getApps();
-  const mid = Math.ceil(apps.length / 2);
-  const leftApps = apps.slice(0, mid);
-  const rightApps = apps.slice(mid);
+  const renderAppCard = (app: App, delayMs: number) => (
+    <button
+      key={app.key}
+      className="hub-app-card"
+      style={{ animationDelay: `${delayMs}ms`, "--app-tone": app.tone } as React.CSSProperties}
+      onClick={() => openApp(app)}
+      disabled={!!launching}
+      title={app.caption}
+    >
+      <div className="hub-app-icon mac-icon" style={{ background: app.iconBg }}>
+        <div className="mac-icon-gloss" />
+        <div className="mac-icon-glyph hub-app-glyph">{app.glyph}</div>
+      </div>
+      <span className="hub-app-name">{app.name}</span>
+      <span className="hub-app-cap">{app.caption}</span>
+      {app.external && <span className="hub-app-ext">↗</span>}
+    </button>
+  );
 
   return (
     <div className="mac-os">
@@ -476,14 +476,26 @@ export default function Hub() {
           </div>
         )}
 
-        {/* Desktop Body / App Grid */}
+        {/* Desktop Body — organized hub */}
         <main className="desktop-body">
-          <div className="hub-greeting">
-            <p className="hub-greet-line">
-              {(() => { const h = now.getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; })()}
-              {profile?.username ? `, ${profile.username}` : ""}
-            </p>
-            <p className="hub-greet-sub">Press <kbd>⌘K</kbd> to search · right-click for options</p>
+          <div className="hub-shell">
+            <header className="hub-hero">
+              <div className="hub-hero-copy">
+                <p className="hub-greet-line">
+                  {(() => { const h = now.getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; })()}
+                  {profile?.username ? `, ${profile.username}` : ""}
+                </p>
+                <p className="hub-greet-sub">Your OrbitX command center · <kbd>⌘K</kbd> to search</p>
+              </div>
+              <div className="hub-quick-actions">
+                {QUICK_ACTIONS.map((a) => (
+                  <a key={a.href} href={a.href} className="hub-quick-btn" style={{ "--qa-tone": a.tone } as React.CSSProperties}>
+                    {a.label}
+                  </a>
+                ))}
+              </div>
+            </header>
+
             <div className="hub-chips">
               <button className="hub-chip hub-chip-btn hub-chip-orbitx" onClick={copyOrbitxCA} title="Click to copy contract address">
                 <i className="hub-chip-dot" style={{ background: "#9945FF" }} />
@@ -511,39 +523,48 @@ export default function Hub() {
               </button>
               <button className="hub-chip hub-chip-btn" onClick={() => setBgOpen(true)}>🎨 Background</button>
             </div>
-          </div>
 
-          <MobileWidgetGrid
-            solPrice={solPrice}
-            solChange={solChange}
-            trending={trending}
-            widgets={customWidgets}
-            setWidgets={setCustomWidgets}
-            onOpenPanel={() => { setPanelTab("chat"); setPanelOpen(true); }}
-          />
+            <MobileWidgetGrid
+              solPrice={solPrice}
+              solChange={solChange}
+              trending={trending}
+              widgets={customWidgets}
+              setWidgets={setCustomWidgets}
+              onOpenPanel={() => { setPanelTab("chat"); setPanelOpen(true); }}
+            />
 
-          <div className="desktop-flex">
-            <div className="app-grid">
-            {apps.map((app, i) => (
-              <button
-                key={app.key}
-                className="desktop-icon-wrapper"
-                style={{ animationDelay: `${i * 60}ms` }}
-                onClick={() => openApp(app)}
-                disabled={!!launching}
-                onDoubleClick={() => openApp(app)}
-              >
-                <div className="mac-icon" style={{ background: app.iconBg }}>
-                  <div className="mac-icon-gloss" />
-                  <div className="mac-icon-glyph">{app.glyph}</div>
-                </div>
-                <span className="desktop-icon-label">{app.name}</span>
-              </button>
-            ))}
-          </div>
+            <div className="desktop-flex">
+              <div className="hub-main">
+                {APP_SECTIONS.map((section, si) => {
+                  const sectionApps = section.keys.map((k) => APP_BY_KEY[k]).filter(Boolean);
+                  if (!sectionApps.length) return null;
+                  return (
+                    <section key={section.id} className="hub-section" style={{ animationDelay: `${si * 80}ms` }}>
+                      <div className="hub-section-head">
+                        <h2 className="hub-section-title">{section.title}</h2>
+                        <p className="hub-section-sub">{section.subtitle}</p>
+                      </div>
+                      <div className="hub-app-grid">
+                        {sectionApps.map((app, i) => renderAppCard(app, si * 80 + i * 40))}
+                      </div>
+                    </section>
+                  );
+                })}
 
-            {/* ── Desktop widgets ── */}
-            <aside className="widgets-col">
+                {showAdminApps && (
+                  <section className="hub-section hub-section-admin">
+                    <div className="hub-section-head">
+                      <h2 className="hub-section-title">Owner Admin</h2>
+                      <p className="hub-section-sub">Platform desks · {OWNER_EMAIL}</p>
+                    </div>
+                    <div className="hub-app-grid">
+                      {OWNER_ADMIN_APPS.map((app, i) => renderAppCard(app, i * 40))}
+                    </div>
+                  </section>
+                )}
+              </div>
+
+              <aside className="widgets-col">
               <div className="wg wg-clock">
                 <div className="wg-clock-time">{time}</div>
                 <div className="wg-clock-date">{now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>
@@ -586,19 +607,20 @@ export default function Hub() {
               <div className="wg">
                 <div className="wg-head">
                   <span className="wg-title">💬 Community</span>
-                  <a className="wg-link" href="/social">Open</a>
+                  <a className="wg-link" href="/orbitx-social">Open</a>
                 </div>
                 {latestPosts.length === 0 ? (
                   <div className="wg-empty">No posts yet — say gm</div>
                 ) : latestPosts.map((post) => (
-                  <a key={post.id} className="wg-post" href="/social">
+                  <a key={post.id} className="wg-post" href="/orbitx-social">
                     <span className="wg-post-user">@{post.username || "anon"}</span>
                     <span className="wg-post-text">{post.content.length > 64 ? post.content.slice(0, 64) + "…" : post.content}</span>
                     <span className="wg-post-time">{wgTimeAgo(post.created_at)}</span>
                   </a>
                 ))}
               </div>
-            </aside>
+              </aside>
+            </div>
           </div>
         </main>
 
@@ -652,7 +674,6 @@ export default function Hub() {
           <button onClick={() => { setCtxMenu(null); applyWallpaper(null); applyBgMode("nebula"); }}>✨ Reset background</button>
           <div className="ctx-sep" />
           <button onClick={() => { setCtxMenu(null); setPanelTab("chat"); setPanelOpen(true); }}>✦ Widget Studio</button>
-          <button onClick={() => { setCtxMenu(null); localStorage.removeItem(DOCK_KEY); window.location.reload(); }}>♻️ Reset icon layout</button>
           <button onClick={() => { setCtxMenu(null); window.location.reload(); }}>🔄 Refresh</button>
         </div>
       )}
@@ -670,16 +691,16 @@ export default function Hub() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     const q = spotQ.trim().toLowerCase();
-                    const hit = ALL_APPS.find((a) => !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q));
+                    const hit = searchableApps.find((a) => !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q));
                     if (hit) { setSpotlightOpen(false); openApp(hit); }
                   }
                 }}
-                placeholder="Search apps…"
+                placeholder={showAdminApps ? "Search apps & admin…" : "Search apps…"}
               />
               <span className="spotlight-esc">esc</span>
             </div>
             <div className="spotlight-results">
-              {ALL_APPS.filter((a) => {
+              {searchableApps.filter((a) => {
                 const q = spotQ.trim().toLowerCase();
                 return !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q);
               }).map((a) => (
@@ -721,35 +742,6 @@ export default function Hub() {
   );
 }
 
-function DockItem({ app, launching, onOpen, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isOver }: {
-  app: App; launching: App | null; onOpen: () => void;
-  onDragStart: (e: React.DragEvent, key: string) => void; onDragOver: (e: React.DragEvent, key: string) => void;
-  onDrop: (e: React.DragEvent, key: string) => void; onDragEnd: () => void;
-  isDragging: boolean; isOver: boolean;
-}) {
-  return (
-    <div className={`dock-item-wrapper ${isDragging ? "dragging" : ""} ${isOver ? "drag-over" : ""}`}>
-      <button
-        className="dock-item"
-        onClick={onOpen}
-        disabled={!!launching}
-        draggable
-        onDragStart={(e) => onDragStart(e, app.key)}
-        onDragOver={(e) => onDragOver(e, app.key)}
-        onDrop={(e) => onDrop(e, app.key)}
-        onDragEnd={onDragEnd}
-      >
-        <div className="mac-icon dock-icon" style={{ background: app.iconBg }}>
-          <div className="mac-icon-gloss" />
-          <div className="mac-icon-glyph">{app.glyph}</div>
-        </div>
-        <span className="dock-tooltip">{app.name}</span>
-      </button>
-      <div className="dock-active-dot" />
-    </div>
-  );
-}
-
 function useClock() {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -760,11 +752,31 @@ function useClock() {
 }
 
 const css = `
-/* ── Hub upgrades: greeting, SOL chip, spotlight ── */
-.hub-greeting{text-align:center;margin:4px 0 2px;animation:fadeSlide .5s ease both}
-.hub-greet-line{font-size:27px;font-weight:800;color:#fff;letter-spacing:-.02em;text-shadow:0 2px 16px rgba(0,0,0,.6)}
-.hub-greet-sub{margin-top:5px;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.42)}
+/* ── Hub layout: organized sections ── */
+.hub-shell{width:100%;max-width:1280px;margin:0 auto;padding:0 4px}
+.hub-hero{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 20px;margin-bottom:14px;animation:fadeSlide .5s ease both}
+.hub-hero-copy{text-align:left}
+.hub-greet-line{font-size:clamp(22px,4vw,30px);font-weight:800;color:#fff;letter-spacing:-.02em;text-shadow:0 2px 16px rgba(0,0,0,.6);margin:0}
+.hub-greet-sub{margin:6px 0 0;font-size:12px;font-weight:600;color:rgba(255,255,255,.42)}
 .hub-greet-sub kbd{padding:2px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);font-size:10px}
+.hub-quick-actions{display:flex;flex-wrap:wrap;gap:8px}
+.hub-quick-btn{display:inline-flex;align-items:center;padding:8px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--qa-tone,#2F80FF) 35%,transparent);background:color-mix(in srgb,var(--qa-tone,#2F80FF) 12%,transparent);color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.02em;text-decoration:none;transition:transform .15s,background .15s,border-color .15s}
+.hub-quick-btn:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--qa-tone,#2F80FF) 22%,transparent);border-color:color-mix(in srgb,var(--qa-tone,#2F80FF) 55%,transparent)}
+.hub-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:18px}
+.hub-section{border-radius:22px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(165deg,rgba(18,22,32,.72),rgba(8,10,14,.78));backdrop-filter:blur(20px);padding:16px 16px 14px;animation:fadeSlide .45s ease both}
+.hub-section-admin{border-color:rgba(240,199,94,.22);background:linear-gradient(165deg,rgba(32,28,14,.55),rgba(12,10,6,.72))}
+.hub-section-head{margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.06)}
+.hub-section-title{margin:0;font-size:13px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.88)}
+.hub-section-sub{margin:4px 0 0;font-size:11.5px;font-weight:600;color:rgba(255,255,255,.38)}
+.hub-app-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+.hub-app-card{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:12px;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);text-align:left;cursor:pointer;transition:transform .18s ease,border-color .18s ease,background .18s ease,box-shadow .18s ease;opacity:0;animation:fade-in-up .5s cubic-bezier(.16,1,.3,1) forwards}
+.hub-app-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--app-tone,#2F80FF) 45%,transparent);background:rgba(255,255,255,.06);box-shadow:0 14px 36px -18px color-mix(in srgb,var(--app-tone,#2F80FF) 55%,transparent)}
+.hub-app-card:disabled{opacity:.55;cursor:not-allowed}
+.hub-app-icon{width:52px;height:52px;border-radius:14px}
+.hub-app-glyph{width:28px;height:28px}
+.hub-app-name{font-size:13px;font-weight:800;color:#fff;line-height:1.2}
+.hub-app-cap{font-size:10.5px;font-weight:600;color:rgba(255,255,255,.42);line-height:1.3}
+.hub-app-ext{position:absolute;top:10px;right:10px;font-size:11px;font-weight:800;color:rgba(255,255,255,.35)}
 @keyframes fadeSlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .mb-sol{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;border:1px solid rgba(52,211,153,.25);background:rgba(52,211,153,.09);color:#6ee7b7;font-size:11px;font-weight:800;letter-spacing:.02em}
 .mb-sol-dot{width:5px;height:5px;border-radius:99px;background:#34d399;animation:pulse 2s infinite}
@@ -858,8 +870,9 @@ const css = `
 }
 
 .desktop-body {
-  position: relative; z-index: 10; flex: 1; padding: 20px 20px 100px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; z-index: 10; flex: 1; padding: 18px 16px 100px;
+  display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
+  overflow-y: auto;
 }
 .app-grid {
   display: flex; flex-direction: row; flex-wrap: wrap; gap: 24px 18px;
@@ -1029,9 +1042,9 @@ const css = `
 /* Starfield canvas sits above aurora, below UI */
 .starfield{position:absolute;inset:0;z-index:2;pointer-events:none}
 
-/* Layout: icons + widgets side by side */
-.desktop-flex{display:flex;gap:22px;align-items:flex-start;justify-content:center;width:100%;max-width:1260px;margin:0 auto;padding:0 16px}
-.widgets-col{display:none;flex-direction:column;gap:12px;width:324px;flex-shrink:0;animation:fadeSlide .6s .15s ease both}
+/* Layout: sections + widgets side by side */
+.desktop-flex{display:flex;gap:20px;align-items:flex-start;justify-content:stretch;width:100%;margin-top:16px}
+.widgets-col{display:none;flex-direction:column;gap:12px;width:300px;flex-shrink:0;animation:fadeSlide .6s .15s ease both;position:sticky;top:12px}
 @media(min-width:1024px){.widgets-col{display:flex}}
 
 /* Widget cards */
@@ -1088,7 +1101,7 @@ const css = `
 .ctx-menu button span{margin-left:auto;font-size:10px;color:rgba(255,255,255,.35)}
 .ctx-sep{height:1px;margin:5px 8px;background:rgba(255,255,255,.09)}
 /* ── greeting chips ── */
-.hub-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;animation:hubchips .5s .15s ease both}
+.hub-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px;animation:hubchips .5s .15s ease both}
 @keyframes hubchips{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .hub-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;background:rgba(10,14,24,.6);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.09);font-size:11px;font-weight:800;color:rgba(255,255,255,.85);letter-spacing:.01em}
 .hub-chip b{font-weight:900}
@@ -1103,10 +1116,11 @@ const css = `
 /* Compact mobile hub */
 @media (max-width: 768px) {
   .desktop-body { padding: 14px 12px 92px; }
-  .app-grid { gap: 18px 12px; }
-  .mac-icon { width: 68px; height: 68px; border-radius: 16px; }
-  .mac-icon-glyph { width: 34px; height: 34px; }
-  .hub-greet-line { font-size: 23px; }
-  .hub-greeting { margin: 2px 0 0; }
+  .hub-hero { flex-direction: column; align-items: flex-start; }
+  .hub-quick-actions { width: 100%; }
+  .hub-quick-btn { flex: 1 1 calc(50% - 4px); justify-content: center; min-width: 0; }
+  .hub-app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hub-app-icon { width: 46px; height: 46px; border-radius: 12px; }
+  .hub-app-glyph { width: 24px; height: 24px; }
 }
 `;
