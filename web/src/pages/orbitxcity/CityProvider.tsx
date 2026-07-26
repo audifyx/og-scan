@@ -2,7 +2,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -103,15 +105,22 @@ export function CityProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Keep the state updater pure (React requirement). The pickup chime is played
+  // as a side effect in the effect below, once per newly collected shard.
   const collectShard = useCallback((id: string) => {
     setCollectedShards((prev) => {
       if (prev.has(id)) return prev;
       const next = new Set(prev);
       next.add(id);
-      citySound.play("pickup");
       return next;
     });
   }, []);
+
+  const prevShardCount = useRef(0);
+  useEffect(() => {
+    if (collectedShards.size > prevShardCount.current) citySound.play("pickup");
+    prevShardCount.current = collectedShards.size;
+  }, [collectedShards]);
 
   const interact = useCallback(() => {
     if (!activeZone) {
