@@ -369,7 +369,7 @@ function CommunityPanel() {
       <div className="oxc-actions">
         <Link className="oxc-btn ghost" to="/orbitx-social">Open Social app</Link>
         <Link className="oxc-btn ghost" to="/spaces">Spaces</Link>
-        <Link className="oxc-btn ghost" to="/hq">HQ</Link>
+        <Link className="oxc-btn ghost" to="/orbitx-social">HQ</Link>
       </div>
     </div>
   );
