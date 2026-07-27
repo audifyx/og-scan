@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>OrbitX City · Holographic Recruitment Chamber</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ["Orbitron", "sans-serif"],
+            body: ["Sora", "sans-serif"],
+          },
+          colors: {
+            ox: {
+              bg: "#050708",
+              lime: "#7dba88",
+              gold: "#c5a26f",
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    :root {
+      --neon: #c5a26f;
+      --gold: #e0c48a;
+      --body: #1a1f2a;
+      --accent: #c5a26f;
+      --skin: #e8d5c0;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #050708;
+      color: #f2f5f7;
+      font-family: Sora, system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+    .chamber {
+      min-height: 100%;
+      min-height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      position: relative;
+      isolation: isolate;
+    }
+    .field {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 45% at 50% -5%, rgba(125, 186, 136, 0.16), transparent 55%),
+        radial-gradient(ellipse 40% 30% at 90% 80%, rgba(197, 162, 111, 0.12), transparent 50%),
+        radial-gradient(ellipse 35% 25% at 8% 70%, rgba(91, 141, 239, 0.08), transparent 50%),
+        linear-gradient(180deg, #0b0e0c 0%, #070908 45%, #040505 100%);
+    }
+    .field-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(125, 186, 136, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(125, 186, 136, 0.045) 1px, transparent 1px);
+      background-size: 52px 52px;
+      mask-image: radial-gradient(ellipse at 50% 40%, #000 10%, transparent 72%);
+      animation: drift 28s linear infinite;
+    }
+    .star {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      border-radius: 50%;
+      background: #fff;
+      opacity: 0.35;
+      animation: twinkle 3.6s ease-in-out infinite;
+    }
+    .token-motif {
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      border: 1px solid rgba(197, 162, 111, 0.22);
+      border-radius: 50%;
+      opacity: 0.25;
+      animation: floaty 9s ease-in-out infinite;
+    }
+    .token-motif::after {
+      content: "OX";
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-family: Orbitron, sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: rgba(197, 162, 111, 0.7);
+    }
+    @keyframes drift { to { background-position: 52px 52px; } }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.15; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.4); }
+    }
+    @keyframes floaty {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-18px) rotate(8deg); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--neon) 35%, transparent), 0 0 24px color-mix(in srgb, var(--neon) 18%, transparent); }
+      50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--neon) 65%, transparent), 0 0 36px color-mix(in srgb, var(--neon) 32%, transparent); }
+    }
+    @keyframes barFill { from { width: 0 !important; } }
+    @keyframes enterFlash {
+      0% { opacity: 0; }
+      30% { opacity: 0.55; }
+      100% { opacity: 0; }
+    }
+
+    .glass {
+      background: linear-gradient(160deg, rgba(12, 18, 16, 0.82), rgba(6, 8, 8, 0.72));
+      border: 1px solid rgba(125, 186, 136, 0.22);
+      backdrop-filter: blur(16px);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 16px 40px rgba(0,0,0,0.35);
+    }
+    .pod-card {
+      --neon: #c5a26f;
+      border-radius: 1.35rem;
+      border: 1px solid color-mix(in srgb, var(--neon) 28%, transparent);
+      background: linear-gradient(165deg, rgba(10, 16, 14, 0.9), rgba(5, 7, 7, 0.82));
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+      scroll-snap-align: center;
+    }
+    .pod-card:hover, .pod-card:focus-visible {
+      transform: translateY(-3px) scale(1.01);
+      outline: none;
+      border-color: color-mix(in srgb, var(--neon) 70%, transparent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent), 0 0 28px color-mix(in srgb, var(--neon) 24%, transparent);
+    }
+    .pod-card.is-on {
+      animation: pulseGlow 2.4s ease-in-out infinite;
+      border-color: color-mix(in srgb, var(--neon) 75%, var(--gold));
+    }
+    .pod-card.is-on .energy {
+      opacity: 1;
+    }
+    .energy {
+      position: absolute;
+      inset: -20% -10% auto;
+      height: 55%;
+      border-radius: 50%;
+      background: radial-gradient(circle, color-mix(in srgb, var(--neon) 35%, transparent), transparent 70%);
+      filter: blur(16px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    /* Holo avatar */
+    .holo {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 0.78;
+      max-height: 190px;
+      display: grid;
+      place-items: end center;
+      isolation: isolate;
+    }
+    .holo.lg { max-height: 260px; }
+    .beam {
+      position: absolute;
+      inset: 2% 14% 8%;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--neon) 42%, transparent), transparent 78%);
+      filter: blur(12px);
+      border-radius: 48% 48% 30% 30%;
+      opacity: 0.55;
+    }
+    .is-on .beam, .holo.selected .beam { opacity: 0.95; }
+    .halo {
+      position: absolute;
+      top: 3%;
+      left: 50%;
+      width: 62%;
+      aspect-ratio: 1;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      border: 2px solid color-mix(in srgb, var(--gold) 65%, transparent);
+      box-shadow: 0 0 14px color-mix(in srgb, var(--neon) 40%, transparent), inset 0 0 12px color-mix(in srgb, var(--neon) 18%, transparent);
+    }
+    .figure {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 14%;
+      filter: drop-shadow(0 0 12px color-mix(in srgb, var(--neon) 40%, transparent));
+    }
+    .hair {
+      position: absolute;
+      top: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 34px;
+      height: 14px;
+      background: #151018;
+      border-radius: 14px 14px 4px 4px;
+      z-index: 3;
+    }
+    .head {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--skin);
+      position: relative;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.28);
+    }
+    .eye {
+      position: absolute;
+      top: 42%;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: #12151c;
+    }
+    .eye.l { left: 28%; }
+    .eye.r { right: 28%; }
+    .visor {
+      position: absolute;
+      bottom: 7px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 18px;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--neon);
+      box-shadow: 0 0 8px var(--neon);
+    }
+    .torso {
+      width: 40px;
+      height: 48px;
+      margin-top: 5px;
+      border-radius: 16px 16px 12px 12px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 34%, var(--body)), var(--body));
+      position: relative;
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 35%, transparent), 0 0 12px color-mix(in srgb, var(--accent) 24%, transparent);
+    }
+    .arm {
+      position: absolute;
+      top: 8px;
+      width: 9px;
+      height: 30px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--body) 78%, var(--skin));
+    }
+    .arm.l { left: -7px; transform: rotate(12deg); }
+    .arm.r { right: -7px; transform: rotate(-12deg); }
+    .detail {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 40%;
+      width: 18px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+    .legs { display: flex; gap: 5px; margin-top: 3px; }
+    .legs span {
+      width: 12px;
+      height: 22px;
+      border-radius: 999px;
+      background: var(--body);
+      box-shadow: inset 0 0 0 1px rgba(125,186,136,0.18);
+    }
+    .shoes { display: flex; gap: 5px; margin-top: 2px; }
+    .shoes i {
+      width: 14px;
+      height: 6px;
+      border-radius: 999px;
+      background: #0a0d12;
+      box-shadow: 0 0 6px color-mix(in srgb, var(--neon) 25%, transparent);
+    }
+    .ring {
+      position: absolute;
+      bottom: 2%;
+      left: 50%;
+      width: 74%;
+      height: 12%;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      border: 2px solid var(--neon);
+      background: radial-gradient(ellipse at center, color-mix(in srgb, var(--neon) 18%, transparent), transparent 65%);
+      box-shadow: 0 0 16px color-mix(in srgb, var(--neon) 45%, transparent);
+    }
+    .is-on .ring, .holo.selected .ring { border-color: var(--gold); }
+
+    /* class hair / outfits */
+    .cls-trader .hair { background: #2a2218; height: 11px; }
+    .cls-builder .hair { height: 6px; width: 30px; top: 2px; background: #1a1814; border-radius: 8px; }
+    .cls-builder .figure { transform: scale(1.1, 1.04); transform-origin: bottom; }
+    .cls-gamer .hair {
+      width: 10px; height: 18px; top: -9px; background: var(--accent); border-radius: 6px;
+      box-shadow: -8px 6px 0 -2px var(--accent), 8px 6px 0 -2px var(--accent);
+    }
+    .cls-gamer .figure { transform: scale(0.92, 0.96); transform-origin: bottom; }
+    .cls-creator .hair { background: #c5a26f; height: 13px; }
+    .cls-creator .hair::after {
+      content: ""; position: absolute; top: -7px; left: 50%; width: 12px; height: 12px;
+      transform: translateX(-50%); border-radius: 50%; background: #c5a26f;
+    }
+    .cls-explorer .hair { background: #3a2410; height: 20px; width: 34px; top: -3px; border-radius: 16px 16px 6px 6px; }
+    .cls-explorer .figure { transform: scale(1.03, 1.08); transform-origin: bottom; }
+    .outfit-suit .torso { background: linear-gradient(180deg, #2a3344, #10141d); }
+    .outfit-suit .detail { width: 5px; height: 26px; top: 34%; border-radius: 3px; background: linear-gradient(#edf3ff, var(--accent)); }
+    .outfit-sport .detail { width: 28px; height: 5px; top: 32%; }
+    .outfit-neon .torso { box-shadow: inset 0 0 0 1px var(--accent), 0 0 14px color-mix(in srgb, var(--accent) 40%, transparent); }
+    .outfit-neon .detail { width: 28px; height: 4px; top: 30%; box-shadow: 0 0 8px var(--accent); }
+
+    .stat-bar {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      overflow: hidden;
+    }
+    .stat-bar > i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--neon), var(--gold));
+      box-shadow: 0 0 8px color-mix(in srgb, var(--neon) 55%, transparent);
+      animation: barFill 0.7s ease both;
+    }
+    .radar {
+      width: 148px;
+      height: 148px;
+    }
+    .rail {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(150px, 178px);
+      gap: 0.75rem;
+      overflow-x: auto;
+      padding: 0.35rem 0.25rem 0.65rem;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    @media (min-width: 1024px) {
+      .rail {
+        grid-auto-flow: unset;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        overflow: visible;
+        scroll-snap-type: none;
+      }
+      .main-grid {
+        display: grid;
+        grid-template-columns: 1.55fr 0.95fr;
+        gap: 1rem;
+        align-items: stretch;
+      }
+    }
+    .btn-primary {
+      border-radius: 999px;
+      background: linear-gradient(135deg, #7dba88, #3d9a6a);
+      color: #06140c;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      min-height: 3rem;
+      box-shadow: 0 0 24px rgba(125, 186, 136, 0.28);
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.05); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-ghost {
+      border-radius: 999px;
+      border: 1px solid rgba(125, 186, 136, 0.28);
+      background: rgba(0,0,0,0.28);
+      color: #d7e6dc;
+      min-height: 2.5rem;
+    }
+    .flash {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--neon) 45%, transparent), transparent 55%);
+      opacity: 0;
+    }
+    .flash.go { animation: enterFlash 0.7s ease; }
+    .glitch:hover .tagline { text-shadow: 1px 0 color-mix(in srgb, var(--neon) 60%, transparent), -1px 0 rgba(255,80,120,0.4); }
+  </style>
+</head>
+<body>
+  <!--
+    INTEGRATION NOTES (port to React)
+    --------------------------------
+    1. CLASSES DATA: Keep using web/src/lib/orbitxcity/characterClasses.ts exactly.
+       Add lore/perk/synergy maps in CharacterSelect.tsx (or extend CharacterClassDef).
+    2. HOLO AVATAR: Port renderHolo() markup into HoloAvatar in CharacterSelect.tsx;
+       className pattern cls-{id} outfit-{suit|street|sport|neon} already matches oxc-pod-* CSS.
+    3. STATE: selectedId, callsign, walletConnected → CityProvider setAvatar(appearanceFromClass),
+       setGate("lobbies"|"menu"|"world"), setEntered(true). Wire WalletConnectButton at top.
+    4. STATS UI: Animated bars + SVG radar can drop into the preview aside.
+    5. AUDIO: Use cityAudio.play("ui"|"confirm"|"deny"|"enter") instead of Web Audio stubs.
+    6. CSS: Merge .holo/.pod-card holographic rules into city.css under .oxc-chars / .oxc-pod.
+    7. PROTOTYPE PATH: /orbitxcity/chamber-prototype.html (this file under web/public).
+  -->
+  <div class="chamber">
+    <div class="field" aria-hidden="true">
+      <div class="field-grid"></div>
+      <div id="stars"></div>
+      <div class="token-motif" style="top:18%; left:8%; animation-delay:-2s"></div>
+      <div class="token-motif" style="top:62%; right:10%; width:48px; height:48px; animation-delay:-5s"></div>
+      <div class="token-motif" style="bottom:12%; left:42%; width:36px; height:36px; animation-delay:-1s"></div>
+    </div>
+
+    <header class="relative z-10 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <button id="btnBack" type="button" class="btn-ghost px-4 text-xs tracking-widest uppercase">← Menu</button>
+        <button id="btnWallet" type="button" class="btn-ghost px-4 text-xs tracking-wide" aria-pressed="false">
+          Connect Wallet
+        </button>
+      </div>
+      <div class="text-center">
+        <p class="font-display text-[10px] tracking-[0.28em] text-ox-gold/80 uppercase mb-1">Holographic Recruitment Chamber</p>
+        <h1 class="font-display font-extrabold text-2xl sm:text-3xl tracking-[0.16em]">
+          ORBIT<span class="text-ox-lime">X</span> CITY
+        </h1>
+        <p class="text-[11px] sm:text-xs tracking-[0.14em] uppercase text-white/45 mt-1">Select your operative</p>
+        <p id="walletStatus" class="font-mono text-[10px] mt-1 text-white/35">Wallet offline</p>
+      </div>
+    </header>
+
+    <main class="relative z-10 px-3 sm:px-5 min-h-0 overflow-auto pb-2">
+      <div class="main-grid max-w-6xl mx-auto">
+        <section>
+          <div id="rail" class="rail" role="listbox" aria-label="Character classes"></div>
+          <div class="flex flex-wrap gap-2 mt-2 px-1">
+            <button id="btnRandom" type="button" class="btn-ghost px-4 text-xs tracking-wide">Randomize Operative</button>
+            <span id="badgeHint" class="inline-flex items-center rounded-full border border-ox-gold/30 bg-ox-gold/10 px-3 py-1 text-[10px] tracking-wide text-ox-gold/90 uppercase">
+              Tip · swipe cards on mobile
+            </span>
+          </div>
+        </section>
+
+        <aside id="preview" class="glass rounded-[1.6rem] p-4 sm:p-5 mt-3 lg:mt-0" aria-live="polite">
+          <!-- filled by JS -->
+        </aside>
+      </div>
+    </main>
+
+    <footer class="relative z-10 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+      <div class="max-w-xl mx-auto grid gap-2">
+        <label class="glass rounded-full px-4 py-2 flex items-center gap-3">
+          <span class="text-[10px] tracking-[0.16em] uppercase text-white/45 shrink-0">Callsign</span>
+          <input id="callsign" maxlength="24" placeholder="Traveler"
+            class="bg-transparent outline-none w-full text-sm font-medium placeholder:text-white/25" />
+        </label>
+        <button id="btnStart" type="button" class="btn-primary w-full" disabled>Connect wallet to start</button>
+        <button id="btnDemo" type="button" class="btn-ghost w-full text-sm">Quick Demo Mode</button>
+        <p class="text-center text-[10px] tracking-wide text-white/30 pt-1">
+          Powered by OrbitX · chamber v2.0 · Solana launchpad rails
+        </p>
+      </div>
+    </footer>
+  </div>
+
+  <div id="flash" class="flash" aria-hidden="true"></div>
+
+  <script>
+    const CLASSES = [
+      {
+        id: "trader", name: "Trader", tagline: "Market predator · execution first",
+        neon: "#c5a26f", gold: "#e0c48a", bodyColor: "#1a1f2a", accentColor: "#c5a26f", skinColor: "#e8d5c0",
+        outfit: "suit",
+        stats: [
+          { label: "Instinct", value: 92 }, { label: "Speed", value: 78 },
+          { label: "Risk", value: 86 }, { label: "Focus", value: 80 },
+        ],
+        lore: "Reads tape like a battlefield. Prefers clean entries, hard exits, and no mercy for late bags.",
+        perk: "Perk · Priority lane on trading-floor terminals",
+        synergy: "Class Synergy · DEX desks + live screener walls amplify Instinct.",
+        badge: null,
+      },
+      {
+        id: "builder", name: "Builder", tagline: "Systems · protocols · craft",
+        neon: "#5b8def", gold: "#8eb0ff", bodyColor: "#243044", accentColor: "#5b8def", skinColor: "#c9a07a",
+        outfit: "street",
+        stats: [
+          { label: "Craft", value: 90 }, { label: "Stamina", value: 84 },
+          { label: "Vision", value: 72 }, { label: "Focus", value: 88 },
+        ],
+        lore: "Architect of rails and rituals. Turns Midtown infrastructure into leverage.",
+        perk: "Perk · Faster mission claim cooldown at OrbitX HQ",
+        synergy: "Class Synergy · HQ command floor + builder pods stack Focus.",
+        badge: null,
+      },
+      {
+        id: "gamer", name: "Gamer", tagline: "Arenas · streaks · clutch plays",
+        neon: "#ff4d6a", gold: "#ffd700", bodyColor: "#1c1420", accentColor: "#ff4d6a", skinColor: "#f0d5b8",
+        outfit: "sport",
+        stats: [
+          { label: "Reflex", value: 95 }, { label: "Speed", value: 90 },
+          { label: "Luck", value: 70 }, { label: "Focus", value: 82 },
+        ],
+        lore: "Born for heat checks. Treats every candle and every round as a ranked match.",
+        perk: "Perk · Highlighted games-district markers",
+        synergy: "Class Synergy · Arenas + launch stages spike Reflex under pressure.",
+        badge: "Recommended for degens",
+      },
+      {
+        id: "creator", name: "Creator", tagline: "Signal · culture · narrative",
+        neon: "#b388ff", gold: "#c5a26f", bodyColor: "#2a1f36", accentColor: "#b388ff", skinColor: "#f2dcc8",
+        outfit: "neon",
+        stats: [
+          { label: "Style", value: 93 }, { label: "Reach", value: 85 },
+          { label: "Charm", value: 88 }, { label: "Focus", value: 74 },
+        ],
+        lore: "Broadcasts the culture layer. Memes become markets when Creators walk the boulevard.",
+        perk: "Perk · Boosted social-feed presence aura",
+        synergy: "Class Synergy · Community lounges + neon clubs feed Reach.",
+        badge: null,
+      },
+      {
+        id: "explorer", name: "Explorer", tagline: "Frontier routes · discovery",
+        neon: "#3d9a6a", gold: "#d4af37", bodyColor: "#1e2a22", accentColor: "#3d9a6a", skinColor: "#8d5524",
+        outfit: "street",
+        stats: [
+          { label: "Range", value: 91 }, { label: "Stamina", value: 87 },
+          { label: "Instinct", value: 80 }, { label: "Focus", value: 76 },
+        ],
+        lore: "Maps the unknown districts first. Always two blocks ahead of the crowd.",
+        perk: "Perk · Extended teleport reveal radius",
+        synergy: "Class Synergy · Frontier routes pair with launchpad discovery.",
+        badge: "Wallet compatible",
+      },
+    ];
+
+    let selectedId = "trader";
+    let walletOn = false;
+    const $ = (id) => document.getElementById(id);
+
+    function beep(kind) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        const now = ctx.currentTime;
+        if (kind === "ui") { o.frequency.value = 520; g.gain.setValueAtTime(0.03, now); }
+        else if (kind === "confirm") { o.frequency.value = 660; g.gain.setValueAtTime(0.045, now); }
+        else if (kind === "deny") { o.frequency.value = 180; g.gain.setValueAtTime(0.04, now); }
+        else { o.frequency.value = 880; g.gain.setValueAtTime(0.05, now); }
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        o.start(now); o.stop(now + 0.2);
+      } catch (_) {}
+    }
+
+    function selected() {
+      return CLASSES.find((c) => c.id === selectedId) || CLASSES[0];
+    }
+
+    function renderHolo(cls, { large = false, selectedMark = false } = {}) {
+      return `
+        <div class="holo ${large ? "lg" : ""} ${selectedMark ? "selected" : ""} cls-${cls.id} outfit-${cls.outfit}"
+          style="--neon:${cls.neon};--gold:${cls.gold};--body:${cls.bodyColor};--accent:${cls.accentColor};--skin:${cls.skinColor}">
+          <div class="beam"></div>
+          <div class="halo"></div>
+          <div class="figure">
+            <div class="hair"></div>
+            <div class="head">
+              <span class="eye l"></span><span class="eye r"></span>
+              <span class="visor"></span>
+            </div>
+            <div class="torso">
+              <span class="arm l"></span><span class="arm r"></span>
+              <span class="detail"></span>
+            </div>
+            <div class="legs"><span></span><span></span></div>
+            <div class="shoes"><i></i><i></i></div>
+          </div>
+          <div class="ring"></div>
+        </div>`;
+    }
+
+    function radarSVG(cls) {
+      const cx = 74, cy = 74, r = 52;
+      const pts = cls.stats.map((s, i) => {
+        const a = (-Math.PI / 2) + (i * Math.PI * 2) / cls.stats.length;
+        const rr = r * (s.value / 100);
+        return [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr];
+      });
+      const poly = pts.map((p) => p.join(",")).join(" ");
+      const grid = [0.35, 0.65, 1].map((t) => {
+        const ring = cls.stats.map((_, i) => {
+          const a = (-Math.PI / 2) + (i * Math.PI * 2) / cls.stats.length;
+          return `${cx + Math.cos(a) * r * t},${cy + Math.sin(a) * r * t}`;
+        }).join(" ");
+        return `<polygon points="${ring}" fill="none" stroke="rgba(255,255,255,0.08)" />`;
+      }).join("");
+      const spokes = cls.stats.map((s, i) => {
+        const a = (-Math.PI / 2) + (i * Math.PI * 2) / cls.stats.length;
+        const x = cx + Math.cos(a) * r;
+        const y = cy + Math.sin(a) * r;
+        const lx = cx + Math.cos(a) * (r + 14);
+        const ly = cy + Math.sin(a) * (r + 14);
+        return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(255,255,255,0.08)" />
+          <text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="rgba(210,220,215,0.55)" font-size="8">${s.label}</text>`;
+      }).join("");
+      return `<svg class="radar mx-auto" viewBox="0 0 148 148" aria-hidden="true">
+        ${grid}${spokes}
+        <polygon points="${poly}" fill="${cls.neon}33" stroke="${cls.neon}" stroke-width="1.5" />
+      </svg>`;
+    }
+
+    function renderRail() {
+      $("rail").innerHTML = CLASSES.map((cls) => `
+        <button type="button" role="option" aria-selected="${cls.id === selectedId}"
+          class="pod-card glitch relative p-3 text-left ${cls.id === selectedId ? "is-on" : ""}"
+          style="--neon:${cls.neon};--gold:${cls.gold}"
+          data-id="${cls.id}">
+          <div class="energy"></div>
+          ${cls.badge ? `<span class="absolute top-2 right-2 z-10 rounded-full bg-black/50 border border-white/15 px-2 py-0.5 text-[8px] tracking-wide uppercase text-ox-gold">${cls.badge}</span>` : ""}
+          ${renderHolo(cls, { selectedMark: cls.id === selectedId })}
+          <div class="mt-2 text-center">
+            <div class="font-display text-xs tracking-[0.14em] uppercase" style="color:${cls.neon}">${cls.name}</div>
+            <div class="tagline text-[10px] text-white/45 mt-1 leading-snug">${cls.tagline}</div>
+          </div>
+        </button>
+      `).join("");
+
+      $("rail").querySelectorAll("[data-id]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          selectedId = btn.dataset.id;
+          beep("ui");
+          renderAll();
+        });
+      });
+    }
+
+    function renderPreview() {
+      const cls = selected();
+      const name = $("callsign").value.trim() || "Traveler";
+      $("preview").style.setProperty("--neon", cls.neon);
+      $("preview").style.setProperty("--gold", cls.gold);
+      $("preview").innerHTML = `
+        <div class="flex flex-col sm:flex-row lg:flex-col gap-4 items-center">
+          <div class="w-36 sm:w-40 shrink-0">${renderHolo(cls, { large: true, selectedMark: true })}</div>
+          <div class="flex-1 w-full min-w-0 text-center lg:text-center">
+            <p class="font-display text-[10px] tracking-[0.2em] uppercase text-white/40">Operative dossier</p>
+            <h2 class="font-display text-xl tracking-wide mt-1" style="color:${cls.neon}">${name}</h2>
+            <p class="text-sm text-white/55 mt-1">${cls.name} · ${cls.tagline}</p>
+            ${cls.badge ? `<p class="inline-block mt-2 rounded-full border px-3 py-1 text-[10px] uppercase tracking-wide" style="border-color:${cls.gold};color:${cls.gold}">${cls.badge}</p>` : ""}
+            <p class="text-xs text-white/50 mt-3 leading-relaxed">${cls.lore}</p>
+            <p class="text-[11px] mt-2" style="color:${cls.neon}">${cls.perk}</p>
+            <p class="text-[11px] text-ox-gold/80 mt-1">${cls.synergy}</p>
+          </div>
+        </div>
+        <div class="mt-4 grid sm:grid-cols-2 gap-4 items-center">
+          <ul class="space-y-2">
+            ${cls.stats.map((s) => `
+              <li>
+                <div class="flex justify-between text-[10px] uppercase tracking-wide text-white/45 mb-1">
+                  <span>${s.label}</span><span>${s.value}</span>
+                </div>
+                <div class="stat-bar"><i style="width:${s.value}%;--neon:${cls.neon};--gold:${cls.gold}"></i></div>
+              </li>`).join("")}
+          </ul>
+          ${radarSVG(cls)}
+        </div>
+      `;
+    }
+
+    function updateStart() {
+      const btn = $("btnStart");
+      if (walletOn) {
+        btn.disabled = false;
+        btn.textContent = "Enter OrbitX City → Lobbies";
+      } else {
+        btn.disabled = true;
+        btn.textContent = "Connect wallet to start";
+      }
+      $("walletStatus").textContent = walletOn ? "Wallet linked · ready for Midtown" : "Wallet offline";
+      $("walletStatus").className = `font-mono text-[10px] mt-1 ${walletOn ? "text-ox-lime/80" : "text-white/35"}`;
+      $("btnWallet").textContent = walletOn ? "Wallet Connected" : "Connect Wallet";
+      $("btnWallet").setAttribute("aria-pressed", walletOn ? "true" : "false");
+    }
+
+    function flashEnter() {
+      const cls = selected();
+      $("flash").style.setProperty("--neon", cls.neon);
+      $("flash").classList.remove("go");
+      void $("flash").offsetWidth;
+      $("flash").classList.add("go");
+    }
+
+    function renderAll() {
+      renderRail();
+      renderPreview();
+      updateStart();
+    }
+
+    // stars
+    const stars = $("stars");
+    for (let i = 0; i < 48; i++) {
+      const s = document.createElement("span");
+      s.className = "star";
+      s.style.left = Math.random() * 100 + "%";
+      s.style.top = Math.random() * 100 + "%";
+      s.style.animationDelay = (Math.random() * 4) + "s";
+      stars.appendChild(s);
+    }
+
+    $("callsign").addEventListener("input", () => renderPreview());
+    $("btnWallet").addEventListener("click", () => {
+      walletOn = !walletOn;
+      beep(walletOn ? "confirm" : "ui");
+      updateStart();
+    });
+    $("btnRandom").addEventListener("click", () => {
+      selectedId = CLASSES[Math.floor(Math.random() * CLASSES.length)].id;
+      beep("ui");
+      renderAll();
+    });
+    $("btnStart").addEventListener("click", () => {
+      if (!walletOn) { beep("deny"); return; }
+      beep("enter");
+      flashEnter();
+      setTimeout(() => alert(`Entering lobbies as ${$("callsign").value.trim() || "Traveler"} · ${selected().name}`), 350);
+    });
+    $("btnDemo").addEventListener("click", () => {
+      beep("enter");
+      flashEnter();
+      setTimeout(() => alert("Quick Demo Mode → world (prototype)"), 350);
+    });
+    $("btnBack").addEventListener("click", () => {
+      beep("ui");
+      alert("Back to main menu (prototype)");
+    });
+
+    // keyboard: arrows across pods
+    document.addEventListener("keydown", (e) => {
+      const idx = CLASSES.findIndex((c) => c.id === selectedId);
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        selectedId = CLASSES[(idx + 1) % CLASSES.length].id;
+        beep("ui"); renderAll();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        selectedId = CLASSES[(idx - 1 + CLASSES.length) % CLASSES.length].id;
+        beep("ui"); renderAll();
+      } else if (e.key === "Enter" && walletOn) {
+        $("btnStart").click();
+      }
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>

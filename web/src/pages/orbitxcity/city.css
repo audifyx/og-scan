@@ -1661,7 +1661,35 @@ button.oxc-token-row {
   z-index: 2;
   text-align: center;
   display: grid;
-  gap: 0.35rem;
+  gap: 0.3rem;
+}
+
+.oxc-chars-kicker {
+  margin: 0.15rem 0 0;
+  font-family: var(--oxc-font-display);
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--oxc-gold) 75%, transparent);
+}
+
+.oxc-chars-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 42%, transparent), transparent 55%);
+}
+
+.oxc-chars-flash.is-on {
+  animation: oxc-chars-enter-flash 0.7s ease;
+}
+
+@keyframes oxc-chars-enter-flash {
+  0% { opacity: 0; }
+  30% { opacity: 0.55; }
+  100% { opacity: 0; }
 }
 
 .oxc-chars-top-row {
@@ -1787,6 +1815,41 @@ button.oxc-token-row {
   transform: translateY(12px);
   animation: oxc-tile-in 0.5s ease forwards;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.oxc-pod-badge {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 4;
+  max-width: 46%;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--oxc-gold) 40%, transparent);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--oxc-gold);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.4rem;
+  line-height: 1.2;
+}
+
+.oxc-pod-energy {
+  position: absolute;
+  inset: -18% -8% auto;
+  height: 52%;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 32%, transparent), transparent 70%);
+  filter: blur(16px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+}
+
+.oxc-pod.is-on .oxc-pod-energy,
+.oxc-pod-avatar.is-selected .oxc-pod-energy {
+  opacity: 1;
 }
 
 .oxc-pod:hover {
@@ -2187,9 +2250,9 @@ button.oxc-token-row {
 
 .oxc-chars-preview.glass {
   display: flex;
+  flex-direction: column;
   gap: 0.85rem;
-  align-items: center;
-  padding: 0.8rem 0.95rem;
+  padding: 0.85rem 1rem;
   border-radius: 22px;
   border: 1px solid color-mix(in srgb, var(--oxc-lime) 28%, transparent);
   background: linear-gradient(145deg, rgba(10, 16, 14, 0.86), rgba(5, 8, 7, 0.78));
@@ -2197,6 +2260,12 @@ button.oxc-token-row {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--oxc-gold) 14%, transparent),
     0 14px 40px rgba(0, 0, 0, 0.4);
+}
+
+.oxc-chars-dossier {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
 }
 
 .oxc-chars-preview-fig {
@@ -2211,11 +2280,58 @@ button.oxc-token-row {
 .oxc-chars-preview-meta {
   flex: 1;
   min-width: 0;
+  text-align: left;
+}
+
+.oxc-chars-dossier-kicker {
+  margin: 0;
+  font-family: var(--oxc-font-display);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(210, 220, 215, 0.4);
+}
+
+.oxc-chars-preview-meta h2 {
+  margin: 0.2rem 0 0;
+  font-family: var(--oxc-font-display);
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+}
+
+.oxc-chars-badge {
+  display: inline-block;
+  margin-top: 0.4rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--oxc-gold) 45%, transparent);
+  color: var(--oxc-gold);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+}
+
+.oxc-chars-lore,
+.oxc-chars-perk,
+.oxc-chars-synergy {
+  margin: 0.45rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--oxc-muted);
+}
+
+.oxc-chars-perk {
+  font-weight: 600;
+}
+
+.oxc-chars-synergy {
+  color: color-mix(in srgb, var(--oxc-gold) 80%, transparent);
 }
 
 .oxc-chars-preview-meta label {
   display: grid;
   gap: 0.3rem;
+  margin-top: 0.65rem;
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2241,7 +2357,7 @@ button.oxc-token-row {
 }
 
 .oxc-chars-preview-meta p {
-  margin: 0.5rem 0 0;
+  margin: 0.35rem 0 0;
   font-size: 0.78rem;
   color: var(--oxc-muted);
   text-align: left;
@@ -2249,6 +2365,49 @@ button.oxc-token-row {
 
 .oxc-chars-gold {
   color: var(--oxc-gold);
+}
+
+.oxc-chars-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 0.75rem;
+}
+
+.oxc-chars-stats-full {
+  margin: 0;
+}
+
+.oxc-chars-stats-full li {
+  grid-template-columns: 52px 1fr 28px;
+}
+
+.oxc-chars-stats-full em {
+  font-style: normal;
+  font-size: 9px;
+  color: rgba(210, 220, 215, 0.5);
+  text-align: right;
+}
+
+.oxc-chars-radar {
+  width: 132px;
+  height: 132px;
+}
+
+.oxc-chars-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.15rem 0.2rem 0;
+}
+
+.oxc-chars-random {
+  border-radius: 999px !important;
+  min-height: 2.2rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
 }
 
 .oxc-chars-foot {
@@ -2271,6 +2430,14 @@ button.oxc-token-row {
   width: 100%;
   border-radius: 999px !important;
   min-height: 2.35rem;
+}
+
+.oxc-chars-powered {
+  margin: 0;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgba(200, 215, 210, 0.32);
 }
 
 @media (min-width: 900px) {
@@ -2296,25 +2463,29 @@ button.oxc-token-row {
   }
 
   .oxc-chars-body {
-    grid-template-columns: 1.65fr 0.9fr;
+    grid-template-columns: 1.55fr 1fr;
     align-items: stretch;
   }
 
   .oxc-chars-preview.glass {
-    flex-direction: column;
-    text-align: center;
-    justify-content: center;
     border-radius: 28px;
   }
 
+  .oxc-chars-dossier {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
   .oxc-chars-preview-fig {
-    width: 140px;
+    width: 150px;
   }
 
   .oxc-chars-preview-fig .oxc-pod-avatar {
-    max-height: 180px;
+    max-height: 190px;
   }
 
+  .oxc-chars-preview-meta,
   .oxc-chars-preview-meta label,
   .oxc-chars-preview-meta p {
     text-align: center;
@@ -2466,7 +2637,10 @@ button.oxc-token-row {
 
   .oxc-chars-preview.glass {
     border-radius: 18px;
-    padding: 0.65rem 0.75rem;
+    padding: 0.7rem 0.75rem;
+  }
+
+  .oxc-chars-dossier {
     gap: 0.65rem;
   }
 
@@ -2476,6 +2650,24 @@ button.oxc-token-row {
 
   .oxc-chars-preview-fig .oxc-pod-avatar {
     max-height: 96px;
+  }
+
+  .oxc-chars-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .oxc-chars-radar {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto;
+  }
+
+  .oxc-chars-lore,
+  .oxc-chars-synergy {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .oxc-chars-enter {
