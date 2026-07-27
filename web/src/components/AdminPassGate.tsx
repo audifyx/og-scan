@@ -36,7 +36,7 @@ export function AdminPassGate(_props?: { children?: React.ReactNode }) {
 
   const onPickWallet = async (name: string) => {
     try {
-      await signInWith(name);
+      await signInWith(name, { replaceEmailSession: true });
       setPicker(false);
       toast.success("Signed in with wallet");
     } catch (err) {

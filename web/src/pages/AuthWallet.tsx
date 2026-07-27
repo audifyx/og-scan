@@ -32,6 +32,7 @@ export default function AuthWallet() {
 
   useEffect(() => {
     // Password recovery links must use the email update form, not wallet auth.
+    // Preserve the URL hash (Supabase puts access_token there) or the session is lost.
     let recovery = false;
     try {
       if (window.location.hash.includes("type=recovery")) recovery = true;
@@ -39,9 +40,11 @@ export default function AuthWallet() {
       if (params.get("mode") === "update") recovery = true;
     } catch { /* noop */ }
     if (recovery) {
-      navigate(`/auth/email?mode=update${next && next !== "/app" ? `&next=${encodeURIComponent(next)}` : ""}`, { replace: true });
+      const hash = window.location.hash || "";
+      const nextQ = next && next !== "/app" ? `&next=${encodeURIComponent(next)}` : "";
+      window.location.replace(`/auth/email?mode=update${nextQ}${hash}`);
     }
-  }, [navigate, next, params]);
+  }, [next, params]);
 
   useEffect(() => {
     if (loading || !user || merge || pendingMerge || waitingOnUsername) return;

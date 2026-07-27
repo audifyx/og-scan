@@ -21,6 +21,7 @@ import { shortAddr } from "./_shared";
 import { redeemReferralCode } from "@/lib/orbitx/registry";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useChainTelemetry, useSolUsd, fmtInt } from "./lpx";
+import { useAuth } from "@/hooks/useAuth";
 import "./orbitx-2026.css";
 
 const TABS = [
@@ -34,11 +35,11 @@ const TABS = [
   { to: "/orbitxlaunch/about", label: "About", icon: Info, end: false },
 ];
 
-/* ── wallet console — shared wallet-adapter state; connecting here also signs
-   you in globally via WalletAuthBridge (Sign-In-With-Solana). ── */
+/* ── wallet console — connect for txs; do NOT overwrite email login sessions ── */
 function WalletConsole() {
   const { connection } = useConnection();
   const { publicKey, connected, disconnect } = useWallet();
+  const { user } = useAuth();
   const { pickable, signInWith, busy } = useWalletSignIn();
   const [picker, setPicker] = useState(false);
   const addr = publicKey?.toBase58();
@@ -51,8 +52,15 @@ function WalletConsole() {
   });
 
   const onPick = async (name: string) => {
-    try { await signInWith(name); setPicker(false); toast.success("Signed in with wallet"); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Sign-in failed"); }
+    try {
+      // If already signed in with email, only connect the adapter (keep email session).
+      const emailSession = !!user?.email && !/@wallet\.orbitx\.app$/i.test(user.email);
+      await signInWith(name, emailSession ? { connectOnly: true } : undefined);
+      setPicker(false);
+      toast.success(emailSession ? "Wallet connected" : "Signed in with wallet");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Sign-in failed");
+    }
   };
 
   if (!connected || !addr) {

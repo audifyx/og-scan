@@ -19,7 +19,7 @@ export function useWalletSignIn() {
       .sort((a, b) => rank(a.readyState) - rank(b.readyState) || a.name.localeCompare(b.name));
   }, [wallets]);
 
-  const signInWith = useCallback(async (name: string): Promise<{ isNew: boolean }> => {
+  const signInWith = useCallback(async (name: string, opts?: { replaceEmailSession?: boolean; connectOnly?: boolean }): Promise<{ isNew: boolean }> => {
     const w = wallets.find((x) => x.adapter.name === name);
     if (!w) throw new Error(`${name} not found`);
     const adapter = w.adapter as Adapter & { signMessage?: (m: Uint8Array) => Promise<Uint8Array> };
@@ -29,20 +29,21 @@ export function useWalletSignIn() {
     }
     setBusy(name);
     try {
-      // Connect FIRST: Wallet Standard adapters (Phantom, Backpack, …) only
-      // expose signMessage after connect, so checking it earlier false-fails
-      // with "does not support message signing".
       select(adapter.name);
-      // Let WalletProvider adopt the selection before connect so useWallet()
-      // reports connected/publicKey for buy flows immediately after SIWS.
       await new Promise((r) => setTimeout(r, 60));
       if (!adapter.connected) await adapter.connect();
+      if (opts?.connectOnly) {
+        if (!adapter.publicKey) throw new Error("wallet did not return a public key");
+        return { isNew: false };
+      }
       if (typeof adapter.signMessage !== "function") {
         throw new Error(`${name} can't sign the login message here. Open OrbitX inside the ${name} app, or try another wallet.`);
       }
       const pubkey = adapter.publicKey?.toBase58();
       if (!pubkey) throw new Error("wallet did not return a public key");
-      return await signInWithWallet(pubkey, (m) => adapter.signMessage!(m));
+      return await signInWithWallet(pubkey, (m) => adapter.signMessage!(m), {
+        replaceEmailSession: opts?.replaceEmailSession,
+      });
     } finally {
       setBusy(null);
     }

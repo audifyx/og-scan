@@ -47,7 +47,7 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
 
   const onPick = async (name: string) => {
     try {
-      await signInWith(name);
+      await signInWith(name, { replaceEmailSession: true });
       setPicker(false);
       toast.success("Signed in with wallet");
     } catch (e) {
