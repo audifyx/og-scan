@@ -282,7 +282,7 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
 
           <button
             onClick={onCreateClick}
-            className="lp-cta flex items-center gap-2.5 rounded-xl px-5 py-3 font-display text-sm font-black uppercase tracking-wider shrink-0"
+            className="pf-btn flex shrink-0 items-center gap-2.5"
           >
             <Plus className="h-4.5 w-4.5" />
             Launch Token
