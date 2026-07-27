@@ -20,7 +20,7 @@ export const FEE_WALLET_RESERVE_LAMPORTS = 5_000_000; // 0.005 SOL
 
 export const PLATFORM_FEE_SOURCES = [
   { id: "platform", label: "Platform (launch + swap fees)", wallet: PLATFORM_WALLET },
-  { id: "routed", label: "Routed revenue (2.5% claims)", wallet: ROUTED_FEE_WALLET },
+  { id: "routed", label: "Routed revenue (25% of trade fees)", wallet: ROUTED_FEE_WALLET },
 ] as const;
 
 export type PlatformFeeSourceId = (typeof PLATFORM_FEE_SOURCES)[number]["id"];

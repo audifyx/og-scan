@@ -1,17 +1,22 @@
-// Orbitx Launchpad — fee model (pump.fun parity).
-// The fee STRUCTURE mirrors pump.fun (see pump.fun/docs/fees):
-//   - trading: 0.30% creator fee on every buy/sell (pump bonding-curve creator rate)
+// Orbitx Launchpad — fee model.
+//   - trading: 0.45% on every buy/sell of OrbitX-launched tokens
+//     · 75% → creator (Claim Fees)
+//     · 25% → admin (Launchpad Admin / ROUTED_FEE_WALLET)
 //   - platform: 0.95% protocol-rate swap fee on in-app swaps
 // plus one flat Orbitx launch fee, IDENTICAL on both lanes ($1.50, converted
 // to SOL live so it stays constant in dollar terms).
-import { LAUNCHPAD_FEE_USD, CREATOR_FEE_BPS } from "@/lib/platformFee";
+import {
+  LAUNCHPAD_FEE_USD, CREATOR_FEE_BPS,
+  TRADE_FEE_PLATFORM_SHARE_PCT, TRADE_FEE_CREATOR_SHARE_PCT,
+} from "@/lib/platformFee";
 
 export const ORBITX_FEE_USD = LAUNCHPAD_FEE_USD; // flat Orbitx launch fee — same on pump + custom lanes ($0 during promo)
 export {
   BASE_LAUNCH_FEE_USD, LAUNCH_FEE_PROMO_END,
   isLaunchFeePromoActive, launchFeePromoDaysLeft,
 } from "@/lib/platformFee";
-export { CREATOR_FEE_BPS };                      // 0.30% per buy/sell, claimable by the creator
+export { CREATOR_FEE_BPS, TRADE_FEE_PLATFORM_SHARE_PCT, TRADE_FEE_CREATOR_SHARE_PCT };
+// 0.45% trading fee — creator keeps 75%, platform 25% at claim time
 
 // Real, approximate on-chain costs (mainnet). These are the user's cost, not ours.
 export const RAYDIUM_POOL_FEE_SOL = 0.15; // Raydium CPMM pool-creation protocol fee

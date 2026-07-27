@@ -69,7 +69,7 @@ const FAQ = [
   { q: "What is OrbitX Launchpad?", a: "A Solana token launchpad with two lanes — a pump.fun-style bonding curve and a fully custom SPL/Token-2022 mint — both protected by OrbitX's Anti-Vamp originality system and both minting a recognizable \"obx\" vanity contract address." },
   { q: "What is Anti-Vamp protection?", a: "Before any launch, OrbitX checks the proposed name and ticker against its own registry, pump.fun's live listings, and DexScreener in real time. An exact or near-exact match blocks the launch outright; a looser match still launches but routes creator fees to the OBX buyback wallet instead of the copycat." },
   { q: "What does it cost to launch?", a: "Both lanes charge the same flat launch fee (frequently run as a free promo — check the banner on the Choose Launch page for the current rate) plus the standard Solana network fee. Creator fees are separate and go to you." },
-  { q: "How do I claim my creator fees?", a: "Connect the same wallet you launched with and go to Claim Fees. Fees can be claimed in-app at any time." },
+  { q: "How do I claim my creator fees?", a: "Connect the same wallet you launched with and go to Claim Fees. Trade fee is 0.45% on every buy/sell — you keep 75% ($0.75 of every $1), OrbitX takes 25% ($0.25) claimable on the Admin Desk." },
   { q: "What's the \"obx\" vanity address?", a: "Every OrbitX launch vanity-grinds its mint address so it ends in \"obx\" — a recognizable, on-brand identity for every token launched through the platform." },
   { q: "Can I add liquidity myself?", a: "Yes, on the custom SPL lane you can optionally seed a Raydium CPMM pool with your own SOL at launch, and burn or time-lock the LP for trust." },
 ] as const;

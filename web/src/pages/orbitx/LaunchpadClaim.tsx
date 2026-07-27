@@ -5,8 +5,9 @@
  *  - Pump lane: claims pump.fun creator fees (the Pump program's own
  *    collectCreatorFee system — one claim collects across ALL your pump
  *    coins, bonding curve + graduated).
- *  - Custom lane: claims the 0.30% Token-2022 transfer fee accrued on every
+ *  - Custom lane: claims the 0.45% Token-2022 transfer fee accrued on every
  *    buy/sell of tokens you launched. Paid in your own token; swap anytime.
+ *    Claim split: 75% creator / 25% platform (admin desk).
  */
 import { useState, useCallback, useEffect } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -25,7 +26,7 @@ import {
   getCustomClaimable, buildCustomClaimTransactions, type CustomClaimable,
   buildPumpClaimWithSkim, buildPumpBuyTransaction, buildCustomSwapToSolWithSkim,
 } from "@/lib/orbitx/claim";
-import { CREATOR_FEE_BPS } from "@/lib/platformFee";
+import { CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { TabHero } from "./TabHero";
@@ -101,7 +102,7 @@ export default function LaunchpadClaim() {
     if (!publicKey || !signTransaction) return;
     setPumpClaiming(true);
     try {
-      // Claim + 2.5% platform skim, atomic in one signed tx.
+      // Claim + 25% platform skim, atomic in one signed tx.
       const plan = await buildPumpClaimWithSkim(connection, publicKey);
       if (plan.grossLamports <= 0) { toast.error("Nothing to claim right now"); return; }
       const signed = await signTransaction(plan.tx);
@@ -162,7 +163,7 @@ export default function LaunchpadClaim() {
         await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
       }
       // Custom-lane fees accrue in-token; swap the withdrawn amount to SOL
-      // (+2.5% platform skim) so the creator is paid in SOL like the pump lane.
+      // (+25% platform skim) so the creator is paid in SOL like the pump lane.
       try {
         const plan = await buildCustomSwapToSolWithSkim(connection, publicKey, t.mint_address, info.totalRaw);
         const signedSwap = await signTransaction(plan.tx);
@@ -196,7 +197,7 @@ export default function LaunchpadClaim() {
         accent="green"
         eyebrow="Claim · creator fees"
         title="Claim your creator fees"
-        subtitle={`Same wallet you launched with. Earn ${(CREATOR_FEE_BPS / 100).toFixed(2)}% of every buy & sell on pump + custom lanes.`}
+        subtitle={`Same wallet you launched with. ${(CREATOR_FEE_BPS / 100).toFixed(2)}% on every buy & sell — you keep ${TRADE_FEE_CREATOR_SHARE_PCT}%, platform ${TRADE_FEE_PLATFORM_SHARE_PCT}%.`}
         actions={
           !connected ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect up top</span>
@@ -226,11 +227,22 @@ export default function LaunchpadClaim() {
               <p className="mb-4 text-xs text-muted-foreground">
                 One claim collects your creator fees across <span className="text-foreground">all</span> coins this wallet created on pump.fun (bonding curve + graduated), including launches made here.
               </p>
-              <div className="mb-4 rounded-lg border border-white/10 bg-black/30 p-3 text-xs">
+              <div className="mb-4 rounded-lg border border-white/10 bg-black/30 p-3 text-xs space-y-2">
                 <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Platform fee on claim</span>
+                  <span>Trade fee (every buy &amp; sell)</span>
+                  <span className="font-mono text-foreground">{(CREATOR_FEE_BPS / 100).toFixed(2)}%</span>
+                </div>
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Your share (buyer / creator)</span>
+                  <span className="font-mono text-[hsl(var(--og-cyan))]">{TRADE_FEE_CREATOR_SHARE_PCT}%</span>
+                </div>
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Platform share (admin claim)</span>
                   <span className="font-mono text-foreground">{bpsToPct(DEFAULT_ROUTED_FEE_BPS)}%</span>
                 </div>
+                <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+                  Of every $1 in fees: ${((TRADE_FEE_CREATOR_SHARE_PCT) / 100).toFixed(2)} to you · ${((TRADE_FEE_PLATFORM_SHARE_PCT) / 100).toFixed(2)} to OrbitX (claimable on Admin Desk).
+                </p>
                 <label className="mt-3 flex cursor-pointer items-center gap-2">
                   <input type="checkbox" checked={autoBuyback} onChange={(e) => setAutoBuyback(e.target.checked)}
                     className="h-4 w-4 accent-[hsl(var(--og-gold))]" />
@@ -295,7 +307,7 @@ export default function LaunchpadClaim() {
                 <Badge variant="outline" className="border-white/15 text-[10px] text-muted-foreground">Token-2022 transfer fee</Badge>
               </div>
               <p className="mb-4 text-xs text-muted-foreground">
-                Every buy/sell of your custom tokens withholds {(CREATOR_FEE_BPS / 100).toFixed(2)}% on-chain (paid in your token). Claiming withdraws it and swaps it to <span className="text-foreground">SOL</span>, minus a {bpsToPct(DEFAULT_ROUTED_FEE_BPS)}% platform fee. Only your creator wallet can claim. If the pool is too thin to swap, you keep the tokens.
+                Every buy/sell withholds {(CREATOR_FEE_BPS / 100).toFixed(2)}% on-chain (paid in your token). Claiming withdraws it and swaps to <span className="text-foreground">SOL</span> — you keep {TRADE_FEE_CREATOR_SHARE_PCT}%, platform takes {TRADE_FEE_PLATFORM_SHARE_PCT}% (Admin Desk). Only your creator wallet can claim. If the pool is too thin to swap, you keep the tokens.
               </p>
 
               {tokensLoading ? (

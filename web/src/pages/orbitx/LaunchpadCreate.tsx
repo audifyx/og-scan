@@ -2,7 +2,7 @@
  * OrbitxLaunch — the Orbitx Launch Console (mounted at /orbitxlaunch).
  *
  * Premium space-themed CUSTOM Solana launchpad — REAL on-chain launch on
- * mainnet: own Token-2022 SPL mint + on-chain metadata + 0.30% creator fee
+ * mainnet: own Token-2022 SPL mint + on-chain metadata + 0.45% creator fee
  * on every buy/sell (pump.fun's creator-fee rate, claimable in-app at
  * /orbitxlaunch/claim) + optional Raydium CPMM pool. NOT pump.fun.
  */
@@ -851,7 +851,7 @@ export default function LaunchpadCreate() {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
               <Badge className={launched.flagged ? "border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 text-[hsl(var(--og-blood))]" : "border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 text-[hsl(var(--og-lime))]"}>
-                0.30% creator fee → {launched.flagged ? "OBX buybacks (flagged)" : "your wallet"}
+                0.45% creator fee (75% you / 25% platform) → {launched.flagged ? "OBX buybacks (flagged)" : "your wallet"}
               </Badge>
               {launched.poolId && <Badge className="border-[hsl(var(--og-cyan))]/40 bg-[hsl(var(--og-cyan))]/10 text-[hsl(var(--og-cyan))]">Raydium pool live</Badge>}
               {launched.lpBurned && <Badge className="border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 text-[hsl(var(--og-blood))]">LP burned</Badge>}

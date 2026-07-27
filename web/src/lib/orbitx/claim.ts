@@ -10,9 +10,10 @@
  *   (bonding curve + graduated PumpSwap pools).
  *
  * CUSTOM LANE — same economics, enforced by the Token-2022 transfer-fee
- *   extension: 0.30% of every buy/sell is withheld on-chain. Only the
+ *   extension: 0.45% of every buy/sell is withheld on-chain. Only the
  *   creator wallet (withdraw-withheld authority) can claim, by signing
- *   WithdrawWithheldTokensFromAccounts / ...FromMint.
+ *   WithdrawWithheldTokensFromAccounts / ...FromMint. At claim time OrbitX
+ *   skims 25% to the admin wallet and the creator keeps 75%.
  */
 import {
   Connection, PublicKey, Transaction, VersionedTransaction, LAMPORTS_PER_SOL, ComputeBudgetProgram,
@@ -88,7 +89,7 @@ export interface CustomClaimable {
   feeBps: number;
 }
 
-/** Scan a custom token's accrued (unclaimed) 0.30% trading fees. */
+/** Scan a custom token's accrued (unclaimed) 0.45% trading fees. */
 export async function getCustomClaimable(connection: Connection, mintAddr: string): Promise<CustomClaimable> {
   const mint = new PublicKey(mintAddr);
   const mintInfo = await connection.getAccountInfo(mint, "confirmed");
@@ -178,7 +179,7 @@ export function buildCustomClaimTransactions(
 }
 
 
-/* ─────────────────── Platform fee routing (2.5% at claim) ─────────────────── */
+/* ─────────────────── Platform fee routing (25% at claim) ─────────────────── */
 
 /**
  * Append a single SystemProgram.transfer (lamports, `from` → `to`) to an
@@ -216,7 +217,7 @@ export interface PumpClaimPlan {
 /**
  * Build the pump.fun claim transaction WITH the platform revenue-share skim
  * appended: reads the currently-claimable amount, computes the configured cut
- * (default 2.5%), and appends a transfer of that cut to the routed-fee wallet
+ * (default 25%), and appends a transfer of that cut to the routed-fee wallet
  * inside the same transaction the creator signs. The creator nets the rest.
  * Fail-closed: if the skim can't be computed/appended it throws rather than
  * claiming without the cut.

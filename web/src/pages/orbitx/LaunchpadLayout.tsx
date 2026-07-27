@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
-import { CREATOR_FEE_BPS } from "@/lib/platformFee";
+import { CREATOR_FEE_BPS, TRADE_FEE_CREATOR_SHARE_PCT, TRADE_FEE_PLATFORM_SHARE_PCT } from "@/lib/platformFee";
 import { shortAddr } from "./_shared";
 import { redeemReferralCode } from "@/lib/orbitx/registry";
 import { useAdmin } from "@/hooks/useAdmin";
@@ -132,7 +132,7 @@ function NetworkStrip() {
             {isLaunchFeePromoActive() ? (
               <span className="font-bold text-[#14F195]">★ FREE launches — {launchFeePromoDaysLeft()}d left</span>
             ) : (
-              <span>{fmtUsd(ORBITX_FEE_USD)} launch · {(CREATOR_FEE_BPS / 100).toFixed(2)}% creator</span>
+              <span>{fmtUsd(ORBITX_FEE_USD)} launch · {(CREATOR_FEE_BPS / 100).toFixed(2)}% trade · {TRADE_FEE_CREATOR_SHARE_PCT}/{TRADE_FEE_PLATFORM_SHARE_PCT} split</span>
             )}
           </span>
         ))}

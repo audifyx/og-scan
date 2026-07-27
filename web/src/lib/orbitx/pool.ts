@@ -3,7 +3,7 @@
  *
  * Seeds a real, immediately-tradable SOL pool for a freshly minted custom
  * token. CPMM supports Token-2022 mints with the transfer-fee extension, so
- * the 0.30% creator fee keeps accruing on every pool buy/sell.
+ * the 0.45% trading fee keeps accruing on every pool buy/sell.
  *
  * The Raydium SDK is heavy, so it is imported lazily — only when a launcher
  * actually enables "Add liquidity at launch".

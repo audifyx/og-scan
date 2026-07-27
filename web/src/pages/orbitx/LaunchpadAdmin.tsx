@@ -148,7 +148,7 @@ function ClaimPlatformFeesPanel({ solUsd }: { solUsd: number }) {
           <div>
             <div className="text-sm font-bold text-foreground">Claim platform fees</div>
             <div className="text-[11px] text-muted-foreground">
-              Connect a fee wallet, then sweep SOL to your payout address.
+              25% of trade fees from launchpad tokens (of every $1: $0.25 here · $0.75 to creators). Connect a fee wallet, then sweep SOL to your payout address.
             </div>
           </div>
         </div>
