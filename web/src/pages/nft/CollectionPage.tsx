@@ -1,7 +1,7 @@
 // OrbitX NFT Marketplace — collection page: analytics strip + floor/volume
 // history chart (Phase 4), curator feature control (Phase 5), item grid.
 import { useMemo, useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
@@ -12,10 +12,12 @@ import { useCollectionStats } from "./nftAnalytics";
 import { PriceText } from "./currency";
 import { Media, Verified, RarityBadge, Empty } from "./_ui";
 import { fmtInt } from "./nftMarketData";
-import { TrendingUp, Users, Package, Percent, ArrowLeft, Star, AlertTriangle } from "lucide-react";
+import { TrendingUp, Users, Package, Percent, ArrowLeft, Star, AlertTriangle, Coins } from "lucide-react";
+import { saveTokenCreatePrefill, buildCreateTokenHref } from "@/lib/orbitx/tokenCreatePrefill";
 
 export default function CollectionPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { publicKey } = useWallet();
   const wallet = publicKey?.toBase58();
   const { data: collections } = useQuery({ queryKey: ["nftmkt-collections"], queryFn: () => listNftCollections(200), staleTime: 30_000 });
@@ -25,6 +27,22 @@ export default function CollectionPage() {
   const c = useMemo(() => (collections ?? []).find((x) => x.id === id) ?? null, [collections, id]);
   const items = useMemo(() => (allNfts ?? []).filter((n) => n.collection_id === id), [allNfts, id]);
   const holders = useMemo(() => new Set(items.map((n) => n.current_owner)).size, [items]);
+  const isCreator = !!wallet && !!c?.creator_wallet && wallet === c.creator_wallet;
+  const hasCoin = !!c?.coin_mint;
+
+  const startCreateToken = () => {
+    if (!c) return;
+    saveTokenCreatePrefill({
+      name: c.name,
+      symbol: c.symbol,
+      description: c.description ?? "",
+      website: "",
+      imageUrl: c.logo_url || c.banner_url || null,
+      collectionId: c.id,
+      source: "collection",
+    });
+    navigate(buildCreateTokenHref("pump"));
+  };
 
   const [isCurator, setIsCurator] = useState(false);
   const [featured, setFeatured] = useState(false);
@@ -59,9 +77,21 @@ export default function CollectionPage() {
             <h1 className="flex items-center gap-2 text-2xl font-black">{c?.name ?? "…"} <Verified show={c?.verified} className="h-5 w-5" />{featured && <span className="inline-flex items-center gap-1 rounded-full border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 px-2 py-0.5 text-[10px] font-black uppercase text-[hsl(var(--og-gold))]"><Star className="h-3 w-3" /> Staff pick</span>}</h1>
             {c?.description && <p className="mt-1 max-w-xl text-[13px] mkt-muted line-clamp-2">{c.description}</p>}
           </div>
-          {isCurator && (
-            <button onClick={toggleFeatured} className={`mkt-btn ${featured ? "ghost" : ""}`}><Star className="h-4 w-4" /> {featured ? "Unfeature" : "Feature"}</button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {isCreator && !hasCoin && (
+              <button type="button" onClick={startCreateToken} className="mkt-btn">
+                <Coins className="h-4 w-4" /> Create token
+              </button>
+            )}
+            {hasCoin && c?.coin_mint && (
+              <a href={`/ORBITX_DEX/token/${c.coin_mint}`} className="mkt-btn ghost" target="_blank" rel="noreferrer">
+                <Coins className="h-4 w-4" /> Trade coin
+              </a>
+            )}
+            {isCurator && (
+              <button onClick={toggleFeatured} className={`mkt-btn ${featured ? "ghost" : ""}`}><Star className="h-4 w-4" /> {featured ? "Unfeature" : "Feature"}</button>
+            )}
+          </div>
         </div>
       </div>
 

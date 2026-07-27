@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Rocket, Wallet, Globe, Twitter, Send, MessagesSquare, Upload, Image as ImageIcon,
@@ -33,6 +33,7 @@ import { computeFee, getSolUsd, ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, 
 import { checkAntiVamp, registerToken, recordReferralEarning } from "@/lib/orbitx/registry";
 import { buildCustomLaunchTransaction, launchFeeLamports } from "@/lib/orbitx/token22";
 import { createCpmmPool, buildBurnLpTransaction } from "@/lib/orbitx/pool";
+import { consumeTokenCreatePrefill, peekTokenCreatePrefill } from "@/lib/orbitx/tokenCreatePrefill";
 import { supabase } from "@/lib/supabase";
 import { Confetti } from "./lpx";
 
@@ -201,6 +202,7 @@ function humanTime(sec: number) {
 export default function LaunchpadCreate() {
   const { connected, publicKey, connect, wallets, select, signTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
+  const [params] = useSearchParams();
   const [cfg, setCfg] = useState<LaunchConfig>(DEFAULT_CONFIG);
   const [active, setActive] = useState<SectionId>("identity");
   const [launching, setLaunching] = useState(false);
@@ -211,8 +213,38 @@ export default function LaunchpadCreate() {
   const [checkingName, setCheckingName] = useState(false);
   const [blockedMatch, setBlockedMatch] = useState<{ name: string; ticker: string } | null>(null);
   const [checkError, setCheckError] = useState(false);
+  const [nftPrefillBanner, setNftPrefillBanner] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const nameCheckTimer = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    if (params.get("from") !== "nft" && !peekTokenCreatePrefill()) return;
+    const draft = consumeTokenCreatePrefill();
+    if (!draft) return;
+    setCfg((c) => ({
+      ...c,
+      name: draft.name || c.name,
+      ticker: draft.symbol || c.ticker,
+      description: draft.description || c.description,
+      website: draft.website || c.website,
+      twitter: draft.twitter || c.twitter,
+      telegram: draft.telegram || c.telegram,
+      logoDataUrl: draft.imageDataUrl || c.logoDataUrl,
+    }));
+    setNftPrefillBanner(true);
+    if (!draft.imageDataUrl && draft.imageUrl) {
+      void fetch(draft.imageUrl)
+        .then((r) => r.blob())
+        .then((blob) => {
+          const reader = new FileReader();
+          reader.onload = () => setCfg((c) => ({ ...c, logoDataUrl: reader.result as string }));
+          reader.readAsDataURL(blob);
+        })
+        .catch(() => undefined);
+    }
+    toast.success("NFT details pasted into custom create — review and launch.");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Debounced OrbitX Anti-Vamp check on BOTH name and ticker
   // similarity on both fields in one RPC call, so a duplicate ticker with a
@@ -558,6 +590,11 @@ export default function LaunchpadCreate() {
               </div>
             )}
             <SectionHeading icon={Sparkles} title="Token Identity" desc="Name, ticker, story and logo — the face of your launch." />
+            {nftPrefillBanner && (
+              <div className="mb-4 rounded-xl border border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 p-3 text-sm text-white/85">
+                Filled from your NFT — name, ticker, description, and logo were pasted automatically. Review and launch when ready.
+              </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">

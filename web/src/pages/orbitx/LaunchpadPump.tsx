@@ -13,7 +13,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { HELIUS_API_KEY } from "@/lib/og";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,10 @@ import {
 import bs58 from "bs58";
 import { PLATFORM_WALLET, LAUNCHPAD_FEE_USD, BASE_LAUNCH_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/platformFee";
 import { registerToken, checkAntiVamp, recordReferralEarning } from "@/lib/orbitx/registry";
+import { setCollectionCoin } from "@/lib/orbitx/nftRegistry";
+import {
+  consumeTokenCreatePrefill, peekTokenCreatePrefill, dataUrlToFile, urlToFile,
+} from "@/lib/orbitx/tokenCreatePrefill";
 import { Link } from "react-router-dom";
 import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
@@ -162,7 +166,9 @@ function fmtPrice(n: number): string {
    ═══════════════════════════════════════════════════════════════════════ */
 
 export default function LaunchpadPump() {
-  const [view, setView] = useState<PageView>("gallery");
+  const [params] = useSearchParams();
+  const fromNft = params.get("from") === "nft" || !!peekTokenCreatePrefill();
+  const [view, setView] = useState<PageView>(fromNft ? "create" : "gallery");
 
   return view === "gallery" ? (
     <TokenGallery onCreateClick={() => setView("create")} />
@@ -512,6 +518,9 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const { publicKey, signTransaction, sendTransaction, connected, connect, wallets, select } = useWallet();
   const { connection } = useConnection();
   const { isAdmin } = useAdmin();
+  const [params] = useSearchParams();
+  const linkCollectionId = useRef<string | null>(null);
+  const [nftPrefillBanner, setNftPrefillBanner] = useState(false);
 
   const [form, setForm] = useState<FormData>({
     name: "", symbol: "", description: "",
@@ -533,6 +542,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const [blockedMatch, setBlockedMatch] = useState<{ name: string; ticker: string } | null>(null);
   const [checkError, setCheckError] = useState(false);
   const nameCheckTimer = useRef<ReturnType<typeof setTimeout>>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Custom vanity mint grind (same UX as /orbitxlaunch/create custom lane).
   const [vanityPrefix, setVanityPrefix] = useState("OBX");
@@ -543,6 +553,40 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const grindStop = useRef(false);
   const foundKpRef = useRef<Keypair | null>(null);
   const vanityEst = useMemo(() => estimateVanity(vanityPrefix, rate || 8000), [vanityPrefix, rate]);
+
+  // Auto-fill from NFT / collection handoff
+  useEffect(() => {
+    if (params.get("from") !== "nft" && !peekTokenCreatePrefill()) return;
+    const draft = consumeTokenCreatePrefill();
+    if (!draft) return;
+    linkCollectionId.current = draft.collectionId ?? null;
+    setForm((f) => ({
+      ...f,
+      name: draft.name || f.name,
+      symbol: draft.symbol || f.symbol,
+      description: draft.description || f.description,
+      website: draft.website || f.website,
+      twitter: draft.twitter || f.twitter,
+      telegram: draft.telegram || f.telegram,
+    }));
+    setNftPrefillBanner(true);
+    void (async () => {
+      try {
+        let file: File | null = null;
+        if (draft.imageDataUrl) file = await dataUrlToFile(draft.imageDataUrl, `${draft.symbol || "token"}-logo`);
+        else if (draft.imageUrl) file = await urlToFile(draft.imageUrl, `${draft.symbol || "token"}-logo`);
+        if (file) {
+          setImageFile(file);
+          setImagePreview(draft.imageDataUrl || URL.createObjectURL(file));
+        }
+        toast.success("NFT details pasted into Create Token — review and launch.");
+      } catch (e) {
+        console.warn("[orbitx] prefill image failed", e);
+        toast.message("Name & ticker filled from NFT — upload the logo if it did not load.");
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const runGrind = useCallback(() => {
     const target = vanityPrefix.trim();
@@ -619,7 +663,6 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     }, 500);
     return () => clearTimeout(nameCheckTimer.current);
   }, [form.name, form.symbol]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* ─── Fetch SOL price ──────────────────────────────────────────────── */
 
@@ -860,6 +903,17 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         console.warn("[orbitx] pump registry insert failed", regErr);
       }
 
+      // Link pump coin back to the NFT collection when launched from NFT handoff.
+      if (linkCollectionId.current) {
+        try {
+          await setCollectionCoin(linkCollectionId.current, mintAddr, publicKey.toBase58());
+          toast.success("Token linked to your NFT collection");
+        } catch (linkErr) {
+          console.warn("[orbitx] setCollectionCoin failed", linkErr);
+        }
+        linkCollectionId.current = null;
+      }
+
       setStep("success");
       toast.success("Token launched! 🚀");
     } catch (err: any) {
@@ -1030,6 +1084,17 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
         {/* ─── Form ──────────────────────────────────────────── */}
         {step === "form" && (
           <div className="space-y-5">
+            {nftPrefillBanner && (
+              <div className="rounded-xl border border-[hsl(var(--pf-green))]/40 bg-[hsl(var(--pf-green))]/10 p-4 flex items-start gap-3">
+                <Sparkles className="h-5 w-5 text-[hsl(var(--pf-green))] flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-black text-[hsl(var(--pf-green))]">Filled from your NFT</div>
+                  <div className="mt-1 text-sm text-white/80">
+                    Name, ticker, description, and logo were pasted automatically. Review, then launch when ready — no need to re-enter anything.
+                  </div>
+                </div>
+              </div>
+            )}
             {nameTaken && (
               <div className="rounded-lg border-2 border-[hsl(var(--og-blood))]/60 bg-[hsl(var(--og-blood))]/15 p-4 flex items-start gap-3 shadow-[0_0_30px_-8px_hsl(var(--og-blood)/0.6)]">
                 <AlertCircle className="h-5 w-5 text-[hsl(var(--og-blood))] flex-shrink-0 mt-0.5" />

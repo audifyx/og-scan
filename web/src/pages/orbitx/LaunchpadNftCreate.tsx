@@ -16,10 +16,24 @@ import {
   checkNftContentDuplicate, sha256Hex, type OrbitxNftCollection,
 } from "@/lib/orbitx/nftRegistry";
 import {
-  Wallet, Loader2, Upload, X, Plus, Layers, ImagePlus, Rocket, ShieldCheck, Info, Sparkles, AlertTriangle,
+  saveTokenCreatePrefill, buildCreateTokenHref,
+} from "@/lib/orbitx/tokenCreatePrefill";
+import {
+  Wallet, Loader2, Upload, X, Plus, Layers, ImagePlus, Rocket, ShieldCheck, Info, Sparkles, AlertTriangle, Coins, CheckCircle2, ArrowRight,
 } from "lucide-react";
 
 type Mode = "nft" | "collection";
+
+type MintSuccess = {
+  mode: Mode;
+  name: string;
+  symbol: string;
+  description: string;
+  website: string;
+  imageDataUrl: string | null;
+  collectionId: string | null;
+  copies?: number;
+};
 
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
@@ -41,6 +55,7 @@ export default function LaunchpadNftCreate() {
   const [mode, setMode] = useState<Mode>("nft");
   const [busy, setBusy] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
+  const [success, setSuccess] = useState<MintSuccess | null>(null);
 
   const addr = publicKey?.toBase58();
   const { data: myCollections } = useQuery({
@@ -89,6 +104,19 @@ export default function LaunchpadNftCreate() {
 
   const selectedCollection = useMemo(() => myCollections?.find((c) => c.id === collectionId) ?? null, [myCollections, collectionId]);
 
+  const goCreateToken = (draft: MintSuccess) => {
+    saveTokenCreatePrefill({
+      name: draft.name,
+      symbol: draft.symbol,
+      description: draft.description,
+      website: draft.website,
+      imageDataUrl: draft.imageDataUrl,
+      collectionId: draft.collectionId,
+      source: draft.mode === "collection" ? "collection" : "nft",
+    });
+    navigate(buildCreateTokenHref("pump"));
+  };
+
   const onMediaSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -112,7 +140,8 @@ export default function LaunchpadNftCreate() {
   const updateAttribute = (i: number, key: "trait_type" | "value", v: string) =>
     setAttributes((a) => a.map((row, idx) => (idx === i ? { ...row, [key]: v } : row)));
 
-  const [launchCoin, setLaunchCoin] = useState(true);
+  // Coin launch is a separate step by default — avoids needing SOL for NFT + token in one go.
+  const [launchCoinNow, setLaunchCoinNow] = useState(false);
   const [coinDevBuy, setCoinDevBuy] = useState("0");
 
   const createCollection = async () => {
@@ -144,8 +173,8 @@ export default function LaunchpadNftCreate() {
         await setCollectionCategory(newCollectionId, category, publicKey.toBase58()).catch(() => undefined);
       }
 
-      // One tradeable pump.fun coin per collection (opt-in). Never per-NFT.
-      if (launchCoin && newCollectionId) {
+      // Optional same-session coin (advanced). Default path is NFT first, token later.
+      if (launchCoinNow && newCollectionId) {
         try {
           const b64 = await new Promise<string>((resolve, reject) => {
             const r = new FileReader();
@@ -160,16 +189,24 @@ export default function LaunchpadNftCreate() {
             onStatus: setStatusMsg,
           });
           await setCollectionCoin(newCollectionId, mint, publicKey.toBase58()).catch(() => undefined);
-          toast.success("Collection coin launched on pump.fun! 🪙");
+          toast.success("Collection coin launched on pump.fun!");
         } catch (coinErr) {
           console.warn("[orbitx] collection coin launch skipped:", coinErr);
-          toast.message("Collection created. Coin launch was skipped — you can launch it later from the collection page.");
+          toast.message("Collection created. Create the token next — details will auto-fill.");
         }
       }
 
-      toast.success("Collection minted on-chain! 🎉");
+      toast.success("Collection minted on-chain!");
       qc.invalidateQueries({ queryKey: ["orbitx-nft-my-collections"] });
-      navigate("/nft");
+      setSuccess({
+        mode: "collection",
+        name: name.trim(),
+        symbol: symbol.trim().toUpperCase(),
+        description: description.trim(),
+        website: externalUrl.trim(),
+        imageDataUrl: colBannerPreview,
+        collectionId: newCollectionId,
+      });
     } catch (err) {
       console.error("[orbitx] collection mint failed", err);
       toast.error(err instanceof Error ? err.message : "Collection mint failed");
@@ -207,16 +244,24 @@ export default function LaunchpadNftCreate() {
         }
 
         setStatusMsg("Registering NFT…");
-        const nftId = await registerNft({
+        await registerNft({
           collection_id: selectedCollection?.id ?? null, mint_address: mintAddress, creator_wallet: publicKey.toBase58(),
           name: name.trim(), symbol: symbol.trim().toUpperCase() || "NFT", image_url: mediaUrl, metadata_uri: uri, royalty_bps: royaltyBps,
           attributes: attributes.filter((a) => a.trait_type.trim() && a.value.trim()), content_hash: contentHash ?? undefined,
         });
-        void nftId; // (coins are launched once per collection, not per NFT)
       }
 
-      toast.success(`${copies > 1 ? `${copies} NFTs` : "NFT"} minted on-chain! 🎉`);
-      navigate("/nft");
+      toast.success(`${copies > 1 ? `${copies} NFTs` : "NFT"} minted on-chain!`);
+      setSuccess({
+        mode: "nft",
+        name: name.trim(),
+        symbol: (symbol.trim() || "NFT").toUpperCase(),
+        description: description.trim(),
+        website: externalUrl.trim(),
+        imageDataUrl: mediaPreview,
+        collectionId: selectedCollection?.id ?? null,
+        copies,
+      });
     } catch (err) {
       console.error("[orbitx] NFT mint failed", err);
       toast.error(err instanceof Error ? err.message : "NFT mint failed");
@@ -237,13 +282,55 @@ export default function LaunchpadNftCreate() {
     );
   }
 
+  if (success) {
+    return (
+      <div className="mx-auto max-w-lg">
+        <div className="pf-card space-y-5 p-6 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--pf-green))]/15 text-[hsl(var(--pf-green))]">
+            <CheckCircle2 className="h-7 w-7" />
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-[hsl(var(--pf-ink))]">
+              {success.mode === "collection" ? "Collection minted" : `${success.copies && success.copies > 1 ? `${success.copies} NFTs` : "NFT"} minted`}
+            </h2>
+            <p className="mt-1.5 text-sm text-[hsl(var(--pf-muted))]">
+              Next: create a tradeable token. Name, ticker, image, and description paste in automatically — no retyping. You can do this now or later when you have more SOL.
+            </p>
+          </div>
+          {success.imageDataUrl && (
+            <img src={success.imageDataUrl} alt="" className="mx-auto h-24 w-24 rounded-2xl border border-[hsl(var(--pf-border))] object-cover" />
+          )}
+          <div className="rounded-xl border border-[hsl(var(--pf-border))] bg-white/[0.02] px-4 py-3 text-left">
+            <div className="text-sm font-black text-[hsl(var(--pf-ink))]">{success.name}</div>
+            <div className="pf-mono text-xs text-[hsl(var(--pf-green))]">${success.symbol}</div>
+          </div>
+          <button type="button" onClick={() => goCreateToken(success)} className="pf-btn w-full justify-center">
+            <Coins className="h-4 w-4" /> Create token <ArrowRight className="h-4 w-4" />
+          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {success.collectionId && (
+              <Link to={`/nft/collection/${success.collectionId}`} className="pf-btn-ghost flex-1 justify-center text-sm">
+                View collection
+              </Link>
+            )}
+            <button type="button" onClick={() => navigate("/nft")} className="pf-btn-ghost flex-1 justify-center text-sm">
+              Back to marketplace
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-2 flex items-center gap-2">
         <Sparkles className="h-5 w-5 text-[hsl(var(--pf-green))]" />
         <h1 className="text-xl font-black tracking-tight text-[hsl(var(--pf-ink))]">NFT Creator Studio</h1>
       </div>
-      <p className="mb-5 max-w-xl text-sm text-[hsl(var(--pf-muted))]">Mint real Solana NFTs (Metaplex Token Metadata) straight to your wallet. Every mint is a genuine on-chain transaction you approve in Phantom.</p>
+      <p className="mb-5 max-w-xl text-sm text-[hsl(var(--pf-muted))]">
+        Mint real Solana NFTs first. Creating a tradeable token is a separate step afterward — details auto-fill so you only need one balance at a time.
+      </p>
 
       {addr && <CreatorInventory wallet={addr} />}
 
@@ -341,16 +428,19 @@ export default function LaunchpadNftCreate() {
 
         <div className="flex items-start gap-2 rounded-lg border border-[hsl(var(--pf-border))] bg-white/[0.02] p-3 text-[11px] text-[hsl(var(--pf-muted))]">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[hsl(var(--pf-green))]" />
-          Your connected wallet becomes the verified, permanent creator wallet on-chain. It cannot be changed after minting, and there is no manual payout-wallet field to fill in.
+          Your connected wallet becomes the verified creator on-chain. After minting, use <b className="text-[hsl(var(--pf-ink))]">Create token</b> — name, ticker, and art auto-fill so you do not retype anything.
         </div>
 
         {mode === "collection" && (
-          <div className="mb-3 rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] p-3">
+          <div className="rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] p-3">
             <label className="flex items-start gap-2 text-[13px] text-[hsl(var(--pf-ink))]">
-              <input type="checkbox" checked={launchCoin} onChange={(e) => setLaunchCoin(e.target.checked)} className="mt-0.5" />
-              <span>Also launch a tradeable coin for this collection on <b>pump.fun</b> <span className="text-[hsl(var(--pf-muted))]">(one coin per collection — costs ~0.02 SOL + your optional dev-buy; needs a second signature)</span></span>
+              <input type="checkbox" checked={launchCoinNow} onChange={(e) => setLaunchCoinNow(e.target.checked)} className="mt-0.5" />
+              <span>
+                Also launch the coin <b>in this same session</b>{" "}
+                <span className="text-[hsl(var(--pf-muted))]">(optional — needs a second signature + extra SOL. Recommended: mint first, then Create token.)</span>
+              </span>
             </label>
-            {launchCoin && (
+            {launchCoinNow && (
               <div className="mt-2 flex items-center gap-2 text-[12px] text-[hsl(var(--pf-muted))]">
                 Dev-buy (SOL)
                 <input value={coinDevBuy} onChange={(e) => setCoinDevBuy(e.target.value)} inputMode="decimal" placeholder="0"
@@ -359,7 +449,7 @@ export default function LaunchpadNftCreate() {
             )}
           </div>
         )}
-        <button onClick={mode === "collection" ? createCollection : createNftItems} disabled={busy}
+        <button onClick={mode === "collection" ? createCollection : createNftItems} disabled={busy || (mode === "collection" && !!collectionNameBlocked) || checkingCollectionName}
           className="pf-btn w-full justify-center">
           {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> {statusMsg || "Minting…"}</> : <><Rocket className="h-4 w-4" /> {mode === "collection" ? "Mint collection" : "Mint NFT"}</>}
         </button>
