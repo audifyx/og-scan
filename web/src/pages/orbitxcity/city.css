@@ -1633,18 +1633,22 @@ button.oxc-token-row {
   color: rgba(200, 230, 210, 0.4);
 }
 
-/* ΓöÇΓöÇ Character chamber ΓöÇΓöÇ */
+/* ── Character chamber ── */
 .oxc-chars {
   position: relative;
   height: 100%;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0.75rem;
-  padding: 1rem 1rem 1.25rem;
-  overflow: auto;
+  padding:
+    max(0.75rem, var(--oxc-safe-top))
+    max(0.85rem, var(--oxc-safe-right))
+    max(0.75rem, var(--oxc-safe-bottom))
+    max(0.85rem, var(--oxc-safe-left));
+  overflow: hidden;
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 0.5s ease, transform 0.5s ease;
+  transition: opacity 0.45s ease, transform 0.45s ease;
 }
 
 .oxc-chars.is-in {
@@ -1652,133 +1656,201 @@ button.oxc-token-row {
   transform: none;
 }
 
-.oxc-chars-head {
+.oxc-chars-top {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   text-align: center;
-  padding-top: 0.25rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.oxc-chars-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.oxc-chars-wallet-slot {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.oxc-chars-wallet-slot .wallet-adapter-button,
+.oxc-chars-wallet-slot button {
+  border-radius: 999px !important;
+  font-size: 0.72rem !important;
+  height: 2.15rem !important;
+  padding: 0 0.85rem !important;
 }
 
 .oxc-chars-back {
-  position: absolute;
-  left: 0;
-  top: 0.35rem;
-  background: transparent;
-  border: 1px solid rgba(0, 255, 159, 0.25);
+  background: rgba(8, 12, 10, 0.55);
+  border: 1px solid color-mix(in srgb, var(--oxc-lime) 28%, transparent);
   color: var(--oxc-muted);
   border-radius: 999px;
-  padding: 0.35rem 0.8rem;
-  font-size: 0.75rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.72rem;
   letter-spacing: 0.08em;
   cursor: pointer;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
+  flex-shrink: 0;
 }
 
 .oxc-chars-back:hover {
   color: var(--oxc-lime);
-  border-color: rgba(0, 255, 159, 0.55);
+  border-color: color-mix(in srgb, var(--oxc-lime) 55%, transparent);
 }
 
 .oxc-chars-title {
   font-family: var(--oxc-font-display);
   font-weight: 800;
-  font-size: clamp(1.4rem, 4vw, 2rem);
-  letter-spacing: 0.18em;
-  margin: 0;
+  font-size: clamp(1.25rem, 4.2vw, 1.9rem);
+  letter-spacing: 0.16em;
+  margin: 0.15rem 0 0;
   color: #fff;
-  text-shadow: 0 0 24px rgba(0, 255, 159, 0.35);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--oxc-lime) 35%, transparent);
 }
 
 .oxc-chars-title-x {
   color: var(--oxc-lime);
-  text-shadow: 0 0 18px rgba(0, 255, 159, 0.85);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--oxc-lime) 80%, transparent);
 }
 
 .oxc-chars-sub {
-  margin: 0.35rem 0 0;
-  font-size: 0.78rem;
-  letter-spacing: 0.14em;
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--oxc-muted);
+  line-height: 1.35;
+}
+
+.oxc-chars-wallet-status {
+  margin: 0;
+  font-family: var(--oxc-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgba(200, 220, 210, 0.4);
+}
+
+.oxc-chars-wallet-status.is-on {
+  color: color-mix(in srgb, var(--oxc-lime) 75%, white);
+}
+
+.oxc-chars-body {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+  padding-bottom: 0.25rem;
 }
 
 .oxc-pod-rail {
-  position: relative;
-  z-index: 1;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.65rem;
-  align-items: end;
-  min-height: 0;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(148px, 180px);
+  gap: 0.7rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.35rem 0.15rem 0.55rem;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .oxc-pod {
   position: relative;
+  scroll-snap-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.65rem 0.4rem 0.75rem;
-  border: none;
-  background: transparent;
+  gap: 0.5rem;
+  padding: 0.7rem 0.55rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--oxc-lime) 18%, transparent);
+  border-radius: 22px;
+  background:
+    linear-gradient(165deg, rgba(12, 18, 16, 0.88), rgba(6, 8, 8, 0.78));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 28px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(14px);
   cursor: pointer;
   color: inherit;
   opacity: 0;
-  transform: translateY(16px);
-  animation: oxc-tile-in 0.55s ease forwards;
+  transform: translateY(12px);
+  animation: oxc-tile-in 0.5s ease forwards;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.oxc-pod-class {
-  font-family: var(--oxc-font-display);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(242, 255, 248, 0.75);
+.oxc-pod:hover {
+  border-color: color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 42%, transparent);
+  transform: translateY(-2px);
 }
 
-.oxc-pod.is-on .oxc-pod-class {
-  color: var(--pod-neon, var(--oxc-lime));
-  text-shadow: 0 0 12px color-mix(in srgb, var(--pod-neon, #00ff9f) 70%, transparent);
+.oxc-pod.is-on {
+  border-color: color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 65%, var(--oxc-gold));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--pod-gold, var(--oxc-gold)) 35%, transparent),
+    0 0 28px color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .oxc-pod-avatar {
   position: relative;
   width: 100%;
-  aspect-ratio: 0.72;
-  max-height: 220px;
+  aspect-ratio: 0.78;
+  max-height: 168px;
   display: grid;
   place-items: end center;
   isolation: isolate;
 }
 
-.oxc-pod-beam {
-  position: absolute;
-  inset: 0 18% 12%;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--pod-neon, #00ff9f) 35%, transparent), transparent 75%);
-  filter: blur(8px);
-  opacity: 0.55;
-  border-radius: 40% 40% 20% 20%;
-  z-index: 0;
-  transition: opacity 0.25s ease;
+.oxc-pod-size-lg {
+  max-height: 200px;
 }
 
-.oxc-pod.is-on .oxc-pod-beam {
+.oxc-pod-size-sm {
+  max-height: 110px;
+}
+
+.oxc-pod-beam {
+  position: absolute;
+  inset: 4% 16% 10%;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 40%, transparent),
+    transparent 78%
+  );
+  filter: blur(10px);
+  opacity: 0.5;
+  border-radius: 48% 48% 28% 28%;
+  z-index: 0;
+}
+
+.oxc-pod.is-on .oxc-pod-beam,
+.oxc-pod-avatar.is-selected .oxc-pod-beam {
   opacity: 0.95;
 }
 
 .oxc-pod-halo {
   position: absolute;
-  top: 6%;
+  top: 4%;
   left: 50%;
-  width: 58%;
+  width: 62%;
   aspect-ratio: 1;
   transform: translateX(-50%);
   border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--pod-gold, #c5a26f) 70%, transparent);
+  border: 2px solid color-mix(in srgb, var(--pod-gold, var(--oxc-gold)) 65%, transparent);
   box-shadow:
-    0 0 16px color-mix(in srgb, var(--pod-neon, #00ff9f) 45%, transparent),
-    inset 0 0 12px color-mix(in srgb, var(--pod-neon, #00ff9f) 25%, transparent);
+    0 0 14px color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 40%, transparent),
+    inset 0 0 12px color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 20%, transparent);
   z-index: 1;
 }
 
@@ -1788,246 +1860,291 @@ button.oxc-token-row {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 12%;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--pod-neon, #00ff9f) 40%, transparent));
+  margin-bottom: 14%;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 38%, transparent));
 }
 
 .oxc-pod-head {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   background: var(--pod-skin, #e8d5c0);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.28);
   position: relative;
   z-index: 2;
+  display: grid;
+  place-items: center;
+}
+
+.oxc-pod-eye {
+  position: absolute;
+  top: 42%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #151820;
+}
+
+.oxc-pod-eye:first-child {
+  left: 28%;
+}
+
+.oxc-pod-eye:nth-child(2) {
+  right: 28%;
 }
 
 .oxc-pod-hair {
   position: absolute;
-  top: -2px;
+  top: -1px;
   left: 50%;
-  width: 30px;
+  width: 32px;
   height: 14px;
   transform: translateX(-50%);
   background: #151018;
-  border-radius: 8px 8px 2px 2px;
+  border-radius: 14px 14px 4px 4px;
   z-index: 3;
   pointer-events: none;
 }
 
 .oxc-pod-trader .oxc-pod-hair {
   background: #2a2218;
-  height: 10px;
-  border-radius: 6px 6px 0 0;
+  height: 11px;
+  border-radius: 12px 12px 2px 2px;
 }
 
 .oxc-pod-builder .oxc-pod-hair {
   background: #1a1814;
-  height: 5px;
-  width: 28px;
+  height: 6px;
+  width: 30px;
   top: 2px;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .oxc-pod-builder .oxc-pod-figure {
-  transform: scale(1.12, 1.05);
+  transform: scale(1.1, 1.04);
   transform-origin: bottom center;
 }
 
 .oxc-pod-gamer .oxc-pod-hair {
   width: 10px;
   height: 18px;
-  top: -10px;
+  top: -9px;
   background: var(--pod-accent, #ff4d6a);
-  border-radius: 2px;
+  border-radius: 6px;
   box-shadow:
     -8px 6px 0 -2px var(--pod-accent, #ff4d6a),
     8px 6px 0 -2px var(--pod-accent, #ff4d6a);
 }
 
 .oxc-pod-gamer .oxc-pod-figure {
-  transform: scale(0.9, 0.95);
+  transform: scale(0.92, 0.96);
   transform-origin: bottom center;
 }
 
 .oxc-pod-creator .oxc-pod-hair {
-  background: #c5a26f;
-  height: 12px;
-  border-radius: 10px 10px 2px 2px;
+  background: var(--oxc-gold);
+  height: 13px;
+  border-radius: 14px 14px 3px 3px;
 }
 
 .oxc-pod-creator .oxc-pod-hair::after {
   content: "";
   position: absolute;
-  top: -8px;
+  top: -7px;
   left: 50%;
   width: 12px;
   height: 12px;
   transform: translateX(-50%);
   border-radius: 50%;
-  background: #c5a26f;
+  background: var(--oxc-gold);
 }
 
 .oxc-pod-explorer .oxc-pod-hair {
   background: #3a2410;
-  height: 22px;
+  height: 20px;
   width: 34px;
-  top: -4px;
-  border-radius: 12px 12px 4px 4px;
+  top: -3px;
+  border-radius: 16px 16px 6px 6px;
 }
 
 .oxc-pod-explorer .oxc-pod-figure {
-  transform: scale(1.04, 1.1);
+  transform: scale(1.03, 1.08);
   transform-origin: bottom center;
+}
+
+.oxc-pod-visor {
+  position: absolute;
+  bottom: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--pod-neon, var(--oxc-lime));
+  box-shadow: 0 0 8px var(--pod-neon, var(--oxc-lime));
+  z-index: 4;
+}
+
+.oxc-pod-torso {
+  width: 38px;
+  height: 46px;
+  margin-top: 5px;
+  border-radius: 16px 16px 12px 12px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--pod-accent, var(--pod-neon, var(--oxc-lime))) 32%, var(--pod-body, #12181f)),
+      var(--pod-body, #12181f)
+    );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--pod-gold, var(--oxc-gold)) 35%, transparent),
+    0 0 12px color-mix(in srgb, var(--pod-accent, var(--pod-neon, var(--oxc-lime))) 25%, transparent);
+  position: relative;
+}
+
+.oxc-pod-arm {
+  position: absolute;
+  top: 8px;
+  width: 9px;
+  height: 28px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pod-body, #12181f) 80%, var(--pod-skin, #e8d5c0));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.oxc-pod-arm.left {
+  left: -7px;
+  transform: rotate(12deg);
+}
+
+.oxc-pod-arm.right {
+  right: -7px;
+  transform: rotate(-12deg);
 }
 
 .oxc-pod-detail {
   position: absolute;
-  width: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
   height: 8px;
   top: 42%;
-  border-radius: 2px;
+  border-radius: 999px;
   background: var(--pod-accent, var(--pod-neon));
-  opacity: 0.85;
+  opacity: 0.9;
   z-index: 3;
 }
 
 .oxc-pod-outfit-suit .oxc-pod-torso {
-  background:
-    linear-gradient(180deg, #2a3344 0%, #151a24 55%, #10141d 100%);
+  background: linear-gradient(180deg, #2a3344 0%, #151a24 55%, #10141d 100%);
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--pod-gold, #c5a26f) 55%, transparent),
-    0 0 14px color-mix(in srgb, var(--pod-accent, #c5a26f) 25%, transparent);
+    inset 0 0 0 1px color-mix(in srgb, var(--pod-gold, var(--oxc-gold)) 55%, transparent),
+    0 0 12px color-mix(in srgb, var(--pod-accent, var(--oxc-gold)) 22%, transparent);
 }
 
 .oxc-pod-outfit-suit .oxc-pod-detail {
-  width: 6px;
-  height: 28px;
-  top: 38%;
+  width: 5px;
+  height: 26px;
+  top: 36%;
+  border-radius: 3px;
   background: linear-gradient(180deg, #edf3ff, var(--pod-accent));
 }
 
 .oxc-pod-outfit-sport .oxc-pod-torso {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--pod-accent) 40%, #1c1420), #1c1420 70%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--pod-accent) 42%, #1c1420), #1c1420 72%);
 }
 
 .oxc-pod-outfit-sport .oxc-pod-detail {
   width: 28px;
-  height: 6px;
-  top: 36%;
+  height: 5px;
+  top: 34%;
 }
 
 .oxc-pod-outfit-neon .oxc-pod-torso {
   background: linear-gradient(180deg, #1a1224, #111827);
   box-shadow:
     inset 0 0 0 1px var(--pod-accent),
-    0 0 16px color-mix(in srgb, var(--pod-accent) 45%, transparent);
+    0 0 14px color-mix(in srgb, var(--pod-accent) 42%, transparent);
 }
 
 .oxc-pod-outfit-neon .oxc-pod-detail {
-  width: 30px;
+  width: 28px;
   height: 4px;
-  top: 34%;
+  top: 32%;
   box-shadow: 0 0 8px var(--pod-accent);
-}
-
-.oxc-pod-outfit-street .oxc-pod-detail {
-  width: 18px;
-  height: 10px;
-  top: 48%;
-  border-radius: 3px;
-}
-
-.oxc-pod-visor {
-  width: 22px;
-  height: 6px;
-  margin-top: -8px;
-  border-radius: 2px;
-  background: var(--pod-neon, #00ff9f);
-  box-shadow: 0 0 10px var(--pod-neon, #00ff9f);
-  z-index: 4;
-  position: relative;
-}
-
-.oxc-pod-torso {
-  width: 36px;
-  height: 48px;
-  margin-top: 4px;
-  border-radius: 8px 8px 6px 6px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--pod-accent, var(--pod-neon, #00ff9f)) 35%, var(--pod-body, #12181f)), var(--pod-body, #12181f));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--pod-gold, #c5a26f) 40%, transparent),
-    0 0 14px color-mix(in srgb, var(--pod-accent, var(--pod-neon, #00ff9f)) 30%, transparent);
-  position: relative;
 }
 
 .oxc-pod-legs {
   display: flex;
-  gap: 4px;
+  gap: 5px;
   margin-top: 3px;
 }
 
 .oxc-pod-legs span {
   width: 12px;
-  height: 22px;
-  border-radius: 3px;
+  height: 20px;
+  border-radius: 999px;
   background: var(--pod-body, #12181f);
-  box-shadow: inset 0 0 0 1px rgba(0, 255, 159, 0.2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--oxc-lime) 18%, transparent);
+}
+
+.oxc-pod-shoes {
+  display: flex;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.oxc-pod-shoes i {
+  width: 14px;
+  height: 6px;
+  border-radius: 999px;
+  background: #0a0d12;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 25%, transparent);
 }
 
 .oxc-pod-ring {
   position: absolute;
-  bottom: 4%;
+  bottom: 3%;
   left: 50%;
-  width: 72%;
-  height: 14%;
+  width: 74%;
+  height: 12%;
   transform: translateX(-50%);
   border-radius: 50%;
-  border: 2px solid var(--pod-neon, #00ff9f);
+  border: 2px solid var(--pod-neon, var(--oxc-lime));
   box-shadow:
-    0 0 18px color-mix(in srgb, var(--pod-neon, #00ff9f) 55%, transparent),
-    inset 0 0 10px color-mix(in srgb, var(--pod-neon, #00ff9f) 25%, transparent);
-  background: radial-gradient(ellipse at center, rgba(0, 255, 159, 0.18), transparent 65%);
+    0 0 16px color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 50%, transparent),
+    inset 0 0 8px color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 22%, transparent);
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 18%, transparent), transparent 65%);
   z-index: 1;
 }
 
-.oxc-pod.is-on .oxc-pod-ring {
-  border-color: var(--pod-gold, #c5a26f);
-  box-shadow:
-    0 0 22px color-mix(in srgb, var(--pod-neon, #00ff9f) 70%, transparent),
-    0 0 8px color-mix(in srgb, var(--pod-gold, #c5a26f) 50%, transparent);
+.oxc-pod.is-on .oxc-pod-ring,
+.oxc-pod-avatar.is-selected .oxc-pod-ring {
+  border-color: var(--pod-gold, var(--oxc-gold));
 }
 
 .oxc-pod-card {
   width: 100%;
-  padding: 0.55rem 0.5rem 0.6rem;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 255, 159, 0.2);
-  background: linear-gradient(165deg, rgba(10, 18, 14, 0.85), rgba(5, 8, 6, 0.75));
-  backdrop-filter: blur(12px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  text-align: left;
+  padding: 0.45rem 0.35rem 0.15rem;
+  text-align: center;
 }
 
-.oxc-pod.is-on .oxc-pod-card {
-  border-color: color-mix(in srgb, var(--pod-neon, #00ff9f) 55%, transparent);
-  box-shadow:
-    0 0 18px color-mix(in srgb, var(--pod-neon, #00ff9f) 22%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--pod-gold, #c5a26f) 25%, transparent);
-}
-
-.oxc-pod-card-top strong {
+.oxc-pod-card strong {
   display: block;
   font-family: var(--oxc-font-display);
   font-size: 0.78rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 70%, white);
 }
 
-.oxc-pod-card-top small {
+.oxc-pod.is-on .oxc-pod-card strong {
+  text-shadow: 0 0 10px color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 55%, transparent);
+}
+
+.oxc-pod-card small {
   display: block;
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
   font-size: 0.62rem;
   color: var(--oxc-muted);
   line-height: 1.3;
@@ -2038,16 +2155,17 @@ button.oxc-token-row {
   margin: 0.45rem 0 0;
   padding: 0;
   display: grid;
-  gap: 0.28rem;
+  gap: 0.25rem;
+  text-align: left;
 }
 
 .oxc-pod-stats li {
   display: grid;
-  grid-template-columns: 52px 1fr;
+  grid-template-columns: 48px 1fr;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.3rem;
   font-size: 9px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--oxc-muted);
 }
@@ -2055,7 +2173,7 @@ button.oxc-token-row {
 .oxc-pod-bar {
   height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.07);
   overflow: hidden;
 }
 
@@ -2063,40 +2181,31 @@ button.oxc-token-row {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--pod-neon, #00ff9f), var(--pod-gold, #c5a26f));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--pod-neon, #00ff9f) 60%, transparent);
-}
-
-.oxc-chars-dock {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 0.85rem;
-  align-items: stretch;
+  background: linear-gradient(90deg, var(--pod-neon, var(--oxc-lime)), var(--pod-gold, var(--oxc-gold)));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--pod-neon, var(--oxc-lime)) 55%, transparent);
 }
 
 .oxc-chars-preview.glass {
   display: flex;
   gap: 0.85rem;
   align-items: center;
-  padding: 0.75rem 1rem;
-  border-radius: 16px;
-  border: 1px solid rgba(0, 255, 159, 0.28);
-  background: linear-gradient(145deg, rgba(10, 18, 14, 0.8), rgba(5, 8, 6, 0.7));
+  padding: 0.8rem 0.95rem;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--oxc-lime) 28%, transparent);
+  background: linear-gradient(145deg, rgba(10, 16, 14, 0.86), rgba(5, 8, 7, 0.78));
   backdrop-filter: blur(16px);
   box-shadow:
-    0 0 0 1px rgba(197, 162, 111, 0.12),
-    0 16px 48px rgba(0, 0, 0, 0.45);
+    0 0 0 1px color-mix(in srgb, var(--oxc-gold) 14%, transparent),
+    0 14px 40px rgba(0, 0, 0, 0.4);
 }
 
 .oxc-chars-preview-fig {
-  width: 88px;
+  width: 96px;
   flex-shrink: 0;
 }
 
 .oxc-chars-preview-fig .oxc-pod-avatar {
-  max-height: 110px;
+  max-height: 124px;
 }
 
 .oxc-chars-preview-meta {
@@ -2108,18 +2217,19 @@ button.oxc-token-row {
   display: grid;
   gap: 0.3rem;
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--oxc-muted);
+  text-align: left;
 }
 
 .oxc-chars-preview-meta input {
   width: 100%;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 255, 159, 0.25);
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--oxc-lime) 26%, transparent);
   background: rgba(0, 0, 0, 0.35);
   color: var(--oxc-text);
-  padding: 0.55rem 0.7rem;
+  padding: 0.6rem 0.9rem;
   font-family: var(--oxc-font-body);
   font-size: 0.95rem;
 }
@@ -2127,49 +2237,93 @@ button.oxc-token-row {
 .oxc-chars-preview-meta input:focus {
   outline: none;
   border-color: var(--oxc-lime);
-  box-shadow: 0 0 0 2px rgba(0, 255, 159, 0.15);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--oxc-lime) 18%, transparent);
 }
 
 .oxc-chars-preview-meta p {
-  margin: 0.55rem 0 0;
-  font-size: 0.8rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
   color: var(--oxc-muted);
+  text-align: left;
 }
 
 .oxc-chars-gold {
   color: var(--oxc-gold);
 }
 
-.oxc-chars-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  justify-content: center;
+.oxc-chars-foot {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  gap: 0.45rem;
+  padding-top: 0.15rem;
 }
 
 .oxc-chars-enter {
   width: 100%;
+  border-radius: 999px !important;
+  min-height: 2.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
-.oxc-chars-wallet {
-  grid-column: 1 / -1;
-  font-family: var(--oxc-font-mono);
-  font-size: 11px;
-  color: rgba(200, 230, 210, 0.45);
-  text-align: center;
+.oxc-chars-demo {
+  width: 100%;
+  border-radius: 999px !important;
+  min-height: 2.35rem;
 }
 
-@media (max-width: 980px) {
-  .oxc-menu-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (min-width: 900px) {
+  .oxc-chars {
+    gap: 1rem;
+    padding: 1.1rem 1.4rem 1.15rem;
   }
 
   .oxc-pod-rail {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: unset;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    overflow: visible;
+    scroll-snap-type: none;
+    padding: 0.2rem 0;
   }
 
-  .oxc-chars-dock {
-    grid-template-columns: 1fr;
+  .oxc-pod {
+    scroll-snap-align: unset;
+  }
+
+  .oxc-pod-avatar {
+    max-height: 200px;
+  }
+
+  .oxc-chars-body {
+    grid-template-columns: 1.65fr 0.9fr;
+    align-items: stretch;
+  }
+
+  .oxc-chars-preview.glass {
+    flex-direction: column;
+    text-align: center;
+    justify-content: center;
+    border-radius: 28px;
+  }
+
+  .oxc-chars-preview-fig {
+    width: 140px;
+  }
+
+  .oxc-chars-preview-fig .oxc-pod-avatar {
+    max-height: 180px;
+  }
+
+  .oxc-chars-preview-meta label,
+  .oxc-chars-preview-meta p {
+    text-align: center;
+  }
+
+  .oxc-chars-foot {
+    max-width: 520px;
+    margin: 0 auto;
+    width: 100%;
   }
 }
 
@@ -2270,39 +2424,68 @@ button.oxc-token-row {
     line-height: 1.4;
   }
 
-  .oxc-pod-rail {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.55rem;
-  }
-
   .oxc-chars {
-    padding:
-      max(0.65rem, var(--oxc-safe-top))
-      max(0.65rem, var(--oxc-safe-right))
-      max(0.85rem, var(--oxc-safe-bottom))
-      max(0.65rem, var(--oxc-safe-left));
     gap: 0.55rem;
-  }
-
-  .oxc-chars-back {
-    position: static;
-    margin-bottom: 0.35rem;
+    padding:
+      max(0.55rem, var(--oxc-safe-top))
+      max(0.65rem, var(--oxc-safe-right))
+      max(0.55rem, var(--oxc-safe-bottom))
+      max(0.65rem, var(--oxc-safe-left));
   }
 
   .oxc-chars-title {
-    font-size: clamp(1.15rem, 6vw, 1.55rem);
+    font-size: clamp(1.1rem, 5.8vw, 1.4rem);
+    letter-spacing: 0.12em;
   }
 
   .oxc-chars-sub {
-    font-size: 0.7rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    padding: 0 0.35rem;
   }
 
-  .oxc-chars-preview {
-    padding: 0.65rem;
+  .oxc-pod-rail {
+    grid-auto-columns: minmax(138px, 62vw);
+    gap: 0.55rem;
+    margin: 0 -0.2rem;
+    padding-inline: 0.35rem;
   }
 
-  .oxc-chars-actions {
-    gap: 0.45rem;
+  .oxc-pod {
+    border-radius: 20px;
+    padding: 0.55rem 0.45rem 0.55rem;
+  }
+
+  .oxc-pod-avatar {
+    max-height: 132px;
+  }
+
+  .oxc-pod-stats {
+    display: none;
+  }
+
+  .oxc-chars-preview.glass {
+    border-radius: 18px;
+    padding: 0.65rem 0.75rem;
+    gap: 0.65rem;
+  }
+
+  .oxc-chars-preview-fig {
+    width: 72px;
+  }
+
+  .oxc-chars-preview-fig .oxc-pod-avatar {
+    max-height: 96px;
+  }
+
+  .oxc-chars-enter {
+    min-height: 3rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .oxc-menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
