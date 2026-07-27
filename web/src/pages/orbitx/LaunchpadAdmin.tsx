@@ -95,10 +95,10 @@ function ClaimPlatformFeesPanel({ solUsd }: { solUsd: number }) {
     if (!dest) return toast.error("Enter a payout destination wallet");
     setClaiming("sweep");
     try {
-      const { tx, sol } = await buildPlatformFeeSweepTx(connection, source.wallet, dest);
+      const { tx, sol, blockhash, lastValidBlockHeight } = await buildPlatformFeeSweepTx(connection, source.wallet, dest);
       const signed = await signTransaction(tx);
       const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
-      await connection.confirmTransaction(sig, "confirmed");
+      await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
       toast.success(`Claimed ${sol.toFixed(4)} SOL → ${short(dest)}`, {
         action: { label: "Solscan", onClick: () => window.open(`https://solscan.io/tx/${sig}`, "_blank") },
       });

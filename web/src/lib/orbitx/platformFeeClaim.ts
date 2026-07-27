@@ -51,10 +51,12 @@ export async function buildPlatformFeeSweepTx(
   if (lamports <= 0) throw new Error("Nothing to claim — balance is at/below the 0.005 SOL reserve");
 
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-  const tx = new Transaction({ feePayer: from, blockhash, lastValidBlockHeight });
+  const tx = new Transaction();
+  tx.feePayer = from;
+  tx.recentBlockhash = blockhash;
   tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 50_000 }));
   tx.add(SystemProgram.transfer({ fromPubkey: from, toPubkey: to, lamports }));
-  return { tx, lamports, sol: lamports / LAMPORTS_PER_SOL };
+  return { tx, lamports, sol: lamports / LAMPORTS_PER_SOL, blockhash, lastValidBlockHeight };
 }
 
 /** Pump creator-vault claimable for a fee wallet (if it ever launched coins). */
