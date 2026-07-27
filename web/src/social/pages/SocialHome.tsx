@@ -1,100 +1,66 @@
 import { Link } from "react-router-dom";
+import { Hash, Mail, Radio, Users, MessageSquare, Sparkles } from "lucide-react";
 import { useCurrentProfile, useSocialStore } from "../hooks/useSocialStore";
 import { progressToNext } from "../growth/xp";
+import { PostCard } from "../components/PostCard";
+import { SocialPageHeader } from "../components/SocialPageHeader";
 
 export default function SocialHome() {
-  const { posts, communities, voice, profiles } = useSocialStore();
+  const { posts, communities, voice, profiles, currentUserId } = useSocialStore();
   const me = useCurrentProfile();
   const prog = progressToNext(me?.xp ?? 0);
   const live = voice.filter((v) => v.live).length;
 
+  const tiles = [
+    { href: "/hq/feed", icon: Hash, label: "For you feed", desc: "Posts, likes, and replies — X-style timeline", cls: "oxs-tile-icon--x" },
+    { href: "/hq/messages", icon: Mail, label: "Direct messages", desc: "Private chats — Telegram-style DMs", cls: "oxs-tile-icon--tg" },
+    { href: "/hq/chat", icon: MessageSquare, label: "Community channels", desc: "Discord-style text + voice channels", cls: "oxs-tile-icon--dc" },
+    { href: "/hq/communities", icon: Users, label: "Communities", desc: `${communities.length} groups · token · gaming · alpha`, cls: "oxs-tile-icon--dc" },
+    { href: "/hq/voice", icon: Radio, label: "Voice spaces", desc: `${live} live now · trading & creator rooms`, cls: "oxs-tile-icon--x" },
+    { href: "/hq/growth", icon: Sparkles, label: "Growth & XP", desc: `${me?.xp ?? 0} XP · ${prog.current.title}`, cls: "oxs-tile-icon--tg" },
+  ];
+
   return (
     <div>
-      <header className="oxs-hero">
-        <h1>OrbitX</h1>
-        <p>
-          Social network for traders, gamers, and communities — feeds, holder rooms, live voice, referrals, and reputation in one HQ.
-        </p>
-        <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <Link to="/hq/feed" className="oxs-btn" style={{ textDecoration: "none" }}>
-            Open feed
-          </Link>
-          <Link to="/hq/voice" className="oxs-btn oxs-btn-ghost" style={{ textDecoration: "none" }}>
-            Join voice
-          </Link>
-          <Link to="/hq/growth" className="oxs-btn oxs-btn-ghost" style={{ textDecoration: "none" }}>
-            Claim XP
-          </Link>
-        </div>
-      </header>
+      <SocialPageHeader title="Home" subtitle="Your social hub — feed, DMs, communities, and voice." />
 
-      <div className="oxs-grid oxs-grid-3" style={{ marginBottom: "1rem" }}>
-        <div className="oxs-panel oxs-stat">
+      <div className="oxs-grid oxs-grid-3">
+        <div className="oxs-stat">
           <div className="label">Your XP</div>
           <div className="value">{me?.xp ?? 0}</div>
-          <div className="oxs-muted" style={{ fontSize: "0.78rem", marginTop: "0.35rem" }}>
-            {prog.current.title}
-            {prog.next ? ` → ${prog.next.title}` : " · Max tier"}
-          </div>
-          <div className="oxs-progress" style={{ marginTop: "0.55rem" }}>
+          <div className="oxs-muted" style={{ fontSize: "0.78rem", marginTop: "0.35rem" }}>{prog.current.title}</div>
+          <div className="oxs-progress" style={{ marginTop: "0.5rem" }}>
             <span style={{ width: `${prog.pct}%` }} />
           </div>
         </div>
-        <div className="oxs-panel oxs-stat">
+        <div className="oxs-stat">
           <div className="label">Communities</div>
           <div className="value">{communities.length}</div>
-          <div className="oxs-muted" style={{ fontSize: "0.78rem", marginTop: "0.35rem" }}>
-            Token · holder · alpha · gaming
-          </div>
         </div>
-        <div className="oxs-panel oxs-stat">
+        <div className="oxs-stat">
           <div className="label">Live voice</div>
           <div className="value oxs-pulse">{live}</div>
-          <div className="oxs-muted" style={{ fontSize: "0.78rem", marginTop: "0.35rem" }}>
-            Trading · gaming · creator rooms
-          </div>
         </div>
       </div>
 
-      <div className="oxs-grid oxs-grid-2">
-        <div className="oxs-panel">
-          <h3>Latest posts</h3>
-          {posts.slice(0, 4).map((p) => {
-            const a = profiles.find((x) => x.id === p.authorId);
-            return (
-              <div key={p.id} style={{ padding: "0.55rem 0", borderBottom: "1px solid rgba(255,120,72,0.08)" }}>
-                <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>@{a?.username || "anon"}</div>
-                <div className="oxs-muted" style={{ fontSize: "0.82rem" }}>
-                  {p.content.slice(0, 120)}
-                  {p.content.length > 120 ? "…" : ""}
-                </div>
-              </div>
-            );
-          })}
-          <Link to="/hq/feed" className="oxs-link" style={{ fontSize: "0.82rem" }}>
-            View full feed →
-          </Link>
-        </div>
-        <div className="oxs-panel">
-          <h3>Jump in</h3>
-          {[
-            { t: "Trading communities", d: "Token rooms, holder gates, trader rankings.", href: "/hq/trading" },
-            { t: "Voice spaces", d: "Live rooms with moderation tools.", href: "/hq/voice" },
-            { t: "Growth & referrals", d: "XP, invites, creator program.", href: "/hq/growth" },
-            { t: "Classic Discord hub", d: "Existing LiveKit community app.", href: "/community-classic" },
-          ].map((x) => (
-            <Link
-              key={x.href}
-              to={x.href}
-              style={{ display: "block", textDecoration: "none", color: "inherit", padding: "0.55rem 0", borderBottom: "1px solid rgba(255,120,72,0.08)" }}
-            >
-              <div style={{ fontWeight: 700 }}>{x.t}</div>
-              <div className="oxs-muted" style={{ fontSize: "0.8rem" }}>
-                {x.d}
-              </div>
-            </Link>
-          ))}
-        </div>
+      {tiles.map((t) => (
+        <Link key={t.href} to={t.href} className="oxs-tile">
+          <div className={`oxs-tile-icon ${t.cls}`}>
+            <t.icon size={22} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700 }}>{t.label}</div>
+            <div className="oxs-muted" style={{ fontSize: "0.85rem" }}>{t.desc}</div>
+          </div>
+        </Link>
+      ))}
+
+      <SocialPageHeader title="Latest posts" />
+      {posts.slice(0, 5).map((p) => (
+        <PostCard key={p.id} post={p} author={profiles.find((x) => x.id === p.authorId)} meId={currentUserId} />
+      ))}
+      <div style={{ padding: "0.85rem 1rem" }}>
+        <Link to="/hq/feed" className="oxs-link">View full feed →</Link>
       </div>
     </div>
   );

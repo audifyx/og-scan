@@ -79,6 +79,10 @@ const NotificationsPage = lazyWithRetry(() => import("./social/pages/Notificatio
 const ProfileView = lazyWithRetry(() => import("./social/pages/ProfileView"));
 const ModerationAdmin = lazyWithRetry(() => import("./social/pages/ModerationAdmin"));
 const InviteLanding = lazyWithRetry(() => import("./social/pages/InviteLanding"));
+const SocialMessagesPage = lazyWithRetry(() => import("./social/pages/SocialMessagesPage"));
+const SocialChatPage = lazyWithRetry(() => import("./social/pages/SocialChatPage"));
+const SocialRoomsPage = lazyWithRetry(() => import("./social/pages/SocialRoomsPage"));
+const SocialSpacesPage = lazyWithRetry(() => import("./social/pages/SocialSpacesPage"));
 import LaunchpadPump from "./pages/orbitx/LaunchpadPump";
 import LaunchpadToken from "./pages/orbitx/LaunchpadToken";
 import LaunchpadAbout from "./pages/orbitx/LaunchpadAbout";
@@ -203,6 +207,12 @@ function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undef
     window.location.replace(target);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
+}
+
+function HqRedirect({ to }: { to: string | ((p: Record<string, string | undefined>) => string) }) {
+  const params = useParams();
+  const target = typeof to === "function" ? to(params) : to;
+  return <Navigate to={target} replace />;
 }
 
 const App = () => (
@@ -354,6 +364,10 @@ const App = () => (
               <Route path="leaderboards" element={<Suspense fallback={<RouteFallback label="Leaderboards" />}><LeaderboardsPage /></Suspense>} />
               <Route path="creators" element={<Suspense fallback={<RouteFallback label="Creators" />}><CreatorProgram /></Suspense>} />
               <Route path="notifications" element={<Suspense fallback={<RouteFallback label="Alerts" />}><NotificationsPage /></Suspense>} />
+              <Route path="messages" element={<ProtectedRoute><Suspense fallback={<RouteFallback label="Messages" />}><SocialMessagesPage /></Suspense></ProtectedRoute>} />
+              <Route path="chat" element={<ProtectedRoute><Suspense fallback={<RouteFallback label="Channels" />}><SocialChatPage /></Suspense></ProtectedRoute>} />
+              <Route path="rooms" element={<ProtectedRoute><Suspense fallback={<RouteFallback label="Rooms" />}><SocialRoomsPage /></Suspense></ProtectedRoute>} />
+              <Route path="spaces" element={<ProtectedRoute><Suspense fallback={<RouteFallback label="Spaces" />}><SocialSpacesPage /></Suspense></ProtectedRoute>} />
               <Route path="profile" element={<Suspense fallback={<RouteFallback label="Profile" />}><ProfileView /></Suspense>} />
               <Route path="profile/:userId" element={<Suspense fallback={<RouteFallback label="Profile" />}><ProfileView /></Suspense>} />
               <Route path="ox-desk-m4k9q" element={<AdminRoute><Suspense fallback={<RouteFallback label="Moderation" />}><ModerationAdmin /></Suspense></AdminRoute>} />
@@ -388,7 +402,7 @@ const App = () => (
             <Route path="/migration-tool" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/migration-tracker" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/trending" element={<OgdexRedirect to="/ORBITX_DEX" />} />
-            <Route path="/communities" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/communities" element={<Navigate to="/hq/communities" replace />} />
             <Route path="/discover" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/whales" element={<OgdexRedirect to="/ORBITX_DEX/kol" />} />
             <Route path="/tx-feed" element={<OgdexRedirect to="/ORBITX_DEX" />} />
@@ -399,17 +413,17 @@ const App = () => (
             <Route path="/news-signal" element={<OgdexRedirect to="/ORBITX_DEX/pulse" />} />
             <Route path="/memes" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/art-feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/spaces" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/spaces" element={<Navigate to="/hq/spaces" replace />} />
             <Route path="/social" element={<Navigate to="/hq" replace />} />
             <Route path="/orbitx-social" element={<Navigate to="/hq" replace />} />
             <Route path="/listings" element={<OgdexRedirect to="/ORBITX_DEX/store" />} />
             <Route path="/listings/:mintAddress" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mintAddress}`} />} />
             <Route path="/token-manager" element={<OgdexRedirect to="/ORBITX_DEX/metadata" />} />
             <Route path="/social-hub" element={<Navigate to="/hq" replace />} />
-            <Route path="/community" element={<Navigate to="/community-classic" replace />} />
-            <Route path="/community-classic" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
-            <Route path="/community-hub" element={<ProtectedRoute><CommunityClassic /></ProtectedRoute>} />
-            <Route path="/voice-rooms" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/community" element={<Navigate to="/hq/chat" replace />} />
+            <Route path="/community-classic" element={<Navigate to="/hq/chat" replace />} />
+            <Route path="/community-hub" element={<Navigate to="/hq/communities" replace />} />
+            <Route path="/voice-rooms" element={<Navigate to="/hq/voice" replace />} />
             <Route path="/tech" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/page/:pageNumber" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/page-:pageNumber" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -418,14 +432,14 @@ const App = () => (
             <Route path="/tools/:toolSlug" element={<OgdexRedirect to="/ORBITX_DEX/tools" />} />
 
             {/* ── Protected: User pages ── */}
-            <Route path="/profile" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/profile/:userId" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/profile" element={<Navigate to="/hq/profile" replace />} />
+            <Route path="/profile/:userId" element={<HqRedirect to={(p) => `/hq/profile/${p.userId}`} />} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/reports" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             <Route path="/alerts" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             <Route path="/wallets" element={<OgdexRedirect to="/ORBITX_DEX/wallet" />} />
             <Route path="/games" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+            <Route path="/notifications" element={<Navigate to="/hq/notifications" replace />} />
             {/* Credits removed */}
 
             {/* ── Protected: Tools & Features ── */}
@@ -440,11 +454,13 @@ const App = () => (
             <Route path="/callouts" element={<OgdexRedirect to="/ORBITX_DEX/callouts" />} />
 
             {/* ── Protected: Community ── */}
-            <Route path="/coin-communities" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/coin-communities" element={<Navigate to="/hq/communities" replace />} />
             <Route path="/trading-lobbies" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/leaderboard" element={<OgdexRedirect to="/ORBITX_DEX/leaderboard" />} />
             <Route path="/invite" element={<ProtectedRoute><Invite /></ProtectedRoute>} />
-            <Route path="/messages" element={<ProtectedRoute><DirectMessagesPage /></ProtectedRoute>} />
+            <Route path="/messages" element={<Navigate to="/hq/messages" replace />} />
+            <Route path="/rooms" element={<Navigate to="/hq/rooms" replace />} />
+            <Route path="/community-rooms" element={<Navigate to="/hq/rooms" replace />} />
 
             {/* Premium removed */}
 

@@ -1,4 +1,6 @@
 import { Link, useParams } from "react-router-dom";
+import { useState } from "react";
+import { Calendar, MapPin } from "lucide-react";
 import { useSocialStore } from "../hooks/useSocialStore";
 import { toggleFollow } from "../store/localSocialStore";
 import { progressToNext, tierForXp } from "../growth/xp";
@@ -7,6 +9,7 @@ import { PostCard } from "../components/PostCard";
 export default function ProfileView() {
   const { userId } = useParams<{ userId?: string }>();
   const { profiles, posts, currentUserId } = useSocialStore();
+  const [tab, setTab] = useState<"posts" | "replies" | "media">("posts");
   const id = userId || currentUserId;
   const profile = profiles.find((p) => p.id === id);
   const me = profiles.find((p) => p.id === currentUserId);
@@ -17,73 +20,75 @@ export default function ProfileView() {
 
   if (!profile) {
     return (
-      <div>
-        <header className="oxs-hero">
-          <h1>Profile</h1>
-          <p className="oxs-muted">User not found.</p>
-        </header>
+      <div className="oxs-page-head">
+        <h1>Profile</h1>
+        <p className="oxs-muted">User not found.</p>
       </div>
     );
   }
 
   return (
     <div>
-      <header className="oxs-hero">
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
-          <div className="oxs-avatar" style={{ width: 64, height: 64, fontSize: "1.2rem" }}>
-            {profile.displayName.slice(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <h1 style={{ marginBottom: "0.15rem" }}>{profile.displayName}</h1>
-            <p className="oxs-muted" style={{ margin: 0 }}>
-              @{profile.username}
-              {profile.isCreator ? " · Creator" : ""}
-              {profile.isMod ? " · Mod" : ""}
-              {profile.banned ? " · Banned" : profile.muted ? " · Muted" : ""}
-            </p>
-          </div>
-        </div>
-        <p style={{ marginTop: "0.85rem" }}>{profile.bio}</p>
-        <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.85rem", flexWrap: "wrap" }}>
-          {id !== currentUserId && (
-            <button className="oxs-btn" type="button" onClick={() => toggleFollow(id)}>
+      <div className="oxs-profile-banner" />
+      <div className="oxs-profile-head">
+        <div className="oxs-profile-actions">
+          {id !== currentUserId ? (
+            <button
+              className={`oxs-btn ${following ? "oxs-btn-following" : "oxs-btn-follow"}`}
+              type="button"
+              onClick={() => toggleFollow(id)}
+            >
               {following ? "Following" : "Follow"}
             </button>
+          ) : (
+            <Link to="/hq/growth" className="oxs-btn oxs-btn-ghost" style={{ textDecoration: "none" }}>
+              Edit growth
+            </Link>
           )}
-          <Link to="/hq/growth" className="oxs-btn oxs-btn-ghost" style={{ textDecoration: "none" }}>
-            Growth
-          </Link>
         </div>
-      </header>
-
-      <div className="oxs-grid oxs-grid-3" style={{ marginBottom: "1rem" }}>
-        <div className="oxs-panel oxs-stat">
-          <div className="label">Followers</div>
-          <div className="value">{profile.followers.length}</div>
+        <div className="oxs-avatar oxs-avatar--xl">{profile.displayName.slice(0, 2).toUpperCase()}</div>
+        <h1 style={{ margin: "0.65rem 0 0", fontSize: "1.35rem", fontWeight: 800 }}>{profile.displayName}</h1>
+        <div className="oxs-muted" style={{ fontSize: "0.92rem" }}>
+          @{profile.username}
+          {profile.isCreator ? " · Creator" : ""}
+          {profile.isMod ? " · Mod" : ""}
         </div>
-        <div className="oxs-panel oxs-stat">
-          <div className="label">Following</div>
-          <div className="value">{profile.following.length}</div>
+        <p style={{ margin: "0.75rem 0 0", lineHeight: 1.45 }}>{profile.bio}</p>
+        <div className="oxs-muted" style={{ display: "flex", gap: "1rem", marginTop: "0.55rem", fontSize: "0.85rem", flexWrap: "wrap" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
+            <MapPin size={14} /> OrbitX
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
+            <Calendar size={14} /> Joined {new Date(profile.createdAt).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
+          </span>
         </div>
-        <div className="oxs-panel oxs-stat">
-          <div className="label">Reputation</div>
-          <div className="value">{tier.title}</div>
-          <div className="oxs-muted" style={{ fontSize: "0.75rem", marginTop: "0.25rem" }}>
-            {profile.xp} XP · {prog.pct}% to next
-          </div>
-          <div className="oxs-progress" style={{ marginTop: "0.45rem" }}>
-            <span style={{ width: `${prog.pct}%` }} />
-          </div>
+        <div className="oxs-profile-stats">
+          <span><strong>{profile.following.length}</strong> <span className="oxs-muted">Following</span></span>
+          <span><strong>{profile.followers.length}</strong> <span className="oxs-muted">Followers</span></span>
+          <span><strong>{tier.title}</strong> <span className="oxs-muted">· {profile.xp} XP</span></span>
+        </div>
+        <div className="oxs-progress" style={{ marginTop: "0.65rem", maxWidth: 280 }}>
+          <span style={{ width: `${prog.pct}%` }} />
         </div>
       </div>
 
-      <div className="oxs-panel">
-        <h3>Posts</h3>
-        {myPosts.length === 0 && <p className="oxs-muted">No posts yet.</p>}
-        {myPosts.map((p) => (
-          <PostCard key={p.id} post={p} author={profile} meId={currentUserId} />
+      <div className="oxs-tabs">
+        {(["posts", "replies", "media"] as const).map((t) => (
+          <button key={t} type="button" className={`oxs-tab${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
         ))}
       </div>
+
+      {tab === "posts" ? (
+        myPosts.length === 0 ? (
+          <div className="oxs-panel oxs-muted">No posts yet.</div>
+        ) : (
+          myPosts.map((p) => <PostCard key={p.id} post={p} author={profile} meId={currentUserId} />)
+        )
+      ) : (
+        <div className="oxs-panel oxs-muted">Nothing here yet.</div>
+      )}
     </div>
   );
 }

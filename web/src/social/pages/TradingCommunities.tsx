@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { SocialPageHeader } from "../components/SocialPageHeader";
 import { useSocialStore } from "../hooks/useSocialStore";
 import { traderRankScore, rankByMetric } from "../growth/leaderboard";
 import { joinCommunity } from "../store/localSocialStore";
@@ -24,23 +25,19 @@ export default function TradingCommunities() {
 
   return (
     <div>
-      <header className="oxs-hero">
-        <h1>Trading communities</h1>
-        <p>Token communities, holder-only groups, trader rankings, alpha channels, and discussion rooms.</p>
-      </header>
+      <SocialPageHeader title="Trading communities" subtitle="Token rooms, holder gates, and trader rankings." />
 
-      <div className="oxs-grid oxs-grid-3" style={{ marginBottom: "1rem" }}>
+      <div className="oxs-grid oxs-grid-3">
         {trading.map((c) => {
           const joined = c.memberIds.includes(currentUserId);
           return (
-            <div key={c.id} className="oxs-panel">
-              <div style={{ fontSize: "1.4rem", marginBottom: "0.35rem" }}>{c.avatarEmoji}</div>
-              <h3 style={{ marginBottom: "0.35rem" }}>{c.name}</h3>
-              <span className="oxs-badge" style={{ marginBottom: "0.5rem" }}>
-                {c.kind}
-                {c.holderOnly ? " · gated" : ""}
+            <div key={c.id} className="oxs-community">
+              <div className="oxs-community-icon">{c.avatarEmoji}</div>
+              <h3 style={{ margin: "0 0 0.35rem", fontWeight: 800 }}>{c.name}</h3>
+              <span className="oxs-badge oxs-badge-live" style={{ marginBottom: "0.5rem" }}>
+                {c.kind}{c.holderOnly ? " · gated" : ""}
               </span>
-              <p className="oxs-muted" style={{ fontSize: "0.8rem", minHeight: "2.4rem" }}>
+              <p className="oxs-muted" style={{ fontSize: "0.85rem", minHeight: "2.5rem", margin: "0 0 0.75rem" }}>
                 {c.description}
               </p>
               <button className="oxs-btn" type="button" disabled={joined} onClick={() => joinCommunity(c.id)}>
@@ -52,48 +49,36 @@ export default function TradingCommunities() {
       </div>
 
       <div className="oxs-grid oxs-grid-2">
-        <div className="oxs-panel">
+        <div className="oxs-panel--card" style={{ margin: "0.75rem 1rem" }}>
           <h3>Trader rankings</h3>
           <table className="oxs-table">
             <thead>
-              <tr>
-                <th>#</th>
-                <th>Trader</th>
-                <th>Score</th>
-              </tr>
+              <tr><th>#</th><th>Trader</th><th>Score</th></tr>
             </thead>
             <tbody>
               {rankings.slice(0, 8).map((r) => (
                 <tr key={r.userId}>
                   <td>{r.rank}</td>
-                  <td>
-                    <Link className="oxs-link" to={`/hq/profile/${r.userId}`}>
-                      @{r.username}
-                    </Link>
-                  </td>
+                  <td><Link className="oxs-link" to={`/hq/profile/${r.userId}`}>@{r.username}</Link></td>
                   <td>{r.value}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div className="oxs-panel">
+        <div className="oxs-panel--card" style={{ margin: "0.75rem 1rem" }}>
           <h3>Alpha channel</h3>
-          {alphaPosts.length === 0 && <p className="oxs-muted">No alpha posts yet.</p>}
+          {alphaPosts.length === 0 ? <p className="oxs-muted">No alpha posts yet.</p> : null}
           {alphaPosts.slice(0, 5).map((p) => {
             const a = profiles.find((x) => x.id === p.authorId);
             return (
-              <div key={p.id} style={{ padding: "0.5rem 0", borderBottom: "1px solid rgba(255,120,72,0.08)" }}>
-                <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>@{a?.username}</div>
-                <div className="oxs-muted" style={{ fontSize: "0.8rem" }}>
-                  {p.content}
-                </div>
+              <div key={p.id} className="oxs-bubble" style={{ marginBottom: "0.5rem" }}>
+                <strong style={{ color: "var(--oxs-x)", fontSize: "0.82rem" }}>@{a?.username}</strong>
+                <div>{p.content}</div>
               </div>
             );
           })}
-          <Link to="/hq/feed" className="oxs-link" style={{ fontSize: "0.82rem" }}>
-            Discuss in feed →
-          </Link>
+          <Link to="/hq/feed" className="oxs-link" style={{ fontSize: "0.85rem" }}>Discuss in feed →</Link>
         </div>
       </div>
     </div>
