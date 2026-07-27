@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
-import { AppLayout } from "@/components/layout/AppLayout";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { NFT_CATEGORIES } from "@/lib/orbitx/nftCategories";
 import { useRecentSales, shortAddr, fmtSol } from "./nftMarketData";
