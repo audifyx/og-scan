@@ -11,12 +11,11 @@ import { useEvmWallet } from "@/hooks/useEvmWallet";
 import { linkEvmToSolana } from "@/lib/orbitx/walletLink";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
 import { toast } from "sonner";
-import { AppLayout } from "@/components/layout/AppLayout";
 import {
   Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Zap, Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
+import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 import { shortAddr } from "./_shared";
 import { redeemReferralCode } from "@/lib/orbitx/registry";
@@ -167,84 +166,80 @@ function ReferralCapture() {
 
 export default function LaunchpadLayout() {
   const { isAdmin } = useAdmin();
+  // Standalone launchpad shell — no AppLayout / SocialTopBar / galaxy chrome.
+  // Full-bleed like pump.fun so the board is the entire page.
   return (
-    <AppLayout>
-      <div className="lp-classic relative min-h-screen">
-        <ReferralCapture />
-        <NetworkStrip />
+    <div className="lp-classic relative min-h-screen">
+      <ReferralCapture />
+      <NetworkStrip />
 
-        {/* ── redesigned header ── */}
-        <header className="sticky top-0 z-20 border-b border-[hsl(var(--pf-border))]/70" style={{ background: "hsl(var(--pf-bg) / 0.82)", backdropFilter: "blur(16px)" }}>
-          <div className="mx-auto flex w-full max-w-[1440px] items-center gap-3 px-3 py-3 sm:px-4">
-            {/* brand */}
-            <Link to="/orbitxlaunch" className="group flex items-center gap-2.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl shadow-lg transition group-hover:scale-105"
-                style={{ background: "linear-gradient(135deg, hsl(var(--pf-green)), hsl(var(--pf-blue)))" }}>
-                <Rocket className="h-5 w-5 text-black" strokeWidth={2.6} />
+      <header className="sticky top-0 z-30 border-b border-[hsl(var(--pf-border))]/70" style={{ background: "hsl(var(--pf-bg) / 0.92)", backdropFilter: "blur(16px)" }}>
+        <div className="mx-auto flex w-full max-w-[1440px] items-center gap-3 px-3 py-2.5 sm:px-4">
+          <Link to="/orbitxlaunch" className="group flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl shadow-lg transition group-hover:scale-105"
+              style={{ background: "linear-gradient(135deg, hsl(var(--pf-green)), hsl(152 90% 42%))" }}>
+              <Rocket className="h-4 w-4 text-black" strokeWidth={2.6} />
+            </div>
+            <div className="leading-tight">
+              <div className="text-base font-black tracking-tight text-[hsl(var(--pf-ink))]">
+                orbit<span className="text-[hsl(var(--pf-green))]">x</span>
+                <span className="text-[hsl(var(--pf-muted))]">.fun</span>
               </div>
-              <div className="leading-tight">
-                <div className="text-lg font-black tracking-tight text-[hsl(var(--pf-ink))]">
-                  Orbit<span className="text-[hsl(var(--pf-green))]">X</span>
-                </div>
-                <div className="pf-mono text-[9px] font-bold uppercase tracking-[0.24em] text-[hsl(var(--pf-muted))]">Launchpad</div>
-              </div>
+              <div className="pf-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[hsl(var(--pf-muted))]">coin board</div>
+            </div>
+          </Link>
+
+          <nav className="ml-2 hidden items-center gap-0.5 overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {TABS.map((t) => (
+              <NavLink key={t.to} to={t.to} end={t.end}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition",
+                  isActive ? "bg-[hsl(var(--pf-green))]/15 text-[hsl(var(--pf-green))]" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]"
+                )}>
+                <t.icon className={cn("h-3.5 w-3.5", t.hot && "text-[hsl(var(--pf-gold))]")} />
+                {t.label}
+              </NavLink>
+            ))}
+            {isAdmin && (
+              <NavLink to="/orbitxlaunch/ox-desk-m4k9q"
+                className={({ isActive }) => cn("flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition",
+                  isActive ? "bg-[hsl(var(--pf-green))]/15 text-[hsl(var(--pf-green))]" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]")}>
+                <ShieldCheck className="h-3.5 w-3.5" /> Desk
+              </NavLink>
+            )}
+          </nav>
+
+          <div className="ml-auto flex items-center gap-2">
+            <AntiVampProtectionBadge />
+            <Link to="/orbitxlaunch/create" className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-black text-black shadow-[0_0_24px_hsl(152_86%_52%/0.35)]"
+              style={{ background: "hsl(var(--pf-green))" }}>
+              <Zap className="h-4 w-4" /> Create coin
             </Link>
-
-            <div className="ml-auto flex items-center gap-2">
-              <AntiVampProtectionBadge />
-              <Link to="/orbitxlaunch/create" className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-black text-black"
-                style={{ background: "linear-gradient(135deg, hsl(var(--pf-green)), hsl(152 90% 42%))" }}>
-                <Zap className="h-4 w-4" /> Create coin
-              </Link>
-              <EvmWalletButton />
-              <WalletConsole />
-            </div>
+            <EvmWalletButton />
+            <WalletConsole />
           </div>
-
-          {/* ── segmented tab bar ── */}
-          <div className="mx-auto w-full max-w-[1440px] px-2 sm:px-3">
-            <nav className="flex items-center gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {TABS.map((t) => (
-                <NavLink key={t.to} to={t.to} end={t.end}
-                  className={({ isActive }) => cn(
-                    "group relative flex items-center gap-1.5 whitespace-nowrap rounded-t-lg px-3.5 py-2.5 text-[12px] font-bold transition",
-                    isActive ? "text-[hsl(var(--pf-ink))]" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]"
-                  )}>
-                  {({ isActive }) => (
-                    <>
-                      <t.icon className={cn("h-3.5 w-3.5", t.hot && "text-[hsl(var(--pf-gold))]")} />
-                      {t.label}
-                      <span className={cn("absolute inset-x-2 -bottom-px h-0.5 rounded-full transition", isActive ? "opacity-100" : "opacity-0")}
-                        style={{ background: "linear-gradient(90deg, hsl(var(--pf-green)), hsl(var(--pf-blue)))" }} />
-                    </>
-                  )}
-                </NavLink>
-              ))}
-              {isAdmin && (
-                <NavLink to="/orbitxlaunch/ox-desk-m4k9q"
-                  className={({ isActive }) => cn("flex items-center gap-1.5 whitespace-nowrap rounded-t-lg px-3.5 py-2.5 text-[12px] font-bold transition",
-                    isActive ? "text-[hsl(var(--pf-ink))]" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]")}>
-                  <ShieldCheck className="h-3.5 w-3.5" /> Desk
-                </NavLink>
-              )}
-            </nav>
-          </div>
-        </header>
-
-        <div className="mx-auto w-full max-w-[1440px] px-3 pb-16 pt-4 sm:px-4">
-          <Outlet />
-
-          {/* ── footer ── */}
-          <footer className="mt-10 border-t border-[hsl(var(--pf-border))] pt-5">
-            <div className="grid grid-cols-1 gap-3 pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))] sm:grid-cols-4">
-              <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--pf-gold))]" /> {isLaunchFeePromoActive() ? <>FREE launches · {launchFeePromoDaysLeft()}d left</> : <>{fmtUsd(ORBITX_FEE_USD)} flat launch</>}</div>
-              <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--pf-green))]" /> {(CREATOR_FEE_BPS / 100).toFixed(2)}% of every trade → creator</div>
-              <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--pf-blue))]" /> claim in-app · same wallet</div>
-              <a href="/nft" className="flex items-center gap-2 hover:text-[hsl(var(--pf-ink))]"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--pf-blue))]" /> OrbitX NFT Marketplace →</a>
-            </div>
-          </footer>
         </div>
+
+        {/* Mobile tabs */}
+        <div className="mx-auto w-full max-w-[1440px] px-2 pb-1 md:hidden">
+          <nav className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {TABS.map((t) => (
+              <NavLink key={t.to} to={t.to} end={t.end}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition",
+                  isActive ? "bg-[hsl(var(--pf-green))] text-black" : "text-[hsl(var(--pf-muted))]"
+                )}>
+                <t.icon className="h-3 w-3" />
+                {t.label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-[1440px] px-2 pb-10 pt-3 sm:px-3">
+        <Outlet />
       </div>
-    </AppLayout>
+    </div>
   );
 }
