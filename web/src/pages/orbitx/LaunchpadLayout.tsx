@@ -1,4 +1,4 @@
-// OrbitX Launchpad shell — two-tier Solana launchpad chrome (brand bar + tab rail).
+// OrbitX Launchpad shell — black / metal chrome (gold · blue · silver).
 import { AntiVampProtectionBadge } from "@/components/layout/AntiVampProtectionBadge";
 import { NavLink, Outlet, Link, useSearchParams } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -10,7 +10,8 @@ import { linkEvmToSolana } from "@/lib/orbitx/walletLink";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
 import { toast } from "sonner";
 import {
-  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Zap, Link2, Plus,
+  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Link2, Plus,
+  Twitter, Send, Github, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
@@ -122,7 +123,7 @@ function NetworkStrip() {
         {Array.from({ length: 2 }).map((_, dup) => (
           <span key={dup} className="inline-flex items-center gap-6 pf-mono text-[11px] uppercase tracking-wide">
             <span className="inline-flex items-center gap-1.5">
-              <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-[#14F195]" : "bg-[#ff4d6d]"}`} />
+              <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-[#3B82F6]" : "bg-[#ff4d6d]"}`} style={ok ? { boxShadow: "0 0 8px #3B82F6" } : undefined} />
               Solana {ok ? "live" : "degraded"}
             </span>
             <span>slot {fmtInt(tel.data?.slot)}</span>
@@ -130,7 +131,7 @@ function NetworkStrip() {
             <span>rpc {tel.data?.latencyMs != null ? `${tel.data.latencyMs}ms` : "—"}</span>
             <span>SOL ${solUsd.data ? solUsd.data.price.toFixed(2) : "—"}</span>
             {isLaunchFeePromoActive() ? (
-              <span className="font-bold text-[#14F195]">★ FREE launches — {launchFeePromoDaysLeft()}d left</span>
+              <span className="font-bold text-[#F0C75E]">★ FREE launches — {launchFeePromoDaysLeft()}d left</span>
             ) : (
               <span>{fmtUsd(ORBITX_FEE_USD)} launch · {(CREATOR_FEE_BPS / 100).toFixed(2)}% trade · {TRADE_FEE_CREATOR_SHARE_PCT}/{TRADE_FEE_PLATFORM_SHARE_PCT} split</span>
             )}
@@ -183,15 +184,78 @@ function TabRail({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+function FooterCol({ title, links }: { title: string; links: [string, string][] }) {
+  return (
+    <div className="ox-footer-col">
+      <div className="ox-footer-col-title">{title}</div>
+      <ul>
+        {links.map(([label, to]) => (
+          <li key={to}>
+            <Link to={to}>
+              {label} <ChevronRight className="h-3 w-3 opacity-50" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function LaunchpadFooter() {
+  const year = new Date().getFullYear();
+  return (
+    <footer className="ox-footer">
+      <div className="ox-footer-inner">
+        <div>
+          <div className="ox-footer-brand">Orbit<span>X</span></div>
+          <p className="ox-footer-blurb">
+            Launch, trade, claim, and rescue on Solana — black metal desk for new coins.
+          </p>
+          <div className="ox-footer-socials">
+            <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" aria-label="X"><Twitter className="h-4 w-4" /></a>
+            <a href="https://t.me/ogscan" target="_blank" rel="noreferrer" aria-label="Telegram"><Send className="h-4 w-4" /></a>
+            <a href="https://github.com/audifyx/og-scan" target="_blank" rel="noreferrer" aria-label="GitHub"><Github className="h-4 w-4" /></a>
+          </div>
+        </div>
+        <FooterCol title="Launchpad" links={[
+          ["Board", "/orbitxlaunch"],
+          ["Leaders", "/orbitxlaunch/leaderboard"],
+          ["Portfolio", "/orbitxlaunch/portfolio"],
+          ["About", "/orbitxlaunch/about"],
+        ]} />
+        <FooterCol title="Create & claim" links={[
+          ["Create coin", "/orbitxlaunch/create"],
+          ["Claim fees", "/orbitxlaunch/claim"],
+          ["Rescue", "/orbitxlaunch/rescue"],
+          ["Profile", "/orbitxlaunch/profile"],
+        ]} />
+        <FooterCol title="Company" links={[
+          ["NFT Market", "/nft"],
+          ["DEX", "/ORBITX_DEX"],
+          ["Terms", "/terms"],
+          ["Privacy", "/privacy"],
+        ]} />
+      </div>
+      <div className="ox-footer-bar">
+        <div className="ox-footer-bar-inner">
+          <span>© {year} OrbitX. All rights reserved.</span>
+          <span>
+            {(CREATOR_FEE_BPS / 100).toFixed(2)}% trade fee · {TRADE_FEE_CREATOR_SHARE_PCT}/{TRADE_FEE_PLATFORM_SHARE_PCT} creator/platform · {fmtUsd(ORBITX_FEE_USD)} launch
+          </span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 export default function LaunchpadLayout() {
   const { isAdmin } = useAdmin();
   return (
-    <div className="lp-classic relative min-h-screen">
+    <div className="lp-classic relative flex min-h-screen flex-col">
       <ReferralCapture />
       <NetworkStrip />
 
       <header className="ox-shell-header sticky top-0 z-30">
-        {/* Tier 1 — brand + actions */}
         <div className="ox-shell-top">
           <div className="ox-shell-inner">
             <Link to="/orbitxlaunch" className="ox-brand group">
@@ -200,7 +264,7 @@ export default function LaunchpadLayout() {
               </div>
               <div className="leading-tight">
                 <div className="ox-brand-name">
-                  orbit<span>x</span>
+                  Orbit<span>X</span>
                 </div>
                 <div className="ox-brand-sub">launchpad</div>
               </div>
@@ -219,7 +283,6 @@ export default function LaunchpadLayout() {
           </div>
         </div>
 
-        {/* Tier 2 — tab rail */}
         <div className="ox-shell-tabs">
           <div className="ox-shell-inner">
             <TabRail isAdmin={!!isAdmin} />
@@ -227,9 +290,11 @@ export default function LaunchpadLayout() {
         </div>
       </header>
 
-      <div className="ox-shell-main">
+      <div className="ox-shell-main flex-1">
         <Outlet />
       </div>
+
+      <LaunchpadFooter />
     </div>
   );
 }

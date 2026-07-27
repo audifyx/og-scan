@@ -213,24 +213,24 @@ export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | nul
         <div className="ox-coin-stats">
           <span className="ox-coin-mc">{fmtMc(mcap)}</span>
           {ch != null && Number.isFinite(ch) && (
-            <span className={ch >= 0 ? "text-[#14F195]" : "text-[#ff4d6d]"}>
+            <span className={ch >= 0 ? "ox-coin-up" : "ox-coin-down"}>
               {ch >= 0 ? "+" : ""}{ch.toFixed(1)}%
             </span>
           )}
-          <span className="text-white/40">vol {fmtCompact(market?.vol24)}</span>
+          <span className="text-[#A8B0BC]">vol {fmtCompact(market?.vol24)}</span>
         </div>
 
         <div className="mt-1.5">
-          <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-white/40">
+          <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-[#A8B0BC]">
             <span>{graduated ? "Graduated" : "Bonding"}</span>
-            <span className={graduated ? "text-[#F0B429]" : "text-[#14F195]"}>{pct}%</span>
+            <span className={graduated ? "text-[#F0C75E]" : "text-[#60A5FA]"}>{pct}%</span>
           </div>
           <div className="pf-progress h-1.5"><div className={`pf-progress-fill ${graduated ? "is-complete" : ""}`} style={{ width: `${pct}%` }} /></div>
         </div>
 
         <div className="ox-coin-meta">
           {!t.is_vamp ? (
-            <span className="inline-flex items-center gap-0.5 text-[#14F195]"><ShieldCheck className="h-3 w-3" /> OG</span>
+            <span className="inline-flex items-center gap-0.5 text-[#60A5FA]"><ShieldCheck className="h-3 w-3" /> OG</span>
           ) : (
             <span className="inline-flex items-center gap-0.5 text-[#ff4d6d]"><ShieldAlert className="h-3 w-3" /> Vamp</span>
           )}

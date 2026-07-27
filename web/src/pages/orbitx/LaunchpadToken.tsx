@@ -22,7 +22,7 @@ import { jupGetTokens, jupQuote, jupSwapTransaction, SOL_MINT, fmtPct, HELIUS_BA
 import { toast } from "sonner";
 import {
   Loader2, Copy, Check, ExternalLink, ShieldCheck, ShieldAlert, Droplets, Flame,
-  ArrowLeft, Coins, ArrowDownUp, Zap, BadgeCheck, TrendingUp, TrendingDown,
+  ArrowLeft, Coins, Zap, BadgeCheck, TrendingUp, TrendingDown, ArrowDownUp,
   Globe, Twitter, Send, Wallet, RefreshCw,
 } from "lucide-react";
 
@@ -65,7 +65,7 @@ async function fetchMetaJson(uri: string | null | undefined) {
     const r = await fetch(uri);
     if (!r.ok) return null;
     const j = await r.json();
-    return j as { description?: string; twitter?: string; telegram?: string; website?: string };
+    return j as { description?: string; twitter?: string; telegram?: string; website?: string; image?: string };
   } catch { return null; }
 }
 
@@ -74,11 +74,13 @@ async function fetchMetaJson(uri: string | null | undefined) {
 function ChartPanel({ pairAddress, dexId }: { pairAddress: string | null; dexId: string | null }) {
   if (!pairAddress || !dexId) {
     return (
-      <div className="pf-card p-3">
+      <div className="ox-tok-panel">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="pf-mono text-xs font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">Price chart</h3>
+          <h3 className="pf-mono text-xs font-black uppercase tracking-wide text-white/45">Price chart</h3>
         </div>
-        <div className="flex h-[420px] items-center justify-center text-xs text-[hsl(var(--pf-muted))]">No liquidity pool yet — chart appears once trading starts</div>
+        <div className="flex h-[360px] items-center justify-center rounded-xl border border-dashed border-white/10 text-xs text-white/40">
+          No liquidity pool yet — chart appears once trading starts
+        </div>
       </div>
     );
   }
@@ -86,14 +88,12 @@ function ChartPanel({ pairAddress, dexId }: { pairAddress: string | null; dexId:
   const dexScreenerUrl = `https://dexscreener.com/solana/${pairAddress}`;
 
   return (
-    <div className="pf-card p-3">
+    <div className="ox-tok-panel">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="pf-mono text-xs font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">Live chart</h3>
-        <a href={dexScreenerUrl} target="_blank" rel="noreferrer" className="pf-mono text-[9px] font-bold text-[hsl(var(--pf-blue))] hover:underline">Fullscreen ↗</a>
+        <h3 className="pf-mono text-xs font-black uppercase tracking-wide text-white/45">Live chart</h3>
+        <a href={dexScreenerUrl} target="_blank" rel="noreferrer" className="pf-mono text-[9px] font-bold text-[#60A5FA] hover:underline">Fullscreen ↗</a>
       </div>
-      {/* Big, touch-friendly embed: viewport-relative height so it stays large on
-          phones and gets even taller on desktop. */}
-      <div className="obx-chart-frame relative w-full h-[72vh] min-h-[460px] md:h-[680px]">
+      <div className="obx-chart-frame relative w-full h-[58vh] min-h-[380px] md:h-[560px] overflow-hidden rounded-xl">
         <iframe
           title="price chart"
           src={`https://dexscreener.com/solana/${pairAddress}?embed=1&theme=dark&trades=1&info=0`}
@@ -169,38 +169,38 @@ function PositionPanel({ mint, symbol, priceUsd, solUsd }: { mint: string; symbo
   const pnlUsd = pnlSol != null && solUsd != null ? pnlSol * solUsd : null;
 
   return (
-    <div className="pf-card p-4">
+    <div className="ox-tok-panel">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="pf-mono text-xs font-black uppercase tracking-wide text-[hsl(var(--pf-muted))]">Your position</h3>
-        <button onClick={() => { balQ.refetch(); pnlQ.refetch(); }} className="rounded-full p-1 text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]">
+        <h3 className="pf-mono text-xs font-black uppercase tracking-wide text-white/45">Your position</h3>
+        <button onClick={() => { balQ.refetch(); pnlQ.refetch(); }} className="rounded-full p-1 text-white/40 hover:text-white">
           <RefreshCw className={`h-3.5 w-3.5 ${balQ.isFetching ? "animate-spin" : ""}`} />
         </button>
       </div>
       {balQ.isLoading ? (
-        <div className="flex items-center gap-2 py-4 text-xs text-[hsl(var(--pf-muted))]"><Loader2 className="h-4 w-4 animate-spin" /> checking wallet…</div>
+        <div className="flex items-center gap-2 py-4 text-xs text-white/40"><Loader2 className="h-4 w-4 animate-spin" /> checking wallet…</div>
       ) : balance <= 0 ? (
-        <div className="py-2 text-xs text-[hsl(var(--pf-muted))]">You don't hold any ${symbol} yet.</div>
+        <div className="py-2 text-xs text-white/40">You don't hold any ${symbol} yet.</div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <div className="text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">Holding</div>
-            <div className="pf-mono text-lg font-black text-[hsl(var(--pf-ink))]">{balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-            <div className="pf-mono text-[10px] text-[hsl(var(--pf-muted))]">${symbol}</div>
+            <div className="text-[9px] font-bold uppercase tracking-widest text-white/40">Holding</div>
+            <div className="pf-mono text-lg font-black text-white">{balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            <div className="pf-mono text-[10px] text-white/40">${symbol}</div>
           </div>
           <div>
-            <div className="text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">Value</div>
-            <div className="pf-mono text-lg font-black text-[hsl(var(--pf-ink))]">{valueUsd != null ? fmtCompactUsd(valueUsd) : "—"}</div>
+            <div className="text-[9px] font-bold uppercase tracking-widest text-white/40">Value</div>
+            <div className="pf-mono text-lg font-black text-white">{valueUsd != null ? fmtCompactUsd(valueUsd) : "—"}</div>
           </div>
           {pnlSol != null && (
-            <div className="col-span-2 mt-1 rounded-lg border border-[hsl(var(--pf-border))] p-2">
-              <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">
+            <div className="col-span-2 mt-1 rounded-lg border border-white/10 p-2">
+              <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-white/40">
                 <span>Est. unrealized PnL</span>
                 <span>{pnlQ.data?.swapsSeen} swap{pnlQ.data?.swapsSeen === 1 ? "" : "s"} seen</span>
               </div>
-              <div className={`pf-mono text-base font-black ${pnlSol >= 0 ? "text-[hsl(var(--pf-green-dark))]" : "text-[hsl(var(--pf-red))]"}`}>
+              <div className={`pf-mono text-base font-black ${pnlSol >= 0 ? "text-[#60A5FA]" : "text-[#ff4d6d]"}`}>
                 {pnlSol >= 0 ? "+" : ""}{pnlSol.toFixed(4)} SOL {pnlUsd != null && <span className="text-xs font-bold">({pnlUsd >= 0 ? "+" : ""}{fmtCompactUsd(Math.abs(pnlUsd))})</span>}
               </div>
-              <div className="mt-0.5 text-[9px] text-[hsl(var(--pf-muted))]">Based on your recent on-chain swaps for this token — may not cover full history.</div>
+              <div className="mt-0.5 text-[9px] text-white/35">Based on recent on-chain swaps — may not cover full history.</div>
             </div>
           )}
         </div>
@@ -272,20 +272,22 @@ function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol
   }, [balQ]);
 
   return (
-    <div className="pf-card p-4">
-      <div className="mb-3 flex gap-1 rounded-full border border-[hsl(var(--pf-border))] p-1">
+    <div className="ox-tok-panel ox-tok-trade">
+      <div className="mb-3 flex gap-1 rounded-full border border-white/10 p-1">
         {(["buy", "sell"] as const).map((s) => (
           <button key={s} type="button" onClick={() => setSide(s)}
-            className={`flex-1 rounded-full py-2 text-xs font-black uppercase tracking-wide transition ${
-              side === s ? (s === "buy" ? "bg-[hsl(var(--pf-green))] text-white" : "bg-[hsl(var(--pf-red))] text-white") : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]"
+            className={`flex-1 rounded-full py-2.5 text-xs font-black uppercase tracking-wide transition ${
+              side === s
+                ? (s === "buy" ? "bg-[#D4AF37] text-black" : "bg-[#ff4d6d] text-white")
+                : "text-white/45 hover:text-white"
             }`}>
             {s}
           </button>
         ))}
       </div>
 
-      <div className="rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] p-3">
-        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">
+      <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-white/40">
           <span>{side === "buy" ? "You pay (SOL)" : `You pay ($${symbol})`}</span>
           {side === "sell" && connected && <span>bal {balQ.data != null ? balQ.data.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "—"}</span>}
         </div>
@@ -294,37 +296,37 @@ function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol
           onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
           inputMode="decimal"
           placeholder="0.0"
-          className="mt-1 w-full bg-transparent text-2xl font-black text-[hsl(var(--pf-ink))] outline-none"
+          className="mt-1 w-full bg-transparent text-2xl font-black text-white outline-none"
         />
         <div className="mt-2 flex gap-1.5">
           {side === "buy"
             ? buyQuick.map((v) => (
-                <button key={v} onClick={() => setAmount(v)} className="rounded-full border border-[hsl(var(--pf-border))] px-2.5 py-1 pf-mono text-[10px] font-bold text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-green))] hover:text-[hsl(var(--pf-ink))]">{v} SOL</button>
+                <button key={v} onClick={() => setAmount(v)} className="rounded-full border border-white/10 px-2.5 py-1 pf-mono text-[10px] font-bold text-white/50 hover:border-[#60A5FA] hover:text-white">{v} SOL</button>
               ))
             : sellQuick.map(([label, pct]) => (
-                <button key={label} onClick={() => setAmount(String((balQ.data ?? 0) * pct))} className="rounded-full border border-[hsl(var(--pf-border))] px-2.5 py-1 pf-mono text-[10px] font-bold text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-red))] hover:text-[hsl(var(--pf-ink))]">{label}</button>
+                <button key={label} onClick={() => setAmount(String((balQ.data ?? 0) * pct))} className="rounded-full border border-white/10 px-2.5 py-1 pf-mono text-[10px] font-bold text-white/50 hover:border-[#ff4d6d] hover:text-white">{label}</button>
               ))}
         </div>
       </div>
       <div className="my-1 flex justify-center">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))]"><ArrowDownUp className="h-3.5 w-3.5 text-[hsl(var(--pf-muted))]" /></div>
+        <div className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]"><ArrowDownUp className="h-3.5 w-3.5 text-white/40" /></div>
       </div>
-      <div className="rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] p-3">
-        <div className="text-[10px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">
+      <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+        <div className="text-[10px] font-bold uppercase tracking-widest text-white/40">
           {side === "buy" ? `You receive ($${symbol})` : "You receive (SOL)"}
         </div>
-        <div className="mt-1 text-2xl font-black text-[hsl(var(--pf-green-dark))]">
+        <div className="mt-1 text-2xl font-black text-[#F0C75E]">
           {isFetching ? <Loader2 className="h-5 w-5 animate-spin" /> : error ? "—" : outAmount || "0.0"}
         </div>
         {side === "buy" && outAmount && solUsd != null && (
-          <div className="pf-mono text-[10px] text-[hsl(var(--pf-muted))]">≈ {fmtCompactUsd(Number(amount) * solUsd)}</div>
+          <div className="pf-mono text-[10px] text-white/40">≈ {fmtCompactUsd(Number(amount) * solUsd)}</div>
         )}
       </div>
 
       {quote && (
-        <div className="mt-2 flex items-center justify-between pf-mono text-[10px] uppercase tracking-wide text-[hsl(var(--pf-muted))]">
+        <div className="mt-2 flex items-center justify-between pf-mono text-[10px] uppercase tracking-wide text-white/40">
           <span>Price impact</span>
-          <span className={impact != null && impact > 1 ? "text-[hsl(var(--pf-red))]" : "text-[hsl(var(--pf-green-dark))]"}>{impact != null ? fmtPct(impact) : "—"}</span>
+          <span className={impact != null && impact > 1 ? "text-[#ff4d6d]" : "text-[#60A5FA]"}>{impact != null ? fmtPct(impact) : "—"}</span>
         </div>
       )}
 
@@ -332,14 +334,15 @@ function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol
         type="button"
         onClick={execute}
         disabled={!connected || !quote || isFetching || executing || rawAmount === "0"}
-        className={`pf-btn mt-3 w-full justify-center disabled:opacity-50 ${side === "sell" ? "!bg-[hsl(var(--pf-red))] !shadow-[0_3px_0_hsl(0_65%_35%)]" : ""}`}
+        className={`mt-3 w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-black disabled:opacity-50 ${
+          side === "sell" ? "bg-[#ff4d6d] text-white" : "bg-[#D4AF37] text-black"
+        }`}
       >
         {executing
-          ? <><Loader2 className="h-4 w-4 animate-spin" /> Confirm in Phantom…</>
+          ? <><Loader2 className="h-4 w-4 animate-spin" /> Confirm in wallet…</>
           : <><Zap className="h-4 w-4" /> {!connected ? "Connect wallet to trade" : side === "buy" ? `Buy $${symbol}` : `Sell $${symbol}`}</>}
       </button>
-      <p className="mt-2 text-center text-[10px] text-[hsl(var(--pf-muted))]">Live quote via Jupiter · signs in your connected wallet · 1% slippage</p>
-      {!connected && <p className="mt-1 text-center text-[10px] text-[hsl(var(--pf-muted))]"><Wallet className="mr-1 inline h-3 w-3" />Connect via the wallet button up top to see your balance</p>}
+      <p className="mt-2 text-center text-[10px] text-[#A8B0BC]">Live quote via Jupiter · 1% slippage</p>
     </div>
   );
 }
@@ -348,9 +351,9 @@ function BuySellPanel({ mint, symbol, decimals, solUsd }: { mint: string; symbol
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-[hsl(var(--pf-border))] py-2.5 last:border-0">
-      <span className="pf-mono text-[11px] uppercase tracking-wider text-[hsl(var(--pf-muted))]">{label}</span>
-      <span className="text-right pf-mono text-sm font-medium text-[hsl(var(--pf-ink))]">{children}</span>
+    <div className="flex items-center justify-between gap-3 border-b border-white/8 py-2.5 last:border-0">
+      <span className="pf-mono text-[11px] uppercase tracking-wider text-white/40">{label}</span>
+      <span className="text-right pf-mono text-sm font-medium text-white">{children}</span>
     </div>
   );
 }
@@ -358,13 +361,13 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function StatBox({ label, value, tone, href, hint }: { label: string; value: React.ReactNode; tone?: "up" | "down"; href?: string; hint?: string }) {
   const body = (
     <>
-      <div className="flex items-center justify-center gap-1 text-[9px] font-bold uppercase tracking-widest text-[hsl(var(--pf-muted))]">{label}{href ? <ExternalLink className="h-2.5 w-2.5 opacity-50" /> : null}</div>
-      <div className={`mt-1 text-base font-black ${tone === "up" ? "text-[hsl(var(--pf-green-dark))]" : tone === "down" ? "text-[hsl(var(--pf-red))]" : "text-[hsl(var(--pf-ink))]"}`}>{value}</div>
-      {hint ? <div className="mt-0.5 pf-mono text-[8px] uppercase tracking-widest text-[hsl(var(--pf-muted))]">{hint}</div> : null}
+      <div className="ox-tok-stat-label flex items-center gap-1">{label}{href ? <ExternalLink className="h-2.5 w-2.5 opacity-50" /> : null}</div>
+      <div className={`ox-tok-stat-val ${tone === "up" ? "!text-[#60A5FA]" : tone === "down" ? "!text-[#ff4d6d]" : ""}`}>{value}</div>
+      {hint ? <div className="mt-0.5 pf-mono text-[8px] uppercase tracking-widest text-white/30">{hint}</div> : null}
     </>
   );
-  if (href) return <a href={href} target="_blank" rel="noreferrer" className="pf-card block p-3 text-center transition">{body}</a>;
-  return <div className="pf-card p-3 text-center">{body}</div>;
+  if (href) return <a href={href} target="_blank" rel="noreferrer" className="ox-tok-stat block transition">{body}</a>;
+  return <div className="ox-tok-stat">{body}</div>;
 }
 
 /* ═══════════════════════ PAGE ═══════════════════════ */
@@ -480,162 +483,153 @@ export default function LaunchpadToken() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <Link to="/orbitxlaunch" className="mb-4 inline-flex items-center gap-1.5 pf-mono text-xs uppercase tracking-wider text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]"><ArrowLeft className="h-4 w-4" /> Launchpad</Link>
+    <div className="ox-tok">
+      <Link to="/orbitxlaunch" className="mb-4 inline-flex items-center gap-1.5 pf-mono text-xs uppercase tracking-wider text-[#A8B0BC] hover:text-white"><ArrowLeft className="h-4 w-4" /> Launchpad</Link>
 
-      <div className="pf-card p-6">
-        <div className="flex items-start gap-4">
-          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-[hsl(var(--pf-ink))] bg-[hsl(var(--pf-bg))]">
+      <div className="ox-tok-hero relative">
+        <div className="relative flex items-start gap-4">
+          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-[rgba(192,198,210,0.25)] bg-black">
             <TokenLogo src={logo} metadataUri={t?.metadata_uri} symbol={ticker} className="h-full w-full text-xl" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-black tracking-tight text-[hsl(var(--pf-ink))]">{name}</h1>
-              <span className="rounded-full bg-[hsl(var(--pf-ink))/0.06] px-2 py-0.5 pf-mono text-xs font-bold text-[hsl(28_80%_32%)]">${ticker}</span>
+              <h1 className="text-2xl font-black tracking-tight text-white">{name}</h1>
+              <span className="rounded-full border border-[rgba(212,175,55,0.35)] bg-[rgba(212,175,55,0.12)] px-2 py-0.5 pf-mono text-xs font-bold text-[#F0C75E]">${ticker}</span>
               {isOfficial && <Pill tone="gold"><BadgeCheck className="h-3 w-3" /> Official OrbitX token</Pill>}
               {t && <Pill tone={t.launch_type === "pump" ? "cyan" : "gold"}>{t.launch_type === "pump" ? "Pump launch" : "Custom launch"}</Pill>}
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <div className="ox-tok-price mt-3">{fmtPrice(priceUsd)}</div>
+            <div className="ox-tok-chips mt-3">
               {graduated
-                ? <Pill tone="lime"><Droplets className="h-3 w-3" /> Graduated</Pill>
-                : <Pill tone="cyan"><Flame className="h-3 w-3" /> Fresh</Pill>}
+                ? <span className="ox-tok-chip"><Droplets className="h-3 w-3 text-[#F0C75E]" /> Graduated</span>
+                : <span className="ox-tok-chip"><Flame className="h-3 w-3 text-[#60A5FA]" /> Fresh</span>}
+              {ch24 != null && (
+                <span className={`ox-tok-chip ${ch24 >= 0 ? "ox-tok-chip--up" : "ox-tok-chip--down"}`}>
+                  {ch24 >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />} {fmtPct(ch24)} 24h
+                </span>
+              )}
               {t ? (
                 t.is_vamp
-                  ? <Pill tone="blood"><ShieldAlert className="h-3 w-3" /> Vamp · fees → {t.fee_route === "orbitx_buyback" ? "OBX buyback" : t.fee_route}</Pill>
-                  : <Pill tone="muted"><ShieldCheck className="h-3 w-3" /> Verified unique</Pill>
-              ) : jup?.isVerified ? (
-                <Pill tone="muted"><ShieldCheck className="h-3 w-3" /> Verified on Jupiter</Pill>
+                  ? <span className="ox-tok-chip ox-tok-chip--down"><ShieldAlert className="h-3 w-3" /> Vamp</span>
+                  : <span className="ox-tok-chip ox-tok-chip--up"><ShieldCheck className="h-3 w-3" /> Verified</span>
               ) : null}
-              {ch24 != null && (
-                <Pill tone={ch24 >= 0 ? "lime" : "blood"}>{ch24 >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />} {fmtPct(ch24)} 24h</Pill>
-              )}
-              {pairAgeMs != null && <Pill tone="muted">{timeAgo(new Date(Date.now() - pairAgeMs).toISOString())} old pool</Pill>}
+              {pairAgeMs != null && <span className="ox-tok-chip">{timeAgo(new Date(Date.now() - pairAgeMs).toISOString())} old pool</span>}
             </div>
-            {description && <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[hsl(var(--pf-muted))]">{description}</p>}
+            {description && <p className="relative mt-3 max-w-2xl text-sm leading-relaxed text-[#A8B0BC]">{description}</p>}
             {(website || twitter || telegram) && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {website && <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs font-bold text-[hsl(var(--pf-ink))] hover:border-[hsl(var(--pf-green))]"><Globe className="h-3.5 w-3.5" /> Website</a>}
-                {twitter && <a href={twitter} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs font-bold text-[hsl(var(--pf-ink))] hover:border-[hsl(var(--pf-green))]"><Twitter className="h-3.5 w-3.5" /> X / Twitter</a>}
-                {telegram && <a href={telegram} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs font-bold text-[hsl(var(--pf-ink))] hover:border-[hsl(var(--pf-green))]"><Send className="h-3.5 w-3.5" /> Telegram</a>}
+              <div className="relative mt-3 flex flex-wrap gap-2">
+                {website && <a href={website} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(192,198,210,0.2)] px-3 py-1.5 text-xs font-bold text-white hover:border-[#60A5FA]"><Globe className="h-3.5 w-3.5" /> Website</a>}
+                {twitter && <a href={twitter} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(192,198,210,0.2)] px-3 py-1.5 text-xs font-bold text-white hover:border-[#60A5FA]"><Twitter className="h-3.5 w-3.5" /> X / Twitter</a>}
+                {telegram && <a href={telegram} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(192,198,210,0.2)] px-3 py-1.5 text-xs font-bold text-white hover:border-[#60A5FA]"><Send className="h-3.5 w-3.5" /> Telegram</a>}
               </div>
             )}
           </div>
         </div>
 
-        <div className="mt-5 flex items-center gap-2 rounded-lg border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg))] px-3 py-2.5">
-          <Coins className="h-4 w-4 shrink-0 text-[hsl(28_80%_32%)]" />
-          <span className="min-w-0 flex-1 truncate pf-mono text-sm text-[hsl(var(--pf-ink))]">{mint}</span>
-          <button onClick={copy} className="shrink-0 rounded-lg border border-[hsl(var(--pf-border))] p-1.5 hover:bg-[hsl(var(--pf-ink))/0.06]" title="Copy CA">{copied ? <Check className="h-4 w-4 text-[hsl(var(--pf-green-dark))]" /> : <Copy className="h-4 w-4" />}</button>
-          <a href={explorer} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-[hsl(var(--pf-border))] p-1.5 hover:bg-[hsl(var(--pf-ink))/0.06]" title="View on Solscan"><ExternalLink className="h-4 w-4" /></a>
+        <div className="ox-tok-ca relative mt-5">
+          <Coins className="h-4 w-4 shrink-0 text-[#F0C75E]" />
+          <span className="min-w-0 flex-1 truncate pf-mono text-sm text-white">{mint}</span>
+          <button onClick={copy} className="shrink-0 rounded-lg border border-[rgba(192,198,210,0.2)] p-1.5 hover:bg-white/5" title="Copy CA">{copied ? <Check className="h-4 w-4 text-[#60A5FA]" /> : <Copy className="h-4 w-4" />}</button>
+          <a href={explorer} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-[rgba(192,198,210,0.2)] p-1.5 hover:bg-white/5" title="View on Solscan"><ExternalLink className="h-4 w-4" /></a>
         </div>
       </div>
 
-      {/* market stats */}
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="ox-tok-statgrid mt-4">
         <StatBox label="Price" value={fmtPrice(priceUsd)} href={pair?.url} hint="live chart" />
         <StatBox label="Market cap" value={fmtCompactUsd(mcap)} href={pair?.url} hint="dexscreener" />
         <StatBox label="Liquidity" value={fmtCompactUsd(liq)} href={pair?.url} hint="pool" />
         <StatBox label="24h volume" value={fmtCompactUsd(vol24)} href={pair?.url} hint="dexscreener" />
-      </div>
-      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatBox label="24h buys" value={buys ?? "—"} tone="up" />
         <StatBox label="24h sells" value={sells ?? "—"} tone="down" />
         <StatBox label="Holders" value={jup?.holderCount != null ? jup.holderCount.toLocaleString() : "—"} href={explorer} hint="solscan" />
         <StatBox label="Contract" value={shortAddr(mint, 4)} href={explorer} hint="solscan" />
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <div className="pf-card p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <SectionLabel>Orbit Score</SectionLabel>
-            <div className="text-3xl font-black leading-none" style={{ color: os.score >= 75 ? "hsl(var(--pf-green))" : os.score >= 50 ? "hsl(var(--pf-gold))" : "hsl(var(--pf-red))" }}>
-              {os.score}<span className="text-sm text-[hsl(var(--pf-muted))]">/100</span>
-            </div>
-          </div>
-          {scoreRows.map((r) => (
-            <div key={r.label} className="mb-2">
-              <div className="mb-1 flex justify-between pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))]"><span>{r.label}</span><span className="text-[hsl(var(--pf-ink))]">{r.val}%</span></div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[hsl(var(--pf-bg-2))]"><div className="h-full rounded-full bg-[hsl(var(--pf-green))]" style={{ width: `${r.val}%` }} /></div>
-            </div>
-          ))}
-          <p className="mt-2 pf-mono text-[9px] leading-relaxed text-[hsl(var(--pf-muted))]">Computed live from liquidity depth, 24h activity, buy pressure, holder spread and safety flags.</p>
-        </div>
-
-        <div className="pf-card p-4">
-          <SectionLabel>{t?.is_vamp ? "Vamp warning" : "Original token verified"}</SectionLabel>
-          {t ? (
-            <>
-              <div className="mb-3 flex items-center gap-2">
-                {t.is_vamp ? <ShieldAlert className="h-6 w-6 text-[hsl(var(--pf-red))]" /> : <ShieldCheck className="h-6 w-6 text-[hsl(var(--pf-green))]" />}
-                <div className="text-sm font-black text-[hsl(var(--pf-ink))]">{t.is_vamp ? "Flagged as a look-alike clone" : "Protected by OrbitX anti-vamp"}</div>
-              </div>
-              <Row label="Original creator"><Link to={`/orbitxlaunch/creator/${t.creator_wallet}`} className="text-[hsl(var(--pf-blue))] hover:underline">{shortAddr(t.creator_wallet, 5)}</Link></Row>
-              <Row label="Launched">{timeAgo(t.created_at)}</Row>
-              <Row label="Launch type">{t.launch_type === "pump" ? "Bonding curve" : "Custom SPL"}</Row>
-              <Row label="Status">{graduated ? "Graduated" : "Bonding"}</Row>
-            </>
-          ) : (
-            <div className="pt-1 text-xs leading-relaxed text-[hsl(var(--pf-muted))]">External Solana token — not launched through OrbitX, so creator verification and anti-vamp protection don't apply to it.</div>
-          )}
-        </div>
-      </div>
-
-      {!graduated && (
-        <div className="pf-card mt-4 p-4">
-          <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--pf-muted))]">
-            <span>Bonding curve</span>
-            <span className="text-[hsl(var(--pf-green-dark))]">{pct}% to graduation</span>
-          </div>
-          <div className="pf-progress"><div className="pf-progress-fill" style={{ width: `${pct}%` }} /></div>
-        </div>
-      )}
-
-      <div className="mt-4">
-        <ChartPanel pairAddress={pair?.pairAddress ?? null} dexId={pair?.dexId ?? null} />
-      </div>
-
-      <TokenAnalytics mint={mint!} pairAddress={pair?.pairAddress ?? null} holderCount={jup?.holderCount ?? null} />
-
-      <TokenChat mint={mint!} />
-
-      {/* buy / sell + position + details */}
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <div className="ox-tok-layout">
         <div className="space-y-4">
-          <BuySellPanel mint={mint!} symbol={ticker ?? "TOKEN"} decimals={decimals} solUsd={solUsdData ?? null} />
-          <PositionPanel mint={mint!} symbol={ticker ?? "TOKEN"} priceUsd={priceUsd} solUsd={solUsdData ?? null} />
+          {!graduated && (
+            <div className="ox-tok-panel">
+              <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#A8B0BC]">
+                <span>Bonding curve</span>
+                <span className="text-[#60A5FA]">{pct}% to graduation</span>
+              </div>
+              <div className="pf-progress"><div className="pf-progress-fill" style={{ width: `${pct}%` }} /></div>
+            </div>
+          )}
+
+          <ChartPanel pairAddress={pair?.pairAddress ?? null} dexId={pair?.dexId ?? null} />
+          <TokenAnalytics mint={mint!} pairAddress={pair?.pairAddress ?? null} holderCount={jup?.holderCount ?? null} />
+          <TokenChat mint={mint!} />
         </div>
 
-        <div className="pf-card p-6">
-          <SectionLabel>Token details</SectionLabel>
-          <div className="grid gap-x-8 gap-y-0">
+        <aside className="ox-tok-aside space-y-4">
+          <div className="ox-tok-trade ox-tok-panel">
+            <BuySellPanel mint={mint!} symbol={ticker ?? "TOKEN"} decimals={decimals} solUsd={solUsdData ?? null} />
+          </div>
+          <PositionPanel mint={mint!} symbol={ticker ?? "TOKEN"} priceUsd={priceUsd} solUsd={solUsdData ?? null} />
+
+          <div className="ox-tok-panel">
+            <div className="mb-3 flex items-center justify-between">
+              <SectionLabel>Orbit Score</SectionLabel>
+              <div className="text-3xl font-black leading-none" style={{ color: os.score >= 75 ? "#60A5FA" : os.score >= 50 ? "#F0C75E" : "#ff4d6d" }}>
+                {os.score}<span className="text-sm text-[#A8B0BC]">/100</span>
+              </div>
+            </div>
+            {scoreRows.map((r) => (
+              <div key={r.label} className="mb-2">
+                <div className="mb-1 flex justify-between pf-mono text-[10px] uppercase tracking-widest text-[#A8B0BC]"><span>{r.label}</span><span className="text-white">{r.val}%</span></div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#161616]"><div className="h-full rounded-full bg-[#3B82F6]" style={{ width: `${r.val}%` }} /></div>
+              </div>
+            ))}
+          </div>
+
+          <div className="ox-tok-panel">
+            <SectionLabel>{t?.is_vamp ? "Vamp warning" : "Original token verified"}</SectionLabel>
             {t ? (
               <>
-                <Row label="Supply">{Number(t.supply).toLocaleString()}</Row>
-                <Row label="Decimals">{t.decimals}</Row>
-                <Row label="DEX">{pair?.dexId || t.dex || "—"}</Row>
-                <Row label="Fee routing">{t.fee_route === "orbitx_buyback" ? "OBX buyback" : t.fee_route === "og" ? "Original token" : "Creator"}</Row>
-                <Row label="Creator"><Link to={`/orbitxlaunch/creator/${t.creator_wallet}`} className="text-[hsl(var(--pf-blue))] hover:underline">{shortAddr(t.creator_wallet, 5)}</Link></Row>
+                <div className="mb-3 flex items-center gap-2">
+                  {t.is_vamp ? <ShieldAlert className="h-6 w-6 text-[#ff4d6d]" /> : <ShieldCheck className="h-6 w-6 text-[#60A5FA]" />}
+                  <div className="text-sm font-black text-white">{t.is_vamp ? "Flagged as a look-alike clone" : "Protected by OrbitX anti-vamp"}</div>
+                </div>
+                <Row label="Original creator"><Link to={`/orbitxlaunch/creator/${t.creator_wallet}`} className="text-[#60A5FA] hover:underline">{shortAddr(t.creator_wallet, 5)}</Link></Row>
                 <Row label="Launched">{timeAgo(t.created_at)}</Row>
-                {t.lp_pool_address && <Row label="LP pool">{shortAddr(t.lp_pool_address, 5)}</Row>}
-                {t.mint_signature && <Row label="Mint tx"><a className="text-[hsl(var(--pf-blue))] hover:underline" target="_blank" rel="noreferrer" href={`https://solscan.io/tx/${t.mint_signature}${cluster !== "mainnet-beta" ? "?cluster=devnet" : ""}`}>{shortAddr(t.mint_signature, 5)}</a></Row>}
+                <Row label="Launch type">{t.launch_type === "pump" ? "Bonding curve" : "Custom SPL"}</Row>
+                <Row label="Status">{graduated ? "Graduated" : "Bonding"}</Row>
               </>
             ) : (
-              <>
-                <Row label="Decimals">{decimals}</Row>
-                <Row label="Holders">{jup?.holderCount != null ? jup.holderCount.toLocaleString() : "—"}</Row>
-                <Row label="Mint authority">{jup?.audit?.mintAuthorityDisabled ? "Revoked" : "Active"}</Row>
-                <Row label="Freeze authority">{jup?.audit?.freezeAuthorityDisabled ? "Revoked" : "Active"}</Row>
-                <div className="pt-2 text-xs text-[hsl(var(--pf-muted))]">
-                  External Solana token — not launched through OrbitX. Live price and liquidity verified via Jupiter, DexScreener and GeckoTerminal.
-                </div>
-              </>
+              <div className="pt-1 text-xs leading-relaxed text-[#A8B0BC]">External Solana token — not launched through OrbitX.</div>
             )}
-            <div className="flex flex-wrap gap-3 pt-3">
-              {pair?.url && <a href={pair.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 pf-mono text-xs font-bold text-[hsl(var(--pf-blue))] hover:underline">DexScreener <ExternalLink className="h-3 w-3" /></a>}
-              <a href={explorer} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 pf-mono text-xs font-bold text-[hsl(var(--pf-blue))] hover:underline">Solscan <ExternalLink className="h-3 w-3" /></a>
+          </div>
+
+          <div className="ox-tok-panel">
+            <SectionLabel>Token details</SectionLabel>
+            <div className="grid gap-x-8 gap-y-0">
+              {t ? (
+                <>
+                  <Row label="Supply">{Number(t.supply).toLocaleString()}</Row>
+                  <Row label="Decimals">{t.decimals}</Row>
+                  <Row label="DEX">{pair?.dexId || t.dex || "—"}</Row>
+                  <Row label="Fee routing">{t.fee_route === "orbitx_buyback" ? "OBX buyback" : t.fee_route === "og" ? "Original token" : "Creator"}</Row>
+                  <Row label="Creator"><Link to={`/orbitxlaunch/creator/${t.creator_wallet}`} className="text-[#60A5FA] hover:underline">{shortAddr(t.creator_wallet, 5)}</Link></Row>
+                  <Row label="Launched">{timeAgo(t.created_at)}</Row>
+                  {t.lp_pool_address && <Row label="LP pool">{shortAddr(t.lp_pool_address, 5)}</Row>}
+                  {t.mint_signature && <Row label="Mint tx"><a className="text-[#60A5FA] hover:underline" target="_blank" rel="noreferrer" href={`https://solscan.io/tx/${t.mint_signature}${cluster !== "mainnet-beta" ? "?cluster=devnet" : ""}`}>{shortAddr(t.mint_signature, 5)}</a></Row>}
+                </>
+              ) : (
+                <>
+                  <Row label="Decimals">{decimals}</Row>
+                  <Row label="Holders">{jup?.holderCount != null ? jup.holderCount.toLocaleString() : "—"}</Row>
+                  <Row label="Mint authority">{jup?.audit?.mintAuthorityDisabled ? "Revoked" : "Active"}</Row>
+                  <Row label="Freeze authority">{jup?.audit?.freezeAuthorityDisabled ? "Revoked" : "Active"}</Row>
+                </>
+              )}
+              <div className="flex flex-wrap gap-3 pt-3">
+                {pair?.url && <a href={pair.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 pf-mono text-xs font-bold text-[#60A5FA] hover:underline">DexScreener <ExternalLink className="h-3 w-3" /></a>}
+                <a href={explorer} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 pf-mono text-xs font-bold text-[#60A5FA] hover:underline">Solscan <ExternalLink className="h-3 w-3" /></a>
+              </div>
             </div>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   );

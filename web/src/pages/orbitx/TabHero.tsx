@@ -1,4 +1,4 @@
-// Shared page chrome for OrbitX launchpad tabs — Solana purple/green identity.
+// Shared page chrome for OrbitX launchpad tabs — black / metal accents.
 import type { LucideIcon } from "lucide-react";
 
 export function TabHero({
@@ -6,28 +6,27 @@ export function TabHero({
   eyebrow,
   title,
   subtitle,
-  accent = "green",
+  accent = "gold",
   actions,
 }: {
   icon: LucideIcon;
   eyebrow: string;
   title: string;
   subtitle?: string;
-  accent?: "green" | "purple" | "gold" | "red";
+  accent?: "green" | "purple" | "gold" | "red" | "blue";
   actions?: React.ReactNode;
 }) {
   const tone =
-    accent === "purple" ? "#9945FF"
-    : accent === "gold" ? "#F0B429"
+    accent === "blue" || accent === "purple" || accent === "green" ? "#60A5FA"
     : accent === "red" ? "#FF4D6D"
-    : "#14F195";
+    : "#F0C75E";
 
   return (
     <div className="ox-tab-hero mb-5">
-      <div className="ox-tab-hero-glow" style={{ background: `radial-gradient(500px 180px at 0% 0%, ${tone}33, transparent 70%)` }} />
+      <div className="ox-tab-hero-glow" style={{ background: `radial-gradient(500px 180px at 0% 0%, ${tone}28, transparent 70%)` }} />
       <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex min-w-0 flex-1 items-start gap-3.5">
-          <div className="ox-tab-hero-icon" style={{ borderColor: `${tone}66`, color: tone, boxShadow: `0 0 24px -8px ${tone}` }}>
+          <div className="ox-tab-hero-icon" style={{ borderColor: `${tone}66`, color: tone }}>
             <Icon className="h-5 w-5" />
           </div>
           <div className="min-w-0">

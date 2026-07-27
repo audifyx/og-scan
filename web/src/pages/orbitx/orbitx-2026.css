@@ -1,41 +1,54 @@
 /* ============================================================================
-   OrbitX Launchpad — Solana palette (purple #9945FF + green #14F195).
-   Remaps --pf-* / --og-* tokens for the whole /orbitxlaunch/* surface.
+   OrbitX Launchpad — Black / Metal system
+   Black · white · gold · blue · silver. No purple / pump-green chrome.
    Scoped to .lp-classic so nothing else in the app changes.
    ========================================================================== */
 
 .lp-classic {
-  /* Solana brand remap */
-  --pf-bg: 250 40% 4%;
-  --pf-bg-2: 255 32% 8%;
-  --pf-ink: 0 0% 98%;
-  --pf-muted: 250 12% 72%;
-  --pf-border: 263 28% 24%;
-  --pf-green: 158 89% 51%;       /* #14F195 */
-  --pf-green-dark: 158 78% 42%;
-  --pf-red: 356 84% 62%;
-  --pf-gold: 42 92% 60%;
-  --pf-blue: 263 100% 64%;       /* #9945FF */
+  --ox-font-display: "Syne", "Manrope", system-ui, sans-serif;
+  --ox-font-body: "Manrope", system-ui, sans-serif;
+  --ox-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --obx-glass: 255 30% 10%;
-  --obx-glow: 158 89% 51%;
+  --pf-bg: 0 0% 2%;
+  --pf-bg-2: 0 0% 5%;
+  --pf-ink: 0 0% 100%;
+  --pf-muted: 216 12% 68%;
+  --pf-border: 216 12% 28%;
+  --pf-green: 217 91% 60%;       /* blue = "up" */
+  --pf-green-dark: 217 91% 48%;
+  --pf-red: 356 84% 62%;
+  --pf-gold: 43 65% 52%;         /* #D4AF37 */
+  --pf-blue: 217 91% 60%;        /* #3B82F6 */
+
+  --obx-glass: 0 0% 7%;
+  --obx-glow: 43 65% 52%;
+
+  --ox-gold: #D4AF37;
+  --ox-gold-hi: #F0C75E;
+  --ox-blue: #3B82F6;
+  --ox-blue-hi: #60A5FA;
+  --ox-silver: #A8B0BC;
+  --ox-silver-dim: rgba(192, 198, 210, 0.16);
+  --ox-black: #050505;
+  --ox-black-2: #0a0a0a;
 
   position: relative;
-  background: #07040f;
-  color: hsl(var(--pf-ink));
+  background: var(--ox-black);
+  color: #fff;
   isolation: isolate;
+  font-family: var(--ox-font-body);
 }
 
-/* Solana aurora: purple left, green right */
 .lp-classic::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -2;
   background:
-    linear-gradient(180deg, rgba(7, 4, 15, 0.78), rgba(7, 4, 15, 0.92)),
-    url("/orbitx-space-bg.png") center center / cover no-repeat,
-    #07040f;
+    linear-gradient(180deg, rgba(5, 5, 5, 0.88), rgba(5, 5, 5, 0.96)),
+    radial-gradient(900px 500px at 12% -8%, rgba(59, 130, 246, 0.14), transparent 55%),
+    radial-gradient(800px 480px at 92% 0%, rgba(212, 175, 55, 0.1), transparent 55%),
+    #050505;
 }
 .lp-classic::after {
   content: "";
@@ -43,463 +56,186 @@
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(1100px 700px at 8% -10%, hsl(263 100% 40% / 0.32), transparent 58%),
-    radial-gradient(900px 600px at 95% 0%, hsl(158 89% 40% / 0.22), transparent 58%),
-    radial-gradient(900px 700px at 50% 120%, hsl(263 80% 30% / 0.18), transparent 55%),
-    linear-gradient(hsl(263 100% 64% / 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(158 89% 51% / 0.035) 1px, transparent 1px);
-  background-size: auto, auto, auto, 46px 46px, 46px 46px;
-  animation: obxAurora 22s ease-in-out infinite alternate;
-}
-@keyframes obxAurora {
-  0%   { filter: hue-rotate(0deg) brightness(1); }
-  100% { filter: hue-rotate(24deg) brightness(1.12); }
-}
-@keyframes obxGridDrift {
-  0%   { background-position: 0 0, 0 0; }
-  100% { background-position: 46px 92px, 92px 46px; }
+    linear-gradient(rgba(168, 176, 188, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 176, 188, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  opacity: 0.55;
 }
 
-/* ---- glass panels ---- */
+.lp-classic .pf-mono,
+.lp-classic .ox-brand-sub,
+.lp-classic .ox-coin-ticker,
+.lp-classic .ox-coin-stats,
+.lp-classic .ox-board-col-count,
+.lp-classic .ox-tok-price,
+.lp-classic .ox-tok-stat-val,
+.lp-classic .ox-tok-stat-label,
+.lp-classic .ox-tok-chip,
+.lp-classic .ox-wallet-exit {
+  font-family: var(--ox-font-mono);
+}
+
+.lp-classic .ox-brand-name,
+.lp-classic .ox-board-col-head h2,
+.lp-classic .ox-tab,
+.lp-classic .ox-create-cta,
+.lp-classic h1, .lp-classic h2 {
+  font-family: var(--ox-font-display);
+}
+
+/* ---- panels ---- */
 .lp-classic .pf-card {
-  background: linear-gradient(180deg, hsl(var(--obx-glass) / 0.55), hsl(220 30% 6% / 0.7));
-  border: 1px solid hsl(var(--pf-border) / 0.7);
-  border-radius: 16px;
-  box-shadow: 0 8px 40px -18px hsl(152 86% 40% / 0.35), inset 0 1px 0 hsl(0 0% 100% / 0.05);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  transition: border-color .25s ease, box-shadow .25s ease, transform .25s ease;
+  background: linear-gradient(180deg, rgba(14, 14, 14, 0.95), rgba(8, 8, 8, 0.98));
+  border: 1px solid var(--ox-silver-dim);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
 }
 .lp-classic a.pf-card:hover,
 .lp-classic .pf-card.group:hover {
-  border-color: hsl(var(--pf-green) / 0.6);
-  box-shadow: 0 14px 50px -18px hsl(152 86% 50% / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.06);
-  transform: translateY(-2px);
+  border-color: rgba(212, 175, 55, 0.45);
+  box-shadow: 0 12px 40px -20px rgba(212, 175, 55, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: translateY(-1px);
 }
 
-/* ---- neon buttons ---- */
+/* ---- buttons ---- */
 .lp-classic .pf-btn {
-  border: 1px solid hsl(var(--pf-green) / 0.65);
-  background: linear-gradient(180deg, hsl(152 86% 52%), hsl(152 80% 40%));
-  color: #04120b;
-  border-radius: 12px;
+  border: 1px solid var(--ox-gold);
+  background: linear-gradient(180deg, var(--ox-gold-hi), var(--ox-gold));
+  color: #0a0a0a;
+  border-radius: 10px;
   font-weight: 800;
-  box-shadow: 0 0 0 1px hsl(152 86% 52% / 0.25), 0 10px 30px -12px hsl(152 86% 52% / 0.7);
-  transition: transform .15s ease, box-shadow .2s ease, filter .2s ease;
+  font-family: var(--ox-font-display);
+  box-shadow: 0 8px 28px -12px rgba(212, 175, 55, 0.65);
+  transition: transform .15s ease, filter .2s ease;
 }
-.lp-classic .pf-btn:hover { filter: brightness(1.08); box-shadow: 0 0 0 1px hsl(152 86% 52% / 0.4), 0 14px 40px -12px hsl(152 86% 52% / 0.85); }
+.lp-classic .pf-btn:hover { filter: brightness(1.06); }
 .lp-classic .pf-btn:active { transform: translateY(1px); }
 .lp-classic .pf-btn-ghost {
-  border: 1px solid hsl(var(--pf-border));
-  background: hsl(var(--obx-glass) / 0.4);
-  color: hsl(var(--pf-ink));
-  border-radius: 12px;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  border: 1px solid var(--ox-silver-dim);
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  border-radius: 10px;
   box-shadow: none;
 }
-.lp-classic .pf-btn-ghost:hover { border-color: hsl(var(--pf-green) / 0.6); color: hsl(var(--pf-green)); }
+.lp-classic .pf-btn-ghost:hover { border-color: rgba(96, 165, 250, 0.5); color: var(--ox-blue-hi); }
 
-/* ---- tab bar ---- */
 .lp-classic .pf-nav-link {
   border: 1px solid transparent;
-  border-radius: 10px;
-  color: #ffffff;
+  border-radius: 8px;
+  color: var(--ox-silver);
   padding: 0.4rem 0.75rem;
   font-weight: 700;
-  transition: all .2s ease;
 }
-.lp-classic .pf-nav-link:hover { color: hsl(var(--pf-ink)); background: hsl(var(--obx-glass) / 0.5); }
+.lp-classic .pf-nav-link:hover { color: #fff; background: rgba(255, 255, 255, 0.04); }
 .lp-classic .pf-nav-link.active {
-  color: hsl(152 90% 60%);
-  background: hsl(152 86% 52% / 0.12);
-  border-color: hsl(152 86% 52% / 0.45);
-  box-shadow: 0 0 22px -6px hsl(152 86% 52% / 0.6);
+  color: var(--ox-gold-hi);
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.35);
 }
 
-/* ---- pills: fix dark-mode contrast ---- */
-.lp-classic .pf-pill { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-radius: 9999px; }
-.lp-classic .pf-pill--gold { background: hsl(var(--pf-gold) / 0.16); color: hsl(var(--pf-gold)); border-color: hsl(var(--pf-gold) / 0.55); }
-.lp-classic .pf-pill--green { background: hsl(var(--pf-green) / 0.16); color: hsl(152 90% 62%); border-color: hsl(var(--pf-green) / 0.5); }
+.lp-classic .pf-pill { border-radius: 9999px; }
+.lp-classic .pf-pill--gold { background: rgba(212, 175, 55, 0.14); color: var(--ox-gold-hi); border-color: rgba(212, 175, 55, 0.45); }
+.lp-classic .pf-pill--green { background: rgba(59, 130, 246, 0.14); color: var(--ox-blue-hi); border-color: rgba(59, 130, 246, 0.4); }
 
-/* keep tailwind dark utilities dark inside the launchpad (undo classic flips) */
-.lp-classic [class*="bg-black"] { background-color: hsl(220 30% 6% / 0.6) !important; }
-.lp-classic [class*="border-white"] { border-color: hsl(var(--pf-border) / 0.6) !important; }
-.lp-classic [class*="text-white"] { color: hsl(var(--pf-ink)) !important; }
+.lp-classic [class*="bg-black"] { background-color: var(--ox-black-2) !important; }
+.lp-classic [class*="border-white"] { border-color: var(--ox-silver-dim) !important; }
+.lp-classic [class*="text-white"] { color: #fff !important; }
 
-/* progress bar → neon */
-.lp-classic .pf-progress { background: hsl(220 30% 14%); border-color: hsl(var(--pf-border)); }
-.lp-classic .pf-progress-fill { background: linear-gradient(90deg, hsl(152 86% 44%), hsl(152 90% 60%)); box-shadow: 0 0 16px hsl(152 86% 52% / 0.7); }
+.lp-classic .pf-progress { background: #161616; border-color: var(--ox-silver-dim); }
+.lp-classic .pf-progress-fill {
+  background: linear-gradient(90deg, var(--ox-blue), var(--ox-gold));
+  box-shadow: none;
+}
+.lp-classic .pf-progress-fill.is-complete {
+  background: linear-gradient(90deg, var(--ox-gold), var(--ox-gold-hi));
+}
 
-/* header + footer glass */
 .lp-classic .obx-header {
-  background: hsl(220 32% 6% / 0.72);
-  border-bottom: 1px solid hsl(var(--pf-border) / 0.6);
+  background: rgba(5, 5, 5, 0.9);
+  border-bottom: 1px solid var(--ox-silver-dim);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
 }
 .lp-classic .obx-brand-badge {
-  background: radial-gradient(circle at 30% 25%, hsl(152 90% 60%), hsl(152 80% 34%));
-  border: 1px solid hsl(152 86% 60% / 0.6);
-  box-shadow: 0 0 22px -4px hsl(152 86% 52% / 0.8);
+  background: linear-gradient(135deg, var(--ox-gold-hi), var(--ox-gold));
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  box-shadow: 0 0 18px -6px rgba(212, 175, 55, 0.55);
 }
-
-/* ---- hero ---- */
 .lp-classic .obx-hero {
-  position: relative;
-  overflow: hidden;
-  border-radius: 24px;
-  border: 1px solid hsl(var(--pf-border) / 0.6);
-  background: linear-gradient(135deg, hsl(210 40% 10% / 0.6), hsl(220 40% 5% / 0.75));
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 30px 90px -40px hsl(152 86% 40% / 0.5);
+  border-radius: 18px;
+  border: 1px solid var(--ox-silver-dim);
+  background: linear-gradient(135deg, #0e0e0e, #080808);
 }
 .lp-classic .obx-gradient-text {
-  background: linear-gradient(120deg, #ffffff 0%, hsl(152 90% 66%) 45%, hsl(42 92% 66%) 100%);
+  background: linear-gradient(120deg, #fff 0%, var(--ox-silver) 40%, var(--ox-gold-hi) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
-.lp-classic .obx-globe {
-  filter: drop-shadow(0 0 60px hsl(152 86% 45% / 0.55)) drop-shadow(0 0 120px hsl(190 90% 45% / 0.35));
-  animation: obxFloat 7s ease-in-out infinite;
-}
-@keyframes obxFloat {
-  0%, 100% { transform: translateY(-6px) rotate(-0.5deg); }
-  50%      { transform: translateY(10px) rotate(0.5deg); }
-}
-.lp-classic .obx-glow-ring {
-  position: absolute;
-  border-radius: 9999px;
-  background: radial-gradient(circle, hsl(152 86% 50% / 0.35), transparent 70%);
-  filter: blur(30px);
-  animation: obxPulse 6s ease-in-out infinite;
-}
-@keyframes obxPulse { 0%,100% { opacity: .6; transform: scale(1);} 50% { opacity: 1; transform: scale(1.08);} }
-
-/* chart chrome */
-.lp-classic .obx-chart-frame { border-radius: 12px; overflow: hidden; border: 1px solid hsl(var(--pf-border) / 0.6); background: #06090f; }
-
-@media (prefers-reduced-motion: reduce) {
-  .lp-classic::before, .lp-classic::after, .lp-classic .obx-globe, .lp-classic .obx-glow-ring { animation: none; }
+.lp-classic .obx-chart-frame {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ox-silver-dim);
+  background: #000;
 }
 
-/* ============================================================================
-   Premium polish pass — top-tier finish across the launchpad.
-   ========================================================================== */
-
-/* smoother images + selects */
 .lp-classic img { image-rendering: auto; }
-.lp-classic ::selection { background: hsl(152 86% 52% / 0.3); color: #fff; }
-
-/* thin neon scrollbars */
+.lp-classic ::selection { background: rgba(59, 130, 246, 0.35); color: #fff; }
 .lp-classic *::-webkit-scrollbar { width: 8px; height: 8px; }
 .lp-classic *::-webkit-scrollbar-track { background: transparent; }
 .lp-classic *::-webkit-scrollbar-thumb {
-  background: linear-gradient(hsl(152 86% 40% / 0.6), hsl(190 92% 45% / 0.5));
-  border-radius: 9999px;
+  background: linear-gradient(var(--ox-silver), rgba(59, 130, 246, 0.45));
+  border-radius: 999px;
 }
-.lp-classic *::-webkit-scrollbar-thumb:hover { background: hsl(152 86% 52% / 0.8); }
-
-/* card sheen + smoother hover on every glass panel */
-.lp-classic .pf-card { position: relative; overflow: hidden; }
-.lp-classic .pf-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(140deg, hsl(0 0% 100% / 0.12), transparent 40%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-  opacity: 0.7;
-}
-
-/* section labels get a neon tick */
-.lp-classic h2 { position: relative; }
-
-/* stat tiles (home) — lift + glow on hover */
-.lp-classic .pf-card.p-3,
-.lp-classic .pf-card.p-4 { transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
-.lp-classic a.pf-card:hover { transform: translateY(-2px); }
-
-/* buttons: sweeping shine on hover */
-.lp-classic .pf-btn { position: relative; overflow: hidden; }
-.lp-classic .pf-btn::after {
-  content: "";
-  position: absolute;
-  top: 0; left: -120%;
-  width: 60%; height: 100%;
-  background: linear-gradient(100deg, transparent, hsl(0 0% 100% / 0.35), transparent);
-  transform: skewX(-18deg);
-  transition: left .5s ease;
-}
-.lp-classic .pf-btn:hover::after { left: 130%; }
-
-/* headings crisp */
-.lp-classic h1, .lp-classic h2, .lp-classic h3 { -webkit-font-smoothing: antialiased; letter-spacing: -0.01em; }
-
-/* network ticker → glass */
-.lp-classic .pf-ticker {
-  background: hsl(220 32% 6% / 0.6);
-  border-bottom: 1px solid hsl(var(--pf-border) / 0.5);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-}
-
-/* inputs → dark glass */
-.lp-classic input {
-  background: hsl(220 30% 8% / 0.6) !important;
-  border-color: hsl(var(--pf-border) / 0.7) !important;
-  color: hsl(var(--pf-ink)) !important;
-}
-.lp-classic input:focus { border-color: hsl(var(--pf-green) / 0.6) !important; box-shadow: 0 0 0 3px hsl(152 86% 52% / 0.12); }
 
 /* ============================================================================
-   Bring the lpx-* HUD components (Create / Choose / Rescue / Claim / Terminal)
-   into the same premium glass language as the rest of the launchpad.
+   AUTHORITATIVE contrast lock — metal palette pinned
    ========================================================================== */
-.lp-classic .lpx-panel {
-  background: linear-gradient(180deg, hsl(var(--obx-glass) / 0.55), hsl(220 30% 6% / 0.7)) !important;
-  border: 1px solid hsl(var(--pf-border) / 0.7) !important;
-  border-radius: 16px !important;
-  box-shadow: 0 8px 40px -18px hsl(152 86% 40% / 0.35), inset 0 1px 0 hsl(0 0% 100% / 0.05) !important;
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-}
-.lp-classic .lpx-panel::before,
-.lp-classic .lpx-panel::after { display: none !important; }
-.lp-classic .lpx-panel--gold {
-  border-color: hsl(var(--pf-gold) / 0.4) !important;
-  box-shadow: 0 8px 40px -18px hsl(42 90% 45% / 0.38), inset 0 1px 0 hsl(0 0% 100% / 0.05) !important;
-}
-.lp-classic .lpx-panel--hot { border-color: hsl(var(--pf-green) / 0.45) !important; }
-.lp-classic .lpx-panel-title { color: hsl(var(--pf-muted)) !important; letter-spacing: 0.02em; }
+.lp-classic.lp-classic {
+  --pf-bg: 0 0% 2%;
+  --pf-bg-2: 0 0% 5%;
+  --pf-ink: 0 0% 100%;
+  --pf-muted: 216 12% 68%;
+  --pf-border: 216 12% 28%;
+  --pf-green: 217 91% 60%;
+  --pf-green-dark: 217 91% 48%;
+  --pf-red: 356 84% 62%;
+  --pf-gold: 43 65% 52%;
+  --pf-blue: 217 91% 60%;
 
-/* primary HUD buttons → neon gradient (keep any per-button accent border) */
-.lp-classic .lpx-btn {
-  background: linear-gradient(180deg, hsl(152 86% 52%), hsl(152 80% 40%)) !important;
-  color: #04120b !important;
-  border-radius: 12px !important;
-  font-weight: 800 !important;
-  box-shadow: 0 10px 30px -12px hsl(152 86% 52% / 0.6) !important;
-  position: relative;
-  overflow: hidden;
-}
-.lp-classic .lpx-btn:hover { filter: brightness(1.08); }
-.lp-classic .lpx-btn::after {
-  content: "";
-  position: absolute; top: 0; left: -120%;
-  width: 60%; height: 100%;
-  background: linear-gradient(100deg, transparent, hsl(0 0% 100% / 0.35), transparent);
-  transform: skewX(-18deg);
-  transition: left .5s ease;
-}
-.lp-classic .lpx-btn:hover::after { left: 130%; }
-.lp-classic .lpx-btn--gold {
-  background: linear-gradient(180deg, hsl(42 92% 60%), hsl(42 86% 48%)) !important;
-  color: #150e02 !important;
-}
+  --background: 0 0% 2%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 5%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 5%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 43 65% 52%;
+  --primary-foreground: 0 0% 5%;
+  --secondary: 217 40% 14%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 216 12% 68%;
+  --accent: 217 40% 14%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 356 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 216 12% 22%;
+  --input: 0 0% 10%;
+  --ring: 43 65% 52%;
 
-/* re-enable neon glow text in the dark theme (classic had killed it) */
-.lp-classic .lpx-glow { text-shadow: 0 0 8px hsl(var(--pf-green) / 0.75), 0 0 28px hsl(var(--pf-green) / 0.35) !important; }
-.lp-classic .lpx-glow-gold { text-shadow: 0 0 8px hsl(var(--pf-gold) / 0.7), 0 0 24px hsl(var(--pf-gold) / 0.32) !important; }
-.lp-classic .lpx-count { color: hsl(var(--pf-green)) !important; text-shadow: 0 0 18px hsl(152 86% 52% / 0.5); }
-.lp-classic .lpx-term { border-radius: 12px; }
+  --og-lime: 217 91% 60%;
+  --og-gold: 43 65% 52%;
+  --og-cyan: 217 91% 60%;
+  --og-blood: 356 84% 62%;
 
-/* og-glass-card (Profile / Rescue empty states) → match glass */
-.lp-classic .og-glass-card,
-.lp-classic .og-glass-frame {
-  background: linear-gradient(180deg, hsl(var(--obx-glass) / 0.5), hsl(220 30% 6% / 0.68)) !important;
-  border: 1px solid hsl(var(--pf-border) / 0.7) !important;
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  border-radius: 16px !important;
-}
-
-/* animated gradient sheen on the hero border */
-.lp-classic .obx-hero::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: 24px;
-  padding: 1px;
-  background: linear-gradient(120deg, hsl(152 86% 52% / 0.5), transparent 30%, transparent 70%, hsl(42 92% 60% / 0.4));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-
-/* shadcn buttons/inputs inside launchpad get sensible dark defaults */
-.lp-classic button[class*="border-white"] { border-color: hsl(var(--pf-border) / 0.7) !important; }
-
-/* ============================================================================
-   Launch wizard — premium step nav + accents to match the glass theme.
-   ========================================================================== */
-.lp-classic .lpx-step {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 0.8rem;
-  border-radius: 12px;
-  border: 1px solid hsl(var(--pf-border) / 0.6);
-  background: hsl(var(--obx-glass) / 0.35);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  transition: border-color .2s ease, box-shadow .2s ease, transform .15s ease, background .2s ease;
-}
-.lp-classic .lpx-step:hover { border-color: hsl(var(--pf-green) / 0.4); transform: translateY(-1px); }
-.lp-classic .lpx-step[data-on="true"] {
-  border-color: hsl(var(--pf-green) / 0.55);
-  background: hsl(152 86% 52% / 0.1);
-  box-shadow: 0 0 22px -6px hsl(152 86% 52% / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.05);
-}
-.lp-classic .lpx-step .idx {
-  font-family: ui-monospace, monospace;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: hsl(var(--pf-muted));
-}
-.lp-classic .lpx-step[data-on="true"] .idx { color: hsl(152 90% 60%); }
-.lp-classic .lpx-led {
-  height: 7px; width: 7px; border-radius: 9999px;
-  background: hsl(var(--pf-green));
-  box-shadow: 0 0 8px hsl(var(--pf-green));
-  animation: obxPulse 2.4s ease-in-out infinite;
-}
-.lp-classic .lpx-sweep {
-  position: absolute; inset: 0;
-  background: linear-gradient(120deg, transparent, hsl(152 86% 52% / 0.06), transparent);
-  pointer-events: none;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   CONTRAST GUARANTEE v2 (theme-wide, every launchpad route)
-   Rule: NEVER dark-on-dark or light-on-light.
-   → light text on dark surfaces, dark text on bright surfaces.
-   Accent colors (green/red/gold/cyan) are preserved.
-   ══════════════════════════════════════════════════════════════ */
-
-/* 0) Base — anything with no explicit color inherits readable light text. */
-.lp-classic { color: hsl(var(--pf-ink)); }
-
-/* 1) Hardcoded DARK text utilities are invisible on the dark theme → force light.
-      (Overridden again by rule 3 when they sit on a bright surface.) */
-.lp-classic [class~="text-black"],
-.lp-classic [class*="text-gray-4"], .lp-classic [class*="text-gray-5"], .lp-classic [class*="text-gray-6"],
-.lp-classic [class*="text-gray-7"], .lp-classic [class*="text-gray-8"], .lp-classic [class*="text-gray-9"],
-.lp-classic [class*="text-slate-5"], .lp-classic [class*="text-slate-6"], .lp-classic [class*="text-slate-7"],
-.lp-classic [class*="text-slate-8"], .lp-classic [class*="text-slate-9"],
-.lp-classic [class*="text-zinc-5"], .lp-classic [class*="text-zinc-6"], .lp-classic [class*="text-zinc-7"],
-.lp-classic [class*="text-zinc-8"], .lp-classic [class*="text-zinc-9"],
-.lp-classic [class*="text-neutral-5"], .lp-classic [class*="text-neutral-6"], .lp-classic [class*="text-neutral-7"],
-.lp-classic [class*="text-neutral-8"], .lp-classic [class*="text-neutral-9"],
-.lp-classic [class*="text-stone-5"], .lp-classic [class*="text-stone-6"], .lp-classic [class*="text-stone-7"],
-.lp-classic [class*="text-stone-8"], .lp-classic [class*="text-stone-9"] {
+  background: #050505 !important;
   color: #ffffff !important;
 }
 
-/* 2) SOLID BRIGHT surfaces (opaque only — [class~=] ignores /10 /15 translucent
-      variants) get DARK text on themselves and every descendant, so nothing is
-      light-on-light. This also corrects any text-black flipped by rule 1. */
-.lp-classic [class~="bg-white"],
-.lp-classic [class~="bg-gray-50"], .lp-classic [class~="bg-gray-100"], .lp-classic [class~="bg-gray-200"],
-.lp-classic [class~="bg-slate-50"], .lp-classic [class~="bg-slate-100"], .lp-classic [class~="bg-slate-200"],
-.lp-classic [class~="bg-zinc-50"], .lp-classic [class~="bg-zinc-100"], .lp-classic [class~="bg-neutral-100"],
-.lp-classic [class~="bg-[hsl(var(--og-gold))]"], .lp-classic [class~="bg-[hsl(var(--pf-gold))]"],
-.lp-classic [class~="bg-[hsl(var(--og-lime))]"], .lp-classic [class~="bg-[hsl(var(--pf-green))]"],
-.lp-classic [class~="bg-[hsl(var(--pf-green-dark))]"], .lp-classic [class~="bg-[hsl(var(--og-cyan))]"],
-.lp-classic [class~="bg-[hsl(var(--pf-blue))]"] {
-  color: #0a0f14 !important;
-}
-.lp-classic [class~="bg-white"] *, .lp-classic [class~="bg-gray-50"] *,
-.lp-classic [class~="bg-gray-100"] *, .lp-classic [class~="bg-gray-200"] *,
-.lp-classic [class~="bg-slate-50"] *, .lp-classic [class~="bg-slate-100"] *,
-.lp-classic [class~="bg-zinc-50"] *, .lp-classic [class~="bg-zinc-100"] *,
-.lp-classic [class~="bg-neutral-100"] *,
-.lp-classic [class~="bg-[hsl(var(--og-gold))]"] *, .lp-classic [class~="bg-[hsl(var(--pf-gold))]"] *,
-.lp-classic [class~="bg-[hsl(var(--og-lime))]"] *, .lp-classic [class~="bg-[hsl(var(--pf-green))]"] *,
-.lp-classic [class~="bg-[hsl(var(--pf-green-dark))]"] *, .lp-classic [class~="bg-[hsl(var(--og-cyan))]"] *,
-.lp-classic [class~="bg-[hsl(var(--pf-blue))]"] * {
-  color: #0a0f14 !important;
-}
-
-/* 3) Legacy HUD utility classes on the dark theme. */
-.lp-classic [class*="bg-black"] { background-color: hsl(var(--pf-bg-2)) !important; }
-.lp-classic [class*="text-white"] { color: #ffffff !important; }
-
-/* 4) Inputs / textareas / selects — readable value + placeholder text. */
-.lp-classic input, .lp-classic textarea, .lp-classic select {
-  color: hsl(var(--pf-ink)) !important;
-}
-.lp-classic input::placeholder, .lp-classic textarea::placeholder {
-  color: hsl(var(--pf-muted)) !important;
-  opacity: 1;
-}
-
-/* ============================================================================
-   AUTHORITATIVE DARK THEME + CONTRAST LOCK (v3)
-   The launchpad had two competing .lp-classic definitions (a legacy light
-   "classic" theme in index.css and this 2026 dark redesign). Bundler load
-   order made the winner nondeterministic per-property, producing dark-on-dark
-   and light-on-light text across every route. This block is scoped to
-   .lp-classic.lp-classic so it ALWAYS wins on specificity, pinning the whole
-   /orbitxlaunch/* surface to a single dark theme and remapping EVERY design
-   system token so all current and future components inherit readable colors.
-   Rule: light text on dark surfaces, dark text on bright surfaces.
-   Never dark-on-dark, never light-on-light.
-   ========================================================================== */
-.lp-classic.lp-classic {
-  /* Solana palette (pinned) */
-  --pf-bg: 250 40% 4%;
-  --pf-bg-2: 255 32% 8%;
-  --pf-ink: 0 0% 98%;
-  --pf-muted: 250 12% 72%;
-  --pf-border: 263 28% 24%;
-  --pf-green: 158 89% 51%;
-  --pf-green-dark: 158 78% 42%;
-  --pf-red: 356 84% 62%;
-  --pf-gold: 42 92% 60%;
-  --pf-blue: 263 100% 64%;
-
-  /* shadcn / design-system semantic tokens (dark) */
-  --background: 250 40% 4%;
-  --foreground: 0 0% 98%;
-  --card: 255 32% 8%;
-  --card-foreground: 0 0% 98%;
-  --popover: 255 32% 7%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 158 89% 51%;
-  --primary-foreground: 250 40% 6%;
-  --secondary: 263 40% 14%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 255 24% 14%;
-  --muted-foreground: 250 12% 70%;
-  --accent: 263 40% 16%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 356 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 263 28% 24%;
-  --input: 255 24% 16%;
-  --ring: 158 89% 51%;
-
-  /* neon accents */
-  --og-lime: 158 89% 51%;
-  --og-gold: 42 92% 60%;
-  --og-cyan: 263 100% 64%;
-  --og-blood: 356 84% 62%;
-
-  background: #07040f !important;
-  color: hsl(var(--pf-ink)) !important;
-}
-
-/* 1) DARK text utilities are invisible on the dark theme -> force light.
-      (bright-surface rule below overrides this again where needed.) */
 .lp-classic.lp-classic [class*="text-black"],
 .lp-classic.lp-classic [class*="text-gray-4"], .lp-classic.lp-classic [class*="text-gray-5"],
 .lp-classic.lp-classic [class*="text-gray-6"], .lp-classic.lp-classic [class*="text-gray-7"],
@@ -516,24 +252,17 @@
 .lp-classic.lp-classic [class*="text-stone-4"], .lp-classic.lp-classic [class*="text-stone-5"],
 .lp-classic.lp-classic [class*="text-stone-6"], .lp-classic.lp-classic [class*="text-stone-7"],
 .lp-classic.lp-classic [class*="text-stone-8"], .lp-classic.lp-classic [class*="text-stone-9"] {
-  color: #eef4f2 !important;
+  color: #f5f5f5 !important;
 }
-
-/* 2) Legacy HUD utilities on the dark theme. */
-.lp-classic.lp-classic [class*="bg-black"] { background-color: hsl(var(--pf-bg-2)) !important; }
+.lp-classic.lp-classic [class*="bg-black"] { background-color: #0a0a0a !important; }
 .lp-classic.lp-classic [class*="text-white"] { color: #ffffff !important; }
-.lp-classic.lp-classic [class*="border-white"] { border-color: hsl(var(--pf-border) / 0.6) !important; }
-
-/* 3) Inputs / textareas / selects — readable value + placeholder. */
+.lp-classic.lp-classic [class*="border-white"] { border-color: rgba(192, 198, 210, 0.16) !important; }
 .lp-classic.lp-classic input,
 .lp-classic.lp-classic textarea,
-.lp-classic.lp-classic select { color: hsl(var(--pf-ink)) !important; }
+.lp-classic.lp-classic select { color: #fff !important; }
 .lp-classic.lp-classic input::placeholder,
-.lp-classic.lp-classic textarea::placeholder { color: hsl(var(--pf-muted)) !important; opacity: 1; }
+.lp-classic.lp-classic textarea::placeholder { color: var(--ox-silver) !important; opacity: 0.75; }
 
-/* 4) BRIGHT OPAQUE surfaces get DARK text on themselves AND every descendant.
-      Declared LAST so it always wins -> nothing is ever light-on-light.
-      Uses [class~=] (exact token) so translucent /10 /15 variants are ignored. */
 .lp-classic.lp-classic [class~="bg-white"],
 .lp-classic.lp-classic [class~="bg-gray-50"], .lp-classic.lp-classic [class~="bg-gray-100"],
 .lp-classic.lp-classic [class~="bg-gray-200"], .lp-classic.lp-classic [class~="bg-gray-300"],
@@ -544,16 +273,12 @@
 .lp-classic.lp-classic [class~="bg-neutral-200"], .lp-classic.lp-classic [class~="bg-stone-100"],
 .lp-classic.lp-classic [class~="bg-yellow-300"], .lp-classic.lp-classic [class~="bg-yellow-400"],
 .lp-classic.lp-classic [class~="bg-amber-300"], .lp-classic.lp-classic [class~="bg-amber-400"],
-.lp-classic.lp-classic [class~="bg-lime-300"], .lp-classic.lp-classic [class~="bg-lime-400"],
-.lp-classic.lp-classic [class~="bg-green-400"], .lp-classic.lp-classic [class~="bg-green-500"],
-.lp-classic.lp-classic [class~="bg-emerald-400"], .lp-classic.lp-classic [class~="bg-cyan-300"],
-.lp-classic.lp-classic [class~="bg-cyan-400"],
 .lp-classic.lp-classic [class~="bg-[hsl(var(--og-gold))]"], .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-gold))]"],
 .lp-classic.lp-classic [class~="bg-[hsl(var(--og-lime))]"], .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-green))]"],
 .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-green-dark))]"], .lp-classic.lp-classic [class~="bg-[hsl(var(--og-cyan))]"],
 .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-blue))]"], .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-ink))]"],
 .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-muted))]"] {
-  color: #0a0f14 !important;
+  color: #0a0a0a !important;
 }
 .lp-classic.lp-classic [class~="bg-white"] *, .lp-classic.lp-classic [class~="bg-gray-50"] *,
 .lp-classic.lp-classic [class~="bg-gray-100"] *, .lp-classic.lp-classic [class~="bg-gray-200"] *,
@@ -565,73 +290,101 @@
 .lp-classic.lp-classic [class~="bg-stone-100"] *,
 .lp-classic.lp-classic [class~="bg-yellow-300"] *, .lp-classic.lp-classic [class~="bg-yellow-400"] *,
 .lp-classic.lp-classic [class~="bg-amber-300"] *, .lp-classic.lp-classic [class~="bg-amber-400"] *,
-.lp-classic.lp-classic [class~="bg-lime-300"] *, .lp-classic.lp-classic [class~="bg-lime-400"] *,
-.lp-classic.lp-classic [class~="bg-green-400"] *, .lp-classic.lp-classic [class~="bg-green-500"] *,
-.lp-classic.lp-classic [class~="bg-emerald-400"] *, .lp-classic.lp-classic [class~="bg-cyan-300"] *,
-.lp-classic.lp-classic [class~="bg-cyan-400"] *,
 .lp-classic.lp-classic [class~="bg-[hsl(var(--og-gold))]"] *, .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-gold))]"] *,
 .lp-classic.lp-classic [class~="bg-[hsl(var(--og-lime))]"] *, .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-green))]"] *,
 .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-green-dark))]"] *, .lp-classic.lp-classic [class~="bg-[hsl(var(--og-cyan))]"] *,
 .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-blue))]"] *, .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-ink))]"] *,
 .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-muted))]"] * {
-  color: #0a0f14 !important;
+  color: #0a0a0a !important;
 }
 
-/* ── Pump-style live board ─────────────────────────────────────────────── */
+/* ── Board ─────────────────────────────────────────────────────────────── */
 .lp-classic .ox-tri-board {
-  min-height: calc(100vh - 180px);
-  gap: 10px;
+  min-height: calc(100vh - 220px);
+  gap: 12px;
 }
 .lp-classic .ox-board-col {
-  max-height: calc(100vh - 180px);
-  background: linear-gradient(180deg, hsl(255 32% 9% / 0.95), hsl(250 40% 5% / 0.9));
-  border-radius: 18px;
-  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04), 0 16px 40px -28px hsl(263 100% 40% / 0.45);
-}
-.lp-classic .ox-board-col > div {
-  overscroll-behavior: contain;
-}
-.lp-classic a.ox-coin {
-  background: linear-gradient(135deg, hsl(255 28% 10%), hsl(250 35% 7%));
+  display: flex;
+  min-height: 0;
+  max-height: calc(100vh - 220px);
+  flex-direction: column;
   border-radius: 14px;
-  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.04);
+  border: 1px solid var(--ox-silver-dim);
+  background: linear-gradient(180deg, #0c0c0c, #080808);
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
-.lp-classic a.ox-coin:hover {
-  background: linear-gradient(135deg, hsl(255 30% 13%), hsl(263 40% 10%));
-  box-shadow: 0 0 0 1px hsl(158 89% 51% / 0.4), 0 12px 32px -16px hsl(158 89% 51% / 0.5);
-  transform: translateY(-1px);
+.lp-classic .ox-board-col--live { border-color: rgba(59, 130, 246, 0.4); }
+.lp-classic .ox-board-col--graduating { border-color: rgba(212, 175, 55, 0.4); }
+.lp-classic .ox-board-col--graduated { border-color: rgba(168, 176, 188, 0.35); }
+.lp-classic .ox-board-col-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--ox-silver-dim);
+  background: rgba(10, 10, 10, 0.96);
+  backdrop-filter: blur(10px);
+  padding: 11px 14px;
 }
-.lp-classic .ox-launchboard input {
-  background: hsl(255 32% 8%) !important;
-  border-radius: 14px !important;
+.lp-classic .ox-board-col-head h2 {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.lp-classic .ox-board-col--live .ox-board-col-icon { color: var(--ox-blue-hi); }
+.lp-classic .ox-board-col--graduating .ox-board-col-icon { color: var(--ox-gold-hi); }
+.lp-classic .ox-board-col--graduated .ox-board-col-icon { color: var(--ox-silver); }
+.lp-classic .ox-board-col-count {
+  margin-left: auto;
+  border-radius: 9999px;
+  background: #161616;
+  border: 1px solid var(--ox-silver-dim);
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ox-silver);
+}
+.lp-classic .ox-board-col-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 8px;
+  scrollbar-width: thin;
 }
 
-/* ── Shell header (two-tier) ───────────────────────────────────────────── */
+/* ── Shell ─────────────────────────────────────────────────────────────── */
 .lp-classic .ox-shell-header {
-  border-bottom: 1px solid hsl(263 40% 22% / 0.55);
-  background: linear-gradient(180deg, hsl(250 40% 5% / 0.96), hsl(255 35% 6% / 0.9));
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--ox-silver-dim);
+  background: rgba(5, 5, 5, 0.92);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
 }
 .lp-classic .ox-shell-inner {
   margin: 0 auto;
   width: 100%;
   max-width: 1440px;
-  padding: 0 12px;
+  padding: 0 14px;
 }
 @media (min-width: 640px) {
-  .lp-classic .ox-shell-inner { padding: 0 16px; }
+  .lp-classic .ox-shell-inner { padding: 0 20px; }
 }
 .lp-classic .ox-shell-top {
-  border-bottom: 1px solid hsl(263 30% 18% / 0.45);
+  border-bottom: 1px solid var(--ox-silver-dim);
 }
 .lp-classic .ox-shell-top .ox-shell-inner {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 58px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  min-height: 64px;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 .lp-classic .ox-shell-actions {
   margin-left: auto;
@@ -642,53 +395,53 @@
 .lp-classic .ox-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   text-decoration: none;
 }
 .lp-classic .ox-brand-mark {
   display: flex;
-  height: 38px;
-  width: 38px;
+  height: 40px;
+  width: 40px;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  color: #07040f;
-  background: linear-gradient(135deg, #14F195 0%, #9945FF 100%);
-  box-shadow: 0 0 24px -6px #14F195aa, 0 0 28px -10px #9945FFaa;
+  border-radius: 11px;
+  color: #0a0a0a;
+  background: linear-gradient(145deg, var(--ox-gold-hi), var(--ox-gold));
+  border: 1px solid rgba(240, 199, 94, 0.5);
+  box-shadow: 0 0 22px -8px rgba(212, 175, 55, 0.7);
   transition: transform .15s ease;
 }
-.lp-classic .ox-brand:hover .ox-brand-mark { transform: scale(1.05); }
+.lp-classic .ox-brand:hover .ox-brand-mark { transform: scale(1.04); }
 .lp-classic .ox-brand-name {
-  font-size: 1.05rem;
-  font-weight: 900;
-  letter-spacing: -0.03em;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
   color: #fff;
+  line-height: 1;
 }
 .lp-classic .ox-brand-name span {
-  background: linear-gradient(90deg, #14F195, #9945FF);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--ox-gold-hi);
+  -webkit-text-fill-color: var(--ox-gold-hi);
+  background: none;
 }
 .lp-classic .ox-brand-sub {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  margin-top: 3px;
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.32em;
   text-transform: uppercase;
-  color: hsl(250 12% 62%);
+  color: var(--ox-silver);
 }
 
-/* Tab rail */
 .lp-classic .ox-shell-tabs {
-  background: hsl(255 35% 6% / 0.65);
+  background: #070707;
 }
 .lp-classic .ox-tab-rail {
   display: flex;
   align-items: stretch;
-  gap: 2px;
+  gap: 0;
   overflow-x: auto;
-  padding: 6px 0 0;
+  padding: 0;
   scrollbar-width: none;
 }
 .lp-classic .ox-tab-rail::-webkit-scrollbar { display: none; }
@@ -698,52 +451,57 @@
   align-items: center;
   gap: 7px;
   white-space: nowrap;
-  padding: 10px 14px 12px;
+  padding: 12px 16px;
   font-size: 12px;
-  font-weight: 800;
-  color: hsl(250 12% 62%);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ox-silver);
   text-decoration: none;
-  border-radius: 12px 12px 0 0;
-  transition: color .15s ease, background .15s ease;
+  transition: color .15s ease;
 }
-.lp-classic .ox-tab:hover {
-  color: #fff;
-  background: hsl(0 0% 100% / 0.03);
+.lp-classic .ox-tab:hover { color: #fff; }
+.lp-classic .ox-tab--hot { color: var(--ox-blue-hi); }
+.lp-classic .ox-tab--hot::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--ox-blue);
+  box-shadow: 0 0 8px var(--ox-blue);
 }
-.lp-classic .ox-tab--hot { color: #F0B429; }
 .lp-classic .ox-tab--on {
   color: #fff;
-  background: linear-gradient(180deg, hsl(263 60% 18% / 0.55), transparent);
 }
 .lp-classic .ox-tab--on::after {
   content: "";
   position: absolute;
-  left: 10px;
-  right: 10px;
+  left: 12px;
+  right: 12px;
   bottom: 0;
   height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: linear-gradient(90deg, #14F195, #9945FF);
-  box-shadow: 0 0 12px #14F19588;
+  background: var(--ox-gold);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.55);
 }
-.lp-classic .ox-tab--on svg { color: #14F195; }
+.lp-classic .ox-tab--on svg { color: var(--ox-gold-hi); }
 
-/* Buttons / chips */
 .lp-classic .ox-create-cta {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   border-radius: 9999px;
-  padding: 9px 14px;
+  padding: 10px 16px;
   font-size: 13px;
-  font-weight: 900;
-  color: #07040f !important;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0a0a0a !important;
   text-decoration: none;
-  background: linear-gradient(135deg, #14F195, #9945FF) !important;
-  box-shadow: 0 0 28px -8px #14F195b0, 0 0 28px -10px #9945FF99;
+  background: linear-gradient(180deg, var(--ox-gold-hi), var(--ox-gold)) !important;
+  border: 1px solid rgba(240, 199, 94, 0.55);
+  box-shadow: 0 8px 24px -10px rgba(212, 175, 55, 0.7);
   transition: filter .15s ease, transform .15s ease;
 }
-.lp-classic .ox-create-cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.lp-classic .ox-create-cta:hover { filter: brightness(1.06); transform: translateY(-1px); }
 .lp-classic .ox-wallet-btn {
   display: inline-flex;
   align-items: center;
@@ -751,65 +509,68 @@
   border-radius: 9999px;
   padding: 9px 14px;
   font-size: 12px;
-  font-weight: 900;
-  color: #07040f;
-  background: #14F195;
-  box-shadow: 0 0 20px -6px #14F195aa;
+  font-weight: 800;
+  color: #fff;
+  background: transparent;
+  border: 1px solid rgba(96, 165, 250, 0.55);
+  box-shadow: none;
+}
+.lp-classic .ox-wallet-btn:hover {
+  border-color: var(--ox-blue-hi);
+  background: rgba(59, 130, 246, 0.12);
 }
 .lp-classic .ox-wallet-chip {
   display: flex;
   align-items: center;
   gap: 8px;
-  border-radius: 14px;
-  border: 1px solid hsl(263 40% 28% / 0.7);
-  background: hsl(255 32% 10% / 0.9);
+  border-radius: 12px;
+  border: 1px solid var(--ox-silver-dim);
+  background: #0e0e0e;
   padding: 6px 8px 6px 10px;
 }
 .lp-classic .ox-wallet-dot {
   height: 8px;
   width: 8px;
   border-radius: 9999px;
-  background: #14F195;
-  box-shadow: 0 0 8px #14F195;
+  background: var(--ox-blue);
+  box-shadow: 0 0 8px var(--ox-blue);
 }
 .lp-classic .ox-wallet-exit {
   border-radius: 8px;
-  border: 1px solid hsl(263 30% 28% / 0.6);
+  border: 1px solid var(--ox-silver-dim);
   padding: 4px 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: hsl(250 12% 62%);
+  color: var(--ox-silver);
 }
 .lp-classic .ox-wallet-exit:hover {
-  border-color: #ff4d6d88;
+  border-color: rgba(255, 77, 109, 0.5);
   color: #ff4d6d;
 }
 .lp-classic .ox-ghost-btn {
   align-items: center;
   gap: 6px;
   border-radius: 9999px;
-  border: 1px solid hsl(263 30% 28% / 0.7);
+  border: 1px solid var(--ox-silver-dim);
   padding: 8px 12px;
   font-size: 11px;
   font-weight: 700;
-  color: hsl(250 12% 68%);
+  color: var(--ox-silver);
   background: transparent;
 }
 .lp-classic .ox-ghost-btn:hover {
-  border-color: #9945FF88;
+  border-color: rgba(96, 165, 250, 0.5);
   color: #fff;
 }
 
-/* Ticker */
 .lp-classic .ox-ticker {
   overflow: hidden;
-  border-bottom: 1px solid hsl(263 30% 18% / 0.5);
-  background: linear-gradient(90deg, hsl(263 80% 12% / 0.55), hsl(158 50% 10% / 0.35), hsl(263 80% 12% / 0.55));
-  color: hsl(250 12% 72%);
-  padding: 6px 0;
+  border-bottom: 1px solid var(--ox-silver-dim);
+  background: #000;
+  color: var(--ox-silver);
+  padding: 7px 0;
 }
 .lp-classic .ox-ticker-track {
   display: flex;
@@ -822,26 +583,119 @@
   to { transform: translateX(-50%); }
 }
 
-/* Main */
 .lp-classic .ox-shell-main {
   margin: 0 auto;
   width: 100%;
   max-width: 1440px;
-  padding: 14px 10px 48px;
+  padding: 16px 14px 32px;
 }
 @media (min-width: 640px) {
-  .lp-classic .ox-shell-main { padding: 18px 16px 56px; }
+  .lp-classic .ox-shell-main { padding: 20px 20px 40px; }
+}
+
+/* Footer */
+.lp-classic .ox-footer {
+  margin-top: auto;
+  border-top: 1px solid var(--ox-silver-dim);
+  background: #000;
+}
+.lp-classic .ox-footer-inner {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1440px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  padding: 36px 14px 28px;
+}
+@media (min-width: 640px) {
+  .lp-classic .ox-footer-inner {
+    grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
+    padding: 40px 20px 32px;
+  }
+}
+.lp-classic .ox-footer-brand {
+  font-family: var(--ox-font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+}
+.lp-classic .ox-footer-brand span { color: var(--ox-gold-hi); }
+.lp-classic .ox-footer-blurb {
+  margin-top: 8px;
+  max-width: 260px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ox-silver);
+}
+.lp-classic .ox-footer-socials {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+}
+.lp-classic .ox-footer-socials a {
+  display: inline-flex;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--ox-silver-dim);
+  color: var(--ox-silver);
+}
+.lp-classic .ox-footer-socials a:hover {
+  color: #fff;
+  border-color: rgba(96, 165, 250, 0.45);
+}
+.lp-classic .ox-footer-col-title {
+  margin-bottom: 12px;
+  font-family: var(--ox-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ox-silver);
+}
+.lp-classic .ox-footer-col a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
+}
+.lp-classic .ox-footer-col a:hover { color: var(--ox-gold-hi); }
+.lp-classic .ox-footer-col li + li { margin-top: 8px; }
+.lp-classic .ox-footer-bar {
+  border-top: 1px solid var(--ox-silver-dim);
+}
+.lp-classic .ox-footer-bar-inner {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1440px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px;
+  font-family: var(--ox-font-mono);
+  font-size: 11px;
+  color: var(--ox-silver);
+}
+@media (min-width: 640px) {
+  .lp-classic .ox-footer-bar-inner {
+    flex-direction: row;
+    padding: 14px 20px;
+  }
 }
 
 /* Tab hero */
 .lp-classic .ox-tab-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 20px;
-  border: 1px solid hsl(263 40% 28% / 0.55);
-  background: linear-gradient(135deg, hsl(255 32% 9%), hsl(263 45% 10% / 0.7) 55%, hsl(158 40% 8% / 0.45));
+  border-radius: 16px;
+  border: 1px solid var(--ox-silver-dim);
+  background: linear-gradient(135deg, #0e0e0e, #090909 60%, #0a0c10);
   padding: 18px 18px 20px;
-  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.05), 0 20px 50px -30px hsl(263 100% 40% / 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .lp-classic .ox-tab-hero-glow {
   pointer-events: none;
@@ -853,8 +707,8 @@
   position: absolute;
   inset: auto 0 0 0;
   height: 2px;
-  background: linear-gradient(90deg, #9945FF, #14F195, transparent);
-  opacity: 0.9;
+  background: linear-gradient(90deg, var(--ox-gold), var(--ox-blue), transparent);
+  opacity: 0.85;
 }
 .lp-classic .ox-tab-hero-icon {
   display: flex;
@@ -863,80 +717,63 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid;
-  background: hsl(0 0% 0% / 0.35);
+  background: rgba(0, 0, 0, 0.45);
+}
+.lp-classic .ox-tab-hero h1 {
+  font-family: var(--ox-font-display);
 }
 
-/* Legacy nav pill still used on home filters */
+/* Category pills */
 .lp-classic .ox-nav-pill {
   border-radius: 9999px;
-  border: 1px solid transparent;
-  transition: background .2s, border-color .2s, color .2s, box-shadow .2s;
+  border: 1px solid var(--ox-silver-dim);
+  background: transparent;
+  color: var(--ox-silver);
+  transition: background .2s, border-color .2s, color .2s;
 }
 .lp-classic .ox-nav-pill--on {
-  color: #07040f !important;
-  background: linear-gradient(135deg, #14F195, #9945FF);
-  box-shadow: 0 0 22px -6px hsl(158 89% 51% / 0.65);
-  border-color: transparent;
+  color: #0a0a0a !important;
+  background: var(--ox-gold) !important;
+  border-color: var(--ox-gold) !important;
+  box-shadow: none;
 }
-.lp-classic .ox-nav-pill--on svg {
-  color: #07040f !important;
+.lp-classic .ox-nav-pill--on svg { color: #0a0a0a !important; }
+
+.lp-classic .ox-launchboard input {
+  background: #0c0c0c !important;
+  border-radius: 12px !important;
+  border-color: var(--ox-silver-dim) !important;
+}
+.lp-classic .ox-launchboard input:focus {
+  border-color: rgba(59, 130, 246, 0.55) !important;
 }
 
-/* Board columns */
-.lp-classic .ox-board-col {
+.lp-classic .ox-stats-strip {
   display: flex;
-  min-height: 0;
-  flex-direction: column;
-  border-radius: 18px;
-  border: 1px solid hsl(263 30% 22% / 0.65);
-  background: linear-gradient(180deg, hsl(255 32% 9% / 0.92), hsl(255 40% 6% / 0.75));
-  overflow: hidden;
-}
-.lp-classic .ox-board-col--live { border-color: #14F19555; box-shadow: inset 0 1px 0 #14F19522; }
-.lp-classic .ox-board-col--graduating { border-color: #F0B42955; box-shadow: inset 0 1px 0 #F0B42922; }
-.lp-classic .ox-board-col--graduated { border-color: #9945FF55; box-shadow: inset 0 1px 0 #9945FF22; }
-.lp-classic .ox-board-col-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid hsl(263 30% 20% / 0.7);
-  background: hsl(255 36% 8% / 0.94);
-  backdrop-filter: blur(10px);
-  padding: 10px 12px;
+  gap: 12px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--ox-silver-dim);
+  background: #0a0a0a;
+  padding: 10px 14px;
+  font-family: var(--ox-font-mono);
+  font-size: 11px;
+  color: var(--ox-silver);
 }
-.lp-classic .ox-board-col-head h2 {
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #fff;
+.lp-classic .ox-stats-strip .ox-live-dot {
+  height: 6px;
+  width: 6px;
+  border-radius: 999px;
+  background: var(--ox-blue);
+  box-shadow: 0 0 8px var(--ox-blue);
+  animation: oxPulseDot 1.6s ease-in-out infinite;
 }
-.lp-classic .ox-board-col--live .ox-board-col-icon { color: #14F195; }
-.lp-classic .ox-board-col--graduating .ox-board-col-icon { color: #F0B429; }
-.lp-classic .ox-board-col--graduated .ox-board-col-icon { color: #9945FF; }
-.lp-classic .ox-board-col-count {
-  margin-left: auto;
-  border-radius: 9999px;
-  background: hsl(255 30% 14%);
-  padding: 2px 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 10px;
-  font-weight: 700;
-  color: hsl(250 12% 68%);
-}
-.lp-classic .ox-board-col-body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  padding: 8px;
-  scrollbar-width: thin;
+@keyframes oxPulseDot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 
 /* Coin tiles */
@@ -945,16 +782,16 @@
   display: flex;
   gap: 12px;
   overflow: hidden;
-  border-radius: 16px;
-  border: 1px solid hsl(263 30% 22% / 0.7);
-  background: linear-gradient(135deg, hsl(255 32% 10%), hsl(263 40% 9%));
+  border-radius: 14px;
+  border: 1px solid var(--ox-silver-dim);
+  background: linear-gradient(145deg, #101010, #0a0a0a);
   padding: 10px;
   text-decoration: none;
   transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
 }
 .lp-classic .ox-coin:hover {
-  border-color: #14F19588;
-  box-shadow: 0 0 28px -14px #14F195aa;
+  border-color: rgba(212, 175, 55, 0.45);
+  box-shadow: 0 10px 28px -16px rgba(212, 175, 55, 0.4);
   transform: translateY(-1px);
 }
 .lp-classic .ox-coin-star {
@@ -964,17 +801,17 @@
   z-index: 10;
   border-radius: 8px;
   padding: 4px;
-  color: hsl(250 12% 55%);
+  color: var(--ox-silver);
 }
-.lp-classic .ox-coin-star:hover { color: #F0B429; }
+.lp-classic .ox-coin-star:hover { color: var(--ox-gold-hi); }
 .lp-classic .ox-coin-art {
   position: relative;
   height: 88px;
   width: 88px;
   flex-shrink: 0;
   overflow: hidden;
-  border-radius: 14px;
-  border: 1px solid hsl(263 30% 24% / 0.8);
+  border-radius: 12px;
+  border: 1px solid var(--ox-silver-dim);
   background: #000;
 }
 @media (min-width: 640px) {
@@ -985,7 +822,7 @@
   bottom: 6px;
   left: 6px;
   border-radius: 6px;
-  background: #F0B429;
+  background: var(--ox-gold);
   padding: 2px 6px;
   font-size: 8px;
   font-weight: 900;
@@ -1002,16 +839,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--ox-font-display);
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 800;
   color: #fff;
 }
 .lp-classic .ox-coin-ticker {
   flex-shrink: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
   font-weight: 700;
-  color: #14F195;
+  color: var(--ox-gold-hi);
 }
 .lp-classic .ox-coin-stats {
   margin-top: 4px;
@@ -1019,13 +856,14 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
 }
 .lp-classic .ox-coin-mc {
   font-weight: 900;
-  color: #fff;
+  color: var(--ox-gold-hi);
 }
+.lp-classic .ox-coin-up { color: var(--ox-blue-hi) !important; }
+.lp-classic .ox-coin-down { color: #ff4d6d !important; }
 .lp-classic .ox-coin-meta {
   margin-top: 6px;
   display: flex;
@@ -1033,7 +871,161 @@
   align-items: center;
   gap: 6px;
   font-size: 10px;
-  color: hsl(250 12% 58%);
+  color: var(--ox-silver);
+}
+
+/* ── Token page ── */
+.lp-classic .ox-tok {
+  max-width: 1480px;
+  margin: 0 auto;
+}
+.lp-classic .ox-tok-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--ox-silver-dim);
+  background: linear-gradient(135deg, #101010, #0a0a0a);
+  padding: 18px 20px;
+}
+.lp-classic .ox-tok-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(560px 200px at 0% 0%, rgba(212, 175, 55, 0.16), transparent 60%),
+    radial-gradient(480px 180px at 100% 0%, rgba(59, 130, 246, 0.12), transparent 55%);
+  pointer-events: none;
+}
+.lp-classic .ox-tok-price {
+  font-size: clamp(1.6rem, 3vw, 2.25rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 1;
+}
+.lp-classic .ox-tok-statgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (min-width: 640px) {
+  .lp-classic .ox-tok-statgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .lp-classic .ox-tok-statgrid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+}
+.lp-classic .ox-tok-stat {
+  border-radius: 12px;
+  border: 1px solid var(--ox-silver-dim);
+  background: #0c0c0c;
+  padding: 10px 12px;
+  text-align: left;
+  transition: border-color .15s ease;
+}
+.lp-classic .ox-tok-stat:hover { border-color: rgba(212, 175, 55, 0.4); }
+.lp-classic .ox-tok-stat-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ox-silver);
+}
+.lp-classic .ox-tok-stat-val {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+}
+.lp-classic .ox-tok-layout {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+@media (min-width: 1100px) {
+  .lp-classic .ox-tok-layout {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    align-items: start;
+  }
+  .lp-classic .ox-tok-aside {
+    position: sticky;
+    top: 96px;
+  }
+}
+.lp-classic .ox-tok-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--ox-silver-dim);
+  background: #0a0a0a;
+  scrollbar-width: none;
+}
+.lp-classic .ox-tok-tabs::-webkit-scrollbar { display: none; }
+.lp-classic .ox-tok-tab {
+  flex-shrink: 0;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ox-silver);
+  transition: all .15s ease;
+}
+.lp-classic .ox-tok-tab:hover { color: #fff; background: #141414; }
+.lp-classic .ox-tok-tab--on {
+  color: #0a0a0a !important;
+  background: var(--ox-gold) !important;
+}
+.lp-classic .ox-tok-panel {
+  border-radius: 14px;
+  border: 1px solid var(--ox-silver-dim);
+  background: linear-gradient(180deg, #101010, #0a0a0a);
+  padding: 14px;
+}
+.lp-classic .ox-tok-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lp-classic .ox-tok-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 9999px;
+  border: 1px solid var(--ox-silver-dim);
+  background: #121212;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+.lp-classic .ox-tok-chip--up { color: var(--ox-blue-hi); border-color: rgba(59, 130, 246, 0.35); }
+.lp-classic .ox-tok-chip--down { color: #ff4d6d; border-color: rgba(255, 77, 109, 0.35); }
+.lp-classic .ox-tok-ca {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--ox-silver-dim);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 8px 10px;
+}
+.lp-classic .ox-tok-trade .pf-btn,
+.lp-classic .ox-tok-trade button[type="button"] {
+  border-radius: 9999px;
+}
+.lp-classic .ox-tok-pressure {
+  height: 6px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: rgba(255, 77, 109, 0.35);
+  display: flex;
+}
+.lp-classic .ox-tok-pressure > span {
+  height: 100%;
+  background: var(--ox-blue);
 }
 
 @media (max-width: 1023px) {
@@ -1042,4 +1034,9 @@
     min-height: auto;
     max-height: none;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-classic .ox-ticker-track,
+  .lp-classic .ox-stats-strip .ox-live-dot { animation: none; }
 }

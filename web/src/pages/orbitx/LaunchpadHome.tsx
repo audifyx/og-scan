@@ -172,10 +172,10 @@ export default function LaunchpadHome() {
   return (
     <div className="ox-launchboard space-y-4">
       <div className="ox-tab-hero mb-1">
-        <div className="ox-tab-hero-glow" style={{ background: "radial-gradient(520px 180px at 10% 0%, #9945FF44, transparent 70%)" }} />
+        <div className="ox-tab-hero-glow" style={{ background: "radial-gradient(520px 180px at 10% 0%, #D4AF3728, transparent 70%)" }} />
         <div className="relative flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className="pf-mono text-[10px] font-bold uppercase tracking-[0.3em] text-[#9945FF]">Solana · live board</div>
+            <div className="pf-mono text-[10px] font-bold uppercase tracking-[0.3em] text-[#F0C75E]">New tokens · live feed</div>
             <h1 className="mt-1 text-xl font-black tracking-tight text-white sm:text-2xl">Discover &amp; trade new coins</h1>
           </div>
           <Link to="/orbitxlaunch/create" className="ox-create-cta hidden sm:inline-flex">
@@ -186,12 +186,12 @@ export default function LaunchpadHome() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A8B0BC]" />
           <input
             placeholder="Search name, ticker, or mint…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-[14px] border border-white/10 bg-[hsl(255_32%_8%)] py-3 pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#14F195]/60"
+            className="w-full rounded-[12px] border border-white/10 bg-[#0c0c0c] py-3 pl-11 pr-4 text-sm text-white outline-none placeholder:text-[#A8B0BC]/70 focus:border-[#3B82F6]/60"
           />
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -201,7 +201,7 @@ export default function LaunchpadHome() {
             className={`ox-nav-pill inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide ${
               hideVamps
                 ? "ox-nav-pill--on"
-                : "border border-white/10 text-white/55 hover:border-white/25 hover:text-white"
+                : "text-[#A8B0BC] hover:border-white/25 hover:text-white"
             }`}
             title="Hide vamp / clone tokens"
           >
@@ -214,17 +214,17 @@ export default function LaunchpadHome() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 pf-mono text-[11px] text-white/50">
+      <div className="ox-stats-strip">
         <span className="inline-flex items-center gap-1.5 font-bold text-white">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#14F195]" />
+          <span className="ox-live-dot" />
           Live board
         </span>
         <span>{stats.total} coins</span>
-        <span className="text-[#F0B429]">{stats.graduated} graduated</span>
+        <span className="text-[#F0C75E]">{stats.graduated} graduated</span>
         <span>vol {fmtCompactUsd(vol24Total)}</span>
         <span>{trades24.toLocaleString()} tx / 24h</span>
         {promoActive && (
-          <span className="ml-auto inline-flex items-center gap-1 font-bold text-[#14F195]">
+          <span className="ml-auto inline-flex items-center gap-1 font-bold text-[#60A5FA]">
             <Zap className="h-3 w-3" /> Promo · {promoDaysLeft}d · ${ORBITX_FEE_USD} launch
           </span>
         )}
@@ -252,7 +252,7 @@ export default function LaunchpadHome() {
               className={`ox-nav-pill inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide ${
                 on
                   ? "ox-nav-pill--on"
-                  : "border border-white/10 text-white/50 hover:border-white/25 hover:text-white"
+                  : "text-[#A8B0BC] hover:border-white/25 hover:text-white"
               }`}
             >
               <Icon className="h-3 w-3" />
