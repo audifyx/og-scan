@@ -884,6 +884,158 @@
   color: #07040f !important;
 }
 
+/* Board columns */
+.lp-classic .ox-board-col {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid hsl(263 30% 22% / 0.65);
+  background: linear-gradient(180deg, hsl(255 32% 9% / 0.92), hsl(255 40% 6% / 0.75));
+  overflow: hidden;
+}
+.lp-classic .ox-board-col--live { border-color: #14F19555; box-shadow: inset 0 1px 0 #14F19522; }
+.lp-classic .ox-board-col--graduating { border-color: #F0B42955; box-shadow: inset 0 1px 0 #F0B42922; }
+.lp-classic .ox-board-col--graduated { border-color: #9945FF55; box-shadow: inset 0 1px 0 #9945FF22; }
+.lp-classic .ox-board-col-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid hsl(263 30% 20% / 0.7);
+  background: hsl(255 36% 8% / 0.94);
+  backdrop-filter: blur(10px);
+  padding: 10px 12px;
+}
+.lp-classic .ox-board-col-head h2 {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.lp-classic .ox-board-col--live .ox-board-col-icon { color: #14F195; }
+.lp-classic .ox-board-col--graduating .ox-board-col-icon { color: #F0B429; }
+.lp-classic .ox-board-col--graduated .ox-board-col-icon { color: #9945FF; }
+.lp-classic .ox-board-col-count {
+  margin-left: auto;
+  border-radius: 9999px;
+  background: hsl(255 30% 14%);
+  padding: 2px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: hsl(250 12% 68%);
+}
+.lp-classic .ox-board-col-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 8px;
+  scrollbar-width: thin;
+}
+
+/* Coin tiles */
+.lp-classic .ox-coin {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid hsl(263 30% 22% / 0.7);
+  background: linear-gradient(135deg, hsl(255 32% 10%), hsl(263 40% 9%));
+  padding: 10px;
+  text-decoration: none;
+  transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+.lp-classic .ox-coin:hover {
+  border-color: #14F19588;
+  box-shadow: 0 0 28px -14px #14F195aa;
+  transform: translateY(-1px);
+}
+.lp-classic .ox-coin-star {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  z-index: 10;
+  border-radius: 8px;
+  padding: 4px;
+  color: hsl(250 12% 55%);
+}
+.lp-classic .ox-coin-star:hover { color: #F0B429; }
+.lp-classic .ox-coin-art {
+  position: relative;
+  height: 88px;
+  width: 88px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid hsl(263 30% 24% / 0.8);
+  background: #000;
+}
+@media (min-width: 640px) {
+  .lp-classic .ox-coin-art { height: 104px; width: 104px; }
+}
+.lp-classic .ox-coin-grad-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  border-radius: 6px;
+  background: #F0B429;
+  padding: 2px 6px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #000;
+}
+.lp-classic .ox-coin-body {
+  min-width: 0;
+  flex: 1;
+  padding-right: 22px;
+}
+.lp-classic .ox-coin-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+}
+.lp-classic .ox-coin-ticker {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #14F195;
+}
+.lp-classic .ox-coin-stats {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+}
+.lp-classic .ox-coin-mc {
+  font-weight: 900;
+  color: #fff;
+}
+.lp-classic .ox-coin-meta {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: hsl(250 12% 58%);
+}
+
 @media (max-width: 1023px) {
   .lp-classic .ox-tri-board,
   .lp-classic .ox-board-col {

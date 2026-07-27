@@ -36,27 +36,21 @@ function BoardColumn({
   markets?: Record<string, MarketRow> | null;
   empty: string;
 }) {
-  const accent =
-    tone === "live" ? "text-[hsl(var(--pf-green))]"
-    : tone === "graduating" ? "text-[hsl(var(--pf-gold))]"
-    : "text-[hsl(var(--pf-blue))]";
-  const border =
-    tone === "live" ? "border-[hsl(var(--pf-green))]/35"
-    : tone === "graduating" ? "border-[hsl(var(--pf-gold))]/35"
-    : "border-[hsl(var(--pf-blue))]/35";
+  const toneCls =
+    tone === "live" ? "ox-board-col--live"
+    : tone === "graduating" ? "ox-board-col--graduating"
+    : "ox-board-col--graduated";
 
   return (
-    <section className={`ox-board-col flex min-h-0 flex-col rounded-2xl border ${border} bg-[hsl(var(--pf-bg)/0.55)]`}>
-      <header className="sticky top-0 z-[1] flex items-center gap-2 border-b border-[hsl(var(--pf-border))]/60 bg-[hsl(var(--pf-bg)/0.94)] px-3 py-2.5 backdrop-blur-md">
-        <span className={accent}>{icon}</span>
-        <h2 className="text-[12px] font-black uppercase tracking-wide text-[hsl(var(--pf-ink))]">{title}</h2>
-        <span className="pf-mono ml-auto rounded-full bg-[hsl(var(--pf-bg-2))] px-2 py-0.5 text-[10px] font-bold text-[hsl(var(--pf-muted))]">
-          {items.length}
-        </span>
+    <section className={`ox-board-col ${toneCls}`}>
+      <header className="ox-board-col-head">
+        <span className="ox-board-col-icon">{icon}</span>
+        <h2>{title}</h2>
+        <span className="ox-board-col-count">{items.length}</span>
       </header>
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2 [scrollbar-width:thin]">
+      <div className="ox-board-col-body">
         {!items.length ? (
-          <div className="px-2 py-10 text-center text-xs text-[hsl(var(--pf-muted))]">{empty}</div>
+          <div className="px-2 py-10 text-center text-xs text-white/40">{empty}</div>
         ) : (
           items.map((t) => (
             <TokenCard key={t.mint_address} t={t} mc={markets?.[t.mint_address]?.mcap ?? null} market={markets?.[t.mint_address] ?? null} />

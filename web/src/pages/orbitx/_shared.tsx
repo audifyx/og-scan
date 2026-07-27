@@ -189,57 +189,50 @@ export function TokenCard({ t, mc, market }: { t: OrbitxToken; mc?: number | nul
   const to = `/orbitxlaunch/token/${t.mint_address}`;
 
   return (
-    <Link
-      to={to}
-      className="ox-coin group relative flex gap-3 overflow-hidden rounded-2xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] p-2.5 transition hover:border-[hsl(var(--pf-green))]/55 hover:bg-[hsl(var(--pf-bg-2))]"
-    >
+    <Link to={to} className="ox-coin">
       <button
         type="button"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWatch(); }}
-        className="absolute right-2 top-2 z-10 rounded-md p-1 text-[hsl(var(--pf-muted))] transition hover:text-[hsl(var(--pf-gold))]"
+        className="ox-coin-star"
         title={watched ? "Remove from watchlist" : "Add to watchlist"}
       >
-        <Star className={`h-3.5 w-3.5 ${watched ? "fill-current text-[hsl(var(--pf-gold))]" : ""}`} />
+        <Star className={`h-3.5 w-3.5 ${watched ? "fill-current text-[#F0B429]" : ""}`} />
       </button>
 
-      <div className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl border border-[hsl(var(--pf-border))] bg-black/40 sm:h-[104px] sm:w-[104px]">
+      <div className="ox-coin-art">
         <TokenLogo src={t.logo_url} metadataUri={t.metadata_uri} symbol={t.ticker} className="h-full w-full text-lg" />
-        {graduated && (
-          <span className="absolute bottom-1 left-1 rounded bg-[hsl(var(--pf-gold))] px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-black">
-            Grad
-          </span>
-        )}
+        {graduated && <span className="ox-coin-grad-badge">Grad</span>}
       </div>
 
-      <div className="min-w-0 flex-1 pr-6">
+      <div className="ox-coin-body">
         <div className="flex items-baseline gap-1.5">
-          <span className="truncate text-[15px] font-black text-[hsl(var(--pf-ink))]">{t.name}</span>
-          <span className="pf-mono shrink-0 text-[11px] font-bold text-[hsl(var(--pf-green))]">${t.ticker}</span>
+          <span className="ox-coin-name">{t.name}</span>
+          <span className="ox-coin-ticker">${t.ticker}</span>
         </div>
 
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 pf-mono text-[11px]">
-          <span className="font-black text-[hsl(var(--pf-ink))]">{fmtMc(mcap)}</span>
+        <div className="ox-coin-stats">
+          <span className="ox-coin-mc">{fmtMc(mcap)}</span>
           {ch != null && Number.isFinite(ch) && (
-            <span className={ch >= 0 ? "text-[hsl(var(--pf-green))]" : "text-[hsl(var(--pf-red))]"}>
+            <span className={ch >= 0 ? "text-[#14F195]" : "text-[#ff4d6d]"}>
               {ch >= 0 ? "+" : ""}{ch.toFixed(1)}%
             </span>
           )}
-          <span className="text-[hsl(var(--pf-muted))]">vol {fmtCompact(market?.vol24)}</span>
+          <span className="text-white/40">vol {fmtCompact(market?.vol24)}</span>
         </div>
 
         <div className="mt-1.5">
-          <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-[hsl(var(--pf-muted))]">
+          <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-white/40">
             <span>{graduated ? "Graduated" : "Bonding"}</span>
-            <span className={graduated ? "text-[hsl(var(--pf-gold))]" : "text-[hsl(var(--pf-green))]"}>{pct}%</span>
+            <span className={graduated ? "text-[#F0B429]" : "text-[#14F195]"}>{pct}%</span>
           </div>
           <div className="pf-progress h-1.5"><div className={`pf-progress-fill ${graduated ? "is-complete" : ""}`} style={{ width: `${pct}%` }} /></div>
         </div>
 
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-[hsl(var(--pf-muted))]">
+        <div className="ox-coin-meta">
           {!t.is_vamp ? (
-            <span className="inline-flex items-center gap-0.5 text-[hsl(var(--pf-green))]"><ShieldCheck className="h-3 w-3" /> OG</span>
+            <span className="inline-flex items-center gap-0.5 text-[#14F195]"><ShieldCheck className="h-3 w-3" /> OG</span>
           ) : (
-            <span className="inline-flex items-center gap-0.5 text-[hsl(var(--pf-red))]"><ShieldAlert className="h-3 w-3" /> Vamp</span>
+            <span className="inline-flex items-center gap-0.5 text-[#ff4d6d]"><ShieldAlert className="h-3 w-3" /> Vamp</span>
           )}
           <span className="pf-mono">{t.launch_type === "pump" ? "pump" : "custom"}</span>
           {tx > 0 && <span className="pf-mono">{tx} tx</span>}
