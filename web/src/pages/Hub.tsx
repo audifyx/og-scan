@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { AIWidgetPanel, MobileWidgetGrid, aiWidgetCSS, readWidgets, writeWidgets, type WidgetConfig } from "@/components/AIWidgetPanel";
 import { loadWidgetsFromCloud, saveWidgetsToCloud } from "@/lib/widgetSync";
 import { MobileNav } from "@/components/MobileNavV2";
 import { BackgroundFX, BgCustomizeModal, readBgMode, BG_KEY, WALLPAPER_KEY, type BgMode } from "@/components/BackgroundFX";
+import { ADMIN_APPS } from "@/lib/adminApps";
+import { OWNER_EMAIL, isOwnerIdentity } from "@/lib/ownerDesk";
 
 const BRAND = "OrbitX";
 const OS_NAME = "OrbitX";
@@ -129,7 +131,20 @@ const ALL_APPS: App[] = [
   { key: "pnltracker", name: "PNL Tracker", caption: "Profit & loss", href: "/app/pnl-tracker", tone: "#F97316", iconBg: "linear-gradient(135deg, #F97316, #B45309)", glyph: <div style={{ fontSize: "20px" }}>📈</div> },
   { key: "launchpad", name: "Launchpad", caption: "Launch a token", href: "/orbitxlaunch", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFC53D, #B8860B)", glyph: Glyph.launchpad },
   { key: "nft", name: "NFT Market", caption: "Mint & trade NFTs", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(135deg, #00FFA3, #00C776)", glyph: <div style={{ fontSize: "20px" }}>🖼️</div> },
+  { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(135deg, #F0C75E, #B8860B)", glyph: <div style={{ fontSize: "20px" }}>💼</div> },
 ];
+
+/** Owner-only admin apps for /app (audifyx@gmail.com). */
+const OWNER_ADMIN_APPS: App[] = ADMIN_APPS.map((a) => ({
+  key: `admin-${a.key}`,
+  name: a.label,
+  caption: a.caption,
+  href: a.to,
+  external: a.to.startsWith("http") || a.to.startsWith("/ORBITX_DEX"),
+  tone: a.tone,
+  iconBg: a.iconBg,
+  glyph: <div style={{ fontSize: "18px" }}>{a.emoji || "🛡️"}</div>,
+}));
 
 const CENTER_TABS: { key: string; name: string; href?: string; action: "profile" | "settings" | "logout" | "wallpaper"; tone: string; glyph: JSX.Element }[] = [
   { key: "profile", name: "Profile", href: "/profile", action: "profile", tone: "#2F80FF", glyph: Glyph.profile },
@@ -168,8 +183,18 @@ export default function Hub() {
   const [wallpaper, setWallpaper] = useState<string | null>(() => { try { return localStorage.getItem(WALLPAPER_KEY); } catch { return null; } });
   const [fng, setFng] = useState<{ v: number; label: string } | null>(null);
   const now = useClock();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, user } = useAuth();
   const logout = async () => { try { await signOut(); } finally { window.location.assign("/auth"); } };
+
+  // Strict owner gate for /app admin icons — audifyx@gmail.com (or owner wallet SIWS).
+  const showAdminApps = useMemo(
+    () => isOwnerIdentity({ email: user?.email }),
+    [user?.email],
+  );
+  const searchableApps = useMemo(
+    () => (showAdminApps ? [...ALL_APPS, ...OWNER_ADMIN_APPS] : ALL_APPS),
+    [showAdminApps],
+  );
 
   const [dockOrder, setDockOrder] = useState<string[]>(() => {
     try {
@@ -540,6 +565,22 @@ export default function Hub() {
                 <span className="desktop-icon-label">{app.name}</span>
               </button>
             ))}
+            {showAdminApps && OWNER_ADMIN_APPS.map((app, i) => (
+              <button
+                key={app.key}
+                className="desktop-icon-wrapper"
+                style={{ animationDelay: `${(apps.length + i) * 40}ms` }}
+                onClick={() => openApp(app)}
+                disabled={!!launching}
+                title={`${app.caption} · ${OWNER_EMAIL}`}
+              >
+                <div className="mac-icon" style={{ background: app.iconBg, boxShadow: "0 0 0 1.5px rgba(240,199,94,0.45)" }}>
+                  <div className="mac-icon-gloss" />
+                  <div className="mac-icon-glyph">{app.glyph}</div>
+                </div>
+                <span className="desktop-icon-label">{app.name}</span>
+              </button>
+            ))}
           </div>
 
             {/* ── Desktop widgets ── */}
@@ -670,16 +711,16 @@ export default function Hub() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     const q = spotQ.trim().toLowerCase();
-                    const hit = ALL_APPS.find((a) => !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q));
+                    const hit = searchableApps.find((a) => !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q));
                     if (hit) { setSpotlightOpen(false); openApp(hit); }
                   }
                 }}
-                placeholder="Search apps…"
+                placeholder={showAdminApps ? "Search apps & admin…" : "Search apps…"}
               />
               <span className="spotlight-esc">esc</span>
             </div>
             <div className="spotlight-results">
-              {ALL_APPS.filter((a) => {
+              {searchableApps.filter((a) => {
                 const q = spotQ.trim().toLowerCase();
                 return !q || a.name.toLowerCase().includes(q) || a.caption.toLowerCase().includes(q);
               }).map((a) => (
