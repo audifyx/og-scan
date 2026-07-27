@@ -6,6 +6,7 @@ import {
   Activity, Waves, Users, TrendingUp, Gauge, Sparkles, AlertTriangle,
   Rocket, BadgeCheck, RefreshCw, Loader2, Zap,
 } from "lucide-react";
+import { PageHero } from "../components/PageShell";
 
 interface Signal {
   mint: string; symbol?: string; name?: string; icon?: string | null; chain?: string;
@@ -140,25 +141,16 @@ export default function Pulse() {
 
   return (
     <div>
-      {/* Hero */}
-      <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 ring-brand">
-        <div className="relative flex items-center gap-3 bg-gradient-to-r from-accent2/15 via-panel to-accent/10 px-4 py-4 sm:px-6">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.05] text-accent">
-            <Activity className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-extrabold tracking-tight sm:text-2xl">
-              <span className="text-brand-gradient">Pulse</span> — live on-chain signals
-            </h1>
-            <p className="text-[11px] text-muted sm:text-sm">
-              Real-time anomaly detection: volume &amp; trade-velocity spikes, buyer surges, momentum, fresh runners and pump.fun graduations. The signals a plain screener can't show you.
-            </p>
-          </div>
-          <button onClick={load} className="btn hidden shrink-0 items-center gap-1.5 bg-white/5 border border-white/10 text-muted hover:text-white sm:inline-flex">
-            <RefreshCw className="h-3.5 w-3.5" /> Refresh
-          </button>
-        </div>
-      </div>
+      <PageHero
+        kicker="Live signals"
+        title="Pulse"
+        sub="Real-time anomaly detection: volume spikes, buyer surges, momentum, fresh runners and graduations."
+        icon={Activity}
+      >
+        <button type="button" onClick={load} className="dex-btn dex-btn--ghost mt-4 !py-2 !text-xs inline-flex items-center gap-1.5">
+          <RefreshCw className="h-3.5 w-3.5" /> Refresh
+        </button>
+      </PageHero>
 
       {/* Filters */}
       <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>

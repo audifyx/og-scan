@@ -8,6 +8,7 @@ import {
   forensicOgAttribution, tokenEffectiveLiquidityUsd, fmtUsd, fmtNum, shortAddr,
   type ForensicOgReport, type JupTokenInfo, type TokenLineageNode, type TokenForensicScores,
 } from "../lib/og";
+import { PageHero } from "../components/PageShell";
 
 const num = (n: any) => (Number.isFinite(Number(n)) ? Number(n) : null);
 
@@ -130,18 +131,13 @@ export default function OgScanner() {
     : [];
 
   return (
-    <div className="mx-auto max-w-[980px] space-y-4 px-4 py-6">
-      {/* Header */}
-      <div className="term-panel bg-term-grid px-4 sm:px-5 py-4">
-        <div className="term text-[11px]" style={{ color: "#66707E" }}>
-          <span style={{ color: "#00FFA3" }}>orbitx@dex</span><span>:~$</span> ogscan --forensic --lineage --expose-clones
-        </div>
-        <div className="flex flex-wrap items-end gap-3 mt-1.5">
-          <h1 className="font-display text-2xl font-black text-white flex items-center gap-2"><Crosshair className="h-5 w-5 text-accent" strokeWidth={2.2} /> OG_SCANNER</h1>
-          <span className="rounded-md border border-accent/40 bg-accent/15 px-2 py-0.5 text-[9px] term font-black uppercase tracking-widest text-accent mb-1">FORENSIC MODE</span>
-        </div>
-        <p className="term text-[11px] leading-relaxed text-muted mt-1 max-w-lg">trace token lineage → identify the TRUE OG → expose clones, fake revivals and exploit copies. click any node for the full token page.</p>
-      </div>
+    <div className="mx-auto max-w-[980px] space-y-4">
+      <PageHero
+        kicker="Forensic mode"
+        title="Scanner"
+        sub="Trace token lineage, identify the TRUE OG, expose clones and fake revivals."
+        icon={Crosshair}
+      />
 
       {/* Search */}
       <div className="flex items-center gap-2 rounded-lg border border-line bg-panel p-2 focus-within:border-accent/60 focus-within:shadow-glow-term">

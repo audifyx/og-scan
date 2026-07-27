@@ -7,6 +7,7 @@ import { timeAgo } from "../lib/format";
 import TokenLogo from "../components/TokenLogo";
 import Copyable from "../components/Copyable";
 import { Radio, ExternalLink, Search, ArrowUpRight, ArrowDownRight, BadgeCheck, Plus, Loader2, X, Activity, Flame, Wallet2, TrendingUp } from "lucide-react";
+import { PageHero } from "../components/PageShell";
 
 const RANGES: [string, number][] = [["1h", 3600e3], ["6h", 6 * 3600e3], ["24h", 864e5], ["7d", 7 * 864e5]];
 
@@ -14,20 +15,12 @@ export default function KolScanner() {
   const [view, setView] = useState<"feed" | "leaderboard">("feed");
   return (
     <div>
-      {/* ── Terminal header ── */}
-      <div className="term-panel bg-term-grid px-4 sm:px-5 py-4 mb-4">
-        <div className="term text-[11px]" style={{ color: "#66707E" }}>
-          <span style={{ color: "#00FFA3" }}>orbitx@dex</span><span>:~$</span> kol --track --wallets all --live
+      <PageHero kicker="Smart money" title="KOL" sub="Track KOL wallets, live swaps, and PnL intel." icon={Radio}>
+        <div className="mt-4 flex gap-1 dex-tab-segment-wrap !inline-flex">
+          <button type="button" onClick={() => setView("feed")} className={`dex-tab-segment ${view === "feed" ? "dex-tab-segment--on" : ""}`}>Live feed</button>
+          <button type="button" onClick={() => setView("leaderboard")} className={`dex-tab-segment ${view === "leaderboard" ? "dex-tab-segment--on" : ""}`}>Leaderboard</button>
         </div>
-        <div className="flex flex-wrap items-end gap-3 mt-1.5">
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Radio className="w-5 h-5 text-accent" /> KOL_TRACKER</h1>
-          <p className="term text-[11px] text-muted pb-1">smart-money wallets · real-time swaps · PnL intel</p>
-          <div className="sm:ml-auto flex gap-1 bg-panel border border-line rounded-md p-1">
-            <button onClick={() => setView("feed")} className={`btn text-xs uppercase tracking-wider ${view === "feed" ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>Live_Feed</button>
-            <button onClick={() => setView("leaderboard")} className={`btn text-xs uppercase tracking-wider ${view === "leaderboard" ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>Leaderboard</button>
-          </div>
-        </div>
-      </div>
+      </PageHero>
       {view === "feed" ? <LiveFeed /> : <Leaderboard />}
     </div>
   );
