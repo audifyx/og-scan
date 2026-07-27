@@ -29,7 +29,7 @@ type BackpackProvider = {
   isConnected?: boolean;
   publicKey: PublicKey | null;
   connect: () => Promise<{ publicKey: PublicKey }>;
-  disconnect: (): Promise<void>;
+  disconnect(): Promise<void>;
   signMessage: (message: Uint8Array) => Promise<Uint8Array | { signature: Uint8Array }>;
   signTransaction?: <T extends Transaction | VersionedTransaction>(tx: T) => Promise<T>;
   signAllTransactions?: <T extends Transaction | VersionedTransaction>(txs: T[]) => Promise<T[]>;
