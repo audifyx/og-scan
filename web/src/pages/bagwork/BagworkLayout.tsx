@@ -55,7 +55,8 @@ function WalletBar() {
 }
 
 export default function BagworkLayout() {
-  const { isAdmin } = useAdmin();
+  const { isAdmin, isOwnerIdentity } = useAdmin();
+  const showAdmin = isAdmin || isOwnerIdentity;
 
   return (
     <div className="bw-shell">
@@ -78,7 +79,7 @@ export default function BagworkLayout() {
             <NavLink to="/bagwork/my" className={({ isActive }) => cn(isActive && "bw-nav--on")}>
               My work
             </NavLink>
-            {isAdmin && (
+            {showAdmin && (
               <NavLink to="/bagwork/admin" className={({ isActive }) => cn(isActive && "bw-nav--on")}>
                 <ShieldCheck className="h-3.5 w-3.5" /> Admin
               </NavLink>
@@ -92,7 +93,7 @@ export default function BagworkLayout() {
       <nav className="flex gap-2 border-b border-white/10 px-4 py-2 sm:hidden">
         <NavLink to="/bagwork" end className={({ isActive }) => cn("bw-btn flex-1 !py-2 text-[10px]", !isActive && "bw-btn-ghost")}>Tasks</NavLink>
         <NavLink to="/bagwork/my" className={({ isActive }) => cn("bw-btn flex-1 !py-2 text-[10px]", !isActive && "bw-btn-ghost")}>My work</NavLink>
-        {isAdmin && (
+        {showAdmin && (
           <NavLink to="/bagwork/admin" className={({ isActive }) => cn("bw-btn flex-1 !py-2 text-[10px]", !isActive && "bw-btn-ghost")}>Admin</NavLink>
         )}
       </nav>

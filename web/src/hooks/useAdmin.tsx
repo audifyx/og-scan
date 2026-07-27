@@ -70,6 +70,8 @@ export const useAdmin = () => {
   return {
     isAdmin: isOwner,
     isOwner,
+    /** True when the signed-in identity is the platform owner (ignores desk code). */
+    isOwnerIdentity: ownerMatch,
     deskUnlocked: unlocked,
     isSupportAgent: isOwner || Boolean(profile?.is_official_account || profile?.affiliate_org_id),
     loading: authLoading && !unlocked,

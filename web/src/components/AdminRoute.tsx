@@ -22,7 +22,7 @@ interface AdminRouteProps {
  * Not a substitute for server ADMIN_PASS / JWT on APIs.
  */
 export const AdminRoute = ({ children }: AdminRouteProps) => {
-  const { isAdmin, deskUnlocked, loading } = useAdmin();
+  const { isAdmin, deskUnlocked, loading, ownerEmail } = useAdmin();
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   const next = `${location.pathname}${location.search}`;
@@ -43,7 +43,8 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
 
   if (isAdmin) return <>{children}</>;
 
-  const email = (user?.email || "").toLowerCase();
+  const email = (user?.email || "").toLowerCase().trim();
+  const looksLikeWalletSession = /@wallet\.orbitx\.app$/i.test(email);
 
   const onPick = async (name: string) => {
     try {
@@ -58,18 +59,27 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
   return (
     <div className="min-h-screen bg-[#020915] flex items-center justify-center p-4">
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center">
-        <h1 className="mb-2 text-lg font-bold text-white">Sign in required</h1>
+        <h1 className="mb-2 text-lg font-bold text-white">Owner account required</h1>
         <p className="mb-5 text-sm text-white/45">
-          {email
-            ? `Signed in as ${email}, but this desk is limited to the owner account.`
-            : `Sign in with email (${OWNER_EMAIL}) or an owner wallet.`}
+          {email ? (
+            <>
+              This session is <span className="font-mono text-white/70">{email}</span>
+              {looksLikeWalletSession ? (
+                <> — a wallet login. Sign in with email <span className="font-mono text-white/70">{OWNER_EMAIL}</span> to open the desk.</>
+              ) : (
+                <> — not the owner email (<span className="font-mono text-white/70">{ownerEmail}</span>).</>
+              )}
+            </>
+          ) : (
+            <>Sign in with email ({OWNER_EMAIL}) or an owner wallet.</>
+          )}
         </p>
         <div className="space-y-2.5">
           <Link
             to={`/auth/email?next=${encodeURIComponent(next)}`}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#14F195] py-3 text-sm font-black text-black hover:brightness-110"
           >
-            <Mail className="h-4 w-4" /> Sign in with email
+            <Mail className="h-4 w-4" /> Sign in with {OWNER_EMAIL}
           </Link>
           <button
             type="button"
@@ -78,7 +88,7 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 py-3 text-sm font-bold text-white hover:bg-white/10 disabled:opacity-40"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-            {OWNER_WALLETS.length === 0 ? "Wallet (set VITE_OWNER_WALLETS)" : "Or connect wallet"}
+            {OWNER_WALLETS.length === 0 ? "Wallet (set VITE_OWNER_WALLETS)" : "Or connect owner wallet"}
           </button>
         </div>
         <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={onPick} busy={busy} />
