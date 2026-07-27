@@ -1,6 +1,6 @@
 // ORBITX_DEX PWA service worker — scope: /ORBITX_DEX/. Separate from OrbitX root sw.js
 // (which intentionally bypasses /ORBITX_DEX). Must never cache /api/ responses long.
-const VERSION = "ogdex-v2";
+const VERSION = "ogdex-v3";
 const SHELL = "ogdex-shell-" + VERSION;
 const RUNTIME = "ogdex-rt-" + VERSION;
 const SHELL_URLS = ["/ORBITX_DEX/", "/ORBITX_DEX/index.html", "/ORBITX_DEX/manifest.webmanifest", "/ORBITX_DEX/ogdex-logo.png", "/ORBITX_DEX/pwa-192.png"];

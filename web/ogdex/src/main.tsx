@@ -68,8 +68,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="launchpad" element={<Suspense fallback={<PageFallback />}><Launchpad /></Suspense>} />
           <Route path="robinhood" element={<Suspense fallback={<PageFallback />}><Robinhood /></Suspense>} />
           <Route path="robinhood/scanner" element={<Suspense fallback={<PageFallback />}><RobinhoodScanner /></Suspense>} />
-          {/* Launcher moved into the Launchpad — keep /launch as a redirect. */}
-          <Route path="launch" element={<Navigate to="/launchpad" replace />} />
+          {/* Launcher → Tools create; new → real launchpad */}
+          <Route path="launch" element={<Navigate to="/tools?tab=create" replace />} />
           <Route path="new" element={<Navigate to="/launchpad" replace />} />
           <Route path="wallet" element={<Suspense fallback={<PageFallback />}><WalletIndex /></Suspense>} />
           <Route path="wallet/:address" element={<Suspense fallback={<PageFallback />}><Wallet /></Suspense>} />

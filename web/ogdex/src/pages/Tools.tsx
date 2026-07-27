@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Shield, Users, Droplets, Wallet2, Calculator, Search, Loader2, ArrowRight,
   Crosshair, ExternalLink, CheckCircle2, XCircle, AlertTriangle, RefreshCw,
@@ -10,10 +10,14 @@ import {
   type Holder, type Pool, type WalletProfile,
 } from "../lib/scan";
 import { getScreener, fmtUsd, compact, type Row } from "../lib/api";
+import { PageHero, DexPanel } from "../components/PageShell";
 
-type ToolId = "sniper" | "holders" | "liquidity" | "wallet" | "staking" | "il";
+const Launch = lazy(() => import("./Launch"));
 
-const TOOLS: { id: ToolId; label: string; desc: string; cmd: string; Icon: typeof Shield; kind: "feed" | "mint" | "wallet" | "calc"; ph: string }[] = [
+type ToolId = "create" | "sniper" | "holders" | "liquidity" | "wallet" | "staking" | "il";
+
+const TOOLS: { id: ToolId; label: string; desc: string; cmd: string; Icon: typeof Shield; kind: "feed" | "mint" | "wallet" | "calc" | "create"; ph: string }[] = [
+  { id: "create",   label: "Create token",     desc: "Multi-chain launcher",       cmd: "launch --chain",    Icon: Rocket,     kind: "create", ph: "" },
   { id: "sniper",   label: "Token Sniper",     desc: "Live pump.fun launches",     cmd: "snipe --live",      Icon: Crosshair,  kind: "feed",   ph: "" },
   { id: "holders",  label: "Holder Analysis",  desc: "Top holder distribution",    cmd: "holders --top 20",  Icon: Users,      kind: "mint",   ph: "paste token contract address" },
   { id: "liquidity",label: "Liquidity Scanner",desc: "Pools & liquidity depth",    cmd: "liq --depth",       Icon: Droplets,   kind: "mint",   ph: "paste token contract address" },
@@ -27,7 +31,9 @@ const fmt = (n: number | null | undefined, d = 2) =>
 const short = (a: string) => (a && a.length > 12 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a);
 
 export default function Tools() {
-  const [tool, setTool] = useState<ToolId>("sniper");
+  const [params] = useSearchParams();
+  const initial = (params.get("tab") as ToolId) || "sniper";
+  const [tool, setTool] = useState<ToolId>(TOOLS.some((t) => t.id === initial) ? initial : "sniper");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -55,43 +61,50 @@ export default function Tools() {
   const pickTool = (id: ToolId) => { setTool(id); setResult(null); setError(""); setInput(""); };
 
   return (
-    <div className="mx-auto max-w-[1080px] space-y-6 px-4 py-6">
-      <div className="term-panel bg-term-grid px-4 sm:px-5 py-4">
-        <div className="term text-[11px]" style={{ color: "#66707E" }}>
-          <span style={{ color: "#00FFA3" }}>orbitx@dex</span><span>:~$</span> tools --list --all
-        </div>
-        <div className="flex items-end gap-3 mt-1.5">
-          <h1 className="font-display text-2xl font-black text-white flex items-center gap-2"><Crosshair className="h-5 w-5 text-accent" /> TOOLKIT</h1>
-          <span className="pill bg-accent/15 text-accent text-[10px] term font-bold mb-0.5">6 MODULES LOADED</span>
-        </div>
-      </div>
+    <div className="mx-auto max-w-[1080px] space-y-6">
+      <PageHero
+        kicker="Terminal tools"
+        title="Tools"
+        sub="Sniper feeds, holder analysis, liquidity scans, wallet profiles — plus multi-chain token create."
+        icon={Crosshair}
+      />
 
-      {/* Tool selector */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="flex flex-wrap gap-2">
         {TOOLS.map((t) => (
-          <button key={t.id} onClick={() => pickTool(t.id)}
-            className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition ${tool === t.id ? "border-accent/60 bg-accent/10 shadow-glow-term" : "border-line bg-panel hover:border-accent/30"}`}>
-            <span className="flex items-center gap-1.5 w-full">
-              <t.Icon className={`h-4 w-4 ${tool === t.id ? "text-accent" : "text-muted"}`} />
-              {tool === t.id && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
-            </span>
-            <span className="text-[12.5px] font-bold text-white">{t.label}</span>
-            <span className={`term text-[9.5px] leading-tight ${tool === t.id ? "text-accent/80" : "text-faint"}`}>$ {t.cmd}</span>
-            <span className="text-[10px] text-muted leading-tight">{t.desc}</span>
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => pickTool(t.id)}
+            className={`dex-cat-pill ${tool === t.id ? "dex-cat-pill--on" : ""}`}
+          >
+            <t.Icon className="w-3.5 h-3.5" /> {t.label}
           </button>
         ))}
       </div>
 
-      {/* ── Tool body ── */}
+      {tool === "create" ? (
+        <DexPanel className="p-2 sm:p-4">
+          <Suspense fallback={<div className="grid place-items-center py-16 text-muted"><Loader2 className="w-5 h-5 animate-spin" /></div>}>
+            <Launch />
+          </Suspense>
+        </DexPanel>
+      ) : (
+      <>
+      <div className="dex-panel px-4 sm:px-5 py-4">
+        <div className="term text-[11px] text-[var(--ox-silver)]">
+          <span className="text-[var(--ox-blue-hi)]">orbitx@terminal</span> — {active.label}
+        </div>
+        <p className="mt-1 text-sm text-[var(--ox-silver)]">{active.desc}</p>
+      </div>
+
       {tool === "sniper" ? <TokenSniper /> : tool === "staking" ? <StakingCalc /> : tool === "il" ? <ImpermanentLoss /> : (
         <>
-          <form onSubmit={run} className="flex items-center gap-2 rounded-lg border border-line bg-panel p-2 focus-within:border-accent/60 focus-within:shadow-glow-term">
-            <span className="term text-xs pl-2 shrink-0 select-none"><span className="text-accent">$ {active.cmd}</span></span>
+          <form onSubmit={run} className="flex items-center gap-2 rounded-xl border border-line bg-panel p-2 focus-within:border-accent/60">
+            <span className="term text-xs pl-2 shrink-0 select-none text-[var(--ox-blue-hi)]">{active.cmd}</span>
             <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={active.ph}
-              className="flex-1 bg-transparent px-1 py-2 term text-sm text-white outline-none placeholder:text-muted/50" style={{ caretColor: "#00FFA3" }} />
-            <button type="submit" disabled={loading}
-              className="rounded-md bg-accent px-5 py-2 term text-sm font-bold text-black transition hover:brightness-110 disabled:opacity-60">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "EXEC"}
+              className="flex-1 bg-transparent px-1 py-2 term text-sm text-white outline-none placeholder:text-muted/50" />
+            <button type="submit" disabled={loading} className="dex-btn !py-2 !px-4 !text-xs disabled:opacity-60">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Run"}
             </button>
           </form>
 
@@ -104,19 +117,20 @@ export default function Tools() {
         </>
       )}
 
-      {/* Related live feeds */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link to="/new" className="card card-hover-lift flex items-center gap-3 p-4">
+        <Link to="/launchpad" className="card card-hover-lift flex items-center gap-3 p-4">
           <Rocket className="h-5 w-5 text-accent" />
-          <div><div className="text-sm font-bold text-white">Newly Listed</div><div className="term text-[10px] text-faint">$ launches --fresh</div></div>
+          <div><div className="text-sm font-bold text-white">Launchpad</div><div className="term text-[10px] text-faint">Real OrbitX desk</div></div>
           <ArrowRight className="ml-auto h-4 w-4 text-muted" />
         </Link>
         <Link to="/pulse" className="card card-hover-lift flex items-center gap-3 p-4">
           <Flame className="h-5 w-5 text-accent" />
-          <div><div className="text-sm font-bold text-white">Market Pulse</div><div className="term text-[10px] text-faint">$ pulse --signals</div></div>
+          <div><div className="text-sm font-bold text-white">Market Pulse</div><div className="term text-[10px] text-faint">Live signals</div></div>
           <ArrowRight className="ml-auto h-4 w-4 text-muted" />
         </Link>
       </div>
+      </>
+      )}
     </div>
   );
 }
