@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { Check, Copy } from "lucide-react";
 import logo from "@/assets/logo.png";
+import { OGSCAN_TOKEN_MINT, OGSCAN_DEXSCREENER_URL, shortAddr } from "@/lib/og";
 
 /* ── Data ───────────────────────────────────────────────────────── */
 
@@ -15,24 +17,80 @@ const LINKS = {
   x: "https://x.com/orbitx_wrldbackup",
   xOrbitXPredictionMarket: "https://x.com/orbitx-predictionbet",
   ogdex: "/ORBITX_DEX",
+  launchpad: "/orbitxlaunch",
   orbitxPrediction: "https://solno.fun",
   degen: "https://degen-tower.vercel.app",
   privacy: "/privacy",
   terms: "/terms",
+  caDex: OGSCAN_DEXSCREENER_URL,
 };
 
 const HERO_PLANES = [
-  { src: "/orbitx-banner.jpg", alt: "OrbitX platform" },
-  { src: "/og-brand.jpg", alt: "OrbitX brand" },
+  { src: "/ogscan-splash-banner.jpg", alt: "OrbitX product" },
+  { src: "/ogscan-shot-screener.jpg", alt: "OrbitX DEX screener" },
+  { src: "/orbitx-banner.jpg", alt: "OrbitX brand" },
   { src: "/orbitx-space-bg.png", alt: "OrbitX atmosphere" },
 ] as const;
 
-const GALLERY = [
-  { src: "/orbitx-banner.jpg", title: "Command surface", copy: "Trading, social, and intelligence in one destination." },
-  { src: "/og-brand.jpg", title: "Live intel", copy: "Scanner energy — pairs, momentum, and risk in one sweep." },
-  { src: "/orbitx-globe.png", title: "On-chain OS", copy: "Identity, wallets, and signals that follow you across the stack." },
-  { src: "/orbitx-space-bg.png", title: "Built for velocity", copy: "Same clarity on desktop and mobile — scan anywhere." },
-] as const;
+type ShowcaseShot = { src: string; label: string };
+type ProductShowcase = {
+  id: string;
+  tag: string;
+  title: string;
+  copy: string;
+  href: string;
+  cta: string;
+  tone: "gold" | "blue" | "silver";
+  shots: ShowcaseShot[];
+};
+
+const SHOWCASES: ProductShowcase[] = [
+  {
+    id: "dex",
+    tag: "OrbitX DEX",
+    title: "Trade with live intel.",
+    copy: "Screener, scanner, charts, and one-click execution — the Solana desk that stays open.",
+    href: LINKS.ogdex,
+    cta: "Open DEX",
+    tone: "blue",
+    shots: [
+      { src: "/splash/dex-01.jpg", label: "Terminal" },
+      { src: "/splash/dex-02.jpg", label: "Scanner" },
+      { src: "/splash/dex-03.jpg", label: "Pulse" },
+      { src: "/splash/dex-04.jpg", label: "Wallets" },
+    ],
+  },
+  {
+    id: "launch",
+    tag: "Launchpad",
+    title: "Ship coins. Keep control.",
+    copy: "Create, claim, rescue, and lead — anti-vamp checks and metal chrome for new launches.",
+    href: LINKS.launchpad,
+    cta: "Open Launchpad",
+    tone: "gold",
+    shots: [
+      { src: "/splash/launch-01.jpg", label: "Board" },
+      { src: "/splash/launch-02.jpg", label: "Create" },
+      { src: "/splash/launch-03.jpg", label: "Leaders" },
+      { src: "/splash/launch-04.jpg", label: "Claim" },
+    ],
+  },
+  {
+    id: "predict",
+    tag: "Prediction",
+    title: "Markets & fair games.",
+    copy: "Prediction markets plus Coinflip, Dice, Crash, Plinko — wired into the OrbitX stack.",
+    href: LINKS.orbitxPrediction,
+    cta: "Open solno.fun",
+    tone: "silver",
+    shots: [
+      { src: "/splash/predict-01.jpg", label: "Hero" },
+      { src: "/splash/predict-02.jpg", label: "Stats" },
+      { src: "/splash/predict-03.jpg", label: "Markets" },
+      { src: "/splash/predict-04.jpg", label: "Games" },
+    ],
+  },
+];
 
 type Feature = { tag: string; title: string; copy: string; tone: string; icon: string };
 const FEATURES: Feature[] = [
@@ -158,6 +216,161 @@ async function fetchLiveStats(): Promise<LiveStats> {
   }
 }
 
+function probeShot(src: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = Math.min(img.naturalWidth, 48);
+        const h = Math.min(img.naturalHeight, 48);
+        if (w < 8 || h < 8) { resolve(false); return; }
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const ctx = c.getContext("2d");
+        if (!ctx) { resolve(true); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h).data;
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 4) sum += data[i] + data[i + 1] + data[i + 2];
+        resolve(sum / (w * h * 3) > 8);
+      } catch {
+        resolve(true);
+      }
+    };
+    img.onerror = () => resolve(false);
+    img.src = src;
+  });
+}
+
+function useValidShots(shots: ShowcaseShot[]) {
+  const [valid, setValid] = useState<ShowcaseShot[]>(shots);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(shots.map(async (s) => ((await probeShot(s.src)) ? s : null))).then((results) => {
+      if (cancelled) return;
+      const ok = results.filter(Boolean) as ShowcaseShot[];
+      setValid(ok.length ? ok : shots);
+    });
+    return () => { cancelled = true; };
+  }, [shots]);
+  return valid;
+}
+
+function ProductSlideshow({ showcase, reverse }: { showcase: ProductShowcase; reverse?: boolean }) {
+  const shots = useValidShots(showcase.shots);
+  const [idx, setIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const touchX = useRef<number | null>(null);
+
+  useEffect(() => { setIdx(0); }, [shots]);
+
+  useEffect(() => {
+    if (paused || shots.length < 2) return;
+    const id = setInterval(() => {
+      if (!document.hidden) setIdx((i) => (i + 1) % shots.length);
+    }, 3800);
+    return () => clearInterval(id);
+  }, [paused, shots.length, idx]);
+
+  const go = (dir: number) => setIdx((i) => (i + dir + shots.length) % shots.length);
+
+  return (
+    <article className={`sp-show reveal ${reverse ? "sp-show--rev" : ""} sp-show--${showcase.tone}`}>
+      <div className="sp-show-copy">
+        <span className="sp-kicker">{showcase.tag}</span>
+        <h2 className="sp-h2">{showcase.title}</h2>
+        <p className="sp-body">{showcase.copy}</p>
+        <a
+          className="sp-btn-primary"
+          href={showcase.href}
+          {...(showcase.href.startsWith("http") ? { target: "_blank", rel: "noreferrer" } : {})}
+        >
+          {showcase.cta}
+        </a>
+      </div>
+
+      <div
+        className="sp-show-stage"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+        onTouchEnd={(e) => {
+          if (touchX.current == null) return;
+          const dx = e.changedTouches[0].clientX - touchX.current;
+          touchX.current = null;
+          if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+        }}
+      >
+        <div className="sp-show-chrome">
+          <span /><span /><span />
+          <em>{showcase.tag}</em>
+        </div>
+        <div className="sp-show-viewport">
+          {shots.map((shot, i) => (
+            <figure
+              key={shot.src}
+              className={`sp-show-slide ${i === idx ? "is-on" : ""} ${i === (idx - 1 + shots.length) % shots.length ? "is-exit" : ""}`}
+            >
+              <img src={shot.src} alt={`${showcase.tag} — ${shot.label}`} loading="lazy" decoding="async" draggable={false} />
+            </figure>
+          ))}
+          <div className="sp-show-progress" aria-hidden>
+            <i key={idx} style={{ animationDuration: "3.8s" }} />
+          </div>
+        </div>
+        <div className="sp-show-controls">
+          <button type="button" className="sp-show-arrow" aria-label="Previous" onClick={() => go(-1)}>‹</button>
+          <div className="sp-show-dots">
+            {shots.map((s, i) => (
+              <button
+                key={s.src}
+                type="button"
+                aria-label={s.label}
+                className={i === idx ? "on" : ""}
+                onClick={() => setIdx(i)}
+              />
+            ))}
+          </div>
+          <button type="button" className="sp-show-arrow" aria-label="Next" onClick={() => go(1)}>›</button>
+          <span className="sp-show-caption">{shots[idx]?.label}</span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CaBar({ id }: { id?: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(OGSCAN_TOKEN_MINT);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch { /* ignore */ }
+  };
+  return (
+    <section id={id} className="sp-ca reveal" aria-label="Official contract address">
+      <div className="sp-ca-inner">
+        <div className="sp-ca-meta">
+          <img src="/ogscan-our-coin-logo.webp" alt="" width={40} height={40} className="sp-ca-logo" />
+          <div>
+            <span className="sp-ca-kicker">Official CA</span>
+            <strong className="sp-ca-name">OrbitX · $OGS</strong>
+          </div>
+        </div>
+        <code className="sp-ca-addr" title={OGSCAN_TOKEN_MINT}>{OGSCAN_TOKEN_MINT}</code>
+        <div className="sp-ca-actions">
+          <button type="button" className="sp-ca-copy" onClick={copy}>
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? "Copied" : "Copy CA"}
+          </button>
+          <a className="sp-btn-ghost sm" href={LINKS.caDex} target="_blank" rel="noreferrer">DexScreener</a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ── Component ──────────────────────────────────────────────────── */
 
 export default function Splash() {
@@ -203,7 +416,7 @@ export default function Splash() {
         child.style.transitionDelay = `${i * 70}ms`;
         child.classList.add("in");
       });
-    }), { threshold: 0.12 });
+    }), { threshold: 0.14, rootMargin: "0px 0px -8% 0px" });
     document.querySelectorAll<HTMLElement>(".reveal").forEach((el) => io.observe(el));
     return () => io.disconnect();
   }, []);
@@ -265,7 +478,7 @@ export default function Splash() {
           <a href="#product">Product</a>
           <a href="#build">Build</a>
           <a href="#roadmap">Roadmap</a>
-          <a href="#ecosystem">Ecosystem</a>
+          <a href="#ca">CA</a>
         </div>
         <div className="sp-nav-cta">
           <a className="sp-btn-ghost sm" href={LINKS.signin}>Sign in</a>
@@ -309,6 +522,8 @@ export default function Splash() {
         </div>
       </header>
 
+      <CaBar id="ca" />
+
       <section className="sp-statbar reveal" aria-label="Live platform statistics">
         <div className="sp-statbar-inner">
           <p className="sp-stat-live">
@@ -341,21 +556,15 @@ export default function Splash() {
         </div>
       </div>
 
-      <section id="product" className="sp-sec reveal">
-        <span className="sp-kicker">Inside the product</span>
-        <h2 className="sp-h2">Real surfaces.<br />Not mockups.</h2>
-        <p className="sp-body">Live OrbitX atmosphere — the same stack you open after signup.</p>
-        <div className="sp-gallery">
-          {GALLERY.map((g, i) => (
-            <article key={g.src} className={`sp-shot stagger ${i === 0 ? "sp-shot-hero" : ""}`} style={{ transitionDelay: `${i * 60}ms` }}>
-              <div className="sp-shot-frame">
-                <img src={g.src} alt={g.title} loading="lazy" decoding="async" />
-              </div>
-              <h3>{g.title}</h3>
-              <p>{g.copy}</p>
-            </article>
-          ))}
+      <section id="product" className="sp-product">
+        <div className="sp-sec reveal" style={{ paddingBottom: 24 }}>
+          <span className="sp-kicker">Inside the product</span>
+          <h2 className="sp-h2">Real surfaces.<br />Live product shots.</h2>
+          <p className="sp-body">DEX, Launchpad, and Prediction — swipe or autoplay through each desk.</p>
         </div>
+        {SHOWCASES.map((s, i) => (
+          <ProductSlideshow key={s.id} showcase={s} reverse={i % 2 === 1} />
+        ))}
       </section>
 
       <section id="problem" className="sp-sec reveal">
@@ -441,17 +650,17 @@ export default function Splash() {
             <p>Real-time Solana screener, scanner & trading.</p>
             <span className="sp-eco-link">Open →</span>
           </a>
+          <a className="sp-eco-card stagger" href={LINKS.launchpad} onMouseMove={handleCardMouse}>
+            <div className="sp-eco-icon" style={{ ["--ic" as string]: "#F0C75E" }}><Icon name="launch" /></div>
+            <h3>Launchpad</h3>
+            <p>Create, claim, rescue — anti-vamp from minute one.</p>
+            <span className="sp-eco-link">Launch →</span>
+          </a>
           <a className="sp-eco-card stagger" href={LINKS.orbitxPrediction} target="_blank" rel="noreferrer" onMouseMove={handleCardMouse}>
-            <div className="sp-eco-icon" style={{ ["--ic" as string]: "#F0C75E" }}><Icon name="target" /></div>
+            <div className="sp-eco-icon" style={{ ["--ic" as string]: "#A8B0BC" }}><Icon name="target" /></div>
             <h3>Prediction Market</h3>
             <p>Markets + provably-fair 1v1 games.</p>
             <span className="sp-eco-link">solno.fun →</span>
-          </a>
-          <a className="sp-eco-card stagger" href={LINKS.degen} target="_blank" rel="noreferrer" onMouseMove={handleCardMouse}>
-            <div className="sp-eco-icon" style={{ ["--ic" as string]: "#A8B0BC" }}><Icon name="gamepad" /></div>
-            <h3>Degen Tower</h3>
-            <p>Tap-to-earn with real USDC payouts.</p>
-            <span className="sp-eco-link">Play →</span>
           </a>
         </div>
       </section>
@@ -473,9 +682,17 @@ export default function Splash() {
             <div>
               <h4>Product</h4>
               <a href={LINKS.ogdex}>OrbitX DEX</a>
+              <a href={LINKS.launchpad}>Launchpad</a>
               <a href={LINKS.orbitxPrediction} target="_blank" rel="noreferrer">Prediction Market</a>
-              <a href={LINKS.degen} target="_blank" rel="noreferrer">Degen Tower</a>
               <a href={LINKS.signup}>Sign up</a>
+            </div>
+            <div>
+              <h4>Token</h4>
+              <button type="button" className="sp-foot-ca" onClick={() => navigator.clipboard.writeText(OGSCAN_TOKEN_MINT).catch(() => undefined)}>
+                CA · {shortAddr(OGSCAN_TOKEN_MINT, 6)}
+              </button>
+              <a href={LINKS.caDex} target="_blank" rel="noreferrer">DexScreener</a>
+              <a href={LINKS.degen} target="_blank" rel="noreferrer">Degen Tower</a>
             </div>
             <div>
               <h4>Community</h4>
@@ -492,6 +709,7 @@ export default function Splash() {
         </div>
         <div className="sp-foot-bottom">
           <span>© {new Date().getFullYear()} {BRAND}. Building in public.</span>
+          <span className="sp-foot-mint">{OGSCAN_TOKEN_MINT}</span>
         </div>
       </footer>
     </div>
@@ -524,6 +742,7 @@ const css = `
 }
 .sp *, .sp *::before, .sp *::after { box-sizing: border-box; }
 .sp a { text-decoration: none; color: inherit; }
+.sp button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
 
 .sp-noise {
   position: fixed; inset: 0; z-index: 80; pointer-events: none; opacity: 0.045;
@@ -531,12 +750,11 @@ const css = `
   background-size: 200px;
 }
 
-/* ── Nav ── */
 .sp-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 18px clamp(18px, 4vw, 48px);
-  transition: background .35s, border-color .35s, backdrop-filter .35s;
+  transition: background .35s, border-color .35s, backdrop-filter .35s, transform .4s;
 }
 .sp-nav.scrolled {
   background: rgba(5,5,5,0.82);
@@ -580,7 +798,7 @@ const css = `
   padding: 15px 26px; border-radius: 12px;
   background: linear-gradient(180deg, var(--gold-hi), var(--gold));
   box-shadow: 0 12px 32px -14px rgba(212,175,55,0.75);
-  transition: transform .2s, filter .2s;
+  transition: transform .25s cubic-bezier(0.16,1,0.3,1), filter .2s;
 }
 .sp-btn-primary:hover { transform: translateY(-2px); filter: brightness(1.05); }
 .sp-btn-primary.lg { font-size: 15px; padding: 17px 32px; }
@@ -592,16 +810,17 @@ const css = `
   border: 1px solid var(--line-bright);
   background: rgba(255,255,255,0.04);
   backdrop-filter: blur(8px);
-  transition: border-color .2s, background .2s, color .2s;
+  transition: border-color .2s, background .2s, color .2s, transform .2s;
 }
 .sp-btn-ghost.sm { font-size: 12px; padding: 9px 14px; }
 .sp-btn-ghost:hover {
   border-color: rgba(96,165,250,0.5);
   background: rgba(59,130,246,0.1);
   color: #fff;
+  transform: translateY(-1px);
 }
 
-/* ── Hero — one full-bleed composition ── */
+/* ── Hero ── */
 .sp-hero {
   position: relative;
   min-height: 100vh; min-height: 100dvh;
@@ -619,9 +838,9 @@ const css = `
   width: 100%; height: 100%;
   object-fit: cover; object-position: center 35%;
   opacity: 0;
-  transform: scale(1.04);
-  transition: opacity 1.4s ease, transform 6.2s ease;
-  filter: saturate(1.05) contrast(1.05) brightness(0.72);
+  transform: scale(1.08);
+  transition: opacity 1.6s cubic-bezier(0.4,0,0.2,1), transform 7s ease;
+  filter: saturate(1.05) contrast(1.05) brightness(0.7);
 }
 .sp-hero-plane.is-on {
   opacity: 1;
@@ -650,7 +869,6 @@ const css = `
   mix-blend-mode: screen;
   filter: drop-shadow(0 0 40px rgba(59,130,246,0.25));
   animation: globeFloat 14s ease-in-out infinite alternate;
-  transform: translate3d(calc(var(--mx,0) * -0.5), calc(var(--my,0) * -0.4), 0);
 }
 @keyframes globeFloat {
   from { transform: translate3d(0, 0, 0) rotate(-2deg); }
@@ -679,7 +897,6 @@ const css = `
   letter-spacing: -0.055em;
   font-weight: 800;
   color: #fff;
-  text-wrap: balance;
 }
 .sp-brand-hero span {
   background: linear-gradient(135deg, var(--gold-hi) 10%, var(--gold) 55%, #fff 120%);
@@ -702,7 +919,6 @@ const css = `
   display: flex; gap: 12px; flex-wrap: wrap;
   margin-top: clamp(26px, 4vh, 36px);
 }
-
 .sp-hero-scroll {
   position: absolute; z-index: 3;
   right: clamp(18px, 4vw, 48px); bottom: clamp(28px, 5vh, 48px);
@@ -724,17 +940,63 @@ const css = `
   .sp-hero-scroll { display: none; }
   .sp-hero-globe { opacity: 0.22; right: -20%; width: 70vw; }
   .sp-hero { justify-content: flex-end; padding-bottom: 48px; }
-  .sp-hero-scrim {
-    background:
-      linear-gradient(180deg, rgba(5,5,5,0.4) 0%, rgba(5,5,5,0.35) 35%, rgba(5,5,5,0.85) 70%, var(--bg) 100%),
-      linear-gradient(90deg, rgba(5,5,5,0.75), rgba(5,5,5,0.35));
-  }
 }
 
-/* ── Stats (below hero) ── */
+/* ── CA bar ── */
+.sp-ca { position: relative; z-index: 2; }
+.sp-ca-inner {
+  max-width: 1140px; margin: 0 auto;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 18px clamp(18px, 4vw, 40px);
+  border-block: 1px solid var(--line);
+  background:
+    linear-gradient(90deg, rgba(212,175,55,0.08), transparent 40%, rgba(59,130,246,0.06)),
+    #080808;
+}
+.sp-ca-meta { display: flex; align-items: center; gap: 12px; min-width: 160px; }
+.sp-ca-logo {
+  border-radius: 10px;
+  border: 1px solid rgba(212,175,55,0.35);
+  background: #111;
+}
+.sp-ca-kicker {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold-hi);
+}
+.sp-ca-name {
+  display: block; margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: 15px; font-weight: 700; letter-spacing: -0.02em;
+}
+.sp-ca-addr {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 1.2vw, 12.5px);
+  color: var(--silver);
+  letter-spacing: 0.01em;
+  word-break: break-all;
+}
+.sp-ca-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.sp-ca-copy {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-display);
+  font-size: 12px; font-weight: 700; color: #0a0a0a;
+  padding: 10px 14px; border-radius: 10px;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  transition: transform .2s, filter .2s;
+}
+.sp-ca-copy:hover { transform: translateY(-1px); filter: brightness(1.05); }
+@media(max-width:640px) {
+  .sp-ca-inner { flex-direction: column; align-items: stretch; }
+  .sp-ca-actions { margin-left: 0; }
+  .sp-ca-addr { white-space: normal; word-break: break-all; }
+}
+
+/* ── Stats ── */
 .sp-statbar {
   position: relative; z-index: 2;
-  border-top: 1px solid var(--line);
   background: linear-gradient(180deg, #0a0a0a, var(--bg));
 }
 .sp-statbar-inner {
@@ -757,13 +1019,8 @@ const css = `
   70% { box-shadow: 0 0 0 10px rgba(59,130,246,0); }
   100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
 }
-.sp-stats {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-}
-.sp-stat {
-  padding: 8px 4px 4px 0;
-  border-right: 1px solid var(--line);
-}
+.sp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sp-stat { padding: 8px 4px 4px 0; border-right: 1px solid var(--line); }
 .sp-stat:last-child { border-right: none; }
 .sp-stat strong {
   display: block;
@@ -802,6 +1059,7 @@ const css = `
   max-width: 1140px; margin: 0 auto;
   padding: clamp(64px, 11vw, 120px) clamp(18px, 4vw, 40px);
 }
+.sp-product { position: relative; z-index: 2; padding-bottom: 40px; }
 .sp-kicker {
   display: inline-block;
   font-family: var(--font-mono);
@@ -820,52 +1078,152 @@ const css = `
   line-height: 1.65; color: var(--muted); font-weight: 500;
 }
 
-.sp-gallery {
+/* ── Product showcases / slideshows ── */
+.sp-show {
+  max-width: 1180px; margin: 0 auto;
+  padding: clamp(36px, 6vw, 72px) clamp(18px, 4vw, 40px);
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 14px; margin-top: 32px;
+  grid-template-columns: 0.9fr 1.2fr;
+  gap: clamp(28px, 5vw, 56px);
+  align-items: center;
 }
-.sp-shot { grid-column: span 4; }
-.sp-shot-hero { grid-column: span 8; }
-@media(max-width:900px) {
-  .sp-shot, .sp-shot-hero { grid-column: span 6; }
+.sp-show--rev { direction: rtl; }
+.sp-show--rev > * { direction: ltr; }
+@media(max-width:960px) {
+  .sp-show, .sp-show--rev { grid-template-columns: 1fr; direction: ltr; }
 }
-@media(max-width:600px) {
-  .sp-shot, .sp-shot-hero { grid-column: span 12; }
-}
-.sp-shot-frame {
+.sp-show-copy .sp-btn-primary { margin-top: 28px; }
+.sp-show-stage {
   position: relative;
-  border-radius: 4px; overflow: hidden;
+  border-radius: 16px;
   border: 1px solid var(--line);
-  aspect-ratio: 16/10;
-  background: #0a0a0a;
-  transition: transform .4s cubic-bezier(0.16,1,0.3,1), border-color .3s, box-shadow .3s;
-  box-shadow: 0 24px 50px -28px rgba(0,0,0,0.8);
+  background: linear-gradient(180deg, #121212, #080808);
+  box-shadow:
+    0 40px 80px -36px rgba(0,0,0,0.9),
+    0 0 0 1px rgba(255,255,255,0.03) inset;
+  overflow: hidden;
+  transform: perspective(1200px) rotateY(-4deg) rotateX(2deg);
+  transition: transform .5s cubic-bezier(0.16,1,0.3,1), box-shadow .4s;
 }
-.sp-shot-hero .sp-shot-frame { aspect-ratio: 16/9; }
-.sp-shot:hover .sp-shot-frame {
-  transform: translateY(-6px);
-  border-color: rgba(212,175,55,0.4);
-  box-shadow: 0 36px 70px -24px rgba(212,175,55,0.2);
+.sp-show--rev .sp-show-stage { transform: perspective(1200px) rotateY(4deg) rotateX(2deg); }
+.sp-show-stage:hover {
+  transform: perspective(1200px) rotateY(0deg) rotateX(0deg) translateY(-4px);
+  box-shadow: 0 48px 90px -30px rgba(0,0,0,0.95), 0 0 40px -20px var(--tone, rgba(212,175,55,0.35));
 }
-.sp-shot-frame img {
-  width: 100%; height: 100%; object-fit: cover; object-position: center;
-  display: block; filter: saturate(1.05) contrast(1.03);
+.sp-show--gold { --tone: rgba(212,175,55,0.4); }
+.sp-show--blue { --tone: rgba(59,130,246,0.4); }
+.sp-show--silver { --tone: rgba(168,176,188,0.35); }
+.sp-show--gold .sp-show-stage { border-color: rgba(212,175,55,0.22); }
+.sp-show--blue .sp-show-stage { border-color: rgba(59,130,246,0.22); }
+.sp-show--silver .sp-show-stage { border-color: rgba(168,176,188,0.22); }
+
+.sp-show-chrome {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(0,0,0,0.45);
 }
-.sp-shot h3 {
-  margin: 12px 0 4px;
-  font-family: var(--font-display);
-  font-size: 17px; font-weight: 700; letter-spacing: -0.03em;
+.sp-show-chrome span {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(255,255,255,0.18);
 }
-.sp-shot p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.sp-show-chrome span:nth-child(1) { background: #ff5f57; }
+.sp-show-chrome span:nth-child(2) { background: #febc2e; }
+.sp-show-chrome span:nth-child(3) { background: #28c840; }
+.sp-show-chrome em {
+  margin-left: 10px;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+}
+.sp-show-viewport {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: #000;
+  overflow: hidden;
+}
+.sp-show-slide {
+  position: absolute; inset: 0; margin: 0;
+  opacity: 0;
+  transform: scale(1.04) translateX(18px);
+  filter: blur(6px);
+  transition:
+    opacity .85s cubic-bezier(0.22,1,0.36,1),
+    transform 1s cubic-bezier(0.22,1,0.36,1),
+    filter .85s ease;
+  pointer-events: none;
+}
+.sp-show-slide.is-on {
+  opacity: 1;
+  transform: scale(1) translateX(0);
+  filter: none;
+  z-index: 2;
+  animation: ken 3.8s ease-out both;
+}
+.sp-show-slide.is-exit {
+  opacity: 0;
+  transform: scale(0.98) translateX(-24px);
+  filter: blur(4px);
+  z-index: 1;
+}
+@keyframes ken {
+  from { transform: scale(1) translateX(0); }
+  to { transform: scale(1.045) translateX(-1.5%); }
+}
+.sp-show-slide img {
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: top center;
+  display: block;
+}
+.sp-show-progress {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+  height: 2px; background: rgba(255,255,255,0.08);
+}
+.sp-show-progress i {
+  display: block; height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--gold-hi), var(--blue-hi));
+  animation: prog linear forwards;
+}
+@keyframes prog { to { width: 100%; } }
+.sp-show-controls {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  background: rgba(0,0,0,0.35);
+}
+.sp-show-arrow {
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  color: #fff; font-size: 18px; line-height: 1;
+  transition: background .2s, border-color .2s;
+}
+.sp-show-arrow:hover { background: rgba(255,255,255,0.06); border-color: var(--line-bright); }
+.sp-show-dots { display: flex; gap: 6px; }
+.sp-show-dots button {
+  width: 7px; height: 7px; border-radius: 50%; padding: 0;
+  background: rgba(255,255,255,0.22);
+  transition: width .25s, background .25s, border-radius .25s;
+}
+.sp-show-dots button.on {
+  width: 20px; border-radius: 999px;
+  background: var(--gold-hi);
+}
+.sp-show-caption {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+}
 
 .sp-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
 .sp-chip {
   font-size: 12.5px; color: #c5d0e0; font-weight: 500;
   padding: 8px 12px; border-radius: 999px;
   border: 1px solid var(--line); background: rgba(255,255,255,0.02);
+  transition: border-color .2s, color .2s, transform .2s;
 }
-.sp-chip:hover { border-color: rgba(212,175,55,0.4); color: #fff; }
+.sp-chip:hover { border-color: rgba(212,175,55,0.4); color: #fff; transform: translateY(-1px); }
 
 .sp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 32px; }
 @media(max-width:900px) { .sp-grid { grid-template-columns: 1fr 1fr; } }
@@ -874,7 +1232,7 @@ const css = `
   position: relative; border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
   border-radius: 14px; padding: 22px; overflow: hidden;
-  transition: border-color .3s, transform .3s;
+  transition: border-color .3s, transform .35s cubic-bezier(0.16,1,0.3,1);
 }
 .sp-card-glow {
   position: absolute; inset: 0; opacity: 0; pointer-events: none;
@@ -923,7 +1281,9 @@ const css = `
 .sp-phase {
   border: 1px solid var(--line); border-radius: 14px; padding: 18px;
   background: rgba(255,255,255,0.015);
+  transition: transform .3s, border-color .3s;
 }
+.sp-phase:hover { transform: translateY(-3px); }
 .sp-phase-active {
   border-color: rgba(212,175,55,0.35);
   background: linear-gradient(160deg, rgba(212,175,55,0.08), transparent);
@@ -954,7 +1314,7 @@ const css = `
 .sp-eco-card {
   border: 1px solid var(--line); border-radius: 14px; padding: 24px;
   background: linear-gradient(160deg, rgba(212,175,55,0.05), rgba(255,255,255,0.01));
-  transition: border-color .3s, transform .3s;
+  transition: border-color .3s, transform .35s cubic-bezier(0.16,1,0.3,1);
 }
 .sp-eco-card:hover { border-color: rgba(212,175,55,0.4); transform: translateY(-3px); }
 .sp-eco-icon {
@@ -1001,21 +1361,40 @@ const css = `
   font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
   color: #657084; margin: 0 0 10px; font-weight: 600;
 }
-.sp-foot-cols a { display: block; font-size: 13.5px; color: #8b95a8; margin-bottom: 8px; font-weight: 500; }
-.sp-foot-cols a:hover { color: var(--gold-hi); }
+.sp-foot-cols a, .sp-foot-ca {
+  display: block; font-size: 13.5px; color: #8b95a8; margin-bottom: 8px; font-weight: 500; text-align: left;
+}
+.sp-foot-cols a:hover, .sp-foot-ca:hover { color: var(--gold-hi); }
 .sp-foot-bottom {
   max-width: 1140px; margin: 32px auto 0; padding-top: 18px;
   border-top: 1px solid var(--line); font-size: 12px; color: #5a6275;
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.sp-foot-mint {
+  font-family: var(--font-mono);
+  font-size: 10px; word-break: break-all; color: #6b7280;
 }
 
-.reveal { opacity: 0; transform: translateY(24px); transition: opacity .85s cubic-bezier(0.16,1,0.3,1), transform .85s cubic-bezier(0.16,1,0.3,1); }
-.reveal.in { opacity: 1; transform: none; }
-.stagger { opacity: 0; transform: translateY(14px); transition: opacity .6s cubic-bezier(0.16,1,0.3,1), transform .6s cubic-bezier(0.16,1,0.3,1); }
+.reveal {
+  opacity: 0;
+  transform: translateY(36px) scale(0.985);
+  filter: blur(4px);
+  transition:
+    opacity .9s cubic-bezier(0.16,1,0.3,1),
+    transform .9s cubic-bezier(0.16,1,0.3,1),
+    filter .9s ease;
+}
+.reveal.in { opacity: 1; transform: none; filter: none; }
+.stagger {
+  opacity: 0; transform: translateY(16px);
+  transition: opacity .65s cubic-bezier(0.16,1,0.3,1), transform .65s cubic-bezier(0.16,1,0.3,1);
+}
 .stagger.in { opacity: 1; transform: none; }
 .sp ::selection { background: rgba(212,175,55,0.3); color: #fff; }
 @media (prefers-reduced-motion: no-preference) { .sp { scroll-behavior: smooth; } }
 @media (prefers-reduced-motion: reduce) {
-  .sp-hero-globe, .sp-live-dot, .sp-marquee-track, .sp-hero-scroll i { animation: none !important; }
-  .sp-hero-plane { transition: opacity .4s ease !important; }
+  .sp-hero-globe, .sp-live-dot, .sp-marquee-track, .sp-hero-scroll i, .sp-show-slide.is-on, .sp-show-progress i { animation: none !important; }
+  .sp-hero-plane, .sp-show-slide { transition: opacity .35s ease !important; }
+  .reveal, .stagger { filter: none; transform: none; }
 }
 `;
