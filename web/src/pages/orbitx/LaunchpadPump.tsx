@@ -36,7 +36,7 @@ import {
   Loader2, CheckCircle, Copy, ExternalLink, Wallet, AlertTriangle, AlertCircle,
   Sparkles, Zap, ArrowRight, X, Info, DollarSign, Plus,
   TrendingUp, TrendingDown, Clock, BarChart3, Droplets,
-  Users, ArrowLeft, RefreshCw, Search, ChevronRight,
+  Users, ArrowLeft, RefreshCw, Search, ChevronRight, Wand2, CheckCircle2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Confetti } from "./lpx";
@@ -47,6 +47,37 @@ const MAX_IMG_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMG = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 const STORAGE_KEY = "ogscan_launched_tokens";
+
+function estimateVanity(prefix: string, ratePerSec: number) {
+  const clean = prefix.replace(/[^1-9A-HJ-NP-Za-km-z]/g, "");
+  const n = clean.length;
+  const perCharSpace = 58 / 2;
+  const expected = Math.pow(perCharSpace, n);
+  const seconds = ratePerSec > 0 ? expected / ratePerSec : Infinity;
+  return { n, expected, seconds };
+}
+function humanTime(sec: number) {
+  if (!isFinite(sec)) return "—";
+  if (sec < 1) return "<1s";
+  if (sec < 60) return `${Math.round(sec)}s`;
+  if (sec < 3600) return `${Math.round(sec / 60)}m`;
+  if (sec < 86400) return `${(sec / 3600).toFixed(1)}h`;
+  return `${(sec / 86400).toFixed(1)}d`;
+}
+
+function VanityStatChip({ label, value, tone = "gold" }: { label: string; value: string; tone?: "gold" | "cyan" | "lime" | "blood" }) {
+  const toneHsl =
+    tone === "cyan" ? "hsl(var(--og-cyan))" :
+    tone === "lime" ? "hsl(var(--og-lime))" :
+    tone === "blood" ? "hsl(var(--og-blood))" :
+    "hsl(var(--og-gold))";
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+      <div className="font-mono text-[9px] uppercase tracking-widest text-white/35">{label}</div>
+      <div className="mt-0.5 font-mono text-sm font-bold" style={{ color: toneHsl }}>{value}</div>
+    </div>
+  );
+}
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
 
@@ -503,6 +534,64 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const [checkError, setCheckError] = useState(false);
   const nameCheckTimer = useRef<ReturnType<typeof setTimeout>>();
 
+  // Custom vanity mint grind (same UX as /orbitxlaunch/create custom lane).
+  const [vanityPrefix, setVanityPrefix] = useState("OBX");
+  const [grinding, setGrinding] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [foundKey, setFoundKey] = useState<string | null>(null);
+  const [rate, setRate] = useState(0);
+  const grindStop = useRef(false);
+  const foundKpRef = useRef<Keypair | null>(null);
+  const vanityEst = useMemo(() => estimateVanity(vanityPrefix, rate || 8000), [vanityPrefix, rate]);
+
+  const runGrind = useCallback(() => {
+    const target = vanityPrefix.trim();
+    if (!target) {
+      toast.error("Enter a vanity prefix (e.g. OBX)");
+      return;
+    }
+    setGrinding(true);
+    setFoundKey(null);
+    setAttempts(0);
+    foundKpRef.current = null;
+    grindStop.current = false;
+    const started = performance.now();
+    let count = 0;
+    const CHUNK = 1200;
+    const targetLower = target.toLowerCase();
+    const step = () => {
+      if (grindStop.current) {
+        setGrinding(false);
+        return;
+      }
+      for (let i = 0; i < CHUNK; i++) {
+        const kp = Keypair.generate();
+        count++;
+        const addr = kp.publicKey.toBase58();
+        if (addr.toLowerCase().startsWith(targetLower)) {
+          foundKpRef.current = kp;
+          setFoundKey(addr);
+          setAttempts(count);
+          setRate(Math.round((count / (performance.now() - started)) * 1000));
+          setGrinding(false);
+          toast.success(`Found ${target}… address in ${count.toLocaleString()} tries`);
+          return;
+        }
+      }
+      setAttempts(count);
+      setRate(Math.round((count / (performance.now() - started)) * 1000));
+      if (count > 2_500_000) {
+        setGrinding(false);
+        toast.error("Grind ceiling reached — try a shorter prefix (OBX is realistic, longer isn't).");
+        return;
+      }
+      setTimeout(step, 0);
+    };
+    setTimeout(step, 0);
+  }, [vanityPrefix]);
+
+  useEffect(() => () => { grindStop.current = true; }, []);
+
   // Debounced OrbitX Anti-Vamp check on BOTH name and ticker
   // similarity on both fields in one RPC call, so a duplicate ticker with a
   // different name blocks live here too, not just at final submit.
@@ -588,7 +677,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const canLaunch =
     connected && publicKey && signTransaction && sendTransaction &&
     form.name.trim().length > 0 && form.symbol.trim().length > 0 &&
-    !!imageFile && !nameTaken && !checkingName;
+    !!imageFile && !nameTaken && !checkingName && !grinding;
 
   /* Launch flow */
 
@@ -659,33 +748,38 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       const { metadataUri: uri } = await ipfsRes.json();
       setMetadataUri(uri);
 
-      /* Step 2 — Generate vanity mint keypair ending with "obx" */
-      setStatusMsg("Generating custom token address (ending with 'obx')…");
-      let vanityRes = await fetch("/api/vanity-mint", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ suffix: "obx", maxIterations: 5000000 }),
-      });
-      if (!vanityRes.ok && vanityRes.status === 504) {
-        // Probabilistic search — one retry before giving up.
-        setStatusMsg("Still searching for a matching address, retrying…");
-        vanityRes = await fetch("/api/vanity-mint", {
+      /* Step 2 — Vanity mint keypair (browser grind if ready, else server fallback) */
+      let mintKeypair: Keypair;
+      if (foundKpRef.current) {
+        mintKeypair = foundKpRef.current;
+        setStatusMsg(`Using your vanity mint (${vanityPrefix}…)…`);
+        setMintAddress(mintKeypair.publicKey.toBase58());
+      } else {
+        const suffix = (vanityPrefix.trim() || "obx").toLowerCase().slice(0, 5);
+        setStatusMsg(`Generating vanity address (…${suffix})…`);
+        let vanityRes = await fetch("/api/vanity-mint", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ suffix: "obx", maxIterations: 5000000 }),
+          body: JSON.stringify({ suffix, maxIterations: 5000000 }),
         });
+        if (!vanityRes.ok && vanityRes.status === 504) {
+          setStatusMsg("Still searching for a matching address, retrying…");
+          vanityRes = await fetch("/api/vanity-mint", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ suffix, maxIterations: 5000000 }),
+          });
+        }
+        if (!vanityRes.ok) {
+          const err = await vanityRes.json().catch(() => ({ error: "Vanity mint generation failed" }));
+          throw new Error(err.error || "Vanity mint generation failed");
+        }
+        const { publicKey: vanityPubKey, secretKey: vanitySecretKeyBase58, attempts: vanityAttempts, timeMs } = await vanityRes.json();
+        console.log(`[orbitx] Generated vanity mint ${vanityPubKey} after ${vanityAttempts} attempts in ${timeMs}ms`);
+        const secretKeyBytes = bs58.decode(vanitySecretKeyBase58);
+        mintKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyBytes));
+        setMintAddress(vanityPubKey);
       }
-      if (!vanityRes.ok) {
-        const err = await vanityRes.json().catch(() => ({ error: "Vanity mint generation failed" }));
-        throw new Error(err.error || "Vanity mint generation failed");
-      }
-      const { publicKey: vanityPubKey, secretKey: vanitySecretKeyBase58, attempts, timeMs } = await vanityRes.json();
-      console.log(`[v0] Generated vanity mint ${vanityPubKey} after ${attempts} attempts in ${timeMs}ms`);
-      
-      // Reconstruct the keypair from the base58-encoded secret key
-      const secretKeyBytes = bs58.decode(vanitySecretKeyBase58);
-      const mintKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyBytes));
-      setMintAddress(vanityPubKey);
 
       /* Step 3 — Get unsigned transaction from PumpPortal */
       setStatusMsg("Building launch transaction…");
@@ -819,7 +913,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             </div>
             <h1 className="font-display text-2xl md:text-3xl font-black text-white mb-2">LAUNCH ON <span className="lpx-glow text-[hsl(var(--og-lime))]">PUMP.FUN</span></h1>
             <p className="text-sm text-white/40 max-w-md mx-auto">
-              {isLaunchFeePromoActive() ? <>Launch fee <span className="font-bold text-[hsl(var(--og-lime))]">FREE for {launchFeePromoDaysLeft()} more days</span> — fill in the details and deploy with a custom "obx" vanity address.</> : <>Fill in the details and launch your token with a custom "obx" vanity address.</>}
+              {isLaunchFeePromoActive() ? <>Launch fee <span className="font-bold text-[hsl(var(--og-lime))]">FREE for {launchFeePromoDaysLeft()} more days</span> — fill in the details, optionally grind a custom vanity mint, then deploy.</> : <>Fill in the details, optionally grind a custom vanity mint, then launch.</>}
             </p>
           </div>
         </div>
@@ -1061,6 +1155,93 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               </CardContent>
             </Card>
 
+            {/* Vanity Mint Card — same custom selection as Custom launches */}
+            <Card className="lpx-panel border-0 bg-transparent">
+              <CardContent className="p-5 md:p-6 space-y-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Wand2 className="h-4 w-4 text-[hsl(var(--og-gold))]" />
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Vanity Mint Address</h3>
+                  <Badge className="bg-[hsl(var(--og-gold))]/10 text-[hsl(var(--og-gold))] border-[hsl(var(--og-gold))]/25 text-[9px]">Custom</Badge>
+                </div>
+                <div className="flex items-start gap-2 rounded-xl border border-[hsl(var(--og-cyan))]/30 bg-[hsl(var(--og-cyan))]/10 p-3 text-xs text-white/55">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-[hsl(var(--og-cyan))]" />
+                  <span>
+                    <b className="text-white/85">Same as Custom launches:</b> grind a mint that <b className="text-white/85">starts with</b> your prefix in-browser.
+                    A 3-char prefix like <span className="font-mono text-[hsl(var(--og-gold))]">OBX</span> is realistic. Longer prefixes get ~29× harder per character.
+                    If you skip grinding, launch falls back to a server vanity search for <span className="font-mono">…{vanityPrefix.trim().toLowerCase() || "obx"}</span>.
+                  </span>
+                </div>
+                <div>
+                  <Label className="text-xs text-white/40 uppercase tracking-widest mb-2 block">Desired prefix</Label>
+                  <Input
+                    value={vanityPrefix}
+                    maxLength={8}
+                    disabled={nameTaken || grinding}
+                    onChange={(e) => {
+                      const next = e.target.value.replace(/[^1-9A-HJ-NP-Za-km-z]/g, "");
+                      setVanityPrefix(next);
+                      foundKpRef.current = null;
+                      setFoundKey(null);
+                    }}
+                    className="bg-white/[0.03] border-white/[0.08] text-white font-mono uppercase placeholder:text-white/15 focus:border-[hsl(var(--og-gold))]/40 max-w-[220px] disabled:opacity-40"
+                    placeholder="OBX"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <VanityStatChip label="Length" value={String(vanityEst.n)} tone="cyan" />
+                  <VanityStatChip
+                    label="Est. tries"
+                    value={vanityEst.expected >= 1e6 ? vanityEst.expected.toExponential(1) : Math.round(vanityEst.expected).toLocaleString()}
+                    tone="gold"
+                  />
+                  <VanityStatChip label="Est. time" value={humanTime(vanityEst.seconds)} tone={vanityEst.n > 4 ? "blood" : "lime"} />
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {!grinding ? (
+                    <Button
+                      type="button"
+                      onClick={runGrind}
+                      disabled={nameTaken || !vanityPrefix.trim()}
+                      className="bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90"
+                    >
+                      <Wand2 className="mr-2 h-4 w-4" /> Start grinding
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={() => { grindStop.current = true; }}
+                      variant="outline"
+                      className="border-[hsl(var(--og-blood))]/50 text-[hsl(var(--og-blood))]"
+                    >
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Stop
+                    </Button>
+                  )}
+                  {attempts > 0 && (
+                    <span className="font-mono text-xs text-white/40">
+                      {attempts.toLocaleString()} tries{rate ? ` · ${rate.toLocaleString()}/s` : ""}
+                    </span>
+                  )}
+                </div>
+                {foundKey && (
+                  <div className="rounded-xl border border-[hsl(var(--og-lime))]/40 bg-[hsl(var(--og-lime))]/10 p-3">
+                    <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-[hsl(var(--og-lime))]">
+                      <CheckCircle2 className="h-4 w-4" /> Match found — will be used on launch
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="truncate font-mono text-xs text-white/80">{foundKey}</code>
+                      <button
+                        type="button"
+                        onClick={() => { void navigator.clipboard.writeText(foundKey); toast.success("Copied"); }}
+                        className="text-white/40 hover:text-white"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Connect wallet / Launch button */}
             {!connected ? (
               <div className="w-full flex items-center justify-center gap-2 rounded-xl border border-[hsl(var(--pf-border))] px-6 py-4 text-sm text-[hsl(var(--pf-muted))]">
@@ -1077,7 +1258,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             )}
 
   <p className="text-center text-[10px] text-white/15 leading-relaxed">
-By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity address ending in "obx".<br />{isLaunchFeePromoActive() ? <>Launch fee: <span className="font-bold text-[hsl(var(--og-lime))]">FREE for a limited time</span> (normally ${BASE_LAUNCH_FEE_USD.toFixed(2)}) — you only pay the standard network fee (~0.02 SOL).</> : <>A ${BASE_LAUNCH_FEE_USD.toFixed(2)} platform launch fee (paid in SOL) applies — the same flat fee as the custom lane — plus the standard network fee (~0.02 SOL).</>}<br />You earn pump.fun creator fees on every buy/sell (0.30% on the bonding curve, dynamic after graduation) — claim them in-app under Claim Fees.
+By launching, you agree to pump.fun's terms. Tokens are deployed on Solana mainnet with a custom vanity mint (grind your own prefix, or fall back to a server vanity search).<br />{isLaunchFeePromoActive() ? <>Launch fee: <span className="font-bold text-[hsl(var(--og-lime))]">FREE for a limited time</span> (normally ${BASE_LAUNCH_FEE_USD.toFixed(2)}) — you only pay the standard network fee (~0.02 SOL).</> : <>A ${BASE_LAUNCH_FEE_USD.toFixed(2)} platform launch fee (paid in SOL) applies — the same flat fee as the custom lane — plus the standard network fee (~0.02 SOL).</>}<br />You earn pump.fun creator fees on every buy/sell (0.30% on the bonding curve, dynamic after graduation) — claim them in-app under Claim Fees.
             </p>
           </div>
         )}
