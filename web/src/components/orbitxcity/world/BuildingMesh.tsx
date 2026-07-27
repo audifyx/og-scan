@@ -243,22 +243,68 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         </>
       )}
 
+      {/* Ground-floor storefront glass + neon marquee so venues read as enterable shops */}
+      <mesh position={[0, 1.55, size.depth / 2 + 0.02]} castShadow>
+        <boxGeometry args={[Math.min(size.width * 0.92, size.width - 0.4), 3.0, 0.12]} />
+        <meshStandardMaterial color="#12171d" metalness={0.35} roughness={0.45} />
+      </mesh>
+      <mesh position={[0, 1.55, size.depth / 2 + 0.09]}>
+        <planeGeometry args={[Math.min(size.width * 0.85, size.width - 0.8), 2.55]} />
+        <meshStandardMaterial
+          color="#0a121c"
+          emissive={accent}
+          emissiveIntensity={building.interaction ? 0.16 : 0.05}
+          metalness={0.2}
+          roughness={0.35}
+          transparent
+          opacity={0.92}
+        />
+      </mesh>
+      <mesh position={[0, 3.25, size.depth / 2 + 0.18]} castShadow>
+        <boxGeometry args={[Math.min(size.width * 0.78, 6.5), 0.45, 0.28]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} toneMapped={false} />
+      </mesh>
+      <Text
+        position={[0, 3.25, size.depth / 2 + 0.34]}
+        fontSize={0.22}
+        color="#061018"
+        anchorX="center"
+        anchorY="middle"
+        maxWidth={Math.min(size.width * 0.7, 6)}
+      >
+        {(label ?? name).toUpperCase()}
+      </Text>
+
       {/* Recessed entrance with awning + sidewalk apron */}
-      <mesh position={[0, 1.05, size.depth / 2 + 0.04]} castShadow>
+      <mesh position={[0, 1.05, size.depth / 2 + 0.12]} castShadow>
         <boxGeometry args={[doorW + 0.35, 2.4, 0.16]} />
         <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
       </mesh>
       <mesh
-        position={[0, 1.05, size.depth / 2 + 0.1]}
+        position={[0, 1.05, size.depth / 2 + 0.2]}
         onClick={(e) => {
           e.stopPropagation();
           enterBuilding(building.id);
         }}
       >
         <planeGeometry args={[doorW, 2.05]} />
-        <meshStandardMaterial color="#0c1014" emissive={accent} emissiveIntensity={0.08} metalness={0.15} roughness={0.45} />
+        <meshStandardMaterial color="#0c1014" emissive={accent} emissiveIntensity={0.18} metalness={0.15} roughness={0.45} />
       </mesh>
-      <mesh position={[0, 2.35, size.depth / 2 + 0.28]} castShadow>
+      <Text
+        position={[0, 0.35, size.depth / 2 + 0.22]}
+        fontSize={0.16}
+        color={accent}
+        anchorX="center"
+        outlineWidth={0.01}
+        outlineColor="#05080c"
+        onClick={(e) => {
+          e.stopPropagation();
+          enterBuilding(building.id);
+        }}
+      >
+        {building.interaction ? "CLICK · ENTER" : "ENTER"}
+      </Text>
+      <mesh position={[0, 2.35, size.depth / 2 + 0.38]} castShadow>
         <boxGeometry args={[doorW + 0.7, 0.12, 0.55]} />
         <meshStandardMaterial color="#3a4046" metalness={0.25} roughness={0.7} />
       </mesh>

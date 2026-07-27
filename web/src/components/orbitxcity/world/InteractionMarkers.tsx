@@ -5,13 +5,27 @@ import * as THREE from "three";
 import type { InteractionZone, Vec3 } from "@/lib/orbitxcity/types";
 
 const KIND_COLOR: Record<string, string> = {
-  marketplace: "#c4a574",
-  launch: "#b8a878",
-  trading: "#7a92a0",
-  community: "#8a7a90",
-  hq: "#6a8f6e",
-  billboard: "#7a92a0",
-  token: "#6a8f6e",
+  marketplace: "#ff4d9a",
+  launch: "#f5c542",
+  trading: "#3de7ff",
+  community: "#a78bfa",
+  hq: "#17ff4d",
+  billboard: "#3de7ff",
+  token: "#17ff4d",
+  voice: "#ff6bcb",
+  games: "#a78bfa",
+};
+
+const KIND_HINT: Record<string, string> = {
+  marketplace: "Shop · memes & buys",
+  launch: "Launch arena",
+  trading: "Trading floor",
+  community: "Social lounge",
+  hq: "OrbitX HQ",
+  billboard: "Live data wall",
+  token: "Token desk",
+  voice: "Voice club",
+  games: "Games / screen",
 };
 
 export function InteractionMarkers({
@@ -79,13 +93,13 @@ function ZoneMarker({ zone, active }: { zone: InteractionZone; active: boolean }
         <>
           <mesh position={[0, 2.55, 0]}>
             <torusGeometry args={[0.55, 0.035, 8, 32]} />
-            <meshStandardMaterial color="#8fbf8a" emissive="#6a8f6e" emissiveIntensity={0.4} metalness={0.2} roughness={0.4} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.55} metalness={0.2} roughness={0.4} />
           </mesh>
-          <Text position={[0, 3.15, 0]} fontSize={0.28} color="#d8e8d6" anchorX="center" outlineWidth={0.02} outlineColor="#1a221c">
-            SAFE ZONE
+          <Text position={[0, 3.2, 0]} fontSize={0.22} color={color} anchorX="center" outlineWidth={0.018} outlineColor="#0a1014">
+            {(KIND_HINT[zone.kind] ?? "Venue").toUpperCase()}
           </Text>
-          <Text position={[0, 2.15, 0]} fontSize={0.34} color="#eef2f4" anchorX="center" outlineWidth={0.022} outlineColor="#12161a">
-            [E] {zone.label}
+          <Text position={[0, 2.2, 0]} fontSize={0.32} color="#eef2f4" anchorX="center" outlineWidth={0.022} outlineColor="#12161a">
+            [E] ENTER · {zone.label}
           </Text>
         </>
       )}

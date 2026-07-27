@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useAnimations, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { SkeletonUtils } from "three-stdlib";
 import type { AvatarAppearance, FaceStyle, HairStyle, OutfitStyle } from "@/lib/orbitxcity/types";
 
 export interface CharacterAnimationState {
@@ -38,16 +36,6 @@ const DEFAULTS = {
   faceStyle: "cool" as FaceStyle,
 };
 
-const CHAR_MODELS = {
-  rogue: "/orbitxcity/models/characters/Rogue.glb",
-  mage: "/orbitxcity/models/characters/Mage.glb",
-  knight: "/orbitxcity/models/characters/Knight.glb",
-} as const;
-
-useGLTF.preload(CHAR_MODELS.rogue);
-useGLTF.preload(CHAR_MODELS.mage);
-useGLTF.preload(CHAR_MODELS.knight);
-
 function resolveCharacterProps({
   appearance,
   bodyColor,
@@ -70,64 +58,191 @@ function resolveCharacterProps({
   };
 }
 
-function pickModel(classId?: string, outfit?: OutfitStyle): string {
-  if (outfit === "suit" || classId === "trader" || classId === "builder") return CHAR_MODELS.knight;
-  if (outfit === "neon" || classId === "creator" || classId === "gamer") return CHAR_MODELS.mage;
-  return CHAR_MODELS.rogue;
-}
-
 function classScale(classId?: string) {
   switch (classId) {
     case "builder":
-      return 1.08;
+      return [1.12, 1.05, 1.1] as const;
     case "gamer":
-      return 0.92;
+      return [0.92, 0.96, 0.92] as const;
     case "creator":
-      return 0.96;
+      return [0.96, 1.02, 0.96] as const;
     case "explorer":
-      return 1.04;
+      return [1.02, 1.08, 1.02] as const;
     case "trader":
     default:
-      return 1;
+      return [1, 1.02, 1] as const;
   }
 }
 
-const HIDDEN_NAME = /knife|crossbow|sword|axe|shield|bow|arrow|staff|wand|spell|quiver|throwable|weapon|mug/i;
-
-function prepareCharacter(scene: THREE.Object3D, accent: string, bodyColor: string) {
-  const root = SkeletonUtils.clone(scene);
-  root.traverse((obj) => {
-    if (HIDDEN_NAME.test(obj.name)) {
-      obj.visible = false;
-      return;
-    }
-    const mesh = obj as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    mats.forEach((mat) => {
-      const m = mat as THREE.MeshStandardMaterial;
-      if (!m?.color || !m.isMeshStandardMaterial) return;
-      const cloned = m.clone();
-      if (/body|chest|leg|arm|cape|cloth|shirt/i.test(mesh.name)) {
-        cloned.color.lerp(new THREE.Color(bodyColor), 0.32);
-      }
-      cloned.emissive = new THREE.Color(accent);
-      cloned.emissiveIntensity = 0.06;
-      cloned.needsUpdate = true;
-      if (Array.isArray(mesh.material)) {
-        const idx = mats.indexOf(mat);
-        (mesh.material as THREE.Material[])[idx] = cloned;
-      } else {
-        mesh.material = cloned;
-      }
-    });
-  });
-  return root;
+function Hair({ style, color }: { style: HairStyle; color: string }) {
+  if (style === "buzz") {
+    return (
+      <mesh position={[0, 2.28, 0]} castShadow>
+        <sphereGeometry args={[0.305, 14, 12]} />
+        <meshStandardMaterial color={color} roughness={0.85} />
+      </mesh>
+    );
+  }
+  if (style === "bun") {
+    return (
+      <>
+        <mesh position={[0, 2.28, -0.02]} castShadow>
+          <sphereGeometry args={[0.3, 14, 12]} />
+          <meshStandardMaterial color={color} roughness={0.78} />
+        </mesh>
+        <mesh position={[0, 2.52, -0.06]} castShadow>
+          <sphereGeometry args={[0.14, 12, 10]} />
+          <meshStandardMaterial color={color} roughness={0.78} />
+        </mesh>
+      </>
+    );
+  }
+  if (style === "mohawk") {
+    return (
+      <mesh position={[0, 2.42, 0]} castShadow>
+        <boxGeometry args={[0.1, 0.32, 0.34]} />
+        <meshStandardMaterial color={color} roughness={0.72} />
+      </mesh>
+    );
+  }
+  if (style === "long") {
+    return (
+      <>
+        <mesh position={[0, 2.28, -0.02]} castShadow>
+          <sphereGeometry args={[0.32, 14, 12]} />
+          <meshStandardMaterial color={color} roughness={0.78} />
+        </mesh>
+        <mesh position={[0, 1.95, -0.18]} castShadow>
+          <capsuleGeometry args={[0.16, 0.45, 4, 10]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+      </>
+    );
+  }
+  return (
+    <mesh position={[0, 2.3, -0.01]} castShadow>
+      <sphereGeometry args={[0.31, 14, 12]} />
+      <meshStandardMaterial color={color} roughness={0.76} />
+    </mesh>
+  );
 }
 
+function Face({ style, accent }: { style: FaceStyle; accent: string }) {
+  const eyeY = 2.12;
+  return (
+    <group>
+      <mesh position={[-0.09, eyeY, 0.27]}>
+        <sphereGeometry args={[0.035, 8, 8]} />
+        <meshStandardMaterial color="#111318" roughness={0.4} />
+      </mesh>
+      <mesh position={[0.09, eyeY, 0.27]}>
+        <sphereGeometry args={[0.035, 8, 8]} />
+        <meshStandardMaterial color="#111318" roughness={0.4} />
+      </mesh>
+      {style === "cool" && (
+        <mesh position={[0, 2.12, 0.29]}>
+          <boxGeometry args={[0.28, 0.06, 0.04]} />
+          <meshStandardMaterial color="#0b0e14" metalness={0.55} roughness={0.25} emissive={accent} emissiveIntensity={0.15} />
+        </mesh>
+      )}
+      {style === "smile" && (
+        <mesh position={[0, 1.98, 0.28]} rotation={[0.2, 0, 0]}>
+          <torusGeometry args={[0.07, 0.012, 6, 12, Math.PI]} />
+          <meshStandardMaterial color="#6a3a3a" roughness={0.7} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+function OutfitShell({
+  outfit,
+  bodyColor,
+  accent,
+}: {
+  outfit: OutfitStyle;
+  bodyColor: string;
+  accent: string;
+}) {
+  if (outfit === "suit") {
+    return (
+      <>
+        <mesh position={[0, 1.38, 0.2]} castShadow>
+          <boxGeometry args={[0.42, 0.55, 0.08]} />
+          <meshStandardMaterial color="#f4f6fa" roughness={0.7} />
+        </mesh>
+        <mesh position={[0, 1.55, 0.24]} castShadow>
+          <boxGeometry args={[0.08, 0.28, 0.04]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.2} />
+        </mesh>
+        <mesh position={[-0.22, 1.4, 0.22]} castShadow>
+          <boxGeometry args={[0.16, 0.5, 0.05]} />
+          <meshStandardMaterial color="#121722" roughness={0.55} metalness={0.2} />
+        </mesh>
+        <mesh position={[0.22, 1.4, 0.22]} castShadow>
+          <boxGeometry args={[0.16, 0.5, 0.05]} />
+          <meshStandardMaterial color="#121722" roughness={0.55} metalness={0.2} />
+        </mesh>
+      </>
+    );
+  }
+  if (outfit === "sport") {
+    return (
+      <>
+        <mesh position={[0, 1.55, 0.22]} castShadow>
+          <boxGeometry args={[0.55, 0.12, 0.06]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} />
+        </mesh>
+        <mesh position={[0, 1.15, 0.2]} castShadow>
+          <boxGeometry args={[0.5, 0.08, 0.05]} />
+          <meshStandardMaterial color="#f5f7fa" roughness={0.65} />
+        </mesh>
+      </>
+    );
+  }
+  if (outfit === "neon") {
+    return (
+      <>
+        <mesh position={[0, 1.35, 0.22]}>
+          <boxGeometry args={[0.52, 0.08, 0.04]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} toneMapped={false} />
+        </mesh>
+        <mesh position={[0, 1.55, 0.22]}>
+          <boxGeometry args={[0.4, 0.05, 0.04]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} toneMapped={false} />
+        </mesh>
+      </>
+    );
+  }
+  // street hoodie
+  return (
+    <>
+      <mesh position={[0, 1.72, -0.08]} castShadow>
+        <sphereGeometry args={[0.22, 12, 10]} />
+        <meshStandardMaterial color={bodyColor} roughness={0.72} />
+      </mesh>
+      <mesh position={[0, 1.55, 0.22]} castShadow>
+        <boxGeometry args={[0.48, 0.35, 0.08]} />
+        <meshStandardMaterial color={bodyColor} roughness={0.7} />
+      </mesh>
+      <mesh position={[0, 1.42, 0.26]}>
+        <boxGeometry args={[0.2, 0.08, 0.03]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.25} />
+      </mesh>
+    </>
+  );
+}
+
+/** Modern street avatar — rounded proportions, city outfits (not fantasy/dungeon). */
 export function CharacterMesh(props: CharacterMeshProps) {
+  const root = useRef<THREE.Group>(null);
+  const torso = useRef<THREE.Group>(null);
+  const head = useRef<THREE.Group>(null);
+  const armL = useRef<THREE.Group>(null);
+  const armR = useRef<THREE.Group>(null);
+  const legL = useRef<THREE.Group>(null);
+  const legR = useRef<THREE.Group>(null);
+
   const character = useMemo(
     () => resolveCharacterProps(props),
     [
@@ -142,63 +257,128 @@ export function CharacterMesh(props: CharacterMeshProps) {
     ],
   );
 
-  const modelPath = pickModel(character.classId, character.outfit);
-  const { scene, animations } = useGLTF(modelPath);
-  const clone = useMemo(
-    () => prepareCharacter(scene, character.accentColor, character.bodyColor),
-    [scene, character.accentColor, character.bodyColor],
-  );
-
-  const root = useRef<THREE.Group>(null);
-  const modelRef = useRef<THREE.Object3D>(null);
-  const { actions } = useAnimations(animations, modelRef);
-  const modeRef = useRef<"idle" | "walk" | "run" | "dance" | null>(null);
-  const scale = classScale(character.classId);
-
-  useEffect(() => {
-    modeRef.current = null;
-  }, [modelPath, actions]);
+  const topColor =
+    character.outfit === "suit" ? "#151a24" : character.outfit === "neon" ? "#0e121c" : character.bodyColor;
+  const pantColor =
+    character.outfit === "sport" ? "#1a2436" : character.outfit === "suit" ? "#10141d" : "#141a24";
+  const shoeColor = character.outfit === "neon" ? character.accentColor : "#0a0d12";
 
   useFrame(({ clock }) => {
     const animation = props.animation;
+    const t = animation?.time ?? props.time ?? clock.elapsedTime;
     const moving = animation?.moving ?? props.moving ?? false;
     const dancing = animation?.dancing ?? props.dancing ?? false;
     const intensity = animation?.walkIntensity ?? props.walkIntensity ?? 1;
-    const t = animation?.time ?? props.time ?? clock.elapsedTime;
+    const walk = moving ? Math.sin(t * 9.2) * 0.48 * intensity : Math.sin(t * 1.5) * 0.03;
+    const dance = dancing ? Math.sin(t * 12) * 0.7 : 0;
+    const bounce = dancing
+      ? Math.abs(Math.sin(t * 9)) * 0.09
+      : moving
+        ? Math.abs(Math.sin(t * 9.2)) * 0.04
+        : Math.sin(t * 1.5) * 0.01;
 
-    const walk = actions?.Walking_A ?? actions?.Walking_B;
-    const run = actions?.Running_A ?? actions?.Running_B;
-    const idle = actions?.Idle ?? actions?.Unarmed_Idle;
-    const cheer = actions?.Cheer;
-
-    let next: "idle" | "walk" | "run" | "dance" = "idle";
-    if (dancing && cheer) next = "dance";
-    else if (moving) next = intensity > 1.2 && run ? "run" : "walk";
-
-    if (next !== modeRef.current && actions) {
-      const fade = 0.18;
-      Object.values(actions).forEach((a) => a?.fadeOut(fade));
-      const play =
-        next === "dance" ? cheer : next === "run" ? run : next === "walk" ? walk : idle;
-      play?.reset().fadeIn(fade).play();
-      if (play && (next === "walk" || next === "run")) {
-        play.setEffectiveTimeScale(0.95 + intensity * 0.2);
-      }
-      modeRef.current = next;
+    if (root.current) root.current.position.y = bounce;
+    if (torso.current) {
+      torso.current.rotation.z = dancing ? Math.sin(t * 7) * 0.16 : Math.sin(t * 1.4) * 0.02;
+      torso.current.rotation.x = moving ? -0.05 : 0;
     }
-
-    if (root.current) {
-      root.current.position.y = dancing ? Math.abs(Math.sin(t * 9)) * 0.05 : 0;
-    }
+    if (head.current) head.current.rotation.z = dancing ? Math.sin(t * 9) * 0.12 : Math.sin(t * 1.3) * 0.02;
+    if (legL.current) legL.current.rotation.x = dancing ? dance * 0.4 : walk;
+    if (legR.current) legR.current.rotation.x = dancing ? -dance * 0.4 : -walk;
+    if (armL.current) armL.current.rotation.x = dancing ? -1.0 + dance : -walk * 0.8 - 0.1;
+    if (armR.current) armR.current.rotation.x = dancing ? -1.0 - dance : walk * 0.8 - 0.1;
   });
 
   return (
-    <group ref={root} name="characterMesh" scale={scale * 0.95}>
-      <primitive ref={modelRef} object={clone} />
-      <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.28, 0.38, 24]} />
-        <meshBasicMaterial color={character.accentColor} transparent opacity={0.55} toneMapped={false} />
-      </mesh>
+    <group ref={root} name="characterMesh" scale={classScale(character.classId)}>
+      <group ref={torso}>
+        {/* hips */}
+        <mesh position={[0, 0.95, 0]} castShadow>
+          <capsuleGeometry args={[0.2, 0.18, 6, 12]} />
+          <meshStandardMaterial color={pantColor} roughness={0.62} metalness={0.08} />
+        </mesh>
+        {/* torso */}
+        <mesh position={[0, 1.38, 0]} castShadow>
+          <capsuleGeometry args={[0.26, 0.42, 6, 14]} />
+          <meshStandardMaterial color={topColor} roughness={0.6} metalness={0.12} />
+        </mesh>
+        <mesh position={[0, 1.78, 0]} castShadow>
+          <capsuleGeometry args={[0.1, 0.08, 4, 10]} />
+          <meshStandardMaterial color={character.skinColor} roughness={0.68} />
+        </mesh>
+        <OutfitShell outfit={character.outfit} bodyColor={topColor} accent={character.accentColor} />
+      </group>
+
+      <group ref={head}>
+        <mesh position={[0, 2.08, 0]} castShadow>
+          <sphereGeometry args={[0.3, 18, 16]} />
+          <meshStandardMaterial color={character.skinColor} roughness={0.66} metalness={0.04} />
+        </mesh>
+        <Hair style={character.hairStyle} color={character.hairColor} />
+        <Face style={character.faceStyle} accent={character.accentColor} />
+      </group>
+
+      <group ref={armL} position={[-0.38, 1.58, 0]} rotation={[0, 0, 0.14]}>
+        <mesh position={[0, -0.22, 0]} castShadow>
+          <capsuleGeometry args={[0.07, 0.32, 4, 10]} />
+          <meshStandardMaterial color={topColor} roughness={0.6} />
+        </mesh>
+        <mesh position={[0, -0.55, 0]} castShadow>
+          <capsuleGeometry args={[0.06, 0.28, 4, 10]} />
+          <meshStandardMaterial color={character.skinColor} roughness={0.66} />
+        </mesh>
+        <mesh position={[0, -0.78, 0.02]} castShadow>
+          <sphereGeometry args={[0.07, 10, 8]} />
+          <meshStandardMaterial color={character.skinColor} roughness={0.66} />
+        </mesh>
+      </group>
+
+      <group ref={armR} position={[0.38, 1.58, 0]} rotation={[0, 0, -0.14]}>
+        <mesh position={[0, -0.22, 0]} castShadow>
+          <capsuleGeometry args={[0.07, 0.32, 4, 10]} />
+          <meshStandardMaterial color={topColor} roughness={0.6} />
+        </mesh>
+        <mesh position={[0, -0.55, 0]} castShadow>
+          <capsuleGeometry args={[0.06, 0.28, 4, 10]} />
+          <meshStandardMaterial color={character.skinColor} roughness={0.66} />
+        </mesh>
+        <mesh position={[0, -0.78, 0.02]} castShadow>
+          <sphereGeometry args={[0.07, 10, 8]} />
+          <meshStandardMaterial color={character.skinColor} roughness={0.66} />
+        </mesh>
+      </group>
+
+      <group ref={legL} position={[-0.14, 0.82, 0]}>
+        <mesh position={[0, -0.28, 0]} castShadow>
+          <capsuleGeometry args={[0.085, 0.42, 4, 10]} />
+          <meshStandardMaterial color={pantColor} roughness={0.6} />
+        </mesh>
+        <mesh position={[0, -0.72, 0.06]} castShadow>
+          <boxGeometry args={[0.16, 0.1, 0.28]} />
+          <meshStandardMaterial
+            color={shoeColor}
+            emissive={character.outfit === "neon" ? character.accentColor : "#000"}
+            emissiveIntensity={character.outfit === "neon" ? 0.35 : 0}
+            roughness={0.45}
+          />
+        </mesh>
+      </group>
+
+      <group ref={legR} position={[0.14, 0.82, 0]}>
+        <mesh position={[0, -0.28, 0]} castShadow>
+          <capsuleGeometry args={[0.085, 0.42, 4, 10]} />
+          <meshStandardMaterial color={pantColor} roughness={0.6} />
+        </mesh>
+        <mesh position={[0, -0.72, 0.06]} castShadow>
+          <boxGeometry args={[0.16, 0.1, 0.28]} />
+          <meshStandardMaterial
+            color={shoeColor}
+            emissive={character.outfit === "neon" ? character.accentColor : "#000"}
+            emissiveIntensity={character.outfit === "neon" ? 0.35 : 0}
+            roughness={0.45}
+          />
+        </mesh>
+      </group>
     </group>
   );
 }

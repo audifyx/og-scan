@@ -20,7 +20,13 @@ export function resolveRoomTheme(building: BuildingDefinition): RoomTheme {
 
   if (id.includes("club") || interaction === "voice") return "club";
   if (id.includes("casino") || id.includes("arcade") || interaction === "games") return "theater";
-  if (id.includes("cinema") || id.includes("theater") || id.includes("theatre") || name.includes("theatre") || name.includes("theater")) {
+  if (
+    id.includes("cinema") ||
+    id.includes("theater") ||
+    id.includes("theatre") ||
+    name.includes("theatre") ||
+    name.includes("theater")
+  ) {
     return "theater";
   }
   if (id.includes("coffee") || interaction === "community" || building.kind === "social_hub") return "lounge";
@@ -75,7 +81,7 @@ export function roomTitle(theme: RoomTheme, building: BuildingDefinition): strin
     case "club":
       return "PULSE · LIVE ROOM";
     case "theater":
-      return "NOW SHOWING · ORBITX";
+      return "ORBITX SCREEN · PLAY";
     case "hq":
       return "ORBITX HQ · OPS";
     case "launch":
@@ -85,64 +91,62 @@ export function roomTitle(theme: RoomTheme, building: BuildingDefinition): strin
   }
 }
 
-/** Collision solids in local room space — keep walkways open near the south door. */
+/** Collision solids in local room space — keep the south doorway clear. */
 export function furnitureSolids(theme: RoomTheme, width: number, depth: number): FurnitureSolid[] {
-  const wallZ = -depth / 2 + 0.85;
-  const side = Math.min(width / 2 - 1.1, 3.2);
+  const wallZ = -depth / 2 + 0.7;
+  const side = Math.min(width / 2 - 1.2, 3.0);
   switch (theme) {
     case "trade":
       return [
-        { x: -side * 0.7, z: wallZ + 0.2, w: 1.4, d: 0.9 },
-        { x: 0, z: wallZ + 0.2, w: 1.4, d: 0.9 },
-        { x: side * 0.7, z: wallZ + 0.2, w: 1.4, d: 0.9 },
-        { x: -side, z: 0.1, w: 0.9, d: 0.9 },
-        { x: side, z: 0.1, w: 0.9, d: 0.9 },
+        { x: -side * 0.65, z: wallZ, w: 2.4, d: 0.85 },
+        { x: side * 0.65, z: wallZ, w: 2.4, d: 0.85 },
+        { x: 0, z: 0.2, w: 1.7, d: 0.85 },
       ];
     case "lounge":
       return [
-        { x: -side * 0.55, z: -0.35, w: 1.8, d: 0.95 },
-        { x: side * 0.55, z: -0.35, w: 1.8, d: 0.95 },
-        { x: 0, z: wallZ + 0.15, w: 1.6, d: 0.7 },
-        { x: -side, z: 0.6, w: 0.7, d: 0.7 },
-        { x: side, z: 0.6, w: 0.7, d: 0.7 },
+        { x: -side * 0.55, z: -0.2, w: 1.55, d: 0.85 },
+        { x: side * 0.55, z: -0.2, w: 1.55, d: 0.85 },
+        { x: 0, z: wallZ, w: Math.min(width - 1.6, 4), d: 0.95 },
+        { x: -side, z: 0.5, w: 1.1, d: 0.8 },
+        { x: side, z: 0.5, w: 1.1, d: 0.8 },
       ];
     case "market":
       return [
-        { x: 0, z: wallZ + 0.1, w: Math.min(width - 1.4, 4.2), d: 0.85 },
-        { x: -side, z: -0.1, w: 0.95, d: 0.85 },
-        { x: side, z: -0.1, w: 0.95, d: 0.85 },
-        { x: -side * 0.4, z: 0.55, w: 0.8, d: 0.8 },
+        { x: -side * 0.7, z: wallZ + 0.1, w: 1.45, d: 1.0 },
+        { x: 0, z: wallZ + 0.1, w: 1.45, d: 1.0 },
+        { x: side * 0.7, z: wallZ + 0.1, w: 1.45, d: 1.0 },
+        { x: 0, z: 0.55, w: Math.min(width - 2, 3.2), d: 0.95 },
       ];
     case "club":
       return [
-        { x: 0, z: wallZ + 0.2, w: Math.min(width - 1.6, 3.6), d: 0.8 },
-        { x: -side, z: 0.2, w: 0.85, d: 0.85 },
-        { x: side, z: 0.2, w: 0.85, d: 0.85 },
+        { x: 0, z: wallZ, w: Math.min(width - 1.8, 4.2), d: 0.95 },
+        { x: -side, z: 0.3, w: 1.1, d: 0.8 },
+        { x: side, z: 0.3, w: 1.1, d: 0.8 },
       ];
     case "theater":
       return [
-        { x: -1.2, z: 0.35, w: 0.95, d: 0.85 },
-        { x: 0, z: 0.55, w: 0.95, d: 0.85 },
-        { x: 1.2, z: 0.35, w: 0.95, d: 0.85 },
-        { x: 0, z: wallZ + 0.05, w: Math.min(width - 1.2, 5.2), d: 0.35 },
+        { x: -1.3, z: 0.55, w: 1.55, d: 0.85 },
+        { x: 0, z: 0.55, w: 1.55, d: 0.85 },
+        { x: 1.3, z: 0.55, w: 1.55, d: 0.85 },
+        { x: side, z: wallZ + 0.4, w: 1.1, d: 0.8 },
       ];
     case "hq":
       return [
-        { x: 0, z: wallZ + 0.15, w: Math.min(width - 1.3, 4.8), d: 1.0 },
-        { x: -side, z: 0.15, w: 0.9, d: 0.9 },
-        { x: side, z: 0.15, w: 0.9, d: 0.9 },
+        { x: 0, z: wallZ, w: Math.min(width - 1.4, 5), d: 1.15 },
+        { x: -side, z: 0.3, w: 1.1, d: 0.8 },
+        { x: side, z: 0.3, w: 1.1, d: 0.8 },
       ];
     case "launch":
       return [
-        { x: 0, z: -0.15, w: 2.6, d: 2.6 },
-        { x: -side, z: wallZ + 0.3, w: 0.9, d: 0.9 },
-        { x: side, z: wallZ + 0.3, w: 0.9, d: 0.9 },
+        { x: 0, z: -0.1, w: 2.8, d: 2.8 },
+        { x: -side, z: wallZ + 0.2, w: 1.1, d: 0.8 },
+        { x: side, z: wallZ + 0.2, w: 1.1, d: 0.8 },
       ];
     default:
       return [
-        { x: 0, z: wallZ + 0.2, w: Math.min(width - 1.4, 3.6), d: 0.9 },
-        { x: -side * 0.75, z: 0.2, w: 0.9, d: 0.9 },
-        { x: side * 0.75, z: 0.2, w: 0.9, d: 0.9 },
+        { x: 0, z: wallZ, w: Math.min(width - 1.6, 3.8), d: 0.95 },
+        { x: -side * 0.7, z: 0.35, w: 1.55, d: 0.85 },
+        { x: side * 0.7, z: 0.35, w: 1.55, d: 0.85 },
       ];
   }
 }

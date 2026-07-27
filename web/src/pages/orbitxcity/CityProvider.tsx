@@ -333,7 +333,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
       };
     }
     if (!activeZone || panel !== "none") return null;
-    return { label: activeZone.label, hint: activeZone.hint || "Press E to enter" };
+    return {
+      label: activeZone.label,
+      hint: activeZone.buildingId
+        ? activeZone.hint || "Press E to walk inside · tap stations for tools"
+        : activeZone.hint || "Press E to interact",
+    };
   }, [activeZone, panel, interiorBuildingId]);
 
   useEffect(() => {
