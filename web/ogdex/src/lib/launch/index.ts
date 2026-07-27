@@ -133,7 +133,7 @@ async function launchPumpfun(chain: ChainConfig, lp: Launchpad, form: LaunchForm
   onStatus("Confirm in your wallet to deploy…");
   const launchTx = await signAndSendCreate(created.transaction, mintKp);
 
-  // $1.50 launch fee (Solana only — every other chain is free).
+  // $0.90 launch fee (Solana only — every other chain is free).
   let feeTx = "";
   try {
     const cfg = await getLaunchConfig("solana");

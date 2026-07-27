@@ -3,7 +3,7 @@ import { send, callFn, dbInsert, dbSelect, readBody, PLATFORM_FEE_WALLET } from 
 /**
  * OG DEX Token Launcher backend.
  *
- * $1.50 launch fee on SOLANA launches only, paid in SOL to PLATFORM_FEE_WALLET,
+ * $0.90 launch fee on SOLANA launches only, paid in SOL to PLATFORM_FEE_WALLET,
  * verified on-chain via the fee transaction signature. Every other chain
  * (all 16 EVM chains) remains free.
  *
@@ -17,14 +17,14 @@ import { send, callFn, dbInsert, dbSelect, readBody, PLATFORM_FEE_WALLET } from 
  *                 → { transaction }              (unsigned PumpPortal create tx, base64)
  *   step "record" { payment_tx, pay_currency, creator_wallet, mint, name, symbol, icon,
  *                   description, launch_tx, links, chain }
- *                 → { ok, token }   verifies the $1.50 fee on-chain (Solana only), then stores the launch
+ *                 → { ok, token }   verifies the $0.90 fee on-chain (Solana only), then stores the launch
  *
  * Launched tokens are stored UNVERIFIED with no boost — they surface only in
  * the "Newly Listed" section (/api/launches).
  */
 
-const FEE_USD = 1.5;                      // Solana launch fee — other chains are free
-const FEE_TOLERANCE = 0.92;               // accept >= 92% of $1.50 to absorb price drift
+const FEE_USD = 0.9;                       // Solana launch fee — other chains are free
+const FEE_TOLERANCE = 0.92;               // accept >= 92% of fee to absorb price drift
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB";
@@ -212,7 +212,7 @@ async function handleRecord(body, res) {
   const launchpad = body.launchpad ? String(body.launchpad) : (chain === "solana" ? "pumpfun" : null);
   if (!mint) return send(res, 400, { ok: false, error: "mint required" });
 
-  // $1.50 fee on Solana only — every other chain is free. Never trust the
+  // $0.90 fee on Solana only — every other chain is free. Never trust the
   // client's own claim about the chain being free; re-derive it here.
   const chargeFee = chain === "solana";
 
@@ -281,7 +281,7 @@ async function handleRecord(body, res) {
 }
 
 /**
- * Verify a fee payment transaction actually transferred >= $1.50 (allowing
+ * Verify a fee payment transaction actually transferred >= $0.90 (allowing
  * small price drift) to PLATFORM_FEE_WALLET, in SOL or the chosen stablecoin.
  */
 async function verifyFee(signature, payCurrency) {

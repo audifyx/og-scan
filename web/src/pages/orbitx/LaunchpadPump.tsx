@@ -754,7 +754,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     }
 
     try {
-      /* Step 0 — Platform launch fee ($1.50 in SOL, Solana only) */
+      /* Step 0 — Platform launch fee ($0.90 in SOL, Solana only) */
       if (LAUNCHPAD_FEE_USD > 0) {
         setStep("uploading");
         setStatusMsg("Paying launch fee…");

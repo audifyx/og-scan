@@ -79,6 +79,7 @@
 .lp-classic .ox-brand-name,
 .lp-classic .ox-board-col-head h2,
 .lp-classic .ox-tab,
+.lp-classic .ox-launch-tab,
 .lp-classic .ox-create-cta,
 .lp-classic h1, .lp-classic h2 {
   font-family: var(--ox-font-display);
@@ -450,6 +451,152 @@
   border-top: 1px solid var(--ox-silver-dim);
   padding: 8px 0 10px;
 }
+
+/* ── Launch header + grouped tabs ─────────────────────────────────────── */
+.lp-classic .ox-launch-header {
+  border-bottom: 1px solid var(--ox-silver-dim);
+  background: rgba(5, 5, 5, 0.94);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 12px 40px -28px rgba(0, 0, 0, 0.85);
+}
+.lp-classic .ox-launch-header-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 62px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.lp-classic .ox-header-stats {
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.lp-classic .ox-header-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--ox-silver-dim);
+  background: rgba(255, 255, 255, 0.02);
+  font-family: var(--ox-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  white-space: nowrap;
+}
+.lp-classic .ox-header-stat--dim { color: var(--ox-silver); }
+.lp-classic .ox-header-stat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.lp-classic .ox-header-stat-dot--ok {
+  background: var(--ox-blue);
+  box-shadow: 0 0 8px var(--ox-blue);
+}
+.lp-classic .ox-header-stat-dot--bad {
+  background: #ff4d6d;
+  box-shadow: 0 0 8px #ff4d6d;
+}
+.lp-classic .ox-launch-tabbar {
+  border-top: 1px solid rgba(168, 176, 188, 0.12);
+  background: linear-gradient(180deg, #0a0a0a, #060606);
+  padding: 10px 0 12px;
+}
+.lp-classic .ox-tab-groups {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.lp-classic .ox-tab-groups::-webkit-scrollbar { display: none; }
+.lp-classic .ox-tab-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+.lp-classic .ox-tab-group-label {
+  padding: 0 8px;
+  font-family: var(--ox-font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(168, 176, 188, 0.55);
+}
+.lp-classic .ox-tab-group-items {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 12px;
+  border: 1px solid var(--ox-silver-dim);
+  background: linear-gradient(180deg, rgba(18, 18, 18, 0.95), rgba(8, 8, 8, 0.98));
+}
+.lp-classic .ox-tab-group--admin .ox-tab-group-items {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.08), rgba(8, 8, 8, 0.98));
+}
+.lp-classic .ox-tab-group-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 18px 10px 4px;
+  background: linear-gradient(180deg, transparent, var(--ox-silver-dim), transparent);
+  flex-shrink: 0;
+}
+.lp-classic .ox-launch-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  border-radius: 9px;
+  padding: 7px 11px;
+  font-family: var(--ox-font-display);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ox-silver);
+  text-decoration: none;
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease, transform .12s ease;
+}
+.lp-classic .ox-launch-tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+.lp-classic .ox-launch-tab--hot { color: var(--ox-blue-hi); }
+.lp-classic .ox-launch-tab--accent { color: var(--ox-gold-hi); }
+.lp-classic .ox-launch-tab--on {
+  color: #0a0a0a;
+  background: linear-gradient(180deg, var(--ox-gold-hi), var(--ox-gold));
+  box-shadow: 0 6px 18px -8px rgba(212, 175, 55, 0.7);
+}
+.lp-classic .ox-launch-tab--on svg { color: #0a0a0a; }
+.lp-classic .ox-launch-tab--on.ox-launch-tab--hot,
+.lp-classic .ox-launch-tab--on.ox-launch-tab--accent { color: #0a0a0a; }
+@media (max-width: 767px) {
+  .lp-classic .ox-launch-header-row { min-height: 56px; gap: 10px; }
+  .lp-classic .ox-brand-name { font-size: 1.15rem; }
+  .lp-classic .ox-brand-mark { height: 36px; width: 36px; }
+  .lp-classic .ox-launch-tabbar { padding: 8px 0 10px; }
+  .lp-classic .ox-launch-tab { padding: 6px 9px; font-size: 10px; }
+  .lp-classic .ox-tab-group-label { font-size: 8px; letter-spacing: 0.18em; }
+}
+
 .lp-classic .ox-tab-segment-wrap {
   display: inline-flex;
   align-items: center;

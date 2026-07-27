@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { Upload, CheckCircle, AlertCircle } from "lucide-react";
+import { BASE_LAUNCH_FEE_USD } from "@/lib/platformFee";
 
 type Step = "basic" | "advanced" | "review" | "confirm";
 
@@ -160,7 +161,7 @@ export default function TerminalLaunch() {
             {/* Fee Info */}
             <div className="bg-black/50 border border-amber-500/20 rounded p-3 text-xs text-amber-300">
               <AlertCircle className="w-4 h-4 inline mr-2" />
-              $1.50 launch fee • 0.45% trade fee (75% creator / 25% platform)
+              ${BASE_LAUNCH_FEE_USD.toFixed(2)} launch fee • 0.45% trade fee (75% creator / 25% platform)
             </div>
           </div>
         )}
