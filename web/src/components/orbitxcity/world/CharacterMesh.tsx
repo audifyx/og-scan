@@ -1,3 +1,7 @@
+/**
+ * Solid game-style avatars — wider torsos, proper limb thickness, distinct class silhouettes.
+ * Still pure primitives (AI-buildable), no fantasy GLTFs.
+ */
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -58,10 +62,11 @@ function resolveCharacterProps({
   };
 }
 
+/** Align with characterClasses.ts scales — distinct readable silhouettes. */
 function classScale(classId?: string) {
   switch (classId) {
     case "builder":
-      return [1.12, 1.05, 1.1] as const;
+      return [1.18, 1.05, 1.12] as const;
     case "gamer":
       return [0.92, 0.96, 0.92] as const;
     case "creator":
@@ -77,8 +82,8 @@ function classScale(classId?: string) {
 function Hair({ style, color }: { style: HairStyle; color: string }) {
   if (style === "buzz") {
     return (
-      <mesh position={[0, 2.28, 0]} castShadow>
-        <sphereGeometry args={[0.305, 14, 12]} />
+      <mesh position={[0, 1.72, 0]} castShadow>
+        <sphereGeometry args={[0.26, 14, 12]} />
         <meshStandardMaterial color={color} roughness={0.85} />
       </mesh>
     );
@@ -86,12 +91,12 @@ function Hair({ style, color }: { style: HairStyle; color: string }) {
   if (style === "bun") {
     return (
       <>
-        <mesh position={[0, 2.28, -0.02]} castShadow>
-          <sphereGeometry args={[0.3, 14, 12]} />
+        <mesh position={[0, 1.72, -0.02]} castShadow>
+          <sphereGeometry args={[0.255, 14, 12]} />
           <meshStandardMaterial color={color} roughness={0.78} />
         </mesh>
-        <mesh position={[0, 2.52, -0.06]} castShadow>
-          <sphereGeometry args={[0.14, 12, 10]} />
+        <mesh position={[0, 1.92, -0.05]} castShadow>
+          <sphereGeometry args={[0.12, 12, 10]} />
           <meshStandardMaterial color={color} roughness={0.78} />
         </mesh>
       </>
@@ -99,55 +104,67 @@ function Hair({ style, color }: { style: HairStyle; color: string }) {
   }
   if (style === "mohawk") {
     return (
-      <mesh position={[0, 2.42, 0]} castShadow>
-        <boxGeometry args={[0.1, 0.32, 0.34]} />
-        <meshStandardMaterial color={color} roughness={0.72} />
-      </mesh>
+      <>
+        <mesh position={[0, 1.72, -0.02]} castShadow>
+          <sphereGeometry args={[0.24, 12, 10]} />
+          <meshStandardMaterial color={color} roughness={0.8} />
+        </mesh>
+        <mesh position={[0, 1.88, 0]} castShadow>
+          <boxGeometry args={[0.1, 0.28, 0.32]} />
+          <meshStandardMaterial color={color} roughness={0.72} />
+        </mesh>
+      </>
     );
   }
   if (style === "long") {
     return (
       <>
-        <mesh position={[0, 2.28, -0.02]} castShadow>
-          <sphereGeometry args={[0.32, 14, 12]} />
+        <mesh position={[0, 1.72, -0.02]} castShadow>
+          <sphereGeometry args={[0.27, 14, 12]} />
           <meshStandardMaterial color={color} roughness={0.78} />
         </mesh>
-        <mesh position={[0, 1.95, -0.18]} castShadow>
-          <capsuleGeometry args={[0.16, 0.45, 4, 10]} />
+        <mesh position={[0, 1.42, -0.16]} castShadow>
+          <capsuleGeometry args={[0.14, 0.38, 4, 10]} />
           <meshStandardMaterial color={color} roughness={0.8} />
         </mesh>
       </>
     );
   }
   return (
-    <mesh position={[0, 2.3, -0.01]} castShadow>
-      <sphereGeometry args={[0.31, 14, 12]} />
+    <mesh position={[0, 1.74, -0.01]} castShadow>
+      <sphereGeometry args={[0.265, 14, 12]} />
       <meshStandardMaterial color={color} roughness={0.76} />
     </mesh>
   );
 }
 
 function Face({ style, accent }: { style: FaceStyle; accent: string }) {
-  const eyeY = 2.12;
+  const eyeY = 1.58;
   return (
     <group>
-      <mesh position={[-0.09, eyeY, 0.27]}>
-        <sphereGeometry args={[0.035, 8, 8]} />
+      <mesh position={[-0.08, eyeY, 0.22]}>
+        <sphereGeometry args={[0.032, 8, 8]} />
         <meshStandardMaterial color="#111318" roughness={0.4} />
       </mesh>
-      <mesh position={[0.09, eyeY, 0.27]}>
-        <sphereGeometry args={[0.035, 8, 8]} />
+      <mesh position={[0.08, eyeY, 0.22]}>
+        <sphereGeometry args={[0.032, 8, 8]} />
         <meshStandardMaterial color="#111318" roughness={0.4} />
       </mesh>
       {style === "cool" && (
-        <mesh position={[0, 2.12, 0.29]}>
-          <boxGeometry args={[0.28, 0.06, 0.04]} />
-          <meshStandardMaterial color="#0b0e14" metalness={0.55} roughness={0.25} emissive={accent} emissiveIntensity={0.15} />
+        <mesh position={[0, 1.58, 0.24]}>
+          <boxGeometry args={[0.26, 0.055, 0.04]} />
+          <meshStandardMaterial
+            color="#0b0e14"
+            metalness={0.55}
+            roughness={0.25}
+            emissive={accent}
+            emissiveIntensity={0.2}
+          />
         </mesh>
       )}
       {style === "smile" && (
-        <mesh position={[0, 1.98, 0.28]} rotation={[0.2, 0, 0]}>
-          <torusGeometry args={[0.07, 0.012, 6, 12, Math.PI]} />
+        <mesh position={[0, 1.46, 0.23]} rotation={[0.2, 0, 0]}>
+          <torusGeometry args={[0.065, 0.012, 6, 12, Math.PI]} />
           <meshStandardMaterial color="#6a3a3a" roughness={0.7} />
         </mesh>
       )}
@@ -159,29 +176,36 @@ function OutfitShell({
   outfit,
   bodyColor,
   accent,
+  classId,
 }: {
   outfit: OutfitStyle;
   bodyColor: string;
   accent: string;
+  classId?: string;
 }) {
   if (outfit === "suit") {
     return (
       <>
-        <mesh position={[0, 1.38, 0.2]} castShadow>
-          <boxGeometry args={[0.42, 0.55, 0.08]} />
+        {/* Dress shirt + jacket lapels */}
+        <mesh position={[0, 1.12, 0.2]} castShadow>
+          <boxGeometry args={[0.38, 0.52, 0.08]} />
           <meshStandardMaterial color="#f4f6fa" roughness={0.7} />
         </mesh>
-        <mesh position={[0, 1.55, 0.24]} castShadow>
-          <boxGeometry args={[0.08, 0.28, 0.04]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.2} />
+        <mesh position={[0, 1.28, 0.25]} castShadow>
+          <boxGeometry args={[0.09, 0.32, 0.04]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.28} />
         </mesh>
-        <mesh position={[-0.22, 1.4, 0.22]} castShadow>
-          <boxGeometry args={[0.16, 0.5, 0.05]} />
-          <meshStandardMaterial color="#121722" roughness={0.55} metalness={0.2} />
+        <mesh position={[-0.2, 1.12, 0.22]} castShadow>
+          <boxGeometry args={[0.16, 0.5, 0.06]} />
+          <meshStandardMaterial color="#121722" roughness={0.5} metalness={0.22} />
         </mesh>
-        <mesh position={[0.22, 1.4, 0.22]} castShadow>
-          <boxGeometry args={[0.16, 0.5, 0.05]} />
-          <meshStandardMaterial color="#121722" roughness={0.55} metalness={0.2} />
+        <mesh position={[0.2, 1.12, 0.22]} castShadow>
+          <boxGeometry args={[0.16, 0.5, 0.06]} />
+          <meshStandardMaterial color="#121722" roughness={0.5} metalness={0.22} />
+        </mesh>
+        <mesh position={[0, 0.78, 0.18]} castShadow>
+          <boxGeometry args={[0.42, 0.08, 0.06]} />
+          <meshStandardMaterial color="#0e1218" roughness={0.55} />
         </mesh>
       </>
     );
@@ -189,13 +213,17 @@ function OutfitShell({
   if (outfit === "sport") {
     return (
       <>
-        <mesh position={[0, 1.55, 0.22]} castShadow>
-          <boxGeometry args={[0.55, 0.12, 0.06]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} />
+        <mesh position={[0, 1.28, 0.22]} castShadow>
+          <boxGeometry args={[0.58, 0.14, 0.07]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.45} toneMapped={false} />
         </mesh>
-        <mesh position={[0, 1.15, 0.2]} castShadow>
-          <boxGeometry args={[0.5, 0.08, 0.05]} />
+        <mesh position={[0, 0.95, 0.2]} castShadow>
+          <boxGeometry args={[0.52, 0.1, 0.06]} />
           <meshStandardMaterial color="#f5f7fa" roughness={0.65} />
+        </mesh>
+        <mesh position={[-0.22, 1.1, 0.2]}>
+          <boxGeometry args={[0.08, 0.35, 0.04]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} />
         </mesh>
       </>
     );
@@ -203,37 +231,53 @@ function OutfitShell({
   if (outfit === "neon") {
     return (
       <>
-        <mesh position={[0, 1.35, 0.22]}>
-          <boxGeometry args={[0.52, 0.08, 0.04]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} toneMapped={false} />
+        <mesh position={[0, 1.1, 0.23]}>
+          <boxGeometry args={[0.55, 0.09, 0.05]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.85} toneMapped={false} />
         </mesh>
-        <mesh position={[0, 1.55, 0.22]}>
-          <boxGeometry args={[0.4, 0.05, 0.04]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} toneMapped={false} />
+        <mesh position={[0, 1.28, 0.23]}>
+          <boxGeometry args={[0.42, 0.06, 0.05]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.65} toneMapped={false} />
+        </mesh>
+        <mesh position={[0, 0.9, 0.22]}>
+          <boxGeometry args={[0.48, 0.05, 0.04]} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.5} toneMapped={false} />
         </mesh>
       </>
     );
   }
-  // street hoodie
+  // street hoodie (+ builder tool belt / explorer pack accents)
   return (
     <>
-      <mesh position={[0, 1.72, -0.08]} castShadow>
-        <sphereGeometry args={[0.22, 12, 10]} />
+      <mesh position={[0, 1.38, -0.06]} castShadow>
+        <sphereGeometry args={[0.2, 12, 10]} />
         <meshStandardMaterial color={bodyColor} roughness={0.72} />
       </mesh>
-      <mesh position={[0, 1.55, 0.22]} castShadow>
-        <boxGeometry args={[0.48, 0.35, 0.08]} />
+      <mesh position={[0, 1.2, 0.22]} castShadow>
+        <boxGeometry args={[0.52, 0.38, 0.1]} />
         <meshStandardMaterial color={bodyColor} roughness={0.7} />
       </mesh>
-      <mesh position={[0, 1.42, 0.26]}>
-        <boxGeometry args={[0.2, 0.08, 0.03]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.25} />
+      <mesh position={[0, 1.05, 0.28]}>
+        <boxGeometry args={[0.22, 0.09, 0.04]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.3} />
       </mesh>
+      {classId === "builder" && (
+        <mesh position={[0, 0.72, 0.2]} castShadow>
+          <boxGeometry args={[0.5, 0.1, 0.12]} />
+          <meshStandardMaterial color="#2a3344" metalness={0.35} roughness={0.5} />
+        </mesh>
+      )}
+      {classId === "explorer" && (
+        <mesh position={[0, 1.05, -0.28]} castShadow>
+          <boxGeometry args={[0.36, 0.42, 0.16]} />
+          <meshStandardMaterial color="#243028" roughness={0.75} />
+        </mesh>
+      )}
     </>
   );
 }
 
-/** Modern street avatar — rounded proportions, city outfits (not fantasy/dungeon). */
+/** Modern street avatar — solid game proportions, city outfits. */
 export function CharacterMesh(props: CharacterMeshProps) {
   const root = useRef<THREE.Group>(null);
   const torso = useRef<THREE.Group>(null);
@@ -262,6 +306,9 @@ export function CharacterMesh(props: CharacterMeshProps) {
   const pantColor =
     character.outfit === "sport" ? "#1a2436" : character.outfit === "suit" ? "#10141d" : "#141a24";
   const shoeColor = character.outfit === "neon" ? character.accentColor : "#0a0d12";
+
+  // Builder = thicker limbs; Gamer = leaner; Trader = balanced.
+  const limbBoost = character.classId === "builder" ? 1.15 : character.classId === "gamer" ? 0.92 : 1;
 
   useFrame(({ clock }) => {
     const animation = props.animation;
@@ -292,90 +339,113 @@ export function CharacterMesh(props: CharacterMeshProps) {
   return (
     <group ref={root} name="characterMesh" scale={classScale(character.classId)}>
       <group ref={torso}>
-        {/* hips */}
-        <mesh position={[0, 0.95, 0]} castShadow>
-          <capsuleGeometry args={[0.2, 0.18, 6, 12]} />
+        {/* Hips / pelvis — wider base */}
+        <mesh position={[0, 0.78, 0]} castShadow>
+          <capsuleGeometry args={[0.24 * limbBoost, 0.16, 6, 12]} />
           <meshStandardMaterial color={pantColor} roughness={0.62} metalness={0.08} />
         </mesh>
-        {/* torso */}
-        <mesh position={[0, 1.38, 0]} castShadow>
-          <capsuleGeometry args={[0.26, 0.42, 6, 14]} />
-          <meshStandardMaterial color={topColor} roughness={0.6} metalness={0.12} />
+        {/* Chest — solid game torso */}
+        <mesh position={[0, 1.18, 0]} castShadow>
+          <capsuleGeometry args={[0.32 * limbBoost, 0.38, 6, 14]} />
+          <meshStandardMaterial color={topColor} roughness={0.58} metalness={0.12} />
         </mesh>
-        <mesh position={[0, 1.78, 0]} castShadow>
-          <capsuleGeometry args={[0.1, 0.08, 4, 10]} />
+        {/* Shoulders */}
+        <mesh position={[-0.34 * limbBoost, 1.4, 0]} castShadow>
+          <sphereGeometry args={[0.12 * limbBoost, 12, 10]} />
+          <meshStandardMaterial color={topColor} roughness={0.58} />
+        </mesh>
+        <mesh position={[0.34 * limbBoost, 1.4, 0]} castShadow>
+          <sphereGeometry args={[0.12 * limbBoost, 12, 10]} />
+          <meshStandardMaterial color={topColor} roughness={0.58} />
+        </mesh>
+        {/* Neck */}
+        <mesh position={[0, 1.48, 0]} castShadow>
+          <capsuleGeometry args={[0.09, 0.08, 4, 10]} />
           <meshStandardMaterial color={character.skinColor} roughness={0.68} />
         </mesh>
-        <OutfitShell outfit={character.outfit} bodyColor={topColor} accent={character.accentColor} />
+        <OutfitShell
+          outfit={character.outfit}
+          bodyColor={topColor}
+          accent={character.accentColor}
+          classId={character.classId}
+        />
       </group>
 
       <group ref={head}>
-        <mesh position={[0, 2.08, 0]} castShadow>
-          <sphereGeometry args={[0.3, 18, 16]} />
+        <mesh position={[0, 1.58, 0]} castShadow>
+          <sphereGeometry args={[0.26, 18, 16]} />
           <meshStandardMaterial color={character.skinColor} roughness={0.66} metalness={0.04} />
         </mesh>
         <Hair style={character.hairStyle} color={character.hairColor} />
         <Face style={character.faceStyle} accent={character.accentColor} />
       </group>
 
-      <group ref={armL} position={[-0.38, 1.58, 0]} rotation={[0, 0, 0.14]}>
-        <mesh position={[0, -0.22, 0]} castShadow>
-          <capsuleGeometry args={[0.07, 0.32, 4, 10]} />
+      <group ref={armL} position={[-0.42 * limbBoost, 1.38, 0]} rotation={[0, 0, 0.12]}>
+        <mesh position={[0, -0.2, 0]} castShadow>
+          <capsuleGeometry args={[0.095 * limbBoost, 0.3, 4, 10]} />
           <meshStandardMaterial color={topColor} roughness={0.6} />
         </mesh>
-        <mesh position={[0, -0.55, 0]} castShadow>
-          <capsuleGeometry args={[0.06, 0.28, 4, 10]} />
+        <mesh position={[0, -0.52, 0]} castShadow>
+          <capsuleGeometry args={[0.08 * limbBoost, 0.26, 4, 10]} />
           <meshStandardMaterial color={character.skinColor} roughness={0.66} />
         </mesh>
-        <mesh position={[0, -0.78, 0.02]} castShadow>
-          <sphereGeometry args={[0.07, 10, 8]} />
+        <mesh position={[0, -0.74, 0.02]} castShadow>
+          <sphereGeometry args={[0.08 * limbBoost, 10, 8]} />
           <meshStandardMaterial color={character.skinColor} roughness={0.66} />
         </mesh>
       </group>
 
-      <group ref={armR} position={[0.38, 1.58, 0]} rotation={[0, 0, -0.14]}>
-        <mesh position={[0, -0.22, 0]} castShadow>
-          <capsuleGeometry args={[0.07, 0.32, 4, 10]} />
+      <group ref={armR} position={[0.42 * limbBoost, 1.38, 0]} rotation={[0, 0, -0.12]}>
+        <mesh position={[0, -0.2, 0]} castShadow>
+          <capsuleGeometry args={[0.095 * limbBoost, 0.3, 4, 10]} />
           <meshStandardMaterial color={topColor} roughness={0.6} />
         </mesh>
-        <mesh position={[0, -0.55, 0]} castShadow>
-          <capsuleGeometry args={[0.06, 0.28, 4, 10]} />
+        <mesh position={[0, -0.52, 0]} castShadow>
+          <capsuleGeometry args={[0.08 * limbBoost, 0.26, 4, 10]} />
           <meshStandardMaterial color={character.skinColor} roughness={0.66} />
         </mesh>
-        <mesh position={[0, -0.78, 0.02]} castShadow>
-          <sphereGeometry args={[0.07, 10, 8]} />
+        <mesh position={[0, -0.74, 0.02]} castShadow>
+          <sphereGeometry args={[0.08 * limbBoost, 10, 8]} />
           <meshStandardMaterial color={character.skinColor} roughness={0.66} />
         </mesh>
       </group>
 
-      <group ref={legL} position={[-0.14, 0.82, 0]}>
-        <mesh position={[0, -0.28, 0]} castShadow>
-          <capsuleGeometry args={[0.085, 0.42, 4, 10]} />
+      <group ref={legL} position={[-0.16 * limbBoost, 0.7, 0]}>
+        <mesh position={[0, -0.22, 0]} castShadow>
+          <capsuleGeometry args={[0.11 * limbBoost, 0.28, 4, 10]} />
           <meshStandardMaterial color={pantColor} roughness={0.6} />
         </mesh>
-        <mesh position={[0, -0.72, 0.06]} castShadow>
-          <boxGeometry args={[0.16, 0.1, 0.28]} />
+        <mesh position={[0, -0.52, 0]} castShadow>
+          <capsuleGeometry args={[0.095 * limbBoost, 0.22, 4, 10]} />
+          <meshStandardMaterial color={pantColor} roughness={0.62} />
+        </mesh>
+        <mesh position={[0, -0.72, 0.07]} castShadow>
+          <boxGeometry args={[0.18 * limbBoost, 0.11, 0.32]} />
           <meshStandardMaterial
             color={shoeColor}
             emissive={character.outfit === "neon" ? character.accentColor : "#000"}
-            emissiveIntensity={character.outfit === "neon" ? 0.35 : 0}
-            roughness={0.45}
+            emissiveIntensity={character.outfit === "neon" ? 0.4 : 0}
+            roughness={0.42}
           />
         </mesh>
       </group>
 
-      <group ref={legR} position={[0.14, 0.82, 0]}>
-        <mesh position={[0, -0.28, 0]} castShadow>
-          <capsuleGeometry args={[0.085, 0.42, 4, 10]} />
+      <group ref={legR} position={[0.16 * limbBoost, 0.7, 0]}>
+        <mesh position={[0, -0.22, 0]} castShadow>
+          <capsuleGeometry args={[0.11 * limbBoost, 0.28, 4, 10]} />
           <meshStandardMaterial color={pantColor} roughness={0.6} />
         </mesh>
-        <mesh position={[0, -0.72, 0.06]} castShadow>
-          <boxGeometry args={[0.16, 0.1, 0.28]} />
+        <mesh position={[0, -0.52, 0]} castShadow>
+          <capsuleGeometry args={[0.095 * limbBoost, 0.22, 4, 10]} />
+          <meshStandardMaterial color={pantColor} roughness={0.62} />
+        </mesh>
+        <mesh position={[0, -0.72, 0.07]} castShadow>
+          <boxGeometry args={[0.18 * limbBoost, 0.11, 0.32]} />
           <meshStandardMaterial
             color={shoeColor}
             emissive={character.outfit === "neon" ? character.accentColor : "#000"}
-            emissiveIntensity={character.outfit === "neon" ? 0.35 : 0}
-            roughness={0.45}
+            emissiveIntensity={character.outfit === "neon" ? 0.4 : 0}
+            roughness={0.42}
           />
         </mesh>
       </group>
