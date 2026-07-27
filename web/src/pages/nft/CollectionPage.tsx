@@ -10,9 +10,9 @@ import { listNftCollections, listNfts } from "@/lib/orbitx/nftRegistry";
 import { supabase } from "@/lib/supabase";
 import { useCollectionStats } from "./nftAnalytics";
 import { PriceText } from "./currency";
-import { Media, Verified, RarityBadge, Empty } from "./_ui";
+import { Media, Verified, Empty, NftGrid, NftCard } from "./_ui";
 import { fmtInt } from "./nftMarketData";
-import { TrendingUp, Users, Package, Percent, ArrowLeft, Star, AlertTriangle, Coins } from "lucide-react";
+import { TrendingUp, Users, Package, Percent, ArrowLeft, Star, Coins } from "lucide-react";
 import { saveTokenCreatePrefill, buildCreateTokenHref } from "@/lib/orbitx/tokenCreatePrefill";
 
 export default function CollectionPage() {
@@ -126,17 +126,19 @@ export default function CollectionPage() {
       <div className="mt-6">
         <div className="mb-3 text-lg font-black">Items <span className="mkt-muted text-sm font-semibold">({items.length})</span></div>
         {items.length === 0 ? <Empty label="No items in this collection yet." /> : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <NftGrid cols={5}>
             {items.map((n) => (
-              <Link key={n.id} to="/nft/explore" className="mkt-card">
-                <Media src={n.image_url} className="aspect-square w-full" />
-                <div className="flex items-center justify-between gap-2 p-3">
-                  <span className="flex items-center gap-1 truncate text-[13px] font-bold">{n.is_flagged_duplicate && <AlertTriangle className="h-3 w-3 shrink-0 text-[hsl(var(--og-blood))]" aria-label="Possible copy" />}{n.name}</span>
-                  <RarityBadge tier={n.rarity_tier} rank={n.rarity_rank} />
-                </div>
-              </Link>
+              <NftCard
+                key={n.id}
+                to="/nft/explore"
+                name={n.name}
+                image={n.image_url}
+                rarityTier={n.rarity_tier}
+                rarityRank={n.rarity_rank}
+                flagged={n.is_flagged_duplicate}
+              />
             ))}
-          </div>
+          </NftGrid>
         )}
       </div>
     </div>

@@ -51,7 +51,7 @@ function DropCard({ d }: { d: NftDrop }) {
   const target = phase === "upcoming" ? d.starts_at : d.ends_at;
   const pct = d.supply ? Math.min(100, Math.round((d.minted / d.supply) * 100)) : 0;
   return (
-    <div className="mkt-card">
+    <div className="mkt-drop-card">
       <div className="relative"><Media src={d.banner_url ?? d.logo_url} className="aspect-[16/10] w-full" />
         <span className={`absolute left-3 top-3 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${PHASE_TONE[phase]}`}>{PHASE_LABEL[phase]}</span>
         {d.access !== "public" && <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border mkt-hairline bg-black/50 px-2 py-0.5 text-[10px] font-bold uppercase"><Lock className="h-3 w-3" /> {d.access}</span>}

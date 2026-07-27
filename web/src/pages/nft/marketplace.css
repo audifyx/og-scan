@@ -1,60 +1,49 @@
-/* OrbitX NFT Marketplace — Solana launchpad-aligned shell.
-   Self-contained so /nft never depends on orbitx-2026.css. */
+/* OrbitX NFT Marketplace — fast, premium card UI */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+
 .obx-mkt {
-  --mkt-bg: 255 40% 4%;
-  --mkt-panel: 255 32% 8%;
-  --mkt-panel-2: 255 28% 11%;
-  --mkt-line: 263 28% 20%;
-  --mkt-ink: 0 0% 100%;
-  --mkt-muted: 250 12% 62%;
-  --mkt-purple: 263 100% 64%;   /* #9945FF */
-  --mkt-green: 158 89% 51%;     /* #14F195 */
-  --mkt-gold: 40 87% 55%;       /* #F0B429 */
-  --mkt-red: 350 100% 65%;
-  --mkt-cyan: 190 100% 50%;
-  --mkt-accent: var(--mkt-purple);
-  --mkt-lime: var(--mkt-green);
+  --mkt-bg: 240 8% 4%;
+  --mkt-panel: 240 6% 8%;
+  --mkt-panel-2: 240 5% 11%;
+  --mkt-line: 240 6% 16%;
+  --mkt-ink: 0 0% 98%;
+  --mkt-muted: 240 4% 55%;
+  --mkt-purple: 263 85% 62%;
+  --mkt-green: 158 84% 48%;
+  --mkt-gold: 42 96% 56%;
+  --mkt-red: 350 89% 62%;
+  --mkt-cyan: 190 95% 52%;
+  --og-lime: var(--mkt-green);
+  --og-gold: var(--mkt-gold);
+  --og-cyan: var(--mkt-cyan);
+  --og-blood: var(--mkt-red);
+
   min-height: 100vh;
   background:
-    radial-gradient(1100px 520px at 8% -12%, hsl(263 100% 64% / 0.18), transparent 58%),
-    radial-gradient(900px 420px at 92% -6%, hsl(158 89% 51% / 0.10), transparent 55%),
+    radial-gradient(900px 400px at 10% -8%, hsl(263 85% 62% / 0.12), transparent 55%),
+    radial-gradient(700px 350px at 90% 0%, hsl(158 84% 48% / 0.08), transparent 50%),
     hsl(var(--mkt-bg));
   color: hsl(var(--mkt-ink));
-  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-.obx-mkt .mkt-panel {
-  background: linear-gradient(180deg, hsl(var(--mkt-panel) / 0.95), hsl(255 40% 6% / 0.9));
-  border: 1px solid hsl(var(--mkt-line) / 0.85);
-  border-radius: 18px;
-}
-.obx-mkt .mkt-panel-2 {
-  background: hsl(var(--mkt-panel-2));
-  border: 1px solid hsl(var(--mkt-line) / 0.8);
-}
-.obx-mkt .mkt-hairline { border-color: hsl(var(--mkt-line) / 0.8); }
-.obx-mkt .mkt-muted { color: hsl(var(--mkt-muted)); }
-.obx-mkt .mkt-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-/* ── Shell header (two-tier) ── */
+/* ── Shell ── */
 .obx-mkt .mkt-shell-header {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: hsl(var(--mkt-bg) / 0.88);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid hsl(var(--mkt-line) / 0.7);
+  background: hsl(var(--mkt-bg) / 0.82);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid hsl(var(--mkt-line));
 }
-.obx-mkt .mkt-shell-top {
-  border-bottom: 1px solid hsl(var(--mkt-line) / 0.45);
-}
+.obx-mkt .mkt-shell-top { border-bottom: 1px solid hsl(var(--mkt-line) / 0.6); }
 .obx-mkt .mkt-shell-inner {
   margin: 0 auto;
   display: flex;
   width: 100%;
-  max-width: 1400px;
+  max-width: 1440px;
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
@@ -69,39 +58,36 @@
 }
 .obx-mkt .mkt-brand-mark {
   display: flex;
-  height: 36px;
-  width: 36px;
+  height: 38px;
+  width: 38px;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #9945FF, #14F195);
-  box-shadow: 0 0 24px -8px #9945FFcc;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #9945FF 0%, #14F195 100%);
+  box-shadow: 0 4px 20px -6px #9945FF99;
 }
 .obx-mkt .mkt-search {
   position: relative;
   display: none;
   min-width: 0;
-  max-width: 420px;
+  max-width: 440px;
   flex: 1;
-  margin-left: 8px;
 }
-@media (min-width: 768px) {
-  .obx-mkt .mkt-search { display: block; }
-}
+@media (min-width: 768px) { .obx-mkt .mkt-search { display: block; } }
 .obx-mkt .mkt-search input {
   width: 100%;
-  border-radius: 14px;
-  border: 1px solid hsl(var(--mkt-line) / 0.8);
+  border-radius: 12px;
+  border: 1px solid hsl(var(--mkt-line));
   background: hsl(var(--mkt-panel-2));
   padding: 10px 12px 10px 38px;
   font-size: 13px;
   color: #fff;
   outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
-.obx-mkt .mkt-search input::placeholder { color: hsl(var(--mkt-muted) / 0.85); }
 .obx-mkt .mkt-search input:focus {
-  border-color: #14F19599;
-  box-shadow: 0 0 0 3px #14F19522;
+  border-color: hsl(var(--mkt-green) / 0.5);
+  box-shadow: 0 0 0 3px hsl(var(--mkt-green) / 0.12);
 }
 .obx-mkt .mkt-shell-actions {
   margin-left: auto;
@@ -110,14 +96,13 @@
   gap: 8px;
 }
 
-/* Tab rail */
+/* Tabs */
 .obx-mkt .mkt-tab-rail {
   margin: 0 auto;
   display: flex;
   width: 100%;
-  max-width: 1400px;
-  align-items: center;
-  gap: 4px;
+  max-width: 1440px;
+  gap: 2px;
   overflow-x: auto;
   padding: 0 12px;
   scrollbar-width: none;
@@ -129,198 +114,455 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  padding: 12px 14px;
+  padding: 11px 14px;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: hsl(var(--mkt-muted));
   text-decoration: none;
-  transition: color .15s ease;
+  transition: color 0.12s;
 }
 .obx-mkt .mkt-tab:hover { color: #fff; }
-.obx-mkt .mkt-tab.active {
-  color: #fff;
-}
+.obx-mkt .mkt-tab.active { color: #fff; }
 .obx-mkt .mkt-tab.active::after {
   content: "";
   position: absolute;
-  left: 12px;
-  right: 12px;
+  left: 10px;
+  right: 10px;
   bottom: 0;
   height: 2px;
   border-radius: 2px 2px 0 0;
   background: linear-gradient(90deg, #14F195, #9945FF);
-  box-shadow: 0 0 12px #14F19588;
 }
-.obx-mkt .mkt-tab.active svg { color: #14F195; }
 
 /* Category chips */
+.obx-mkt .mkt-cat-bar {
+  border-top: 1px solid hsl(var(--mkt-line) / 0.5);
+  background: hsl(var(--mkt-panel) / 0.5);
+}
 .obx-mkt .mkt-rail { scrollbar-width: none; }
 .obx-mkt .mkt-rail::-webkit-scrollbar { display: none; }
-.obx-mkt .mkt-cat-bar {
-  border-top: 1px solid hsl(var(--mkt-line) / 0.45);
-  background: linear-gradient(90deg, hsl(263 80% 12% / 0.35), transparent 40%, hsl(158 50% 10% / 0.25));
-}
 .obx-mkt .mkt-chip {
-  border: 1px solid hsl(var(--mkt-line) / 0.75);
-  background: hsl(var(--mkt-panel-2) / 0.8);
+  border: 1px solid hsl(var(--mkt-line));
+  background: hsl(var(--mkt-panel-2));
   color: hsl(var(--mkt-muted));
   border-radius: 999px;
   white-space: nowrap;
-  transition: all .15s ease;
+  transition: all 0.12s ease;
+  cursor: pointer;
 }
-.obx-mkt .mkt-chip:hover {
-  color: #fff;
-  border-color: #9945FF88;
-}
+.obx-mkt .mkt-chip:hover { color: #fff; border-color: hsl(var(--mkt-purple) / 0.5); }
 .obx-mkt .mkt-chip.active {
-  color: #07040f !important;
+  color: #050508;
   background: linear-gradient(135deg, #14F195, #9945FF);
   border-color: transparent;
   font-weight: 800;
-  box-shadow: 0 0 20px -6px #14F195aa;
-}
-
-/* Legacy nav (kept for any leftover class usage) */
-.obx-mkt .mkt-nav {
-  color: hsl(var(--mkt-muted));
-  border-radius: 10px;
-  transition: all .15s ease;
-}
-.obx-mkt .mkt-nav:hover { color: #fff; background: hsl(var(--mkt-panel-2)); }
-.obx-mkt .mkt-nav.active {
-  color: #fff;
-  background: hsl(var(--mkt-panel-2));
-  box-shadow: inset 0 -2px 0 0 #14F195;
 }
 
 /* Buttons */
 .obx-mkt .mkt-btn {
   display: inline-flex;
   align-items: center;
-  gap: .45rem;
-  border-radius: 9999px;
-  padding: .55rem 1rem;
-  font-weight: 800;
-  font-size: .82rem;
-  background: linear-gradient(135deg, #14F195, #9945FF);
-  color: #07040f;
-  border: 1px solid transparent;
-  box-shadow: 0 0 24px -8px #14F195b0;
-  transition: filter .15s ease, transform .15s ease;
+  gap: 0.4rem;
+  border-radius: 10px;
+  padding: 0.55rem 1rem;
+  font-weight: 700;
+  font-size: 0.82rem;
+  background: linear-gradient(135deg, #14F195, #7c3aed);
+  color: #050508;
+  border: none;
+  text-decoration: none;
+  transition: filter 0.12s, transform 0.12s;
+  cursor: pointer;
 }
-.obx-mkt .mkt-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.obx-mkt .mkt-btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
 .obx-mkt .mkt-btn.ghost {
-  background: transparent;
+  background: hsl(var(--mkt-panel-2));
   color: #fff;
-  border-color: hsl(var(--mkt-line));
-  box-shadow: none;
+  border: 1px solid hsl(var(--mkt-line));
 }
-.obx-mkt .mkt-btn.ghost:hover { border-color: #9945FF99; }
+.obx-mkt .mkt-btn.ghost:hover { border-color: hsl(var(--mkt-green) / 0.45); }
 
 .obx-mkt .mkt-wallet-chip {
   display: flex;
   align-items: center;
   gap: 8px;
-  border-radius: 14px;
-  border: 1px solid hsl(263 40% 28% / 0.7);
-  background: hsl(255 32% 10% / 0.9);
-  padding: 6px 8px 6px 10px;
+  border-radius: 12px;
+  border: 1px solid hsl(var(--mkt-line));
+  background: hsl(var(--mkt-panel-2));
+  padding: 6px 10px;
+  cursor: pointer;
 }
 .obx-mkt .mkt-wallet-dot {
   height: 8px;
   width: 8px;
-  border-radius: 9999px;
+  border-radius: 50%;
   background: #14F195;
-  box-shadow: 0 0 8px #14F195;
+  box-shadow: 0 0 8px #14F19588;
 }
 
-/* Cards */
-.obx-mkt .mkt-card {
-  background: linear-gradient(145deg, hsl(var(--mkt-panel)), hsl(263 40% 9%));
-  border: 1px solid hsl(var(--mkt-line) / 0.85);
-  border-radius: 16px;
-  overflow: hidden;
-  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+/* Panels */
+.obx-mkt .mkt-panel {
+  background: hsl(var(--mkt-panel));
+  border: 1px solid hsl(var(--mkt-line));
+  border-radius: 14px;
 }
-.obx-mkt .mkt-card:hover {
+.obx-mkt .mkt-hairline { border-color: hsl(var(--mkt-line)); }
+.obx-mkt .mkt-muted { color: hsl(var(--mkt-muted)); }
+.obx-mkt .mkt-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.obx-mkt .mkt-row { transition: background 0.1s; }
+.obx-mkt .mkt-row:hover { background: hsl(var(--mkt-panel-2) / 0.6); }
+
+.obx-mkt .mkt-main {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1440px;
+  padding: 20px 16px 56px;
+}
+
+/* ── Media ── */
+.obx-mkt .mkt-media-wrap {
+  position: relative;
+  overflow: hidden;
+  background: hsl(var(--mkt-panel-2));
+}
+.obx-mkt .mkt-media-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--mkt-panel-2));
+}
+.obx-mkt .mkt-media-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.25s ease;
+}
+.obx-mkt .mkt-media-img.is-loaded { opacity: 1; }
+.group:hover .mkt-media-img.is-loaded { transform: scale(1.04); }
+
+.obx-mkt .mkt-skeleton {
+  background: linear-gradient(90deg, hsl(var(--mkt-panel-2)) 0%, hsl(var(--mkt-line) / 0.5) 50%, hsl(var(--mkt-panel-2)) 100%);
+  background-size: 200% 100%;
+  animation: mkt-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes mkt-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Grid (content-visibility for perf) ── */
+.obx-mkt .mkt-grid {
+  display: grid;
+  gap: 14px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
+}
+.obx-mkt .mkt-grid--3 { grid-template-columns: repeat(2, 1fr); }
+.obx-mkt .mkt-grid--4 { grid-template-columns: repeat(2, 1fr); }
+.obx-mkt .mkt-grid--5 { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 640px) {
+  .obx-mkt .mkt-grid--3 { grid-template-columns: repeat(3, 1fr); }
+  .obx-mkt .mkt-grid--4 { grid-template-columns: repeat(3, 1fr); }
+  .obx-mkt .mkt-grid--5 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1024px) {
+  .obx-mkt .mkt-grid--4 { grid-template-columns: repeat(4, 1fr); }
+  .obx-mkt .mkt-grid--5 { grid-template-columns: repeat(5, 1fr); }
+}
+
+/* ── NFT card ── */
+.obx-mkt .mkt-nft-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 14px;
+  border: 1px solid hsl(var(--mkt-line));
+  background: hsl(var(--mkt-panel));
+  overflow: hidden;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+  will-change: transform;
+}
+.obx-mkt .mkt-nft-card:hover {
+  transform: translateY(-4px);
+  border-color: hsl(var(--mkt-green) / 0.45);
+  box-shadow: 0 12px 40px -16px hsl(var(--mkt-green) / 0.35);
+}
+.obx-mkt .mkt-nft-card--skeleton { pointer-events: none; }
+.obx-mkt .mkt-nft-card__media {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+.obx-mkt .mkt-nft-card__shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.06) 50%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.obx-mkt .mkt-nft-card:hover .mkt-nft-card__shine { opacity: 1; }
+.obx-mkt .mkt-nft-card__price {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+  color: #14F195;
+  border: 1px solid rgba(20, 241, 149, 0.25);
+}
+.obx-mkt .mkt-nft-card__rarity {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.obx-mkt .mkt-nft-card__coin-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  background: hsl(var(--mkt-cyan) / 0.15);
+  color: hsl(var(--mkt-cyan));
+  border: 1px solid hsl(var(--mkt-cyan) / 0.3);
+}
+.obx-mkt .mkt-nft-card__body { padding: 10px 12px 12px; }
+.obx-mkt .mkt-nft-card__title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.obx-mkt .mkt-nft-card__sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: hsl(var(--mkt-muted));
+}
+.obx-mkt .mkt-nft-card__stats {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: hsl(var(--mkt-muted));
+}
+.obx-mkt .mkt-nft-card__stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ── Collection card ── */
+.obx-mkt .mkt-col-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 14px;
+  border: 1px solid hsl(var(--mkt-line));
+  background: hsl(var(--mkt-panel));
+  overflow: hidden;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.obx-mkt .mkt-col-card:hover {
   transform: translateY(-3px);
-  border-color: #14F19588;
-  box-shadow: 0 0 28px -14px #14F195aa;
+  border-color: hsl(var(--mkt-purple) / 0.45);
+  box-shadow: 0 10px 36px -14px hsl(var(--mkt-purple) / 0.3);
+}
+.obx-mkt .mkt-col-card__banner {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+.obx-mkt .mkt-col-card__grad {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, hsl(var(--mkt-panel)) 0%, transparent 55%);
+  pointer-events: none;
+}
+.obx-mkt .mkt-col-card__logo {
+  position: absolute;
+  left: 12px;
+  bottom: -18px;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  border: 3px solid hsl(var(--mkt-panel));
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  z-index: 2;
+}
+.obx-mkt .mkt-col-card__verified {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(20, 241, 149, 0.12);
+  color: #14F195;
+  border: 1px solid rgba(20, 241, 149, 0.25);
+}
+.obx-mkt .mkt-col-card__body { padding: 26px 12px 12px; }
+.obx-mkt .mkt-col-card__name {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.obx-mkt .mkt-col-card__meta {
+  margin-top: 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(var(--mkt-muted));
+}
+.obx-mkt .mkt-col-card__stats {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 12px;
+}
+.obx-mkt .mkt-col-card__stats .label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(var(--mkt-muted));
+  margin-bottom: 2px;
+}
+.obx-mkt .mkt-col-card__stats .value { font-weight: 700; }
+.obx-mkt .mkt-col-card__stats .value.accent { color: #14F195; }
+
+/* Rarity */
+.obx-mkt .mkt-rarity {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid;
+}
+.obx-mkt .mkt-rarity--mythic { color: #f472b6; border-color: #f472b666; background: #f472b618; }
+.obx-mkt .mkt-rarity--legendary { color: #fbbf24; border-color: #fbbf2466; background: #fbbf2418; }
+.obx-mkt .mkt-rarity--epic { color: #22d3ee; border-color: #22d3ee66; background: #22d3ee18; }
+.obx-mkt .mkt-rarity--rare { color: #14F195; border-color: #14F19566; background: #14F19518; }
+.obx-mkt .mkt-rarity--common { color: hsl(var(--mkt-muted)); border-color: hsl(var(--mkt-line)); background: rgba(255,255,255,0.03); }
+
+/* Drop card (upgrade legacy mkt-card) */
+.obx-mkt .mkt-card,
+.obx-mkt .mkt-drop-card {
+  border-radius: 14px;
+  border: 1px solid hsl(var(--mkt-line));
+  background: hsl(var(--mkt-panel));
+  overflow: hidden;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.obx-mkt .mkt-card:hover,
+.obx-mkt .mkt-drop-card:hover {
+  transform: translateY(-3px);
+  border-color: hsl(var(--mkt-green) / 0.4);
 }
 
 /* Hero */
 .obx-mkt .mkt-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 20px;
-  border: 1px solid hsl(var(--mkt-line) / 0.85);
+  border-radius: 16px;
+  border: 1px solid hsl(var(--mkt-line));
   background: hsl(var(--mkt-panel));
 }
 .obx-mkt .mkt-hero-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border-radius: 9999px;
-  border: 1px solid #F0B42955;
-  background: hsl(40 87% 55% / 0.12);
+  border-radius: 999px;
+  border: 1px solid hsl(var(--mkt-gold) / 0.35);
+  background: hsl(var(--mkt-gold) / 0.1);
   padding: 4px 10px;
   font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
+  font-weight: 800;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #F0B429;
+  color: hsl(var(--mkt-gold));
 }
 
-/* Ticker */
+/* Ticker — faster */
 .obx-mkt .mkt-marquee {
   overflow: hidden;
   border-bottom: 1px solid hsl(var(--mkt-line) / 0.5);
-  background: linear-gradient(90deg, hsl(263 80% 12% / 0.55), hsl(158 50% 10% / 0.35), hsl(263 80% 12% / 0.55));
+  background: hsl(var(--mkt-panel) / 0.6);
 }
 .obx-mkt .mkt-marquee-track {
   display: inline-flex;
   gap: 2rem;
   white-space: nowrap;
-  animation: mkt-scroll 40s linear infinite;
+  animation: mkt-scroll 28s linear infinite;
 }
 .obx-mkt .mkt-marquee:hover .mkt-marquee-track { animation-play-state: paused; }
 @keyframes mkt-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
-.obx-mkt .mkt-row:hover { background: hsl(var(--mkt-panel-2) / 0.65); }
-
-.obx-mkt .mkt-main {
-  margin: 0 auto;
-  width: 100%;
-  max-width: 1400px;
-  padding: 20px 16px 48px;
+/* Section */
+.obx-mkt .mkt-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
 }
-
-.obx-mkt .mkt-footer {
-  border-top: 1px solid hsl(var(--mkt-line) / 0.7);
-  background: linear-gradient(180deg, hsl(255 32% 7% / 0.6), hsl(var(--mkt-bg)));
-}
-
-/* Section headers */
 .obx-mkt .mkt-section-title {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 900;
   letter-spacing: -0.02em;
-  color: #fff;
 }
 .obx-mkt .mkt-section-sub {
   margin-top: 2px;
   font-size: 12px;
   color: hsl(var(--mkt-muted));
 }
-
-/* Map og-* accents used in JSX to Solana palette inside marketplace */
-.obx-mkt .text-\[hsl\(var\(--og-lime\)\)\],
-.obx-mkt [class*="og-lime"] { /* fallback via CSS vars below */ }
-.obx-mkt {
-  --og-lime: var(--mkt-green);
-  --og-gold: var(--mkt-gold);
-  --og-cyan: var(--mkt-purple);
-  --og-blood: var(--mkt-red);
+.obx-mkt .mkt-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+  border-radius: 14px;
+  border: 1px dashed hsl(var(--mkt-line));
+  color: hsl(var(--mkt-muted));
+  font-size: 14px;
 }
+
+.obx-mkt .mkt-footer {
+  border-top: 1px solid hsl(var(--mkt-line));
+  background: hsl(var(--mkt-panel) / 0.4);
+}
+.obx-mkt .mkt-nav {
+  color: hsl(var(--mkt-muted));
+  transition: color 0.12s, background 0.12s;
+}
+.obx-mkt .mkt-nav:hover { color: #fff; background: hsl(var(--mkt-panel-2)); }
