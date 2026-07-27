@@ -355,7 +355,7 @@ const App = () => (
 
             {/* ── OrbitX Social HQ (Social + Growth Team) ── */}
             <Route path="/hq" element={<Suspense fallback={<RouteFallback label="Social HQ" />}><SocialLayout /></Suspense>}>
-              <Route index element={<Suspense fallback={<RouteFallback label="HQ" />}><SocialHomeHq /></Suspense>} />
+            <Route index element={<Navigate to="/hq/feed" replace />} />
               <Route path="feed" element={<Suspense fallback={<RouteFallback label="Feed" />}><NetworkFeed /></Suspense>} />
               <Route path="communities" element={<Suspense fallback={<RouteFallback label="Communities" />}><CommunitiesHub /></Suspense>} />
               <Route path="trading" element={<Suspense fallback={<RouteFallback label="Trading rooms" />}><TradingCommunities /></Suspense>} />

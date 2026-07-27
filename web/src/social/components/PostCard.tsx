@@ -73,11 +73,8 @@ export function PostCard({
         {showComments ? (
           <div style={{ marginTop: "0.65rem" }}>
             {post.comments.map((c) => (
-              <div key={c.id} className="oxs-bubble" style={{ marginBottom: "0.45rem" }}>
-                <strong style={{ fontSize: "0.78rem", color: "var(--oxs-x)" }}>
-                  {c.authorId === meId ? "You" : c.authorId}
-                </strong>
-                <div>{c.content}</div>
+              <div key={c.id} className="oxs-muted" style={{ fontSize: 14, marginBottom: 6, paddingLeft: 8, borderLeft: "2px solid #2f3336" }}>
+                <strong style={{ color: "#e7e9ea" }}>{c.authorId === meId ? "You" : c.authorId}</strong>: {c.content}
               </div>
             ))}
             <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
