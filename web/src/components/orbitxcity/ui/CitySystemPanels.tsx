@@ -342,7 +342,7 @@ export function FriendsSystemPanel() {
         >
           Voice plaza
         </button>
-        <Link className="oxc-btn ghost" to="/hq">
+        <Link className="oxc-btn ghost" to="/orbitx-social">
           Open HQ
         </Link>
       </div>

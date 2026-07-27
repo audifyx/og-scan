@@ -10,7 +10,7 @@ const DOCK = [
   { to: "/os/dashboard", icon: LayoutGrid },
   { to: "/intel", icon: Compass },
   { to: "/play", icon: Gamepad2 },
-  { to: "/hq", icon: UserRound },
+  { to: "/orbitx-social", icon: UserRound },
 ] as const;
 
 export function OsShell() {

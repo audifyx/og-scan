@@ -8,11 +8,11 @@ import { resolve } from "node:path";
 describe("OrbitX route manifest", () => {
   const app = readFileSync(resolve(__dirname, "../App.tsx"), "utf8");
 
-  it("keeps OS, Play, Intel, Social HQ, and City routes", () => {
+  it("keeps OS, Play, Intel, Social, and City routes", () => {
     expect(app).toContain('path="/os/*"');
     expect(app).toContain('path="/play/*"');
     expect(app).toContain('path="/intel"');
-    expect(app).toContain('path="/hq"');
+    expect(app).toContain('path="/orbitx-social"');
     expect(app).toContain('path="/Orbitxcity"');
   });
 
@@ -20,11 +20,11 @@ describe("OrbitX route manifest", () => {
     expect(app).toContain("./os/OsApp");
     expect(app).toContain("./gaming/PlayApp");
     expect(app).toContain("./crypto/pages/IntelLayout");
-    expect(app).toContain("./social/pages/SocialLayout");
+    expect(app).toContain("./pages/SocialAppPage");
   });
 
-  it("redirects legacy social aliases to HQ", () => {
+  it("redirects legacy social aliases to live social app", () => {
     expect(app).toContain('path="/social"');
-    expect(app).toContain('Navigate to="/hq"');
+    expect(app).toContain('Navigate to="/orbitx-social"');
   });
 });
