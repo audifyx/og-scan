@@ -177,72 +177,65 @@ export default function LaunchpadHome() {
 
   return (
     <div className="ox-launchboard space-y-4">
-      <div className="ox-tab-hero mb-1 overflow-hidden rounded-2xl border border-[hsl(var(--pf-border))]/80 px-4 py-3 sm:px-5"
-        style={{ background: "linear-gradient(135deg, hsl(var(--pf-bg-2)), hsl(263 60% 12% / 0.5) 60%, hsl(158 50% 10% / 0.35))" }}>
-        <div className="flex flex-wrap items-end justify-between gap-2">
+      <div className="ox-tab-hero mb-1">
+        <div className="ox-tab-hero-glow" style={{ background: "radial-gradient(520px 180px at 10% 0%, #9945FF44, transparent 70%)" }} />
+        <div className="relative flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className="pf-mono text-[10px] font-bold uppercase tracking-[0.28em] text-[hsl(var(--pf-blue))]">Solana · live board</div>
-            <h1 className="text-lg font-black text-[hsl(var(--pf-ink))] sm:text-xl">Discover &amp; trade new coins</h1>
+            <div className="pf-mono text-[10px] font-bold uppercase tracking-[0.3em] text-[#9945FF]">Solana · live board</div>
+            <h1 className="mt-1 text-xl font-black tracking-tight text-white sm:text-2xl">Discover &amp; trade new coins</h1>
           </div>
-          <Link to="/orbitxlaunch/create" className="ox-create-cta hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black sm:inline-flex">
+          <Link to="/orbitxlaunch/create" className="ox-create-cta hidden sm:inline-flex">
             <Plus className="h-3.5 w-3.5" strokeWidth={3} /> Create coin
           </Link>
         </div>
       </div>
 
-      {/* Create + search — the actual launchpad chrome */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[hsl(var(--pf-muted))]" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
           <input
             placeholder="Search name, ticker, or mint…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-[hsl(var(--pf-border))] bg-[hsl(var(--pf-bg-2))] py-2.5 pl-10 pr-4 text-sm text-[hsl(var(--pf-ink))] outline-none placeholder:text-[hsl(var(--pf-muted))] focus:border-[hsl(var(--pf-green))]"
+            className="w-full rounded-[14px] border border-white/10 bg-[hsl(255_32%_8%)] py-3 pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#14F195]/60"
           />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => setHideVamps((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold uppercase tracking-wide transition ${
+            className={`ox-nav-pill inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide ${
               hideVamps
-                ? "bg-[hsl(var(--pf-green))] text-black"
-                : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))] hover:text-[hsl(var(--pf-ink))]"
+                ? "ox-nav-pill--on"
+                : "border border-white/10 text-white/55 hover:border-white/25 hover:text-white"
             }`}
             title="Hide vamp / clone tokens"
           >
             <ShieldCheck className="h-3.5 w-3.5" />
             {hideVamps ? "OG only" : "All"}
           </button>
-          <Link
-            to="/orbitxlaunch/create"
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black text-black sm:flex-none"
-            style={{ background: "linear-gradient(135deg, hsl(var(--pf-green)), hsl(152 90% 42%))" }}
-          >
-            <Plus className="h-4 w-4" strokeWidth={3} /> Create coin
+          <Link to="/orbitxlaunch/create" className="ox-create-cta flex-1 justify-center sm:hidden">
+            <Plus className="h-4 w-4" strokeWidth={3} /> Create
           </Link>
         </div>
       </div>
 
-      {/* Live strip — compact, not a marketing stats dashboard */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-[hsl(var(--pf-border))]/70 bg-[hsl(var(--pf-bg-2))] px-3 py-2 pf-mono text-[11px] text-[hsl(var(--pf-muted))]">
-        <span className="inline-flex items-center gap-1.5 font-bold text-[hsl(var(--pf-ink))]">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[hsl(var(--pf-green))]" />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 pf-mono text-[11px] text-white/50">
+        <span className="inline-flex items-center gap-1.5 font-bold text-white">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#14F195]" />
           Live board
         </span>
         <span>{stats.total} coins</span>
-        <span className="text-[hsl(var(--pf-gold))]">{stats.graduated} graduated</span>
+        <span className="text-[#F0B429]">{stats.graduated} graduated</span>
         <span>vol {fmtCompactUsd(vol24Total)}</span>
         <span>{trades24.toLocaleString()} tx / 24h</span>
         {promoActive && (
-          <span className="ml-auto inline-flex items-center gap-1 font-bold text-[hsl(var(--pf-green))]">
+          <span className="ml-auto inline-flex items-center gap-1 font-bold text-[#14F195]">
             <Zap className="h-3 w-3" /> Promo · {promoDaysLeft}d · ${ORBITX_FEE_USD} launch
           </span>
         )}
       </div>
 
-      {/* Filters */}
       <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {([
           { id: "board", label: "Board", icon: Rocket },
@@ -262,10 +255,10 @@ export default function LaunchpadHome() {
               key={c.id}
               type="button"
               onClick={() => setCategory(c.id)}
-              className={`ox-nav-pill inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
+              className={`ox-nav-pill inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide ${
                 on
                   ? "ox-nav-pill--on"
-                  : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))] hover:text-[hsl(var(--pf-ink))]"
+                  : "border border-white/10 text-white/50 hover:border-white/25 hover:text-white"
               }`}
             >
               <Icon className="h-3 w-3" />

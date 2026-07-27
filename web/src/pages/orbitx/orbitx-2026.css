@@ -579,29 +579,296 @@
 
 /* ── Pump-style live board ─────────────────────────────────────────────── */
 .lp-classic .ox-tri-board {
-  min-height: calc(100vh - 140px);
+  min-height: calc(100vh - 180px);
+  gap: 10px;
 }
 .lp-classic .ox-board-col {
-  max-height: calc(100vh - 140px);
-  background: hsl(220 28% 7% / 0.85);
-  box-shadow: inset 0 1px 0 hsl(152 86% 52% / 0.08);
+  max-height: calc(100vh - 180px);
+  background: linear-gradient(180deg, hsl(255 32% 9% / 0.95), hsl(250 40% 5% / 0.9));
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04), 0 16px 40px -28px hsl(263 100% 40% / 0.45);
 }
 .lp-classic .ox-board-col > div {
   overscroll-behavior: contain;
 }
 .lp-classic a.ox-coin {
-  background: hsl(220 28% 9% / 0.95);
-  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.03);
+  background: linear-gradient(135deg, hsl(255 28% 10%), hsl(250 35% 7%));
+  border-radius: 14px;
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.04);
 }
 .lp-classic a.ox-coin:hover {
-  background: hsl(220 28% 12%);
-  box-shadow: 0 0 0 1px hsl(152 86% 52% / 0.35), 0 10px 28px -16px hsl(152 86% 52% / 0.55);
+  background: linear-gradient(135deg, hsl(255 30% 13%), hsl(263 40% 10%));
+  box-shadow: 0 0 0 1px hsl(158 89% 51% / 0.4), 0 12px 32px -16px hsl(158 89% 51% / 0.5);
   transform: translateY(-1px);
 }
 .lp-classic .ox-launchboard input {
-  background: hsl(var(--pf-bg-2)) !important;
+  background: hsl(255 32% 8%) !important;
+  border-radius: 14px !important;
 }
 
+/* ── Shell header (two-tier) ───────────────────────────────────────────── */
+.lp-classic .ox-shell-header {
+  border-bottom: 1px solid hsl(263 40% 22% / 0.55);
+  background: linear-gradient(180deg, hsl(250 40% 5% / 0.96), hsl(255 35% 6% / 0.9));
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+.lp-classic .ox-shell-inner {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1440px;
+  padding: 0 12px;
+}
+@media (min-width: 640px) {
+  .lp-classic .ox-shell-inner { padding: 0 16px; }
+}
+.lp-classic .ox-shell-top {
+  border-bottom: 1px solid hsl(263 30% 18% / 0.45);
+}
+.lp-classic .ox-shell-top .ox-shell-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.lp-classic .ox-shell-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lp-classic .ox-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.lp-classic .ox-brand-mark {
+  display: flex;
+  height: 38px;
+  width: 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: #07040f;
+  background: linear-gradient(135deg, #14F195 0%, #9945FF 100%);
+  box-shadow: 0 0 24px -6px #14F195aa, 0 0 28px -10px #9945FFaa;
+  transition: transform .15s ease;
+}
+.lp-classic .ox-brand:hover .ox-brand-mark { transform: scale(1.05); }
+.lp-classic .ox-brand-name {
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+.lp-classic .ox-brand-name span {
+  background: linear-gradient(90deg, #14F195, #9945FF);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.lp-classic .ox-brand-sub {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: hsl(250 12% 62%);
+}
+
+/* Tab rail */
+.lp-classic .ox-shell-tabs {
+  background: hsl(255 35% 6% / 0.65);
+}
+.lp-classic .ox-tab-rail {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  padding: 6px 0 0;
+  scrollbar-width: none;
+}
+.lp-classic .ox-tab-rail::-webkit-scrollbar { display: none; }
+.lp-classic .ox-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  padding: 10px 14px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  color: hsl(250 12% 62%);
+  text-decoration: none;
+  border-radius: 12px 12px 0 0;
+  transition: color .15s ease, background .15s ease;
+}
+.lp-classic .ox-tab:hover {
+  color: #fff;
+  background: hsl(0 0% 100% / 0.03);
+}
+.lp-classic .ox-tab--hot { color: #F0B429; }
+.lp-classic .ox-tab--on {
+  color: #fff;
+  background: linear-gradient(180deg, hsl(263 60% 18% / 0.55), transparent);
+}
+.lp-classic .ox-tab--on::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(90deg, #14F195, #9945FF);
+  box-shadow: 0 0 12px #14F19588;
+}
+.lp-classic .ox-tab--on svg { color: #14F195; }
+
+/* Buttons / chips */
+.lp-classic .ox-create-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9999px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #07040f !important;
+  text-decoration: none;
+  background: linear-gradient(135deg, #14F195, #9945FF) !important;
+  box-shadow: 0 0 28px -8px #14F195b0, 0 0 28px -10px #9945FF99;
+  transition: filter .15s ease, transform .15s ease;
+}
+.lp-classic .ox-create-cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.lp-classic .ox-wallet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9999px;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #07040f;
+  background: #14F195;
+  box-shadow: 0 0 20px -6px #14F195aa;
+}
+.lp-classic .ox-wallet-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 14px;
+  border: 1px solid hsl(263 40% 28% / 0.7);
+  background: hsl(255 32% 10% / 0.9);
+  padding: 6px 8px 6px 10px;
+}
+.lp-classic .ox-wallet-dot {
+  height: 8px;
+  width: 8px;
+  border-radius: 9999px;
+  background: #14F195;
+  box-shadow: 0 0 8px #14F195;
+}
+.lp-classic .ox-wallet-exit {
+  border-radius: 8px;
+  border: 1px solid hsl(263 30% 28% / 0.6);
+  padding: 4px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: hsl(250 12% 62%);
+}
+.lp-classic .ox-wallet-exit:hover {
+  border-color: #ff4d6d88;
+  color: #ff4d6d;
+}
+.lp-classic .ox-ghost-btn {
+  align-items: center;
+  gap: 6px;
+  border-radius: 9999px;
+  border: 1px solid hsl(263 30% 28% / 0.7);
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: hsl(250 12% 68%);
+  background: transparent;
+}
+.lp-classic .ox-ghost-btn:hover {
+  border-color: #9945FF88;
+  color: #fff;
+}
+
+/* Ticker */
+.lp-classic .ox-ticker {
+  overflow: hidden;
+  border-bottom: 1px solid hsl(263 30% 18% / 0.5);
+  background: linear-gradient(90deg, hsl(263 80% 12% / 0.55), hsl(158 50% 10% / 0.35), hsl(263 80% 12% / 0.55));
+  color: hsl(250 12% 72%);
+  padding: 6px 0;
+}
+.lp-classic .ox-ticker-track {
+  display: flex;
+  width: max-content;
+  gap: 48px;
+  animation: oxTicker 36s linear infinite;
+}
+@keyframes oxTicker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* Main */
+.lp-classic .ox-shell-main {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1440px;
+  padding: 14px 10px 48px;
+}
+@media (min-width: 640px) {
+  .lp-classic .ox-shell-main { padding: 18px 16px 56px; }
+}
+
+/* Tab hero */
+.lp-classic .ox-tab-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid hsl(263 40% 28% / 0.55);
+  background: linear-gradient(135deg, hsl(255 32% 9%), hsl(263 45% 10% / 0.7) 55%, hsl(158 40% 8% / 0.45));
+  padding: 18px 18px 20px;
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.05), 0 20px 50px -30px hsl(263 100% 40% / 0.45);
+}
+.lp-classic .ox-tab-hero-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+.lp-classic .ox-tab-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: linear-gradient(90deg, #9945FF, #14F195, transparent);
+  opacity: 0.9;
+}
+.lp-classic .ox-tab-hero-icon {
+  display: flex;
+  height: 46px;
+  width: 46px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid;
+  background: hsl(0 0% 0% / 0.35);
+}
+
+/* Legacy nav pill still used on home filters */
 .lp-classic .ox-nav-pill {
   border-radius: 9999px;
   border: 1px solid transparent;
@@ -616,22 +883,7 @@
 .lp-classic .ox-nav-pill--on svg {
   color: #07040f !important;
 }
-.lp-classic .ox-create-cta {
-  background: linear-gradient(135deg, #14F195, #9945FF) !important;
-  color: #07040f !important;
-  box-shadow: 0 0 28px -8px hsl(158 89% 51% / 0.7), 0 0 28px -10px hsl(263 100% 64% / 0.55);
-}
-.lp-classic .ox-tab-hero {
-  position: relative;
-}
-.lp-classic .ox-tab-hero::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 2px;
-  background: linear-gradient(90deg, #9945FF, #14F195, transparent);
-  opacity: 0.85;
-}
+
 @media (max-width: 1023px) {
   .lp-classic .ox-tri-board,
   .lp-classic .ox-board-col {
