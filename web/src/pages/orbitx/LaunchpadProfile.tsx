@@ -203,7 +203,7 @@ export default function LaunchpadProfile() {
 
   if (!connected || !addr)
     return (
-      <div className="og-glass-card mx-auto flex max-w-lg flex-col items-center gap-4 border-dashed py-20 text-center">
+      <div className="pf-card mx-auto flex max-w-lg flex-col items-center gap-4 border-dashed py-20 text-center">
         <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/10 bg-white/5"><Wallet className="h-7 w-7 text-muted-foreground" /></div>
         <div>
           <div className="font-display text-lg font-bold text-foreground">Connect your wallet</div>

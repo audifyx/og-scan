@@ -17,7 +17,7 @@ import { TabHero } from "./TabHero";
 
 function InfoCard({ icon: Icon, title, children }: { icon: React.ComponentType<{ className?: string }>; title: string; children: React.ReactNode }) {
   return (
-    <div className="og-glass-card lift p-5">
+    <div className="pf-card p-5">
       <div className="mb-2.5 flex items-center gap-2.5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[hsl(var(--og-gold))]/25 bg-[hsl(var(--og-gold))]/10"><Icon className="h-4 w-4 text-[hsl(var(--og-gold))]" /></div>
         <h3 className="font-display text-sm font-bold uppercase tracking-wide text-foreground">{title}</h3>
@@ -201,7 +201,7 @@ export default function LaunchpadAbout() {
       </div>
 
       {/* Contact / community */}
-      <div className="og-glass-card mb-8 border-[hsl(var(--og-cyan))]/25 p-5">
+      <div className="pf-card mb-8 border-[rgba(59,130,246,0.25)] p-5">
         <div className="mb-3 flex items-center gap-2">
           <MessageCircle className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
           <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[hsl(var(--og-cyan))]">Contact &amp; community</h3>

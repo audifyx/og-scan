@@ -829,15 +829,15 @@ export default function LaunchpadCreate() {
   if (launched) {
     return (
       <div className="mx-auto max-w-2xl py-10">
-        <Card className="lpx-panel lpx-panel--hot relative overflow-hidden border-0 bg-transparent">
+        <Card className="ox-panel ox-panel--accent pf-card relative overflow-hidden border-0 bg-transparent">
           <Confetti />
           <CardContent className="relative space-y-5 p-8 text-center">
-            <div className="lpx-pop mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[hsl(var(--og-lime))]/45 bg-[hsl(var(--og-lime))]/10">
-              <CheckCircle2 className="h-9 w-9 text-[hsl(var(--og-lime))]" />
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(212,175,55,0.45)] bg-[rgba(212,175,55,0.1)]">
+              <CheckCircle2 className="h-9 w-9 text-[#F0C75E]" />
             </div>
             <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Deployment complete</div>
-              <h2 className="lpx-glow font-display text-2xl font-black text-[hsl(var(--og-lime))]">TOKEN LIVE ON MAINNET</h2>
+              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#A8B0BC]">Deployment complete</div>
+              <h2 className="font-display text-2xl font-black text-[#F0C75E]">TOKEN LIVE ON MAINNET</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {cfg.name.trim()} (${cfg.ticker.trim().toUpperCase()}) is live{launched.poolId ? " and instantly tradable on Raydium" : ""}.
               </p>
@@ -883,13 +883,12 @@ export default function LaunchpadCreate() {
     <>
       <div className="relative mx-auto max-w-6xl px-4 pb-24 pt-6">
         {/* Deploy console header */}
-        <div className="lpx-panel lpx-panel--hot relative mb-6 overflow-hidden">
-          <div className="lpx-sweep" />
+        <div className="ox-panel ox-panel--accent pf-card relative mb-6 overflow-hidden">
           <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-xl">
-              <div className="font-mono text-[10px] uppercase tracking-[0.34em] text-[hsl(var(--og-lime))]">{"//"} deploy console — custom lane</div>
-              <h1 className="mt-1 font-display text-2xl font-black tracking-tight sm:text-3xl">
-                BUILD YOUR <span className="lpx-glow text-[hsl(var(--og-lime))]">MINT</span>
+              <div className="font-mono text-[10px] uppercase tracking-[0.34em] text-[#F0C75E]">{"//"} deploy console — custom lane</div>
+              <h1 className="mt-1 font-display text-2xl font-black tracking-tight text-white sm:text-3xl">
+                BUILD YOUR <span className="text-[#60A5FA]">MINT</span>
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Own SPL mint · Metaplex metadata · optional Raydium pool · on-chain creator fees · OBX vanity address. No pump.fun.
@@ -898,22 +897,23 @@ export default function LaunchpadCreate() {
                 <div>
                   <div className="mb-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-widest">
                     <span className="text-muted-foreground">Launch readiness</span>
-                    <span className="font-bold text-[hsl(var(--og-lime))]">{readiness}%</span>
+                    <span className="font-bold text-[#60A5FA]">{readiness}%</span>
                   </div>
-                  <div className="lpx-gauge"><div style={{ width: `${readiness}%` }} /></div>
+                  <div className="ox-gauge"><div style={{ width: `${readiness}%` }} /></div>
                 </div>
                 <div>
                   <div className="mb-1 flex items-center justify-between font-mono text-[9px] uppercase tracking-widest">
                     <span className="text-muted-foreground">Trust score</span>
                     <span className="font-bold" style={{ color: toneHsl[trustTone] }}>{trust}/100</span>
                   </div>
-                  <div className="lpx-gauge"><div style={{ width: `${trust}%`, background: toneHsl[trustTone], boxShadow: `0 0 10px ${toneHsl[trustTone]}` }} /></div>
+                  <div className="ox-gauge"><div style={{ width: `${trust}%`, background: toneHsl[trustTone], boxShadow: `0 0 10px ${toneHsl[trustTone]}` }} /></div>
                 </div>
               </div>
             </div>
             {connected ? (
-              <span className="flex items-center gap-1.5 self-start rounded-lg border border-[hsl(var(--og-lime))]/35 bg-black/40 px-3 py-2 font-mono text-[11px] font-bold text-[hsl(var(--og-lime))]">
-                <span className="lpx-led" /> {publicKey?.toBase58().slice(0, 4)}…{publicKey?.toBase58().slice(-4)}
+              <span className="ox-wallet-chip self-start">
+                <span className="ox-led" />
+                <span className="pf-mono text-[11px] font-bold text-white">{publicKey?.toBase58().slice(0, 4)}…{publicKey?.toBase58().slice(-4)}</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 self-start rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect via the wallet button up top</span>
@@ -928,7 +928,7 @@ export default function LaunchpadCreate() {
               const Icon = s.icon; const on = active === s.id; const done = sectionDone[s.id];
               return (
                 <button key={s.id} onClick={() => setActive(s.id)} data-on={on}
-                  className="lpx-step shrink-0 lg:w-full">
+                  className="ox-step shrink-0 lg:w-full">
                   <span className="idx">{String(idx + 1).padStart(2, "0")}</span>
                   <Icon className={`h-4 w-4 shrink-0 ${on ? "text-[hsl(var(--og-lime))]" : "text-muted-foreground"}`} />
                   <span className={`flex-1 text-left font-mono text-[11px] font-bold uppercase tracking-wider ${on ? "text-[hsl(var(--og-lime))]" : "text-muted-foreground"}`}>{s.label}</span>
@@ -939,11 +939,11 @@ export default function LaunchpadCreate() {
           </nav>
 
           {/* Active section */}
-          <div className="lpx-panel"><div className="p-6">{renderSection()}</div></div>
+          <div className="ox-panel pf-card"><div className="p-6">{renderSection()}</div></div>
 
           {/* Live summary */}
           <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <div className="lpx-panel"><header className="lpx-panel-title">Launch telemetry</header><div className="p-5">
+            <div className="ox-panel pf-card"><header className="ox-panel-title">Launch telemetry</header><div className="p-5">
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   {cfg.logoDataUrl ? <img src={cfg.logoDataUrl} alt="" className="h-full w-full object-cover" /> : <Coins className="h-5 w-5 text-muted-foreground" />}
@@ -1003,9 +1003,9 @@ export default function LaunchpadCreate() {
               </div>
 
               {launching && (
-                <div className="lpx-term mb-3 rounded-lg border border-[hsl(var(--og-lime))]/20 bg-black/60 p-2.5">
+                <div className="ox-term mb-3 rounded-lg border border-[hsl(var(--og-lime))]/20 bg-black/60 p-2.5">
                   <div className="gold">$ orbitx deploy --lane custom</div>
-                  <div>[{phase}] {phaseMsg || "working…"}<span className="lpx-caret" /></div>
+                  <div>[{phase}] {phaseMsg || "working…"}<span className="ox-caret" /></div>
                 </div>
               )}
               <Button onClick={handleLaunch} disabled={launching || errors.length > 0}

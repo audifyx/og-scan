@@ -1,20 +1,8 @@
 /**
  * Orbitx Launchpad — CLAIM CREATOR FEES (both lanes, in-app, non-custodial).
- *
- * Connect the SAME WALLET you launched with:
- *  - Pump lane: claims pump.fun creator fees (the Pump program's own
- *    collectCreatorFee system — one claim collects across ALL your pump
- *    coins, bonding curve + graduated).
- *  - Custom lane: claims the 0.45% Token-2022 transfer fee accrued on every
- *    buy/sell of tokens you launched. Paid in your own token; swap anytime.
- *    Claim split: 75% creator / 25% platform (admin desk).
  */
 import { useState, useCallback, useEffect } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
@@ -22,7 +10,7 @@ import {
 } from "lucide-react";
 import { listByCreator, type OrbitxToken } from "@/lib/orbitx/registry";
 import {
-  getPumpClaimableSol, buildPumpClaimTransaction,
+  getPumpClaimableSol,
   getCustomClaimable, buildCustomClaimTransactions, type CustomClaimable,
   buildPumpClaimWithSkim, buildPumpBuyTransaction, buildCustomSwapToSolWithSkim,
 } from "@/lib/orbitx/claim";
@@ -37,7 +25,6 @@ export default function LaunchpadClaim() {
   const { connected, publicKey, connect, wallets, select, signTransaction } = useWallet();
   const { connection } = useConnection();
 
-  /* pump lane */
   const [pumpSol, setPumpSol] = useState<number | null>(null);
   const [pumpLoading, setPumpLoading] = useState(false);
   const [pumpClaiming, setPumpClaiming] = useState(false);
@@ -45,7 +32,6 @@ export default function LaunchpadClaim() {
   const [autoBuyback, setAutoBuyback] = useState(false);
   const [buybackMint, setBuybackMint] = useState("");
 
-  /* custom lane */
   const [tokens, setTokens] = useState<OrbitxToken[]>([]);
   const [tokensLoading, setTokensLoading] = useState(false);
   const [claimables, setClaimables] = useState<Record<string, CustomClaimable | "loading" | "error">>({});
@@ -102,7 +88,6 @@ export default function LaunchpadClaim() {
     if (!publicKey || !signTransaction) return;
     setPumpClaiming(true);
     try {
-      // Claim + 25% platform skim, atomic in one signed tx.
       const plan = await buildPumpClaimWithSkim(connection, publicKey);
       if (plan.grossLamports <= 0) { toast.error("Nothing to claim right now"); return; }
       const signed = await signTransaction(plan.tx);
@@ -112,10 +97,9 @@ export default function LaunchpadClaim() {
       const netSol = plan.netLamports / LAMPORTS_PER_SOL;
       toast.success(`Claimed ${netSol.toFixed(4)} SOL (${bpsToPct(DEFAULT_ROUTED_FEE_BPS)}% platform fee routed)`);
 
-      // Optional: use the freshly-claimed SOL to buy back your own coin.
       if (autoBuyback) {
         const mint = buybackMint || pumpTokens[0]?.mint_address || "";
-        const buyLamports = plan.netLamports - Math.floor(0.01 * LAMPORTS_PER_SOL); // leave gas
+        const buyLamports = plan.netLamports - Math.floor(0.01 * LAMPORTS_PER_SOL);
         if (!mint) {
           toast.error("Pick a coin to buy back");
         } else if (buyLamports <= 0) {
@@ -162,8 +146,6 @@ export default function LaunchpadClaim() {
         lastSig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
         await connection.confirmTransaction({ signature: lastSig, blockhash, lastValidBlockHeight }, "confirmed");
       }
-      // Custom-lane fees accrue in-token; swap the withdrawn amount to SOL
-      // (+25% platform skim) so the creator is paid in SOL like the pump lane.
       try {
         const plan = await buildCustomSwapToSolWithSkim(connection, publicKey, t.mint_address, info.totalRaw);
         const signedSwap = await signTransaction(plan.tx);
@@ -194,19 +176,22 @@ export default function LaunchpadClaim() {
     <div className="space-y-6">
       <TabHero
         icon={HandCoins}
-        accent="green"
+        accent="gold"
         eyebrow="Claim · creator fees"
         title="Claim your creator fees"
         subtitle={`Same wallet you launched with. ${(CREATOR_FEE_BPS / 100).toFixed(2)}% on every buy & sell — you keep ${TRADE_FEE_CREATOR_SHARE_PCT}%, platform ${TRADE_FEE_PLATFORM_SHARE_PCT}%.`}
         actions={
           !connected ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect up top</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(192,198,210,0.16)] px-3 py-1.5 text-xs text-[#A8B0BC]"><Wallet className="h-3.5 w-3.5" /> Connect up top</span>
           ) : (
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-[hsl(var(--og-lime))]/40 font-mono text-[hsl(var(--og-lime))]">{publicKey ? short(publicKey.toBase58()) : ""}</Badge>
-              <Button variant="outline" size="sm" className="border-white/15" onClick={() => { refreshPump(); refreshTokens(); }}>
+              <span className="ox-wallet-chip">
+                <span className="ox-wallet-dot" />
+                <span className="pf-mono text-[11px] font-bold text-white">{publicKey ? short(publicKey.toBase58()) : ""}</span>
+              </span>
+              <button type="button" className="ox-btn !px-2.5" onClick={() => { refreshPump(); refreshTokens(); }}>
                 <RefreshCw className="h-3.5 w-3.5" />
-              </Button>
+              </button>
             </div>
           )
         }
@@ -214,155 +199,147 @@ export default function LaunchpadClaim() {
 
       {connected && (
         <>
-          {/* ── Pump lane ── */}
-          <Card className="glass-card border-white/10 bg-black/30">
-            <CardContent className="p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Rocket className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
-                  <span className="font-display text-sm font-bold uppercase tracking-wider">Pump lane — pump.fun creator fees</span>
-                </div>
-                <Badge variant="outline" className="border-white/15 text-[10px] text-muted-foreground">native pump.fun system</Badge>
+          <div className="ox-claim-card">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Rocket className="h-4 w-4 text-[#60A5FA]" />
+                <span className="font-display text-sm font-bold uppercase tracking-wider text-white">Pump lane — pump.fun creator fees</span>
               </div>
-              <p className="mb-4 text-xs text-muted-foreground">
-                One claim collects your creator fees across <span className="text-foreground">all</span> coins this wallet created on pump.fun (bonding curve + graduated), including launches made here.
+              <span className="ox-lane-badge text-[#A8B0BC]">native pump.fun system</span>
+            </div>
+            <p className="mb-4 text-xs text-[#A8B0BC]">
+              One claim collects your creator fees across <span className="text-white">all</span> coins this wallet created on pump.fun (bonding curve + graduated), including launches made here.
+            </p>
+            <div className="ox-claim-inner mb-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between text-[#A8B0BC]">
+                <span>Trade fee (every buy &amp; sell)</span>
+                <span className="pf-mono text-white">{(CREATOR_FEE_BPS / 100).toFixed(2)}%</span>
+              </div>
+              <div className="flex items-center justify-between text-[#A8B0BC]">
+                <span>Your share (buyer / creator)</span>
+                <span className="pf-mono text-[#60A5FA]">{TRADE_FEE_CREATOR_SHARE_PCT}%</span>
+              </div>
+              <div className="flex items-center justify-between text-[#A8B0BC]">
+                <span>Platform share (admin claim)</span>
+                <span className="pf-mono text-white">{bpsToPct(DEFAULT_ROUTED_FEE_BPS)}%</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-[#A8B0BC]/80">
+                Of every $1 in fees: ${((TRADE_FEE_CREATOR_SHARE_PCT) / 100).toFixed(2)} to you · ${((TRADE_FEE_PLATFORM_SHARE_PCT) / 100).toFixed(2)} to OrbitX (claimable on Admin Desk).
               </p>
-              <div className="mb-4 rounded-lg border border-white/10 bg-black/30 p-3 text-xs space-y-2">
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Trade fee (every buy &amp; sell)</span>
-                  <span className="font-mono text-foreground">{(CREATOR_FEE_BPS / 100).toFixed(2)}%</span>
-                </div>
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Your share (buyer / creator)</span>
-                  <span className="font-mono text-[hsl(var(--og-cyan))]">{TRADE_FEE_CREATOR_SHARE_PCT}%</span>
-                </div>
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Platform share (admin claim)</span>
-                  <span className="font-mono text-foreground">{bpsToPct(DEFAULT_ROUTED_FEE_BPS)}%</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
-                  Of every $1 in fees: ${((TRADE_FEE_CREATOR_SHARE_PCT) / 100).toFixed(2)} to you · ${((TRADE_FEE_PLATFORM_SHARE_PCT) / 100).toFixed(2)} to OrbitX (claimable on Admin Desk).
-                </p>
-                <label className="mt-3 flex cursor-pointer items-center gap-2">
-                  <input type="checkbox" checked={autoBuyback} onChange={(e) => setAutoBuyback(e.target.checked)}
-                    className="h-4 w-4 accent-[hsl(var(--og-gold))]" />
-                  <span className="font-semibold text-foreground">Claim &amp; auto-buyback</span>
-                </label>
-                {autoBuyback && (
-                  pumpTokens.length > 0 ? (
-                    <select value={buybackMint || pumpTokens[0].mint_address} onChange={(e) => setBuybackMint(e.target.value)}
-                      className="mt-2 w-full rounded-md border border-white/10 bg-black/50 px-2 py-1.5 text-foreground">
-                      {pumpTokens.map((t) => (
-                        <option key={t.mint_address} value={t.mint_address}>${t.ticker} · {short(t.mint_address)}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="mt-2 text-[11px] text-muted-foreground">No pump launches from this wallet to buy back yet.</p>
-                  )
-                )}
-                {autoBuyback && <p className="mt-2 text-[11px] text-muted-foreground">Right after claiming, your net SOL is used to market-buy the selected coin.</p>}
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Claimable now</div>
-                  <div className="font-mono text-2xl font-bold text-[hsl(var(--og-gold))]">
-                    {pumpLoading ? "…" : pumpSol === null ? "—" : `${pumpSol.toFixed(6)} SOL`}
-                  </div>
-                </div>
-                <Button onClick={claimPump} disabled={pumpClaiming || pumpLoading || pumpSol === 0}
-                  className="bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90 disabled:opacity-50">
-                  {pumpClaiming ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Claiming…</> : <><Coins className="mr-2 h-4 w-4" /> Claim pump.fun fees</>}
-                </Button>
-              </div>
-              {pumpSig && (
-                <a href={`https://solscan.io/tx/${pumpSig}`} target="_blank" rel="noopener noreferrer"
-                  className="mt-3 inline-flex items-center gap-1 text-xs text-[hsl(var(--og-lime))] underline-offset-4 hover:underline">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
-              {pumpTokens.length > 0 && (
-                <>
-                  <Separator className="my-4 bg-white/10" />
-                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Your pump launches here</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
+              <label className="mt-3 flex cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={autoBuyback} onChange={(e) => setAutoBuyback(e.target.checked)} className="h-4 w-4 accent-[#F0C75E]" />
+                <span className="font-semibold text-white">Claim &amp; auto-buyback</span>
+              </label>
+              {autoBuyback && (
+                pumpTokens.length > 0 ? (
+                  <select value={buybackMint || pumpTokens[0].mint_address} onChange={(e) => setBuybackMint(e.target.value)}
+                    className="mt-2 w-full rounded-md border border-[rgba(192,198,210,0.16)] bg-[#0a0a0a] px-2 py-1.5 text-white">
                     {pumpTokens.map((t) => (
-                      <a key={t.mint_address} href={`https://pump.fun/${t.mint_address}`} target="_blank" rel="noopener noreferrer">
-                        <Badge variant="outline" className="border-white/15 font-mono text-xs hover:border-[hsl(var(--og-cyan))]/50">${t.ticker} · {short(t.mint_address)}</Badge>
-                      </a>
+                      <option key={t.mint_address} value={t.mint_address}>${t.ticker} · {short(t.mint_address)}</option>
                     ))}
-                  </div>
-                </>
+                  </select>
+                ) : (
+                  <p className="mt-2 text-[11px] text-[#A8B0BC]">No pump launches from this wallet to buy back yet.</p>
+                )
               )}
-            </CardContent>
-          </Card>
-
-          {/* ── Custom lane ── */}
-          <Card className="glass-card border-white/10 bg-black/30">
-            <CardContent className="p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Coins className="h-4 w-4 text-[hsl(var(--og-gold))]" />
-                  <span className="font-display text-sm font-bold uppercase tracking-wider">Custom lane — {(CREATOR_FEE_BPS / 100).toFixed(2)}% on-chain trading fees</span>
+              {autoBuyback && <p className="mt-2 text-[11px] text-[#A8B0BC]">Right after claiming, your net SOL is used to market-buy the selected coin.</p>}
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-[#A8B0BC]">Claimable now</div>
+                <div className="pf-mono text-2xl font-bold text-[#F0C75E]">
+                  {pumpLoading ? "…" : pumpSol === null ? "—" : `${pumpSol.toFixed(6)} SOL`}
                 </div>
-                <Badge variant="outline" className="border-white/15 text-[10px] text-muted-foreground">Token-2022 transfer fee</Badge>
               </div>
-              <p className="mb-4 text-xs text-muted-foreground">
-                Every buy/sell withholds {(CREATOR_FEE_BPS / 100).toFixed(2)}% on-chain (paid in your token). Claiming withdraws it and swaps to <span className="text-foreground">SOL</span> — you keep {TRADE_FEE_CREATOR_SHARE_PCT}%, platform takes {TRADE_FEE_PLATFORM_SHARE_PCT}% (Admin Desk). Only your creator wallet can claim. If the pool is too thin to swap, you keep the tokens.
-              </p>
-
-              {tokensLoading ? (
-                <div className="py-8 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Loading your launches…</div>
-              ) : customTokens.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-muted-foreground">
-                  No custom-lane launches from this wallet yet.
-                  <div className="mt-3"><Link to="/orbitxlaunch/create/custom"><Button variant="outline" size="sm" className="border-white/15"><Rocket className="mr-2 h-3.5 w-3.5" /> Launch one</Button></Link></div>
+              <button type="button" onClick={claimPump} disabled={pumpClaiming || pumpLoading || pumpSol === 0} className="pf-btn disabled:opacity-50">
+                {pumpClaiming ? <><Loader2 className="h-4 w-4 animate-spin" /> Claiming…</> : <><Coins className="h-4 w-4" /> Claim pump.fun fees</>}
+              </button>
+            </div>
+            {pumpSig && (
+              <a href={`https://solscan.io/tx/${pumpSig}`} target="_blank" rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1 text-xs text-[#60A5FA] underline-offset-4 hover:underline">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            {pumpTokens.length > 0 && (
+              <>
+                <div className="my-4 h-px bg-[rgba(192,198,210,0.16)]" />
+                <div className="text-[10px] uppercase tracking-widest text-[#A8B0BC]">Your pump launches here</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {pumpTokens.map((t) => (
+                    <a key={t.mint_address} href={`https://pump.fun/${t.mint_address}`} target="_blank" rel="noopener noreferrer">
+                      <span className="ox-lane-badge font-mono text-xs hover:border-[rgba(59,130,246,0.5)]">${t.ticker} · {short(t.mint_address)}</span>
+                    </a>
+                  ))}
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {customTokens.map((t) => {
-                    const info = claimables[t.mint_address];
-                    const busy = !!claiming[t.mint_address];
-                    const sig = claimSigs[t.mint_address];
-                    const isBuyback = t.fee_route !== "creator";
-                    return (
-                      <div key={t.mint_address} className="rounded-xl border border-white/10 bg-black/40 p-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex items-center gap-3">
-                            {t.logo_url ? <img src={t.logo_url} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5"><Coins className="h-4 w-4 text-muted-foreground" /></div>}
-                            <div>
-                              <div className="flex items-center gap-2 text-sm font-semibold">{t.name} <span className="text-muted-foreground">${t.ticker}</span>
-                                {isBuyback && <Badge className="border-[hsl(var(--og-blood))]/40 bg-[hsl(var(--og-blood))]/10 text-[10px] text-[hsl(var(--og-blood))]"><AlertTriangle className="mr-1 h-3 w-3" /> flagged — fees → OBX buyback</Badge>}
-                              </div>
-                              <a href={`https://solscan.io/token/${t.mint_address}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-muted-foreground hover:text-foreground">{short(t.mint_address)}</a>
+              </>
+            )}
+          </div>
+
+          <div className="ox-claim-card">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Coins className="h-4 w-4 text-[#F0C75E]" />
+                <span className="font-display text-sm font-bold uppercase tracking-wider text-white">Custom lane — {(CREATOR_FEE_BPS / 100).toFixed(2)}% on-chain trading fees</span>
+              </div>
+              <span className="ox-lane-badge text-[#A8B0BC]">Token-2022 transfer fee</span>
+            </div>
+            <p className="mb-4 text-xs text-[#A8B0BC]">
+              Every buy/sell withholds {(CREATOR_FEE_BPS / 100).toFixed(2)}% on-chain (paid in your token). Claiming withdraws it and swaps to <span className="text-white">SOL</span> — you keep {TRADE_FEE_CREATOR_SHARE_PCT}%, platform takes {TRADE_FEE_PLATFORM_SHARE_PCT}% (Admin Desk). Only your creator wallet can claim. If the pool is too thin to swap, you keep the tokens.
+            </p>
+
+            {tokensLoading ? (
+              <div className="py-8 text-center text-sm text-[#A8B0BC]"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Loading your launches…</div>
+            ) : customTokens.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[rgba(192,198,210,0.16)] p-6 text-center text-sm text-[#A8B0BC]">
+                No custom-lane launches from this wallet yet.
+                <div className="mt-3"><Link to="/orbitxlaunch/create/custom" className="ox-btn ox-btn--blue inline-flex"><Rocket className="h-3.5 w-3.5" /> Launch one</Link></div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customTokens.map((t) => {
+                  const info = claimables[t.mint_address];
+                  const busy = !!claiming[t.mint_address];
+                  const sig = claimSigs[t.mint_address];
+                  const isBuyback = t.fee_route !== "creator";
+                  return (
+                    <div key={t.mint_address} className="ox-claim-row">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
+                          {t.logo_url ? <img src={t.logo_url} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5"><Coins className="h-4 w-4 text-[#A8B0BC]" /></div>}
+                          <div>
+                            <div className="flex items-center gap-2 text-sm font-semibold text-white">{t.name} <span className="text-[#A8B0BC]">${t.ticker}</span>
+                              {isBuyback && <span className="ox-lane-badge border-[rgba(255,77,109,0.4)] bg-[rgba(255,77,109,0.1)] text-[#ff4d6d]"><AlertTriangle className="mr-1 inline h-3 w-3" /> flagged — fees → OBX buyback</span>}
                             </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Unclaimed</div>
-                              <div className="font-mono text-sm font-bold text-[hsl(var(--og-gold))]">
-                                {info === "loading" || !info ? "…" : info === "error" ? "scan failed" : `${info.totalUi.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${t.ticker}`}
-                              </div>
-                            </div>
-                            <Button size="sm" onClick={() => claimCustom(t)}
-                              disabled={busy || isBuyback || !info || info === "loading" || info === "error" || info.totalRaw <= BigInt(0)}
-                              className="bg-[hsl(var(--og-gold))] text-black hover:bg-[hsl(var(--og-gold))]/90 disabled:opacity-40">
-                              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Claim"}
-                            </Button>
+                            <a href={`https://solscan.io/token/${t.mint_address}`} target="_blank" rel="noopener noreferrer" className="pf-mono text-xs text-[#A8B0BC] hover:text-white">{short(t.mint_address)}</a>
                           </div>
                         </div>
-                        {sig && (
-                          <a href={`https://solscan.io/tx/${sig}`} target="_blank" rel="noopener noreferrer"
-                            className="mt-2 inline-flex items-center gap-1 text-xs text-[hsl(var(--og-lime))] underline-offset-4 hover:underline">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx <ExternalLink className="h-3 w-3" />
-                          </a>
-                        )}
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="text-[10px] uppercase tracking-widest text-[#A8B0BC]">Unclaimed</div>
+                            <div className="pf-mono text-sm font-bold text-[#F0C75E]">
+                              {info === "loading" || !info ? "…" : info === "error" ? "scan failed" : `${info.totalUi.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${t.ticker}`}
+                            </div>
+                          </div>
+                          <button type="button" onClick={() => claimCustom(t)}
+                            disabled={busy || isBuyback || !info || info === "loading" || info === "error" || info.totalRaw <= BigInt(0)}
+                            className="pf-btn !px-4 !py-2 text-xs disabled:opacity-40">
+                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Claim"}
+                          </button>
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      {sig && (
+                        <a href={`https://solscan.io/tx/${sig}`} target="_blank" rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 text-xs text-[#60A5FA] underline-offset-4 hover:underline">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Claimed — view tx <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>

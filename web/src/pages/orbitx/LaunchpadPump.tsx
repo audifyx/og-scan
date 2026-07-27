@@ -273,7 +273,7 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
               </div>
             </div>
             <h1 className="font-display text-2xl md:text-3xl font-black text-white">
-              LAUNCHED <span className="lpx-glow text-[hsl(var(--og-lime))]">TOKENS</span>
+              LAUNCHED <span className=" text-[hsl(var(--og-lime))]">TOKENS</span>
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Every token deployed through the OrbitX pump lane — live-priced via DexScreener
@@ -965,7 +965,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               <Rocket className="h-4 w-4 text-[hsl(var(--og-lime))]" />
               <span className="font-mono text-[10px] font-bold text-[hsl(var(--og-lime))] uppercase tracking-[0.24em]">Deploy console · pump lane</span>
             </div>
-            <h1 className="font-display text-2xl md:text-3xl font-black text-white mb-2">LAUNCH ON <span className="lpx-glow text-[hsl(var(--og-lime))]">PUMP.FUN</span></h1>
+            <h1 className="font-display text-2xl md:text-3xl font-black text-white mb-2">LAUNCH ON <span className=" text-[hsl(var(--og-lime))]">PUMP.FUN</span></h1>
             <p className="text-sm text-white/40 max-w-md mx-auto">
               {isLaunchFeePromoActive() ? <>Launch fee <span className="font-bold text-[hsl(var(--og-lime))]">FREE for {launchFeePromoDaysLeft()} more days</span> — fill in the details, optionally grind a custom vanity mint, then deploy.</> : <>Fill in the details, optionally grind a custom vanity mint, then launch.</>}
             </p>
@@ -974,13 +974,13 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
         {/* ─── Success Screen ──────────────────────────────── */}
         {step === "success" && (
-          <Card className="lpx-panel lpx-panel--hot relative overflow-hidden border-0 bg-transparent">
+          <Card className="ox-panel ox-panel--accent pf-card relative overflow-hidden border-0 bg-transparent">
             <Confetti />
             <CardContent className="relative p-8 text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10 border border-green-500/20">
                 <CheckCircle className="h-10 w-10 text-green-400" />
               </div>
-              <h2 className="lpx-glow font-display text-2xl font-black text-[hsl(var(--og-lime))] mb-2">DEPLOYMENT COMPLETE 🚀</h2>
+              <h2 className=" font-display text-2xl font-black text-[hsl(var(--og-lime))] mb-2">DEPLOYMENT COMPLETE 🚀</h2>
               <p className="text-sm text-white/50 mb-6">Your token is now live on pump.fun</p>
 
               <div className="mb-4 rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
@@ -1043,7 +1043,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
         {/* ─── Loading / In-Progress ─────────────────────────── */}
         {(step === "uploading" || step === "signing" || step === "sending") && (
-          <Card className="lpx-panel lpx-panel--hot relative overflow-hidden border-0 bg-transparent">
+          <Card className="ox-panel ox-panel--accent pf-card relative overflow-hidden border-0 bg-transparent">
             <CardContent className="p-12 text-center">
               <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(var(--og-cyan))]/10 border border-[hsl(var(--og-cyan))]/20 animate-pulse">
                 <Loader2 className="h-10 w-10 text-[hsl(var(--og-cyan))] animate-spin" />
@@ -1114,7 +1114,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               </div>
             )}
             {/* Token Info Card */}
-            <Card className="lpx-panel border-0 bg-transparent">
+            <Card className="ox-panel pf-card border-0 bg-transparent">
               <CardContent className="p-5 md:p-6 space-y-5">
                 <div className="flex items-center gap-2 mb-1">
                   <Sparkles className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
@@ -1174,7 +1174,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             </Card>
 
             {/* Socials Card */}
-            <Card className="lpx-panel border-0 bg-transparent">
+            <Card className="ox-panel pf-card border-0 bg-transparent">
               <CardContent className="p-5 md:p-6 space-y-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Globe className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
@@ -1202,7 +1202,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             </Card>
 
             {/* Dev Buy Card */}
-            <Card className="lpx-panel border-0 bg-transparent">
+            <Card className="ox-panel pf-card border-0 bg-transparent">
               <CardContent className="p-5 md:p-6 space-y-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Zap className="h-4 w-4 text-[hsl(var(--og-cyan))]" />
@@ -1221,7 +1221,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
             </Card>
 
             {/* Vanity Mint Card — same custom selection as Custom launches */}
-            <Card className="lpx-panel border-0 bg-transparent">
+            <Card className="ox-panel pf-card border-0 bg-transparent">
               <CardContent className="p-5 md:p-6 space-y-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Wand2 className="h-4 w-4 text-[hsl(var(--og-gold))]" />

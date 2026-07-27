@@ -187,7 +187,7 @@ export default function LaunchpadApiLaunch() {
       <div className="mb-6 text-center">
         <div className="font-mono text-[10px] uppercase tracking-[0.34em] text-[hsl(var(--og-gold))]">// third lane — api launch · no api keys anywhere</div>
         <h1 className="mt-2 font-display text-3xl font-black tracking-tight">
-          LAUNCH ON <span className="lpx-glow text-[hsl(var(--og-gold))]">{chain.name.toUpperCase()}</span>
+          LAUNCH ON <span className=" text-[hsl(var(--og-gold))]">{chain.name.toUpperCase()}</span>
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Solana with <span className="text-[hsl(var(--og-gold))]">OBX vanity CA</span> · 12 EVM chains incl. <span className="text-[#00C805]">Robinhood Chain mainnet</span> · hex-vanity CA via CREATE2 · fully keyless.
@@ -195,7 +195,7 @@ export default function LaunchpadApiLaunch() {
       </div>
 
       {/* chain rail */}
-      <div className="lpx-panel mb-6 p-4">
+      <div className="ox-panel pf-card mb-6 p-4">
         <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
           <Globe2 className="h-3.5 w-3.5" /> Select chain · {CHAINS.length} registered · zero API keys
         </div>
@@ -221,22 +221,22 @@ export default function LaunchpadApiLaunch() {
       {/* ── SOLANA: the two live lanes ── */}
       {chain.id === "solana" && (
         <div className="mb-6 grid gap-4 md:grid-cols-2">
-          <div className="lpx-panel flex flex-col p-6">
+          <div className="ox-panel pf-card flex flex-col p-6">
             <div className="mb-2 flex items-center gap-2"><Rocket className="h-4 w-4 text-[hsl(var(--og-cyan))]" /><span className="font-display text-base font-black">PUMP LANE</span><StatusChip status="live" /></div>
             <p className="mb-4 flex-1 text-sm text-muted-foreground">pump.fun bonding curve via PumpPortal — zero seeded liquidity, auto-graduation, OBX vanity CA, claim fees in-app.</p>
-            <Link to="/orbitxlaunch/create/pump" className="lpx-btn w-full !border-[hsl(var(--og-cyan))]/50 !text-[hsl(var(--og-cyan))] hover:!bg-[hsl(var(--og-cyan))]/15">Deploy pump-style <ArrowRight className="h-4 w-4" /></Link>
+            <Link to="/orbitxlaunch/create/pump" className="ox-btn w-full !border-[hsl(var(--og-cyan))]/50 !text-[hsl(var(--og-cyan))] hover:!bg-[hsl(var(--og-cyan))]/15">Deploy pump-style <ArrowRight className="h-4 w-4" /></Link>
           </div>
-          <div className="lpx-panel flex flex-col p-6">
+          <div className="ox-panel pf-card flex flex-col p-6">
             <div className="mb-2 flex items-center gap-2"><Rocket className="h-4 w-4 text-[hsl(var(--og-lime))]" /><span className="font-display text-base font-black">CUSTOM LANE</span><StatusChip status="live" /></div>
             <p className="mb-4 flex-1 text-sm text-muted-foreground">Your own Token-2022 mint — on-chain 0.45% creator fee (75% you / 25% platform), revocable authorities, optional Raydium pool, OBX vanity grind.</p>
-            <Link to="/orbitxlaunch/create/custom" className="lpx-btn w-full !border-[hsl(var(--og-lime))]/50 !text-[hsl(var(--og-lime))] hover:!bg-[hsl(var(--og-lime))]/15">Deploy custom <ArrowRight className="h-4 w-4" /></Link>
+            <Link to="/orbitxlaunch/create/custom" className="ox-btn w-full !border-[hsl(var(--og-lime))]/50 !text-[hsl(var(--og-lime))] hover:!bg-[hsl(var(--og-lime))]/15">Deploy custom <ArrowRight className="h-4 w-4" /></Link>
           </div>
         </div>
       )}
 
       {/* ── EVM: direct-deploy console with vanity ── */}
       {isEvm && (
-        <div className="lpx-panel mb-6 p-6">
+        <div className="ox-panel pf-card mb-6 p-6">
           <div className="mb-4 flex items-center gap-2">
             <WalletIcon className="h-4 w-4 text-[hsl(var(--og-gold))]" />
             <span className="font-display text-base font-black">DIRECT DEPLOY · {chain.name.toUpperCase()}</span>
@@ -281,9 +281,9 @@ export default function LaunchpadApiLaunch() {
                 <div className="break-all text-foreground">{tokenAddr}</div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <a href={explorerAddressUrl(chain, tokenAddr)} target="_blank" rel="noreferrer" className="lpx-btn !border-[hsl(var(--og-lime))]/50 !text-[hsl(var(--og-lime))]">View token <ExternalLink className="h-3.5 w-3.5" /></a>
-                <a href={explorerTxUrl(chain, txHash)} target="_blank" rel="noreferrer" className="lpx-btn">Deploy tx <ExternalLink className="h-3.5 w-3.5" /></a>
-                <button onClick={resetLaunch} className="lpx-btn">Launch another</button>
+                <a href={explorerAddressUrl(chain, tokenAddr)} target="_blank" rel="noreferrer" className="ox-btn !border-[hsl(var(--og-lime))]/50 !text-[hsl(var(--og-lime))]">View token <ExternalLink className="h-3.5 w-3.5" /></a>
+                <a href={explorerTxUrl(chain, txHash)} target="_blank" rel="noreferrer" className="ox-btn">Deploy tx <ExternalLink className="h-3.5 w-3.5" /></a>
+                <button onClick={resetLaunch} className="ox-btn">Launch another</button>
               </div>
             </div>
           ) : (
@@ -334,7 +334,7 @@ export default function LaunchpadApiLaunch() {
               </div>
 
               <button onClick={deploy} disabled={phase !== "idle"}
-                className="lpx-btn w-full !border-[hsl(var(--og-gold))]/50 !text-[hsl(var(--og-gold))] hover:!bg-[hsl(var(--og-gold))]/15 disabled:opacity-60">
+                className="ox-btn w-full !border-[hsl(var(--og-gold))]/50 !text-[hsl(var(--og-gold))] hover:!bg-[hsl(var(--og-gold))]/15 disabled:opacity-60">
                 {phase === "grinding" ? (<><Loader2 className="h-4 w-4 animate-spin" /> Grinding vanity… {grindTries.toLocaleString()} tries</>)
                   : phase === "deploying" ? (<><Loader2 className="h-4 w-4 animate-spin" /> Confirm in wallet…</>)
                   : phase === "confirming" ? (<><Loader2 className="h-4 w-4 animate-spin" /> Confirming on {chain.name}…</>)
@@ -351,7 +351,7 @@ export default function LaunchpadApiLaunch() {
       {/* providers for the selected chain */}
       <div className="space-y-4">
         {providers.map((p) => (
-          <div key={p.id} className="lpx-panel relative flex flex-col gap-4 p-6 md:flex-row md:items-center">
+          <div key={p.id} className="ox-panel pf-card relative flex flex-col gap-4 p-6 md:flex-row md:items-center">
             <div className="md:min-w-[240px]">
               <div className="mb-1 flex items-center gap-2">
                 <Plug className="h-4 w-4 text-[hsl(var(--og-gold))]" />
@@ -364,7 +364,7 @@ export default function LaunchpadApiLaunch() {
               <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">API: {p.api}</p>
             </div>
             {(p.status === "live" || p.status === "beta") && p.route && p.route !== "/orbitxlaunch/create/api" ? (
-              <Link to={p.route} className="lpx-btn w-full !border-[hsl(var(--og-lime))]/50 !text-[hsl(var(--og-lime))] hover:!bg-[hsl(var(--og-lime))]/15 md:w-auto">Launch now <ArrowRight className="h-4 w-4" /></Link>
+              <Link to={p.route} className="ox-btn w-full !border-[hsl(var(--og-lime))]/50 !text-[hsl(var(--og-lime))] hover:!bg-[hsl(var(--og-lime))]/15 md:w-auto">Launch now <ArrowRight className="h-4 w-4" /></Link>
             ) : p.status === "live" ? (
               <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[hsl(var(--og-lime))]/30 bg-[hsl(var(--og-lime))]/5 px-5 py-3 font-display text-xs font-black uppercase tracking-wider text-[hsl(var(--og-lime))] md:w-auto"><CheckCircle2 className="h-4 w-4" /> Console above</span>
             ) : (
