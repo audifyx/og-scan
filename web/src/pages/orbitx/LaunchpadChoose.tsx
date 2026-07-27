@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Rocket, ShieldCheck, Wand2, TrendingUp, ArrowRight, Zap, HandCoins, Check, Plug } from "lucide-react";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
+import { TabHero } from "./TabHero";
 
 function Spec({ children }: { children: React.ReactNode }) {
   return (
@@ -18,15 +19,13 @@ export default function LaunchpadChoose() {
   const creatorPct = (CREATOR_FEE_BPS / 100).toFixed(2);
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-6 text-center">
-        <div className="font-mono text-[10px] uppercase tracking-[0.34em] text-[hsl(var(--og-lime))]">// select deployment lane</div>
-        <h1 className="mt-2 font-display text-3xl font-black tracking-tight">
-          CHOOSE YOUR <span className="lpx-glow text-[hsl(var(--og-lime))]">LAUNCH</span>
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Both lanes live on <span className="text-[hsl(var(--og-lime))]">Solana mainnet</span> · both mint an <span className="font-mono text-[hsl(var(--og-gold))]">obx</span> vanity address · identical fees.
-        </p>
-      </div>
+      <TabHero
+        icon={Rocket}
+        accent="purple"
+        eyebrow="Create · Solana mainnet"
+        title="Choose your launch lane"
+        subtitle="Pump bonding curve or full-control custom mint — same fees, obx vanity CA, anti-vamp on both."
+      />
 
       {/* fee parity band */}
       <div className="lpx-panel lpx-panel--gold mb-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 py-3 font-mono text-[10px] uppercase tracking-widest">

@@ -28,6 +28,7 @@ import {
 import { CREATOR_FEE_BPS } from "@/lib/platformFee";
 import { DEFAULT_ROUTED_FEE_BPS, bpsToPct } from "@/lib/orbitx/feeRouting";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { TabHero } from "./TabHero";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
@@ -190,21 +191,15 @@ export default function LaunchpadClaim() {
 
   return (
     <div className="space-y-6">
-      {/* Hero */}
-      <div className="glass-card relative overflow-hidden rounded-2xl border border-white/10 p-6">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[hsl(var(--og-gold))]/10 blur-3xl" />
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <Badge className="border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 text-[hsl(var(--og-gold))]"><HandCoins className="mr-1 h-3 w-3" /> Creator Fees</Badge>
-            </div>
-            <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Claim your creator fees</h1>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              Connect the <span className="text-foreground">same wallet you launched with</span>. You earn {(CREATOR_FEE_BPS / 100).toFixed(2)}% of every buy and sell — pump.fun's creator rate — on both lanes.
-            </p>
-          </div>
-          {!connected ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect via the wallet button up top</span>
+      <TabHero
+        icon={HandCoins}
+        accent="green"
+        eyebrow="Claim · creator fees"
+        title="Claim your creator fees"
+        subtitle={`Same wallet you launched with. Earn ${(CREATOR_FEE_BPS / 100).toFixed(2)}% of every buy & sell on pump + custom lanes.`}
+        actions={
+          !connected ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect up top</span>
           ) : (
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="border-[hsl(var(--og-lime))]/40 font-mono text-[hsl(var(--og-lime))]">{publicKey ? short(publicKey.toBase58()) : ""}</Badge>
@@ -212,9 +207,9 @@ export default function LaunchpadClaim() {
                 <RefreshCw className="h-3.5 w-3.5" />
               </Button>
             </div>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
       {connected && (
         <>

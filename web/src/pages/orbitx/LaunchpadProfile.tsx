@@ -15,6 +15,7 @@ import {
   ExternalLink, Download, Trophy, ShieldCheck, Droplets, Coins, Flame,
   Award, Star, Gem, Crown, Users, ListChecks, Eye, Share2, Gift,
 } from "lucide-react";
+import { TabHero } from "./TabHero";
 
 const goldBtn = "inline-flex items-center gap-1.5 rounded-lg border border-[hsl(var(--og-gold))]/50 bg-[hsl(var(--og-gold))]/15 px-5 py-2.5 font-display text-xs font-bold uppercase tracking-wider text-[hsl(var(--og-gold))] transition hover:bg-[hsl(var(--og-gold))]/25";
 
@@ -214,6 +215,13 @@ export default function LaunchpadProfile() {
 
   return (
     <div className="mx-auto max-w-5xl">
+      <TabHero
+        icon={Users}
+        accent="green"
+        eyebrow="Profile · creator desk"
+        title="Your creator profile"
+        subtitle="Wallet-native identity, launches, referrals, and achievements."
+      />
       {editing && <EditProfileModal wallet={addr} profile={profile ?? null} onClose={() => setEditing(false)} onSaved={() => refetchProfile()} />}
 
       {/* Header */}

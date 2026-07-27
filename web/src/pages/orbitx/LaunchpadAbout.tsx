@@ -13,6 +13,7 @@ import {
 import { listTokens } from "@/lib/orbitx/registry";
 import { useMarketMap, fmtCompactUsd, fmtInt } from "./lpx";
 import { GRADUATION_MC_USD } from "./_shared";
+import { TabHero } from "./TabHero";
 
 function InfoCard({ icon: Icon, title, children }: { icon: React.ComponentType<{ className?: string }>; title: string; children: React.ReactNode }) {
   return (
@@ -95,11 +96,13 @@ export default function LaunchpadAbout() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-6">
-        <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-muted-foreground">// how it works</div>
-        <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">About OrbitX Launchpad</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Two launch lanes — <span className="text-[hsl(var(--og-cyan))]">Pump-style</span> bonding curve or a fully <span className="text-[hsl(var(--og-gold))]">Custom</span> SPL mint — with clone protection baked in.</p>
-      </div>
+      <TabHero
+        icon={Sparkles}
+        accent="purple"
+        eyebrow="About · how OrbitX works"
+        title="Solana launchpad with anti-vamp"
+        subtitle="Pump bonding curve or custom SPL mint — clone protection, obx vanity CAs, and creator fees you claim in-app."
+      />
 
       {/* Platform statistics — real, live numbers from the registry + DexScreener */}
       <SectionHeading icon={Sparkles} title="Platform statistics" desc="Live numbers, not marketing copy — pulled from the same data every launchpad page uses." />

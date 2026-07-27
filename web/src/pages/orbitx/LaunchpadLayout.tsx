@@ -166,44 +166,49 @@ function ReferralCapture() {
 
 export default function LaunchpadLayout() {
   const { isAdmin } = useAdmin();
-  // Standalone launchpad shell — no AppLayout / SocialTopBar / galaxy chrome.
-  // Full-bleed like pump.fun so the board is the entire page.
   return (
     <div className="lp-classic relative min-h-screen">
       <ReferralCapture />
       <NetworkStrip />
 
-      <header className="sticky top-0 z-30 border-b border-[hsl(var(--pf-border))]/70" style={{ background: "hsl(var(--pf-bg) / 0.92)", backdropFilter: "blur(16px)" }}>
+      <header className="sticky top-0 z-30 border-b border-[hsl(var(--pf-border))]/70" style={{ background: "hsl(var(--pf-bg) / 0.94)", backdropFilter: "blur(18px)" }}>
         <div className="mx-auto flex w-full max-w-[1440px] items-center gap-3 px-3 py-2.5 sm:px-4">
           <Link to="/orbitxlaunch" className="group flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl shadow-lg transition group-hover:scale-105"
-              style={{ background: "linear-gradient(135deg, hsl(var(--pf-green)), hsl(152 90% 42%))" }}>
-              <Rocket className="h-4 w-4 text-black" strokeWidth={2.6} />
+              style={{ background: "linear-gradient(135deg, #14F195, #9945FF)" }}>
+              <Rocket className="h-4 w-4 text-[#07040f]" strokeWidth={2.6} />
             </div>
             <div className="leading-tight">
               <div className="text-base font-black tracking-tight text-[hsl(var(--pf-ink))]">
-                orbit<span className="text-[hsl(var(--pf-green))]">x</span>
-                <span className="text-[hsl(var(--pf-muted))]">.fun</span>
+                orbit<span style={{ background: "linear-gradient(90deg,#14F195,#9945FF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>x</span>
               </div>
-              <div className="pf-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[hsl(var(--pf-muted))]">coin board</div>
+              <div className="pf-mono text-[9px] font-bold uppercase tracking-[0.2em] text-[hsl(var(--pf-muted))]">solana launchpad</div>
             </div>
           </Link>
 
-          <nav className="ml-2 hidden items-center gap-0.5 overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav className="ml-3 hidden items-center gap-1 overflow-x-auto lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {TABS.map((t) => (
-              <NavLink key={t.to} to={t.to} end={t.end}
+              <NavLink
+                key={t.to}
+                to={t.to}
+                end={t.end}
                 className={({ isActive }) => cn(
-                  "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition",
-                  isActive ? "bg-[hsl(var(--pf-green))]/15 text-[hsl(var(--pf-green))]" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]"
-                )}>
+                  "ox-nav-pill inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-[12px] font-bold",
+                  isActive ? "ox-nav-pill--on" : "text-[hsl(var(--pf-muted))] hover:bg-white/[0.04] hover:text-[hsl(var(--pf-ink))]"
+                )}
+              >
                 <t.icon className={cn("h-3.5 w-3.5", t.hot && "text-[hsl(var(--pf-gold))]")} />
                 {t.label}
               </NavLink>
             ))}
             {isAdmin && (
-              <NavLink to="/orbitxlaunch/ox-desk-m4k9q"
-                className={({ isActive }) => cn("flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-bold transition",
-                  isActive ? "bg-[hsl(var(--pf-green))]/15 text-[hsl(var(--pf-green))]" : "text-[hsl(var(--pf-muted))] hover:text-[hsl(var(--pf-ink))]")}>
+              <NavLink
+                to="/orbitxlaunch/ox-desk-m4k9q"
+                className={({ isActive }) => cn(
+                  "ox-nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-bold",
+                  isActive ? "ox-nav-pill--on" : "text-[hsl(var(--pf-muted))]"
+                )}
+              >
                 <ShieldCheck className="h-3.5 w-3.5" /> Desk
               </NavLink>
             )}
@@ -211,8 +216,7 @@ export default function LaunchpadLayout() {
 
           <div className="ml-auto flex items-center gap-2">
             <AntiVampProtectionBadge />
-            <Link to="/orbitxlaunch/create" className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-black text-black shadow-[0_0_24px_hsl(152_86%_52%/0.35)]"
-              style={{ background: "hsl(var(--pf-green))" }}>
+            <Link to="/orbitxlaunch/create" className="ox-create-cta inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-black">
               <Zap className="h-4 w-4" /> Create coin
             </Link>
             <EvmWalletButton />
@@ -220,15 +224,18 @@ export default function LaunchpadLayout() {
           </div>
         </div>
 
-        {/* Mobile tabs */}
-        <div className="mx-auto w-full max-w-[1440px] px-2 pb-1 md:hidden">
-          <nav className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mx-auto w-full max-w-[1440px] px-2 pb-2 lg:hidden">
+          <nav className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {TABS.map((t) => (
-              <NavLink key={t.to} to={t.to} end={t.end}
+              <NavLink
+                key={t.to}
+                to={t.to}
+                end={t.end}
                 className={({ isActive }) => cn(
-                  "flex items-center gap-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition",
-                  isActive ? "bg-[hsl(var(--pf-green))] text-black" : "text-[hsl(var(--pf-muted))]"
-                )}>
+                  "ox-nav-pill inline-flex items-center gap-1 whitespace-nowrap px-3 py-1.5 text-[11px] font-bold",
+                  isActive ? "ox-nav-pill--on" : "text-[hsl(var(--pf-muted))]"
+                )}
+              >
                 <t.icon className="h-3 w-3" />
                 {t.label}
               </NavLink>

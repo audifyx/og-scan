@@ -177,6 +177,19 @@ export default function LaunchpadHome() {
 
   return (
     <div className="ox-launchboard space-y-4">
+      <div className="ox-tab-hero mb-1 overflow-hidden rounded-2xl border border-[hsl(var(--pf-border))]/80 px-4 py-3 sm:px-5"
+        style={{ background: "linear-gradient(135deg, hsl(var(--pf-bg-2)), hsl(263 60% 12% / 0.5) 60%, hsl(158 50% 10% / 0.35))" }}>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <div className="pf-mono text-[10px] font-bold uppercase tracking-[0.28em] text-[hsl(var(--pf-blue))]">Solana · live board</div>
+            <h1 className="text-lg font-black text-[hsl(var(--pf-ink))] sm:text-xl">Discover &amp; trade new coins</h1>
+          </div>
+          <Link to="/orbitxlaunch/create" className="ox-create-cta hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black sm:inline-flex">
+            <Plus className="h-3.5 w-3.5" strokeWidth={3} /> Create coin
+          </Link>
+        </div>
+      </div>
+
       {/* Create + search — the actual launchpad chrome */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
@@ -249,9 +262,9 @@ export default function LaunchpadHome() {
               key={c.id}
               type="button"
               onClick={() => setCategory(c.id)}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
+              className={`ox-nav-pill inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
                 on
-                  ? "bg-[hsl(var(--pf-green))] text-black"
+                  ? "ox-nav-pill--on"
                   : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))] hover:text-[hsl(var(--pf-ink))]"
               }`}
             >

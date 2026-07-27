@@ -33,6 +33,7 @@ import {
 import { getPumpClaimableSol, buildPumpClaimTransaction } from "@/lib/orbitx/claim";
 import { supabase } from "@/lib/supabase";
 import { Panel, useSolUsd } from "./lpx";
+import { TabHero } from "./TabHero";
 
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const BURN_PRESETS = [10, 25, 35, 50, 75, 100];
@@ -661,22 +662,15 @@ export default function LaunchpadRescue() {
       <ClaimCelebrationDialog data={claimCelebration} solUsd={solUsd.data?.price ?? null} onClose={() => setClaimCelebration(null)} />
       <BurnResultDialog data={burnCelebration} onClose={() => setBurnCelebration(null)} />
 
-      {/* Hero */}
-      <Panel hot bodyClassName="p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-[hsl(var(--og-lime))]">
-              <Radar className="h-3.5 w-3.5" /> Rescue console
-            </div>
-            <h1 className="font-display text-2xl font-black tracking-tight sm:text-3xl">
-              Every claimable lamport. <span className="lpx-glow text-[hsl(var(--og-lime))]">Found and swept.</span>
-            </h1>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              Scans this wallet for rent locked in empty accounts, wrapped SOL, unclaimed pump.fun creator fees and convertible dust — then claims it all, non-custodially.
-            </p>
-          </div>
-          {!connected ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect via the wallet button up top</span>
+      <TabHero
+        icon={Radar}
+        accent="gold"
+        eyebrow="Rescue · reclaim SOL"
+        title="Every claimable lamport. Found and swept."
+        subtitle="Rent locked in empty accounts, wrapped SOL, pump creator fees, and dust — scanned and claimed non-custodially."
+        actions={
+          !connected ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--pf-border))] px-3 py-1.5 text-xs text-[hsl(var(--pf-muted))]"><Wallet className="h-3.5 w-3.5" /> Connect up top</span>
           ) : (
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1.5 rounded-lg border border-[hsl(var(--og-lime))]/35 bg-black/40 px-3 py-1.5 font-mono text-[11px] font-bold text-[hsl(var(--og-lime))]">
@@ -686,9 +680,9 @@ export default function LaunchpadRescue() {
                 <RefreshCw className="h-3.5 w-3.5" />
               </button>
             </div>
-          )}
-        </div>
-      </Panel>
+          )
+        }
+      />
 
       {connected && (
         <Tabs value={tab} onValueChange={setTab} className="w-full">

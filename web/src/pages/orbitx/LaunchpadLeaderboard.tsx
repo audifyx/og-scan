@@ -9,6 +9,7 @@ import { listTokens } from "@/lib/orbitx/registry";
 import { TokenCard, shortAddr, GRADUATION_MC_USD } from "./_shared";
 import { useMarketMap, fmtCompactUsd } from "./lpx";
 import { Trophy, Rocket, Droplets, Loader2, Crown, Coins } from "lucide-react";
+import { TabHero } from "./TabHero";
 
 type Tab = "creators" | "tokens";
 
@@ -43,15 +44,18 @@ export default function LaunchpadLeaderboard() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-5 flex items-center gap-2">
-        <Trophy className="h-5 w-5 text-[hsl(var(--pf-gold))]" />
-        <h1 className="text-xl font-black tracking-tight text-[hsl(var(--pf-ink))]">Leaderboards</h1>
-      </div>
+      <TabHero
+        icon={Trophy}
+        accent="gold"
+        eyebrow="Leaders · ranked live"
+        title="Leaderboards"
+        subtitle="Top creators by graduations and top tokens by live market cap — all on-chain data."
+      />
 
       <div className="mb-4 flex gap-2">
         {([["creators", "Top creators"], ["tokens", "Top tokens"]] as [Tab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
-            className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wide transition ${tab === id ? "bg-[hsl(var(--pf-green))] text-black" : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))]"}`}>
+            className={`ox-nav-pill px-4 py-2 text-xs font-bold uppercase tracking-wide transition ${tab === id ? "ox-nav-pill--on" : "border border-[hsl(var(--pf-border))] text-[hsl(var(--pf-muted))] hover:border-[hsl(var(--pf-ink))]"}`}>
             {label}
           </button>
         ))}

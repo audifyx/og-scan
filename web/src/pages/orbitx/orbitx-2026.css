@@ -1,43 +1,41 @@
 /* ============================================================================
-   OrbitX Launchpad — 2026 "Deep Space" redesign.
-   Reskins the whole /orbitxlaunch/* surface by remapping the existing --pf-*
-   design tokens to a matte-black cyber palette (neon emerald + metallic gold),
-   then layering glassmorphism, an animated starfield/aurora background, and a
-   premium hero. Scoped to .lp-classic so nothing else in the app changes.
+   OrbitX Launchpad — Solana palette (purple #9945FF + green #14F195).
+   Remaps --pf-* / --og-* tokens for the whole /orbitxlaunch/* surface.
+   Scoped to .lp-classic so nothing else in the app changes.
    ========================================================================== */
 
 .lp-classic {
-  /* dark cyber token remap — every launchpad component reads these */
-  --pf-bg: 222 32% 5%;
-  --pf-bg-2: 220 28% 8%;
-  --pf-ink: 150 20% 96%;
-  --pf-muted: 210 18% 82%;
-  --pf-border: 200 25% 22%;
-  --pf-green: 152 86% 52%;
-  --pf-green-dark: 152 72% 44%;
+  /* Solana brand remap */
+  --pf-bg: 250 40% 4%;
+  --pf-bg-2: 255 32% 8%;
+  --pf-ink: 0 0% 98%;
+  --pf-muted: 250 12% 72%;
+  --pf-border: 263 28% 24%;
+  --pf-green: 158 89% 51%;       /* #14F195 */
+  --pf-green-dark: 158 78% 42%;
   --pf-red: 356 84% 62%;
   --pf-gold: 42 92% 60%;
-  --pf-blue: 190 92% 56%;
+  --pf-blue: 263 100% 64%;       /* #9945FF */
 
-  --obx-glass: 210 40% 12%;
-  --obx-glow: 152 86% 52%;
+  --obx-glass: 255 30% 10%;
+  --obx-glow: 158 89% 51%;
 
   position: relative;
-  background: #04060a;
+  background: #07040f;
   color: hsl(var(--pf-ink));
   isolation: isolate;
 }
 
-/* animated deep-space background: aurora blooms + drifting grid, all fixed */
+/* Solana aurora: purple left, green right */
 .lp-classic::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -2;
   background:
-    linear-gradient(180deg, rgba(3, 5, 9, 0.74), rgba(3, 5, 9, 0.90)),
+    linear-gradient(180deg, rgba(7, 4, 15, 0.78), rgba(7, 4, 15, 0.92)),
     url("/orbitx-space-bg.png") center center / cover no-repeat,
-    #04060a;
+    #07040f;
 }
 .lp-classic::after {
   content: "";
@@ -45,13 +43,13 @@
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(1100px 700px at 12% -8%, hsl(152 86% 22% / 0.26), transparent 60%),
-    radial-gradient(900px 600px at 92% 6%, hsl(190 92% 26% / 0.20), transparent 60%),
-    radial-gradient(1000px 800px at 50% 118%, hsl(42 80% 30% / 0.12), transparent 55%),
-    linear-gradient(hsl(152 86% 52% / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(152 86% 52% / 0.035) 1px, transparent 1px);
+    radial-gradient(1100px 700px at 8% -10%, hsl(263 100% 40% / 0.32), transparent 58%),
+    radial-gradient(900px 600px at 95% 0%, hsl(158 89% 40% / 0.22), transparent 58%),
+    radial-gradient(900px 700px at 50% 120%, hsl(263 80% 30% / 0.18), transparent 55%),
+    linear-gradient(hsl(263 100% 64% / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(158 89% 51% / 0.035) 1px, transparent 1px);
   background-size: auto, auto, auto, 46px 46px, 46px 46px;
-  animation: obxAurora 20s ease-in-out infinite alternate;
+  animation: obxAurora 22s ease-in-out infinite alternate;
 }
 @keyframes obxAurora {
   0%   { filter: hue-rotate(0deg) brightness(1); }
@@ -457,46 +455,46 @@
    Never dark-on-dark, never light-on-light.
    ========================================================================== */
 .lp-classic.lp-classic {
-  /* pump-style tokens (dark) */
-  --pf-bg: 222 32% 5%;
-  --pf-bg-2: 220 28% 8%;
-  --pf-ink: 150 20% 96%;
-  --pf-muted: 210 16% 78%;
-  --pf-border: 200 22% 24%;
-  --pf-green: 152 86% 52%;
-  --pf-green-dark: 152 74% 46%;
+  /* Solana palette (pinned) */
+  --pf-bg: 250 40% 4%;
+  --pf-bg-2: 255 32% 8%;
+  --pf-ink: 0 0% 98%;
+  --pf-muted: 250 12% 72%;
+  --pf-border: 263 28% 24%;
+  --pf-green: 158 89% 51%;
+  --pf-green-dark: 158 78% 42%;
   --pf-red: 356 84% 62%;
   --pf-gold: 42 92% 60%;
-  --pf-blue: 190 92% 56%;
+  --pf-blue: 263 100% 64%;
 
   /* shadcn / design-system semantic tokens (dark) */
-  --background: 222 32% 5%;
-  --foreground: 150 20% 96%;
-  --card: 220 28% 8%;
-  --card-foreground: 150 20% 96%;
-  --popover: 220 28% 7%;
-  --popover-foreground: 150 20% 96%;
-  --primary: 152 86% 52%;
-  --primary-foreground: 150 40% 6%;
-  --secondary: 220 20% 14%;
-  --secondary-foreground: 150 20% 96%;
-  --muted: 220 20% 14%;
-  --muted-foreground: 210 16% 76%;
-  --accent: 220 20% 16%;
-  --accent-foreground: 150 20% 96%;
+  --background: 250 40% 4%;
+  --foreground: 0 0% 98%;
+  --card: 255 32% 8%;
+  --card-foreground: 0 0% 98%;
+  --popover: 255 32% 7%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 158 89% 51%;
+  --primary-foreground: 250 40% 6%;
+  --secondary: 263 40% 14%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 255 24% 14%;
+  --muted-foreground: 250 12% 70%;
+  --accent: 263 40% 16%;
+  --accent-foreground: 0 0% 98%;
   --destructive: 356 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --border: 200 22% 24%;
-  --input: 220 20% 16%;
-  --ring: 152 86% 52%;
+  --border: 263 28% 24%;
+  --input: 255 24% 16%;
+  --ring: 158 89% 51%;
 
-  /* neon accents (readable on dark) */
-  --og-lime: 152 86% 52%;
+  /* neon accents */
+  --og-lime: 158 89% 51%;
   --og-gold: 42 92% 60%;
-  --og-cyan: 190 92% 56%;
+  --og-cyan: 263 100% 64%;
   --og-blood: 356 84% 62%;
 
-  background: #04060a !important;
+  background: #07040f !important;
   color: hsl(var(--pf-ink)) !important;
 }
 
@@ -604,9 +602,35 @@
   background: hsl(var(--pf-bg-2)) !important;
 }
 
-/* Full-bleed standalone launchpad (no AppLayout chrome) */
-.lp-classic {
-  min-height: 100dvh;
+.lp-classic .ox-nav-pill {
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  transition: background .2s, border-color .2s, color .2s, box-shadow .2s;
+}
+.lp-classic .ox-nav-pill--on {
+  color: #07040f !important;
+  background: linear-gradient(135deg, #14F195, #9945FF);
+  box-shadow: 0 0 22px -6px hsl(158 89% 51% / 0.65);
+  border-color: transparent;
+}
+.lp-classic .ox-nav-pill--on svg {
+  color: #07040f !important;
+}
+.lp-classic .ox-create-cta {
+  background: linear-gradient(135deg, #14F195, #9945FF) !important;
+  color: #07040f !important;
+  box-shadow: 0 0 28px -8px hsl(158 89% 51% / 0.7), 0 0 28px -10px hsl(263 100% 64% / 0.55);
+}
+.lp-classic .ox-tab-hero {
+  position: relative;
+}
+.lp-classic .ox-tab-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 2px;
+  background: linear-gradient(90deg, #9945FF, #14F195, transparent);
+  opacity: 0.85;
 }
 @media (max-width: 1023px) {
   .lp-classic .ox-tri-board,
