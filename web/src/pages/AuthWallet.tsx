@@ -31,6 +31,19 @@ export default function AuthWallet() {
   const waitingOnUsername = Boolean(user && profile && needsUsernameClaim(profile.username, walletPk));
 
   useEffect(() => {
+    // Password recovery links must use the email update form, not wallet auth.
+    let recovery = false;
+    try {
+      if (window.location.hash.includes("type=recovery")) recovery = true;
+      if (sessionStorage.getItem("og_password_recovery") === "1") recovery = true;
+      if (params.get("mode") === "update") recovery = true;
+    } catch { /* noop */ }
+    if (recovery) {
+      navigate(`/auth/email?mode=update${next && next !== "/app" ? `&next=${encodeURIComponent(next)}` : ""}`, { replace: true });
+    }
+  }, [navigate, next, params]);
+
+  useEffect(() => {
     if (loading || !user || merge || pendingMerge || waitingOnUsername) return;
     // Wait until profile is loaded so we don't skip the username gate
     if (user && !profile) return;
@@ -64,17 +77,24 @@ export default function AuthWallet() {
         </div>
 
         <div className="w-full rounded-3xl border border-white/10 bg-white/[0.03] p-7 text-center backdrop-blur-xl">
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">Wallet is your login</div>
-          <h1 className="text-2xl font-black">Connect to enter</h1>
-          <p className="mx-auto mt-2 max-w-xs text-[13px] text-white/50">One wallet connection unlocks the launchpad, DEX, NFT marketplace, and every tool. No email, no password.</p>
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.3em] text-og-cyan">Sign in</div>
+          <h1 className="text-2xl font-black">Enter OrbitX</h1>
+          <p className="mx-auto mt-2 max-w-xs text-[13px] text-white/50">Email login preferred for owner tools. Wallet works everywhere else.</p>
 
           {waitingOnUsername ? (
             <p className="mt-6 text-[13px] text-og-lime">Pick a username in the popup to finish signing in…</p>
           ) : (
             <>
+              <Link
+                to={`/auth/email?next=${encodeURIComponent(next)}`}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#14F195] px-5 py-3.5 text-sm font-black text-black transition hover:brightness-110"
+              >
+                Sign in with email
+              </Link>
+
               <button type="button" onClick={() => { setPendingMerge(false); setPicker(true); }} disabled={loading}
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-og-cyan px-5 py-3.5 text-sm font-black text-black transition hover:brightness-110 disabled:opacity-50">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />} Log in with wallet
+                className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3.5 text-sm font-black text-white transition hover:bg-white/10 disabled:opacity-50">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />} Or connect wallet
               </button>
 
               <button type="button" onClick={() => { if (user) { setMerge(true); } else { setPendingMerge(true); setPicker(true); } }} disabled={loading}
@@ -91,8 +111,8 @@ export default function AuthWallet() {
           </div>
         </div>
 
-        <Link to="/auth/email" className="mt-5 inline-flex items-center gap-1 text-[11px] text-white/30 hover:text-white/60">
-          Trouble connecting? Use email (legacy) <ArrowRight className="h-3 w-3" />
+        <Link to={`/auth/email?mode=reset&next=${encodeURIComponent(next)}`} className="mt-5 inline-flex items-center gap-1 text-[11px] text-white/40 hover:text-white/70">
+          Forgot password? Reset via email <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
 

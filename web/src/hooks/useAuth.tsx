@@ -238,7 +238,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth?mode=update`,
+      // Must land on /auth/email — /auth is wallet-only and ignores mode=update.
+      redirectTo: `${window.location.origin}/auth/email?mode=update`,
     });
     return { error: error as Error | null };
   };

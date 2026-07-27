@@ -181,13 +181,13 @@ const Auth = () => {
         if (error) toast.error(error.message);
         else {
           toast.success("Password updated — you're in");
-          navigate("/app");
+          navigate(searchParams.get("next") || "/ox-desk-m4k9q");
         }
       } else {
         const { error } = await resetPassword(email);
         if (error) toast.error(error.message);
         else {
-          toast.success("Check your email for the reset link");
+          toast.success("Check your email for the reset link — open it to set a new password");
           setMode("signin");
         }
       }
