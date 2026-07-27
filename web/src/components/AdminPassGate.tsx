@@ -110,7 +110,7 @@ export function AdminPassGate(_props?: { children?: React.ReactNode }) {
         {!alreadyOwner && (
           <div className="mt-5 space-y-2 border-t border-white/10 pt-5">
             <Link
-              to={`/auth/email?next=${encodeURIComponent(next)}`}
+              to={`/auth?next=${encodeURIComponent(next)}`}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#14F195] py-3 text-sm font-black text-black hover:brightness-110"
             >
               <Mail className="h-4 w-4" /> Sign in with email first

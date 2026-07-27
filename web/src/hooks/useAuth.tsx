@@ -132,8 +132,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, username: string) => {
+    const cleanEmail = email.trim().toLowerCase();
     const cleanUsername = normalizeUsernameForPolicy(username);
-    if (isReservedUsername(cleanUsername) && !canUseReservedUsername(email)) {
+    if (isReservedUsername(cleanUsername) && !canUseReservedUsername(cleanEmail)) {
       return { error: new Error(getReservedUsernameMessage()), userId: null };
     }
 
@@ -142,7 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // and 3 accounts per IP, then we establish the session here.
     const fingerprint = getDeviceFingerprint();
     const { error: guardErr } = await supabase.functions.invoke("signup-guard", {
-      body: { email, password, username: cleanUsername, fingerprint },
+      body: { email: cleanEmail, password, username: cleanUsername, fingerprint },
     });
     if (guardErr) {
       let message = "Sign up failed";
@@ -152,7 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch { /* ignore */ }
       return { error: new Error(message), userId: null };
     }
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
 
     // Process referral if ?ref= was captured
     if (!error && data?.user) {
@@ -209,7 +210,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const clean = email.trim().toLowerCase();
+    const { data, error } = await supabase.auth.signInWithPassword({ email: clean, password });
     if (!error && data?.user) {
       trackActivity({
         user_id: data.user.id,

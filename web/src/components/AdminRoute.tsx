@@ -76,7 +76,7 @@ export const AdminRoute = ({ children }: AdminRouteProps) => {
         </p>
         <div className="space-y-2.5">
           <Link
-            to={`/auth/email?next=${encodeURIComponent(next)}`}
+            to={`/auth?next=${encodeURIComponent(next)}`}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#14F195] py-3 text-sm font-black text-black hover:brightness-110"
           >
             <Mail className="h-4 w-4" /> Sign in with {OWNER_EMAIL}

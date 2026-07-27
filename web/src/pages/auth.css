@@ -1,0 +1,256 @@
+/* OrbitX auth — black / gold / blue / silver */
+.ox-auth {
+  --ox-gold: #d4af37;
+  --ox-gold-hi: #f0c75e;
+  --ox-blue: #3b82f6;
+  --ox-blue-hi: #60a5fa;
+  --ox-silver: #a8b0bc;
+  position: relative;
+  min-height: 100vh;
+  color: #fff;
+  font-family: "Manrope", system-ui, sans-serif;
+  background: #050505;
+}
+.ox-auth-bg {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(900px 480px at 12% -8%, rgba(59, 130, 246, 0.16), transparent 55%),
+    radial-gradient(800px 420px at 92% 0%, rgba(212, 175, 55, 0.12), transparent 55%),
+    linear-gradient(rgba(168, 176, 188, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 176, 188, 0.03) 1px, transparent 1px),
+    #050505;
+  background-size: auto, auto, 48px 48px, 48px 48px, auto;
+}
+.ox-auth-inner {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto;
+  display: flex;
+  min-height: 100vh;
+  max-width: 440px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.ox-auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  text-decoration: none;
+  color: inherit;
+}
+.ox-auth-brand-mark {
+  display: flex;
+  height: 40px;
+  width: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  background: linear-gradient(135deg, rgba(240, 199, 94, 0.25), rgba(59, 130, 246, 0.15));
+  color: var(--ox-gold-hi);
+}
+.ox-auth-brand-name {
+  font-family: "Syne", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.ox-auth-brand-name span { color: var(--ox-gold-hi); }
+.ox-auth-brand-sub {
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ox-silver);
+}
+.ox-auth-card {
+  width: 100%;
+  border-radius: 20px;
+  border: 1px solid rgba(192, 198, 210, 0.16);
+  background: linear-gradient(180deg, rgba(14, 14, 14, 0.98), rgba(8, 8, 8, 0.99));
+  padding: 24px 20px 22px;
+  box-shadow: 0 24px 80px -32px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.ox-auth-kicker {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ox-gold-hi);
+}
+.ox-auth-title {
+  margin-top: 8px;
+  font-family: "Syne", sans-serif;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.ox-auth-sub {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ox-silver);
+}
+.ox-auth-em {
+  font-family: ui-monospace, monospace;
+  color: #fff;
+}
+.ox-auth-wait {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ox-blue-hi);
+}
+.ox-auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 20px;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(192, 198, 210, 0.14);
+  background: #0a0a0a;
+}
+.ox-auth-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 9px;
+  padding: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ox-silver);
+  background: transparent;
+}
+.ox-auth-tab--on {
+  color: #0a0a0a;
+  background: linear-gradient(180deg, var(--ox-gold-hi), var(--ox-gold));
+}
+.ox-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+.ox-auth-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ox-silver);
+}
+.ox-auth-input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(192, 198, 210, 0.16);
+  background: #0a0a0a;
+  padding: 12px 14px;
+  font-size: 15px;
+  color: #fff;
+  outline: none;
+  letter-spacing: normal;
+  text-transform: none;
+  font-weight: 500;
+}
+.ox-auth-input:focus { border-color: rgba(59, 130, 246, 0.55); }
+.ox-auth-pw { position: relative; }
+.ox-auth-pw .ox-auth-input { padding-right: 44px; }
+.ox-auth-eye {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ox-silver);
+}
+.ox-auth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(240, 199, 94, 0.5);
+  background: linear-gradient(180deg, var(--ox-gold-hi), var(--ox-gold));
+  padding: 13px 16px;
+  font-family: "Syne", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0a0a0a;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.ox-auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ox-auth-btn:hover:not(:disabled) { filter: brightness(1.05); }
+.ox-auth-btn--blue {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: linear-gradient(180deg, var(--ox-blue-hi), var(--ox-blue));
+  color: #fff;
+}
+.ox-auth-btn--ghost {
+  border-color: rgba(192, 198, 210, 0.2);
+  background: transparent;
+  color: #fff;
+  margin-top: 8px;
+}
+.ox-auth-btn--ghost:hover:not(:disabled) {
+  border-color: rgba(212, 175, 55, 0.45);
+  color: var(--ox-gold-hi);
+}
+.ox-auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.ox-auth-links a,
+.ox-auth-links button {
+  color: var(--ox-silver);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+.ox-auth-links a:hover,
+.ox-auth-links button:hover { color: var(--ox-blue-hi); }
+.ox-auth-wallet { margin-top: 16px; }
+.ox-auth-bullets {
+  margin-top: 14px;
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ox-silver);
+}
+.ox-auth-bullets li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ox-auth-bullets svg { color: var(--ox-blue-hi); flex-shrink: 0; }
+.ox-auth-back {
+  margin-top: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: rgba(168, 176, 188, 0.7);
+  text-decoration: none;
+}
+.ox-auth-back:hover { color: #fff; }
