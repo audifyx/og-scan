@@ -91,9 +91,9 @@ function LiveSalesTicker() {
   );
 }
 
-function TabRail({ mobile = false }: { mobile?: boolean }) {
+function TabRail() {
   return (
-    <nav className={`mkt-tab-rail ${mobile ? "border-b mkt-hairline lg:hidden" : "hidden lg:flex"}`}>
+    <nav className="mkt-tab-rail">
       {NAV.map((n) => (
         <NavLink
           key={n.to}
@@ -129,102 +129,99 @@ export default function MarketplaceLayout() {
   const year = useMemo(() => new Date().getFullYear(), []);
 
   return (
-    <AppLayout>
-      <CurrencyProvider>
-        <div className="obx-mkt">
-          <header className="mkt-shell-header">
-            <div className="mkt-shell-top">
-              <div className="mkt-shell-inner">
-                <Link to="/nft" className="mkt-brand">
-                  <div className="mkt-brand-mark">
-                    <Rocket className="h-5 w-5 text-black" strokeWidth={2.4} />
+    <CurrencyProvider>
+      <div className="obx-mkt">
+        <header className="mkt-shell-header">
+          <div className="mkt-shell-top">
+            <div className="mkt-shell-inner">
+              <Link to="/nft" className="mkt-brand">
+                <div className="mkt-brand-mark">
+                  <Rocket className="h-5 w-5 text-black" strokeWidth={2.4} />
+                </div>
+                <div className="leading-none">
+                  <div className="text-[15px] font-black tracking-tight text-white">
+                    OrbitX <span className="text-white/45 font-bold">NFT</span>
                   </div>
-                  <div className="leading-none">
-                    <div className="text-[15px] font-black tracking-tight text-white">
-                      OrbitX <span className="text-white/45 font-bold">NFT</span>
-                    </div>
-                    <div className="mkt-mono text-[9px] uppercase tracking-[0.22em] text-[#9945FF]">Marketplace</div>
-                  </div>
+                  <div className="mkt-mono text-[9px] uppercase tracking-[0.22em] text-[#9945FF]">Marketplace</div>
+                </div>
+              </Link>
+
+              <form onSubmit={submitSearch} className="mkt-search">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search collections, NFTs, creators…"
+                />
+              </form>
+
+              <div className="mkt-shell-actions">
+                <CurrencyToggle />
+                <Link to="/nft/notifications" className="mkt-nav hidden rounded-xl p-2 sm:block" title="Notifications">
+                  <Bell className="h-5 w-5" />
                 </Link>
+                <WalletLogin />
+              </div>
+            </div>
+          </div>
 
-                <form onSubmit={submitSearch} className="mkt-search">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                  <input
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder="Search collections, NFTs, creators…"
-                  />
-                </form>
+          <TabRail />
 
-                <div className="mkt-shell-actions">
-                  <CurrencyToggle />
-                  <Link to="/nft/notifications" className="mkt-nav hidden rounded-xl p-2 sm:block" title="Notifications">
-                    <Bell className="h-5 w-5" />
-                  </Link>
-                  <WalletLogin />
+          <div className="mkt-cat-bar">
+            <div className="mkt-rail mx-auto flex w-full max-w-[1400px] items-center gap-2 overflow-x-auto px-4 py-2">
+              {CATS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCat(c)}
+                  className={`mkt-chip px-3 py-1.5 text-[12px] font-semibold ${activeCat === c ? "active" : ""}`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+
+        <LiveSalesTicker />
+
+        <main className="mkt-main">
+          <Outlet />
+        </main>
+
+        <footer className="mkt-footer">
+          <div className="mx-auto grid w-full max-w-[1400px] grid-cols-2 gap-8 px-4 py-10 sm:grid-cols-4">
+            <div className="col-span-2 sm:col-span-1">
+              <div className="mb-2 flex items-center gap-2">
+                <div className="mkt-brand-mark h-8 w-8 !rounded-lg">
+                  <Rocket className="h-4 w-4 text-black" strokeWidth={2.4} />
                 </div>
+                <span className="text-sm font-black text-white">OrbitX Market</span>
+              </div>
+              <p className="text-[12px] mkt-muted">
+                The wallet-native NFT marketplace on Solana. Mint, trade, and earn creator fees — all in-app.
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <a href="https://twitter.com" target="_blank" rel="noreferrer" className="mkt-nav rounded-lg p-2"><Twitter className="h-4 w-4" /></a>
+                <a href="https://t.me" target="_blank" rel="noreferrer" className="mkt-nav rounded-lg p-2"><Send className="h-4 w-4" /></a>
+                <a href="https://github.com" target="_blank" rel="noreferrer" className="mkt-nav rounded-lg p-2"><Github className="h-4 w-4" /></a>
               </div>
             </div>
-
-            <TabRail />
-            <TabRail mobile />
-
-            <div className="mkt-cat-bar">
-              <div className="mkt-rail mx-auto flex w-full max-w-[1400px] items-center gap-2 overflow-x-auto px-4 py-2">
-                {CATS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCat(c)}
-                    className={`mkt-chip px-3 py-1.5 text-[12px] font-semibold ${activeCat === c ? "active" : ""}`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
+            <FooterCol title="Marketplace" links={[["Home", "/nft"], ["Explore", "/nft/explore"], ["Drops", "/nft/drops"], ["Activity", "/nft/activity"]]} />
+            <FooterCol title="Create" links={[["Mint an NFT", "/nft/create"], ["Launch a drop", "/nft/drops"], ["Creator dashboard", "/nft/me"], ["Claim fees", "/nft/me?tab=fees"]]} />
+            <FooterCol title="Company" links={[["Launchpad", "/orbitxlaunch"], ["DEX", "/ORBITX_DEX"], ["Terms", "/terms"], ["Privacy", "/privacy"]]} />
+          </div>
+          <div className="border-t mkt-hairline">
+            <div className="mx-auto flex w-full max-w-[1400px] flex-col items-center justify-between gap-2 px-4 py-4 text-[11px] mkt-muted sm:flex-row">
+              <span>© {year} OrbitX. All rights reserved.</span>
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-[#14F195]" /> Verified badges · duplicate &amp; scam detection built in
+              </span>
             </div>
-          </header>
-
-          <LiveSalesTicker />
-
-          <main className="mkt-main">
-            <Outlet />
-          </main>
-
-          <footer className="mkt-footer">
-            <div className="mx-auto grid w-full max-w-[1400px] grid-cols-2 gap-8 px-4 py-10 sm:grid-cols-4">
-              <div className="col-span-2 sm:col-span-1">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="mkt-brand-mark h-8 w-8 !rounded-lg">
-                    <Rocket className="h-4 w-4 text-black" strokeWidth={2.4} />
-                  </div>
-                  <span className="text-sm font-black text-white">OrbitX Market</span>
-                </div>
-                <p className="text-[12px] mkt-muted">
-                  The wallet-native NFT marketplace on Solana. Mint, trade, and earn creator fees — all in-app.
-                </p>
-                <div className="mt-3 flex items-center gap-2">
-                  <a href="https://twitter.com" target="_blank" rel="noreferrer" className="mkt-nav rounded-lg p-2"><Twitter className="h-4 w-4" /></a>
-                  <a href="https://t.me" target="_blank" rel="noreferrer" className="mkt-nav rounded-lg p-2"><Send className="h-4 w-4" /></a>
-                  <a href="https://github.com" target="_blank" rel="noreferrer" className="mkt-nav rounded-lg p-2"><Github className="h-4 w-4" /></a>
-                </div>
-              </div>
-              <FooterCol title="Marketplace" links={[["Home", "/nft"], ["Explore", "/nft/explore"], ["Drops", "/nft/drops"], ["Activity", "/nft/activity"]]} />
-              <FooterCol title="Create" links={[["Mint an NFT", "/nft/create"], ["Launch a drop", "/nft/drops"], ["Creator dashboard", "/nft/me"], ["Claim fees", "/nft/me?tab=fees"]]} />
-              <FooterCol title="Company" links={[["Launchpad", "/orbitxlaunch"], ["DEX", "/ORBITX_DEX"], ["Terms", "/terms"], ["Privacy", "/privacy"]]} />
-            </div>
-            <div className="border-t mkt-hairline">
-              <div className="mx-auto flex w-full max-w-[1400px] flex-col items-center justify-between gap-2 px-4 py-4 text-[11px] mkt-muted sm:flex-row">
-                <span>© {year} OrbitX. All rights reserved.</span>
-                <span className="inline-flex items-center gap-1.5">
-                  <ShieldCheck className="h-3.5 w-3.5 text-[#14F195]" /> Verified badges · duplicate &amp; scam detection built in
-                </span>
-              </div>
-            </div>
-          </footer>
-        </div>
-      </CurrencyProvider>
-    </AppLayout>
+          </div>
+        </footer>
+      </div>
+    </CurrencyProvider>
   );
 }
 
