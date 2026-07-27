@@ -7,8 +7,9 @@
  *     creator vault, plus a DexScreener-priced estimate of token dust that
  *     One CLAIM ALL sweeps the lot.
  *   • Rent Refund — closes empty token accounts, rent comes back as SOL/USDC.
- *   • Burn — burns held tokens, then shows a full burn report (amount, % of
- *     supply, supply before/after, tx) and logs the verified burn event.
+ *   • Burn — burns held tokens; when the account is emptied, closes it so
+ *     rent SOL returns to the wallet. Shows a full burn report and logs the
+ *     verified burn event.
  */
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -26,7 +27,7 @@ import {
 import {
   scanEmptyTokenAccounts, totalReclaimableSol, buildCloseAccountsTransactions,
   buildSolToUsdcSwapTransaction, scanBurnableTokens, resolvePercentBurnAmount,
-  parseManualBurnAmount, buildBurnTransaction, fetchBurnTokenMeta,
+  parseManualBurnAmount, buildBurnTransaction, burnReclaimsRent, fetchBurnTokenMeta,
   scanNativeSolAccounts, buildUnwrapTransactions, estimateHoldingsUsd,
   type EmptyTokenAccount, type BurnableToken, type NativeSolAccount, type BurnTokenMeta,
 } from "@/lib/orbitx/rescue";
@@ -235,6 +236,8 @@ interface BurnCelebration {
   supplyBefore: number;
   supplyAfter: number;
   sig: string;
+  /** Rent SOL returned when the emptied ATA was closed in the same tx. */
+  rentReclaimedSol: number | null;
 }
 
 function BurnResultDialog({ data, onClose }: { data: BurnCelebration | null; onClose: () => void }) {
@@ -244,7 +247,9 @@ function BurnResultDialog({ data, onClose }: { data: BurnCelebration | null; onC
   const keptPct = Math.max(0, Math.min(100, (data.supplyAfter / (data.supplyBefore || 1)) * 100));
   const nf = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
   const tweet = encodeURIComponent(
-    `🔥 Just burned ${nf(data.amountUi)} $${data.meta.symbol} — ${data.pctOfSupply.toFixed(3)}% of total supply, gone forever. Verified on-chain via OrbitX Rescue. solscan.io/tx/${data.sig}`,
+    data.rentReclaimedSol != null && data.rentReclaimedSol > 0
+      ? `🔥 Just burned ${nf(data.amountUi)} $${data.meta.symbol} and reclaimed ${data.rentReclaimedSol.toFixed(4)} SOL rent via OrbitX Rescue. solscan.io/tx/${data.sig}`
+      : `🔥 Just burned ${nf(data.amountUi)} $${data.meta.symbol} — ${data.pctOfSupply.toFixed(3)}% of total supply, gone forever. Verified on-chain via OrbitX Rescue. solscan.io/tx/${data.sig}`,
   );
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -290,6 +295,12 @@ function BurnResultDialog({ data, onClose }: { data: BurnCelebration | null; onC
                 <span className="text-muted-foreground">token</span>
                 <span className="font-bold text-foreground">{data.meta.name} · {short(data.mint)}</span>
               </div>
+              {data.rentReclaimedSol != null && data.rentReclaimedSol > 0 && (
+                <div className="lpx-row-in flex items-center justify-between" style={{ animationDelay: "0.85s" }}>
+                  <span className="text-muted-foreground">rent SOL back to wallet</span>
+                  <span className="font-bold text-[hsl(var(--og-lime))]">+{data.rentReclaimedSol.toFixed(6)} SOL</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -595,7 +606,7 @@ export default function LaunchpadRescue() {
     }
     setBurning(true);
     try {
-      const tx = buildBurnTransaction(publicKey, selectedToken, burnAmountRaw);
+      const { tx, rentLamports } = await buildBurnTransaction(connection, publicKey, selectedToken, burnAmountRaw);
       tx.feePayer = publicKey;
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
       tx.recentBlockhash = blockhash;
@@ -608,6 +619,7 @@ export default function LaunchpadRescue() {
       const supplyAfter = Number(selectedToken.supplyRaw - burnAmountRaw) / divisor;
       const percentOfSupply = (Number(burnAmountRaw) / Number(selectedToken.supplyRaw)) * 100;
       const amountUi = Number(burnAmountRaw) / divisor;
+      const rentReclaimedSol = rentLamports != null ? rentLamports / 1e9 : null;
 
       // Metadata for the report card (best-effort, fast).
       const meta = await fetchBurnTokenMeta(selectedToken.mint);
@@ -619,7 +631,12 @@ export default function LaunchpadRescue() {
         supplyBefore,
         supplyAfter,
         sig,
+        rentReclaimedSol,
       });
+
+      if (rentReclaimedSol != null && rentReclaimedSol > 0) {
+        toast.success(`Burned · +${rentReclaimedSol.toFixed(6)} SOL rent back to wallet`);
+      }
 
       // Fire-and-forget: log the verified burn for the global feed.
       (async () => {
@@ -644,6 +661,8 @@ export default function LaunchpadRescue() {
       setManualAmount("");
       setPercent(null);
       scanBurn();
+      scanRent();
+      omniScan();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("User rejected")) toast.error("Transaction cancelled");
@@ -835,7 +854,8 @@ export default function LaunchpadRescue() {
               <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">irreversible · on-chain</span>
             }>
               <p className="mb-4 text-xs text-muted-foreground">
-                Burns only what this wallet holds. Percent presets are a share of total supply, capped at your balance. You'll get a full burn report when it confirms.
+                Burns only what this wallet holds. Percent presets are a share of total supply, capped at your balance.
+                Burn your <span className="text-foreground">entire balance</span> and the empty account closes in the same tx — rent (~0.002 SOL) returns to your wallet.
               </p>
 
               {burnScanning ? (
@@ -909,6 +929,11 @@ export default function LaunchpadRescue() {
                           {burnAmountRaw && selectedToken.supplyRaw > BigInt(0) && (
                             <div className="font-mono text-[10px] text-orange-400">
                               = {((Number(burnAmountRaw) / Number(selectedToken.supplyRaw)) * 100).toFixed(4)}% of total supply
+                            </div>
+                          )}
+                          {selectedToken && burnAmountRaw && burnReclaimsRent(selectedToken, burnAmountRaw) && (
+                            <div className="mt-1 font-mono text-[10px] text-[hsl(var(--og-lime))]">
+                              + empties account → rent SOL back to wallet
                             </div>
                           )}
                         </div>

@@ -15,13 +15,20 @@
  *   touches supply they don't hold. Percent presets are computed against the
  *   mint's total supply (capped to what the wallet actually holds); manual
  *   entry burns the exact raw token count typed, independent of USD value.
+ *
+ *   When the burn empties the account, we also close it in the same tx so the
+ *   ~0.002 SOL rent returns to the owner (same pattern as NFT burn).
+ *   Token-2022 accounts with leftover withheld transfer fees are harvested
+ *   to the mint first so close can succeed.
  */
 import {
-  Connection, PublicKey, Transaction, TransactionInstruction,
+  Connection, PublicKey, Transaction,
 } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID,
   createCloseAccountInstruction, createBurnInstruction,
+  createHarvestWithheldTokensToMintInstruction,
+  unpackAccount, getTransferFeeAmount,
 } from "@solana/spl-token";
 
 export const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
@@ -256,20 +263,64 @@ export async function fetchBurnTokenMeta(mint: string): Promise<BurnTokenMeta> {
   return { name: short, symbol: short, logoUrl: null };
 }
 
-export function buildBurnTransaction(
+/**
+ * Build burn (+ optional rent reclaim). When `amountRaw` equals the full
+ * account balance, appends close-account so rent SOL returns to `owner`.
+ * For Token-2022 transfer-fee accounts with withheld balance, harvests to
+ * mint first so CloseAccount can succeed.
+ */
+export async function buildBurnTransaction(
+  connection: Connection,
   owner: PublicKey,
   token: BurnableToken,
   amountRaw: bigint,
-): Transaction {
-  const ix: TransactionInstruction = createBurnInstruction(
+): Promise<{ tx: Transaction; rentLamports: number | null }> {
+  const mint = new PublicKey(token.mint);
+  const tx = new Transaction();
+  tx.add(createBurnInstruction(
     token.tokenAccount,
-    new PublicKey(token.mint),
+    mint,
     owner,
     amountRaw,
     [],
     token.programId,
-  );
-  return new Transaction().add(ix);
+  ));
+
+  const emptiesAccount = amountRaw >= token.balanceRaw;
+  if (!emptiesAccount) return { tx, rentLamports: null };
+
+  const acctInfo = await connection.getAccountInfo(token.tokenAccount, "confirmed");
+  const rentLamports = acctInfo?.lamports ?? null;
+
+  if (token.programId.equals(TOKEN_2022_PROGRAM_ID) && acctInfo) {
+    try {
+      const parsed = unpackAccount(token.tokenAccount, acctInfo, TOKEN_2022_PROGRAM_ID);
+      const feeAmt = getTransferFeeAmount(parsed);
+      if (feeAmt && feeAmt.withheldAmount > BigInt(0)) {
+        tx.add(createHarvestWithheldTokensToMintInstruction(
+          mint,
+          [token.tokenAccount],
+          token.programId,
+        ));
+      }
+    } catch {
+      // Account may not carry TransferFeeAmount — skip harvest.
+    }
+  }
+
+  tx.add(createCloseAccountInstruction(
+    token.tokenAccount,
+    owner,
+    owner,
+    [],
+    token.programId,
+  ));
+  return { tx, rentLamports };
+}
+
+/** True when this burn amount will empty the ATA and reclaim rent SOL. */
+export function burnReclaimsRent(token: BurnableToken, amountRaw: bigint): boolean {
+  return amountRaw > BigInt(0) && amountRaw >= token.balanceRaw;
 }
 
 /* ──────────────────── OmniClaim scanner additions ──────────────────── */

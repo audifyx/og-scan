@@ -4,11 +4,19 @@ import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import {
+  TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID,
   getAssociatedTokenAddressSync, createAssociatedTokenAccountInstruction,
   createTransferInstruction, createBurnInstruction, createCloseAccountInstruction,
 } from "@solana/spl-token";
 import { toast } from "sonner";
 import { X, Send, Flame, Loader2 } from "lucide-react";
+
+async function resolveTokenProgram(connection: ReturnType<typeof useConnection>["connection"], mint: PublicKey) {
+  const info = await connection.getAccountInfo(mint, "confirmed");
+  if (!info) throw new Error("Mint not found on-chain");
+  if (info.owner.equals(TOKEN_2022_PROGRAM_ID)) return TOKEN_2022_PROGRAM_ID;
+  return TOKEN_PROGRAM_ID;
+}
 
 export function TransferBurnModal({ mint, name, onClose, onDone }: { mint: string; name: string; onClose: () => void; onDone?: () => void }) {
   const { publicKey, sendTransaction } = useWallet();
@@ -25,11 +33,14 @@ export function TransferBurnModal({ mint, name, onClose, onDone }: { mint: strin
     setBusy(true);
     try {
       const mintPk = new PublicKey(mint);
-      const fromAta = getAssociatedTokenAddressSync(mintPk, publicKey);
-      const toAta = getAssociatedTokenAddressSync(mintPk, dest);
+      const programId = await resolveTokenProgram(connection, mintPk);
+      const fromAta = getAssociatedTokenAddressSync(mintPk, publicKey, false, programId);
+      const toAta = getAssociatedTokenAddressSync(mintPk, dest, false, programId);
       const tx = new Transaction();
-      if (!(await connection.getAccountInfo(toAta))) tx.add(createAssociatedTokenAccountInstruction(publicKey, toAta, dest, mintPk));
-      tx.add(createTransferInstruction(fromAta, toAta, publicKey, 1));
+      if (!(await connection.getAccountInfo(toAta))) {
+        tx.add(createAssociatedTokenAccountInstruction(publicKey, toAta, dest, mintPk, programId));
+      }
+      tx.add(createTransferInstruction(fromAta, toAta, publicKey, 1, [], programId));
       const sig = await sendTransaction(tx, connection);
       await connection.confirmTransaction(sig, "confirmed");
       toast.success(`Transferred ${name}`);
@@ -44,13 +55,18 @@ export function TransferBurnModal({ mint, name, onClose, onDone }: { mint: strin
     setBusy(true);
     try {
       const mintPk = new PublicKey(mint);
-      const ata = getAssociatedTokenAddressSync(mintPk, publicKey);
+      const programId = await resolveTokenProgram(connection, mintPk);
+      const ata = getAssociatedTokenAddressSync(mintPk, publicKey, false, programId);
+      const before = await connection.getAccountInfo(ata, "confirmed");
+      const rentSol = before ? before.lamports / 1e9 : 0;
       const tx = new Transaction()
-        .add(createBurnInstruction(ata, mintPk, publicKey, 1))
-        .add(createCloseAccountInstruction(ata, publicKey, publicKey));
+        .add(createBurnInstruction(ata, mintPk, publicKey, 1, [], programId))
+        .add(createCloseAccountInstruction(ata, publicKey, publicKey, [], programId));
       const sig = await sendTransaction(tx, connection);
       await connection.confirmTransaction(sig, "confirmed");
-      toast.success(`Burned ${name} · rent reclaimed`);
+      toast.success(rentSol > 0
+        ? `Burned ${name} · +${rentSol.toFixed(6)} SOL rent back`
+        : `Burned ${name} · rent reclaimed`);
       onDone?.(); onClose();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Burn failed"); }
     finally { setBusy(false); }
@@ -77,7 +93,7 @@ export function TransferBurnModal({ mint, name, onClose, onDone }: { mint: strin
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-[12px] text-white/50">Burning permanently destroys this NFT and reclaims its rent. This cannot be undone. Type <span className="font-black text-og-blood">BURN</span> to confirm.</p>
+            <p className="text-[12px] text-white/50">Burning permanently destroys this NFT and reclaims its rent (~0.002 SOL) to your wallet. This cannot be undone. Type <span className="font-black text-og-blood">BURN</span> to confirm.</p>
             <input value={confirmBurn} onChange={(e) => setConfirmBurn(e.target.value)} placeholder="BURN"
               className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-og-blood/60" />
             <button onClick={doBurn} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-og-blood px-4 py-2.5 text-sm font-black text-white disabled:opacity-50">
