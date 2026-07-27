@@ -23,16 +23,113 @@ import { useChainTelemetry, useSolUsd, fmtInt } from "./lpx";
 import { useAuth } from "@/hooks/useAuth";
 import "./orbitx-2026.css";
 
-const TABS = [
-  { to: "/orbitxlaunch", label: "Board", icon: Home, end: true },
-  { to: "/orbitxlaunch/create", label: "Create", icon: PlusCircle, end: false },
-  { to: "/orbitxlaunch/claim", label: "Claim", icon: HandCoins, end: false, hot: true },
-  { to: "/orbitxlaunch/rescue", label: "Rescue", icon: Flame, end: false, hot: true },
-  { to: "/orbitxlaunch/leaderboard", label: "Leaders", icon: Trophy, end: false },
-  { to: "/orbitxlaunch/portfolio", label: "Portfolio", icon: Briefcase, end: false },
-  { to: "/orbitxlaunch/profile", label: "Profile", icon: UserCircle2, end: false },
-  { to: "/orbitxlaunch/about", label: "About", icon: Info, end: false },
+const TAB_GROUPS: { id: string; label: string; tabs: TabDef[] }[] = [
+  {
+    id: "discover",
+    label: "Discover",
+    tabs: [
+      { to: "/orbitxlaunch", label: "Board", icon: Home, end: true },
+      { to: "/orbitxlaunch/leaderboard", label: "Leaders", icon: Trophy, end: false },
+    ],
+  },
+  {
+    id: "launch",
+    label: "Launch",
+    tabs: [
+      { to: "/orbitxlaunch/create", label: "Create", icon: PlusCircle, end: false, accent: "gold" },
+      { to: "/orbitxlaunch/claim", label: "Claim", icon: HandCoins, end: false, hot: true },
+      { to: "/orbitxlaunch/rescue", label: "Rescue", icon: Flame, end: false, hot: true },
+    ],
+  },
+  {
+    id: "you",
+    label: "You",
+    tabs: [
+      { to: "/orbitxlaunch/portfolio", label: "Portfolio", icon: Briefcase, end: false },
+      { to: "/orbitxlaunch/profile", label: "Profile", icon: UserCircle2, end: false },
+      { to: "/orbitxlaunch/about", label: "About", icon: Info, end: false },
+    ],
+  },
 ];
+
+type TabDef = {
+  to: string;
+  label: string;
+  icon: typeof Home;
+  end?: boolean;
+  hot?: boolean;
+  accent?: "gold";
+};
+
+function HeaderStats() {
+  const tel = useChainTelemetry();
+  const solUsd = useSolUsd();
+  const ok = tel.data?.ok ?? false;
+  return (
+    <div className="ox-header-stats hidden md:flex" aria-label="Network stats">
+      <span className="ox-header-stat">
+        <span className={`ox-header-stat-dot ${ok ? "ox-header-stat-dot--ok" : "ox-header-stat-dot--bad"}`} />
+        {ok ? "Solana live" : "Degraded"}
+      </span>
+      <span className="ox-header-stat ox-header-stat--dim">
+        SOL ${solUsd.data ? solUsd.data.price.toFixed(2) : "—"}
+      </span>
+      <span className="ox-header-stat ox-header-stat--dim">
+        {fmtUsd(ORBITX_FEE_USD)} launch
+      </span>
+      <span className="ox-header-stat ox-header-stat--dim">
+        {(CREATOR_FEE_BPS / 100).toFixed(2)}% trade
+      </span>
+    </div>
+  );
+}
+
+function TabRail({ isAdmin }: { isAdmin: boolean }) {
+  return (
+    <nav className="ox-tab-groups" aria-label="Launchpad sections">
+      {TAB_GROUPS.map((group, gi) => (
+        <div key={group.id} className="ox-tab-group">
+          <span className="ox-tab-group-label">{group.label}</span>
+          <div className="ox-tab-group-items">
+            {group.tabs.map((t) => (
+              <NavLink
+                key={t.to}
+                to={t.to}
+                end={t.end}
+                className={({ isActive }) =>
+                  cn(
+                    "ox-launch-tab",
+                    isActive && "ox-launch-tab--on",
+                    t.hot && !isActive && "ox-launch-tab--hot",
+                    t.accent === "gold" && !isActive && "ox-launch-tab--accent",
+                  )
+                }
+              >
+                <t.icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span>{t.label}</span>
+              </NavLink>
+            ))}
+          </div>
+          {gi < TAB_GROUPS.length - 1 && <span className="ox-tab-group-divider" aria-hidden />}
+        </div>
+      ))}
+      {isAdmin && (
+        <div className="ox-tab-group ox-tab-group--admin">
+          <span className="ox-tab-group-label">Admin</span>
+          <div className="ox-tab-group-items">
+            <NavLink
+              to="/orbitxlaunch/ox-desk-m4k9q"
+              className={({ isActive }) => cn("ox-launch-tab", isActive && "ox-launch-tab--on")}
+            >
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>Desk</span>
+            </NavLink>
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+}
 
 function WalletConsole() {
   const { connection } = useConnection();
@@ -160,30 +257,6 @@ function ReferralCapture() {
   return null;
 }
 
-function TabRail({ isAdmin }: { isAdmin: boolean }) {
-  return (
-    <nav className="ox-tab-segment-wrap" aria-label="Launchpad">
-      {TABS.map((t) => (
-        <NavLink
-          key={t.to}
-          to={t.to}
-          end={t.end}
-          className={({ isActive }) => cn("ox-tab-segment", isActive && "ox-tab-segment--on", t.hot && !isActive && "ox-tab-segment--hot")}
-        >
-          <t.icon className="h-3.5 w-3.5 shrink-0" />
-          <span className="hidden sm:inline">{t.label}</span>
-        </NavLink>
-      ))}
-      {isAdmin && (
-        <NavLink to="/orbitxlaunch/ox-desk-m4k9q" className={({ isActive }) => cn("ox-tab-segment", isActive && "ox-tab-segment--on")}>
-          <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-          <span className="hidden sm:inline">Desk</span>
-        </NavLink>
-      )}
-    </nav>
-  );
-}
-
 function FooterCol({ title, links }: { title: string; links: [string, string][] }) {
   return (
     <div className="ox-footer-col">
@@ -255,8 +328,8 @@ export default function LaunchpadLayout() {
       <ReferralCapture />
       <NetworkStrip />
 
-      <header className="ox-shell-header sticky top-0 z-30">
-        <div className="ox-shell-inner ox-shell-bar">
+      <header className="ox-launch-header sticky top-0 z-30">
+        <div className="ox-shell-inner ox-launch-header-row">
           <Link to="/orbitxlaunch" className="ox-brand group shrink-0">
             <div className="ox-brand-mark">
               <Rocket className="h-4 w-4" strokeWidth={2.8} />
@@ -269,9 +342,7 @@ export default function LaunchpadLayout() {
             </div>
           </Link>
 
-          <div className="ox-shell-nav hidden min-w-0 flex-1 justify-center lg:flex">
-            <TabRail isAdmin={!!isAdmin} />
-          </div>
+          <HeaderStats />
 
           <div className="ox-shell-actions shrink-0">
             <AntiVampProtectionBadge />
@@ -285,7 +356,7 @@ export default function LaunchpadLayout() {
           </div>
         </div>
 
-        <div className="ox-shell-tabs lg:hidden">
+        <div className="ox-launch-tabbar">
           <div className="ox-shell-inner">
             <TabRail isAdmin={!!isAdmin} />
           </div>

@@ -42,13 +42,20 @@ export function WalletAuthBridge() {
       if (attempted.current === pk) return;
       const flag = `orbitx_siws_${pk}`;
       if (sessionStorage.getItem(flag)) return;
-      const adapter = wallet?.adapter as { signMessage?: (m: Uint8Array) => Promise<Uint8Array> } | undefined;
+      const adapter = wallet?.adapter as {
+        signMessage?: (m: Uint8Array) => Promise<Uint8Array | { signature: Uint8Array }>;
+      } | undefined;
       if (!adapter?.signMessage) return;
 
       attempted.current = pk;
       sessionStorage.setItem(flag, "1");
       try {
-        await signInWithWallet(pk, (m) => adapter.signMessage!(m), { replaceEmailSession: false });
+        await signInWithWallet(pk, async (m) => {
+          const result = await adapter.signMessage!(m);
+          if (result instanceof Uint8Array) return result;
+          if (result?.signature instanceof Uint8Array) return result.signature;
+          throw new Error("wallet returned an invalid signature");
+        }, { replaceEmailSession: false });
         if (!cancelled) toast.success("Signed in with wallet");
       } catch {
         sessionStorage.removeItem(flag);
