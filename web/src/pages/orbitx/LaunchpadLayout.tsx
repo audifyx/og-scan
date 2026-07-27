@@ -13,7 +13,7 @@ import { WalletPickerModal } from "@/components/WalletPickerModal";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
-  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Zap, ArrowUpRight, Link2,
+  Rocket, Home, PlusCircle, Info, UserCircle2, HandCoins, Wallet, Flame, Trophy, Briefcase, ShieldCheck, Zap, Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ORBITX_FEE_USD, fmtUsd, isLaunchFeePromoActive, launchFeePromoDaysLeft, BASE_LAUNCH_FEE_USD } from "@/lib/orbitx/fee";
@@ -25,11 +25,11 @@ import { useChainTelemetry, useSolUsd, fmtInt } from "./lpx";
 import "./orbitx-2026.css";
 
 const TABS = [
-  { to: "/orbitxlaunch", label: "Mission", icon: Home, end: true },
-  { to: "/orbitxlaunch/create", label: "Deploy", icon: PlusCircle, end: false },
-  { to: "/orbitxlaunch/claim", label: "Claim Fees", icon: HandCoins, end: false, hot: true },
+  { to: "/orbitxlaunch", label: "Board", icon: Home, end: true },
+  { to: "/orbitxlaunch/create", label: "Create", icon: PlusCircle, end: false },
+  { to: "/orbitxlaunch/claim", label: "Claim", icon: HandCoins, end: false, hot: true },
   { to: "/orbitxlaunch/rescue", label: "Rescue", icon: Flame, end: false, hot: true },
-  { to: "/orbitxlaunch/leaderboard", label: "Leaderboard", icon: Trophy, end: false },
+  { to: "/orbitxlaunch/leaderboard", label: "Leaders", icon: Trophy, end: false },
   { to: "/orbitxlaunch/portfolio", label: "Portfolio", icon: Briefcase, end: false },
   { to: "/orbitxlaunch/profile", label: "Profile", icon: UserCircle2, end: false },
   { to: "/orbitxlaunch/about", label: "About", icon: Info, end: false },
@@ -175,7 +175,7 @@ export default function LaunchpadLayout() {
 
         {/* ── redesigned header ── */}
         <header className="sticky top-0 z-20 border-b border-[hsl(var(--pf-border))]/70" style={{ background: "hsl(var(--pf-bg) / 0.82)", backdropFilter: "blur(16px)" }}>
-          <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-3">
+          <div className="mx-auto flex w-full max-w-[1440px] items-center gap-3 px-3 py-3 sm:px-4">
             {/* brand */}
             <Link to="/orbitxlaunch" className="group flex items-center gap-2.5">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl shadow-lg transition group-hover:scale-105"
@@ -191,13 +191,10 @@ export default function LaunchpadLayout() {
             </Link>
 
             <div className="ml-auto flex items-center gap-2">
-              <a href="/nft" className="hidden items-center gap-1 rounded-xl border border-[hsl(var(--pf-border))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--pf-muted))] transition hover:border-[hsl(var(--pf-blue))]/60 hover:text-[hsl(var(--pf-ink))] md:inline-flex">
-                NFT Market <ArrowUpRight className="h-3.5 w-3.5" />
-              </a>
               <AntiVampProtectionBadge />
-              <Link to="/orbitxlaunch/create" className="hidden items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-black text-black md:inline-flex"
-                style={{ background: "linear-gradient(135deg, hsl(var(--pf-gold)), hsl(var(--pf-green)))" }}>
-                <Zap className="h-4 w-4" /> Launch a coin
+              <Link to="/orbitxlaunch/create" className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-black text-black"
+                style={{ background: "linear-gradient(135deg, hsl(var(--pf-green)), hsl(152 90% 42%))" }}>
+                <Zap className="h-4 w-4" /> Create coin
               </Link>
               <EvmWalletButton />
               <WalletConsole />
@@ -205,7 +202,7 @@ export default function LaunchpadLayout() {
           </div>
 
           {/* ── segmented tab bar ── */}
-          <div className="mx-auto w-full max-w-7xl px-2">
+          <div className="mx-auto w-full max-w-[1440px] px-2 sm:px-3">
             <nav className="flex items-center gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {TABS.map((t) => (
                 <NavLink key={t.to} to={t.to} end={t.end}
@@ -234,11 +231,11 @@ export default function LaunchpadLayout() {
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5">
+        <div className="mx-auto w-full max-w-[1440px] px-3 pb-16 pt-4 sm:px-4">
           <Outlet />
 
           {/* ── footer ── */}
-          <footer className="mt-12 border-t border-[hsl(var(--pf-border))] pt-5">
+          <footer className="mt-10 border-t border-[hsl(var(--pf-border))] pt-5">
             <div className="grid grid-cols-1 gap-3 pf-mono text-[10px] uppercase tracking-widest text-[hsl(var(--pf-muted))] sm:grid-cols-4">
               <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--pf-gold))]" /> {isLaunchFeePromoActive() ? <>FREE launches · {launchFeePromoDaysLeft()}d left</> : <>{fmtUsd(ORBITX_FEE_USD)} flat launch</>}</div>
               <div className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--pf-green))]" /> {(CREATOR_FEE_BPS / 100).toFixed(2)}% of every trade → creator</div>

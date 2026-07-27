@@ -578,3 +578,28 @@
 .lp-classic.lp-classic [class~="bg-[hsl(var(--pf-muted))]"] * {
   color: #0a0f14 !important;
 }
+
+/* ── Pump-style live board ─────────────────────────────────────────────── */
+.lp-classic .ox-tri-board {
+  min-height: min(72vh, 820px);
+}
+.lp-classic .ox-board-col {
+  max-height: min(72vh, 820px);
+  background: hsl(var(--pf-bg-2) / 0.55);
+  box-shadow: inset 0 1px 0 hsl(152 86% 52% / 0.06);
+}
+.lp-classic .ox-board-col > div {
+  overscroll-behavior: contain;
+}
+.lp-classic a.ox-coin {
+  background: hsl(var(--pf-bg-2) / 0.92);
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.03);
+}
+.lp-classic a.ox-coin:hover {
+  background: hsl(220 28% 11%);
+  box-shadow: 0 0 0 1px hsl(152 86% 52% / 0.28), 0 10px 28px -16px hsl(152 86% 52% / 0.55);
+  transform: translateY(-1px);
+}
+.lp-classic .ox-launchboard input {
+  background: hsl(var(--pf-bg-2)) !important;
+}
