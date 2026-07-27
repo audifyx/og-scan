@@ -86,6 +86,10 @@ import LaunchpadProfile from "./pages/orbitx/LaunchpadProfile";
 import LaunchpadLeaderboard from "./pages/orbitx/LaunchpadLeaderboard";
 import LaunchpadCreator from "./pages/orbitx/LaunchpadCreator";
 import LaunchpadPortfolio from "./pages/orbitx/LaunchpadPortfolio";
+import BagworkLayout from "./pages/bagwork/BagworkLayout";
+import BagworkHome from "./pages/bagwork/BagworkHome";
+import BagworkMyWork from "./pages/bagwork/BagworkMyWork";
+import BagworkAdmin from "./pages/bagwork/BagworkAdmin";
 import LaunchpadClaim from "./pages/orbitx/LaunchpadClaim";
 import LaunchpadRescue from "./pages/orbitx/LaunchpadRescue";
 import LaunchpadAdmin from "./pages/orbitx/LaunchpadAdmin";
@@ -294,6 +298,13 @@ const App = () => (
               <Route path="portfolio" element={<LaunchpadPortfolio />} />
               <Route path="ox-desk-m4k9q" element={<AdminRoute><LaunchpadAdmin /></AdminRoute>} />
               <Route path="admin" element={<NotFound />} />
+            </Route>
+
+            {/* ── Bagwork — earn USDC for tasks ── */}
+            <Route path="/bagwork" element={<BagworkLayout />}>
+              <Route index element={<BagworkHome />} />
+              <Route path="my" element={<BagworkMyWork />} />
+              <Route path="admin" element={<AdminRoute><BagworkAdmin /></AdminRoute>} />
             </Route>
 
             {/* ── Terminal UI: Trading Platform Style ── */}
