@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { ShieldCheck, ShieldAlert, Star } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { OrbitxToken } from "@/lib/orbitx/registry";
+import { cn } from "@/lib/utils";
 import { useIsWatched } from "./watchlist";
 
 type MarketLite = { mcap?: number | null; liq?: number | null; vol24?: number | null; ch24?: number | null; buys24?: number | null; sells24?: number | null; url?: string | null };
@@ -170,6 +171,72 @@ export function Pill({ children, tone }: { children: React.ReactNode; tone: "gol
     : tone === "lime" ? "pf-pill pf-pill--green"
     : "pf-pill";
   return <span className={cls}>{children}</span>;
+}
+
+/**
+ * Terminal-style feed row — dense list view (not pump card grid).
+ */
+export function TokenFeedRow({
+  t,
+  rank,
+  mc,
+  market,
+}: {
+  t: OrbitxToken;
+  rank?: number;
+  mc?: number | null;
+  market?: MarketLite | null;
+}) {
+  const { watched, toggle: toggleWatch } = useIsWatched(t?.mint_address ?? "");
+  if (!t) return null;
+  const mcap = market?.mcap ?? mc ?? null;
+  const graduated = !!t.lp_pool_address || !!t.graduated_at || (typeof mcap === "number" && mcap >= GRADUATION_MC_USD);
+  const pct = graduated ? 100 : typeof mcap === "number" && mcap > 0 ? Math.max(2, Math.min(99, Math.round((mcap / GRADUATION_MC_USD) * 100))) : 3;
+  const ch = market?.ch24 ?? null;
+  const to = `/orbitxlaunch/token/${t.mint_address}`;
+
+  return (
+    <Link to={to} className="ox-feed-row group">
+      {rank != null && <span className="ox-feed-rank">{rank}</span>}
+      <div className="ox-feed-token">
+        <div className="ox-feed-logo">
+          <TokenLogo src={t.logo_url} metadataUri={t.metadata_uri} symbol={t.ticker} className="h-full w-full text-xs" />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="ox-feed-name truncate">{t.name}</span>
+            <span className="ox-feed-ticker">${t.ticker}</span>
+            {graduated && <span className="ox-feed-badge ox-feed-badge--grad">Grad</span>}
+            {!t.is_vamp ? (
+              <span className="ox-feed-badge ox-feed-badge--og">OG</span>
+            ) : (
+              <span className="ox-feed-badge ox-feed-badge--vamp">Vamp</span>
+            )}
+          </div>
+          <div className="ox-feed-sub pf-mono">{shortAddr(t.mint_address, 5)} · {timeAgo(t.created_at)}</div>
+        </div>
+      </div>
+      <div className="ox-feed-mc">{fmtMc(mcap).replace(" MC", "")}</div>
+      <div className={cn("ox-feed-ch", ch != null && ch >= 0 ? "ox-feed-ch--up" : "ox-feed-ch--down")}>
+        {ch != null && Number.isFinite(ch) ? `${ch >= 0 ? "+" : ""}${ch.toFixed(1)}%` : "—"}
+      </div>
+      <div className="ox-feed-vol">{fmtCompact(market?.vol24)}</div>
+      <div className="ox-feed-bond">
+        <div className="ox-feed-bond-bar">
+          <div className={`pf-progress-fill ${graduated ? "is-complete" : ""}`} style={{ width: `${pct}%` }} />
+        </div>
+        <span className="pf-mono text-[10px] text-[#A8B0BC]">{pct}%</span>
+      </div>
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWatch(); }}
+        className="ox-feed-star"
+        title={watched ? "Remove from watchlist" : "Add to watchlist"}
+      >
+        <Star className={`h-3.5 w-3.5 ${watched ? "fill-current text-[#F0C75E]" : ""}`} />
+      </button>
+    </Link>
+  );
 }
 
 /**

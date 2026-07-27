@@ -162,22 +162,22 @@ function ReferralCapture() {
 
 function TabRail({ isAdmin }: { isAdmin: boolean }) {
   return (
-    <nav className="ox-tab-rail">
+    <nav className="ox-tab-segment-wrap" aria-label="Launchpad">
       {TABS.map((t) => (
         <NavLink
           key={t.to}
           to={t.to}
           end={t.end}
-          className={({ isActive }) => cn("ox-tab", isActive && "ox-tab--on", t.hot && !isActive && "ox-tab--hot")}
+          className={({ isActive }) => cn("ox-tab-segment", isActive && "ox-tab-segment--on", t.hot && !isActive && "ox-tab-segment--hot")}
         >
-          <t.icon className="h-3.5 w-3.5" />
-          <span>{t.label}</span>
+          <t.icon className="h-3.5 w-3.5 shrink-0" />
+          <span className="hidden sm:inline">{t.label}</span>
         </NavLink>
       ))}
       {isAdmin && (
-        <NavLink to="/orbitxlaunch/ox-desk-m4k9q" className={({ isActive }) => cn("ox-tab", isActive && "ox-tab--on")}>
-          <ShieldCheck className="h-3.5 w-3.5" />
-          <span>Desk</span>
+        <NavLink to="/orbitxlaunch/ox-desk-m4k9q" className={({ isActive }) => cn("ox-tab-segment", isActive && "ox-tab-segment--on")}>
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+          <span className="hidden sm:inline">Desk</span>
         </NavLink>
       )}
     </nav>
@@ -251,39 +251,41 @@ function LaunchpadFooter() {
 export default function LaunchpadLayout() {
   const { isAdmin } = useAdmin();
   return (
-    <div className="lp-classic relative flex min-h-screen flex-col">
+    <div className="lp-classic lp-classic relative flex min-h-screen flex-col">
       <ReferralCapture />
       <NetworkStrip />
 
       <header className="ox-shell-header sticky top-0 z-30">
-        <div className="ox-shell-top">
-          <div className="ox-shell-inner">
-            <Link to="/orbitxlaunch" className="ox-brand group">
-              <div className="ox-brand-mark">
-                <Rocket className="h-4 w-4" strokeWidth={2.8} />
-              </div>
-              <div className="leading-tight">
-                <div className="ox-brand-name">
-                  Orbit<span>X</span>
-                </div>
-                <div className="ox-brand-sub">launchpad</div>
-              </div>
-            </Link>
-
-            <div className="ox-shell-actions">
-              <AntiVampProtectionBadge />
-              <Link to="/orbitxlaunch/create" className="ox-create-cta">
-                <Plus className="h-4 w-4" strokeWidth={3} />
-                <span className="hidden sm:inline">Create coin</span>
-                <span className="sm:hidden">Create</span>
-              </Link>
-              <EvmWalletButton />
-              <WalletConsole />
+        <div className="ox-shell-inner ox-shell-bar">
+          <Link to="/orbitxlaunch" className="ox-brand group shrink-0">
+            <div className="ox-brand-mark">
+              <Rocket className="h-4 w-4" strokeWidth={2.8} />
             </div>
+            <div className="leading-tight">
+              <div className="ox-brand-name">
+                Orbit<span>X</span>
+              </div>
+              <div className="ox-brand-sub">launchpad</div>
+            </div>
+          </Link>
+
+          <div className="ox-shell-nav hidden min-w-0 flex-1 justify-center lg:flex">
+            <TabRail isAdmin={!!isAdmin} />
+          </div>
+
+          <div className="ox-shell-actions shrink-0">
+            <AntiVampProtectionBadge />
+            <Link to="/orbitxlaunch/create" className="ox-create-cta">
+              <Plus className="h-4 w-4" strokeWidth={3} />
+              <span className="hidden sm:inline">Create coin</span>
+              <span className="sm:hidden">Create</span>
+            </Link>
+            <EvmWalletButton />
+            <WalletConsole />
           </div>
         </div>
 
-        <div className="ox-shell-tabs">
+        <div className="ox-shell-tabs lg:hidden">
           <div className="ox-shell-inner">
             <TabRail isAdmin={!!isAdmin} />
           </div>

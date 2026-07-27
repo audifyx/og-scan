@@ -1,20 +1,19 @@
-// OrbitX Launchpad — live coin board (pump.fun-style).
-// Three columns on desktop: currently live / about to graduate / graduated.
-// No marketing hero — search, create, filters, dense coin tiles.
+// OrbitX Launchpad — terminal feed + optional column board.
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Rocket, Zap, Flame, Loader2, TrendingUp, Droplets, Sparkles,
-  Search, ShieldCheck, Eye, Activity, Gem, Star, Plus,
+  Search, ShieldCheck, Eye, Activity, Gem, Star, Plus, LayoutGrid, List,
 } from "lucide-react";
 import { ORBITX_FEE_USD, isLaunchFeePromoActive, launchFeePromoDaysLeft } from "@/lib/orbitx/fee";
 import { type OrbitxToken, listTokens } from "@/lib/orbitx/registry";
-import { TokenCard, GRADUATION_MC_USD } from "./_shared";
+import { TokenCard, TokenFeedRow, GRADUATION_MC_USD } from "./_shared";
 import { useWatchlist } from "./watchlist";
 import { launchStats, useMarketMap, fmtCompactUsd, type MarketRow } from "./lpx";
 
 type BoardCategory = "board" | "new" | "trending" | "graduating" | "volume" | "gainers" | "gems" | "graduated" | "watchlist";
+type ViewMode = "feed" | "columns";
 
 function isGraduated(t: OrbitxToken, markets?: Record<string, MarketRow> | null) {
   const m = markets?.[t.mint_address];
@@ -61,9 +60,22 @@ function BoardColumn({
   );
 }
 
+const CATEGORIES = [
+  { id: "board" as const, label: "All", icon: Rocket },
+  { id: "new" as const, label: "New", icon: Sparkles },
+  { id: "trending" as const, label: "Trending", icon: TrendingUp },
+  { id: "graduating" as const, label: "Graduating", icon: Flame },
+  { id: "volume" as const, label: "Volume", icon: Activity },
+  { id: "gainers" as const, label: "Gainers", icon: TrendingUp },
+  { id: "gems" as const, label: "Gems", icon: Gem },
+  { id: "graduated" as const, label: "Graduated", icon: Droplets },
+  { id: "watchlist" as const, label: "Watchlist", icon: Star },
+];
+
 export default function LaunchpadHome() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<BoardCategory>("board");
+  const [viewMode, setViewMode] = useState<ViewMode>("feed");
   const [hideVamps, setHideVamps] = useState(false);
   const { list: watchIds } = useWatchlist();
   const watchSet = useMemo(() => new Set(watchIds), [watchIds]);
@@ -102,7 +114,6 @@ export default function LaunchpadHome() {
   }, [base, markets]);
 
   const graduatingCol = useMemo(() => {
-    // Pump-style: closest to graduation (overlaps "currently live")
     const near = [...base]
       .filter((t) => !isGraduated(t, markets) && (markets?.[t.mint_address]?.mcap ?? 0) > 0)
       .sort((a, b) => (markets?.[b.mint_address]?.mcap ?? 0) - (markets?.[a.mint_address]?.mcap ?? 0));
@@ -167,59 +178,62 @@ export default function LaunchpadHome() {
 
   const promoActive = isLaunchFeePromoActive();
   const promoDaysLeft = launchFeePromoDaysLeft();
-  const showTriBoard = category === "board" && !search.trim();
+  const showTriBoard = viewMode === "columns" && category === "board" && !search.trim();
+  const showFeed = viewMode === "feed" || search.trim() || category !== "board";
+  const feedItems = filtered.slice(0, 80);
 
   return (
     <div className="ox-launchboard space-y-4">
-      <div className="ox-tab-hero mb-1">
-        <div className="ox-tab-hero-glow" style={{ background: "radial-gradient(520px 180px at 10% 0%, #D4AF3728, transparent 70%)" }} />
-        <div className="relative flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <div className="pf-mono text-[10px] font-bold uppercase tracking-[0.3em] text-[#F0C75E]">New tokens · live feed</div>
-            <h1 className="mt-1 text-xl font-black tracking-tight text-white sm:text-2xl">Discover &amp; trade new coins</h1>
-          </div>
-          <Link to="/orbitxlaunch/create" className="ox-create-cta hidden sm:inline-flex">
-            <Plus className="h-3.5 w-3.5" strokeWidth={3} /> Create coin
-          </Link>
+      <div className="ox-board-head">
+        <div>
+          <div className="ox-board-kicker">Live token terminal</div>
+          <h1 className="ox-board-title">New coin feed</h1>
+        </div>
+        <div className="ox-view-toggle">
+          <button
+            type="button"
+            onClick={() => setViewMode("feed")}
+            className={viewMode === "feed" ? "ox-view-toggle-btn ox-view-toggle-btn--on" : "ox-view-toggle-btn"}
+          >
+            <List className="h-3.5 w-3.5" /> Feed
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("columns")}
+            className={viewMode === "columns" ? "ox-view-toggle-btn ox-view-toggle-btn--on" : "ox-view-toggle-btn"}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" /> Columns
+          </button>
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A8B0BC]" />
+      <div className="ox-board-toolbar">
+        <div className="ox-board-search">
+          <Search className="ox-board-search-icon" />
           <input
             placeholder="Search name, ticker, or mint…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-[12px] border border-white/10 bg-[#0c0c0c] py-3 pl-11 pr-4 text-sm text-white outline-none placeholder:text-[#A8B0BC]/70 focus:border-[#3B82F6]/60"
           />
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setHideVamps((v) => !v)}
-            className={`ox-nav-pill inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide ${
-              hideVamps
-                ? "ox-nav-pill--on"
-                : "text-[#A8B0BC] hover:border-white/25 hover:text-white"
-            }`}
-            title="Hide vamp / clone tokens"
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            {hideVamps ? "OG only" : "All"}
-          </button>
-          <Link to="/orbitxlaunch/create" className="ox-create-cta flex-1 justify-center sm:hidden">
-            <Plus className="h-4 w-4" strokeWidth={3} /> Create
-          </Link>
-        </div>
+        <button
+          type="button"
+          onClick={() => setHideVamps((v) => !v)}
+          className={`ox-nav-pill inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide ${
+            hideVamps ? "ox-nav-pill--on" : "text-[#A8B0BC] hover:border-white/25 hover:text-white"
+          }`}
+          title="Hide vamp / clone tokens"
+        >
+          <ShieldCheck className="h-3.5 w-3.5" />
+          {hideVamps ? "OG only" : "All coins"}
+        </button>
       </div>
 
       <div className="ox-stats-strip">
         <span className="inline-flex items-center gap-1.5 font-bold text-white">
           <span className="ox-live-dot" />
-          Live board
+          {stats.total} live
         </span>
-        <span>{stats.total} coins</span>
         <span className="text-[#F0C75E]">{stats.graduated} graduated</span>
         <span>vol {fmtCompactUsd(vol24Total)}</span>
         <span>{trades24.toLocaleString()} tx / 24h</span>
@@ -230,18 +244,8 @@ export default function LaunchpadHome() {
         )}
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {([
-          { id: "board", label: "Board", icon: Rocket },
-          { id: "new", label: "New", icon: Sparkles },
-          { id: "trending", label: "Trending", icon: TrendingUp },
-          { id: "graduating", label: "Graduating", icon: Flame },
-          { id: "volume", label: "Volume", icon: Activity },
-          { id: "gainers", label: "Gainers", icon: TrendingUp },
-          { id: "gems", label: "Gems", icon: Gem },
-          { id: "graduated", label: "Graduated", icon: Droplets },
-          { id: "watchlist", label: "Watchlist", icon: Star },
-        ] as { id: BoardCategory; label: string; icon: typeof Rocket }[]).map((c) => {
+      <div className="ox-filter-rail">
+        {CATEGORIES.map((c) => {
           const Icon = c.icon;
           const on = category === c.id;
           return (
@@ -249,11 +253,7 @@ export default function LaunchpadHome() {
               key={c.id}
               type="button"
               onClick={() => setCategory(c.id)}
-              className={`ox-nav-pill inline-flex shrink-0 items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wide ${
-                on
-                  ? "ox-nav-pill--on"
-                  : "text-[#A8B0BC] hover:border-white/25 hover:text-white"
-              }`}
+              className={`ox-filter-chip ${on ? "ox-filter-chip--on" : ""}`}
             >
               <Icon className="h-3 w-3" />
               {c.label}
@@ -262,9 +262,8 @@ export default function LaunchpadHome() {
         })}
       </div>
 
-      {/* Board body */}
       {isLoading ? (
-        <div className="flex items-center justify-center gap-2 py-20 text-sm text-[hsl(var(--pf-muted))]">
+        <div className="flex items-center justify-center gap-2 py-20 text-sm text-[#A8B0BC]">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading coins…
         </div>
       ) : showTriBoard ? (
@@ -294,18 +293,41 @@ export default function LaunchpadHome() {
             empty="No graduates yet."
           />
         </div>
-      ) : !filtered.length ? (
-        <div className="rounded-2xl border border-[hsl(var(--pf-border))] py-16 text-center">
-          <Eye className="mx-auto mb-3 h-10 w-10 text-[hsl(var(--pf-muted))] opacity-40" />
-          <div className="text-base font-bold text-[hsl(var(--pf-muted))]">No coins found</div>
-          <p className="mt-1 text-sm text-[hsl(var(--pf-muted))]">Adjust filters or create the first one.</p>
+      ) : !feedItems.length ? (
+        <div className="ox-feed-empty">
+          <Eye className="mx-auto mb-3 h-10 w-10 opacity-40" />
+          <div className="text-base font-bold">No coins found</div>
+          <p className="mt-1 text-sm text-[#A8B0BC]">Adjust filters or create the first one.</p>
           <Link to="/orbitxlaunch/create" className="pf-btn mt-5 inline-flex">
             <Plus className="h-4 w-4" /> Create coin
           </Link>
         </div>
+      ) : showFeed ? (
+        <div className="ox-feed-table">
+          <div className="ox-feed-head">
+            <span>#</span>
+            <span>Token</span>
+            <span>Market cap</span>
+            <span>24h</span>
+            <span>Volume</span>
+            <span>Bonding</span>
+            <span className="sr-only">Watch</span>
+          </div>
+          <div className="ox-feed-body">
+            {feedItems.map((t, i) => (
+              <TokenFeedRow
+                key={t.mint_address}
+                rank={i + 1}
+                t={t}
+                mc={markets?.[t.mint_address]?.mcap ?? null}
+                market={markets?.[t.mint_address] ?? null}
+              />
+            ))}
+          </div>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.slice(0, 60).map((t) => (
+          {feedItems.map((t) => (
             <TokenCard key={t.mint_address} t={t} mc={markets?.[t.mint_address]?.mcap ?? null} market={markets?.[t.mint_address] ?? null} />
           ))}
         </div>
