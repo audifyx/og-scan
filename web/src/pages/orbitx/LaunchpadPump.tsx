@@ -267,15 +267,15 @@ function TokenGallery({ onCreateClick }: { onCreateClick: () => void }) {
               <button onClick={() => navigate("/trading-hub")} className="flex items-center justify-center h-8 w-8 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-white/60 hover:text-white">
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <div className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--og-lime))]/30 bg-[hsl(var(--og-lime))]/[0.06] px-4 py-1.5">
-                <Rocket className="h-4 w-4 text-[hsl(var(--og-lime))]" />
-                <span className="font-mono text-[10px] font-bold text-[hsl(var(--og-lime))] uppercase tracking-[0.24em]">Pump lane · launch archive</span>
+              <div className="inline-flex items-center gap-2 rounded-lg border border-[rgba(59,130,246,0.35)] bg-[rgba(59,130,246,0.08)] px-4 py-1.5">
+                <Rocket className="h-4 w-4 text-[#60A5FA]" />
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-[#60A5FA]">Pump lane · launch archive</span>
               </div>
             </div>
-            <h1 className="font-display text-2xl md:text-3xl font-black text-white">
-              LAUNCHED <span className=" text-[hsl(var(--og-lime))]">TOKENS</span>
+            <h1 className="font-display text-2xl font-black text-white md:text-3xl">
+              Launched <span className="text-[#F0C75E]">tokens</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="mt-1 text-sm text-[#A8B0BC]">
               Every token deployed through the OrbitX pump lane — live-priced via DexScreener
             </p>
           </div>
@@ -957,18 +957,20 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
 
         {/* Back button + Header */}
         <div className="mb-8">
-          <button onClick={onBack} className="flex items-center gap-1.5 text-white/40 hover:text-white/70 text-sm mb-4 transition-colors">
+          <button onClick={onBack} className="mb-4 flex items-center gap-1.5 text-sm text-[#A8B0BC] transition-colors hover:text-white">
             <ArrowLeft className="h-4 w-4" /> Back to Launched Tokens
           </button>
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-[hsl(var(--og-lime))]/30 bg-[hsl(var(--og-lime))]/[0.06] px-4 py-1.5 mb-4">
-              <Rocket className="h-4 w-4 text-[hsl(var(--og-lime))]" />
-              <span className="font-mono text-[10px] font-bold text-[hsl(var(--og-lime))] uppercase tracking-[0.24em]">Deploy console · pump lane</span>
+          <div className="ox-tab-hero mb-2">
+            <div className="ox-tab-hero-glow" style={{ background: "radial-gradient(500px 180px at 0% 0%, #60A5FA28, transparent 70%)" }} />
+            <div className="relative text-center">
+              <div className="pf-mono text-[10px] font-bold uppercase tracking-[0.3em] text-[#60A5FA]">Deploy · pump lane</div>
+              <h1 className="mt-1 font-display text-2xl font-black text-white md:text-3xl">
+                Launch on <span className="text-[#F0C75E]">Pump.fun</span>
+              </h1>
+              <p className="mx-auto mt-2 max-w-md text-sm text-[#A8B0BC]">
+                {isLaunchFeePromoActive() ? <>Launch fee <span className="font-bold text-[#F0C75E]">FREE for {launchFeePromoDaysLeft()} more days</span> — fill in the details, optionally grind a custom vanity mint, then deploy.</> : <>Fill in the details, optionally grind a custom vanity mint, then launch.</>}
+              </p>
             </div>
-            <h1 className="font-display text-2xl md:text-3xl font-black text-white mb-2">LAUNCH ON <span className=" text-[hsl(var(--og-lime))]">PUMP.FUN</span></h1>
-            <p className="text-sm text-white/40 max-w-md mx-auto">
-              {isLaunchFeePromoActive() ? <>Launch fee <span className="font-bold text-[hsl(var(--og-lime))]">FREE for {launchFeePromoDaysLeft()} more days</span> — fill in the details, optionally grind a custom vanity mint, then deploy.</> : <>Fill in the details, optionally grind a custom vanity mint, then launch.</>}
-            </p>
           </div>
         </div>
 
@@ -977,11 +979,11 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
           <Card className="ox-panel ox-panel--accent pf-card relative overflow-hidden border-0 bg-transparent">
             <Confetti />
             <CardContent className="relative p-8 text-center">
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10 border border-green-500/20">
-                <CheckCircle className="h-10 w-10 text-green-400" />
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-[rgba(212,175,55,0.35)] bg-[rgba(212,175,55,0.1)]">
+                <CheckCircle className="h-10 w-10 text-[#F0C75E]" />
               </div>
-              <h2 className=" font-display text-2xl font-black text-[hsl(var(--og-lime))] mb-2">DEPLOYMENT COMPLETE 🚀</h2>
-              <p className="text-sm text-white/50 mb-6">Your token is now live on pump.fun</p>
+              <h2 className="font-display text-2xl font-black text-[#F0C75E] mb-2">Deployment complete</h2>
+              <p className="text-sm text-[#A8B0BC] mb-6">Your token is now live on pump.fun</p>
 
               <div className="mb-4 rounded-lg bg-white/[0.03] border border-white/[0.06] p-4">
                 <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Contract Address</p>
@@ -1004,20 +1006,19 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Link to="/orbitxlaunch/claim"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[hsl(var(--og-gold))] px-6 py-3 text-sm font-bold text-black hover:bg-[hsl(var(--og-gold))]/90 transition-colors">
+                <Link to="/orbitxlaunch/claim" className="pf-btn inline-flex items-center justify-center gap-2">
                   <DollarSign className="h-4 w-4" /> Claim Creator Fees
                 </Link>
                 <a href={`https://pump.fun/${mintAddress}`} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[hsl(var(--og-cyan))] px-6 py-3 text-sm font-bold text-black hover:bg-[hsl(var(--og-cyan))] transition-colors">
+                  className="ox-btn ox-btn--blue inline-flex items-center justify-center gap-2">
                   <ExternalLink className="h-4 w-4" /> View on Pump.fun
                 </a>
                 <a href={`https://solscan.io/tx/${txSignature}`} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-6 py-3 text-sm font-bold text-white/60 hover:text-white hover:border-white/20 transition-colors">
+                  className="ox-btn inline-flex items-center justify-center gap-2">
                   <ExternalLink className="h-4 w-4" /> Solscan
                 </a>
                 <button onClick={() => { resetForm(); onSuccess(); }}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-6 py-3 text-sm font-bold text-white/60 hover:text-white hover:border-white/20 transition-colors">
+                  className="ox-btn inline-flex items-center justify-center gap-2">
                   <ArrowLeft className="h-4 w-4" /> View All Tokens
                 </button>
               </div>
