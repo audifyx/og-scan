@@ -20,6 +20,7 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
 import type { CityId } from "@/lib/orbitxcity/types";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
+import { FEATURES_PER_SYSTEM } from "@/lib/orbitxcity/cityFeatureCatalog";
 import { CosmicBackdrop } from "./CosmicBackdrop";
 import { AudioToggle } from "./AudioToggle";
 import { InstallCityPWA } from "./InstallCityPWA";
@@ -50,7 +51,7 @@ const TILES: MenuTile[] = [
   {
     id: "play",
     label: "Enter City",
-    blurb: "Recruit → lobbies → Midtown",
+    blurb: `${FEATURES_PER_SYSTEM} play-loop systems`,
     icon: Play,
     accent: "#c5a26f",
     primary: true,
@@ -59,66 +60,74 @@ const TILES: MenuTile[] = [
   {
     id: "characters",
     label: "Operatives",
-    blurb: "Classes · dossiers · callsigns",
+    blurb: `${FEATURES_PER_SYSTEM} character systems`,
     icon: Users,
     accent: "#b388ff",
+    badge: "168",
   },
   {
     id: "lobbies",
     label: "Lobbies",
-    blurb: "Servers · rooms · squads",
+    blurb: `${FEATURES_PER_SYSTEM} lobby systems`,
     icon: RadioTower,
     accent: "#5b8def",
+    badge: "168",
   },
   {
     id: "marketplace",
     label: "Marketplace",
-    blurb: "Meme store · launches",
+    blurb: `${FEATURES_PER_SYSTEM} market systems`,
     icon: Store,
     accent: "#ff4d6a",
+    badge: "168",
   },
   {
     id: "inventory",
     label: "Inventory",
-    blurb: "Loadout · gear · drops",
+    blurb: `${FEATURES_PER_SYSTEM} bag systems`,
     icon: Backpack,
     accent: "#3d9a6a",
+    badge: "168",
   },
   {
     id: "missions",
     label: "Missions",
-    blurb: "Contracts · streaks",
+    blurb: `${FEATURES_PER_SYSTEM} mission rails`,
     icon: Crosshair,
     accent: "#c5a26f",
+    badge: "168",
   },
   {
     id: "leaderboards",
     label: "Leaderboards",
-    blurb: "Ranks · heat checks",
+    blurb: `${FEATURES_PER_SYSTEM} ranking systems`,
     icon: Trophy,
     accent: "#e0c48a",
+    badge: "168",
   },
   {
     id: "friends",
-    label: "Social",
-    blurb: "Crew · feed · voice",
+    label: "Friends",
+    blurb: `${FEATURES_PER_SYSTEM} social systems`,
     icon: UserPlus,
     accent: "#ff4d6a",
+    badge: "168",
   },
   {
     id: "events",
     label: "Events",
-    blurb: "Drops · stages · seasons",
+    blurb: `${FEATURES_PER_SYSTEM} event systems`,
     icon: CalendarDays,
     accent: "#b388ff",
-    badge: "SOON",
+    badge: "LIVE",
   },
   {
     id: "settings",
-    label: "Systems",
-    blurb: "Audio · controls · PWA",
+    label: "Settings",
+    blurb: `${FEATURES_PER_SYSTEM} system controls`,
     icon: Settings,
     accent: "#5b8def",
+    badge: "168",
   },
 ];
 
@@ -287,7 +296,9 @@ export function MainMenu() {
               aria-pressed={selectedCityId === c.id}
             >
               <span>{c.name.replace(/^OrbitX\s+/i, "")}</span>
-              <small>{selectedCityId === c.id ? "LIVE" : "READY"}</small>
+              <small>
+                {selectedCityId === c.id ? "LIVE" : "READY"} · {FEATURES_PER_SYSTEM}
+              </small>
             </button>
           ))}
         </div>

@@ -3653,3 +3653,134 @@ button.oxc-token-row {
 
 .oxc-pwa-ios-hint b { color: #fff; }
 
+
+/* ── Feature catalog (168 systems) ── */
+.oxc-feat-catalog {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+}
+.oxc-feat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+.oxc-feat-counts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.oxc-feat-tools {
+  display: grid;
+  gap: 0.5rem;
+}
+.oxc-feat-search {
+  width: 100%;
+  min-height: 2.4rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--sys, var(--oxc-gold)) 30%, transparent);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--oxc-text);
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+.oxc-feat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.oxc-feat-card {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 10, 18, 0.72);
+  padding: 0.65rem 0.7rem;
+  display: grid;
+  gap: 0.3rem;
+}
+.oxc-feat-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+.oxc-feat-card h4 {
+  margin: 0;
+  font-family: var(--oxc-font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+}
+.oxc-feat-card p {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--oxc-muted);
+  line-height: 1.35;
+}
+.oxc-feat-card footer {
+  font-family: var(--oxc-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--sys, var(--oxc-gold)) 70%, var(--oxc-muted));
+}
+.oxc-feat-idx {
+  font-family: var(--oxc-font-mono);
+  font-size: 9px;
+  color: var(--oxc-muted);
+}
+.oxc-feat-card.is-live {
+  border-color: color-mix(in srgb, var(--oxc-lime) 35%, transparent);
+}
+.oxc-feat-card.is-beta {
+  border-color: color-mix(in srgb, var(--oxc-cyan) 35%, transparent);
+}
+.oxc-feat-card.is-planned {
+  opacity: 0.72;
+}
+.oxc-feat-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.oxc-sys-tabs {
+  width: 100%;
+  justify-content: stretch;
+}
+.oxc-sys-tabs button {
+  flex: 1;
+}
+.oxc-inv-item.owned {
+  border-color: color-mix(in srgb, var(--oxc-lime) 40%, transparent);
+}
+@media (max-width: 560px) {
+  .oxc-feat-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oxc-chars-catalog {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto;
+  width: min(920px, 100%);
+  padding: 0.65rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--oxc-gold) 28%, transparent);
+  background: rgba(8, 10, 16, 0.55);
+  max-height: 40vh;
+  overflow: auto;
+}
+.oxc-chars-catalog summary {
+  cursor: pointer;
+  font-family: var(--oxc-font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--oxc-gold);
+  list-style: none;
+}
+.oxc-chars-catalog summary::-webkit-details-marker { display: none; }

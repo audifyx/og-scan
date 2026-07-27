@@ -15,6 +15,8 @@ import {
 } from "@/lib/orbitxcity/characterClasses";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { CosmicBackdrop } from "./CosmicBackdrop";
+import { CharactersSystemExtras } from "./CitySystemPanels";
+import { FEATURES_PER_SYSTEM } from "@/lib/orbitxcity/cityFeatureCatalog";
 
 const CLASS_FLAVOR: Record<
   CharacterClassId,
@@ -249,7 +251,7 @@ export function CharacterSelect() {
         <h1 className="oxc-chars-title">
           ORBIT<span className="oxc-chars-title-x">X</span> CITY
         </h1>
-        <p className="oxc-chars-sub">Select your operative</p>
+        <p className="oxc-chars-sub">Select your operative · {FEATURES_PER_SYSTEM} character systems</p>
         <p className={`oxc-chars-wallet-status ${connected ? "is-on" : ""}`}>{walletLabel}</p>
       </header>
 
@@ -348,6 +350,11 @@ export function CharacterSelect() {
           </div>
         </aside>
       </div>
+
+      <details className="oxc-chars-catalog glass">
+        <summary>{FEATURES_PER_SYSTEM} character capabilities</summary>
+        <CharactersSystemExtras />
+      </details>
 
       <footer className="oxc-chars-foot">
         <button

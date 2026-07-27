@@ -91,8 +91,12 @@ const DEFAULT_AVATAR: AvatarAppearance = {
 
 const STARTER_INVENTORY: InventoryItem[] = [
   { id: "badge-pioneer", kind: "badge", label: "City Pioneer", detail: "OrbitX City Phase 1 access" },
+  { id: "badge-founder", kind: "badge", label: "Founder Badge", detail: "Early OrbitX City operative" },
   { id: "key-nyc", kind: "key", label: "NYC Block Key", detail: "Midtown demo district" },
+  { id: "holder-key", kind: "key", label: "Holder Key", detail: "Unlocks VIP building interiors" },
   { id: "ad-slot", kind: "ad_slot", label: "Billboard Slot", detail: "1 SOL · 7 days · Advertising District" },
+  { id: "ad-slot-a", kind: "ad_slot", label: "Billboard Slot A", detail: "Rentable Midtown ad face" },
+  { id: "token-obx", kind: "token", label: "OBX Watchlist Slot", detail: "Pin a mint on your HUD tape" },
 ];
 
 function zoneToPanel(kind: InteractionKind): HudPanel {
