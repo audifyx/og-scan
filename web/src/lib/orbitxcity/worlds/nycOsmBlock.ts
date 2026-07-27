@@ -63,59 +63,66 @@ export const NYC_OSM_TELEPORT_POINTS = [
     accent: "#17ff4d"
   },
   {
-    id: "osm-163474780",
-    label: "MARKET",
-    x: -13.11,
-    z: 5.82,
-    accent: "#ff4d9a"
-  },
-  {
-    id: "osm-157835453",
-    label: "TRADE",
-    x: -22.56,
-    z: 28.69,
-    accent: "#3de7ff"
-  },
-  {
-    id: "osm-266149338",
-    label: "CLUB",
-    x: -60.44,
-    z: 41.42,
-    accent: "#ff4d9a"
-  },
-  {
-    id: "osm-266149373",
-    label: "LAUNCH",
-    x: -38.57,
-    z: 50.87,
-    accent: "#f5c542"
-  },
-  {
     id: "osm-137716320",
-    label: "HQ",
+    label: "ORBITX HQ",
     x: 11.51,
     z: 20.73,
     accent: "#17ff4d"
   },
   {
-    id: "osm-143858914",
-    label: "HOTEL",
-    x: -28.64,
-    z: -31.96,
+    id: "osm-266170795",
+    label: "DEX STORE",
+    x: 38.4,
+    z: -23.63,
+    accent: "#ff4d9a"
+  },
+  {
+    id: "osm-157835453",
+    label: "DEX FLOOR",
+    x: -22.56,
+    z: 28.69,
     accent: "#3de7ff"
   },
   {
-    id: "osm-266149345",
-    label: "THEATER",
-    x: -47.65,
-    z: -13.6,
+    id: "osm-266149373",
+    label: "LAUNCHPAD",
+    x: -38.57,
+    z: 50.87,
+    accent: "#f5c542"
+  },
+  {
+    id: "osm-163474780",
+    label: "SOCIAL",
+    x: -13.11,
+    z: 5.82,
     accent: "#a78bfa"
   },
   {
-    id: "osm-266170751",
-    label: "THEATER",
-    x: 23.47,
-    z: 53.91,
+    id: "osm-266170615",
+    label: "VOICE",
+    x: 23.22,
+    z: -7.13,
+    accent: "#ff6bcb"
+  },
+  {
+    id: "osm-163629929",
+    label: "BUY DESK",
+    x: -10.56,
+    z: 65.31,
+    accent: "#17ff4d"
+  },
+  {
+    id: "osm-266149338",
+    label: "DEX DESK",
+    x: -60.44,
+    z: 41.42,
+    accent: "#3de7ff"
+  },
+  {
+    id: "osm-143858914",
+    label: "COMMUNITY",
+    x: -28.64,
+    z: -31.96,
     accent: "#a78bfa"
   }
 ] as const;
@@ -140,7 +147,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       cityId: "nyc",
       kind: "hq",
       name: "Times Square Midtown",
-      description: "Real OpenStreetMap footprints around Broadway / W 47th.",
+      description: "OrbitX Midtown — DEX stores, launchpad, HQ office, and social venues on real OSM footprints.",
       center: { x: 0, y: 0, z: 0 },
       size: { width: 152, depth: 137 },
     },
@@ -149,7 +156,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "osm-163474780",
     districtId: "midtown",
-    kind: "market",
+    kind: "social_hub",
     name: "New York Marriott Marquis",
     position: {
       x: -26.61,
@@ -162,8 +169,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 30.79
     },
     color: "#302820",
-    accent: "#ff4d9a",
-    label: "MARKET",
+    accent: "#a78bfa",
+    label: "SOCIAL",
     footprint: [
       {
         x: 14.026,
@@ -226,7 +233,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         z: 14.529
       }
     ],
-    interaction: "marketplace"
+    interaction: "community"
   },
   {
     id: "osm-157835453",
@@ -245,7 +252,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#1f2c38",
     accent: "#3de7ff",
-    label: "TRADE",
+    label: "DEX FLOOR",
     footprint: [
       {
         x: -16.632,
@@ -329,7 +336,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "osm-266149338",
     districtId: "midtown",
-    kind: "generic",
+    kind: "trading_floor",
     name: "Times Square Building",
     position: {
       x: -60.44,
@@ -342,8 +349,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 24.21
     },
     color: "#242b35",
-    accent: "#ff4d9a",
-    label: "CLUB",
+    accent: "#3de7ff",
+    label: "DEX DESK",
     footprint: [
       {
         x: 16.117,
@@ -422,7 +429,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         z: -1.302
       }
     ],
-    interaction: "voice"
+    interaction: "trading"
   },
   {
     id: "osm-266149373",
@@ -441,7 +448,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#23302c",
     accent: "#f5c542",
-    label: "LAUNCH",
+    label: "LAUNCHPAD",
     footprint: [
       {
         x: -11.621,
@@ -518,7 +525,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     id: "osm-137716320",
     districtId: "midtown",
     kind: "hq",
-    name: "Bertelsmann Building",
+    name: "OrbitX HQ",
     position: {
       x: 11.51,
       y: 0,
@@ -531,7 +538,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#302820",
     accent: "#17ff4d",
-    label: "HQ",
+    label: "ORBITX HQ",
     footprint: [
       {
         x: -5.682,
@@ -595,7 +602,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "osm-143858914",
     districtId: "midtown",
-    kind: "generic",
+    kind: "social_hub",
     name: "The Hotel Edison NYC",
     position: {
       x: -28.64,
@@ -608,8 +615,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 18.12
     },
     color: "#23302c",
-    accent: "#3de7ff",
-    label: "HOTEL",
+    accent: "#a78bfa",
+    label: "COMMUNITY",
     footprint: [
       {
         x: -13.582,
@@ -673,7 +680,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "osm-163629929",
     districtId: "midtown",
-    kind: "trading_floor",
+    kind: "market",
     name: "1500 Broadway",
     position: {
       x: -10.56,
@@ -686,8 +693,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 24.02
     },
     color: "#1b2433",
-    accent: "#3de7ff",
-    label: "1500",
+    accent: "#17ff4d",
+    label: "BUY DESK",
     footprint: [
       {
         x: 8.524,
@@ -721,7 +728,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 8.524,
         z: -6.187
       }
-    ]
+    ],
+    interaction: "token"
   },
   {
     id: "osm-266170537",
@@ -739,8 +747,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 21.54
     },
     color: "#23302c",
-    accent: "#a78bfa",
-    label: "CHURCH OF SAINT MA",
+    accent: "#17ff4d",
+    label: "NFT HALL",
     footprint: [
       {
         x: 4.154,
@@ -830,7 +838,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 4.154,
         z: 2.896
       }
-    ]
+    ],
+    interaction: "nft"
   },
   {
     id: "osm-266170615",
@@ -848,8 +857,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 16.87
     },
     color: "#302820",
-    accent: "#c5a26f",
-    label: "160",
+    accent: "#ff6bcb",
+    label: "VOICE",
     footprint: [
       {
         x: -2.685,
@@ -915,7 +924,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -2.685,
         z: -6.429
       }
-    ]
+    ],
+    interaction: "voice"
   },
   {
     id: "osm-266149345",
@@ -934,7 +944,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#302820",
     accent: "#a78bfa",
-    label: "THEATER",
+    label: "GAMES",
     footprint: [
       {
         x: 3.387,
@@ -990,7 +1000,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "osm-266170795",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "20 Times Square",
     position: {
       x: 30.9,
@@ -1003,8 +1013,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 15.62
     },
     color: "#23302c",
-    accent: "#a78bfa",
-    label: "20 TIMES SQUARE",
+    accent: "#ff4d9a",
+    label: "DEX STORE",
     footprint: [
       {
         x: 8.939,
@@ -1038,7 +1048,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 8.939,
         z: -0.453
       }
-    ]
+    ],
+    interaction: "marketplace"
   },
   {
     id: "osm-266170751",
@@ -1057,7 +1068,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#1b2433",
     accent: "#a78bfa",
-    label: "THEATER",
+    label: "GAMES",
     footprint: [
       {
         x: 2.411,
@@ -1129,7 +1140,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "osm-266170758",
     districtId: "midtown",
-    kind: "generic",
+    kind: "trading_floor",
     name: "Jacqueline Kennedy Onassis High School",
     position: {
       x: 46.99,
@@ -1142,8 +1153,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 14.37
     },
     color: "#2a2434",
-    accent: "#ff4d9a",
-    label: "JACQUELINE KENNEDY",
+    accent: "#3de7ff",
+    label: "DEX DESK",
     footprint: [
       {
         x: -9.46,
@@ -1241,7 +1252,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -9.46,
         z: 1.993
       }
-    ]
+    ],
+    interaction: "trading"
   },
   {
     id: "osm-266149312",
@@ -1260,7 +1272,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#242b35",
     accent: "#f5c542",
-    label: "LAUNCH",
+    label: "LAUNCHPAD",
     footprint: [
       {
         x: 8.659,
@@ -1318,7 +1330,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#1f2c38",
     accent: "#a78bfa",
-    label: "THEATER",
+    label: "GAMES",
     footprint: [
       {
         x: 2.062,
@@ -1402,7 +1414,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "osm-266170766",
     districtId: "midtown",
-    kind: "trading_floor",
+    kind: "launch_arena",
     name: "Tower 45",
     position: {
       x: 34.67,
@@ -1415,8 +1427,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 14.43
     },
     color: "#23302c",
-    accent: "#3de7ff",
-    label: "TOWER 45",
+    accent: "#f5c542",
+    label: "LAUNCHPAD",
     footprint: [
       {
         x: 4.619,
@@ -1478,7 +1490,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 4.893,
         z: 6.719
       }
-    ]
+    ],
+    interaction: "launch"
   },
   {
     id: "osm-266149327",
@@ -1497,7 +1510,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#242b35",
     accent: "#a78bfa",
-    label: "THEATER",
+    label: "GAMES",
     footprint: [
       {
         x: 7.717,
@@ -1557,7 +1570,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "osm-266170769",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "Hotel Riu Plaza Manhattan Times Square",
     position: {
       x: 49.09,
@@ -1570,8 +1583,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 13.79
     },
     color: "#242b35",
-    accent: "#3de7ff",
-    label: "HOTEL RIU PLAZA MA",
+    accent: "#ff4d9a",
+    label: "MEME STORE",
     footprint: [
       {
         x: 7.296,
@@ -1613,7 +1626,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 7.296,
         z: -1.366
       }
-    ]
+    ],
+    interaction: "marketplace"
   },
   {
     id: "osm-266149330",
@@ -1632,7 +1646,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#2a2434",
     accent: "#a78bfa",
-    label: "THEATER",
+    label: "GAMES",
     footprint: [
       {
         x: 2.518,
@@ -1698,7 +1712,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#302820",
     accent: "#a78bfa",
-    label: "THEATER",
+    label: "GAMES",
     footprint: [
       {
         x: 2.292,
@@ -1750,7 +1764,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "osm-266170756",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "Millennium Hotel Broadway Times Square",
     position: {
       x: 11.97,
@@ -1764,7 +1778,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#2a2434",
     accent: "#ff4d9a",
-    label: "MILLENNIUM HOTEL B",
+    label: "MEME STORE",
     footprint: [
       {
         x: 7.121,
@@ -1838,7 +1852,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 7.121,
         z: -1.434
       }
-    ]
+    ],
+    interaction: "marketplace"
   },
   {
     id: "osm-266149299",
@@ -1857,7 +1872,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#302820",
     accent: "#a78bfa",
-    label: "THEATER",
+    label: "GAMES",
     footprint: [
       {
         x: -6.661,
@@ -1919,7 +1934,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#2a2434",
     accent: "#a78bfa",
-    label: "THEATER",
+    label: "GAMES",
     footprint: [
       {
         x: 2.059,
@@ -1955,7 +1970,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "osm-260180778",
     districtId: "midtown",
-    kind: "generic",
+    kind: "social_hub",
     name: "Hyatt Centric Times Square",
     position: {
       x: 32.3,
@@ -1969,7 +1984,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#23302c",
     accent: "#a78bfa",
-    label: "HYATT CENTRIC TIME",
+    label: "COMMUNITY",
     footprint: [
       {
         x: -1.698,
@@ -2035,7 +2050,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -1.698,
         z: -6.125
       }
-    ]
+    ],
+    interaction: "community"
   },
   {
     id: "osm-266170765",
@@ -2053,8 +2069,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 11.95
     },
     color: "#242b35",
-    accent: "#3de7ff",
-    label: "THE MUSE NEW YORK",
+    accent: "#ff6bcb",
+    label: "VOICE",
     footprint: [
       {
         x: -5.556,
@@ -2088,7 +2104,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -5.556,
         z: 2.453
       }
-    ]
+    ],
+    interaction: "voice"
   },
   {
     id: "osm-266149309",
@@ -2106,8 +2123,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 11.82
     },
     color: "#242b35",
-    accent: "#3de7ff",
-    label: "CHURCH OF SCIENTOL",
+    accent: "#17ff4d",
+    label: "NFT HALL",
     footprint: [
       {
         x: 0.805,
@@ -2133,12 +2150,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 0.805,
         z: 5.912
       }
-    ]
+    ],
+    interaction: "nft"
   },
   {
     id: "osm-266170571",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "133 West 44th Street",
     position: {
       x: 23.03,
@@ -2151,8 +2169,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 10.97
     },
     color: "#1f2c38",
-    accent: "#f5c542",
-    label: "133",
+    accent: "#17ff4d",
+    label: "BUY DESK",
     footprint: [
       {
         x: 4.78,
@@ -2210,7 +2228,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 4.78,
         z: -2.724
       }
-    ]
+    ],
+    interaction: "token"
   },
   {
     id: "osm-266170583",
@@ -2228,8 +2247,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 10.62
     },
     color: "#242b35",
-    accent: "#3de7ff",
-    label: "145",
+    accent: "#17ff4d",
+    label: "NFT HALL",
     footprint: [
       {
         x: -0.895,
@@ -2275,12 +2294,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -0.895,
         z: -5.309
       }
-    ]
+    ],
+    interaction: "nft"
   },
   {
     id: "osm-266170601",
     districtId: "midtown",
-    kind: "generic",
+    kind: "trading_floor",
     name: "150 West 47th Street",
     position: {
       x: 37.81,
@@ -2293,8 +2313,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 10.54
     },
     color: "#23302c",
-    accent: "#a78bfa",
-    label: "150",
+    accent: "#3de7ff",
+    label: "LIVE WALL",
     footprint: [
       {
         x: 0.989,
@@ -2340,12 +2360,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 0.989,
         z: 4.852
       }
-    ]
+    ],
+    interaction: "billboard"
   },
   {
     id: "osm-266170599",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "150 West 45th Street",
     position: {
       x: 16.84,
@@ -2358,8 +2379,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 10.76
     },
     color: "#1f2c38",
-    accent: "#f5c542",
-    label: "150",
+    accent: "#ff4d9a",
+    label: "DEX STORE",
     footprint: [
       {
         x: -0.137,
@@ -2389,12 +2410,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -0.137,
         z: 5.38
       }
-    ]
+    ],
+    interaction: "marketplace"
   },
   {
     id: "osm-1317983503",
     districtId: "midtown",
-    kind: "generic",
+    kind: "trading_floor",
     name: "SpringHill Suites",
     position: {
       x: -29.4,
@@ -2407,8 +2429,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 10.71
     },
     color: "#2a2434",
-    accent: "#ff4d9a",
-    label: "SPRINGHILL SUITES",
+    accent: "#3de7ff",
+    label: "DEX DESK",
     footprint: [
       {
         x: 0.209,
@@ -2438,12 +2460,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 0.209,
         z: -5.354
       }
-    ]
+    ],
+    interaction: "trading"
   },
   {
     id: "osm-266170603",
     districtId: "midtown",
-    kind: "generic",
+    kind: "launch_arena",
     name: "151 West 46th Street",
     position: {
       x: 30.81,
@@ -2457,7 +2480,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#1f2c38",
     accent: "#f5c542",
-    label: "151",
+    label: "LAUNCHPAD",
     footprint: [
       {
         x: 4.325,
@@ -2483,12 +2506,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 4.325,
         z: -3.055
       }
-    ]
+    ],
+    interaction: "launch"
   },
   {
     id: "osm-266149306",
     districtId: "midtown",
-    kind: "generic",
+    kind: "social_hub",
     name: "1557 Broadway",
     position: {
       x: -6.39,
@@ -2501,8 +2525,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 9.13
     },
     color: "#1b2433",
-    accent: "#17ff4d",
-    label: "1557",
+    accent: "#a78bfa",
+    label: "COMMUNITY",
     footprint: [
       {
         x: 2.593,
@@ -2532,12 +2556,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 2.593,
         z: 4.563
       }
-    ]
+    ],
+    interaction: "community"
   },
   {
     id: "osm-266170544",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "45 Times Square Hotel",
     position: {
       x: 38.19,
@@ -2550,8 +2575,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 9.07
     },
     color: "#1f2c38",
-    accent: "#f5c542",
-    label: "45 TIMES SQUARE HO",
+    accent: "#ff4d9a",
+    label: "MEME STORE",
     footprint: [
       {
         x: 0.657,
@@ -2593,12 +2618,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 0.657,
         z: 4.536
       }
-    ]
+    ],
+    interaction: "marketplace"
   },
   {
     id: "osm-266149308",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "Cambria Hotel",
     position: {
       x: -15.9,
@@ -2611,8 +2637,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 9.75
     },
     color: "#1f2c38",
-    accent: "#f5c542",
-    label: "CAMBRIA HOTEL",
+    accent: "#ff4d9a",
+    label: "MEME STORE",
     footprint: [
       {
         x: -0.843,
@@ -2634,7 +2660,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -0.843,
         z: 4.876
       }
-    ]
+    ],
+    interaction: "marketplace"
   },
   {
     id: "osm-266170552",
@@ -2652,8 +2679,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 9.26
     },
     color: "#2a2434",
-    accent: "#ff4d9a",
-    label: "115",
+    accent: "#ff6bcb",
+    label: "VOICE",
     footprint: [
       {
         x: -0.076,
@@ -2687,12 +2714,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -0.076,
         z: 4.629
       }
-    ]
+    ],
+    interaction: "voice"
   },
   {
     id: "osm-266170628",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "170 West 46th Street",
     position: {
       x: 10.73,
@@ -2705,8 +2733,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 6.69
     },
     color: "#242b35",
-    accent: "#3de7ff",
-    label: "170",
+    accent: "#17ff4d",
+    label: "BUY DESK",
     footprint: [
       {
         x: 3.792,
@@ -2732,12 +2760,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 3.792,
         z: 3.346
       }
-    ]
+    ],
+    interaction: "token"
   },
   {
     id: "osm-266170539",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "Broadway @ Times Square Hotel",
     position: {
       x: 47.79,
@@ -2750,8 +2779,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 9
     },
     color: "#1f2c38",
-    accent: "#f5c542",
-    label: "BROADWAY @ TIMES S",
+    accent: "#ff4d9a",
+    label: "MEME STORE",
     footprint: [
       {
         x: -0.482,
@@ -2809,7 +2838,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -0.482,
         z: 4.501
       }
-    ]
+    ],
+    interaction: "marketplace"
   },
   {
     id: "osm-266170757",
@@ -2828,7 +2858,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#23302c",
     accent: "#a78bfa",
-    label: "THEATER",
+    label: "GAMES",
     footprint: [
       {
         x: -0.784,
@@ -2905,8 +2935,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 6.99
     },
     color: "#2a2434",
-    accent: "#ff4d9a",
-    label: "167",
+    accent: "#17ff4d",
+    label: "NFT HALL",
     footprint: [
       {
         x: -4.311,
@@ -2928,12 +2958,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -4.311,
         z: -0.206
       }
-    ]
+    ],
+    interaction: "nft"
   },
   {
     id: "osm-266170593",
     districtId: "midtown",
-    kind: "generic",
+    kind: "trading_floor",
     name: "149 West 46th Street",
     position: {
       x: 33.7,
@@ -2946,8 +2977,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 9.31
     },
     color: "#23302c",
-    accent: "#a78bfa",
-    label: "149",
+    accent: "#3de7ff",
+    label: "LIVE WALL",
     footprint: [
       {
         x: -1.431,
@@ -2969,12 +3000,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -1.431,
         z: 4.656
       }
-    ]
+    ],
+    interaction: "billboard"
   },
   {
     id: "osm-266170608",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "155 West 46th Street",
     position: {
       x: 27.92,
@@ -2987,8 +3019,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 9.31
     },
     color: "#242b35",
-    accent: "#3de7ff",
-    label: "155",
+    accent: "#ff4d9a",
+    label: "DEX STORE",
     footprint: [
       {
         x: -1.435,
@@ -3010,12 +3042,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -1.435,
         z: 4.655
       }
-    ]
+    ],
+    interaction: "marketplace"
   },
   {
     id: "osm-266170600",
     districtId: "midtown",
-    kind: "generic",
+    kind: "trading_floor",
     name: "150 West 46th Street",
     position: {
       x: 25.55,
@@ -3028,8 +3061,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 8.78
     },
     color: "#2a2434",
-    accent: "#ff4d9a",
-    label: "150",
+    accent: "#3de7ff",
+    label: "DEX DESK",
     footprint: [
       {
         x: 0.119,
@@ -3059,12 +3092,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 0.119,
         z: 2.928
       }
-    ]
+    ],
+    interaction: "trading"
   },
   {
     id: "osm-266170542",
     districtId: "midtown",
-    kind: "generic",
+    kind: "launch_arena",
     name: "Dervish",
     position: {
       x: 41.44,
@@ -3078,7 +3112,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     color: "#1f2c38",
     accent: "#f5c542",
-    label: "DERVISH",
+    label: "LAUNCHPAD",
     footprint: [
       {
         x: -1.459,
@@ -3116,12 +3150,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -1.459,
         z: 4.617
       }
-    ]
+    ],
+    interaction: "launch"
   },
   {
     id: "osm-266170540",
     districtId: "midtown",
-    kind: "generic",
+    kind: "social_hub",
     name: "Connolly's",
     position: {
       x: 43.79,
@@ -3134,8 +3169,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 8.43
     },
     color: "#1b2433",
-    accent: "#17ff4d",
-    label: "CONNOLLY'S",
+    accent: "#a78bfa",
+    label: "COMMUNITY",
     footprint: [
       {
         x: -0.212,
@@ -3177,7 +3212,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -0.212,
         z: 4.216
       }
-    ]
+    ],
+    interaction: "community"
   },
   {
     id: "osm-266170587",
@@ -3195,8 +3231,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 9.17
     },
     color: "#302820",
-    accent: "#c5a26f",
-    label: "147",
+    accent: "#ff6bcb",
+    label: "VOICE",
     footprint: [
       {
         x: 3.076,
@@ -3226,12 +3262,13 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: 3.076,
         z: -3.746
       }
-    ]
+    ],
+    interaction: "voice"
   },
   {
     id: "osm-266170573",
     districtId: "midtown",
-    kind: "generic",
+    kind: "market",
     name: "136 West 46th Street",
     position: {
       x: 33.58,
@@ -3244,8 +3281,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 8.97
     },
     color: "#23302c",
-    accent: "#a78bfa",
-    label: "136",
+    accent: "#17ff4d",
+    label: "BUY DESK",
     footprint: [
       {
         x: -1.556,
@@ -3275,7 +3312,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -1.556,
         z: 4.486
       }
-    ]
+    ],
+    interaction: "token"
   },
   {
     id: "osm-266170759",
@@ -3293,8 +3331,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       depth: 8.95
     },
     color: "#23302c",
-    accent: "#a78bfa",
-    label: "AMOR LOCO",
+    accent: "#17ff4d",
+    label: "NFT HALL",
     footprint: [
       {
         x: -1.576,
@@ -3320,7 +3358,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
         x: -1.576,
         z: 4.475
       }
-    ]
+    ],
+    interaction: "nft"
   }
 ],
   billboards: [
@@ -3351,9 +3390,9 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   zones: [
   {
     id: "z-osm-163474780",
-    kind: "marketplace",
-    label: "New York Marriott Marquis",
-    hint: "Enter New York Marriott Marquis",
+    kind: "community",
+    label: "SOCIAL",
+    hint: "Community · social feed & chat",
     position: {
       x: -13.11,
       y: 0,
@@ -3365,8 +3404,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "z-osm-157835453",
     kind: "trading",
-    label: "One Astor Place",
-    hint: "Enter One Astor Place",
+    label: "DEX FLOOR",
+    hint: "Trading floor · live screener",
     position: {
       x: -24.06,
       y: 0,
@@ -3377,9 +3416,9 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   },
   {
     id: "z-osm-266149338",
-    kind: "voice",
-    label: "Times Square Building",
-    hint: "Enter Times Square Building",
+    kind: "trading",
+    label: "DEX DESK",
+    hint: "Trading floor · live screener",
     position: {
       x: -60.44,
       y: 0,
@@ -3391,8 +3430,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "z-osm-266149373",
     kind: "launch",
-    label: "1501 Broadway",
-    hint: "Enter 1501 Broadway",
+    label: "LAUNCHPAD",
+    hint: "Launchpad · new tokens",
     position: {
       x: -38.57,
       y: 0,
@@ -3404,8 +3443,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "z-osm-137716320",
     kind: "hq",
-    label: "Bertelsmann Building",
-    hint: "Enter Bertelsmann Building",
+    label: "ORBITX HQ",
+    hint: "OrbitX HQ · DEX, launchpad, social",
     position: {
       x: 11.51,
       y: 0,
@@ -3417,8 +3456,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "z-osm-143858914",
     kind: "community",
-    label: "The Hotel Edison NYC",
-    hint: "Enter The Hotel Edison NYC",
+    label: "COMMUNITY",
+    hint: "Community · social feed & chat",
     position: {
       x: -28.64,
       y: 0,
@@ -3428,10 +3467,49 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     buildingId: "osm-143858914"
   },
   {
+    id: "z-osm-163629929",
+    kind: "token",
+    label: "BUY DESK",
+    hint: "Token buy desk · Jupiter swap",
+    position: {
+      x: -10.56,
+      y: 0,
+      z: 65.01
+    },
+    radius: 5.5,
+    buildingId: "osm-163629929"
+  },
+  {
+    id: "z-osm-266170537",
+    kind: "nft",
+    label: "NFT HALL",
+    hint: "NFT gallery",
+    position: {
+      x: 45.96,
+      y: 0,
+      z: 10.02
+    },
+    radius: 5.5,
+    buildingId: "osm-266170537"
+  },
+  {
+    id: "z-osm-266170615",
+    kind: "voice",
+    label: "VOICE",
+    hint: "Voice plaza · live talk",
+    position: {
+      x: 23.22,
+      y: 0,
+      z: -7.43
+    },
+    radius: 5.5,
+    buildingId: "osm-266170615"
+  },
+  {
     id: "z-osm-266149345",
     kind: "games",
-    label: "Imperial Theatre",
-    hint: "Enter Imperial Theatre",
+    label: "GAMES",
+    hint: "Games district",
     position: {
       x: -47.65,
       y: 0,
@@ -3441,10 +3519,23 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     buildingId: "osm-266149345"
   },
   {
+    id: "z-osm-266170795",
+    kind: "marketplace",
+    label: "DEX STORE",
+    hint: "Meme Market · live DEX store",
+    position: {
+      x: 38.4,
+      y: 0,
+      z: -23.93
+    },
+    radius: 5.467,
+    buildingId: "osm-266170795"
+  },
+  {
     id: "z-osm-266170751",
     kind: "games",
-    label: "Hudson Theatre",
-    hint: "Enter Hudson Theatre",
+    label: "GAMES",
+    hint: "Games district",
     position: {
       x: 23.47,
       y: 0,
@@ -3454,10 +3545,23 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     buildingId: "osm-266170751"
   },
   {
+    id: "z-osm-266170758",
+    kind: "trading",
+    label: "DEX DESK",
+    hint: "Trading floor · live screener",
+    position: {
+      x: 55.99,
+      y: 0,
+      z: 30.58
+    },
+    radius: 5.0295,
+    buildingId: "osm-266170758"
+  },
+  {
     id: "z-osm-266149312",
     kind: "launch",
-    label: "Paramount Hotel",
-    hint: "Enter Paramount Hotel",
+    label: "LAUNCHPAD",
+    hint: "Launchpad · new tokens",
     position: {
       x: -56.46,
       y: 0,
@@ -3469,8 +3573,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "z-osm-266170755",
     kind: "games",
-    label: "Lyceum Theatre",
-    hint: "Enter Lyceum Theatre",
+    label: "GAMES",
+    hint: "Games district",
     position: {
       x: 17.02,
       y: 0,
@@ -3480,10 +3584,23 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     buildingId: "osm-266170755"
   },
   {
+    id: "z-osm-266170766",
+    kind: "launch",
+    label: "LAUNCHPAD",
+    hint: "Launchpad · new tokens",
+    position: {
+      x: 34.67,
+      y: 0,
+      z: 52.39
+    },
+    radius: 5.0504999999999995,
+    buildingId: "osm-266170766"
+  },
+  {
     id: "z-osm-266149327",
     kind: "games",
-    label: "Lunt-Fontanne Theatre",
-    hint: "Enter Lunt-Fontanne Theatre",
+    label: "GAMES",
+    hint: "Games district",
     position: {
       x: -4.96,
       y: 0,
@@ -3493,10 +3610,23 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     buildingId: "osm-266149327"
   },
   {
+    id: "z-osm-266170769",
+    kind: "marketplace",
+    label: "MEME STORE",
+    hint: "Meme Market · live DEX store",
+    position: {
+      x: 53.59,
+      y: 0,
+      z: -14.78
+    },
+    radius: 4.826499999999999,
+    buildingId: "osm-266170769"
+  },
+  {
     id: "z-osm-266149330",
     kind: "games",
-    label: "Richard Rodgers Theatre",
-    hint: "Enter Richard Rodgers Theatre",
+    label: "GAMES",
+    hint: "Games district",
     position: {
       x: -47.14,
       y: 0,
@@ -3508,8 +3638,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "z-osm-266149334",
     kind: "games",
-    label: "Shubert Theatre",
-    hint: "Enter Shubert Theatre",
+    label: "GAMES",
+    hint: "Games district",
     position: {
       x: -52.87,
       y: 0,
@@ -3519,10 +3649,23 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     buildingId: "osm-266149334"
   },
   {
+    id: "z-osm-266170756",
+    kind: "marketplace",
+    label: "MEME STORE",
+    hint: "Meme Market · live DEX store",
+    position: {
+      x: 11.97,
+      y: 0,
+      z: 49.41
+    },
+    radius: 4.731999999999999,
+    buildingId: "osm-266170756"
+  },
+  {
     id: "z-osm-266149299",
     kind: "games",
-    label: "Booth Theatre",
-    hint: "Enter Booth Theatre",
+    label: "GAMES",
+    hint: "Games district",
     position: {
       x: -50.91,
       y: 0,
@@ -3534,8 +3677,8 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
   {
     id: "z-osm-266149329",
     kind: "games",
-    label: "Music Box Theatre",
-    hint: "Enter Music Box Theatre",
+    label: "GAMES",
+    hint: "Games district",
     position: {
       x: -50.09,
       y: 0,
@@ -3545,10 +3688,205 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     buildingId: "osm-266149329"
   },
   {
+    id: "z-osm-260180778",
+    kind: "community",
+    label: "COMMUNITY",
+    hint: "Community · social feed & chat",
+    position: {
+      x: 32.3,
+      y: 0,
+      z: 31.84
+    },
+    radius: 4.2735,
+    buildingId: "osm-260180778"
+  },
+  {
+    id: "z-osm-266170765",
+    kind: "voice",
+    label: "VOICE",
+    hint: "Voice plaza · live talk",
+    position: {
+      x: 36.06,
+      y: 0,
+      z: 34.53
+    },
+    radius: 3.8884999999999996,
+    buildingId: "osm-266170765"
+  },
+  {
+    id: "z-osm-266149309",
+    kind: "nft",
+    label: "NFT HALL",
+    hint: "NFT gallery",
+    position: {
+      x: -30.75,
+      y: 0,
+      z: -31.49
+    },
+    radius: 3.8289999999999997,
+    buildingId: "osm-266149309"
+  },
+  {
+    id: "z-osm-266170571",
+    kind: "token",
+    label: "BUY DESK",
+    hint: "Token buy desk · Jupiter swap",
+    position: {
+      x: 23.03,
+      y: 0,
+      z: 54.26
+    },
+    radius: 3.346,
+    buildingId: "osm-266170571"
+  },
+  {
+    id: "z-osm-266170583",
+    kind: "nft",
+    label: "NFT HALL",
+    hint: "NFT gallery",
+    position: {
+      x: 29.62,
+      y: 0,
+      z: 31.86
+    },
+    radius: 3.4544999999999995,
+    buildingId: "osm-266170583"
+  },
+  {
+    id: "z-osm-266170601",
+    kind: "billboard",
+    label: "LIVE WALL",
+    hint: "Live OrbitX data",
+    position: {
+      x: 32.56,
+      y: 0,
+      z: 3.65
+    },
+    radius: 3.381,
+    buildingId: "osm-266170601"
+  },
+  {
+    id: "z-osm-266170599",
+    kind: "marketplace",
+    label: "DEX STORE",
+    hint: "Meme Market · live DEX store",
+    position: {
+      x: 11.59,
+      y: 0,
+      z: 48.99
+    },
+    radius: 3.2,
+    buildingId: "osm-266170599"
+  },
+  {
+    id: "z-osm-1317983503",
+    kind: "trading",
+    label: "DEX DESK",
+    hint: "Trading floor · live screener",
+    position: {
+      x: -29.4,
+      y: 0,
+      z: -31.38
+    },
+    radius: 3.2,
+    buildingId: "osm-1317983503"
+  },
+  {
+    id: "z-osm-266170603",
+    kind: "launch",
+    label: "LAUNCHPAD",
+    hint: "Launchpad · new tokens",
+    position: {
+      x: 30.81,
+      y: 0,
+      z: 1.67
+    },
+    radius: 3.2,
+    buildingId: "osm-266170603"
+  },
+  {
+    id: "z-osm-266149306",
+    kind: "community",
+    label: "COMMUNITY",
+    hint: "Community · social feed & chat",
+    position: {
+      x: -3.39,
+      y: 0,
+      z: -24.73
+    },
+    radius: 3.2,
+    buildingId: "osm-266149306"
+  },
+  {
+    id: "z-osm-266170544",
+    kind: "marketplace",
+    label: "MEME STORE",
+    hint: "Meme Market · live DEX store",
+    position: {
+      x: 38.19,
+      y: 0,
+      z: 34.47
+    },
+    radius: 3.2,
+    buildingId: "osm-266170544"
+  },
+  {
+    id: "z-osm-266149308",
+    kind: "marketplace",
+    label: "MEME STORE",
+    hint: "Meme Market · live DEX store",
+    position: {
+      x: -9.54,
+      y: 0,
+      z: -41.53
+    },
+    radius: 3.2,
+    buildingId: "osm-266149308"
+  },
+  {
+    id: "z-osm-266170552",
+    kind: "voice",
+    label: "VOICE",
+    hint: "Voice plaza · live talk",
+    position: {
+      x: 49.53,
+      y: 0,
+      z: 40.35
+    },
+    radius: 3.2,
+    buildingId: "osm-266170552"
+  },
+  {
+    id: "z-osm-266170628",
+    kind: "token",
+    label: "BUY DESK",
+    hint: "Token buy desk · Jupiter swap",
+    position: {
+      x: 8.01,
+      y: 0,
+      z: -8.33
+    },
+    radius: 3.2,
+    buildingId: "osm-266170628"
+  },
+  {
+    id: "z-osm-266170539",
+    kind: "marketplace",
+    label: "MEME STORE",
+    hint: "Meme Market · live DEX store",
+    position: {
+      x: 47.79,
+      y: 0,
+      z: 10.95
+    },
+    radius: 3.2,
+    buildingId: "osm-266170539"
+  },
+  {
     id: "z-osm-266170757",
     kind: "games",
-    label: "Night Theater District",
-    hint: "Enter Night Theater District",
+    label: "GAMES",
+    hint: "Games district",
     position: {
       x: 29.58,
       y: 0,
@@ -3556,6 +3894,123 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     },
     radius: 3.2,
     buildingId: "osm-266170757"
+  },
+  {
+    id: "z-osm-266170624",
+    kind: "nft",
+    label: "NFT HALL",
+    hint: "NFT gallery",
+    position: {
+      x: 16.92,
+      y: 0,
+      z: -6.82
+    },
+    radius: 3.2,
+    buildingId: "osm-266170624"
+  },
+  {
+    id: "z-osm-266170593",
+    kind: "billboard",
+    label: "LIVE WALL",
+    hint: "Live OrbitX data",
+    position: {
+      x: 32.2,
+      y: 0,
+      z: 5.24
+    },
+    radius: 3.2,
+    buildingId: "osm-266170593"
+  },
+  {
+    id: "z-osm-266170608",
+    kind: "marketplace",
+    label: "DEX STORE",
+    hint: "Meme Market · live DEX store",
+    position: {
+      x: 29.42,
+      y: 0,
+      z: 2.04
+    },
+    radius: 3.2,
+    buildingId: "osm-266170608"
+  },
+  {
+    id: "z-osm-266170600",
+    kind: "trading",
+    label: "DEX DESK",
+    hint: "Trading floor · live screener",
+    position: {
+      x: 30.8,
+      y: 0,
+      z: 6.04
+    },
+    radius: 3.2,
+    buildingId: "osm-266170600"
+  },
+  {
+    id: "z-osm-266170542",
+    kind: "launch",
+    label: "LAUNCHPAD",
+    hint: "Launchpad · new tokens",
+    position: {
+      x: 31.05,
+      y: 0,
+      z: 2
+    },
+    radius: 3.2,
+    buildingId: "osm-266170542"
+  },
+  {
+    id: "z-osm-266170540",
+    kind: "community",
+    label: "COMMUNITY",
+    hint: "Community · social feed & chat",
+    position: {
+      x: 45.29,
+      y: 0,
+      z: 39.81
+    },
+    radius: 3.2,
+    buildingId: "osm-266170540"
+  },
+  {
+    id: "z-osm-266170587",
+    kind: "voice",
+    label: "VOICE",
+    hint: "Voice plaza · live talk",
+    position: {
+      x: 32.45,
+      y: 0,
+      z: 4.26
+    },
+    radius: 3.2,
+    buildingId: "osm-266170587"
+  },
+  {
+    id: "z-osm-266170573",
+    kind: "token",
+    label: "BUY DESK",
+    hint: "Token buy desk · Jupiter swap",
+    position: {
+      x: 30.47,
+      y: 0,
+      z: 31.59
+    },
+    radius: 3.2,
+    buildingId: "osm-266170573"
+  },
+  {
+    id: "z-osm-266170759",
+    kind: "nft",
+    label: "NFT HALL",
+    hint: "NFT gallery",
+    position: {
+      x: 24.5,
+      y: 0,
+      z: 26.69
+    },
+    radius: 3.2,
+    buildingId: "osm-266170759"
   }
 ],
 };

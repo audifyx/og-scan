@@ -261,19 +261,30 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         />
       </mesh>
       <mesh position={[0, 3.25, size.depth / 2 + 0.18]} castShadow>
-        <boxGeometry args={[Math.min(size.width * 0.78, 6.5), 0.45, 0.28]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} toneMapped={false} />
+        <boxGeometry args={[Math.min(size.width * 0.78, building.interaction === "hq" ? 7.2 : 6.5), building.interaction === "hq" ? 0.62 : 0.45, 0.28]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={building.interaction === "hq" ? 0.75 : 0.55} toneMapped={false} />
       </mesh>
       <Text
         position={[0, 3.25, size.depth / 2 + 0.34]}
-        fontSize={0.22}
+        fontSize={building.interaction === "hq" ? 0.28 : 0.22}
         color="#061018"
         anchorX="center"
         anchorY="middle"
         maxWidth={Math.min(size.width * 0.7, 6)}
       >
-        {(label ?? name).toUpperCase()}
+        {building.interaction === "hq" ? "ORBITX HQ" : (label ?? name).toUpperCase()}
       </Text>
+      {building.interaction === "hq" && (
+        <Text
+          position={[0, 2.85, size.depth / 2 + 0.34]}
+          fontSize={0.14}
+          color="#061018"
+          anchorX="center"
+          maxWidth={6}
+        >
+          DEX · LAUNCHPAD · SOCIAL
+        </Text>
+      )}
 
       {/* Recessed entrance with awning + sidewalk apron */}
       <mesh position={[0, 1.05, size.depth / 2 + 0.12]} castShadow>

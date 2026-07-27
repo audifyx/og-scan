@@ -17,15 +17,16 @@ const KIND_COLOR: Record<string, string> = {
 };
 
 const KIND_HINT: Record<string, string> = {
-  marketplace: "Shop · memes & buys",
-  launch: "Launch arena",
-  trading: "Trading floor",
-  community: "Social lounge",
-  hq: "OrbitX HQ",
-  billboard: "Live data wall",
-  token: "Token desk",
-  voice: "Voice club",
-  games: "Games / screen",
+  marketplace: "DEX store · meme market",
+  launch: "Launchpad · new tokens",
+  trading: "DEX trading floor",
+  community: "Community · social & chat",
+  hq: "OrbitX HQ · command floor",
+  billboard: "Live OrbitX data wall",
+  token: "Buy desk · Jupiter swap",
+  voice: "Voice plaza",
+  games: "Games district",
+  nft: "NFT gallery",
 };
 
 export function InteractionMarkers({

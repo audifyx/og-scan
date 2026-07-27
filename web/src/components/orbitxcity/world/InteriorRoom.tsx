@@ -223,29 +223,79 @@ function ThemeSet({
 
       {theme === "theater" && (
         <>
-          <mesh position={[0, height * 0.5, -depth / 2 + 0.22]} onClick={activate("games")}>
+          <mesh
+            position={[0, height * 0.5, -depth / 2 + 0.22]}
+            onClick={activate(building.interaction === "nft" ? "nft" : "games")}
+          >
             <boxGeometry args={[Math.min(width - 1, 5.6), Math.min(height * 0.55, 2.2), 0.1]} />
             <meshStandardMaterial color="#0a0e16" emissive="#d8e6f4" emissiveIntensity={0.45} roughness={0.2} />
           </mesh>
-          <Text position={[0, height * 0.5, -depth / 2 + 0.3]} fontSize={0.28} color="#05080c" anchorX="center">
-            TAP SCREEN · PLAY
+          <Text position={[0, height * 0.5, -depth / 2 + 0.3]} fontSize={0.26} color="#05080c" anchorX="center">
+            {building.interaction === "nft" ? "TAP · NFT GALLERY" : "TAP SCREEN · PLAY"}
           </Text>
           {[-1.3, 0, 1.3].map((x) => (
             <LoungeSeating key={x} x={x} z={0.55} accent={accent} />
           ))}
-          <MonitorBank position={[side, 0, wallZ + 0.4]} accent={accent} cols={1} label="EVENTS" onActivate={activate("events")} />
+          <MonitorBank
+            position={[side, 0, wallZ + 0.4]}
+            accent={accent}
+            cols={1}
+            label={building.interaction === "nft" ? "NFT" : "EVENTS"}
+            onActivate={activate(building.interaction === "nft" ? "nft" : "events")}
+          />
         </>
       )}
 
       {theme === "hq" && (
         <>
-          <mesh position={[0, 0.5, wallZ]} castShadow>
-            <boxGeometry args={[Math.min(width - 1.4, 5), 0.95, 1.1]} />
-            <meshStandardMaterial color="#1c2732" metalness={0.4} roughness={0.45} />
+          {/* Premium OrbitX HQ office — glass boardroom + product command wall */}
+          <mesh position={[0, 0.03, -0.15]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[Math.min(width - 1.4, 6.2), Math.min(depth - 2.2, 4.4)]} />
+            <meshStandardMaterial color="#0e161c" metalness={0.55} roughness={0.28} emissive={accent} emissiveIntensity={0.05} />
           </mesh>
-          <MonitorBank position={[0, 0, wallZ + 0.15]} accent={accent} cols={4} label="HQ MAP" onActivate={activate("map")} />
-          <MonitorBank position={[-side, 0, 0.3]} accent={accent} cols={1} label="MISSIONS" onActivate={activate("missions")} />
-          <MonitorBank position={[side, 0, 0.3]} accent={accent} cols={1} label="FRIENDS" onActivate={activate("friends")} />
+          <NeonStrip position={[0, 0.08, -0.15]} size={[Math.min(width - 1.8, 5.6), 0.04, Math.min(depth - 2.6, 3.8)]} color={accent} />
+
+          {/* Reception / brand wall */}
+          <mesh position={[0, height * 0.55, -depth / 2 + 0.2]} castShadow>
+            <boxGeometry args={[Math.min(width - 1.2, 5.8), height * 0.7, 0.12]} />
+            <meshStandardMaterial color="#101820" metalness={0.4} roughness={0.4} />
+          </mesh>
+          <Text position={[0, height * 0.62, -depth / 2 + 0.3]} fontSize={0.42} color={accent} anchorX="center" outlineWidth={0.02} outlineColor="#050a0e">
+            ORBITX
+          </Text>
+          <Text position={[0, height * 0.42, -depth / 2 + 0.3]} fontSize={0.16} color="#d5e2ea" anchorX="center">
+            HQ · DEX · LAUNCHPAD · SOCIAL
+          </Text>
+
+          {/* Glass conference table */}
+          <mesh position={[0, 0.42, -0.35]} castShadow>
+            <boxGeometry args={[2.6, 0.08, 1.35]} />
+            <meshStandardMaterial color="#8ec8e8" metalness={0.65} roughness={0.12} transparent opacity={0.55} />
+          </mesh>
+          <mesh position={[0, 0.2, -0.35]} castShadow>
+            <boxGeometry args={[0.12, 0.4, 0.12]} />
+            <meshStandardMaterial color="#1a222c" metalness={0.5} roughness={0.4} />
+          </mesh>
+          {[-0.85, 0.85].map((x) => (
+            <mesh key={`chair-${x}`} position={[x, 0.35, 0.45]} castShadow>
+              <boxGeometry args={[0.55, 0.55, 0.5]} />
+              <meshStandardMaterial color="#1c2430" roughness={0.65} />
+            </mesh>
+          ))}
+
+          {/* Product command desks — real OrbitX rails */}
+          <MonitorBank position={[0, 0, wallZ + 0.2]} accent={accent} cols={4} label="LIVE DEX" onActivate={activate("live")} />
+          <MonitorBank position={[-side * 0.75, 0, 0.2]} accent={accent} cols={2} label="TRADE" onActivate={activate("trading")} />
+          <MonitorBank position={[side * 0.75, 0, 0.2]} accent={accent} cols={2} label="LAUNCH" onActivate={activate("launch")} />
+          <MonitorBank position={[-side, 0, 0.95]} accent="#ff4d9a" cols={1} label="STORE" onActivate={activate("marketplace")} />
+          <MonitorBank position={[side, 0, 0.95]} accent="#a78bfa" cols={1} label="SOCIAL" onActivate={activate("community")} />
+          <BarCounter
+            position={[0, 0, depth / 2 - 2.35]}
+            width={Math.min(width - 2.2, 3.4)}
+            accent={accent}
+            label="FRONT DESK"
+            onActivate={activate("missions")}
+          />
         </>
       )}
 
@@ -297,7 +347,15 @@ export function InteriorRoom({
   const h = Math.min(4.5, Math.max(3.4, building.size.height * 0.32));
   const { x, z } = building.position;
   const floor =
-    theme === "club" ? "#121018" : theme === "launch" ? "#2a2418" : theme === "trade" ? "#121820" : "#1a1f26";
+    theme === "hq"
+      ? "#0c1218"
+      : theme === "club"
+        ? "#121018"
+        : theme === "launch"
+          ? "#2a2418"
+          : theme === "trade"
+            ? "#121820"
+            : "#1a1f26";
 
   return (
     <group position={[x, 0, z]}>

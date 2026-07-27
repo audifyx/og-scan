@@ -159,15 +159,47 @@ buildings.sort((a, b) => {
 });
 const keep = buildings.slice(0, 48);
 
-// Assign OrbitX venue roles to a few real landmarks so gameplay remains intact.
+// Map Midtown landmarks + fill remaining shells as real OrbitX product venues.
 const venuePlan = [
-  { match: /bertelsmann|1540 broadway/i, kind: "hq", interaction: "hq", label: "HQ", accent: "#17ff4d" },
-  { match: /edison/i, kind: "generic", interaction: "community", label: "HOTEL", accent: "#3de7ff" },
-  { match: /astor|viacom|1515 broadway/i, kind: "trading_floor", interaction: "trading", label: "TRADE", accent: "#3de7ff" },
-  { match: /paramount|1501 broadway/i, matchAlt: /paramount/i, kind: "launch_arena", interaction: "launch", label: "LAUNCH", accent: "#f5c542" },
-  { match: /palace|theater|theatre|cinema|broadway theatre/i, kind: "generic", interaction: "games", label: "THEATER", accent: "#a78bfa" },
-  { match: /bank|chase|citibank/i, kind: "market", interaction: "marketplace", label: "BANK", accent: "#17ff4d" },
+  {
+    match: /bertelsmann|1540 broadway/i,
+    kind: "hq",
+    interaction: "hq",
+    label: "ORBITX HQ",
+    accent: "#17ff4d",
+    name: "OrbitX HQ",
+  },
+  { match: /edison/i, kind: "social_hub", interaction: "community", label: "COMMUNITY", accent: "#a78bfa" },
+  { match: /marriott|marquis/i, kind: "social_hub", interaction: "community", label: "SOCIAL", accent: "#a78bfa" },
+  { match: /astor|viacom|1515 broadway/i, kind: "trading_floor", interaction: "trading", label: "DEX FLOOR", accent: "#3de7ff" },
+  { match: /times square building/i, kind: "trading_floor", interaction: "trading", label: "DEX DESK", accent: "#3de7ff" },
+  {
+    match: /paramount|1501 broadway/i,
+    matchAlt: /paramount/i,
+    kind: "launch_arena",
+    interaction: "launch",
+    label: "LAUNCHPAD",
+    accent: "#f5c542",
+  },
+  { match: /palace|theater|theatre|cinema|broadway theatre/i, kind: "generic", interaction: "games", label: "GAMES", accent: "#a78bfa" },
+  { match: /bank|chase|citibank|wellsfargo|td bank/i, kind: "market", interaction: "marketplace", label: "DEX STORE", accent: "#ff4d9a" },
+  { match: /hotel/i, kind: "market", interaction: "marketplace", label: "MEME STORE", accent: "#ff4d9a" },
+  { match: /church|saint|st\.|cathedral/i, kind: "generic", interaction: "nft", label: "NFT HALL", accent: "#17ff4d" },
+  { match: /one astor|1500 broadway/i, kind: "market", interaction: "token", label: "BUY DESK", accent: "#17ff4d" },
 ];
+
+const ROLE_HINT = {
+  hq: "OrbitX HQ · DEX, launchpad, social",
+  marketplace: "Meme Market · live DEX store",
+  trading: "Trading floor · live screener",
+  launch: "Launchpad · new tokens",
+  community: "Community · social feed & chat",
+  voice: "Voice plaza · live talk",
+  games: "Games district",
+  nft: "NFT gallery",
+  token: "Token buy desk · Jupiter swap",
+  billboard: "Live OrbitX data",
+};
 
 let assigned = 0;
 for (const b of keep) {
@@ -177,23 +209,45 @@ for (const b of keep) {
   b.interaction = plan.interaction;
   b.label = plan.label;
   b.accent = plan.accent;
+  if (plan.name) b.name = plan.name;
   assigned += 1;
 }
 
-// Ensure core gameplay buildings exist even if OSM tags missed them.
+// Ensure every core OrbitX product surface exists as a walk-in venue.
 const ensureRoles = [
-  { kind: "hq", interaction: "hq", label: "HQ", accent: "#17ff4d" },
-  { kind: "market", interaction: "marketplace", label: "MARKET", accent: "#ff4d9a" },
-  { kind: "launch_arena", interaction: "launch", label: "LAUNCH", accent: "#f5c542" },
-  { kind: "trading_floor", interaction: "trading", label: "TRADE", accent: "#3de7ff" },
-  { kind: "social_hub", interaction: "community", label: "SOCIAL", accent: "#a78bfa" },
-  { kind: "generic", interaction: "voice", label: "CLUB", accent: "#ff4d9a" },
+  { kind: "hq", interaction: "hq", label: "ORBITX HQ", accent: "#17ff4d", name: "OrbitX HQ" },
+  { kind: "market", interaction: "marketplace", label: "DEX STORE", accent: "#ff4d9a" },
+  { kind: "launch_arena", interaction: "launch", label: "LAUNCHPAD", accent: "#f5c542" },
+  { kind: "trading_floor", interaction: "trading", label: "DEX FLOOR", accent: "#3de7ff" },
+  { kind: "social_hub", interaction: "community", label: "COMMUNITY", accent: "#a78bfa" },
+  { kind: "generic", interaction: "voice", label: "VOICE", accent: "#ff6bcb" },
+  { kind: "market", interaction: "token", label: "BUY DESK", accent: "#17ff4d" },
+  { kind: "generic", interaction: "nft", label: "NFT HALL", accent: "#17ff4d" },
 ];
 for (const role of ensureRoles) {
   if (keep.some((b) => b.interaction === role.interaction)) continue;
   const candidate = keep.find((b) => !b.interaction && b.size.width >= 6 && b.size.depth >= 6);
   if (!candidate) continue;
   Object.assign(candidate, role);
+}
+
+// Fill remaining mid/large shells as rotating OrbitX stores so Midtown is full of interactables.
+const storeCycle = [
+  { kind: "market", interaction: "marketplace", label: "DEX STORE", accent: "#ff4d9a" },
+  { kind: "trading_floor", interaction: "trading", label: "DEX DESK", accent: "#3de7ff" },
+  { kind: "launch_arena", interaction: "launch", label: "LAUNCHPAD", accent: "#f5c542" },
+  { kind: "social_hub", interaction: "community", label: "COMMUNITY", accent: "#a78bfa" },
+  { kind: "generic", interaction: "voice", label: "VOICE", accent: "#ff6bcb" },
+  { kind: "market", interaction: "token", label: "BUY DESK", accent: "#17ff4d" },
+  { kind: "generic", interaction: "nft", label: "NFT HALL", accent: "#17ff4d" },
+  { kind: "trading_floor", interaction: "billboard", label: "LIVE WALL", accent: "#3de7ff" },
+];
+let storeIdx = 0;
+for (const b of keep) {
+  if (b.interaction) continue;
+  if (b.size.width < 5 || b.size.depth < 5) continue;
+  Object.assign(b, storeCycle[storeIdx % storeCycle.length]);
+  storeIdx += 1;
 }
 
 const xs = keep.flatMap((b) => [b.position.x - b.size.width / 2, b.position.x + b.size.width / 2]);
@@ -257,11 +311,12 @@ const zones = keep
       },
       1.2,
     );
+    const roleHint = ROLE_HINT[b.interaction] || `Enter ${b.name}`;
     return {
       id: `z-${b.id}`,
       kind: b.interaction,
-      label: b.name,
-      hint: `Enter ${b.name}`,
+      label: b.label || b.name,
+      hint: roleHint,
       position: {
         x: clear.x,
         y: 0,
@@ -276,6 +331,34 @@ const zones = keep
 const plaza = project(40.7589, -73.9855);
 const spawn = findClearPoint({ x: plaza.x, z: plaza.z }, 2.6);
 
+function teleportFor(b) {
+  const clear = findClearPoint(
+    {
+      x: b.position.x,
+      z: b.position.z + b.size.depth / 2 + 2.5,
+    },
+    1.5,
+  );
+  return {
+    id: b.id,
+    label: b.label || b.name.slice(0, 18),
+    x: clear.x,
+    z: clear.z,
+    accent: b.accent,
+  };
+}
+
+const priorityInteractions = ["hq", "marketplace", "trading", "launch", "community", "voice", "token"];
+const featured = [];
+for (const kind of priorityInteractions) {
+  const hit = keep.find((b) => b.interaction === kind && !featured.includes(b));
+  if (hit) featured.push(hit);
+}
+for (const b of keep) {
+  if (featured.length >= 9) break;
+  if (b.interaction && !featured.includes(b)) featured.push(b);
+}
+
 const teleports = [
   {
     id: "times",
@@ -284,25 +367,7 @@ const teleports = [
     z: spawn.z,
     accent: "#17ff4d",
   },
-  ...keep
-    .filter((b) => b.interaction)
-    .slice(0, 8)
-    .map((b) => {
-      const clear = findClearPoint(
-        {
-          x: b.position.x,
-          z: b.position.z + b.size.depth / 2 + 2.5,
-        },
-        1.5,
-      );
-      return {
-        id: b.id,
-        label: b.label || b.name.slice(0, 18),
-        x: clear.x,
-        z: clear.z,
-        accent: b.accent,
-      };
-    }),
+  ...featured.map(teleportFor),
 ];
 
 function serialize(obj, indent = 2) {
@@ -334,7 +399,7 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
       cityId: "nyc",
       kind: "hq",
       name: "Times Square Midtown",
-      description: "Real OpenStreetMap footprints around Broadway / W 47th.",
+      description: "OrbitX Midtown — DEX stores, launchpad, HQ office, and social venues on real OSM footprints.",
       center: { x: 0, y: 0, z: 0 },
       size: { width: ${bounds.maxX - bounds.minX}, depth: ${bounds.maxZ - bounds.minZ} },
     },

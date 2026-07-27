@@ -444,23 +444,29 @@ function CommunityPanel() {
       <div className="oxc-hero-tile social">
         <Users className="h-5 w-5" />
         <div>
-          <div className="oxc-tile-title">Social District</div>
-          <p className="oxc-muted">Feed, world chat, and voice plaza — OrbitX social as a place you walk into.</p>
+          <div className="oxc-tile-title">OrbitX Communities</div>
+          <p className="oxc-muted">Live social feed, world chat, and voice — the same OrbitX community rails, inside the city.</p>
         </div>
       </div>
       <div className="oxc-actions">
         <button type="button" className="oxc-btn primary" onClick={() => openPanel("social")}>Social feed</button>
         <button type="button" className="oxc-btn ghost" onClick={() => openPanel("chat")}>World chat</button>
-        <button type="button" className="oxc-btn ghost" onClick={() => { setVoiceOpen(true); openPanel("voice"); }}>Voice plaza</button>
+        <button
+          type="button"
+          className="oxc-btn ghost"
+          onClick={() => {
+            setVoiceOpen(true);
+            openPanel("voice");
+          }}
+        >
+          Voice plaza
+        </button>
       </div>
-      <ul className="oxc-list">
-        <li>Post to the live OrbitX social feed</li>
-        <li>Chat with traders in the Midtown block</li>
-        <li>Join the city voice channel (LiveKit)</li>
-      </ul>
+      <SocialFeedPanel />
       <div className="oxc-actions">
-        <Link className="oxc-btn ghost" to="/orbitx-social">Open Social</Link>
+        <Link className="oxc-btn ghost" to="/orbitx-social">Open Social app</Link>
         <Link className="oxc-btn ghost" to="/spaces">Spaces</Link>
+        <Link className="oxc-btn ghost" to="/hq">HQ</Link>
       </div>
     </div>
   );

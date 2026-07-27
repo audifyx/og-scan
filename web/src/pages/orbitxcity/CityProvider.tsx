@@ -108,7 +108,7 @@ function zoneToPanel(kind: InteractionKind): HudPanel {
     case "community":
       return "social";
     case "hq":
-      return "map";
+      return "live";
     case "billboard":
       return "live";
     case "voice":

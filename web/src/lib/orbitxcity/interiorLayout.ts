@@ -30,16 +30,24 @@ export function resolveRoomTheme(building: BuildingDefinition): RoomTheme {
     return "theater";
   }
   if (id.includes("coffee") || interaction === "community" || building.kind === "social_hub") return "lounge";
-  if (interaction === "trading" || building.kind === "trading_floor") return "trade";
-  if (interaction === "marketplace" || building.kind === "market" || building.kind === "shop") return "market";
+  if (interaction === "trading" || interaction === "billboard" || building.kind === "trading_floor") return "trade";
+  if (
+    interaction === "marketplace" ||
+    interaction === "token" ||
+    building.kind === "market" ||
+    building.kind === "shop"
+  ) {
+    return "market";
+  }
   if (interaction === "hq" || building.kind === "hq") return "hq";
   if (interaction === "launch" || building.kind === "launch_arena") return "launch";
+  if (interaction === "nft") return "theater";
   return "lobby";
 }
 
 export function panelForBuilding(building: BuildingDefinition): HudPanel {
   const map: Record<string, HudPanel> = {
-    hq: "map",
+    hq: "live",
     marketplace: "marketplace",
     launch: "launch",
     trading: "trading",
@@ -48,6 +56,7 @@ export function panelForBuilding(building: BuildingDefinition): HudPanel {
     voice: "voice",
     games: "games",
     nft: "nft",
+    token: "token",
   };
   if (building.interaction && map[building.interaction]) return map[building.interaction]!;
   switch (resolveRoomTheme(building)) {
@@ -83,7 +92,7 @@ export function roomTitle(theme: RoomTheme, building: BuildingDefinition): strin
     case "theater":
       return "ORBITX SCREEN · PLAY";
     case "hq":
-      return "ORBITX HQ · OPS";
+      return "ORBITX HQ · COMMAND FLOOR";
     case "launch":
       return "LAUNCH ARENA";
     default:
@@ -132,9 +141,12 @@ export function furnitureSolids(theme: RoomTheme, width: number, depth: number):
       ];
     case "hq":
       return [
-        { x: 0, z: wallZ, w: Math.min(width - 1.4, 5), d: 1.15 },
-        { x: -side, z: 0.3, w: 1.1, d: 0.8 },
-        { x: side, z: 0.3, w: 1.1, d: 0.8 },
+        { x: 0, z: wallZ, w: Math.min(width - 1.2, 5.4), d: 1.2 },
+        { x: -side * 0.7, z: 0.15, w: 1.7, d: 0.95 },
+        { x: side * 0.7, z: 0.15, w: 1.7, d: 0.95 },
+        { x: -side, z: 0.85, w: 1.1, d: 0.8 },
+        { x: side, z: 0.85, w: 1.1, d: 0.8 },
+        { x: 0, z: -0.35, w: 2.4, d: 1.2 },
       ];
     case "launch":
       return [
