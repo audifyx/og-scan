@@ -514,13 +514,14 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
       try {
         // Unified check: OrbitX registry + pump.fun + DexScreener, live as you type.
         const result = await checkAntiVamp(form.name, form.symbol);
-        setNameTaken(result.blocked);
-        setCheckError(!!result.error);
-        setBlockedMatch(result.hardMatch ? { name: result.hardMatch.name, ticker: result.hardMatch.ticker } : null);
+        const hard = result.blocked && result.hardMatch;
+        setNameTaken(!!hard);
+        setCheckError(!!result.error || !!result.warning);
+        setBlockedMatch(hard ? { name: result.hardMatch!.name, ticker: result.hardMatch!.ticker } : null);
       } catch (err) {
         console.error("Anti-vamp check failed:", err);
-        // Fail closed — an unverifiable name must not be allowed to launch.
-        setNameTaken(true);
+        // Fail open — verification outages must not freeze launches.
+        setNameTaken(false);
         setCheckError(true);
         setBlockedMatch(null);
       } finally {
@@ -587,7 +588,7 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
   const canLaunch =
     connected && publicKey && signTransaction && sendTransaction &&
     form.name.trim().length > 0 && form.symbol.trim().length > 0 &&
-    !!imageFile && !nameTaken && !checkingName && !checkError;
+    !!imageFile && !nameTaken && !checkingName;
 
   /* Launch flow */
 
@@ -595,32 +596,29 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
     if (!canLaunch || !publicKey || !signTransaction || !sendTransaction || !imageFile) return;
 
     let flagged = false;
-    /* Step -1 - OrbitX Anti-Vamp identity check (unified: OrbitX registry +
-       pump.fun + DexScreener), same protection as the custom/SPL lane.
-       Re-run fresh right before any fee payment or on-chain action - never
-       trust only the debounced live-typing result - so a blocked clone
-       never costs the user SOL. Fails CLOSED on a check error (matches the
-       Custom lane): a broken check must never let a duplicate slip through. */
+    /* Step -1 - OrbitX Anti-Vamp. Hard-block only on real collisions; outages fail open. */
     setStep("uploading");
     setStatusMsg("OrbitX Anti-Vamp check...");
     const result = await checkAntiVamp(form.name, form.symbol).catch((err) => {
       console.error("[orbitx] pump anti-vamp check failed", err);
-      return { blocked: true, flagged: true, hardMatch: null, matches: [], message: "Originality verification failed - please try again." } as const;
+      return { blocked: false, flagged: true, hardMatch: null, matches: [], warning: "verification_degraded", message: "Originality verification failed - continuing with caution." } as const;
     });
-    if (result.blocked) {
+    if (result.blocked && result.hardMatch) {
       setNameTaken(true);
-      setBlockedMatch(result.hardMatch ? { name: result.hardMatch.name, ticker: result.hardMatch.ticker } : null);
+      setBlockedMatch({ name: result.hardMatch.name, ticker: result.hardMatch.ticker });
       toast.error(
-        result.hardMatch
-          ? `Blocked - "${form.name}" / ${form.symbol} is too close to ${result.hardMatch.name} ($${result.hardMatch.ticker}). Anti-vamp requires a unique identity.`
-          : result.message || "Originality verification failed - please try again."
+        `Blocked - "${form.name}" / ${form.symbol} is too close to ${result.hardMatch.name} ($${result.hardMatch.ticker}). Anti-vamp requires a unique identity.`
       );
       setStep("form");
       return;
     }
     if (result.flagged) {
       flagged = true;
-      toast.warning(`${result.matches.length} similar token(s) exist - launching FLAGGED: creator fees route to OBX buybacks.`);
+      toast.warning(
+        result.matches.length
+          ? `${result.matches.length} similar token(s) exist - launching FLAGGED: creator fees route to OBX buybacks.`
+          : result.message || "Anti-vamp caution - launching with elevated fee-routing.",
+      );
     }
 
     try {
@@ -944,11 +942,16 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                 <div>
                   <div className="font-black uppercase tracking-wide text-[hsl(var(--og-blood))]">🚫 OrbitX Anti-Vamp Protection — Launch Blocked</div>
                   <div className="text-sm text-white/90 mt-1">
-                    {checkError
-                      ? "Couldn't verify this name/ticker is original right now — retrying automatically. The launch button stays locked until verification succeeds."
-                      : <>This name or ticker is already in use{blockedMatch ? <> — too close to <strong>{blockedMatch.name}</strong> (${blockedMatch.ticker})</> : null}. Change the name or ticker to continue. All other fields are locked until this is resolved.</>}
+                    This name or ticker collides with an existing token
+                    {blockedMatch?.name ? <> — too close to <strong>{blockedMatch.name}</strong>{blockedMatch.ticker && blockedMatch.ticker !== "—" ? <> (${blockedMatch.ticker})</> : null}</> : null}.
+                    Change the name or ticker to continue.
                   </div>
                 </div>
+              </div>
+            )}
+            {checkError && !nameTaken && (
+              <div className="rounded-lg border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 p-3 text-sm text-white/80">
+                Anti-vamp verification is degraded — you can still launch. Soft matches may route creator fees to OBX buybacks.
               </div>
             )}
             {/* Token Info Card */}
@@ -991,10 +994,13 @@ function CreateTokenForm({ onBack, onSuccess }: { onBack: () => void; onSuccess:
                       className={`bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/15 focus:border-[hsl(var(--og-cyan))]/40 uppercase ${nameTaken ? "border-[hsl(var(--og-blood))]" : ""}`} />
                   </div>
                 </div>
-                {nameTaken && (
+                {nameTaken && blockedMatch?.name && (
                   <div className="flex items-start gap-1.5 text-xs text-[hsl(var(--og-blood))]">
                     <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                    <span>OrbitX Anti-Vamp: too close to {blockedMatch?.name} (${blockedMatch?.ticker}). Change the name or ticker to launch.</span>
+                    <span>
+                      OrbitX Anti-Vamp: too close to {blockedMatch.name}
+                      {blockedMatch.ticker && blockedMatch.ticker !== "—" ? ` ($${blockedMatch.ticker})` : ""}. Change the name or ticker to launch.
+                    </span>
                   </div>
                 )}
 

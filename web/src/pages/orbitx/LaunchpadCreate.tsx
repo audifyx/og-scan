@@ -230,12 +230,15 @@ export default function LaunchpadCreate() {
       try {
         // Unified check: OrbitX registry + pump.fun + DexScreener, live as you type.
         const result = await checkAntiVamp(cfg.name, cfg.ticker);
-        setNameTaken(result.blocked);
-        setCheckError(!!result.error);
-        setBlockedMatch(result.hardMatch ? { name: result.hardMatch.name, ticker: result.hardMatch.ticker } : null);
+        // Only hard-block on a real identity collision — never on empty "$" / degraded checks.
+        const hard = result.blocked && result.hardMatch;
+        setNameTaken(!!hard);
+        setCheckError(!!result.error || !!result.warning);
+        setBlockedMatch(hard ? { name: result.hardMatch!.name, ticker: result.hardMatch!.ticker } : null);
       } catch (err) {
         console.error("Anti-vamp check failed:", err);
-        setNameTaken(true);
+        // Fail open — verification outages must not freeze launches.
+        setNameTaken(false);
         setCheckError(true);
         setBlockedMatch(null);
       } finally {
@@ -256,7 +259,7 @@ export default function LaunchpadCreate() {
   const allocValid = allocTotal === 100;
 
   const sectionDone = useMemo<Record<SectionId, boolean>>(() => ({
-    identity: !!cfg.name.trim() && !!cfg.ticker.trim() && !!cfg.description.trim() && !!cfg.logoDataUrl && !nameTaken && !checkingName && !checkError,
+    identity: !!cfg.name.trim() && !!cfg.ticker.trim() && !!cfg.description.trim() && !!cfg.logoDataUrl && !nameTaken && !checkingName,
     socials: !!(cfg.website || cfg.twitter || cfg.telegram || cfg.discord),
     supply: /^\d+$/.test(cfg.supply) && Number(cfg.supply) > 0 && Number(cfg.initialPriceUsd) > 0,
     authorities: cfg.revokeMint && cfg.revokeFreeze,
@@ -370,24 +373,19 @@ export default function LaunchpadCreate() {
     if (!cfg.logoDataUrl) { toast.error("Upload a logo — it becomes your token image"); return; }
     setLaunching(true);
     try {
-      /* 1 — OrbitX Anti-Vamp identity check (unified: OrbitX registry +
-         pump.fun + DexScreener), same protection as the pump.fun lane.
-         Re-run fresh right before any fee/on-chain action. Fails CLOSED on
-         a check error, so a broken check can never let a duplicate slip
-         through. */
+      /* 1 — OrbitX Anti-Vamp identity check. Hard-block only on real collisions.
+         Verification outages fail OPEN so legitimate launches are not frozen. */
       setPhase("checking"); setPhaseMsg("OrbitX Anti-Vamp check…");
       let flagged = false;
       const preLaunchCheck = await checkAntiVamp(cfg.name, cfg.ticker).catch((err) => {
         console.error("[orbitx] custom anti-vamp check failed", err);
-        return { blocked: true, flagged: true, hardMatch: null, matches: [], message: "Originality verification failed — please try again." } as const;
+        return { blocked: false, flagged: true, hardMatch: null, matches: [], warning: "verification_degraded", message: "Originality verification failed — continuing with caution." } as const;
       });
-      if (preLaunchCheck.blocked) {
+      if (preLaunchCheck.blocked && preLaunchCheck.hardMatch) {
         setNameTaken(true);
-        setBlockedMatch(preLaunchCheck.hardMatch ? { name: preLaunchCheck.hardMatch.name, ticker: preLaunchCheck.hardMatch.ticker } : null);
+        setBlockedMatch({ name: preLaunchCheck.hardMatch.name, ticker: preLaunchCheck.hardMatch.ticker });
         toast.error(
-          preLaunchCheck.hardMatch
-            ? `Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${preLaunchCheck.hardMatch.name} ($${preLaunchCheck.hardMatch.ticker}). Anti-vamp requires a unique identity.`
-            : preLaunchCheck.message || "Originality verification failed — please try again."
+          `Blocked — "${cfg.name}" / ${cfg.ticker} is too close to ${preLaunchCheck.hardMatch.name} ($${preLaunchCheck.hardMatch.ticker}). Anti-vamp requires a unique identity.`
         );
         setPhase("idle");
         setLaunching(false);
@@ -395,7 +393,11 @@ export default function LaunchpadCreate() {
       }
       if (preLaunchCheck.flagged) {
         flagged = true;
-        toast.warning(`${preLaunchCheck.matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`);
+        toast.warning(
+          preLaunchCheck.matches.length
+            ? `${preLaunchCheck.matches.length} similar token(s) exist — launching FLAGGED: creator fees route to OBX buybacks.`
+            : preLaunchCheck.message || "Anti-vamp caution — launching with elevated fee-routing.",
+        );
       }
 
       /* 2 — mint keypair (vanity-ground if available) */
@@ -543,11 +545,16 @@ export default function LaunchpadCreate() {
                 <div>
                   <div className="font-black uppercase tracking-wide text-[hsl(var(--og-blood))]">🚫 OrbitX Anti-Vamp Protection — Launch Blocked</div>
                   <div className="text-sm text-white/90 mt-1">
-                    {checkError
-                      ? "Couldn't verify this name/ticker is original right now — retrying automatically. Launch stays locked until verification succeeds."
-                      : <>This name or ticker is already in use{blockedMatch ? <> — too close to <strong>{blockedMatch.name}</strong> (${blockedMatch.ticker})</> : null}. Change the name or ticker to continue. All other fields are locked until this is resolved.</>}
+                    This name or ticker collides with an existing token
+                    {blockedMatch?.name ? <> — too close to <strong>{blockedMatch.name}</strong>{blockedMatch.ticker && blockedMatch.ticker !== "—" ? <> (${blockedMatch.ticker})</> : null}</> : null}.
+                    Change the name or ticker to continue.
                   </div>
                 </div>
+              </div>
+            )}
+            {checkError && !nameTaken && (
+              <div className="rounded-lg border border-[hsl(var(--og-gold))]/40 bg-[hsl(var(--og-gold))]/10 p-3 text-sm text-white/80">
+                Anti-vamp verification is degraded — you can still launch. Soft matches may route creator fees to OBX buybacks.
               </div>
             )}
             <SectionHeading icon={Sparkles} title="Token Identity" desc="Name, ticker, story and logo — the face of your launch." />
@@ -566,10 +573,13 @@ export default function LaunchpadCreate() {
               <div className="space-y-2"><Label>Ticker</Label>
                 <Input className={`${fieldClass} ${nameTaken ? 'border-[hsl(var(--og-blood))]' : ''}`} placeholder="ORBIT" maxLength={10} value={cfg.ticker} onChange={(e) => set("ticker", e.target.value.toUpperCase())} /></div>
             </div>
-            {nameTaken && (
+            {nameTaken && blockedMatch?.name && (
               <div className="flex items-start gap-2 text-sm text-[hsl(var(--og-blood))]">
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>OrbitX Anti-Vamp: too close to {blockedMatch?.name} (${blockedMatch?.ticker}). Change the name or ticker to launch.</span>
+                <span>
+                  OrbitX Anti-Vamp: too close to {blockedMatch.name}
+                  {blockedMatch.ticker && blockedMatch.ticker !== "—" ? ` ($${blockedMatch.ticker})` : ""}. Change the name or ticker to launch.
+                </span>
               </div>
             )}
             <div className="space-y-2"><Label>Description</Label>

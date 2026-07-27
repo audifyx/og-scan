@@ -153,6 +153,8 @@ export interface AntiVampResult {
   hardMatch: { name: string; ticker: string; source: string } | null;
   matches: AntiVampSourceMatch[];
   message?: string;
+  error?: string;
+  warning?: string;
 }
 
 /**
@@ -164,8 +166,9 @@ export interface AntiVampResult {
  * (i.e. effectively all Solana tokens with any market presence), not just
  * tokens launched through OrbitX. `blocked` must hard-stop the launch;
  * `flagged` (soft match) still allows launch but routes creator fees to the
- * OBX buyback wallet. On a network/server failure the endpoint fails CLOSED
- * (blocked: true) — an unverifiable name must never be allowed to launch.
+ * `flagged` (soft match) still allows launch but routes creator fees to the
+ * OBX buyback wallet. On a network/server failure the endpoint fails OPEN
+ * (blocked: false, warning set) so legitimate launches are not frozen.
  */
 export async function checkAntiVamp(name: string, ticker: string): Promise<AntiVampResult> {
   const res = await fetch("/api/orbitx/anti-vamp-check", {
@@ -174,7 +177,14 @@ export async function checkAntiVamp(name: string, ticker: string): Promise<AntiV
     body: JSON.stringify({ name, ticker }),
   });
   if (!res.ok) {
-    return { blocked: true, flagged: true, hardMatch: null, matches: [], message: "Originality verification failed — please try again." };
+    return {
+      blocked: false,
+      flagged: true,
+      hardMatch: null,
+      matches: [],
+      warning: "verification_degraded",
+      message: "Originality verification failed — continuing with caution.",
+    };
   }
   return (await res.json()) as AntiVampResult;
 }
