@@ -1,8 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
-  HARD_MATCH_SIM,
   SOFT_MATCH_SIM,
+  isRelevantMarketCandidate,
   scoreIdentity,
+  type VampMatchContext,
 } from "../../src/lib/orbitx/antiVampScore";
 
 // OrbitX Anti-Vamp — unified, server-side originality check.
@@ -37,7 +38,11 @@ function toMatch(
   name: string,
   ticker: string,
 ): VampSourceMatch | null {
-  const { sim, hard } = scoreIdentity(candName, candTicker, name, ticker);
+  const context: VampMatchContext = source === "orbitx" ? "registry" : "market";
+  if (context === "market" && !isRelevantMarketCandidate(candName, candTicker, name, ticker)) {
+    return null;
+  }
+  const { sim, hard } = scoreIdentity(candName, candTicker, name, ticker, context);
   if (sim < SOFT_MATCH_SIM && !hard) return null;
   return { source, name: candName, ticker: candTicker, sim, hard };
 }
@@ -72,55 +77,78 @@ async function checkOrbitxRegistry(name: string, ticker: string): Promise<Source
   }
 }
 
+async function fetchPumpSearch(term: string): Promise<any[]> {
+  const res = await withTimeout(
+    fetch(
+      `https://frontend-api-v3.pump.fun/coins/search?searchTerm=${encodeURIComponent(term)}&limit=25&offset=0`,
+      { headers: { accept: "application/json" } },
+    ),
+    FETCH_TIMEOUT_MS,
+  );
+  if (!res.ok) throw new Error(`pump.fun ${res.status}`);
+  const data = await res.json();
+  return Array.isArray(data) ? data : Array.isArray(data?.coins) ? data.coins : [];
+}
+
 async function checkPumpFun(name: string, ticker: string): Promise<SourceResult> {
-  const q = name || ticker;
-  if (!q.trim()) return { matches: [], failed: false };
+  const queries = [...new Set([name, ticker].map((q) => q.trim()).filter((q) => q.length >= 2))];
+  if (!queries.length) return { matches: [], failed: false };
   try {
-    const res = await withTimeout(
-      fetch(`https://frontend-api-v3.pump.fun/coins/search?searchTerm=${encodeURIComponent(q)}&limit=25&offset=0`, {
-        headers: { accept: "application/json" },
-      }),
-      FETCH_TIMEOUT_MS,
-    );
-    if (!res.ok) return { matches: [], failed: true };
-    const data = await res.json();
-    const list: any[] = Array.isArray(data) ? data : Array.isArray(data?.coins) ? data.coins : [];
-    return {
-      matches: list
-        .map((t) => toMatch("pumpfun", String(t.name ?? ""), String(t.symbol ?? ""), name, ticker))
-        .filter((m): m is VampSourceMatch => !!m),
-      failed: false,
-    };
+    const lists = await Promise.all(queries.map((q) => fetchPumpSearch(q).catch(() => [])));
+    const seen = new Set<string>();
+    const out: VampSourceMatch[] = [];
+    for (const list of lists) {
+      for (const t of list) {
+        const candName = String(t.name ?? "");
+        const candTicker = String(t.symbol ?? "");
+        const key = `${normalizeKey(candName)}|${normalizeKey(candTicker)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const m = toMatch("pumpfun", candName, candTicker, name, ticker);
+        if (m) out.push(m);
+      }
+    }
+    return { matches: out, failed: false };
   } catch (err) {
     console.error("[anti-vamp-check] pump.fun check failed:", err);
     return { matches: [], failed: true };
   }
 }
 
+function normalizeKey(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 async function checkDexScreener(name: string, ticker: string): Promise<SourceResult> {
-  const q = name || ticker;
-  if (!q.trim()) return { matches: [], failed: false };
+  const queries = [...new Set([name, ticker].map((q) => q.trim()).filter((q) => q.length >= 2))];
+  if (!queries.length) return { matches: [], failed: false };
   try {
-    const res = await withTimeout(
-      fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`, {
-        headers: { accept: "application/json" },
+    const responses = await Promise.all(
+      queries.map(async (q) => {
+        const res = await withTimeout(
+          fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`, {
+            headers: { accept: "application/json" },
+          }),
+          FETCH_TIMEOUT_MS,
+        );
+        if (!res.ok) throw new Error(`dexscreener ${res.status}`);
+        return res.json();
       }),
-      FETCH_TIMEOUT_MS,
     );
-    if (!res.ok) return { matches: [], failed: true };
-    const data = await res.json();
-    const pairs: any[] = Array.isArray(data?.pairs) ? data.pairs : [];
     const seen = new Set<string>();
     const out: VampSourceMatch[] = [];
-    for (const p of pairs) {
-      if (p.chainId && p.chainId !== "solana") continue;
-      const bt = p.baseToken;
-      if (!bt?.name && !bt?.symbol) continue;
-      const key = `${bt.name}|${bt.symbol}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const m = toMatch("dexscreener", String(bt.name ?? ""), String(bt.symbol ?? ""), name, ticker);
-      if (m) out.push(m);
+    for (const data of responses) {
+      const pairs: any[] = Array.isArray(data?.pairs) ? data.pairs : [];
+      for (const p of pairs) {
+        if (p.chainId && p.chainId !== "solana") continue;
+        const bt = p.baseToken;
+        if (!bt?.name && !bt?.symbol) continue;
+        const key = `${normalizeKey(String(bt.name ?? ""))}|${normalizeKey(String(bt.symbol ?? ""))}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const m = toMatch("dexscreener", String(bt.name ?? ""), String(bt.symbol ?? ""), name, ticker);
+        if (m) out.push(m);
+      }
     }
     return { matches: out, failed: false };
   } catch (err) {
@@ -185,7 +213,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const all = [...orbitxRes.matches, ...pumpRes.matches, ...dexRes.matches].sort((a, b) => b.sim - a.sim);
-    const hard = all.find((m) => m.hard || m.sim >= HARD_MATCH_SIM) ?? null;
+    const hard = all.find((m) => m.hard) ?? null;
     const soft = all.filter((m) => m.sim >= SOFT_MATCH_SIM || m.hard);
 
     res.status(200).json({

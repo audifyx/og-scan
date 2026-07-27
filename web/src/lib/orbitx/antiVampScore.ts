@@ -6,6 +6,9 @@
 export const HARD_MATCH_SIM = 0.92;
 export const SOFT_MATCH_SIM = 0.72;
 
+/** OrbitX registry enforces unique name/ticker; market sources need fuller identity overlap. */
+export type VampMatchContext = "registry" | "market";
+
 export function normalizeIdentity(raw: string): string {
   const stripped = (raw || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const map: Record<string, string> = { "0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t" };
@@ -42,15 +45,36 @@ function lengthCompatible(a: string, b: string): boolean {
   return ratio >= 0.65;
 }
 
+/** True when normalized strings share a meaningful substring (≥3 chars) or exact short ticker. */
+export function sharesIdentityFragment(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return a.length >= 2;
+  if (a.length < 3 || b.length < 3) return false;
+  if (a.includes(b) || b.includes(a)) return true;
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  for (let i = 0; i <= shorter.length - 3; i++) {
+    if (longer.includes(shorter.slice(i, i + 3))) return true;
+  }
+  return false;
+}
+
+function combinedSimilarity(nameSim: number, tickerSim: number): number {
+  if (nameSim > 0 && tickerSim > 0) return 0.55 * nameSim + 0.45 * tickerSim;
+  return Math.max(nameSim, tickerSim) * 0.75;
+}
+
 /**
  * Returns a 0..1 similarity used for soft flags, plus whether it is a hard collision.
- * Hard = exact name, exact ticker (≥2 chars), or very high bigram with similar lengths.
+ * Registry: exact normalized name/ticker always hard-blocks (platform uniqueness).
+ * Market (pump.fun / DexScreener): ticker-only collisions are not enough — require name overlap too.
  */
 export function scoreIdentity(
   candidateName: string,
   candidateTicker: string,
   name: string,
   ticker: string,
+  context: VampMatchContext = "market",
 ): { sim: number; hard: boolean } {
   const nName = normalizeIdentity(name);
   const nTicker = normalizeIdentity(ticker);
@@ -59,17 +83,29 @@ export function scoreIdentity(
 
   if (!nName && !nTicker) return { sim: 0, hard: false };
 
-  // Exact ticker collision (meaningful tickers only).
-  if (nTicker.length >= 2 && nCandTicker.length >= 2 && nCandTicker === nTicker) {
-    return { sim: 1, hard: true };
-  }
-  // Exact name collision (ignore ultra-short junk names).
-  if (nName.length >= 3 && nCandName.length >= 3 && nCandName === nName) {
-    return { sim: 1, hard: true };
+  const exactTicker = nTicker.length >= 2 && nCandTicker.length >= 2 && nCandTicker === nTicker;
+  const exactName = nName.length >= 3 && nCandName.length >= 3 && nCandName === nName;
+
+  if (context === "registry") {
+    if (exactTicker || exactName) return { sim: 1, hard: true };
+  } else {
+    if (exactName) return { sim: 1, hard: true };
+    if (exactTicker) {
+      const nameSim = bigramSimilarity(nCandName, nName);
+      const nameOverlap =
+        nameSim >= SOFT_MATCH_SIM ||
+        sharesIdentityFragment(nName, nCandName);
+      if (!nameOverlap) {
+        // Common ticker reuse (e.g. MOON, PEPE) with unrelated name — ignore.
+        return { sim: 0, hard: false };
+      }
+      return { sim: Math.max(nameSim, 0.88), hard: nameSim >= HARD_MATCH_SIM };
+    }
   }
 
   const nameSim = bigramSimilarity(nCandName, nName);
   const tickerSim = bigramSimilarity(nCandTicker, nTicker);
+  const sim = combinedSimilarity(nameSim, tickerSim);
 
   const hardName =
     nameSim >= HARD_MATCH_SIM &&
@@ -83,6 +119,29 @@ export function scoreIdentity(
     nCandTicker.length >= 4 &&
     lengthCompatible(nTicker, nCandTicker);
 
-  const sim = Math.max(nameSim, tickerSim);
-  return { sim, hard: hardName || hardTicker };
+  const hardBoth =
+    nameSim >= SOFT_MATCH_SIM &&
+    tickerSim >= SOFT_MATCH_SIM &&
+    sim >= HARD_MATCH_SIM;
+
+  return { sim, hard: hardName || hardTicker || hardBoth };
+}
+
+/** Pre-filter market search hits before scoring — drops unrelated pump/dex noise. */
+export function isRelevantMarketCandidate(
+  candidateName: string,
+  candidateTicker: string,
+  name: string,
+  ticker: string,
+): boolean {
+  const nName = normalizeIdentity(name);
+  const nTicker = normalizeIdentity(ticker);
+  const nCandName = normalizeIdentity(candidateName);
+  const nCandTicker = normalizeIdentity(candidateTicker);
+  if (!nName && !nTicker) return false;
+  if (nName && sharesIdentityFragment(nName, nCandName)) return true;
+  if (nTicker && nTicker.length >= 2 && (nTicker === nCandTicker || sharesIdentityFragment(nTicker, nCandTicker))) {
+    return true;
+  }
+  return false;
 }
