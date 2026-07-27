@@ -1,13 +1,13 @@
 import type { CityDefinition } from "./types";
 
-/** Four playable city districts, each backed by its own world block. */
+/** Four playable city districts — accents align with holographic class palette. */
 export const ORBITX_CITIES: CityDefinition[] = [
   {
     id: "nyc",
     name: "OrbitX NYC",
     tagline: "Financial hub",
     purpose: "Trading district, launch events, Bloomberg-grade market energy.",
-    accent: "#00ff9f",
+    accent: "#c5a26f",
     unlocked: true,
   },
   {
@@ -15,7 +15,7 @@ export const ORBITX_CITIES: CityDefinition[] = [
     name: "OrbitX Miami",
     tagline: "Coastal community",
     purpose: "Beach-adjacent plazas, community events, and social zones.",
-    accent: "#00ffc3",
+    accent: "#3d9a6a",
     unlocked: true,
   },
   {
@@ -23,7 +23,7 @@ export const ORBITX_CITIES: CityDefinition[] = [
     name: "OrbitX LA",
     tagline: "Creator strip",
     purpose: "Creator launches, NFT culture, games, and entertainment stages.",
-    accent: "#7dffb0",
+    accent: "#b388ff",
     unlocked: true,
   },
   {
@@ -31,7 +31,7 @@ export const ORBITX_CITIES: CityDefinition[] = [
     name: "OrbitX Boston",
     tagline: "Innovation core",
     purpose: "Developers, AI labs, protocol R&D.",
-    accent: "#c5a26f",
+    accent: "#5b8def",
     unlocked: true,
   },
 ];
