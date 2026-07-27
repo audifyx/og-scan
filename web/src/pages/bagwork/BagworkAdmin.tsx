@@ -22,6 +22,9 @@ const emptyTask = (): BagworkTaskInput => ({
   active: true,
   max_submissions_per_user: null,
   sort_order: 0,
+  category: "general",
+  difficulty: "medium",
+  tags: [],
 });
 
 function StatusBadge({ status }: { status: BagworkSubmissionStatus }) {
@@ -84,6 +87,9 @@ export default function BagworkAdmin() {
       active: t.active,
       max_submissions_per_user: t.max_submissions_per_user,
       sort_order: t.sort_order,
+      category: String(t.category || "general"),
+      difficulty: String(t.difficulty || "medium"),
+      tags: t.tags ?? [],
     });
     setTab("tasks");
   };
@@ -117,14 +123,14 @@ export default function BagworkAdmin() {
       <div className="bw-hero">
         <div className="bw-hero-kicker">Owner desk</div>
         <h1 className="bw-hero-title">Bagwork admin</h1>
-        <p className="bw-hero-sub">Create tasks, set USDC prices, review uploads, approve payouts.</p>
+        <p className="bw-hero-sub">Create task cards, set USDC prices, review uploads, approve payouts.</p>
       </div>
 
-      <div className="mb-6 flex gap-2">
-        <button type="button" className={`bw-btn ${tab === "submissions" ? "" : "bw-btn-ghost"}`} onClick={() => setTab("submissions")}>
+      <div className="bw-filters mb-6">
+        <button type="button" className={tab === "submissions" ? "bw-chip bw-chip--on" : "bw-chip"} onClick={() => setTab("submissions")}>
           Submissions ({subs?.length ?? 0})
         </button>
-        <button type="button" className={`bw-btn ${tab === "tasks" ? "" : "bw-btn-ghost"}`} onClick={() => setTab("tasks")}>
+        <button type="button" className={tab === "tasks" ? "bw-chip bw-chip--on" : "bw-chip"} onClick={() => setTab("tasks")}>
           Tasks ({tasks?.length ?? 0})
         </button>
       </div>
@@ -153,6 +159,29 @@ export default function BagworkAdmin() {
               <label className="block">
                 <span className="bw-label">Max per user</span>
                 <input type="number" min={1} className="bw-input" placeholder="Unlimited" value={form.max_submissions_per_user ?? ""} onChange={(e) => setForm({ ...form, max_submissions_per_user: e.target.value ? parseInt(e.target.value, 10) : null })} />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="bw-label">Category</span>
+                <select className="bw-input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                  <option value="general">General</option>
+                  <option value="social">Social</option>
+                  <option value="content">Content</option>
+                  <option value="qa">QA / Bugs</option>
+                  <option value="onchain">On-chain</option>
+                  <option value="design">Design</option>
+                  <option value="research">Research</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="bw-label">Difficulty / rarity</span>
+                <select className="bw-input" value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value })}>
+                  <option value="easy">Easy · Common</option>
+                  <option value="medium">Medium · Uncommon</option>
+                  <option value="hard">Hard · Rare</option>
+                  <option value="expert">Expert · Legendary</option>
+                </select>
               </label>
             </div>
             <label className="flex items-center gap-2 text-sm">

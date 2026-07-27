@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Loader2, Upload, DollarSign, X } from "lucide-react";
+import {
+  Loader2, Upload, DollarSign, X, Share2, PenLine, Bug, Blocks,
+  Palette, Search, Briefcase, Sparkles, Zap,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,7 +17,30 @@ import {
   countUserSubmissionsForTask,
   isLikelySolanaAddress,
 } from "@/lib/bagwork/api";
-import type { BagworkTask } from "@/lib/bagwork/types";
+import { BAGWORK_CATEGORIES, type BagworkDifficulty, type BagworkTask } from "@/lib/bagwork/types";
+
+const CAT_ICON: Record<string, typeof Briefcase> = {
+  social: Share2,
+  content: PenLine,
+  qa: Bug,
+  onchain: Blocks,
+  design: Palette,
+  research: Search,
+  general: Briefcase,
+};
+
+function difficultyOf(t: BagworkTask): BagworkDifficulty {
+  const d = (t.difficulty || "medium").toLowerCase();
+  if (d === "easy" || d === "hard" || d === "expert") return d;
+  return "medium";
+}
+
+function rarityLabel(d: BagworkDifficulty) {
+  if (d === "easy") return "Common";
+  if (d === "medium") return "Uncommon";
+  if (d === "hard") return "Rare";
+  return "Legendary";
+}
 
 function SubmitModal({
   task,
@@ -31,6 +57,8 @@ function SubmitModal({
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const qc = useQueryClient();
+  const diff = difficultyOf(task);
+  const Icon = CAT_ICON[task.category || "general"] || Briefcase;
 
   const submit = async () => {
     if (!user?.id) {
@@ -83,10 +111,20 @@ function SubmitModal({
     <div className="bw-modal-backdrop" onClick={onClose}>
       <div className="bw-modal" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <div className="bw-hero-kicker">Submit work</div>
-            <h2 className="bw-task-title mt-1">{task.title}</h2>
-            <div className="bw-task-reward mt-1">${Number(task.reward_usdc).toFixed(2)} USDC</div>
+          <div className="flex gap-3">
+            <div
+              className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border bg-black/50 bw-poke--${diff}`}
+              style={{ borderColor: "var(--poke-rim)", color: "var(--poke-rim)" }}
+            >
+              <Icon className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="bw-hero-kicker">Submit work</div>
+              <h2 className="mt-1 text-lg font-extrabold tracking-tight" style={{ fontFamily: "Syne, sans-serif" }}>{task.title}</h2>
+              <div className="mt-1 font-mono text-sm font-bold text-[#F0C75E]">
+                ${Number(task.reward_usdc).toFixed(2)} USDC · {rarityLabel(diff)}
+              </div>
+            </div>
           </div>
           <button type="button" onClick={onClose} className="text-[#A8B0BC] hover:text-white">
             <X className="h-5 w-5" />
@@ -125,18 +163,77 @@ function SubmitModal({
   );
 }
 
+function TaskCard({ task, onOpen }: { task: BagworkTask; onOpen: () => void }) {
+  const diff = difficultyOf(task);
+  const Icon = CAT_ICON[task.category || "general"] || Briefcase;
+  const cat = (task.category || "general").replace(/_/g, " ");
+  const reward = Number(task.reward_usdc);
+
+  return (
+    <article className={`bw-poke bw-poke--${diff}`}>
+      <div className="bw-poke-frame">
+        <div className="bw-poke-top">
+          <h2 className="bw-poke-name">{task.title}</h2>
+          <div className="bw-poke-hp">
+            <span className="bw-poke-hp-label">Reward</span>
+            <span className="bw-poke-hp-val">${reward.toFixed(reward % 1 ? 2 : 0)}</span>
+            <span className="bw-poke-hp-unit">USDC</span>
+          </div>
+        </div>
+
+        <div className="bw-poke-art">
+          <span className="bw-poke-rarity">{rarityLabel(diff)}</span>
+          <div className="bw-poke-art-icon">
+            <Icon className="h-7 w-7" strokeWidth={2.2} />
+          </div>
+        </div>
+
+        <div className="bw-poke-body">
+          <div className="bw-poke-types">
+            <span className="bw-type bw-type--cat">{cat}</span>
+            <span className="bw-type">{diff}</span>
+            {(task.tags ?? []).slice(0, 2).map((tag) => (
+              <span key={tag} className="bw-type">{tag}</span>
+            ))}
+          </div>
+          <p className="bw-poke-desc">{task.description || task.instructions || "Complete this task and submit proof to earn USDC."}</p>
+          <div className="bw-poke-attack">
+            <span className="bw-poke-attack-label">Submit work</span>
+            <span className="bw-poke-attack-dmg">+{reward.toFixed(2)}</span>
+          </div>
+          <button type="button" className="bw-btn" onClick={onOpen}>
+            <Zap className="h-3.5 w-3.5" /> Claim &amp; submit
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function BagworkHome() {
   const { user } = useAuth();
   const { publicKey, connected } = useWallet();
   const { pickable, signInWith, busy: walletBusy } = useWalletSignIn();
   const [picker, setPicker] = useState(false);
   const [activeTask, setActiveTask] = useState<BagworkTask | null>(null);
+  const [category, setCategory] = useState("all");
 
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["bagwork-tasks"],
     queryFn: listActiveTasks,
     staleTime: 30_000,
   });
+
+  const filtered = useMemo(() => {
+    if (!tasks) return [];
+    if (category === "all") return tasks;
+    return tasks.filter((t) => (t.category || "general") === category);
+  }, [tasks, category]);
+
+  const totalPool = useMemo(
+    () => (tasks ?? []).reduce((a, t) => a + Number(t.reward_usdc || 0), 0),
+    [tasks],
+  );
 
   const defaultWallet = useMemo(() => publicKey?.toBase58() ?? "", [publicKey]);
 
@@ -162,41 +259,68 @@ export default function BagworkHome() {
   return (
     <>
       <div className="bw-hero">
-        <div className="bw-hero-kicker">Get paid to bag work</div>
-        <h1 className="bw-hero-title">Complete tasks. Earn USDC.</h1>
+        <div className="bw-hero-kicker">
+          <Sparkles className="mr-1 inline h-3 w-3" /> Collectible task cards
+        </div>
+        <h1 className="bw-hero-title">Bag the work. Collect the USDC.</h1>
         <p className="bw-hero-sub">
-          Pick a task, do the work, upload proof, and get paid in USDC to your Solana wallet.
-          Connect with Phantom, Jupiter, or any Wallet Standard wallet.
+          High-rarity task cards on the OrbitX metal desk — pick a card, complete the mission,
+          upload proof, get paid in USDC to your Solana wallet.
         </p>
+        <div className="bw-hero-stats">
+          <div className="bw-stat">
+            <div className="bw-stat-label">Live cards</div>
+            <div className="bw-stat-val">{tasks?.length ?? "—"}</div>
+          </div>
+          <div className="bw-stat">
+            <div className="bw-stat-label">Reward pool</div>
+            <div className="bw-stat-val">${totalPool.toFixed(0)}</div>
+          </div>
+          <div className="bw-stat">
+            <div className="bw-stat-label">Payout</div>
+            <div className="bw-stat-val" style={{ fontSize: "1rem" }}>USDC</div>
+          </div>
+        </div>
         {!connected && (
-          <button type="button" className="bw-btn mt-4" onClick={() => setPicker(true)}>
+          <button type="button" className="bw-btn mt-5" onClick={() => setPicker(true)}>
             <DollarSign className="h-4 w-4" /> Connect wallet to start
           </button>
         )}
         {user?.id && (
-          <p className="mt-3 text-xs text-[#A8B0BC]">
-            Track submissions on <Link to="/bagwork/my" className="text-[#60A5FA] underline-offset-2 hover:underline">My work</Link>.
+          <p className="mt-4 text-xs text-[#A8B0BC]">
+            Track submissions on{" "}
+            <Link to="/bagwork/my" className="text-[#60A5FA] underline-offset-2 hover:underline">My work</Link>.
           </p>
         )}
+      </div>
+
+      <div className="bw-filters" role="tablist" aria-label="Categories">
+        {BAGWORK_CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            role="tab"
+            aria-selected={category === c.id}
+            className={category === c.id ? "bw-chip bw-chip--on" : "bw-chip"}
+            onClick={() => setCategory(c.id)}
+          >
+            {c.label}
+          </button>
+        ))}
       </div>
 
       {isLoading ? (
         <div className="flex justify-center py-20 text-[#A8B0BC]">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
-      ) : !tasks?.length ? (
-        <div className="bw-card py-16 text-center text-[#A8B0BC]">No active tasks yet — check back soon.</div>
+      ) : !filtered.length ? (
+        <div className="bw-card py-16 text-center text-[#A8B0BC]">
+          {tasks?.length ? "No cards in this category." : "No active task cards yet — check back soon."}
+        </div>
       ) : (
         <div className="bw-task-grid">
-          {tasks.map((t) => (
-            <article key={t.id} className="bw-task">
-              <div className="bw-task-reward">${Number(t.reward_usdc).toFixed(2)} USDC</div>
-              <h2 className="bw-task-title">{t.title}</h2>
-              <p className="flex-1 text-sm leading-relaxed text-[#A8B0BC]">{t.description}</p>
-              <button type="button" className="bw-btn mt-2 w-full" onClick={() => openTask(t)}>
-                Submit work
-              </button>
-            </article>
+          {filtered.map((t) => (
+            <TaskCard key={t.id} task={t} onOpen={() => openTask(t)} />
           ))}
         </div>
       )}

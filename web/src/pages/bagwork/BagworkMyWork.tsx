@@ -1,11 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, ExternalLink } from "lucide-react";
+import { Loader2, ExternalLink, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useWalletSignIn } from "@/hooks/useWalletSignIn";
 import { WalletPickerModal } from "@/components/WalletPickerModal";
-import { useState } from "react";
 import { listMySubmissions } from "@/lib/bagwork/api";
 import type { BagworkSubmissionStatus } from "@/lib/bagwork/types";
 
@@ -45,12 +44,24 @@ export default function BagworkMyWork() {
     return rows.filter((r) => r.status === "pending").length;
   }, [rows]);
 
+  const paid = useMemo(() => {
+    if (!rows) return 0;
+    return rows.filter((r) => r.status === "paid").length;
+  }, [rows]);
+
   if (!user?.id) {
     return (
       <div className="bw-card py-16 text-center">
-        <p className="mb-4 text-[#A8B0BC]">Connect with Phantom or Jupiter to view your submissions.</p>
+        <div className="bw-hero-kicker mb-2">My work</div>
+        <p className="mb-5 text-[#A8B0BC]">Connect with Phantom or Jupiter to view your submissions.</p>
         <button type="button" className="bw-btn" onClick={() => setPicker(true)}>Connect wallet</button>
-        <WalletPickerModal open={picker} onClose={() => setPicker(false)} wallets={pickable} onPick={async (n) => { await signInWith(n); setPicker(false); }} busy={busy} />
+        <WalletPickerModal
+          open={picker}
+          onClose={() => setPicker(false)}
+          wallets={pickable}
+          onPick={async (n) => { await signInWith(n); setPicker(false); }}
+          busy={busy}
+        />
       </div>
     );
   }
@@ -58,16 +69,23 @@ export default function BagworkMyWork() {
   return (
     <>
       <div className="bw-hero">
-        <div className="bw-hero-kicker">Your bag work</div>
+        <div className="bw-hero-kicker">
+          <Sparkles className="mr-1 inline h-3 w-3" /> Your bag work
+        </div>
         <h1 className="bw-hero-title">My submissions</h1>
-        <div className="mt-4 flex flex-wrap gap-4">
-          <div className="bw-card min-w-[140px]">
-            <div className="text-[10px] uppercase tracking-widest text-[#A8B0BC]">Approved / paid</div>
-            <div className="mt-1 font-mono text-xl font-bold text-[#F0C75E]">${earned.toFixed(2)}</div>
+        <p className="bw-hero-sub">Track pending reviews, approvals, and USDC payouts.</p>
+        <div className="bw-hero-stats">
+          <div className="bw-stat">
+            <div className="bw-stat-label">Approved / paid</div>
+            <div className="bw-stat-val">${earned.toFixed(2)}</div>
           </div>
-          <div className="bw-card min-w-[140px]">
-            <div className="text-[10px] uppercase tracking-widest text-[#A8B0BC]">Pending review</div>
-            <div className="mt-1 font-mono text-xl font-bold text-white">{pending}</div>
+          <div className="bw-stat">
+            <div className="bw-stat-label">Pending</div>
+            <div className="bw-stat-val" style={{ color: "#fff" }}>{pending}</div>
+          </div>
+          <div className="bw-stat">
+            <div className="bw-stat-label">Paid cards</div>
+            <div className="bw-stat-val" style={{ color: "#60A5FA" }}>{paid}</div>
           </div>
         </div>
       </div>
@@ -76,7 +94,8 @@ export default function BagworkMyWork() {
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#A8B0BC]" /></div>
       ) : !rows?.length ? (
         <div className="bw-card py-12 text-center text-[#A8B0BC]">
-          No submissions yet. <Link to="/bagwork" className="text-[#60A5FA] hover:underline">Browse tasks</Link>
+          No submissions yet.{" "}
+          <Link to="/bagwork" className="text-[#60A5FA] hover:underline">Browse task cards</Link>
         </div>
       ) : (
         <div className="bw-card overflow-x-auto">
