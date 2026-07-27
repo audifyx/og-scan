@@ -216,18 +216,19 @@ export default function MarketplaceHome() {
 
 function Hero({ c }: { c: OrbitxNftCollection }) {
   return (
-    <section className="mkt-panel relative overflow-hidden">
+    <section className="mkt-hero">
       <div className="absolute inset-0">
         <Media src={c.banner_url ?? c.logo_url} className="h-full w-full opacity-30" />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, hsl(var(--mkt-bg)) 8%, transparent 70%), linear-gradient(0deg, hsl(var(--mkt-bg)) 4%, transparent 60%)" }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, hsl(255 40% 4%) 8%, transparent 70%), linear-gradient(0deg, hsl(255 40% 4%) 4%, transparent 60%)" }} />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(600px 240px at 20% 30%, #9945FF33, transparent 70%)" }} />
       </div>
       <div className="relative flex flex-col gap-5 p-6 sm:flex-row sm:items-end sm:p-8">
-        <Media src={c.logo_url} className="h-24 w-24 rounded-2xl border-2 border-[hsl(var(--mkt-line))] sm:h-28 sm:w-28" />
+        <Media src={c.logo_url} className="h-24 w-24 rounded-2xl border border-white/15 sm:h-28 sm:w-28" />
         <div className="min-w-0 flex-1">
-          <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border mkt-hairline bg-[hsl(var(--mkt-panel-2))] px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[hsl(var(--og-gold))]">
+          <div className="mkt-hero-badge mb-2">
             <Flame className="h-3 w-3" /> Featured collection
           </div>
-          <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight sm:text-3xl">{c.name} <Verified show={c.verified} className="h-5 w-5" /></h1>
+          <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight text-white sm:text-3xl">{c.name} <Verified show={c.verified} className="h-5 w-5" /></h1>
           {c.description && <p className="mt-1 max-w-xl text-[13px] mkt-muted line-clamp-2">{c.description}</p>}
           <div className="mt-4 flex flex-wrap items-center gap-6">
             <Stat label="Floor" value={c.floor_price_sol ? fmtSol(c.floor_price_sol) : "—"} />

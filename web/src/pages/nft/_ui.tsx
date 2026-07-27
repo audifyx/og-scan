@@ -35,8 +35,8 @@ export function SectionHeader({ title, sub, action }: { title: string; sub?: str
   return (
     <div className="mb-4 flex items-end justify-between gap-3">
       <div>
-        <h2 className="text-lg font-black tracking-tight">{title}</h2>
-        {sub && <p className="mt-0.5 text-[12px] mkt-muted">{sub}</p>}
+        <h2 className="mkt-section-title">{title}</h2>
+        {sub && <p className="mkt-section-sub">{sub}</p>}
       </div>
       {action}
     </div>

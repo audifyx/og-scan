@@ -211,13 +211,9 @@ export default function Screener() {
                 <button
                   key={cat.id}
                   onClick={() => switchCategory(cat.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border shrink-0 whitespace-nowrap
-                    ${active
-                      ? "text-white border-accent/60 shadow-glow-blue"
-                      : "text-muted border-line hover:text-white hover:border-accent/30 bg-panel"}`}
-                  style={active ? { background: "linear-gradient(135deg, rgba(0,255,163,0.22), rgba(0,209,255,0.16))" } : undefined}
+                  className={`dex-cat-pill ${active ? "dex-cat-pill--on" : ""}`}
                 >
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? "text-accent" : ""}`} />
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
                   {cat.label}
                 </button>
               );
@@ -233,13 +229,13 @@ export default function Screener() {
                 <button
                   key={t.id}
                   onClick={() => switchTab(t.id)}
-                  className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all
-                    ${active ? "text-white bg-accent/10" : "text-muted hover:text-white hover:bg-white/5"}`}
+                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
+                    ${active ? "text-white bg-white/[0.06]" : "text-muted hover:text-white hover:bg-white/5"}`}
                   title={t.desc}
                 >
                   <Icon className={`w-3 h-3 shrink-0 ${active ? "text-accent" : ""}`} />
                   {t.label}
-                  {active && <span className="absolute -bottom-px left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full bg-accent" />}
+                  {active && <span className="absolute -bottom-px left-1/2 -translate-x-1/2 w-5 h-[2px] rounded-full" style={{ background: "linear-gradient(90deg,#14F195,#9945FF)" }} />}
                 </button>
               );
             })}

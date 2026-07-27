@@ -1,86 +1,326 @@
-/* OrbitX NFT Marketplace — scoped theme + primitives.
-   Self-contained so the /nft route never depends on the launchpad's
-   orbitx-2026.css being loaded. Reuses the global shadcn/og-* tokens. */
+/* OrbitX NFT Marketplace — Solana launchpad-aligned shell.
+   Self-contained so /nft never depends on orbitx-2026.css. */
 .obx-mkt {
-  --mkt-bg: 224 30% 5%;
-  --mkt-panel: 225 26% 8%;
-  --mkt-panel-2: 225 22% 11%;
-  --mkt-line: 225 18% 18%;
-  --mkt-ink: 210 20% 96%;
-  --mkt-muted: 220 12% 62%;
-  --mkt-accent: var(--og-cyan);
-  --mkt-gold: var(--og-gold);
-  --mkt-lime: var(--og-lime);
-  --mkt-red: var(--og-blood);
+  --mkt-bg: 255 40% 4%;
+  --mkt-panel: 255 32% 8%;
+  --mkt-panel-2: 255 28% 11%;
+  --mkt-line: 263 28% 20%;
+  --mkt-ink: 0 0% 100%;
+  --mkt-muted: 250 12% 62%;
+  --mkt-purple: 263 100% 64%;   /* #9945FF */
+  --mkt-green: 158 89% 51%;     /* #14F195 */
+  --mkt-gold: 40 87% 55%;       /* #F0B429 */
+  --mkt-red: 350 100% 65%;
+  --mkt-cyan: 190 100% 50%;
+  --mkt-accent: var(--mkt-purple);
+  --mkt-lime: var(--mkt-green);
   min-height: 100vh;
   background:
-    radial-gradient(1200px 480px at 15% -8%, hsl(var(--mkt-accent) / 0.10), transparent 60%),
-    radial-gradient(1000px 420px at 92% -4%, hsl(var(--mkt-gold) / 0.07), transparent 58%),
+    radial-gradient(1100px 520px at 8% -12%, hsl(263 100% 64% / 0.18), transparent 58%),
+    radial-gradient(900px 420px at 92% -6%, hsl(158 89% 51% / 0.10), transparent 55%),
     hsl(var(--mkt-bg));
   color: hsl(var(--mkt-ink));
+  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
-.obx-mkt .mkt-panel { background: hsl(var(--mkt-panel)); border: 1px solid hsl(var(--mkt-line)); border-radius: 16px; }
-.obx-mkt .mkt-panel-2 { background: hsl(var(--mkt-panel-2)); border: 1px solid hsl(var(--mkt-line)); }
-.obx-mkt .mkt-hairline { border-color: hsl(var(--mkt-line)); }
+
+.obx-mkt .mkt-panel {
+  background: linear-gradient(180deg, hsl(var(--mkt-panel) / 0.95), hsl(255 40% 6% / 0.9));
+  border: 1px solid hsl(var(--mkt-line) / 0.85);
+  border-radius: 18px;
+}
+.obx-mkt .mkt-panel-2 {
+  background: hsl(var(--mkt-panel-2));
+  border: 1px solid hsl(var(--mkt-line) / 0.8);
+}
+.obx-mkt .mkt-hairline { border-color: hsl(var(--mkt-line) / 0.8); }
 .obx-mkt .mkt-muted { color: hsl(var(--mkt-muted)); }
-
-/* header */
-.obx-mkt .mkt-header {
-  background: hsl(var(--mkt-bg) / 0.86);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid hsl(var(--mkt-line));
+.obx-mkt .mkt-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-/* rolling category strip */
+/* ── Shell header (two-tier) ── */
+.obx-mkt .mkt-shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: hsl(var(--mkt-bg) / 0.88);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid hsl(var(--mkt-line) / 0.7);
+}
+.obx-mkt .mkt-shell-top {
+  border-bottom: 1px solid hsl(var(--mkt-line) / 0.45);
+}
+.obx-mkt .mkt-shell-inner {
+  margin: 0 auto;
+  display: flex;
+  width: 100%;
+  max-width: 1400px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+.obx-mkt .mkt-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  text-decoration: none;
+  color: inherit;
+}
+.obx-mkt .mkt-brand-mark {
+  display: flex;
+  height: 36px;
+  width: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #9945FF, #14F195);
+  box-shadow: 0 0 24px -8px #9945FFcc;
+}
+.obx-mkt .mkt-search {
+  position: relative;
+  display: none;
+  min-width: 0;
+  max-width: 420px;
+  flex: 1;
+  margin-left: 8px;
+}
+@media (min-width: 768px) {
+  .obx-mkt .mkt-search { display: block; }
+}
+.obx-mkt .mkt-search input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid hsl(var(--mkt-line) / 0.8);
+  background: hsl(var(--mkt-panel-2));
+  padding: 10px 12px 10px 38px;
+  font-size: 13px;
+  color: #fff;
+  outline: none;
+}
+.obx-mkt .mkt-search input::placeholder { color: hsl(var(--mkt-muted) / 0.85); }
+.obx-mkt .mkt-search input:focus {
+  border-color: #14F19599;
+  box-shadow: 0 0 0 3px #14F19522;
+}
+.obx-mkt .mkt-shell-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tab rail */
+.obx-mkt .mkt-tab-rail {
+  margin: 0 auto;
+  display: flex;
+  width: 100%;
+  max-width: 1400px;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 0 12px;
+  scrollbar-width: none;
+}
+.obx-mkt .mkt-tab-rail::-webkit-scrollbar { display: none; }
+.obx-mkt .mkt-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: hsl(var(--mkt-muted));
+  text-decoration: none;
+  transition: color .15s ease;
+}
+.obx-mkt .mkt-tab:hover { color: #fff; }
+.obx-mkt .mkt-tab.active {
+  color: #fff;
+}
+.obx-mkt .mkt-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(90deg, #14F195, #9945FF);
+  box-shadow: 0 0 12px #14F19588;
+}
+.obx-mkt .mkt-tab.active svg { color: #14F195; }
+
+/* Category chips */
 .obx-mkt .mkt-rail { scrollbar-width: none; }
 .obx-mkt .mkt-rail::-webkit-scrollbar { display: none; }
-
+.obx-mkt .mkt-cat-bar {
+  border-top: 1px solid hsl(var(--mkt-line) / 0.45);
+  background: linear-gradient(90deg, hsl(263 80% 12% / 0.35), transparent 40%, hsl(158 50% 10% / 0.25));
+}
 .obx-mkt .mkt-chip {
-  border: 1px solid hsl(var(--mkt-line));
-  background: hsl(var(--mkt-panel-2));
+  border: 1px solid hsl(var(--mkt-line) / 0.75);
+  background: hsl(var(--mkt-panel-2) / 0.8);
   color: hsl(var(--mkt-muted));
   border-radius: 999px;
   white-space: nowrap;
   transition: all .15s ease;
 }
-.obx-mkt .mkt-chip:hover { color: hsl(var(--mkt-ink)); border-color: hsl(var(--mkt-accent) / 0.6); }
+.obx-mkt .mkt-chip:hover {
+  color: #fff;
+  border-color: #9945FF88;
+}
 .obx-mkt .mkt-chip.active {
-  color: hsl(var(--mkt-bg));
-  background: hsl(var(--mkt-accent));
-  border-color: hsl(var(--mkt-accent));
+  color: #07040f !important;
+  background: linear-gradient(135deg, #14F195, #9945FF);
+  border-color: transparent;
   font-weight: 800;
+  box-shadow: 0 0 20px -6px #14F195aa;
 }
 
+/* Legacy nav (kept for any leftover class usage) */
 .obx-mkt .mkt-nav {
   color: hsl(var(--mkt-muted));
   border-radius: 10px;
   transition: all .15s ease;
 }
-.obx-mkt .mkt-nav:hover { color: hsl(var(--mkt-ink)); background: hsl(var(--mkt-panel-2)); }
-.obx-mkt .mkt-nav.active { color: hsl(var(--mkt-ink)); background: hsl(var(--mkt-panel-2)); box-shadow: inset 0 -2px 0 0 hsl(var(--mkt-accent)); }
+.obx-mkt .mkt-nav:hover { color: #fff; background: hsl(var(--mkt-panel-2)); }
+.obx-mkt .mkt-nav.active {
+  color: #fff;
+  background: hsl(var(--mkt-panel-2));
+  box-shadow: inset 0 -2px 0 0 #14F195;
+}
 
+/* Buttons */
 .obx-mkt .mkt-btn {
-  display: inline-flex; align-items: center; gap: .45rem;
-  border-radius: 10px; padding: .5rem .9rem; font-weight: 800; font-size: .82rem;
-  background: hsl(var(--mkt-accent)); color: hsl(var(--mkt-bg));
-  border: 1px solid hsl(var(--mkt-accent)); transition: filter .15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  border-radius: 9999px;
+  padding: .55rem 1rem;
+  font-weight: 800;
+  font-size: .82rem;
+  background: linear-gradient(135deg, #14F195, #9945FF);
+  color: #07040f;
+  border: 1px solid transparent;
+  box-shadow: 0 0 24px -8px #14F195b0;
+  transition: filter .15s ease, transform .15s ease;
 }
-.obx-mkt .mkt-btn:hover { filter: brightness(1.08); }
-.obx-mkt .mkt-btn.ghost { background: transparent; color: hsl(var(--mkt-ink)); border-color: hsl(var(--mkt-line)); }
-.obx-mkt .mkt-btn.ghost:hover { border-color: hsl(var(--mkt-accent) / 0.7); }
+.obx-mkt .mkt-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.obx-mkt .mkt-btn.ghost {
+  background: transparent;
+  color: #fff;
+  border-color: hsl(var(--mkt-line));
+  box-shadow: none;
+}
+.obx-mkt .mkt-btn.ghost:hover { border-color: #9945FF99; }
 
+.obx-mkt .mkt-wallet-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 14px;
+  border: 1px solid hsl(263 40% 28% / 0.7);
+  background: hsl(255 32% 10% / 0.9);
+  padding: 6px 8px 6px 10px;
+}
+.obx-mkt .mkt-wallet-dot {
+  height: 8px;
+  width: 8px;
+  border-radius: 9999px;
+  background: #14F195;
+  box-shadow: 0 0 8px #14F195;
+}
+
+/* Cards */
 .obx-mkt .mkt-card {
-  background: hsl(var(--mkt-panel)); border: 1px solid hsl(var(--mkt-line));
-  border-radius: 14px; overflow: hidden; transition: transform .15s ease, border-color .15s ease;
+  background: linear-gradient(145deg, hsl(var(--mkt-panel)), hsl(263 40% 9%));
+  border: 1px solid hsl(var(--mkt-line) / 0.85);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
-.obx-mkt .mkt-card:hover { transform: translateY(-3px); border-color: hsl(var(--mkt-accent) / 0.55); }
+.obx-mkt .mkt-card:hover {
+  transform: translateY(-3px);
+  border-color: #14F19588;
+  box-shadow: 0 0 28px -14px #14F195aa;
+}
 
-.obx-mkt .mkt-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* Hero */
+.obx-mkt .mkt-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid hsl(var(--mkt-line) / 0.85);
+  background: hsl(var(--mkt-panel));
+}
+.obx-mkt .mkt-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9999px;
+  border: 1px solid #F0B42955;
+  background: hsl(40 87% 55% / 0.12);
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #F0B429;
+}
 
-/* live sales marquee */
-.obx-mkt .mkt-marquee { overflow: hidden; }
-.obx-mkt .mkt-marquee-track { display: inline-flex; gap: 2rem; white-space: nowrap; animation: mkt-scroll 40s linear infinite; }
+/* Ticker */
+.obx-mkt .mkt-marquee {
+  overflow: hidden;
+  border-bottom: 1px solid hsl(var(--mkt-line) / 0.5);
+  background: linear-gradient(90deg, hsl(263 80% 12% / 0.55), hsl(158 50% 10% / 0.35), hsl(263 80% 12% / 0.55));
+}
+.obx-mkt .mkt-marquee-track {
+  display: inline-flex;
+  gap: 2rem;
+  white-space: nowrap;
+  animation: mkt-scroll 40s linear infinite;
+}
 .obx-mkt .mkt-marquee:hover .mkt-marquee-track { animation-play-state: paused; }
 @keyframes mkt-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
-.obx-mkt .mkt-row:hover { background: hsl(var(--mkt-panel-2)); }
+.obx-mkt .mkt-row:hover { background: hsl(var(--mkt-panel-2) / 0.65); }
+
+.obx-mkt .mkt-main {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1400px;
+  padding: 20px 16px 48px;
+}
+
+.obx-mkt .mkt-footer {
+  border-top: 1px solid hsl(var(--mkt-line) / 0.7);
+  background: linear-gradient(180deg, hsl(255 32% 7% / 0.6), hsl(var(--mkt-bg)));
+}
+
+/* Section headers */
+.obx-mkt .mkt-section-title {
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.obx-mkt .mkt-section-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: hsl(var(--mkt-muted));
+}
+
+/* Map og-* accents used in JSX to Solana palette inside marketplace */
+.obx-mkt .text-\[hsl\(var\(--og-lime\)\)\],
+.obx-mkt [class*="og-lime"] { /* fallback via CSS vars below */ }
+.obx-mkt {
+  --og-lime: var(--mkt-green);
+  --og-gold: var(--mkt-gold);
+  --og-cyan: var(--mkt-purple);
+  --og-blood: var(--mkt-red);
+}

@@ -20,7 +20,7 @@ function Brand() {
         <span className="font-black text-[17px] tracking-tight" style={{ fontFamily: "'Space Grotesk', 'JetBrains Mono', sans-serif" }}>
           Orbit<span className="text-brand-gradient">X</span>
         </span>
-        <span className="term" style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.26em", color: "#00FFA3" }}>DEX_INTELLIGENCE</span>
+        <span className="term" style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.26em", color: "#9945FF" }}>DEX · SOLANA</span>
       </span>
     </span>
   );
@@ -105,9 +105,9 @@ export default function Layout() {
     <div
       className="min-h-screen flex flex-col"
       style={{
-        backgroundColor: "#000000",
+        backgroundColor: "#07040f",
         backgroundImage:
-          "radial-gradient(900px 420px at 50% -10%, rgba(0,255,163,0.06), transparent 60%)",
+          "radial-gradient(900px 420px at 18% -10%, rgba(153,69,255,0.12), transparent 55%), radial-gradient(700px 360px at 88% -8%, rgba(20,241,149,0.08), transparent 50%)",
         backgroundAttachment: "fixed",
       }}
     >
@@ -115,44 +115,39 @@ export default function Layout() {
       {/* ── Sticky Header ── */}
       <div className="sticky top-0 z-30">
         <div className="brand-hairline" />
-        <header className="border-b header-sheen backdrop-blur-2xl" style={{ backgroundColor: "rgba(0,0,0,0.92)", borderColor: "#1C2320" }}>
+        <header className="dex-shell-header header-sheen">
           <div className="max-w-[1600px] mx-auto px-5 h-14 flex items-center gap-4">
 
-            {/* Logo */}
             <Link to="/"><Brand /></Link>
 
-            {/* Live stats pill */}
-            <div className="hidden lg:flex items-center gap-3.5 ml-3 pl-4 border-l term text-[10px]" style={{ borderColor: "rgba(0,255,163,0.12)", color: "#5A6B88" }}>
-              <span>USERS <span className="text-[#00FFA3] font-bold">{pstats.activeUsers}</span></span>
+            <div className="hidden lg:flex items-center gap-3.5 ml-3 pl-4 border-l term text-[10px]" style={{ borderColor: "rgba(153,69,255,0.2)", color: "#66707E" }}>
+              <span>USERS <span className="text-[#14F195] font-bold">{pstats.activeUsers}</span></span>
               <span>TOKENS <span className="text-white/75 font-semibold">{pstats.tokenCount}</span></span>
-              <span>VOL <span className="text-[#00FFA3] font-bold">{pstats.volume}</span></span>
-              <span>UP <span className="text-[#FFC53D] font-bold">{pstats.daysLive}d</span></span>
+              <span>VOL <span className="text-[#14F195] font-bold">{pstats.volume}</span></span>
+              <span>UP <span className="text-[#F0B429] font-bold">{pstats.daysLive}d</span></span>
             </div>
 
-            {/* Spacer */}
             <div className="flex-1" />
 
-            {/* Search */}
             <GlobalSearch />
 
-            {/* Watching */}
             <div className="relative" ref={ref}>
               <button
                 onClick={(e) => { setWatch(getWatchlist()); const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setWatchPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }); setWatchOpen(o => !o); }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#A8B3C2] hover:text-white transition-all"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold text-[#A8B3C2] hover:text-white transition-all"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(153,69,255,0.22)" }}
               >
                 <Star className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Watching</span>
-                {watch.length > 0 && <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold" style={{ background: "rgba(0,255,163,0.15)", color: "#00FFA3" }}>{watch.length}</span>}
+                {watch.length > 0 && <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold" style={{ background: "rgba(20,241,149,0.15)", color: "#14F195" }}>{watch.length}</span>}
                 <ChevronDown className="w-3 h-3" />
               </button>
               {watchOpen && watchPos && createPortal(
-                <div ref={dropRef} style={{ position: "fixed", top: watchPos.top, right: watchPos.right, zIndex: 1000, background: "#0B0C0C", border: "1px solid rgba(0,255,163,0.18)", borderRadius: "0.75rem", width: "260px", padding: "6px", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+                <div ref={dropRef} style={{ position: "fixed", top: watchPos.top, right: watchPos.right, zIndex: 1000, background: "#0d0a16", border: "1px solid rgba(153,69,255,0.28)", borderRadius: "0.85rem", width: "260px", padding: "6px", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
                   <div className="text-[10px] uppercase tracking-widest text-[#A8B3C2] px-2 py-1.5 font-bold">Watched Wallets</div>
                   {watch.length ? watch.map((w) => (
                     <Link key={w} to={`/wallet/${w}`} onClick={() => setWatchOpen(false)} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/5 text-sm font-mono text-white transition-colors">
-                      <Wallet className="w-3.5 h-3.5 text-[#00FFA3]" /> {short(w)}
+                      <Wallet className="w-3.5 h-3.5 text-[#14F195]" /> {short(w)}
                     </Link>
                   )) : <div className="px-2 py-3 text-xs text-[#A8B3C2]">No watched wallets yet. Open any wallet and tap <span className="text-white font-semibold">Watch</span>.</div>}
                 </div>,
@@ -160,15 +155,14 @@ export default function Layout() {
               )}
             </div>
 
-            {/* Wallet connect */}
             {address ? (
-              <button onClick={disconnect} title={address} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold font-mono transition-all" style={{ background: "rgba(0,255,163,0.1)", border: "1px solid rgba(0,255,163,0.3)", color: "#00FFA3" }}>
+              <button onClick={disconnect} title={address} className="dex-wallet-chip">
                 <Wallet2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{short(address)}</span>
                 <LogOut className="w-3 h-3 opacity-70" />
               </button>
             ) : (
-              <button onClick={connect} disabled={connecting} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-[#000000] transition-all disabled:opacity-60" style={{ background: "linear-gradient(135deg,#00FFA3,#00C776)" }}>
+              <button onClick={connect} disabled={connecting} className="dex-wallet-btn disabled:opacity-60">
                 <Wallet2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{connecting ? "Connecting…" : "Connect"}</span>
               </button>
@@ -176,8 +170,7 @@ export default function Layout() {
 
             <InstallPWA />
 
-            {/* Store button */}
-            <Link to="/store" className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-[#000000] transition-all hover:opacity-90" style={{ background: "linear-gradient(110deg,#00FFA3,#00D1FF,#FFC53D)" }}>
+            <Link to="/store" className="dex-store-btn hidden sm:inline-flex hover:opacity-90">
               <ShoppingBag className="w-3.5 h-3.5" />
               Store
             </Link>
@@ -185,25 +178,19 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* ── Nav wheel: all app tabs, horizontal scroll (every breakpoint) ── */}
-        <div className="relative border-b backdrop-blur-2xl" style={{ backgroundColor: "rgba(0,0,0,0.88)", borderColor: "#1C2320" }}>
-          {/* edge fades to signal scrollability */}
-          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 z-10" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.97), transparent)" }} />
-          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10" style={{ background: "linear-gradient(270deg, rgba(0,0,0,0.97), transparent)" }} />
-          <nav className="max-w-[1600px] mx-auto flex items-center gap-1.5 px-4 py-2 overflow-x-auto no-scrollbar">
+        <div className="relative dex-shell-header" style={{ borderBottom: "1px solid rgba(42,33,64,0.85)" }}>
+          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 z-10" style={{ background: "linear-gradient(90deg, rgba(7,4,15,0.97), transparent)" }} />
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10" style={{ background: "linear-gradient(270deg, rgba(7,4,15,0.97), transparent)" }} />
+          <nav className="max-w-[1600px] mx-auto flex items-center gap-0.5 px-3 overflow-x-auto no-scrollbar">
             {NAV_LINKS.map(({ to, label, Icon, exact }) => {
               const active = isActive(to, exact);
               return (
                 <Link
                   key={to}
                   to={to}
-                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono uppercase tracking-wider text-[11px] font-bold whitespace-nowrap shrink-0 transition-all duration-200
-                    ${active
-                      ? "text-white border border-term/50 shadow-glow-term"
-                      : "text-[#8FA3C4] border border-transparent hover:text-white hover:border-accent/30 hover:bg-white/[0.04]"}`}
-                  style={active ? { background: "linear-gradient(135deg, rgba(0,255,163,0.16), rgba(0,255,163,0.16))" } : undefined}
+                  className={`dex-tab ${active ? "dex-tab--on" : ""}`}
                 >
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? "text-term" : ""}`} />
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
                   {label}
                 </Link>
               );
@@ -211,19 +198,18 @@ export default function Layout() {
           </nav>
         </div>
 
-        {/* ── Terminal system-status strip ── */}
-        <div className="hidden md:block border-b backdrop-blur-xl" style={{ backgroundColor: "rgba(0,0,0,0.85)", borderColor: "#1C2320" }}>
-          <div className="max-w-[1600px] mx-auto px-5 h-6 flex items-center gap-4 term text-[10px]" style={{ color: "#5A6B88" }}>
+        <div className="hidden md:block dex-status-strip">
+          <div className="max-w-[1600px] mx-auto px-5 h-7 flex items-center gap-4 term text-[10px]" style={{ color: "#66707E" }}>
             <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#00FFA3", boxShadow: "0 0 8px #00FFA3" }} />
-              <span style={{ color: "#00FFA3", letterSpacing: "0.14em" }}>SYSTEM ONLINE</span>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#14F195", boxShadow: "0 0 8px #14F195" }} />
+              <span style={{ color: "#14F195", letterSpacing: "0.14em" }}>SYSTEM ONLINE</span>
             </span>
             <span>NET <span className="text-white/70">SOLANA_MAINNET</span></span>
             <span className="hidden lg:inline">LATENCY <span className="text-white/70">~42ms</span></span>
-            <span className="hidden lg:inline">ACTIVE <span className="text-[#00FFA3]">{pstats.activeUsers}</span></span>
-            <span className="hidden xl:inline">VOL_24H <span style={{ color: "#FFC53D" }}>{pstats.volume}</span></span>
+            <span className="hidden lg:inline">ACTIVE <span className="text-[#14F195]">{pstats.activeUsers}</span></span>
+            <span className="hidden xl:inline">VOL_24H <span style={{ color: "#F0B429" }}>{pstats.volume}</span></span>
             <span className="flex-1" />
-            <span className="term-prompt term-cursor" style={{ color: "#8FA3C4", letterSpacing: "0.06em" }}>orbitx@dex:~</span>
+            <span className="term-prompt term-cursor" style={{ color: "#9AA3B5", letterSpacing: "0.06em" }}>orbitx@dex:~</span>
           </div>
         </div>
       </div>
@@ -237,7 +223,7 @@ export default function Layout() {
       </main>
 
       {/* ── Footer ── */}
-      <footer className="relative mt-12 overflow-hidden" style={{ borderTop: "1px solid #1C2320", background: "#000000" }}>
+      <footer className="relative mt-12 overflow-hidden" style={{ borderTop: "1px solid #2a2140", background: "#07040f" }}>
         <div className="brand-hairline absolute top-0 left-0 right-0" />
 
         <div className="relative max-w-[1600px] mx-auto px-5 py-12">
@@ -251,21 +237,21 @@ export default function Layout() {
               </p>
               <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "#A8B3C2" }}>
                 Updated weekly — read our{" "}
-                <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "#00FFA3" }}>Updates channel</a>
+                <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" className="hover:underline" style={{ color: "#14F195" }}>Updates channel</a>
                 {" "}for changes.
               </p>
               <div className="mt-4 flex items-center gap-1.5 text-[12px]" style={{ color: "#A8B3C2" }}>
-                <Zap className="w-3.5 h-3.5" style={{ color: "#00FFA3" }} />
+                <Zap className="w-3.5 h-3.5" style={{ color: "#14F195" }} />
                 Built &amp; designed by{" "}
                 <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="font-bold hover:underline text-brand-gradient">@orbitx_wrld</a>
               </div>
 
               {/* Social buttons */}
               <div className="mt-4 flex gap-2">
-                <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80" style={{ background: "rgba(0,255,163,0.1)", border: "1px solid rgba(0,255,163,0.2)", color: "#00FFA3" }}>
+                <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all hover:opacity-80" style={{ background: "rgba(20,241,149,0.1)", border: "1px solid rgba(20,241,149,0.25)", color: "#14F195" }}>
                   <Send className="w-3 h-3" /> Telegram
                 </a>
-                <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80" style={{ background: "rgba(0,209,255,0.1)", border: "1px solid rgba(0,209,255,0.2)", color: "#00D1FF" }}>
+                <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all hover:opacity-80" style={{ background: "rgba(153,69,255,0.12)", border: "1px solid rgba(153,69,255,0.3)", color: "#9945FF" }}>
                   <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                   @orbitx_wrld
                 </a>
@@ -275,32 +261,32 @@ export default function Layout() {
             {/* Links grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 lg:gap-x-12 gap-y-6 text-sm">
               <div className="space-y-2.5">
-                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#00FFA3" }}>Product</div>
+                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#14F195" }}>Product</div>
                 {FOOTER_PRODUCT.map(({ to, label }) => (
-                  <Link key={to} to={to} className="block text-[13px] transition-colors hover:text-[#00FFA3]" style={{ color: "#A8B3C2" }}>{label}</Link>
+                  <Link key={to} to={to} className="block text-[13px] transition-colors hover:text-[#14F195]" style={{ color: "#A8B3C2" }}>{label}</Link>
                 ))}
               </div>
               <div className="space-y-2.5">
-                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#FFC53D" }}>Resources</div>
+                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#F0B429" }}>Resources</div>
                 {FOOTER_RESOURCES.map(({ to, label }) => (
-                  <Link key={to} to={to} className="block text-[13px] transition-colors hover:text-[#FFC53D]" style={{ color: "#A8B3C2" }}>{label}</Link>
+                  <Link key={to} to={to} className="block text-[13px] transition-colors hover:text-[#F0B429]" style={{ color: "#A8B3C2" }}>{label}</Link>
                 ))}
               </div>
               <div className="space-y-2.5">
-                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#00D1FF" }}>Ecosystem</div>
+                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#9945FF" }}>Ecosystem</div>
                 {FOOTER_ECOSYSTEM.map(({ href, label }) => (
-                  <a key={href} href={href} target="_blank" rel="noreferrer" className="block text-[13px] transition-colors hover:text-[#00D1FF]" style={{ color: "#A8B3C2" }}>{label}</a>
+                  <a key={href} href={href} target="_blank" rel="noreferrer" className="block text-[13px] transition-colors hover:text-[#9945FF]" style={{ color: "#A8B3C2" }}>{label}</a>
                 ))}
               </div>
               <div className="space-y-2.5 col-span-2 sm:col-span-1">
-                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#00D1FF" }}>Community</div>
-                <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#00FFA3]" style={{ color: "#A8B3C2" }}>
+                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: "#9945FF" }}>Community</div>
+                <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#14F195]" style={{ color: "#A8B3C2" }}>
                   <Send className="w-3 h-3" /> @orbitxwrld
                 </a>
-                <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#00FFA3]" style={{ color: "#A8B3C2" }}>
+                <a href="https://t.me/OrbitXupdates" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#14F195]" style={{ color: "#A8B3C2" }}>
                   <Send className="w-3 h-3" /> @OrbitXupdates
                 </a>
-                <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#00D1FF]" style={{ color: "#A8B3C2" }}>
+                <a href="https://x.com/orbitx_wrldbackup" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[13px] transition-colors hover:text-[#9945FF]" style={{ color: "#A8B3C2" }}>
                   <svg viewBox="0 0 24 24" className="w-3 h-3 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                   @orbitx_wrld
                 </a>
@@ -315,9 +301,9 @@ export default function Layout() {
           <div className="mt-4 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]" style={{ borderTop: "1px solid rgba(255,255,255,0.05)", color: "rgba(136,150,170,0.55)" }}>
             <span>© {new Date().getFullYear()} OrbitX. All rights reserved.</span>
             <div className="flex items-center gap-4">
-              <Link to="/terms" className="hover:text-[#00FFA3] transition-colors">Terms</Link>
-              <Link to="/privacy" className="hover:text-[#00FFA3] transition-colors">Privacy</Link>
-              <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="hover:text-[#00FFA3] transition-colors">Support</a>
+              <Link to="/terms" className="hover:text-[#14F195] transition-colors">Terms</Link>
+              <Link to="/privacy" className="hover:text-[#14F195] transition-colors">Privacy</Link>
+              <a href="https://t.me/orbitxwrld" target="_blank" rel="noreferrer" className="hover:text-[#14F195] transition-colors">Support</a>
             </div>
           </div>
         </div>

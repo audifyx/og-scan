@@ -4,35 +4,35 @@ export default {
   theme: {
     extend: {
       colors: {
-        // ── OrbitX DEX v2 · Phosphor terminal: pure black / white / green ──
-        bg:      "#000000",  // pure black
-        panel:   "#050505",  // flat near-black surface
-        panel2:  "#0B0C0C",  // raised surface
-        line:    "#1C2320",  // hairline borders (green-tinted grey)
-        accent:  "#00FFA3",  // phosphor green (primary)
-        accent2: "#00D1FF",  // terminal cyan (secondary)
-        gold:    "#FFC53D",  // premium gold
-        term:    "#00FFA3",  // alias — terminal green
-        up:      "#00FFA3",  // gains
-        down:    "#FF5C5C",  // loss
-        muted:   "#A8B3C2",  // muted grey text (readable on black)
-        faint:   "#66707E",  // very muted labels
+        // OrbitX DEX · Solana purple / green launchpad system
+        bg:      "#07040f",
+        panel:   "#0d0a16",
+        panel2:  "#14101f",
+        line:    "#2a2140",
+        accent:  "#14F195",  // Solana green
+        accent2: "#9945FF",  // Solana purple
+        gold:    "#F0B429",
+        term:    "#14F195",
+        up:      "#14F195",
+        down:    "#FF4D6D",
+        muted:   "#9AA3B5",
+        faint:   "#66707E",
       },
       fontFamily: {
-        // Mono-first UI — the whole app reads like a terminal.
-        sans:    ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        sans:    ["Space Grotesk", "JetBrains Mono", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["Space Grotesk", "JetBrains Mono", "sans-serif"],
         mono:    ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       backgroundImage: {
-        "glass":        "linear-gradient(145deg, rgba(0,255,163,0.06), rgba(0,209,255,0.04))",
-        "glass-accent": "linear-gradient(145deg, rgba(0,255,163,0.10), rgba(255,197,61,0.05))",
-        "term-grid":    "linear-gradient(rgba(0,255,163,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,163,0.04) 1px, transparent 1px)",
+        "glass":        "linear-gradient(145deg, rgba(153,69,255,0.08), rgba(20,241,149,0.05))",
+        "glass-accent": "linear-gradient(145deg, rgba(20,241,149,0.12), rgba(153,69,255,0.08))",
+        "term-grid":    "linear-gradient(rgba(153,69,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(20,241,149,0.04) 1px, transparent 1px)",
       },
       boxShadow: {
-        "glow-blue": "0 0 34px -8px rgba(0,255,163,0.5)",   /* legacy name, now green */
-        "glow-gold": "0 0 40px -8px rgba(255,197,61,0.45)",
-        "glow-term": "0 0 34px -8px rgba(0,255,163,0.5)",
+        "glow-blue": "0 0 34px -8px rgba(20,241,149,0.5)",
+        "glow-gold": "0 0 40px -8px rgba(240,180,41,0.45)",
+        "glow-term": "0 0 34px -8px rgba(20,241,149,0.5)",
+        "glow-purple": "0 0 34px -8px rgba(153,69,255,0.45)",
       },
     },
   },
