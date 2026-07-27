@@ -227,18 +227,20 @@ export function CityProvider({ children }: { children: ReactNode }) {
       const block = getWorldBlock(selectedCityId);
       const b = block.buildings.find((x) => x.id === buildingId);
       if (!b) return;
-      const interiorDepth = Math.max(4.5, b.size.depth - 1.2);
+      const interiorDepth = Math.max(5.2, Math.min(14, b.size.depth - 0.8));
       // Enter from the south-side doorway, just inside the room — never
       // teleport through a desk or drop the player at the room's center.
       const x = b.position.x;
-      const z = b.position.z + interiorDepth / 2 - 1.75;
+      const z = b.position.z + interiorDepth / 2 - 1.85;
       setInteriorBuildingId(buildingId);
+      setPanel("none");
       setPlayerPos({ x, y: 0, z });
       setTeleportTarget((prev) => ({
         x,
         z,
         seq: (prev?.seq ?? 0) + 1,
       }));
+      cityAudio.play("confirm");
     },
     [selectedCityId],
   );
@@ -309,9 +311,13 @@ export function CityProvider({ children }: { children: ReactNode }) {
     if (activeZone.buildingId) {
       const block = getWorldBlock(selectedCityId);
       const b = block.buildings.find((x) => x.id === activeZone.buildingId);
-      // Walk into full-size venues and dedicated shops; tiny props open their
-      // panel without a separate interior.
-      if (b && ((b.size.width >= 6 && b.size.depth >= 6) || b.kind === "shop")) {
+      // Any venue-sized shell (or shop / interactive landmark) is walk-in.
+      if (
+        b &&
+        (b.interaction ||
+          b.kind === "shop" ||
+          (b.size.width >= 5 && b.size.depth >= 5))
+      ) {
         enterBuilding(b.id);
         return;
       }
@@ -321,10 +327,13 @@ export function CityProvider({ children }: { children: ReactNode }) {
 
   const prompt = useMemo(() => {
     if (interiorBuildingId && panel === "none") {
-      return { label: "Exit building", hint: "Press E or step on the exit pad" };
+      return {
+        label: "Inside · tap glowing stations",
+        hint: "Click a TAP station for tools · E or green pad to exit",
+      };
     }
     if (!activeZone || panel !== "none") return null;
-    return { label: activeZone.label, hint: activeZone.hint };
+    return { label: activeZone.label, hint: activeZone.hint || "Press E to enter" };
   }, [activeZone, panel, interiorBuildingId]);
 
   useEffect(() => {

@@ -148,7 +148,7 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
 
       <HqBeacon block={block} />
       {high && <RocketShow />}
-      <NPCs block={block} count={high ? 12 : 4} />
+      <NPCs block={block} count={high ? 6 : 3} />
       {high && <Drones />}
       {high && <OxiGuide />}
       {high && block.cityId === "nyc" && <Park />}

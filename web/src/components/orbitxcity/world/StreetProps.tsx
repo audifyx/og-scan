@@ -1,9 +1,13 @@
 import { useMemo } from "react";
+import { Clone, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt } from "@/lib/orbitxcity/collision";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { getWorldStreets } from "@/lib/orbitxcity/worlds";
+
+const BENCH_PATH = "/orbitxcity/models/citybits/bench.gltf";
+useGLTF.preload(BENCH_PATH);
 
 const LAMP_SPACING = 16;
 
@@ -131,6 +135,7 @@ function Crosswalks({ block }: { block: WorldBlockConfig }) {
 }
 
 function StreetFurniture({ block }: { block: WorldBlockConfig }) {
+  const { scene } = useGLTF(BENCH_PATH);
   return (
     <group>
       {block.zones.slice(0, 10).map((zone, i) => {
@@ -138,22 +143,15 @@ function StreetFurniture({ block }: { block: WorldBlockConfig }) {
         const z = zone.position.z + (i % 3 === 0 ? 1.2 : -1.2);
         if (collidesAt(x, z, 0.5, block)) return null;
         return (
-          <group key={`street-furniture-${zone.id}`} position={[x, 0, z]} rotation-y={(i % 4) * (Math.PI / 2)}>
-            <mesh position={[0, 0.42, 0]} castShadow receiveShadow>
-              <boxGeometry args={[1.65, 0.1, 0.48]} />
-              <meshStandardMaterial color="#5a5145" metalness={0.12} roughness={0.78} />
-            </mesh>
-            <mesh position={[0, 0.76, -0.18]} castShadow>
-              <boxGeometry args={[1.65, 0.55, 0.09]} />
-              <meshStandardMaterial color="#4a433a" metalness={0.1} roughness={0.8} />
-            </mesh>
-            {[-0.65, 0.65].map((leg) => (
-              <mesh key={leg} position={[leg, 0.2, 0]} castShadow>
-                <boxGeometry args={[0.08, 0.42, 0.42]} />
-                <meshStandardMaterial color="#272d32" metalness={0.65} roughness={0.42} />
-              </mesh>
-            ))}
-          </group>
+          <Clone
+            key={`street-furniture-${zone.id}`}
+            object={scene}
+            position={[x, 0, z]}
+            rotation={[0, (i % 4) * (Math.PI / 2), 0]}
+            scale={1.35}
+            castShadow
+            receiveShadow
+          />
         );
       })}
     </group>

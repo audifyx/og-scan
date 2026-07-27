@@ -1,266 +1,271 @@
-import { Text } from "@react-three/drei";
+import { Clone, Text, useGLTF } from "@react-three/drei";
 import type { BuildingDefinition, HudPanel } from "@/lib/orbitxcity/types";
+import {
+  panelForBuilding,
+  resolveRoomTheme,
+  roomTitle,
+  type RoomTheme,
+} from "@/lib/orbitxcity/interiorLayout";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
-/**
- * Walk-in interiors — the exterior shell remains in the world while this
- * furnished, building-specific lobby is revealed inside it.
- */
-function InteriorTerminal({ building, height, depth }: { building: BuildingDefinition; height: number; depth: number }) {
+const FURN = {
+  couch: "/orbitxcity/models/furniture/couch_pillows.gltf",
+  armchair: "/orbitxcity/models/furniture/armchair_pillows.gltf",
+  table: "/orbitxcity/models/furniture/table_medium.gltf",
+  tableLong: "/orbitxcity/models/furniture/table_medium_long.gltf",
+  tableLow: "/orbitxcity/models/furniture/table_low.gltf",
+  tableSmall: "/orbitxcity/models/furniture/table_small.gltf",
+  chair: "/orbitxcity/models/furniture/chair_A.gltf",
+  stool: "/orbitxcity/models/furniture/chair_stool.gltf",
+  cabinet: "/orbitxcity/models/furniture/cabinet_medium_decorated.gltf",
+  shelf: "/orbitxcity/models/furniture/shelf_B_large_decorated.gltf",
+  lamp: "/orbitxcity/models/furniture/lamp_standing.gltf",
+  lampTable: "/orbitxcity/models/furniture/lamp_table.gltf",
+  rug: "/orbitxcity/models/furniture/rug_rectangle_stripes_A.gltf",
+  books: "/orbitxcity/models/furniture/book_set.gltf",
+  art: "/orbitxcity/models/furniture/pictureframe_large_A.gltf",
+  artMed: "/orbitxcity/models/furniture/pictureframe_medium.gltf",
+  plant: "/orbitxcity/models/furniture/cactus_small_A.gltf",
+} as const;
+
+Object.values(FURN).forEach((path) => useGLTF.preload(path));
+
+function Prop({
+  path,
+  position,
+  rotation = [0, 0, 0],
+  scale = 1,
+}: {
+  path: string;
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: number | [number, number, number];
+}) {
+  const { scene } = useGLTF(path);
+  return <Clone object={scene} position={position} rotation={rotation} scale={scale} castShadow receiveShadow />;
+}
+
+function Hotspot({
+  position,
+  label,
+  accent,
+  panel,
+  voice,
+}: {
+  position: [number, number, number];
+  label: string;
+  accent: string;
+  panel: HudPanel;
+  voice?: boolean;
+}) {
   const { openPanel, setVoiceOpen } = useCity();
-  const panelByKind: Record<string, HudPanel> = {
-    hq: "map",
-    marketplace: "marketplace",
-    launch: "launch",
-    trading: "trading",
-    community: "community",
-    billboard: "live",
-    voice: "voice",
-    games: "games",
-    nft: "nft",
-  };
-  const panel = building.interaction ? panelByKind[building.interaction] ?? "live" : "community";
   const activate = (e: { stopPropagation: () => void }) => {
     e.stopPropagation();
-    if (building.interaction === "voice") setVoiceOpen(true);
+    if (voice) setVoiceOpen(true);
     openPanel(panel);
   };
 
   return (
-    <group position={[0, 0, -depth / 2 + 0.62]}>
-      <mesh position={[0, 0.5, 0]} castShadow onClick={activate}>
-        <boxGeometry args={[2.5, 1, 0.62]} />
-        <meshStandardMaterial color="#1a2229" metalness={0.55} roughness={0.35} />
+    <group position={position} onClick={activate}>
+      <mesh position={[0, 0.92, 0]} castShadow>
+        <boxGeometry args={[1.15, 1.15, 0.55]} />
+        <meshStandardMaterial color="#141b22" metalness={0.55} roughness={0.32} />
       </mesh>
-      <mesh position={[0, 1.08, -0.33]} rotation={[-0.16, 0, 0]} onClick={activate}>
-        <boxGeometry args={[1.82, 0.62, 0.05]} />
-        <meshStandardMaterial color="#091017" emissive={building.accent} emissiveIntensity={0.38} roughness={0.25} />
+      <mesh position={[0, 1.55, -0.28]} rotation={[-0.18, 0, 0]}>
+        <boxGeometry args={[0.95, 0.58, 0.05]} />
+        <meshStandardMaterial color="#070d14" emissive={accent} emissiveIntensity={0.55} roughness={0.22} />
       </mesh>
-      <mesh position={[-0.86, 0.95, -0.36]} onClick={activate}>
-        <sphereGeometry args={[0.07, 12, 12]} />
-        <meshStandardMaterial color={building.accent} emissive={building.accent} emissiveIntensity={0.6} />
+      <mesh position={[0, 0.08, 0]}>
+        <cylinderGeometry args={[0.55, 0.62, 0.08, 20]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} roughness={0.4} />
       </mesh>
       <Text
-        position={[0, 1.52, -0.36]}
-        fontSize={0.2}
-        color="#e8f0f4"
+        position={[0, 2.05, 0]}
+        fontSize={0.16}
+        color="#f2f6f8"
         anchorX="center"
-        outlineWidth={0.015}
+        outlineWidth={0.014}
         outlineColor="#05080c"
-        onClick={activate}
       >
-        TAP TERMINAL · {building.interaction?.toUpperCase() ?? "EXPLORE"}
-      </Text>
-      <Text position={[0, height - 0.9, 0]} fontSize={0.18} color={building.accent} anchorX="center">
-        {building.label ?? building.name}
+        TAP · {label}
       </Text>
     </group>
   );
 }
 
-function InteriorFurniture({
-  building,
+function ThemeFurniture({
+  theme,
   width,
   depth,
   height,
+  accent,
 }: {
-  building: BuildingDefinition;
+  theme: RoomTheme;
   width: number;
   depth: number;
   height: number;
+  accent: string;
 }) {
-  const accent = building.accent;
-  const wallZ = -depth / 2 + 0.28;
-  const id = building.id.toLowerCase();
+  const wallZ = -depth / 2 + 0.55;
+  const side = Math.min(width / 2 - 1.15, 3.1);
 
-  if (id.includes("club")) {
-    return (
-      <>
-        <mesh position={[0, 0.035, -0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[Math.min(width - 1.4, 5.2), Math.min(depth - 3, 4.4)]} />
-          <meshStandardMaterial color="#17121c" emissive={accent} emissiveIntensity={0.14} metalness={0.35} roughness={0.45} />
-        </mesh>
-        {[-1.5, -0.5, 0.5, 1.5].map((x) => (
-          <mesh key={x} position={[x, 0.07, -0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[0.04, Math.min(depth - 3.4, 3.6)]} />
-            <meshBasicMaterial color={accent} toneMapped={false} />
-          </mesh>
-        ))}
-        {[-width / 2 + 0.75, width / 2 - 0.75].map((x) => (
-          <mesh key={x} position={[x, 1.2, -depth / 2 + 0.42]}>
-            <boxGeometry args={[0.8, 2.2, 0.45]} />
-            <meshStandardMaterial color="#131822" emissive={accent} emissiveIntensity={0.18} metalness={0.5} roughness={0.38} />
-          </mesh>
-        ))}
-        <Text position={[0, height - 0.85, wallZ]} fontSize={0.34} color={accent} anchorX="center">PULSE · LIVE ROOM</Text>
-      </>
-    );
-  }
+  return (
+    <>
+      <Prop path={FURN.rug} position={[0, 0.02, -0.15]} scale={[Math.min(width * 0.55, 4.2), 1, Math.min(depth * 0.45, 3.4)]} />
+      <Prop path={FURN.art} position={[-side * 0.35, height * 0.55, wallZ - 0.02]} rotation={[0, 0, 0]} scale={1.15} />
+      <Prop path={FURN.artMed} position={[side * 0.45, height * 0.52, wallZ - 0.02]} scale={1.05} />
+      <Prop path={FURN.plant} position={[-width / 2 + 0.7, 0, depth / 2 - 1.35]} scale={1.2} />
+      <Prop path={FURN.plant} position={[width / 2 - 0.7, 0, depth / 2 - 1.35]} scale={1.1} />
+      <Prop path={FURN.lamp} position={[-width / 2 + 0.85, 0, -0.2]} scale={1.05} />
 
-  if (id.includes("casino") || id.includes("arcade")) {
-    return (
-      <>
-        {[-1.6, 0, 1.6].map((x) => (
-          <group key={x} position={[x, 0, -0.3]}>
-            <mesh position={[0, 0.55, 0]} castShadow>
-              <boxGeometry args={[0.78, 1.1, 0.68]} />
-              <meshStandardMaterial color="#20242a" metalness={0.45} roughness={0.42} />
-            </mesh>
-            <mesh position={[0, 0.78, -0.36]}>
-              <boxGeometry args={[0.54, 0.38, 0.04]} />
-              <meshStandardMaterial color="#0a1017" emissive={accent} emissiveIntensity={0.35} roughness={0.28} />
-            </mesh>
-          </group>
-        ))}
-        <Text position={[0, height - 0.85, wallZ]} fontSize={0.34} color={accent} anchorX="center">
-          {id.includes("casino") ? "ROYAL ORBIT · TABLES OPEN" : "NEON ARCADE · FREE PLAY"}
-        </Text>
-      </>
-    );
-  }
+      {theme === "trade" && (
+        <>
+          <Prop path={FURN.tableLong} position={[-side * 0.7, 0, wallZ + 0.35]} scale={1.05} />
+          <Prop path={FURN.tableLong} position={[0, 0, wallZ + 0.35]} scale={1.05} />
+          <Prop path={FURN.tableLong} position={[side * 0.7, 0, wallZ + 0.35]} scale={1.05} />
+          <Prop path={FURN.chair} position={[-side * 0.7, 0, wallZ + 1.15]} rotation={[0, Math.PI, 0]} />
+          <Prop path={FURN.chair} position={[0, 0, wallZ + 1.15]} rotation={[0, Math.PI, 0]} />
+          <Prop path={FURN.chair} position={[side * 0.7, 0, wallZ + 1.15]} rotation={[0, Math.PI, 0]} />
+          <Prop path={FURN.shelf} position={[-side, 0, 0.15]} rotation={[0, Math.PI / 2, 0]} scale={1.1} />
+          <Prop path={FURN.shelf} position={[side, 0, 0.15]} rotation={[0, -Math.PI / 2, 0]} scale={1.1} />
+          <Prop path={FURN.books} position={[0, 0.78, wallZ + 0.35]} scale={0.9} />
+        </>
+      )}
 
-  if (id.includes("cinema") || id.includes("theater")) {
-    return (
-      <>
-        <mesh position={[0, height * 0.56, -depth / 2 + 0.22]}>
-          <boxGeometry args={[Math.min(width - 1, 6.4), Math.min(height * 0.55, 2.2), 0.08]} />
-          <meshStandardMaterial color="#0c1119" emissive="#d8e4f0" emissiveIntensity={0.32} roughness={0.24} />
-        </mesh>
-        {[-1.35, 0, 1.35].map((x) => (
-          <mesh key={x} position={[x, 0.38, 0.45]} castShadow>
-            <boxGeometry args={[0.85, 0.7, 0.72]} />
-            <meshStandardMaterial color="#34283e" roughness={0.7} />
-          </mesh>
-        ))}
-        <Text position={[0, height - 0.85, wallZ]} fontSize={0.32} color={accent} anchorX="center">NOW SHOWING · ORBITX LIVE</Text>
-      </>
-    );
-  }
+      {theme === "lounge" && (
+        <>
+          <Prop path={FURN.couch} position={[-side * 0.55, 0, -0.35]} rotation={[0, 0.2, 0]} scale={1.15} />
+          <Prop path={FURN.couch} position={[side * 0.55, 0, -0.35]} rotation={[0, -0.2, 0]} scale={1.15} />
+          <Prop path={FURN.tableLow} position={[0, 0, 0.35]} scale={1.2} />
+          <Prop path={FURN.armchair} position={[-side, 0, 0.65]} rotation={[0, 0.9, 0]} />
+          <Prop path={FURN.armchair} position={[side, 0, 0.65]} rotation={[0, -0.9, 0]} />
+          <Prop path={FURN.cabinet} position={[0, 0, wallZ + 0.2]} scale={1.1} />
+          <Prop path={FURN.lampTable} position={[0.7, 0, 0.35]} scale={1} />
+        </>
+      )}
 
-  if (id.includes("coffee")) {
-    return (
-      <>
-        {[-0.95, 0.95].map((x) => (
-          <group key={x} position={[x, 0, -0.2]}>
-            <mesh position={[0, 0.46, 0]} castShadow>
-              <cylinderGeometry args={[0.48, 0.48, 0.08, 16]} />
-              <meshStandardMaterial color="#6d5340" roughness={0.72} />
-            </mesh>
-            <mesh position={[0, 0.23, 0]} castShadow>
-              <cylinderGeometry args={[0.05, 0.08, 0.44, 10]} />
-              <meshStandardMaterial color="#282b2e" metalness={0.7} roughness={0.35} />
-            </mesh>
-          </group>
-        ))}
-        <Text position={[0, height - 0.85, wallZ]} fontSize={0.32} color={accent} anchorX="center">ORBIT BREW · OPEN</Text>
-      </>
-    );
-  }
+      {theme === "market" && (
+        <>
+          <Prop path={FURN.tableLong} position={[0, 0, wallZ + 0.25]} scale={[1.35, 1, 1.1]} />
+          <Prop path={FURN.cabinet} position={[-side, 0, -0.1]} rotation={[0, Math.PI / 2, 0]} />
+          <Prop path={FURN.cabinet} position={[side, 0, -0.1]} rotation={[0, -Math.PI / 2, 0]} />
+          <Prop path={FURN.shelf} position={[-side * 0.35, 0, wallZ + 0.15]} scale={1} />
+          <Prop path={FURN.stool} position={[-0.9, 0, wallZ + 1.1]} />
+          <Prop path={FURN.stool} position={[0.9, 0, wallZ + 1.1]} />
+          <Prop path={FURN.books} position={[0.2, 0.78, wallZ + 0.25]} />
+        </>
+      )}
 
-  switch (building.kind) {
-    case "trading_floor":
-      return (
+      {theme === "club" && (
         <>
-          {[-1.8, 0, 1.8].map((x) => (
-            <group key={x} position={[x, 0, -0.35]}>
-              <mesh position={[0, 0.5, 0]} castShadow>
-                <boxGeometry args={[1.35, 0.75, 0.72]} />
-                <meshStandardMaterial color="#202a31" metalness={0.38} roughness={0.55} />
-              </mesh>
-              <mesh position={[0, 1.03, -0.12]} rotation={[-0.12, 0, 0]}>
-                <boxGeometry args={[1.12, 0.46, 0.05]} />
-                <meshStandardMaterial color="#0b1319" emissive={accent} emissiveIntensity={0.22} roughness={0.35} />
-              </mesh>
-            </group>
-          ))}
-          <Text position={[0, height - 0.85, wallZ]} fontSize={0.34} color={accent} anchorX="center">
-            LIVE MARKET FLOOR
-          </Text>
+          <mesh position={[0, 0.04, -0.15]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[Math.min(width - 1.5, 5.4), Math.min(depth - 2.6, 4)]} />
+            <meshStandardMaterial color="#17121c" emissive={accent} emissiveIntensity={0.16} metalness={0.4} roughness={0.4} />
+          </mesh>
+          <Prop path={FURN.tableLong} position={[0, 0, wallZ + 0.35]} scale={1.2} />
+          <Prop path={FURN.stool} position={[-1.1, 0, wallZ + 1.15]} />
+          <Prop path={FURN.stool} position={[0, 0, wallZ + 1.15]} />
+          <Prop path={FURN.stool} position={[1.1, 0, wallZ + 1.15]} />
+          <Prop path={FURN.armchair} position={[-side, 0, 0.25]} rotation={[0, 0.7, 0]} />
+          <Prop path={FURN.armchair} position={[side, 0, 0.25]} rotation={[0, -0.7, 0]} />
+          <Prop path={FURN.lamp} position={[side * 0.2, 0, -0.8]} scale={1.1} />
         </>
-      );
-    case "launch_arena":
-      return (
+      )}
+
+      {theme === "theater" && (
         <>
-          <mesh position={[0, 0.22, -0.1]} receiveShadow>
-            <cylinderGeometry args={[1.45, 1.7, 0.42, 32]} />
-            <meshStandardMaterial color="#242118" metalness={0.3} roughness={0.6} />
+          <mesh position={[0, height * 0.52, wallZ - 0.05]}>
+            <boxGeometry args={[Math.min(width - 1, 5.8), Math.min(height * 0.5, 2.1), 0.08]} />
+            <meshStandardMaterial color="#0b1018" emissive="#d7e4f2" emissiveIntensity={0.4} roughness={0.22} />
           </mesh>
-          <mesh position={[0, 0.5, -0.1]}>
-            <cylinderGeometry args={[0.95, 1.18, 0.16, 32]} />
-            <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} roughness={0.4} />
-          </mesh>
-          <Text position={[0, 1.25, -0.1]} fontSize={0.38} color="#f7f0d6" anchorX="center">
-            LAUNCH STAGE
-          </Text>
+          <Prop path={FURN.armchair} position={[-1.25, 0, 0.4]} rotation={[0, 0.1, 0]} />
+          <Prop path={FURN.armchair} position={[0, 0, 0.6]} />
+          <Prop path={FURN.armchair} position={[1.25, 0, 0.4]} rotation={[0, -0.1, 0]} />
+          <Prop path={FURN.tableSmall} position={[0, 0, 1.35]} scale={0.9} />
+          <Prop path={FURN.shelf} position={[-side, 0, -0.4]} rotation={[0, Math.PI / 2, 0]} />
         </>
-      );
-    case "social_hub":
-      return (
+      )}
+
+      {theme === "hq" && (
         <>
-          {[-1, 1].map((x) => (
-            <group key={x} position={[x, 0, -0.25]}>
-              <mesh position={[0, 0.38, 0]} castShadow>
-                <boxGeometry args={[1.25, 0.54, 0.75]} />
-                <meshStandardMaterial color="#29263a" roughness={0.72} />
-              </mesh>
-              <mesh position={[0, 0.78, 0]}>
-                <boxGeometry args={[1.35, 0.12, 0.88]} />
-                <meshStandardMaterial color="#5a5370" metalness={0.15} roughness={0.58} />
-              </mesh>
-            </group>
-          ))}
-          <Text position={[0, height - 0.85, wallZ]} fontSize={0.34} color={accent} anchorX="center">
-            COMMUNITY LOUNGE
-          </Text>
+          <Prop path={FURN.tableLong} position={[0, 0, wallZ + 0.3]} scale={[1.4, 1, 1.15]} />
+          <Prop path={FURN.chair} position={[-0.8, 0, wallZ + 1.2]} rotation={[0, Math.PI, 0]} />
+          <Prop path={FURN.chair} position={[0.8, 0, wallZ + 1.2]} rotation={[0, Math.PI, 0]} />
+          <Prop path={FURN.shelf} position={[-side, 0, 0.2]} rotation={[0, Math.PI / 2, 0]} scale={1.15} />
+          <Prop path={FURN.cabinet} position={[side, 0, 0.2]} rotation={[0, -Math.PI / 2, 0]} />
+          <Prop path={FURN.books} position={[-0.3, 0.78, wallZ + 0.3]} />
+          <Prop path={FURN.lampTable} position={[1.1, 0, wallZ + 0.3]} />
         </>
-      );
-    case "market":
-    case "shop":
-      return (
+      )}
+
+      {theme === "launch" && (
         <>
-          <mesh position={[0, 0.56, -0.2]} castShadow>
-            <boxGeometry args={[Math.min(width - 1.2, 4.2), 1.05, 0.72]} />
-            <meshStandardMaterial color="#28272b" metalness={0.18} roughness={0.58} />
+          <mesh position={[0, 0.2, -0.15]} receiveShadow>
+            <cylinderGeometry args={[1.35, 1.6, 0.4, 32]} />
+            <meshStandardMaterial color="#2c2618" metalness={0.35} roughness={0.55} />
           </mesh>
-          <mesh position={[0, 1.12, -0.56]}>
-            <boxGeometry args={[Math.min(width - 1.45, 3.9), 0.72, 0.04]} />
-            <meshStandardMaterial color="#0c1115" emissive={accent} emissiveIntensity={0.18} roughness={0.4} />
+          <mesh position={[0, 0.48, -0.15]}>
+            <cylinderGeometry args={[0.9, 1.1, 0.14, 32]} />
+            <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.42} roughness={0.38} />
           </mesh>
-          <Text position={[0, height - 0.85, wallZ]} fontSize={0.34} color={accent} anchorX="center">
-            {building.label ?? "ORBITX"} EXCHANGE
-          </Text>
+          <Prop path={FURN.stool} position={[-side, 0, wallZ + 0.45]} />
+          <Prop path={FURN.stool} position={[side, 0, wallZ + 0.45]} />
+          <Prop path={FURN.cabinet} position={[0, 0, wallZ + 0.15]} scale={0.95} />
         </>
-      );
-    case "hq":
-      return (
+      )}
+
+      {theme === "lobby" && (
         <>
-          <mesh position={[0, 0.5, -0.45]} castShadow>
-            <boxGeometry args={[Math.min(width - 1.2, 5.4), 0.96, 0.9]} />
-            <meshStandardMaterial color="#202a35" metalness={0.4} roughness={0.48} />
-          </mesh>
-          <Text position={[0, 1.25, -0.1]} fontSize={0.42} color={accent} anchorX="center">
-            ORBITX HQ
-          </Text>
-          <Text position={[0, height - 0.85, wallZ]} fontSize={0.28} color="#d9e4ea" anchorX="center">
-            WORLD OPERATIONS
-          </Text>
+          <Prop path={FURN.table} position={[0, 0, wallZ + 0.35]} scale={1.15} />
+          <Prop path={FURN.chair} position={[-0.7, 0, wallZ + 1.15]} rotation={[0, Math.PI, 0]} />
+          <Prop path={FURN.chair} position={[0.7, 0, wallZ + 1.15]} rotation={[0, Math.PI, 0]} />
+          <Prop path={FURN.couch} position={[-side * 0.75, 0, 0.25]} rotation={[0, 0.4, 0]} />
+          <Prop path={FURN.armchair} position={[side * 0.75, 0, 0.25]} rotation={[0, -0.4, 0]} />
+          <Prop path={FURN.shelf} position={[side, 0, -0.55]} rotation={[0, -Math.PI / 2, 0]} />
+          <Prop path={FURN.books} position={[0.15, 0.78, wallZ + 0.35]} />
         </>
-      );
-    default:
-      return (
-        <>
-          <mesh position={[0, 0.48, -0.35]} castShadow>
-            <boxGeometry args={[Math.min(width - 1.4, 3.8), 0.88, 0.72]} />
-            <meshStandardMaterial color="#2b3036" metalness={0.22} roughness={0.65} />
-          </mesh>
-          <Text position={[0, height - 0.85, wallZ]} fontSize={0.32} color={accent} anchorX="center">
-            {building.label ?? building.name}
-          </Text>
-        </>
-      );
-  }
+      )}
+    </>
+  );
 }
 
+function ThemeHotspots({
+  theme,
+  building,
+  depth,
+  width,
+}: {
+  theme: RoomTheme;
+  building: BuildingDefinition;
+  depth: number;
+  width: number;
+}) {
+  const panel = panelForBuilding(building);
+  const accent = building.accent;
+  const back = -depth / 2 + 1.15;
+  const side = Math.min(width / 2 - 1.4, 2.6);
+
+  const secondary: HudPanel =
+    theme === "trade" ? "token" : theme === "lounge" || theme === "club" ? "chat" : theme === "market" ? "marketplace" : theme === "theater" ? "events" : theme === "hq" ? "missions" : theme === "launch" ? "launch" : "live";
+
+  return (
+    <>
+      <Hotspot position={[0, 0, back]} label={building.interaction?.toUpperCase() ?? "EXPLORE"} accent={accent} panel={panel} voice={building.interaction === "voice"} />
+      <Hotspot position={[-side, 0, 0.15]} label={secondary.toUpperCase()} accent={accent} panel={secondary} />
+      {(theme === "lounge" || theme === "club") && (
+        <Hotspot position={[side, 0, 0.15]} label="VOICE" accent={accent} panel="voice" voice />
+      )}
+      {(theme === "trade" || theme === "market") && (
+        <Hotspot position={[side, 0, 0.15]} label="LIVE" accent={accent} panel="live" />
+      )}
+    </>
+  );
+}
+
+/**
+ * Walk-in interiors — KayKit furniture + glowing tap stations so every
+ * venue has things to look at and actually do.
+ */
 export function InteriorRoom({
   building,
   onRequestExit,
@@ -268,28 +273,26 @@ export function InteriorRoom({
   building: BuildingDefinition;
   onRequestExit: () => void;
 }) {
-  const w = Math.max(4.5, building.size.width - 1.2);
-  const d = Math.max(4.5, building.size.depth - 1.2);
-  const h = Math.min(4.2, Math.max(3.2, building.size.height * 0.35));
+  const theme = resolveRoomTheme(building);
+  const w = Math.max(5.2, Math.min(14, building.size.width - 0.8));
+  const d = Math.max(5.2, Math.min(14, building.size.depth - 0.8));
+  const h = Math.min(4.4, Math.max(3.3, building.size.height * 0.32));
   const { x, z } = building.position;
-  const floorColor = building.kind === "launch_arena" ? "#39311c" : building.color;
-  const wallColor = building.color;
+  const floorColor = theme === "launch" ? "#39311c" : theme === "club" ? "#1a1520" : building.color;
 
   return (
     <group position={[x, 0, z]}>
-      {/* Polished floor and inlaid entry strip */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} receiveShadow>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial color={floorColor} roughness={0.62} metalness={0.24} />
+        <meshStandardMaterial color={floorColor} roughness={0.58} metalness={0.22} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.055, d / 2 - 1.55]}>
-        <planeGeometry args={[Math.min(w - 1, 3.2), 1.1]} />
-        <meshStandardMaterial color="#151b20" emissive={building.accent} emissiveIntensity={0.12} roughness={0.48} />
+        <planeGeometry args={[Math.min(w - 1, 3.4), 1.15]} />
+        <meshStandardMaterial color="#151b20" emissive={building.accent} emissiveIntensity={0.14} roughness={0.45} />
       </mesh>
-      {/* Ceiling panel with perimeter lighting */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, h, 0]}>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial color="#20262b" roughness={0.78} side={2} />
+        <meshStandardMaterial color="#1c2228" roughness={0.78} side={2} />
       </mesh>
       {[
         { pos: [0, h / 2, -d / 2] as const, size: [w, h, 0.18] as const },
@@ -299,23 +302,19 @@ export function InteriorRoom({
       ].map((wall, i) => (
         <mesh key={i} position={wall.pos} castShadow receiveShadow>
           <boxGeometry args={wall.size} />
-          <meshStandardMaterial color={wallColor} roughness={0.72} metalness={0.2} />
+          <meshStandardMaterial color={building.color} roughness={0.7} metalness={0.18} />
         </mesh>
       ))}
       <mesh position={[0, h - 0.16, 0]}>
         <boxGeometry args={[w * 0.92, 0.07, d * 0.92]} />
-        <meshStandardMaterial
-          color={building.accent}
-          emissive={building.accent}
-          emissiveIntensity={0.42}
-          roughness={0.42}
-        />
+        <meshStandardMaterial color={building.accent} emissive={building.accent} emissiveIntensity={0.4} roughness={0.42} />
       </mesh>
-      <pointLight position={[0, h - 0.45, 0]} intensity={1.15} distance={11} color="#e8e2d4" />
-      <pointLight position={[0, 1.6, -d / 2 + 0.6]} intensity={0.45} distance={7} color={building.accent} />
+      <pointLight position={[0, h - 0.45, 0]} intensity={1.25} distance={12} color="#efe8d8" />
+      <pointLight position={[0, 1.7, -d / 2 + 0.7]} intensity={0.55} distance={8} color={building.accent} />
+
       <Text
         position={[0, h - 0.55, d / 2 - 0.22]}
-        fontSize={0.28}
+        fontSize={0.26}
         color="#eef2f4"
         anchorX="center"
         outlineWidth={0.02}
@@ -323,9 +322,13 @@ export function InteriorRoom({
       >
         {building.name.toUpperCase()}
       </Text>
-      <InteriorFurniture building={building} width={w} depth={d} height={h} />
-      <InteriorTerminal building={building} height={h} depth={d} />
-      {/* Exit pad (south / street side) */}
+      <Text position={[0, h - 0.95, -d / 2 + 0.25]} fontSize={0.22} color={building.accent} anchorX="center">
+        {roomTitle(theme, building)}
+      </Text>
+
+      <ThemeFurniture theme={theme} width={w} depth={d} height={h} accent={building.accent} />
+      <ThemeHotspots theme={theme} building={building} depth={d} width={w} />
+
       <mesh
         position={[0, 0.06, d / 2 - 0.9]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -334,12 +337,12 @@ export function InteriorRoom({
           onRequestExit();
         }}
       >
-        <circleGeometry args={[0.7, 24]} />
-        <meshStandardMaterial color="#6a8f6e" emissive="#3d5c3a" emissiveIntensity={0.25} roughness={0.6} />
+        <circleGeometry args={[0.72, 24]} />
+        <meshStandardMaterial color="#6a8f6e" emissive="#3d5c3a" emissiveIntensity={0.28} roughness={0.55} />
       </mesh>
       <Text
         position={[0, 1.1, d / 2 - 0.9]}
-        fontSize={0.28}
+        fontSize={0.26}
         color="#d8e8d6"
         anchorX="center"
         outlineWidth={0.02}

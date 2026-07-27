@@ -1,5 +1,13 @@
 import { NYC_DEMO_BLOCK } from "./demoBlock";
+import { furnitureSolids, resolveRoomTheme } from "./interiorLayout";
 import type { BuildingDefinition, WorldBlockConfig } from "./types";
+
+export function interiorMetrics(building: BuildingDefinition) {
+  const width = Math.max(5.2, Math.min(14, building.size.width - 0.8));
+  const depth = Math.max(5.2, Math.min(14, building.size.depth - 0.8));
+  const theme = resolveRoomTheme(building);
+  return { width, depth, theme, solids: furnitureSolids(theme, width, depth) };
+}
 
 /** 2D collision against building AABBs + world bounds. */
 export function collidesAt(
@@ -35,8 +43,7 @@ export function collidesInInterior(
   radius: number,
   building: BuildingDefinition,
 ): boolean {
-  const width = Math.max(4.5, building.size.width - 1.2);
-  const depth = Math.max(4.5, building.size.depth - 1.2);
+  const { width, depth, theme, solids } = interiorMetrics(building);
   const localX = x - building.position.x;
   const localZ = z - building.position.z;
   const halfW = width / 2;
@@ -52,27 +59,17 @@ export function collidesInInterior(
     return true;
   }
 
-  const hitsRect = (cx: number, cz: number, w: number, d: number) =>
-    localX + radius > cx - w / 2 &&
-    localX - radius < cx + w / 2 &&
-    localZ + radius > cz - d / 2 &&
-    localZ - radius < cz + d / 2;
-
-  switch (building.kind) {
-    case "trading_floor":
-      return [-1.8, 0, 1.8].some((deskX) => hitsRect(deskX, -0.35, 1.35, 0.72));
-    case "launch_arena":
-      return Math.hypot(localX, localZ + 0.1) < 1.55 + radius;
-    case "social_hub":
-      return [-1, 1].some((tableX) => hitsRect(tableX, -0.25, 1.25, 0.75));
-    case "market":
-    case "shop":
-      return hitsRect(0, -0.2, Math.min(width - 1.2, 4.2), 0.72);
-    case "hq":
-      return hitsRect(0, -0.45, Math.min(width - 1.2, 5.4), 0.9);
-    default:
-      return hitsRect(0, -0.35, Math.min(width - 1.4, 3.8), 0.72);
+  if (theme === "launch" && Math.hypot(localX, localZ + 0.15) < 1.45 + radius) {
+    return true;
   }
+
+  return solids.some(
+    (s) =>
+      localX + radius > s.x - s.w / 2 &&
+      localX - radius < s.x + s.w / 2 &&
+      localZ + radius > s.z - s.d / 2 &&
+      localZ - radius < s.z + s.d / 2,
+  );
 }
 
 /** Deterministic PRNG so world decoration is stable across renders. */
