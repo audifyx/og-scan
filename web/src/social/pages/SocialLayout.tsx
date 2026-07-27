@@ -1,160 +1,157 @@
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
+import { useState } from "react";
 import {
   Bell,
-  Hash,
-  Headphones,
+  Bookmark,
   Home,
   Mail,
-  MessageSquare,
+  MoreHorizontal,
   Radio,
   Search,
-  Sparkles,
   Trophy,
   UserRound,
   Users,
   Gift,
-  LayoutGrid,
+  Feather,
+  Globe,
 } from "lucide-react";
 import "../social.css";
 import { useSocialStore, useCurrentProfile } from "../hooks/useSocialStore";
 import { SocialRightRail } from "../components/SocialRightRail";
 
-type NavItem = { to: string; end?: boolean; label: string; icon: typeof Home };
+const PRIMARY: { to: string; end?: boolean; label: string; icon: typeof Home; match?: string[] }[] = [
+  { to: "/hq/feed", label: "Home", icon: Home, match: ["/hq", "/hq/feed"] },
+  { to: "/hq/communities", label: "Explore", icon: Search },
+  { to: "/hq/notifications", label: "Notifications", icon: Bell },
+  { to: "/hq/messages", label: "Messages", icon: Mail },
+  { to: "/hq/trading", label: "Communities", icon: Globe },
+  { to: "/hq/spaces", label: "Spaces", icon: Radio },
+  { to: "/hq/profile", label: "Profile", icon: UserRound },
+  { to: "/hq/feed", label: "Bookmarks", icon: Bookmark },
+];
 
-const GROUPS: { label: string; items: NavItem[] }[] = [
-  {
-    label: "Home",
-    items: [
-      { to: "/hq", end: true, label: "Home", icon: Home },
-      { to: "/hq/feed", label: "For you", icon: Search },
-      { to: "/hq/notifications", label: "Notifications", icon: Bell },
-    ],
-  },
-  {
-    label: "Connect",
-    items: [
-      { to: "/hq/messages", label: "Messages", icon: Mail },
-      { to: "/hq/chat", label: "Channels", icon: Hash },
-      { to: "/hq/rooms", label: "Rooms", icon: MessageSquare },
-    ],
-  },
-  {
-    label: "Communities",
-    items: [
-      { to: "/hq/communities", label: "Discover", icon: Users },
-      { to: "/hq/trading", label: "Trading", icon: LayoutGrid },
-      { to: "/hq/voice", label: "Voice", icon: Headphones },
-      { to: "/hq/spaces", label: "Spaces", icon: Radio },
-    ],
-  },
-  {
-    label: "Growth",
-    items: [
-      { to: "/hq/growth", label: "XP & invites", icon: Sparkles },
-      { to: "/hq/leaderboards", label: "Leaderboards", icon: Trophy },
-      { to: "/hq/creators", label: "Creators", icon: Gift },
-    ],
-  },
+const MORE = [
+  { to: "/hq/chat", label: "Channels" },
+  { to: "/hq/rooms", label: "Rooms" },
+  { to: "/hq/voice", label: "Voice" },
+  { to: "/hq/trading", label: "Trading" },
+  { to: "/hq/growth", label: "Growth & XP" },
+  { to: "/hq/leaderboards", label: "Leaderboards" },
+  { to: "/hq/creators", label: "Creators" },
 ];
 
 const MOBILE = [
-  { to: "/hq", end: true, label: "Home", icon: Home },
-  { to: "/hq/feed", label: "Feed", icon: Search },
-  { to: "/hq/communities", label: "Groups", icon: Users },
-  { to: "/hq/messages", label: "DMs", icon: Mail },
+  { to: "/hq/feed", label: "Home", icon: Home },
+  { to: "/hq/communities", label: "Explore", icon: Search },
+  { to: "/hq/communities", label: "Communities", icon: Users },
+  { to: "/hq/messages", label: "Messages", icon: Mail },
   { to: "/hq/profile", label: "Profile", icon: UserRound },
 ];
+
+function navActive(pathname: string, to: string, match?: string[]) {
+  if (match?.some((m) => (m === "/hq" ? pathname === "/hq" : pathname.startsWith(m)))) return true;
+  return pathname === to || pathname.startsWith(to + "/");
+}
 
 export default function SocialLayout() {
   const { notifications, currentUserId } = useSocialStore();
   const me = useCurrentProfile();
   const loc = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
   const unread = notifications.filter((n) => n.userId === currentUserId && !n.read).length;
-  const embed = ["/hq/messages", "/hq/chat", "/hq/rooms", "/hq/spaces"].some((p) => loc.pathname.startsWith(p));
+  const wide = ["/hq/messages", "/hq/chat", "/hq/rooms", "/hq/spaces"].some((p) => loc.pathname.startsWith(p));
+  const showRail = !wide;
 
   return (
     <div className="oxs-root">
+      <div className="oxs-mobile-top">
+        <Link to="/hq/feed" className="oxs-logo" style={{ padding: 0 }}>
+          <span className="oxs-logo-mark">O</span>
+          <span className="oxs-logo-text">OrbitX</span>
+        </Link>
+        <Link to="/hq/notifications" className="oxs-nav-item" style={{ padding: 8, width: "auto" }}>
+          <Bell size={22} />
+          {unread > 0 ? <span className="oxs-nav-badge">{unread > 9 ? "9+" : unread}</span> : null}
+        </Link>
+      </div>
+
       <div className="oxs-shell">
-        {/* Discord server rail */}
-        <aside className="oxs-icon-rail" aria-label="Servers">
-          <NavLink to="/hq" end className={({ isActive }) => `oxs-server${isActive ? " active" : ""}`} title="OrbitX">
-            OX
-          </NavLink>
-          <div className="oxs-server-divider" />
-          <NavLink to="/hq/communities" className={({ isActive }) => `oxs-server${isActive ? " active" : ""}`} title="Communities">
-            <Users size={20} />
-          </NavLink>
-          <NavLink to="/hq/chat" className={({ isActive }) => `oxs-server${isActive ? " active" : ""}`} title="Channels">
-            <Hash size={20} />
-          </NavLink>
-          <NavLink to="/hq/voice" className={({ isActive }) => `oxs-server${isActive ? " active" : ""}`} title="Voice">
-            <Headphones size={20} />
-          </NavLink>
-          <NavLink to="/hq/trading" className={({ isActive }) => `oxs-server${isActive ? " active" : ""}`} title="Trading">
-            <LayoutGrid size={20} />
-          </NavLink>
-        </aside>
+        <header className="oxs-left">
+          <div>
+            <Link to="/hq/feed" className="oxs-logo">
+              <span className="oxs-logo-mark">O</span>
+              <span className="oxs-logo-text">OrbitX</span>
+            </Link>
 
-        {/* Discord channel list */}
-        <nav className="oxs-nav" aria-label="Social navigation">
-          <div className="oxs-nav-head">
-            <div className="oxs-brand">
-              OrbitX Social
-              <span>X · Telegram · Discord</span>
-            </div>
-          </div>
-          {GROUPS.map((g) => (
-            <div key={g.label} className="oxs-nav-group">
-              <div className="oxs-nav-label">{g.label}</div>
-              {g.items.map(({ to, end, label, icon: Icon }) => (
-                <NavLink key={to} to={to} end={end} className={({ isActive }) => (isActive ? "active" : undefined)}>
-                  <Icon size={18} />
-                  {label}
-                  {label === "Notifications" && unread > 0 ? (
-                    <span className="oxs-badge" style={{ marginLeft: "auto", fontSize: "0.62rem" }}>
-                      {unread}
-                    </span>
-                  ) : null}
-                </NavLink>
-              ))}
-            </div>
-          ))}
-          <NavLink to="/hq/profile" className={({ isActive }) => (isActive ? "active" : undefined)} style={{ marginTop: "0.25rem" }}>
-            <UserRound size={18} />
-            Profile
-          </NavLink>
-          <div className="oxs-nav-foot">
-            <a href="/intel">Crypto intel →</a>
-            <a href="/ORBITX_DEX">DEX →</a>
-          </div>
-          {me ? (
-            <div className="oxs-user-pill">
-              <div className="oxs-avatar">{me.displayName.slice(0, 2).toUpperCase()}</div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="name">{me.displayName}</div>
-                <div className="handle">@{me.username}</div>
+            <nav className="oxs-nav-list" aria-label="Primary">
+              {PRIMARY.map(({ to, end, label, icon: Icon, match }) => {
+                const active = navActive(loc.pathname, to, match);
+                return (
+                  <NavLink
+                    key={`${to}-${label}`}
+                    to={to}
+                    end={end}
+                    className={`oxs-nav-item${active ? " active" : ""}`}
+                  >
+                    <Icon size={26} strokeWidth={active ? 2.5 : 2} />
+                    <span className="oxs-nav-label">{label}</span>
+                    {label === "Notifications" && unread > 0 ? (
+                      <span className="oxs-nav-badge">{unread > 9 ? "9+" : unread}</span>
+                    ) : null}
+                  </NavLink>
+                );
+              })}
+
+              <div className={`oxs-more-wrap${moreOpen ? " open" : ""}`}>
+                <button
+                  type="button"
+                  className="oxs-nav-item"
+                  style={{ width: "100%", border: "none", background: "transparent", cursor: "pointer", font: "inherit" }}
+                  onClick={() => setMoreOpen((v) => !v)}
+                >
+                  <MoreHorizontal size={26} />
+                  <span className="oxs-nav-label">More</span>
+                </button>
+                <div className="oxs-more-menu">
+                  {MORE.map((m) => (
+                    <Link key={m.to} to={m.to} onClick={() => setMoreOpen(false)}>
+                      {m.label}
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : null}
-        </nav>
+            </nav>
 
-        {/* Center — X feed column */}
-        <main className={`oxs-main${embed ? " oxs-main--wide" : ""}`}>
+            <Link to="/hq/feed" className="oxs-post-btn">
+              <Feather size={22} />
+              <span>Post</span>
+            </Link>
+          </div>
+
+          {me ? (
+            <Link to="/hq/profile" className="oxs-user-bar">
+              <div className="oxs-avatar">{me.displayName.slice(0, 2).toUpperCase()}</div>
+              <div className="oxs-user-meta">
+                <div className="oxs-user-name">{me.displayName}</div>
+                <div className="oxs-user-handle">@{me.username}</div>
+              </div>
+            </Link>
+          ) : null}
+        </header>
+
+        <main className={`oxs-main oxs-main--mobile-pad${wide ? " oxs-main--wide" : ""}`}>
           <div className="oxs-main-inner">
             <Outlet />
           </div>
         </main>
 
-        {/* Right — X trends rail */}
-        {!embed ? <SocialRightRail /> : null}
+        {showRail ? <SocialRightRail /> : null}
       </div>
 
-      {/* Mobile bottom nav */}
       <nav className="oxs-mobile-bar" aria-label="Mobile">
-        {MOBILE.map(({ to, end, label, icon: Icon }) => (
-          <NavLink key={to} to={to} end={end} className={({ isActive }) => (isActive ? "active" : undefined)}>
+        {MOBILE.map(({ to, label, icon: Icon }) => (
+          <NavLink key={`${to}-${label}`} to={to} className={({ isActive }) => (isActive ? "active" : undefined)}>
             <Icon />
-            {label}
           </NavLink>
         ))}
       </nav>

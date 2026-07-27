@@ -8,7 +8,7 @@ export default function CommunitiesHub() {
 
   return (
     <div>
-      <SocialPageHeader title="Communities" subtitle="Discord-style groups for traders, gamers, and creators." />
+        <SocialPageHeader title="Explore" subtitle="Discover communities, token rooms, and groups." />
 
       <div className="oxs-grid oxs-grid-2">
         {communities.map((c) => {
