@@ -1,14 +1,16 @@
 import { FormEvent, useMemo, useState } from "react";
+import { Image, Smile } from "lucide-react";
 import { PostCard } from "../components/PostCard";
-import { useSocialStore } from "../hooks/useSocialStore";
+import { SocialPageHeader } from "../components/SocialPageHeader";
+import { useCurrentProfile, useSocialStore } from "../hooks/useSocialStore";
 import { createPost, isSpammy } from "../store/localSocialStore";
 
 export default function NetworkFeed() {
   const { posts, profiles, currentUserId } = useSocialStore();
+  const me = useCurrentProfile();
   const [tab, setTab] = useState<"foryou" | "following">("foryou");
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const me = profiles.find((p) => p.id === currentUserId);
 
   const feed = useMemo(() => {
     if (tab === "following" && me) {
@@ -37,52 +39,53 @@ export default function NetworkFeed() {
 
   return (
     <div>
-      <header className="oxs-hero">
-        <h1>Feed</h1>
-        <p>Posts, comments, likes, and following — the OrbitX social network timeline.</p>
-      </header>
+      <SocialPageHeader title="Home" subtitle="See what's happening in OrbitX." />
 
-      <form className="oxs-panel" onSubmit={onPost} style={{ marginBottom: "1rem" }}>
-        <h3>Compose</h3>
-        <textarea
-          className="oxs-textarea"
-          placeholder="Share alpha, lobby invites, or community updates…"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          maxLength={2000}
-        />
-        {error && (
-          <p style={{ color: "var(--oxs-danger)", fontSize: "0.82rem", margin: "0.45rem 0 0" }}>{error}</p>
-        )}
-        <div style={{ marginTop: "0.65rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span className="oxs-muted" style={{ fontSize: "0.75rem" }}>
-            Anti-spam on · {draft.length}/2000
-          </span>
-          <button className="oxs-btn" type="submit" disabled={!draft.trim()}>
-            Post
-          </button>
-        </div>
-      </form>
-
-      <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.75rem" }}>
+      <div className="oxs-tabs">
         {(["foryou", "following"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            className={tab === t ? "oxs-btn" : "oxs-btn oxs-btn-ghost"}
-            onClick={() => setTab(t)}
-          >
+          <button key={t} type="button" className={`oxs-tab${tab === t ? " active" : ""}`} onClick={() => setTab(t)}>
             {t === "foryou" ? "For you" : "Following"}
           </button>
         ))}
       </div>
 
-      <div className="oxs-panel">
-        {feed.length === 0 && <p className="oxs-muted">No posts in this view yet.</p>}
-        {feed.map((p) => (
+      <form className="oxs-compose" onSubmit={onPost}>
+        <div className="oxs-avatar">{me?.displayName.slice(0, 2).toUpperCase() || "?"}</div>
+        <div style={{ flex: 1 }}>
+          <textarea
+            className="oxs-textarea"
+            placeholder="What's happening?"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            maxLength={2000}
+          />
+          <div className="oxs-compose-actions">
+            <div style={{ display: "flex", gap: "0.25rem", color: "var(--oxs-x)" }}>
+              <button type="button" className="oxs-btn-ghost" style={{ padding: "0.35rem", border: "none", borderRadius: "999px" }} aria-label="Media">
+                <Image size={18} />
+              </button>
+              <button type="button" className="oxs-btn-ghost" style={{ padding: "0.35rem", border: "none", borderRadius: "999px" }} aria-label="Emoji">
+                <Smile size={18} />
+              </button>
+              <span className="oxs-muted" style={{ fontSize: "0.75rem", alignSelf: "center", marginLeft: "0.35rem" }}>
+                {draft.length}/2000
+              </span>
+            </div>
+            <button className="oxs-btn" type="submit" disabled={!draft.trim()}>
+              Post
+            </button>
+          </div>
+          {error ? <p style={{ color: "var(--oxs-red)", fontSize: "0.82rem", margin: "0.45rem 0 0" }}>{error}</p> : null}
+        </div>
+      </form>
+
+      {feed.length === 0 ? (
+        <div className="oxs-panel oxs-muted">No posts in this view yet.</div>
+      ) : (
+        feed.map((p) => (
           <PostCard key={p.id} post={p} author={profiles.find((x) => x.id === p.authorId)} meId={currentUserId} />
-        ))}
-      </div>
+        ))
+      )}
     </div>
   );
 }
