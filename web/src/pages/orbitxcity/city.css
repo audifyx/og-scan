@@ -531,6 +531,26 @@ body.oxc-lock {
   .oxc-help { display: flex; }
 }
 
+.oxc-reset-btn {
+  margin-top: 0.35rem;
+  align-self: flex-end;
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--oxc-cyan) 40%, transparent);
+  background: rgba(8, 16, 22, 0.7);
+  color: var(--oxc-cyan);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.55rem;
+  border-radius: 7px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.oxc-reset-btn:hover {
+  background: color-mix(in srgb, var(--oxc-cyan) 16%, transparent);
+  border-color: var(--oxc-cyan);
+}
+
 /* ΓöÇΓöÇ Live ticker bar ΓöÇΓöÇ */
 .oxc-tickerbar {
   position: absolute;

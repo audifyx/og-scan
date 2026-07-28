@@ -345,8 +345,8 @@ export function MainMenu() {
       <footer className="oxc-menu-foot">
         <span className="oxc-menu-meta">
           {isTouch
-            ? "Joystick · Jump · Sprint · Tap E to interact"
-            : "WASD · E interact · Shift sprint · Space jump"}
+            ? "Joystick · walk into doorways · Tap E for venue tools"
+            : "WASD · walk through doors to enter · E venue tools · Shift sprint"}
         </span>
         <p className="oxc-menu-powered">Powered by OrbitX · holographic bridge v2</p>
       </footer>
