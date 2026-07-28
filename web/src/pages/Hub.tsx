@@ -128,7 +128,7 @@ const ALL_APPS: App[] = [
   { key: "ai", name: "AI Assistant", caption: "Help & support", href: "/ai-chat", tone: "#14a0ff", iconBg: "linear-gradient(135deg, #14a0ff, #0077b6)", glyph: Glyph.ai },
   { key: "social", name: "Social", caption: "Feed & spaces", href: "/orbitx-social", tone: "#9945FF", iconBg: "linear-gradient(135deg, #8A2BE2, #4B0082)", glyph: Glyph.social },
   { key: "gaming", name: "Gaming", caption: "Climb & win", href: "https://degen-tower.vercel.app", external: true, tone: "#FF5BBD", iconBg: "linear-gradient(135deg, #FF3EAA, #B20067)", glyph: Glyph.gaming },
-  { key: "predict", name: "Predictions", caption: "Provably fair", href: "https://solno.fun", external: true, tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFB020, #D47900)", glyph: Glyph.predict },
+  { key: "predict", name: "Predictions", caption: "Trade YES/NO", href: "/predictions", tone: "#FFC53D", iconBg: "linear-gradient(135deg, #FFB020, #D47900)", glyph: Glyph.predict },
   { key: "nft", name: "NFT Market", caption: "Mint & trade", href: "/nft", tone: "#00FFA3", iconBg: "linear-gradient(135deg, #00FFA3, #00C776)", glyph: <div style={{ fontSize: "20px" }}>🖼️</div> },
   { key: "bagwork", name: "Bagwork", caption: "Earn USDC", href: "/bagwork", tone: "#F0C75E", iconBg: "linear-gradient(135deg, #F0C75E, #B8860B)", glyph: <div style={{ fontSize: "20px" }}>💼</div> },
 ];

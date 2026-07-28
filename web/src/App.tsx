@@ -107,6 +107,10 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import PlatformWhitepaper from "./pages/platform/Whitepaper";
 import PlatformRoadmap from "./pages/platform/Roadmap";
+import PredictionsLayout from "./pages/predictions/PredictionsLayout";
+import PredictionsHome from "./pages/predictions/PredictionsHome";
+import PredictionsMarket from "./pages/predictions/PredictionsMarket";
+import PredictionsPortfolio from "./pages/predictions/PredictionsPortfolio";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
 import { EvmWalletProvider } from "@/hooks/useEvmWallet";
@@ -235,6 +239,11 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/whitepaper" element={<PlatformWhitepaper />} />
             <Route path="/roadmap" element={<PlatformRoadmap />} />
+            <Route path="/predictions" element={<PredictionsLayout />}>
+              <Route index element={<PredictionsHome />} />
+              <Route path="market/:id" element={<PredictionsMarket />} />
+              <Route path="portfolio" element={<PredictionsPortfolio />} />
+            </Route>
             <Route path="/r/:id" element={<ReportView />} />
             <Route path="/t/:mint" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mint}`} />} />
             <Route path="/track-record" element={<OgdexRedirect to="/ORBITX_DEX" />} />

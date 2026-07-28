@@ -39,7 +39,7 @@ export const OS_APPS: OsAppDef[] = [
   { id: "launchpad", name: "Launchpad", blurb: "Fair launch console", href: "/intel/launch", accent: "#ff6b35", category: "trade" },
   { id: "nft", name: "NFT Market", blurb: "Create, trade, collect", href: "/nft", accent: "#a78bfa", category: "trade" },
   { id: "games", name: "Games Hub", blurb: "Play Studio · classes & missions", href: "/play", accent: "#17ff4d", category: "play" },
-  { id: "predictions", name: "Prediction Markets", blurb: "Markets & 1v1 games", href: "/play", accent: "#f5c542", category: "play" },
+  { id: "predictions", name: "Prediction Markets", blurb: "Markets & 1v1 games", href: "/predictions", accent: "#f5c542", category: "play" },
   { id: "lobbies", name: "Game Lobbies", blurb: "Matchmaking & rooms", href: "/play/multiplayer", accent: "#3de7ff", category: "play" },
   { id: "social", name: "Social Feed", blurb: "Posts, follows, signals", href: "/orbitx-social", accent: "#ff4d9a", category: "social" },
   { id: "communities", name: "Communities", blurb: "Guilds & coin hubs", href: "/orbitx-social", accent: "#3de7ff", category: "social" },

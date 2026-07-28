@@ -94,6 +94,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="privacy" element={<PlatformDocRedirect path="/privacy" />} />
           <Route path="whitepaper" element={<PlatformDocRedirect path="/whitepaper" />} />
           <Route path="roadmap" element={<PlatformDocRedirect path="/roadmap" />} />
+          <Route path="predictions" element={<PlatformDocRedirect path="/predictions" />} />
           <Route path="leaderboard" element={<Suspense fallback={<PageFallback />}><Leaderboard /></Suspense>} />
           {/* Phase 2: Status page */}
           <Route path="status" element={<Suspense fallback={<PageFallback />}><Status /></Suspense>} />

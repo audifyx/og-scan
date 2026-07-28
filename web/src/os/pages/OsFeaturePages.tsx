@@ -180,13 +180,13 @@ export function OsPredictionsPage() {
     <FeatureShell
       kicker="Prediction markets"
       title="Odds arena"
-      lead="OrbitX prediction surfaces and partner markets in one play lane."
-      primaryHref="/games"
-      primaryLabel="Open prediction apps"
-      secondaryHref="/games"
-      secondaryLabel="Games hub"
+      lead="OrbitX Predictions — on-chain markets linked to DEX intel. Launching soon."
+      primaryHref="/predictions"
+      primaryLabel="Coming soon page"
+      secondaryHref="/play"
+      secondaryLabel="Play Studio"
     >
-      <PreviewFrame label="Prediction Board" href="/games" />
+      <PreviewFrame label="Prediction Board" href="/predictions" />
     </FeatureShell>
   );
 }
