@@ -6,8 +6,8 @@ import { fmtUsd, compact, short } from "../lib/api";
 import { timeAgo } from "../lib/format";
 import TokenLogo from "../components/TokenLogo";
 import Copyable from "../components/Copyable";
-import { Radio, ExternalLink, Search, ArrowUpRight, ArrowDownRight, BadgeCheck, Plus, Loader2, X, Activity, Flame, Wallet2, TrendingUp } from "lucide-react";
-import { PageHero } from "../components/PageShell";
+import { Radio, ExternalLink, Search, ArrowUpRight, ArrowDownRight, BadgeCheck, Plus, Loader2, X, Activity, Flame, Wallet2, TrendingUp, Filter, Users } from "lucide-react";
+import { CommandHero, QuickToolGrid, SegTabs } from "../components/DexAdvanced";
 
 const RANGES: [string, number][] = [["1h", 3600e3], ["6h", 6 * 3600e3], ["24h", 864e5], ["7d", 7 * 864e5]];
 
@@ -15,12 +15,27 @@ export default function KolScanner() {
   const [view, setView] = useState<"feed" | "leaderboard">("feed");
   return (
     <div>
-      <PageHero kicker="Smart money" title="KOL" sub="Track KOL wallets, live swaps, and PnL intel." icon={Radio}>
-        <div className="mt-4 flex gap-1 dex-tab-segment-wrap !inline-flex">
-          <button type="button" onClick={() => setView("feed")} className={`dex-tab-segment ${view === "feed" ? "dex-tab-segment--on" : ""}`}>Live feed</button>
-          <button type="button" onClick={() => setView("leaderboard")} className={`dex-tab-segment ${view === "leaderboard" ? "dex-tab-segment--on" : ""}`}>Leaderboard</button>
+      <CommandHero
+        kicker="Smart money terminal"
+        title="KOL Intel"
+        sub="Live swap tape, smart-money leaderboard, flow stats, and token-level KOL activity."
+        icon={Radio}
+      >
+        <div className="mt-4">
+          <SegTabs tabs={[
+            { id: "feed" as const, label: "Live feed" },
+            { id: "leaderboard" as const, label: "Leaderboard" },
+          ]} value={view} onChange={setView} />
         </div>
-      </PageHero>
+      </CommandHero>
+
+      <QuickToolGrid links={[
+        { to: "/kol/community", label: "Community KOLs", desc: "Nominate wallets", Icon: Users },
+        { to: "/copy-trade", label: "Copy tracking", desc: "Follow trades", Icon: Wallet2 },
+        { to: "/wallet", label: "Wallet intel", desc: "Portfolio lookup", Icon: Wallet2 },
+        { to: "/pulse", label: "Pulse", desc: "Market signals", Icon: Flame },
+      ]} />
+
       {view === "feed" ? <LiveFeed /> : <Leaderboard />}
     </div>
   );
@@ -43,6 +58,8 @@ function LiveFeed() {
   const [feed, setFeed] = useState<KolFeedItem[]>([]);
   const [side, setSide] = useState<"" | "buy" | "sell">("");
   const [range, setRange] = useState(864e5);
+  const [tokenQ, setTokenQ] = useState("");
+  const [minUsd, setMinUsd] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -53,7 +70,13 @@ function LiveFeed() {
     return () => { on = false; clearInterval(id); };
   }, [side]);
 
-  const rows = useMemo(() => feed.filter((f) => !f.time || Date.now() - f.time <= range), [feed, range]);
+  const rows = useMemo(() => feed.filter((f) => {
+    if (f.time && Date.now() - f.time > range) return false;
+    if (minUsd > 0 && (f.usdValue || 0) < minUsd) return false;
+    const tq = tokenQ.trim().toLowerCase();
+    if (tq && !((f.symbol || "").toLowerCase().includes(tq) || (f.mint || "").toLowerCase().includes(tq) || (f.name || "").toLowerCase().includes(tq))) return false;
+    return true;
+  }), [feed, range, minUsd, tokenQ]);
 
   // ── Aggregate flow intel from the visible tape ──
   const stats = useMemo(() => {
@@ -107,6 +130,17 @@ function LiveFeed() {
       )}
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="relative flex-1 min-w-[140px] max-w-xs">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+          <input value={tokenQ} onChange={(e) => setTokenQ(e.target.value)} placeholder="Filter token…" className="inp !pl-8 !py-1.5 !text-xs w-full" />
+        </div>
+        <div className="flex gap-1 bg-panel border border-line rounded-md p-1">
+          {[0, 500, 2000, 10000].map((n) => (
+            <button key={n} type="button" onClick={() => setMinUsd(n)} className={`btn text-[10px] term ${minUsd === n ? "bg-accent/15 text-accent" : "text-muted hover:text-white"}`}>
+              {n === 0 ? "Any $" : `$${n >= 1000 ? n / 1000 + "k" : n}+`}
+            </button>
+          ))}
+        </div>
         <div className="flex gap-1 bg-panel border border-line rounded-md p-1">
           {[["", "ALL"], ["buy", "BUYS"], ["sell", "SELLS"]].map(([id, label]) => (
             <button key={id} onClick={() => setSide(id as any)} className={`btn text-[11px] term ${side === id ? (id === "sell" ? "bg-down/15 text-down" : "bg-accent/15 text-accent") : "text-muted hover:text-white"}`}>{label}</button>

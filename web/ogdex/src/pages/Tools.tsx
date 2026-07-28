@@ -4,26 +4,31 @@ import {
   Shield, Users, Droplets, Wallet2, Calculator, Search, Loader2, ArrowRight,
   Crosshair, ExternalLink, CheckCircle2, XCircle, AlertTriangle, RefreshCw,
   Clock, TrendingUp, TrendingDown, Flame, Rocket, DollarSign, Star, Share2, Check,
+  Percent, BarChart3, Layers,
 } from "lucide-react";
 import {
   isMint, tokenHolders, liquidityScan, walletProfile,
   type Holder, type Pool, type WalletProfile,
 } from "../lib/scan";
 import { getScreener, fmtUsd, compact, type Row } from "../lib/api";
-import { PageHero, DexPanel } from "../components/PageShell";
+import { DexPanel } from "../components/PageShell";
+import { CommandHero, QuickToolGrid, StatDeck } from "../components/DexAdvanced";
 
 const Launch = lazy(() => import("./Launch"));
 
-type ToolId = "create" | "sniper" | "holders" | "liquidity" | "wallet" | "staking" | "il";
+type ToolId = "create" | "sniper" | "holders" | "liquidity" | "wallet" | "staking" | "il" | "tax" | "mcap" | "dca";
 
 const TOOLS: { id: ToolId; label: string; desc: string; cmd: string; Icon: typeof Shield; kind: "feed" | "mint" | "wallet" | "calc" | "create"; ph: string }[] = [
-  { id: "create",   label: "Create token",     desc: "Multi-chain launcher",       cmd: "launch --chain",    Icon: Rocket,     kind: "create", ph: "" },
-  { id: "sniper",   label: "Token Sniper",     desc: "Live pump.fun launches",     cmd: "snipe --live",      Icon: Crosshair,  kind: "feed",   ph: "" },
-  { id: "holders",  label: "Holder Analysis",  desc: "Top holder distribution",    cmd: "holders --top 20",  Icon: Users,      kind: "mint",   ph: "paste token contract address" },
-  { id: "liquidity",label: "Liquidity Scanner",desc: "Pools & liquidity depth",    cmd: "liq --depth",       Icon: Droplets,   kind: "mint",   ph: "paste token contract address" },
-  { id: "wallet",   label: "Wallet Profiler",  desc: "Holdings & activity",        cmd: "profile --wallet",  Icon: Wallet2,    kind: "wallet", ph: "paste wallet address" },
-  { id: "staking",  label: "Staking Calc",     desc: "Estimate staking rewards",   cmd: "calc --stake",      Icon: Calculator, kind: "calc",   ph: "" },
-  { id: "il",       label: "Impermanent Loss", desc: "LP loss vs holding",         cmd: "calc --il",         Icon: AlertTriangle, kind: "calc", ph: "" },
+  { id: "create",    label: "Create token",      desc: "Multi-chain launcher",       cmd: "launch --chain",    Icon: Rocket,        kind: "create", ph: "" },
+  { id: "sniper",    label: "Token Sniper",      desc: "Live pump.fun launches",     cmd: "snipe --live",      Icon: Crosshair,     kind: "feed",   ph: "" },
+  { id: "holders",   label: "Holder Analysis",   desc: "Top holder distribution",    cmd: "holders --top 20",  Icon: Users,         kind: "mint",   ph: "paste token contract address" },
+  { id: "liquidity", label: "Liquidity Scanner", desc: "Pools & liquidity depth",    cmd: "liq --depth",       Icon: Droplets,      kind: "mint",   ph: "paste token contract address" },
+  { id: "wallet",    label: "Wallet Profiler",   desc: "Holdings & activity",        cmd: "profile --wallet",  Icon: Wallet2,       kind: "wallet", ph: "paste wallet address" },
+  { id: "staking",   label: "Staking Calc",      desc: "Estimate staking rewards",   cmd: "calc --stake",      Icon: Calculator,    kind: "calc",   ph: "" },
+  { id: "il",        label: "Impermanent Loss",  desc: "LP loss vs holding",         cmd: "calc --il",         Icon: AlertTriangle, kind: "calc",   ph: "" },
+  { id: "tax",       label: "PnL Estimator",     desc: "Rough gain/loss calculator", cmd: "calc --pnl",        Icon: Percent,       kind: "calc",   ph: "" },
+  { id: "mcap",      label: "MCap Calculator",   desc: "Price × supply scenarios",   cmd: "calc --mcap",       Icon: BarChart3,     kind: "calc",   ph: "" },
+  { id: "dca",       label: "DCA Simulator",     desc: "Dollar-cost average model",  cmd: "calc --dca",        Icon: Layers,        kind: "calc",   ph: "" },
 ];
 
 const fmt = (n: number | null | undefined, d = 2) =>
@@ -61,13 +66,27 @@ export default function Tools() {
   const pickTool = (id: ToolId) => { setTool(id); setResult(null); setError(""); setInput(""); };
 
   return (
-    <div className="mx-auto max-w-[1080px] space-y-6">
-      <PageHero
-        kicker="Terminal tools"
+    <div className="mx-auto max-w-[1080px] space-y-4">
+      <CommandHero
+        kicker="Terminal toolbox"
         title="Tools"
-        sub="Sniper feeds, holder analysis, liquidity scans, wallet profiles — plus multi-chain token create."
+        sub="Sniper feeds, holder analysis, liquidity scans, wallet profiles, calculators, and multi-chain token create."
         icon={Crosshair}
       />
+
+      <StatDeck items={[
+        { label: "TOOLS", value: TOOLS.length, sub: "built-in utilities", tone: "blue" },
+        { label: "SNIPER", value: "Live", sub: "pump.fun feeds", tone: "up" },
+        { label: "CHAINS", value: "16+", sub: "create token", tone: "gold" },
+        { label: "API", value: "Free", sub: "public endpoints", tone: "plain" },
+      ]} />
+
+      <QuickToolGrid links={[
+        { to: "/scanner", label: "OG Scanner", desc: "Forensic attribution", Icon: Shield },
+        { to: "/pulse", label: "Pulse", desc: "Live signals", Icon: Flame },
+        { to: "/kol", label: "KOL tape", desc: "Smart money", Icon: TrendingUp },
+        { to: "/wallet", label: "Wallets", desc: "Portfolio intel", Icon: Wallet2 },
+      ]} />
 
       <div className="flex flex-wrap gap-2">
         {TOOLS.map((t) => (
@@ -97,7 +116,7 @@ export default function Tools() {
         <p className="mt-1 text-sm text-[var(--ox-silver)]">{active.desc}</p>
       </div>
 
-      {tool === "sniper" ? <TokenSniper /> : tool === "staking" ? <StakingCalc /> : tool === "il" ? <ImpermanentLoss /> : (
+      {tool === "sniper" ? <TokenSniper /> : tool === "staking" ? <StakingCalc /> : tool === "il" ? <ImpermanentLoss /> : tool === "tax" ? <PnlCalc /> : tool === "mcap" ? <McapCalc /> : tool === "dca" ? <DcaCalc /> : (
         <>
           <form onSubmit={run} className="flex items-center gap-2 rounded-xl border border-line bg-panel p-2 focus-within:border-accent/60">
             <span className="term text-xs pl-2 shrink-0 select-none text-[var(--ox-blue-hi)]">{active.cmd}</span>
@@ -459,6 +478,69 @@ function ImpermanentLoss() {
         </div>
       </div>
       <p className="text-[11px] text-muted">Note: this does not account for trading fees earned, which can offset impermanent loss.</p>
+    </div>
+  );
+}
+
+function PnlCalc() {
+  const [buy, setBuy] = useState("0.001");
+  const [sell, setSell] = useState("0.002");
+  const [qty, setQty] = useState("1000000");
+  const b = Number(buy) || 0, s = Number(sell) || 0, q = Number(qty) || 0;
+  const cost = b * q, proceeds = s * q, pnl = proceeds - cost;
+  const pct = cost ? (pnl / cost) * 100 : 0;
+  return (
+    <div className="space-y-4 rounded-2xl border border-line bg-panel2/40 p-5">
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="Buy price" value={buy} onChange={setBuy} suffix="USD" />
+        <Field label="Sell price" value={sell} onChange={setSell} suffix="USD" />
+        <Field label="Quantity" value={qty} onChange={setQty} suffix="tokens" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl border border-line bg-bg/50 p-4"><div className="text-[11px] uppercase text-muted">PnL</div><div className={`mt-1 text-xl font-black ${pnl >= 0 ? "text-up" : "text-down"}`}>{pnl >= 0 ? "+" : ""}{fmtUsd(pnl)}</div></div>
+        <div className="rounded-xl border border-line bg-bg/50 p-4"><div className="text-[11px] uppercase text-muted">Return</div><div className={`mt-1 text-xl font-black ${pct >= 0 ? "text-up" : "text-down"}`}>{pct >= 0 ? "+" : ""}{pct.toFixed(1)}%</div></div>
+      </div>
+    </div>
+  );
+}
+
+function McapCalc() {
+  const [price, setPrice] = useState("0.001");
+  const [supply, setSupply] = useState("1000000000");
+  const p = Number(price) || 0, s = Number(supply) || 0;
+  const mcap = p * s;
+  return (
+    <div className="space-y-4 rounded-2xl border border-line bg-panel2/40 p-5">
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Price" value={price} onChange={setPrice} suffix="USD" />
+        <Field label="Supply" value={supply} onChange={setSupply} suffix="tokens" />
+      </div>
+      <div className="rounded-xl border border-accent/30 bg-accent/10 p-4 text-center">
+        <div className="text-[11px] uppercase text-muted">Market cap</div>
+        <div className="mt-1 text-2xl font-black text-white">{fmtUsd(mcap)}</div>
+      </div>
+    </div>
+  );
+}
+
+function DcaCalc() {
+  const [weekly, setWeekly] = useState("100");
+  const [weeks, setWeeks] = useState("12");
+  const [avgPrice, setAvgPrice] = useState("0.001");
+  const w = Number(weekly) || 0, n = Number(weeks) || 0, ap = Number(avgPrice) || 0;
+  const invested = w * n;
+  const tokens = ap > 0 ? invested / ap : 0;
+  return (
+    <div className="space-y-4 rounded-2xl border border-line bg-panel2/40 p-5">
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="Weekly buy" value={weekly} onChange={setWeekly} suffix="USD" />
+        <Field label="Weeks" value={weeks} onChange={setWeeks} suffix="wks" />
+        <Field label="Avg price" value={avgPrice} onChange={setAvgPrice} suffix="USD" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl border border-line bg-bg/50 p-4"><div className="text-[11px] uppercase text-muted">Total invested</div><div className="mt-1 text-xl font-black text-white">{fmtUsd(invested)}</div></div>
+        <div className="rounded-xl border border-line bg-bg/50 p-4"><div className="text-[11px] uppercase text-muted">Tokens acquired</div><div className="mt-1 text-xl font-black text-accent">{tokens.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div></div>
+      </div>
     </div>
   );
 }

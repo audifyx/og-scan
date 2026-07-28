@@ -8,7 +8,7 @@ import {
   forensicOgAttribution, tokenEffectiveLiquidityUsd, fmtUsd, fmtNum, shortAddr,
   type ForensicOgReport, type JupTokenInfo, type TokenLineageNode, type TokenForensicScores,
 } from "../lib/og";
-import { PageHero } from "../components/PageShell";
+import { CommandHero, QuickToolGrid, StatDeck, LiveRefresh, ViewToggle } from "../components/DexAdvanced";
 
 const num = (n: any) => (Number.isFinite(Number(n)) ? Number(n) : null);
 
@@ -132,12 +132,18 @@ export default function OgScanner() {
 
   return (
     <div className="mx-auto max-w-[980px] space-y-4">
-      <PageHero
-        kicker="Forensic mode"
-        title="Scanner"
-        sub="Trace token lineage, identify the TRUE OG, expose clones and fake revivals."
+      <CommandHero
+        kicker="Forensic intelligence"
+        title="OG Scanner"
+        sub="Trace token lineage, identify the TRUE OG, expose clones, fake revivals, and bundle risk."
         icon={Crosshair}
       />
+
+      <div className="flex flex-wrap gap-2 mb-2">
+        {["BONK", "WIF", "POPCAT", "MOG"].map((preset) => (
+          <button key={preset} type="button" onClick={() => setQ(preset)} className="dex-cat-pill !text-xs">${preset}</button>
+        ))}
+      </div>
 
       {/* Search */}
       <div className="flex items-center gap-2 rounded-lg border border-line bg-panel p-2 focus-within:border-accent/60 focus-within:shadow-glow-term">

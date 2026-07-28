@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Loader2, Search, RefreshCw, Feather, TrendingUp, Flame, Droplets, Crosshair,
+  Loader2, Search, Feather, TrendingUp, Flame, Droplets, Crosshair,
   Copy, Check, ExternalLink, ArrowUpRight, ArrowDownRight, Users, Clock, Layers,
 } from "lucide-react";
 import { getScreener, Row, fmtUsd, short } from "../lib/api";
-import { PageHero } from "../components/PageShell";
+import { CommandHero, QuickToolGrid, LiveRefresh, StatDeck, ViewToggle } from "../components/DexAdvanced";
 
 type SortKey = "volume" | "mcap" | "liquidity" | "change" | "holders" | "newest" | "gainers" | "losers";
 type CapKey = "all" | "low" | "mid" | "high";
@@ -75,6 +75,7 @@ export default function Robinhood() {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<SortKey>("volume");
   const [cap, setCap] = useState<CapKey>("all");
+  const [layout, setLayout] = useState<"grid" | "list">("grid");
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const { copied, copy } = useCopy();
 
@@ -113,7 +114,7 @@ export default function Robinhood() {
   const gainers = useMemo(() => rows.filter((r) => (r.change24h || 0) > 0).length, [rows]);
   const avgChange = useMemo(() => rows.length ? rows.reduce((s, r) => s + (r.change24h || 0), 0) / rows.length : 0, [rows]);
 
-  const view = useMemo(() => {
+  const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     let out = rows.filter((r) => {
       if (s && !((r.name || "").toLowerCase().includes(s) ||
@@ -144,29 +145,32 @@ export default function Robinhood() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-4">
-      <PageHero
-        kicker="Robinhood chain"
-        title="Robinhood feed"
-        sub="Live meme coins on Robinhood chain — market data via GeckoTerminal."
+      <CommandHero
+        kicker="Robinhood chain · HOOD"
+        title="Robinhood Feed"
+        sub="Live meme coins on Robinhood Chain — market data via GeckoTerminal + DexScreener fallback."
         icon={Feather}
-      >
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Link to="/robinhood/scanner" className="dex-btn dex-btn--blue !py-2 !text-xs"><Crosshair className="w-3.5 h-3.5" /> Scanner</Link>
-          <span className="pill bg-accent/15 text-accent text-[10px] font-bold">{rows.length} coins</span>
-          {totalVol > 0 && <span className="pill bg-up/10 text-up text-[10px] font-bold">{fmtUsd(totalVol, { compact: true })} 24h</span>}
-          <button type="button" onClick={() => load(true)} className="dex-btn dex-btn--ghost !py-2 !text-xs">
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
-          </button>
-        </div>
-      </PageHero>
+        actions={
+          <>
+            <Link to="/robinhood/scanner" className="dex-btn dex-btn--blue !py-2 !text-xs"><Crosshair className="w-3.5 h-3.5" /> Scanner</Link>
+            <LiveRefresh onClick={() => load(true)} loading={refreshing} />
+          </>
+        }
+      />
 
-      {/* Market overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="card p-3"><div className="text-[10px] uppercase text-muted/60">Coins</div><div className="text-lg font-black text-accent">{rows.length}</div></div>
-        <div className="card p-3"><div className="text-[10px] uppercase text-muted/60">24h Volume</div><div className="text-lg font-black">{fmtUsd(totalVol, { compact: true })}</div></div>
-        <div className="card p-3"><div className="text-[10px] uppercase text-muted/60">Gainers</div><div className="text-lg font-black text-up">{gainers}<span className="text-xs text-muted">/{rows.length}</span></div></div>
-        <div className="card p-3"><div className="text-[10px] uppercase text-muted/60">Avg 24h</div><div className={`text-lg font-black ${avgChange >= 0 ? "text-up" : "text-down"}`}>{avgChange >= 0 ? "+" : ""}{avgChange.toFixed(1)}%</div></div>
-      </div>
+      <StatDeck items={[
+        { label: "COINS", value: rows.length, sub: "tracked pools", tone: "blue" },
+        { label: "24H VOL", value: fmtUsd(totalVol, { compact: true }), sub: "aggregate", tone: "gold" },
+        { label: "GAINERS", value: `${gainers}/${rows.length || "—"}`, sub: "positive 24h", tone: "up" },
+        { label: "AVG 24H", value: `${avgChange >= 0 ? "+" : ""}${avgChange.toFixed(1)}%`, sub: "mean change", tone: avgChange >= 0 ? "up" : "down" },
+      ]} />
+
+      <QuickToolGrid links={[
+        { to: "/robinhood/scanner", label: "HOOD Scanner", desc: "On-chain security", Icon: Crosshair },
+        { to: "/pulse", label: "Pulse", desc: "Solana signals", Icon: TrendingUp },
+        { to: "/tools", label: "Tools", desc: "Terminal toolbox", Icon: Search },
+        { to: "/store", label: "Store", desc: "List & boost", Icon: Layers },
+      ]} />
 
       {/* Controls */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -191,6 +195,7 @@ export default function Robinhood() {
             </button>
           ))}
         </div>
+        <ViewToggle mode={layout} onChange={setLayout} />
       </div>
 
       <div className="text-[11px] text-muted bg-panel2/50 rounded-lg px-3 py-2 border border-line">
@@ -201,14 +206,14 @@ export default function Robinhood() {
 
       {loading ? (
         <div className="py-20 grid place-items-center text-muted"><Loader2 className="w-6 h-6 animate-spin" /></div>
-      ) : view.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="card p-10 text-center space-y-2">
           <Feather className="w-8 h-8 text-muted mx-auto" />
           <div className="font-semibold">{q ? "No coins match" : "No Robinhood coins found right now"}</div>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {view.map((t) => (
+        <div className={layout === "grid" ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3" : "flex flex-col gap-2"}>
+          {filtered.map((t) => (
             <div key={t.mint} className="card p-4 space-y-3 transition-colors hover:border-accent/40">
               <Link to={`/token/${t.mint}?chain=robinhood`} className="flex items-center gap-3 group">
                 {t.icon

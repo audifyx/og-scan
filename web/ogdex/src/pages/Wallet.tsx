@@ -7,9 +7,11 @@ import TokenLogo from "../components/TokenLogo";
 import Copyable from "../components/Copyable";
 import WalletShareButton from "../components/WalletShareButton";
 import Change from "../components/Change";
-import { ArrowLeft, Loader2, Wallet as WalletIcon, ExternalLink, Star, RefreshCw, Eye, EyeOff, Coins, TrendingUp, Zap, History, Bell, BellPlus, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Loader2, Wallet as WalletIcon, ExternalLink, Star, Eye, EyeOff, Coins, TrendingUp, Zap, History, Bell, BellPlus, CheckCircle2, AlertTriangle } from "lucide-react";
+import { CommandHero, StatDeck, SegTabs, QuickToolGrid, LiveRefresh } from "../components/DexAdvanced";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
+type WalletTab = "holdings" | "pnl" | "trades";
 
 export default function Wallet() {
   const { address = "" } = useParams();
@@ -26,6 +28,7 @@ export default function Wallet() {
   const [nTarget, setNTarget] = useState<string>(() => (typeof localStorage !== "undefined" && localStorage.getItem("ogdex.alertTarget")) || "");
   const [nBusy, setNBusy] = useState(false);
   const [nMsg, setNMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [tab, setTab] = useState<WalletTab>("holdings");
   const createWalletAlert = async () => {
     setNMsg(null);
     if (!owner) { await connect(); return; }
@@ -58,46 +61,63 @@ export default function Wallet() {
   if (loading) return <div className="grid place-items-center py-24 text-muted"><Loader2 className="w-6 h-6 animate-spin" /></div>;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white"><ArrowLeft className="w-4 h-4" /> Screener</Link>
-        <button onClick={load} className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1.5 text-xs"><RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} /> Refresh</button>
+    <div className="max-w-6xl mx-auto space-y-4">
+      <Link to="/wallet" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white"><ArrowLeft className="w-4 h-4" /> Wallet hub</Link>
+
+      <CommandHero
+        kicker="Portfolio intelligence"
+        title="Wallet profile"
+        sub="Holdings, realized/unrealized PnL, recent swaps, allocation, and trade alerts — non-custodial lookup only."
+        icon={WalletIcon}
+        actions={
+          <>
+            <button onClick={() => setWatched(toggleWatch(address))} className={`dex-btn ${watched ? "dex-btn--gold" : "dex-btn--ghost"} !py-2 !text-xs`}>
+              <Star className={`w-3.5 h-3.5 ${watched ? "fill-black" : ""}`} /> {watched ? "Watching" : "Watch"}
+            </button>
+            <LiveRefresh onClick={load} loading={refreshing} />
+          </>
+        }
+      >
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Copyable text={address} display={short(address)} className="text-sm font-mono" />
+          <div className="text-3xl sm:text-4xl font-black text-white">{fmtUsd(total)}</div>
+          <span className="pill bg-panel2 text-muted text-[10px]">{d?.tokenCount ?? 0} tokens · {(d?.sol || 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} SOL</span>
+        </div>
+      </CommandHero>
+
+      <QuickToolGrid links={[
+        { to: "/kol", label: "KOL Intel", desc: "Smart money feed", Icon: TrendingUp },
+        { to: "/pulse", label: "Pulse", desc: "Market signals", Icon: Zap },
+        { to: "/tools", label: "Tools", desc: "Terminal toolbox", Icon: Coins },
+        { to: "/scanner", label: "OG Scanner", desc: "Lineage trace", Icon: ExternalLink },
+      ]} />
+
+      {d?.ok && (
+        <StatDeck items={[
+          { label: "PORTFOLIO", value: fmtUsd(total), tone: "gold" },
+          { label: "SOL", value: (d.sol || 0).toLocaleString(undefined, { maximumFractionDigits: 2 }), sub: fmtUsd(d.solUsd), tone: "blue" },
+          { label: "TOKENS", value: d.tokenCount || 0 },
+          { label: "WIN RATE", value: d.pnl?.winRate != null ? `${d.pnl.winRate}%` : "—", sub: d.pnl ? `${d.pnl.closedTrades} closed` : undefined },
+          ...(d.pnl ? [
+            { label: "REALIZED", value: (d.pnl.realizedPnlUsd >= 0 ? "+" : "") + fmtUsd(d.pnl.realizedPnlUsd), tone: (d.pnl.realizedPnlUsd >= 0 ? "up" : "down") as const },
+            { label: "NET PNL", value: d.pnl.totalPnlUsd != null ? (d.pnl.totalPnlUsd >= 0 ? "+" : "") + fmtUsd(d.pnl.totalPnlUsd) : "—", tone: (d.pnl.totalPnlUsd != null ? (d.pnl.totalPnlUsd >= 0 ? "up" : "down") : "plain") as const },
+          ] : []),
+        ]} />
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SegTabs tabs={[
+          { id: "holdings" as const, label: "Holdings" },
+          { id: "pnl" as const, label: "PnL" },
+          { id: "trades" as const, label: "Trades" },
+        ]} value={tab} onChange={setTab} />
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setShowNotify((v) => !v)} className="dex-btn dex-btn--ghost !py-2 !text-xs"><Bell className="w-3.5 h-3.5" /> Alerts</button>
+          <a href={`https://solscan.io/account/${address}`} target="_blank" rel="noreferrer" className="dex-btn dex-btn--ghost !py-2 !text-xs">Solscan <ExternalLink className="w-3 h-3" /></a>
+        </div>
       </div>
 
-      {/* Header */}
-      <div className="card p-5 mb-4">
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-accent/15 border border-accent/30 grid place-items-center shrink-0"><WalletIcon className="w-7 h-7 text-accent" /></div>
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wide text-muted">Wallet portfolio</div>
-            <div className="mt-0.5"><Copyable text={address} display={short(address)} className="text-sm" /></div>
-            <div className="text-4xl font-bold mt-2">{fmtUsd(total)}</div>
-            <div className="text-xs text-muted mt-1">{d?.tokenCount ?? 0} tokens · {d?.sol?.toLocaleString(undefined, { maximumFractionDigits: 3 })} SOL</div>
-            {d?.pnl && ((d.pnl.closedTrades || 0) > 0 || (d.pnl.openPositions || 0) > 0) && (
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                {d.pnl.totalPnlUsd != null && (
-                  <span className={`pill ${d.pnl.totalPnlUsd >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>Total PnL {d.pnl.totalPnlUsd >= 0 ? "+" : ""}{fmtUsd(d.pnl.totalPnlUsd)}</span>
-                )}
-                <span className={`pill ${d.pnl.realizedPnlUsd >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>Realized {d.pnl.realizedPnlUsd >= 0 ? "+" : ""}{fmtUsd(d.pnl.realizedPnlUsd)}</span>
-                {d.pnl.unrealizedPnlUsd != null && (
-                  <span className={`pill ${d.pnl.unrealizedPnlUsd >= 0 ? "bg-up/15 text-up" : "bg-down/15 text-down"}`}>Unrealized {d.pnl.unrealizedPnlUsd >= 0 ? "+" : ""}{fmtUsd(d.pnl.unrealizedPnlUsd)}</span>
-                )}
-                {d.pnl.winRate != null && <span className="pill bg-panel2 text-muted">Win rate {d.pnl.winRate}%</span>}
-                <span className="pill bg-panel2 text-muted">{d.pnl.closedTrades} closed · {d.pnl.openPositions} open</span>
-                <span className="text-[10px] text-muted/60 self-center">recent activity</span>
-                <WalletShareButton address={address} pnl={d.pnl.totalPnlUsd ?? d.pnl.realizedPnlUsd} win={d.pnl.winRate} trades={d.pnl.closedTrades} />
-              </div>
-            )}
-          </div>
-          <div className="sm:ml-auto flex flex-wrap gap-2">
-            <button onClick={() => setWatched(toggleWatch(address))} className={`btn inline-flex items-center gap-1.5 ${watched ? "bg-accent text-black font-semibold" : "bg-panel2 text-muted hover:text-white"}`}>
-              <Star className={`w-3.5 h-3.5 ${watched ? "fill-black" : ""}`} /> {watched ? "Watching" : "Watch wallet"}
-            </button>
-            <button onClick={() => setShowNotify((v) => !v)} className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1.5"><Bell className="w-3.5 h-3.5" /> Notify on trades</button>
-            <a href={`https://solscan.io/account/${address}`} target="_blank" rel="noreferrer" className="btn bg-panel2 text-muted hover:text-white inline-flex items-center gap-1.5">Solscan <ExternalLink className="w-3 h-3" /></a>
-          </div>
-        </div>
-        {showNotify && (
+      {showNotify && (
           <div className="mt-4 rounded-xl border border-line bg-panel2/30 p-3 text-xs">
             <div className="mb-2 flex items-center gap-1.5 font-semibold text-white"><Bell className="h-3.5 w-3.5 text-accent" /> Get notified when this wallet trades</div>
             <div className="grid grid-cols-2 gap-1 rounded-lg bg-panel2/60 p-1 mb-2 max-w-xs">
@@ -112,28 +132,15 @@ export default function Wallet() {
             <p className="mt-2 text-[10px] text-muted/70">Notify-only — ORBITX_DEX never copies or auto-executes trades. Manage alerts on the Alerts page.</p>
           </div>
         )}
-      </div>
 
-      {/* ── Summary stats ── */}
-      {d?.ok && (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 mb-4">
-          <SCard label="Portfolio" value={fmtUsd(total)} />
-          <SCard label="SOL balance" value={(d.sol || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} sub={fmtUsd(d.solUsd)} />
-          <SCard label="Tokens held" value={String(d.tokenCount || 0)} />
-          <SCard label="Win rate" value={d.pnl?.winRate != null ? d.pnl.winRate + "%" : "—"} sub={d.pnl ? `${d.pnl.closedTrades} closed` : undefined} />
-          {d.pnl && (
-            <>
-              <SCard label="Realized PnL" value={(d.pnl.realizedPnlUsd >= 0 ? "+" : "") + fmtUsd(d.pnl.realizedPnlUsd)} tone={d.pnl.realizedPnlUsd >= 0 ? "up" : "down"} />
-              <SCard label="Unrealized PnL" value={d.pnl.unrealizedPnlUsd != null ? (d.pnl.unrealizedPnlUsd >= 0 ? "+" : "") + fmtUsd(d.pnl.unrealizedPnlUsd) : "—"} tone={d.pnl.unrealizedPnlUsd != null ? (d.pnl.unrealizedPnlUsd >= 0 ? "up" : "down") : undefined} />
-              <SCard label="Net PnL" value={d.pnl.totalPnlUsd != null ? (d.pnl.totalPnlUsd >= 0 ? "+" : "") + fmtUsd(d.pnl.totalPnlUsd) : "—"} tone={d.pnl.totalPnlUsd != null ? (d.pnl.totalPnlUsd >= 0 ? "up" : "down") : undefined} />
-              <SCard label="Activity" value={`${d.pnl.openPositions} open`} sub={`${d.pnl.totalSwaps} swaps`} />
-            </>
-          )}
+      {d?.pnl && ((d.pnl.closedTrades || 0) > 0 || (d.pnl.openPositions || 0) > 0) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <WalletShareButton address={address} pnl={d.pnl.totalPnlUsd ?? d.pnl.realizedPnlUsd} win={d.pnl.winRate} trades={d.pnl.closedTrades} />
         </div>
       )}
 
       {/* ── Allocation ── */}
-      {d?.ok && total > 0 && rows.length > 0 && (() => {
+      {d?.ok && tab === "holdings" && total > 0 && rows.length > 0 && (() => {
         const COLORS = ["#00FFA3", "#00D1FF", "#14E0C8", "#FFC53D", "#FF6BD0", "#19E3D0", "#FF8A3D", "#7B5BFF"];
         const top = rows.slice(0, 8);
         const otherVal = rows.slice(8).reduce((a, h) => a + (h.usdValue || 0), 0);
@@ -161,7 +168,7 @@ export default function Wallet() {
 
       {!d?.ok && <div className="card p-10 text-center text-muted">Could not load this wallet. {d?.error}</div>}
 
-      {d?.ok && (
+      {d?.ok && tab === "holdings" && (
         <div className="card overflow-hidden">
           <div className="px-4 py-3 border-b border-line flex items-center gap-2">
             <Coins className="w-4 h-4 text-accent" /><span className="text-sm font-semibold">Holdings</span>
@@ -212,7 +219,7 @@ export default function Wallet() {
           {!rows.length && <div className="p-10 text-center text-muted text-sm">No holdings found.</div>}
         </div>
       )}
-      {d?.ok && d.pnl && (d.pnl.perToken || []).some((t) => (t.closedTrades || 0) > 0 || t.open) && (
+      {d?.ok && tab === "pnl" && d.pnl && (d.pnl.perToken || []).some((t) => (t.closedTrades || 0) > 0 || t.open) && (
         <div className="card overflow-hidden mt-4">
           <div className="px-4 py-3 border-b border-line flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-accent" /><span className="text-sm font-semibold">Per-token PnL</span>
@@ -250,7 +257,7 @@ export default function Wallet() {
         </div>
       )}
 
-      {d?.ok && trades && trades.length > 0 && (
+      {d?.ok && tab === "trades" && trades && trades.length > 0 && (
         <div className="card overflow-hidden mt-4">
           <div className="px-4 py-3 border-b border-line flex items-center gap-2">
             <History className="w-4 h-4 text-accent" /><span className="text-sm font-semibold">Recent trades</span>
@@ -294,17 +301,14 @@ export default function Wallet() {
         </div>
       )}
 
-      <p className="text-[11px] text-muted text-center mt-4">Balances via on-chain RPC · prices from Jupiter · metadata from GeckoTerminal. Values are estimates.</p>
-    </div>
-  );
-}
+      {d?.ok && tab === "trades" && trades && trades.length === 0 && (
+        <div className="card p-10 text-center text-muted text-sm">No recent swaps found for this wallet.</div>
+      )}
+      {d?.ok && tab === "pnl" && d.pnl && !(d.pnl.perToken || []).some((t) => (t.closedTrades || 0) > 0 || t.open) && (
+        <div className="card p-10 text-center text-muted text-sm">No per-token PnL data yet — need more swap history.</div>
+      )}
 
-function SCard({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "up" | "down" }) {
-  return (
-    <div className="rounded-2xl border border-line bg-panel2/50 p-3.5">
-      <div className="text-[10px] uppercase tracking-wider text-muted">{label}</div>
-      <div className={`mt-1 text-lg font-black tabular-nums ${tone === "up" ? "text-up" : tone === "down" ? "text-down" : "text-white"}`}>{value}</div>
-      {sub && <div className="text-[11px] text-muted mt-0.5">{sub}</div>}
+      <p className="text-[11px] text-muted text-center mt-4">Balances via on-chain RPC · prices from Jupiter · metadata from GeckoTerminal. Values are estimates.</p>
     </div>
   );
 }

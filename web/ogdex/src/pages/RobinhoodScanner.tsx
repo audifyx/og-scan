@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Crosshair, Search, Loader2, Feather, ShieldAlert, ShieldCheck, AlertTriangle, Droplets, Users, Flame, Activity, ArrowUpRight, Info, BadgeCheck, XCircle } from "lucide-react";
 import { getScreener, getToken, type Row, fmtUsd, short } from "../lib/api";
+import { CommandHero, QuickToolGrid } from "../components/DexAdvanced";
 
 function analyze(t: Row) {
   const liq = t.liquidity || 0, hold = t.holderCount || 0, vol = t.volume || 0;
@@ -84,14 +85,25 @@ export default function RobinhoodScanner() {
   const riskMeta = a?.risk === "Low" ? { cls: "text-up border-up/40 bg-up/10", Icon: ShieldCheck } : a?.risk === "Medium" ? { cls: "text-gold border-gold/40 bg-gold/10", Icon: AlertTriangle } : { cls: "text-down border-down/40 bg-down/10", Icon: ShieldAlert };
 
   return (
-    <div className="mx-auto max-w-[900px] space-y-4 px-4 py-6">
-      <div className="term-panel bg-term-grid px-4 sm:px-5 py-4">
-        <div className="term text-[11px]" style={{ color: "#66707E" }}><span style={{ color: "#00FFA3" }}>orbitx@robinhood</span>:~$ scan --heuristic --liquidity --holders --activity</div>
-        <div className="flex flex-wrap items-end gap-3 mt-1.5">
-          <h1 className="font-display text-2xl font-black text-white flex items-center gap-2"><Crosshair className="h-5 w-5 text-accent" /> ROBINHOOD_SCANNER</h1>
-          <span className="rounded-md border border-accent/40 bg-accent/15 px-2 py-0.5 text-[9px] term font-black uppercase tracking-widest text-accent mb-1">HEURISTIC</span>
-        </div>
-        <p className="term text-[11px] leading-relaxed text-muted mt-1 max-w-lg">Health & risk heuristics from live liquidity, holder, volume and trade-balance data for Robinhood-chain tokens.</p>
+    <div className="mx-auto max-w-[900px] space-y-4">
+      <CommandHero
+        kicker="Robinhood chain · HOOD"
+        title="Robinhood Scanner"
+        sub="Health & risk heuristics from live liquidity, holder, volume and trade-balance data — plus Blockscout contract security."
+        icon={Crosshair}
+      />
+
+      <QuickToolGrid links={[
+        { to: "/robinhood", label: "Robinhood Feed", desc: "Live meme coins", Icon: Feather },
+        { to: "/pulse", label: "Pulse", desc: "Solana signals", Icon: Activity },
+        { to: "/scanner", label: "OG Scanner", desc: "Lineage trace", Icon: Crosshair },
+        { to: "/tools", label: "Tools", desc: "Terminal toolbox", Icon: Search },
+      ]} />
+
+      <div className="flex flex-wrap gap-2">
+        {rows.slice(0, 6).map((t) => (
+          <button key={t.mint} type="button" onClick={() => { setSel(t); setQ(""); }} className="dex-cat-pill !text-xs">${t.symbol || short(t.mint)}</button>
+        ))}
       </div>
 
       <div className="flex items-center gap-2 rounded-lg border border-line bg-panel p-2 focus-within:border-accent/60">
