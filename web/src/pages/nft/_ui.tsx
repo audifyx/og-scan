@@ -49,7 +49,7 @@ export function Media({
 
 export function Verified({ show, className = "" }: { show?: boolean | null; className?: string }) {
   if (!show) return null;
-  return <ShieldCheck className={`inline h-3.5 w-3.5 text-[#14F195] ${className}`} aria-label="Verified" />;
+  return <ShieldCheck className={`inline h-3.5 w-3.5 mkt-verified-icon ${className}`} aria-label="Verified" />;
 }
 
 const RARITY: Record<string, string> = {

@@ -83,8 +83,8 @@ export default function MarketplaceHome() {
   }, [collections]);
 
   return (
-    <div className="space-y-8">
-      {featured && <Hero c={featured} />}
+    <div className="space-y-10">
+      {featured ? <Hero c={featured} /> : <EmptyHero />}
 
       {staffPicks.length > 0 && (
         <section>
@@ -153,13 +153,13 @@ export default function MarketplaceHome() {
               <span className="text-right mkt-mono font-semibold">
                 {c.floor_price_sol ? <PriceText sol={c.floor_price_sol} /> : "—"}
               </span>
-              <span className="text-right mkt-mono font-semibold text-[#14F195]">
+              <span className="text-right mkt-mono font-semibold mkt-vol">
                 {c.volume_sol ? <PriceText sol={c.volume_sol} /> : "—"}
               </span>
               <span className="hidden text-right mkt-mono sm:block">{c.mint_limit ? fmtInt(c.mint_limit) : "—"}</span>
               <span className="text-right mkt-mono mkt-muted">{(c.royalty_bps / 100).toFixed(1)}%</span>
               <button onClick={() => toggleWatch(c.id)} className="justify-self-end" title="Watchlist" type="button">
-                <Star className={`h-4 w-4 ${watched.has(c.id) ? "fill-[#fbbf24] text-[#fbbf24]" : "mkt-muted"}`} />
+                <Star className={`h-4 w-4 ${watched.has(c.id) ? "fill-[var(--mkt-gold-hi)] text-[var(--mkt-gold-hi)]" : "mkt-muted"}`} />
               </button>
             </div>
           ))}
@@ -286,7 +286,7 @@ export default function MarketplaceHome() {
                   <div className="truncate text-[13px] font-bold">{s.nft?.name ?? "NFT"}</div>
                   <div className="mkt-mono text-[11px] mkt-muted">{timeAgo(s.created_at)} ago</div>
                 </div>
-                <div className="mkt-mono text-sm font-bold text-[#14F195]">{fmtSol(s.amount_sol)}</div>
+                <div className="mkt-mono text-sm font-bold mkt-vol">{fmtSol(s.amount_sol)}</div>
               </div>
             ))}
           </div>
@@ -299,27 +299,21 @@ export default function MarketplaceHome() {
 function Hero({ c }: { c: OrbitxNftCollection }) {
   return (
     <section className="mkt-hero">
-      <div className="absolute inset-0">
-        <Media src={c.banner_url ?? c.logo_url} className="h-full w-full opacity-35" priority />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(90deg, hsl(240 8% 4%) 10%, transparent 65%), linear-gradient(0deg, hsl(240 8% 4%) 8%, transparent 55%)",
-          }}
-        />
+      <div className="mkt-hero-media" aria-hidden>
+        <Media src={c.banner_url ?? c.logo_url} className="h-full w-full" priority />
+        <div className="mkt-hero-scrim" />
       </div>
-      <div className="relative flex flex-col gap-5 p-6 sm:flex-row sm:items-end sm:p-8">
-        <Media src={c.logo_url} className="h-24 w-24 rounded-2xl border-2 border-white/10 sm:h-28 sm:w-28" priority />
+      <div className="mkt-hero-content">
+        <Media src={c.logo_url} className="mkt-hero-logo" priority />
         <div className="min-w-0 flex-1">
-          <div className="mkt-hero-badge mb-2">
+          <div className="mkt-hero-badge">
             <Flame className="h-3 w-3" /> Featured
           </div>
-          <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight sm:text-3xl">
-            {c.name} <Verified show={c.verified} className="h-5 w-5" />
+          <h1 className="mkt-hero-title flex items-center gap-2">
+            {c.name} <Verified show={c.verified} className="h-6 w-6" />
           </h1>
-          {c.description && <p className="mt-1 max-w-xl text-[13px] mkt-muted line-clamp-2">{c.description}</p>}
-          <div className="mt-4 flex flex-wrap items-center gap-6">
+          {c.description && <p className="mkt-hero-desc line-clamp-2">{c.description}</p>}
+          <div className="mkt-hero-stats">
             <Stat label="Floor" value={c.floor_price_sol ? fmtSol(c.floor_price_sol) : "—"} />
             <Stat label="Volume" value={c.volume_sol ? fmtSol(c.volume_sol) : "—"} />
             <Stat label="Royalty" value={`${(c.royalty_bps / 100).toFixed(1)}%`} />
@@ -334,11 +328,33 @@ function Hero({ c }: { c: OrbitxNftCollection }) {
   );
 }
 
+function EmptyHero() {
+  return (
+    <section className="mkt-hero-empty">
+      <div className="mkt-hero-badge">
+        <Flame className="h-3 w-3" /> OrbitX NFT
+      </div>
+      <h1 className="mkt-hero-title">Trade culture on Solana.</h1>
+      <p className="mkt-hero-desc">
+        Mint, list, and collect on the OrbitX metal desk — same chrome as DEX and Launchpad.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Link to="/nft/explore" className="mkt-btn">
+          Explore market
+        </Link>
+        <Link to="/nft/create" className="mkt-btn ghost">
+          Create NFT
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="mkt-mono text-[10px] uppercase tracking-widest mkt-muted">{label}</div>
-      <div className="text-lg font-black">{value}</div>
+      <div className="mkt-hero-stat-label">{label}</div>
+      <div className="mkt-hero-stat-value">{value}</div>
     </div>
   );
 }
@@ -355,13 +371,7 @@ function TabBtn({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold transition ${
-        active ? "bg-[hsl(var(--mkt-panel-2))] text-white ring-1 ring-[#14F195]/30" : "mkt-muted hover:text-white"
-      }`}
-    >
+    <button type="button" onClick={onClick} className={`mkt-tabbtn ${active ? "active" : ""}`}>
       {icon} {children}
     </button>
   );

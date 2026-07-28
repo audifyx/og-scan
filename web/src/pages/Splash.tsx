@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { Check, Copy } from "lucide-react";
 import logo from "@/assets/logo.png";
-import { OGSCAN_TOKEN_MINT, OGSCAN_DEXSCREENER_URL, shortAddr } from "@/lib/og";
 
 /* ── Data ───────────────────────────────────────────────────────── */
 
@@ -22,7 +20,6 @@ const LINKS = {
   degen: "https://degen-tower.vercel.app",
   privacy: "/privacy",
   terms: "/terms",
-  caDex: OGSCAN_DEXSCREENER_URL,
 };
 
 const HERO_PLANES = [
@@ -340,14 +337,6 @@ function ProductSlideshow({ showcase, reverse }: { showcase: ProductShowcase; re
 }
 
 function CaBar({ id }: { id?: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(OGSCAN_TOKEN_MINT);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch { /* ignore */ }
-  };
   return (
     <section id={id} className="sp-ca reveal" aria-label="Official contract address">
       <div className="sp-ca-inner">
@@ -355,16 +344,12 @@ function CaBar({ id }: { id?: string }) {
           <img src="/ogscan-our-coin-logo.webp" alt="" width={40} height={40} className="sp-ca-logo" />
           <div>
             <span className="sp-ca-kicker">Official CA</span>
-            <strong className="sp-ca-name">OrbitX · $OGS</strong>
+            <strong className="sp-ca-name">OrbitX token</strong>
           </div>
         </div>
-        <code className="sp-ca-addr" title={OGSCAN_TOKEN_MINT}>{OGSCAN_TOKEN_MINT}</code>
+        <code className="sp-ca-addr sp-ca-addr--soon">Coming soon</code>
         <div className="sp-ca-actions">
-          <button type="button" className="sp-ca-copy" onClick={copy}>
-            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            {copied ? "Copied" : "Copy CA"}
-          </button>
-          <a className="sp-btn-ghost sm" href={LINKS.caDex} target="_blank" rel="noreferrer">DexScreener</a>
+          <span className="sp-ca-soon-badge">Soon</span>
         </div>
       </div>
     </section>
@@ -688,10 +673,7 @@ export default function Splash() {
             </div>
             <div>
               <h4>Token</h4>
-              <button type="button" className="sp-foot-ca" onClick={() => navigator.clipboard.writeText(OGSCAN_TOKEN_MINT).catch(() => undefined)}>
-                CA · {shortAddr(OGSCAN_TOKEN_MINT, 6)}
-              </button>
-              <a href={LINKS.caDex} target="_blank" rel="noreferrer">DexScreener</a>
+              <span className="sp-foot-ca">CA · Coming soon</span>
               <a href={LINKS.degen} target="_blank" rel="noreferrer">Degen Tower</a>
             </div>
             <div>
@@ -709,7 +691,7 @@ export default function Splash() {
         </div>
         <div className="sp-foot-bottom">
           <span>© {new Date().getFullYear()} {BRAND}. Building in public.</span>
-          <span className="sp-foot-mint">{OGSCAN_TOKEN_MINT}</span>
+          <span className="sp-foot-mint">CA · Coming soon</span>
         </div>
       </footer>
     </div>
@@ -978,16 +960,22 @@ const css = `
   letter-spacing: 0.01em;
   word-break: break-all;
 }
-.sp-ca-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.sp-ca-copy {
-  display: inline-flex; align-items: center; gap: 7px;
+.sp-ca-addr--soon {
   font-family: var(--font-display);
-  font-size: 12px; font-weight: 700; color: #0a0a0a;
+  font-size: clamp(16px, 2.2vw, 22px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+.sp-ca-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.sp-ca-soon-badge {
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: #0a0a0a;
   padding: 10px 14px; border-radius: 10px;
   background: linear-gradient(180deg, var(--gold-hi), var(--gold));
-  transition: transform .2s, filter .2s;
 }
-.sp-ca-copy:hover { transform: translateY(-1px); filter: brightness(1.05); }
 @media(max-width:640px) {
   .sp-ca-inner { flex-direction: column; align-items: stretch; }
   .sp-ca-actions { margin-left: 0; }
