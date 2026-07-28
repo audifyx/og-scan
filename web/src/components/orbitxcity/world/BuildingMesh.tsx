@@ -8,8 +8,26 @@ import { Text, Billboard, Clone, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { BuildingDefinition } from "@/lib/orbitxcity/types";
 import { hashSeed, mulberry32, isWalkInBuilding, buildingDoorWidth } from "@/lib/orbitxcity/collision";
-import { createFacadeTexture } from "@/lib/orbitxcity/textures";
+import { createFacadeTexture, createAdTexture } from "@/lib/orbitxcity/textures";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
+
+/** Manhattan-inspired facade family, chosen from massing + venue role. */
+export type FacadeFamily = "brick" | "limestone" | "glass" | "retail";
+
+export function facadeFamily(b: BuildingDefinition): FacadeFamily {
+  const { height, width } = b.size;
+  if (b.interaction || b.kind === "shop") return "retail";
+  if (height >= 20) return "glass";
+  if (height >= 11 && width >= 9) return "limestone";
+  return "brick";
+}
+
+const FAMILY_TRIM: Record<FacadeFamily, string> = {
+  brick: "#6a4a3a",
+  limestone: "#b9b2a0",
+  glass: "#3a4652",
+  retail: "#2a3038",
+};
 
 const ROOF_MAT = new THREE.MeshStandardMaterial({ color: "#3e464e", metalness: 0.28, roughness: 0.72 });
 const CITY_MODEL_PATHS = [
@@ -387,6 +405,91 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
   );
 }
 
+/** Overhanging cornice band for brick / limestone prewar massing. */
+function Cornice({ w, d, y, color }: { w: number; d: number; y: number; color: string }) {
+  return (
+    <group position={[0, y, 0]}>
+      <mesh castShadow>
+        <boxGeometry args={[w + 0.5, 0.5, d + 0.5]} />
+        <meshStandardMaterial color={color} metalness={0.14} roughness={0.82} />
+      </mesh>
+      <mesh position={[0, -0.36, 0]}>
+        <boxGeometry args={[w + 0.24, 0.26, d + 0.24]} />
+        <meshStandardMaterial color={color} metalness={0.1} roughness={0.86} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Retail entrance awning over the storefront (street-level identity). */
+function Awning({ w, z, accent }: { w: number; z: number; accent: string }) {
+  return (
+    <group position={[0, 2.8, z + 0.55]}>
+      <mesh rotation={[-0.34, 0, 0]} castShadow>
+        <boxGeometry args={[w, 0.08, 1.15]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.16} metalness={0.2} roughness={0.6} />
+      </mesh>
+      <mesh position={[0, -0.24, 0.04]}>
+        <boxGeometry args={[w, 0.22, 0.05]} />
+        <meshStandardMaterial color="#0a1016" emissive={accent} emissiveIntensity={0.3} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Illuminated roof crown that marks OrbitX venue buildings from a distance. */
+function RoofCrown({ y, radius, accent }: { y: number; radius: number; accent: string }) {
+  return (
+    <mesh position={[0, y + 0.55, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <torusGeometry args={[Math.max(1, radius), 0.12, 8, 40]} />
+      <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.9} toneMapped={false} metalness={0.4} roughness={0.3} />
+    </mesh>
+  );
+}
+
+/** Local, procedurally-drawn poster panel (no remote assets) on the facade. */
+function FacadePoster({
+  w,
+  z,
+  y,
+  seed,
+  title,
+  subtitle,
+  accent,
+}: {
+  w: number;
+  z: number;
+  y: number;
+  seed: number;
+  title: string;
+  subtitle: string;
+  accent: string;
+}) {
+  const tex = useMemo(() => createAdTexture(title, subtitle, accent, seed), [title, subtitle, accent, seed]);
+  const pw = Math.min(2.2, Math.max(1.2, w * 0.34));
+  return (
+    <group position={[w * 0.3, y, z + 0.06]}>
+      <mesh>
+        <planeGeometry args={[pw, pw * 0.62]} />
+        <meshStandardMaterial
+          map={tex}
+          emissiveMap={tex}
+          emissive="#ffffff"
+          emissiveIntensity={0.24}
+          toneMapped={false}
+          roughness={0.62}
+          metalness={0.1}
+        />
+      </mesh>
+      {/* Thin frame */}
+      <mesh position={[0, 0, -0.02]}>
+        <planeGeometry args={[pw + 0.12, pw * 0.62 + 0.12]} />
+        <meshStandardMaterial color="#0b0f14" metalness={0.3} roughness={0.6} />
+      </mesh>
+    </group>
+  );
+}
+
 export function BuildingMesh({ building }: { building: BuildingDefinition }) {
   const { quality } = useCity();
   const { position, size, accent, label, name } = building;
@@ -404,6 +507,11 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
   const walkIn = isWalkInBuilding(building);
   const doorW = buildingDoorWidth(building);
   const isHq = building.kind === "hq" || building.interaction === "hq";
+  // Manhattan facade family + quality-gated ornament flags (capped so detail
+  // never reintroduces lag on lite / lots of buildings).
+  const family = facadeFamily(building);
+  const showCornice = !hasFootprint && quality === "high" && (family === "brick" || family === "limestone");
+  const showPoster = quality === "high" && !isHq && !hasFootprint && hashSeed(`poster-${building.id}`) % 3 === 0;
 
   return (
     <group position={[position.x, 0, position.z]}>
@@ -450,6 +558,26 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         accent={accent}
         seed={hashSeed(`graf-${building.id}`)}
       />
+
+      {/* Manhattan facade ornament (family-aware, quality-gated) */}
+      {showCornice && <Cornice w={top.w} d={top.d} y={roofY} color={FAMILY_TRIM[family]} />}
+      {walkIn && (
+        <>
+          <Awning w={Math.min(doorW + 1.6, size.width - 0.6)} z={size.depth / 2} accent={accent} />
+          <RoofCrown y={roofY} radius={Math.min(size.width, size.depth) * 0.32} accent={accent} />
+        </>
+      )}
+      {showPoster && (
+        <FacadePoster
+          w={size.width}
+          z={size.depth / 2}
+          y={Math.min(roofY - 1.4, 5.2)}
+          seed={hashSeed(`ad-${building.id}`)}
+          title={(building.label ?? building.name).slice(0, 10).toUpperCase()}
+          subtitle="ORBITX ADNET"
+          accent={accent}
+        />
+      )}
 
       {/* Ground-floor storefront glazing — split around the doorway for walk-in
           venues so the opening stays clear, otherwise a full-width shopfront. */}
