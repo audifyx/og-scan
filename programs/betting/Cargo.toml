@@ -1,0 +1,19 @@
+[package]
+name = "betting"
+version = "0.1.0"
+description = "Solana P2P Betting Program"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "betting"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }

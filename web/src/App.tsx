@@ -107,10 +107,6 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import PlatformWhitepaper from "./pages/platform/Whitepaper";
 import PlatformRoadmap from "./pages/platform/Roadmap";
-import PredictionsLayout from "./pages/predictions/PredictionsLayout";
-import PredictionsHome from "./pages/predictions/PredictionsHome";
-import PredictionsMarket from "./pages/predictions/PredictionsMarket";
-import PredictionsPortfolio from "./pages/predictions/PredictionsPortfolio";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
 import { EvmWalletProvider } from "@/hooks/useEvmWallet";
@@ -193,6 +189,28 @@ function RouteFallback({ label }: { label: string }) {
 
 const SOCIAL_FALLBACK = <RouteFallback label="Social" />;
 
+// Redirect /predictions to the Next.js app (Vercel rewrite in prod; external URL locally).
+function PredictionsRedirect() {
+  useEffect(() => {
+    const target = window.location.pathname + window.location.search + window.location.hash;
+    const isLocal =
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (isLocal) {
+      const rest = window.location.pathname.replace(/^\/predictions\/?/, "");
+      const path = rest ? `/${rest}` : "/";
+      window.location.replace(`https://orbitx-prediction.fun${path}${window.location.search}${window.location.hash}`);
+      return;
+    }
+    // Full navigation so Vercel edge rewrites proxy to the Next.js app.
+    window.location.href = target;
+  }, []);
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center bg-[#05080c] font-mono text-xs uppercase tracking-[0.18em] text-white/45">
+      Opening OrbitX Predictions…
+    </div>
+  );
+}
+
 // Redirect legacy crypto/tools/coin routes into the OrbitX DEX app (/ORBITX_DEX).
 function OgdexRedirect({ to }: { to: string | ((p: Record<string, string | undefined>) => string) }) {
   const params = useParams();
@@ -239,11 +257,7 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/whitepaper" element={<PlatformWhitepaper />} />
             <Route path="/roadmap" element={<PlatformRoadmap />} />
-            <Route path="/predictions" element={<PredictionsLayout />}>
-              <Route index element={<PredictionsHome />} />
-              <Route path="market/:id" element={<PredictionsMarket />} />
-              <Route path="portfolio" element={<PredictionsPortfolio />} />
-            </Route>
+            <Route path="/predictions/*" element={<PredictionsRedirect />} />
             <Route path="/r/:id" element={<ReportView />} />
             <Route path="/t/:mint" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mint}`} />} />
             <Route path="/track-record" element={<OgdexRedirect to="/ORBITX_DEX" />} />

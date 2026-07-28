@@ -1,0 +1,9 @@
+@layer components {
+  .label {
+    @apply text-xs text-gray-400 uppercase tracking-widest block mb-1.5;
+  }
+  .input-field {
+    @apply w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm
+           focus:outline-none focus:border-purple/40 transition-all;
+  }
+}

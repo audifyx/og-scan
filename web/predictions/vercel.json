@@ -1,0 +1,9 @@
+{
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/resolve",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}

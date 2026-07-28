@@ -43,6 +43,22 @@
       "destination": "/ORBITX_DEX/index.html"
     },
     {
+      "source": "/predictions/api/:path*",
+      "destination": "https://orbitx-prediction.fun/api/:path*"
+    },
+    {
+      "source": "/predictions/_next/:path*",
+      "destination": "https://orbitx-prediction.fun/_next/:path*"
+    },
+    {
+      "source": "/predictions",
+      "destination": "https://orbitx-prediction.fun/"
+    },
+    {
+      "source": "/predictions/:path*",
+      "destination": "https://orbitx-prediction.fun/:path*"
+    },
+    {
       "source": "/",
       "destination": "/app.html"
     },
@@ -195,6 +211,10 @@
     {
       "path": "/api/kol/launch-digest",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/predictions/api/cron/resolve",
+      "schedule": "0 8 * * *"
     }
   ]
 }

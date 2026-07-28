@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 build
+.next
 
 # expo / rork / vercel
 .expo
@@ -31,3 +32,6 @@ npm-debug.log*
 supabase/.temp
 supabase/.branches
 *.tgz
+
+# local clones (agent / dev)
+.tmp/
