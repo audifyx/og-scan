@@ -5,7 +5,7 @@ import * as THREE from "three";
 
 const TIPS = [
   "Welcome to OrbitX City. I'm OXI, your guide.",
-  "Press E near glowing rings to interact.",
+  "Walk through an open door to step inside. Press E for venue tools.",
   "Billboards are LIVE — tap one to buy the token.",
   "Enter opens world chat. Say gm.",
   "Fast travel from the Map panel.",

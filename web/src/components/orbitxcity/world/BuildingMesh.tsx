@@ -7,9 +7,27 @@ import { useFrame } from "@react-three/fiber";
 import { Text, Billboard, Clone, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { BuildingDefinition } from "@/lib/orbitxcity/types";
-import { hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
-import { createFacadeTexture } from "@/lib/orbitxcity/textures";
+import { hashSeed, mulberry32, isWalkInBuilding, buildingDoorWidth } from "@/lib/orbitxcity/collision";
+import { createFacadeTexture, createAdTexture } from "@/lib/orbitxcity/textures";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
+
+/** Manhattan-inspired facade family, chosen from massing + venue role. */
+export type FacadeFamily = "brick" | "limestone" | "glass" | "retail";
+
+export function facadeFamily(b: BuildingDefinition): FacadeFamily {
+  const { height, width } = b.size;
+  if (b.interaction || b.kind === "shop") return "retail";
+  if (height >= 20) return "glass";
+  if (height >= 11 && width >= 9) return "limestone";
+  return "brick";
+}
+
+const FAMILY_TRIM: Record<FacadeFamily, string> = {
+  brick: "#6a4a3a",
+  limestone: "#b9b2a0",
+  glass: "#3a4652",
+  retail: "#2a3038",
+};
 
 const ROOF_MAT = new THREE.MeshStandardMaterial({ color: "#3e464e", metalness: 0.28, roughness: 0.72 });
 const CITY_MODEL_PATHS = [
@@ -387,8 +405,93 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
   );
 }
 
+/** Overhanging cornice band for brick / limestone prewar massing. */
+function Cornice({ w, d, y, color }: { w: number; d: number; y: number; color: string }) {
+  return (
+    <group position={[0, y, 0]}>
+      <mesh castShadow>
+        <boxGeometry args={[w + 0.5, 0.5, d + 0.5]} />
+        <meshStandardMaterial color={color} metalness={0.14} roughness={0.82} />
+      </mesh>
+      <mesh position={[0, -0.36, 0]}>
+        <boxGeometry args={[w + 0.24, 0.26, d + 0.24]} />
+        <meshStandardMaterial color={color} metalness={0.1} roughness={0.86} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Retail entrance awning over the storefront (street-level identity). */
+function Awning({ w, z, accent }: { w: number; z: number; accent: string }) {
+  return (
+    <group position={[0, 2.8, z + 0.55]}>
+      <mesh rotation={[-0.34, 0, 0]} castShadow>
+        <boxGeometry args={[w, 0.08, 1.15]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.16} metalness={0.2} roughness={0.6} />
+      </mesh>
+      <mesh position={[0, -0.24, 0.04]}>
+        <boxGeometry args={[w, 0.22, 0.05]} />
+        <meshStandardMaterial color="#0a1016" emissive={accent} emissiveIntensity={0.3} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Illuminated roof crown that marks OrbitX venue buildings from a distance. */
+function RoofCrown({ y, radius, accent }: { y: number; radius: number; accent: string }) {
+  return (
+    <mesh position={[0, y + 0.55, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <torusGeometry args={[Math.max(1, radius), 0.12, 8, 40]} />
+      <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.9} toneMapped={false} metalness={0.4} roughness={0.3} />
+    </mesh>
+  );
+}
+
+/** Local, procedurally-drawn poster panel (no remote assets) on the facade. */
+function FacadePoster({
+  w,
+  z,
+  y,
+  seed,
+  title,
+  subtitle,
+  accent,
+}: {
+  w: number;
+  z: number;
+  y: number;
+  seed: number;
+  title: string;
+  subtitle: string;
+  accent: string;
+}) {
+  const tex = useMemo(() => createAdTexture(title, subtitle, accent, seed), [title, subtitle, accent, seed]);
+  const pw = Math.min(2.2, Math.max(1.2, w * 0.34));
+  return (
+    <group position={[w * 0.3, y, z + 0.06]}>
+      <mesh>
+        <planeGeometry args={[pw, pw * 0.62]} />
+        <meshStandardMaterial
+          map={tex}
+          emissiveMap={tex}
+          emissive="#ffffff"
+          emissiveIntensity={0.24}
+          toneMapped={false}
+          roughness={0.62}
+          metalness={0.1}
+        />
+      </mesh>
+      {/* Thin frame */}
+      <mesh position={[0, 0, -0.02]}>
+        <planeGeometry args={[pw + 0.12, pw * 0.62 + 0.12]} />
+        <meshStandardMaterial color="#0b0f14" metalness={0.3} roughness={0.6} />
+      </mesh>
+    </group>
+  );
+}
+
 export function BuildingMesh({ building }: { building: BuildingDefinition }) {
-  const { enterBuilding, quality } = useCity();
+  const { quality } = useCity();
   const { position, size, accent, label, name } = building;
   const rand = useMemo(() => mulberry32(hashSeed(`bld-${building.id}`)), [building.id]);
   const modelPath = CITY_MODEL_PATHS[hashSeed(building.id) % CITY_MODEL_PATHS.length]!;
@@ -399,8 +502,16 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
   const tiers = useMemo(() => buildTiers(building, rand), [building, rand]);
   const top = tiers[tiers.length - 1]!;
   const roofY = hasFootprint ? size.height : top.yBase + top.h;
-  const doorW = Math.min(2.4, Math.max(1.4, size.width * 0.28));
+  // Door width matches the passable collision gap so the visible opening and the
+  // walk-through threshold line up exactly.
+  const walkIn = isWalkInBuilding(building);
+  const doorW = buildingDoorWidth(building);
   const isHq = building.kind === "hq" || building.interaction === "hq";
+  // Manhattan facade family + quality-gated ornament flags (capped so detail
+  // never reintroduces lag on lite / lots of buildings).
+  const family = facadeFamily(building);
+  const showCornice = !hasFootprint && quality === "high" && (family === "brick" || family === "limestone");
+  const showPoster = quality === "high" && !isHq && !hasFootprint && hashSeed(`poster-${building.id}`) % 3 === 0;
 
   return (
     <group position={[position.x, 0, position.z]}>
@@ -448,23 +559,62 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         seed={hashSeed(`graf-${building.id}`)}
       />
 
-      {/* Ground-floor storefront + neon marquee */}
-      <mesh position={[0, 1.55, size.depth / 2 + 0.02]} castShadow>
-        <boxGeometry args={[Math.min(size.width * 0.92, size.width - 0.4), 3.0, 0.12]} />
-        <meshStandardMaterial color="#12171d" metalness={0.35} roughness={0.45} />
-      </mesh>
-      <mesh position={[0, 1.55, size.depth / 2 + 0.09]}>
-        <planeGeometry args={[Math.min(size.width * 0.85, size.width - 0.8), 2.55]} />
-        <meshStandardMaterial
-          color="#0a121c"
-          emissive={accent}
-          emissiveIntensity={building.interaction ? 0.22 : 0.08}
-          metalness={0.2}
-          roughness={0.32}
-          transparent
-          opacity={0.92}
+      {/* Manhattan facade ornament (family-aware, quality-gated) */}
+      {showCornice && <Cornice w={top.w} d={top.d} y={roofY} color={FAMILY_TRIM[family]} />}
+      {walkIn && (
+        <>
+          <Awning w={Math.min(doorW + 1.6, size.width - 0.6)} z={size.depth / 2} accent={accent} />
+          <RoofCrown y={roofY} radius={Math.min(size.width, size.depth) * 0.32} accent={accent} />
+        </>
+      )}
+      {showPoster && (
+        <FacadePoster
+          w={size.width}
+          z={size.depth / 2}
+          y={Math.min(roofY - 1.4, 5.2)}
+          seed={hashSeed(`ad-${building.id}`)}
+          title={(building.label ?? building.name).slice(0, 10).toUpperCase()}
+          subtitle="ORBITX ADNET"
+          accent={accent}
         />
-      </mesh>
+      )}
+
+      {/* Ground-floor storefront glazing — split around the doorway for walk-in
+          venues so the opening stays clear, otherwise a full-width shopfront. */}
+      {(() => {
+        const totalW = Math.min(size.width * 0.92, size.width - 0.4);
+        const glassW = Math.min(size.width * 0.85, size.width - 0.8);
+        const openW = walkIn ? doorW + 0.9 : 0;
+        const segFrame = walkIn ? Math.max(0, (totalW - openW) / 2) : totalW;
+        const segGlass = walkIn ? Math.max(0, (glassW - openW) / 2) : glassW;
+        const sides = walkIn ? [-1, 1] : [0];
+        return sides.map((s) => {
+          const cx = walkIn ? s * (openW / 2 + segFrame / 2) : 0;
+          if (walkIn && segFrame <= 0.05) return null;
+          return (
+            <group key={`store-${s}`}>
+              <mesh position={[cx, 1.55, size.depth / 2 + 0.02]} castShadow>
+                <boxGeometry args={[segFrame, 3.0, 0.12]} />
+                <meshStandardMaterial color="#12171d" metalness={0.35} roughness={0.45} />
+              </mesh>
+              {segGlass > 0.05 && (
+                <mesh position={[cx, 1.55, size.depth / 2 + 0.09]}>
+                  <planeGeometry args={[segGlass, 2.55]} />
+                  <meshStandardMaterial
+                    color="#0a121c"
+                    emissive={accent}
+                    emissiveIntensity={building.interaction ? 0.22 : 0.08}
+                    metalness={0.2}
+                    roughness={0.32}
+                    transparent
+                    opacity={0.92}
+                  />
+                </mesh>
+              )}
+            </group>
+          );
+        });
+      })()}
       <mesh position={[0, 3.35, size.depth / 2 + 0.2]} castShadow>
         <boxGeometry
           args={[
@@ -501,53 +651,60 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         </Text>
       )}
 
-      {/* Recessed enterable door */}
-      <mesh position={[0, 1.05, size.depth / 2 + 0.12]} castShadow>
-        <boxGeometry args={[doorW + 0.4, 2.45, 0.18]} />
-        <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
-      </mesh>
-      <mesh
-        position={[0, 1.05, size.depth / 2 + 0.22]}
-        onClick={(e) => {
-          e.stopPropagation();
-          enterBuilding(building.id);
-        }}
-      >
-        <planeGeometry args={[doorW, 2.1]} />
-        <meshStandardMaterial
-          color="#0c1014"
-          emissive={accent}
-          emissiveIntensity={0.28}
-          metalness={0.15}
-          roughness={0.4}
-        />
-      </mesh>
-      <mesh position={[-doorW * 0.18, 1.05, size.depth / 2 + 0.24]}>
-        <sphereGeometry args={[0.04, 8, 8]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.9} toneMapped={false} />
-      </mesh>
-      <Text
-        position={[0, 0.32, size.depth / 2 + 0.26]}
-        fontSize={0.16}
-        color={accent}
-        anchorX="center"
-        outlineWidth={0.01}
-        outlineColor="#05080c"
-        onClick={(e) => {
-          e.stopPropagation();
-          enterBuilding(building.id);
-        }}
-      >
-        {building.interaction ? "CLICK · ENTER" : "ENTER"}
-      </Text>
-      <mesh position={[0, 2.4, size.depth / 2 + 0.42]} castShadow>
-        <boxGeometry args={[doorW + 0.75, 0.14, 0.6]} />
-        <meshStandardMaterial color="#3a4046" metalness={0.25} roughness={0.7} />
-      </mesh>
-      <mesh position={[0, 0.02, size.depth / 2 + 1.15]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[doorW + 2.6, 2.4]} />
-        <meshStandardMaterial color="#6a7178" roughness={0.9} metalness={0.06} />
-      </mesh>
+      {/* Open, walk-through doorway (entry is by physically crossing it — never
+          a click). The jambs/lintel frame a dark recess so the opening reads as
+          a real hole in the facade that lines up with the collision gap. */}
+      {walkIn ? (
+        <group>
+          {/* Left + right jambs flanking the opening */}
+          {[-1, 1].map((s) => (
+            <mesh key={`jamb-${s}`} position={[s * (doorW / 2 + 0.16), 1.2, size.depth / 2 + 0.12]} castShadow>
+              <boxGeometry args={[0.32, 2.7, 0.34]} />
+              <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
+            </mesh>
+          ))}
+          {/* Lintel */}
+          <mesh position={[0, 2.62, size.depth / 2 + 0.12]} castShadow>
+            <boxGeometry args={[doorW + 0.64, 0.34, 0.34]} />
+            <meshStandardMaterial color="#20252b" metalness={0.32} roughness={0.5} />
+          </mesh>
+          {/* Dark interior recess seen through the opening */}
+          <mesh position={[0, 1.2, size.depth / 2 - 0.25]}>
+            <planeGeometry args={[doorW, 2.4]} />
+            <meshStandardMaterial color="#05070a" roughness={0.95} metalness={0} />
+          </mesh>
+          {/* Warm threshold glow so the entrance reads as "open" */}
+          <mesh position={[0, 0.06, size.depth / 2 + 0.02]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[doorW, 1.4]} />
+            <meshBasicMaterial color={accent} transparent opacity={0.28} toneMapped={false} />
+          </mesh>
+          <Text
+            position={[0, 0.34, size.depth / 2 + 0.26]}
+            fontSize={0.16}
+            color={accent}
+            anchorX="center"
+            outlineWidth={0.01}
+            outlineColor="#05080c"
+          >
+            OPEN · WALK IN
+          </Text>
+          {/* Entrance canopy */}
+          <mesh position={[0, 2.9, size.depth / 2 + 0.5]} castShadow>
+            <boxGeometry args={[doorW + 0.95, 0.14, 0.8]} />
+            <meshStandardMaterial color="#3a4046" metalness={0.25} roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 0.02, size.depth / 2 + 1.2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <planeGeometry args={[doorW + 2.6, 2.6]} />
+            <meshStandardMaterial color="#6a7178" roughness={0.9} metalness={0.06} />
+          </mesh>
+        </group>
+      ) : (
+        // Non-walk-in structures keep a plain closed storefront door.
+        <mesh position={[0, 1.05, size.depth / 2 + 0.12]} castShadow>
+          <boxGeometry args={[doorW + 0.4, 2.45, 0.16]} />
+          <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
+        </mesh>
+      )}
 
       <Billboard position={[0, roofY + 1.7, 0]}>
         <Text

@@ -407,7 +407,7 @@ export function InteriorRoom({
         outlineWidth={0.012}
         outlineColor="#0a1014"
       >
-        TAP glowing stations · E exits
+        TAP stations or press E for venue tools · walk out the door to leave
       </Text>
 
       <ThemeSet theme={theme} width={w} depth={d} height={h} accent={building.accent} building={building} />
@@ -424,7 +424,7 @@ export function InteriorRoom({
         <meshStandardMaterial color="#6a8f6e" emissive="#3d5c3a" emissiveIntensity={0.32} />
       </mesh>
       <Text position={[0, 1.05, d / 2 - 0.9]} fontSize={0.26} color="#d8e8d6" anchorX="center" outlineWidth={0.02} outlineColor="#1a221c">
-        [E] EXIT TO STREET
+        WALK OUT TO STREET
       </Text>
     </group>
   );

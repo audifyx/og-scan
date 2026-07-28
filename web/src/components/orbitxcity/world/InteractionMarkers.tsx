@@ -97,10 +97,10 @@ function ZoneMarker({ zone, active }: { zone: InteractionZone; active: boolean }
             <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.55} metalness={0.2} roughness={0.4} />
           </mesh>
           <Text position={[0, 3.2, 0]} fontSize={0.22} color={color} anchorX="center" outlineWidth={0.018} outlineColor="#0a1014">
-            {(KIND_HINT[zone.kind] ?? "Venue").toUpperCase()}
+            {zone.buildingId ? "E · VENUE TOOLS" : (KIND_HINT[zone.kind] ?? "Venue").toUpperCase()}
           </Text>
           <Text position={[0, 2.2, 0]} fontSize={0.32} color="#eef2f4" anchorX="center" outlineWidth={0.022} outlineColor="#12161a">
-            [E] ENTER · {zone.label}
+            {zone.buildingId ? `WALK IN · ${zone.label}` : `[E] ${zone.label}`}
           </Text>
         </>
       )}

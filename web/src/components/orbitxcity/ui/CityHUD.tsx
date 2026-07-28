@@ -144,6 +144,7 @@ export function CityHUD() {
     exitToMenu,
     lobby,
     selectedCityId,
+    resetPlayer,
   } = useCity();
   const isPhone = useIsPhone();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -326,6 +327,9 @@ export function CityHUD() {
             <button type="button" className="oxc-toggle-btn" onClick={() => { setMoreOpen(false); openPanel("settings"); }}>
               Settings
             </button>
+            <button type="button" className="oxc-toggle-btn" onClick={() => { setMoreOpen(false); resetPlayer(); }}>
+              Stuck? Reset
+            </button>
             <div className="oxc-more-wallet">
               <WalletConnectButton />
             </div>
@@ -380,14 +384,17 @@ export function CityHUD() {
             <span>{prompt.hint}</span>
           </div>
           <button type="button" className="oxc-btn primary compact" onClick={interact}>
-            Go
+            Tools
           </button>
         </div>
       )}
 
       <div className="oxc-help">
         <span>WASD · Shift sprint · Space jump · B dance</span>
-        <span>E Interact / Exit · Enter Chat · Esc Close</span>
+        <span>Walk through doors to enter · E Venue tools · Enter Chat · Esc Close</span>
+        <button type="button" className="oxc-reset-btn" onClick={resetPlayer} title="Reset to spawn if stuck">
+          Stuck? Reset
+        </button>
       </div>
 
       {touchControls && <TouchControls />}
