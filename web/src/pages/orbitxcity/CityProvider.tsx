@@ -314,6 +314,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
   }, [realtime]);
 
   const openToken = useCallback((mint: string) => {
+    setVenueBuildingId(null);
     setSelectedMint(mint);
     setPanel("token");
   }, []);

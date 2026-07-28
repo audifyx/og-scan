@@ -3799,6 +3799,13 @@ button.oxc-token-row {
 .oxc-venue-close:hover, .oxc-venue-close:focus-visible { border-color: var(--oxc-cyan); color: var(--oxc-cyan); outline: none; }
 .oxc-venue-context { display: flex; flex-wrap: wrap; gap: 0.5rem; border-top: 1px solid var(--oxc-line); border-bottom: 1px solid var(--oxc-line); padding: 0.7rem 0; }
 .oxc-venue-context span { display: flex; align-items: center; gap: 0.35rem; border-right: 1px solid var(--oxc-line); padding-right: 0.75rem; color: var(--oxc-muted); font-family: var(--oxc-font-mono); font-size: 0.68rem; text-transform: uppercase; }
+.oxc-venue-tabs { display: flex; align-items: center; gap: 0.5rem; }
+.oxc-venue-tabs button { display: flex; align-items: center; gap: 0.45rem; border: 1px solid var(--oxc-line); background: #0f131a; padding: 0.7rem 0.9rem; color: var(--oxc-muted); font-family: var(--oxc-font-mono); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+.oxc-venue-tabs button svg { width: 1rem; height: 1rem; }
+.oxc-venue-tabs button:hover, .oxc-venue-tabs button:focus-visible, .oxc-venue-tabs button.active { border-color: var(--oxc-cyan); color: var(--oxc-cyan); outline: none; }
+.oxc-venue-tabs button.active { background: rgba(91, 141, 239, 0.12); }
+.oxc-venue-workspace { flex: 1; min-height: 18rem; overflow: visible; border: 1px solid var(--oxc-line); background: #090c11; padding: clamp(0.8rem, 2vw, 1.25rem); }
+.oxc-venue-workspace .oxc-stack { width: 100%; }
 .oxc-venue-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; flex: 1; }
 .oxc-venue-card { min-height: 11rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.7rem; border: 1px solid var(--oxc-line); background: #0f131a; padding: 1rem; color: var(--oxc-text); text-align: left; transition: border-color 150ms ease, transform 150ms ease, background 150ms ease; }
 .oxc-venue-card:hover, .oxc-venue-card:focus-visible { border-color: var(--oxc-cyan); background: #131923; transform: translateY(-2px); outline: none; }

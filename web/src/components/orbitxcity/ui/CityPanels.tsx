@@ -118,7 +118,7 @@ export function CityPanelHost() {
   );
 }
 
-function GamesPanel() {
+export function GamesPanel() {
   return (
     <div className="oxc-stack">
       <div className="oxc-hero-tile launch">
@@ -146,7 +146,7 @@ function GamesPanel() {
   );
 }
 
-function NftPanel() {
+export function NftPanel() {
   return (
     <div className="oxc-stack">
       <div className="oxc-hero-tile social">
@@ -225,7 +225,7 @@ function MapPanel() {
   );
 }
 
-function ProfilePanel() {
+export function ProfilePanel() {
   const { avatar, openPanel } = useCity();
   const { profile, user } = useAuth();
   const { publicKey, connected } = useWallet();
@@ -303,7 +303,7 @@ function LiveDataPanel() {
   );
 }
 
-function TradingPanel() {
+export function TradingPanel() {
   return (
     <div className="oxc-stack">
       <div className="oxc-hero-tile trade">
@@ -322,7 +322,7 @@ function TradingPanel() {
   );
 }
 
-function LaunchPanel() {
+export function LaunchPanel() {
   return (
     <div className="oxc-stack">
       <div className="oxc-hero-tile launch">
@@ -340,7 +340,7 @@ function LaunchPanel() {
   );
 }
 
-function CommunityPanel() {
+export function CommunityPanel() {
   const { openPanel, setVoiceOpen } = useCity();
   return (
     <div className="oxc-stack">
