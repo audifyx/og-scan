@@ -8,6 +8,7 @@ const GT = "https://api.geckoterminal.com/api/v2";
 const EVM_CHAIN_TO_GT = {
   ethereum: "eth", bsc: "bsc", base: "base", polygon: "polygon_pos",
   arbitrum: "arbitrum", avalanche: "avax", sui: "sui-network",
+  robinhood: "robinhood",
 };
 
 // Pull website / socials / banner out of a DexScreener pair's info block.

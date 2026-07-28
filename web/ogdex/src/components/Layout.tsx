@@ -58,8 +58,10 @@ const FOOTER_RESOURCES = [
   { to: "/leaderboard", label: "Leaderboard" },
   { to: "/api", label: "API Docs" },
   { to: "/status", label: "Status" },
-  { to: "/terms", label: "Terms" },
-  { to: "/privacy", label: "Privacy" },
+  { href: "/whitepaper", label: "Whitepaper" },
+  { href: "/roadmap", label: "Roadmap" },
+  { href: "/terms", label: "Terms" },
+  { href: "/privacy", label: "Privacy" },
 ];
 const FOOTER_ECOSYSTEM = [
   { href: "/orbitxlaunch", label: "OrbitX Launchpad" },
@@ -76,6 +78,10 @@ function FooterCol({ title, links, external }: { title: string; links: { to?: st
         {links.map((l) => (
           <li key={l.label}>
             {external && l.href ? (
+              <a href={l.href} className="inline-flex items-center gap-1 text-[13px] text-[var(--ox-silver)] hover:text-[var(--ox-gold-hi)]">
+                {l.label} <ChevronRight className="h-3 w-3 opacity-50" />
+              </a>
+            ) : l.href ? (
               <a href={l.href} className="inline-flex items-center gap-1 text-[13px] text-[var(--ox-silver)] hover:text-[var(--ox-gold-hi)]">
                 {l.label} <ChevronRight className="h-3 w-3 opacity-50" />
               </a>
@@ -252,8 +258,10 @@ export default function Layout() {
           <div className="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-[var(--ox-silver)]/70 border-t" style={{ borderColor: "rgba(192,198,210,0.08)" }}>
             <span>© {new Date().getFullYear()} OrbitX Terminal</span>
             <div className="flex gap-4">
-              <Link to="/terms" className="hover:text-[var(--ox-gold-hi)]">Terms</Link>
-              <Link to="/privacy" className="hover:text-[var(--ox-gold-hi)]">Privacy</Link>
+              <a href="/whitepaper" className="hover:text-[var(--ox-gold-hi)]">Whitepaper</a>
+              <a href="/roadmap" className="hover:text-[var(--ox-gold-hi)]">Roadmap</a>
+              <a href="/terms" className="hover:text-[var(--ox-gold-hi)]">Terms</a>
+              <a href="/privacy" className="hover:text-[var(--ox-gold-hi)]">Privacy</a>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
@@ -27,10 +27,6 @@ const Admin = lazy(() => import("./pages/Admin"));
 const Launchpad = lazy(() => import("./pages/Launchpad"));
 const RobinhoodScanner = lazy(() => import("./pages/RobinhoodScanner"));
 const Robinhood = lazy(() => import("./pages/Robinhood"));
-const Terms = lazy(() => import("./pages/Terms"));
-const Privacy = lazy(() => import("./pages/Privacy"));
-const Whitepaper = lazy(() => import("./pages/Whitepaper"));
-const Roadmap = lazy(() => import("./pages/Roadmap"));
 const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 // Phase 2+
 const Status = lazy(() => import("./pages/Status"));
@@ -44,6 +40,12 @@ const OwnerDeskGate = lazy(() => import("./components/OwnerDeskGate"));
 
 function PageFallback() {
   return <div className="grid place-items-center py-24 text-muted"><Loader2 className="w-5 h-5 animate-spin" /></div>;
+}
+
+/** Unified platform docs live at ogscan.fun root — not under /ORBITX_DEX. */
+function PlatformDocRedirect({ path }: { path: string }) {
+  useEffect(() => { window.location.replace(path); }, [path]);
+  return <PageFallback />;
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -88,10 +90,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           {/* Legacy admin URLs intentionally dead — do not redirect to the desk */}
           <Route path="admin" element={<Navigate to="/" replace />} />
           <Route path="thispageisfordev" element={<Navigate to="/" replace />} />
-          <Route path="terms" element={<Suspense fallback={<PageFallback />}><Terms /></Suspense>} />
-          <Route path="privacy" element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
-          <Route path="whitepaper" element={<Suspense fallback={<PageFallback />}><Whitepaper /></Suspense>} />
-          <Route path="roadmap" element={<Suspense fallback={<PageFallback />}><Roadmap /></Suspense>} />
+          <Route path="terms" element={<PlatformDocRedirect path="/terms" />} />
+          <Route path="privacy" element={<PlatformDocRedirect path="/privacy" />} />
+          <Route path="whitepaper" element={<PlatformDocRedirect path="/whitepaper" />} />
+          <Route path="roadmap" element={<PlatformDocRedirect path="/roadmap" />} />
           <Route path="leaderboard" element={<Suspense fallback={<PageFallback />}><Leaderboard /></Suspense>} />
           {/* Phase 2: Status page */}
           <Route path="status" element={<Suspense fallback={<PageFallback />}><Status /></Suspense>} />

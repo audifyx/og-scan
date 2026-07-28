@@ -72,6 +72,8 @@ export function SocialRightRail() {
       </div>
 
       <div style={{ padding: "0 16px", fontSize: 13, color: "#71767b", lineHeight: 1.6 }}>
+        <Link to="/whitepaper" className="oxs-link" style={{ marginRight: 12 }}>Whitepaper</Link>
+        <Link to="/roadmap" className="oxs-link" style={{ marginRight: 12 }}>Roadmap</Link>
         <Link to="/terms" className="oxs-link" style={{ marginRight: 12 }}>Terms</Link>
         <Link to="/privacy" className="oxs-link">Privacy</Link>
         <div style={{ marginTop: 8 }}>© OrbitX Social</div>

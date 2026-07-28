@@ -56,7 +56,21 @@ export default function RobinhoodScanner() {
 
   useEffect(() => {
     let on = true;
-    getScreener("trending", "24h", 150, "robinhood").then((d) => { if (on) { setRows(d.rows || []); setLoading(false); } }).catch(() => on && setLoading(false));
+    const run = async () => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const d = await getScreener("trending", "24h", 150, "robinhood");
+          if (!on) return;
+          const next = d.rows || [];
+          if (next.length || attempt === 2) { setRows(next); setLoading(false); return; }
+        } catch {
+          if (!on) return;
+        }
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      }
+      if (on) setLoading(false);
+    };
+    run();
     return () => { on = false; };
   }, []);
 

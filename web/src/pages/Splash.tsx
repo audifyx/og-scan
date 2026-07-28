@@ -20,6 +20,8 @@ const LINKS = {
   degen: "https://degen-tower.vercel.app",
   privacy: "/privacy",
   terms: "/terms",
+  whitepaper: "/whitepaper",
+  roadmap: "/roadmap",
 };
 
 const HERO_PLANES = [
@@ -684,8 +686,10 @@ export default function Splash() {
             </div>
             <div>
               <h4>Legal</h4>
-              <a href={LINKS.privacy}>Privacy</a>
+              <a href={LINKS.whitepaper}>Whitepaper</a>
+              <a href={LINKS.roadmap}>Roadmap</a>
               <a href={LINKS.terms}>Terms</a>
+              <a href={LINKS.privacy}>Privacy</a>
             </div>
           </div>
         </div>

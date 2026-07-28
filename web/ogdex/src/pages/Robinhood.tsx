@@ -80,10 +80,27 @@ export default function Robinhood() {
 
   const load = (manual = false) => {
     if (manual) setRefreshing(true);
-    getScreener("trending", "24h", 120, "robinhood")
-      .then((d) => { setRows(d.rows || []); setErr(d.error || null); setUpdatedAt(Date.now()); })
-      .catch((e) => setErr(String(e?.message || e)))
-      .finally(() => { setLoading(false); setRefreshing(false); });
+    const run = async () => {
+      let lastErr: string | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const d = await getScreener("trending", "24h", 120, "robinhood");
+          const next = d.rows || [];
+          if (next.length || attempt === 2) {
+            setRows(next);
+            setErr(next.length ? null : (d.error || null));
+            setUpdatedAt(Date.now());
+            return;
+          }
+          lastErr = d.error || null;
+        } catch (e: any) {
+          lastErr = String(e?.message || e);
+        }
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      }
+      if (lastErr) setErr(lastErr);
+    };
+    run().finally(() => { setLoading(false); setRefreshing(false); });
   };
 
   useEffect(() => {

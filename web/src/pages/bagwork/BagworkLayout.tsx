@@ -129,6 +129,8 @@ function BagworkFooter() {
         ]} />
         <FooterCol title="Company" links={[
           ["App hub", "/app"],
+          ["Whitepaper", "/whitepaper"],
+          ["Roadmap", "/roadmap"],
           ["Terms", "/terms"],
           ["Privacy", "/privacy"],
         ]} />

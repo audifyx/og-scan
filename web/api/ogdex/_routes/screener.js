@@ -4,7 +4,14 @@ import { CELEB_MINTS, fetchMints } from "../_curated.js";
 
 const CHAINS = ["solana","ethereum","bsc","base","polygon","arbitrum","avalanche","sui","ton","robinhood"];
 const GT_HDR = { Accept: "application/json;version=20230302" };
-const STABLES = new Set(["USDC","USDT","SOL","WSOL","JLP","JITOSOL","MSOL","BSOL","JUPSOL","INF","USDS","USDE","PYUSD","EURC","CBBTC","WBTC","HSOL","JUP","ISC","USDH","DAI","BUSD","WETH","ETH","WBNB","BNB","WMATIC","MATIC","POL","WPOL","WAVAX","AVAX","WTON","STETH","WSTETH","FDUSD","TUSD","USDD"]);
+const STABLES = new Set(["USDC","USDT","SOL","WSOL","JLP","JITOSOL","MSOL","BSOL","JUPSOL","INF","USDS","USDE","USDG","PYUSD","EURC","CBBTC","WBTC","HSOL","JUP","ISC","USDH","DAI","BUSD","WETH","ETH","WBNB","BNB","WMATIC","MATIC","POL","WPOL","WAVAX","AVAX","WTON","STETH","WSTETH","FDUSD","TUSD","USDD"]);
+
+/** Pull 0x… / base58 mint out of a GeckoTerminal relationship id (`robinhood_0xabc…`). */
+function mintFromGtId(id) {
+  if (!id || typeof id !== "string") return null;
+  const i = id.indexOf("_");
+  return i >= 0 ? id.slice(i + 1) : null;
+}
 
 // ── Deduplication by mint ─────────────────────────────────────────────────────
 function dedup(rows) {
@@ -73,9 +80,12 @@ function normGecko(item, tokenMap = {}) {
   const netId       = rel.network?.data?.id || "solana";
   const baseTokenId = rel.base_token?.data?.id;
   const bt  = tokenMap[baseTokenId] || {};
-  const mint = bt.address || null;
+  // Prefer included token attrs; when GT omits `included` (rate-limit / trunc),
+  // recover the mint from the relationship id so rows aren't all dropped.
+  const mint = bt.address || mintFromGtId(baseTokenId);
   if (!mint) return null;
   const sym  = bt.symbol || (a.name || "").split(" / ")[0].trim() || null;
+  const poolAddress = a.address || mintFromGtId(item.id) || null;
   return {
     mint, name: bt.name || sym, symbol: sym,
     icon: bt.image_url || null,
@@ -87,10 +97,62 @@ function normGecko(item, tokenMap = {}) {
     change1h:  num(a.price_change_percentage?.h1),
     change24h: num(a.price_change_percentage?.h24),
     holderCount: null,
-    chain: netId, poolAddress: item.id || null,
+    chain: netId, poolAddress,
     createdAt: a.pool_created_at || null,
     _source: "gecko",
   };
+}
+
+// ── DexScreener chain fallback (when GeckoTerminal is empty / rate-limited) ───
+async function fetchDexByChain(chainId, limit = 80) {
+  // DexScreener has no “list by chain” endpoint — seed via a few high-hit queries
+  // and keep only pairs on the requested chain.
+  const queries = chainId === "robinhood"
+    ? ["WETH", "ETH", "USDC", "CATE", "uniswap"]
+    : ["ETH", "USDC", "USDT", "WETH"];
+  try {
+    const batches = await Promise.all(
+      queries.map((q) =>
+        fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`, {
+          headers: { Accept: "application/json" },
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null)
+      )
+    );
+    const out = [];
+    for (const d of batches) {
+      for (const p of d?.pairs || []) {
+        if (String(p.chainId || "").toLowerCase() !== String(chainId).toLowerCase()) continue;
+        const mint = p.baseToken?.address;
+        if (!mint) continue;
+        out.push({
+          mint,
+          name: p.baseToken?.name || null,
+          symbol: p.baseToken?.symbol || null,
+          icon: p.info?.imageUrl || null,
+          priceUsd: num(p.priceUsd),
+          mcap: num(p.marketCap) ?? num(p.fdv),
+          liquidity: num(p.liquidity?.usd),
+          volume: num(p.volume?.h24),
+          change24h: num(p.priceChange?.h24),
+          change1h: num(p.priceChange?.h1),
+          change5m: num(p.priceChange?.m5),
+          holderCount: null,
+          chain: chainId,
+          poolAddress: p.pairAddress || null,
+          createdAt: p.pairCreatedAt ? new Date(p.pairCreatedAt).toISOString() : null,
+          _source: "dexscreener",
+        });
+      }
+    }
+    return dedup(out)
+      .filter((r) => !STABLES.has(String(r.symbol || "").toUpperCase()))
+      .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
 }
 
 // ── Pump.fun API fetch ────────────────────────────────────────────────────────
@@ -191,11 +253,15 @@ export default async function handler(req, res) {
       const netMap = {
         ethereum: "eth", bsc: "bsc", base: "base", polygon: "polygon_pos",
         arbitrum: "arbitrum", avalanche: "avax", sui: "sui-network", ton: "ton",
+        robinhood: "robinhood",
       };
       const net = netMap[chain] || chain;
       cache(res, 60, 300); // cache hard — GeckoTerminal rate-limits shared IPs
+      // Robinhood is a young chain — keep a low volume floor so thin but real
+      // pools still surface. Other EVM chains keep the $100 gate.
+      const minVol = chain === "robinhood" ? 1 : 100;
       const [trend, newP] = await Promise.all([
-        fetchGeckoTrending(net, 3),
+        fetchGeckoTrending(net, chain === "robinhood" ? 2 : 3),
         fetchGeckoNew(net),
       ]);
       const tokenMap = { ...trend.tokenMap, ...newP.tokenMap };
@@ -204,9 +270,18 @@ export default async function handler(req, res) {
           .map(p => normGecko(p, tokenMap))
           .filter(Boolean)
           .filter(r => !STABLES.has(String(r.symbol || "").toUpperCase()))
-          .filter(r => (r.volume ?? 0) >= 100)
+          .filter(r => (r.volume ?? 0) >= minVol || (r.liquidity ?? 0) >= 500)
           .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
-      ).slice(0, limit);
+      );
+      // GeckoTerminal often 429s on Vercel shared IPs → empty feed. DexScreener
+      // is a reliable second source (especially for Robinhood Uniswap pools).
+      if (rows.length < 12) {
+        const dexRows = await fetchDexByChain(chain, limit);
+        rows = dedup([...rows, ...dexRows])
+          .filter(r => !STABLES.has(String(r.symbol || "").toUpperCase()))
+          .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0));
+      }
+      rows = rows.slice(0, limit);
       return send(res, 200, { type, interval, chain, count: rows.length, rows });
     }
 

@@ -64,6 +64,12 @@ export const SiteFooter = () => {
           </div>
         </div>
         <div className="mt-10 flex flex-col items-center gap-2 border-t border-og-grid pt-5">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <a href="/whitepaper" className="hover:text-og-lime">Whitepaper</a>
+            <a href="/roadmap" className="hover:text-og-lime">Roadmap</a>
+            <a href="/terms" className="hover:text-og-lime">Terms</a>
+            <a href="/privacy" className="hover:text-og-lime">Privacy</a>
+          </div>
           <div className="inline-flex items-center gap-3 font-mono text-[9px] uppercase tracking-[0.5em] text-muted-foreground">
             <span className="h-px w-8 bg-og-grid" />
             © {new Date().getFullYear()} · ogscan.fun · Built on Solana

@@ -214,7 +214,7 @@ export default function MarketplaceLayout() {
             </div>
             <FooterCol title="Marketplace" links={[["Home", "/nft"], ["Explore", "/nft/explore"], ["Drops", "/nft/drops"], ["Activity", "/nft/activity"]]} />
             <FooterCol title="Create" links={[["Mint an NFT", "/nft/create"], ["Launch a drop", "/nft/drops"], ["Creator dashboard", "/nft/me"], ["Claim fees", "/nft/me?tab=fees"]]} />
-            <FooterCol title="Company" links={[["Launchpad", "/orbitxlaunch"], ["DEX", "/ORBITX_DEX"], ["Terms", "/terms"], ["Privacy", "/privacy"]]} />
+            <FooterCol title="Company" links={[["Launchpad", "/orbitxlaunch"], ["DEX", "/ORBITX_DEX"], ["Whitepaper", "/whitepaper"], ["Roadmap", "/roadmap"], ["Terms", "/terms"], ["Privacy", "/privacy"]]} />
           </div>
           <div className="border-t mkt-hairline">
             <div className="mx-auto flex w-full max-w-[1440px] flex-col items-center justify-between gap-2 px-4 py-4 text-[11px] mkt-muted sm:flex-row">

@@ -105,6 +105,8 @@ import SupportPage from "./pages/SupportPage";
 import { SupportNotificationBanner } from "./components/SupportNotificationBanner";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import PlatformWhitepaper from "./pages/platform/Whitepaper";
+import PlatformRoadmap from "./pages/platform/Roadmap";
 import { CCCallbackPage } from "./pages/CCCallbackPage";
 import { SolanaWalletProvider } from "./contexts/SolanaWalletProvider";
 import { EvmWalletProvider } from "@/hooks/useEvmWallet";
@@ -230,10 +232,12 @@ const App = () => (
             <Route path="/auth/email" element={<Auth />} />
             <Route path="/setup" element={<Setup />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/whitepaper" element={<PlatformWhitepaper />} />
+            <Route path="/roadmap" element={<PlatformRoadmap />} />
             <Route path="/r/:id" element={<ReportView />} />
             <Route path="/t/:mint" element={<OgdexRedirect to={(p) => `/ORBITX_DEX/token/${p.mint}`} />} />
             <Route path="/track-record" element={<OgdexRedirect to="/ORBITX_DEX" />} />
-            <Route path="/privacy" element={<Privacy />} />
             <Route path="/cc-callback" element={<CCCallbackPage />} />
             <Route path="/x-callback" element={<XCallbackPage />} />
 
@@ -378,7 +382,6 @@ const App = () => (
             <Route path="/command" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/home" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/our-coin" element={<OgdexRedirect to="/ORBITX_DEX" />} />
-            <Route path="/roadmap" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/market-pulse" element={<OgdexRedirect to="/ORBITX_DEX/pulse" />} />
             <Route path="/market" element={<OgdexRedirect to="/ORBITX_DEX" />} />
             <Route path="/feed" element={<OgdexRedirect to="/ORBITX_DEX" />} />

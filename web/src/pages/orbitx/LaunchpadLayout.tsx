@@ -305,6 +305,8 @@ function LaunchpadFooter() {
         <FooterCol title="Company" links={[
           ["NFT Market", "/nft"],
           ["DEX", "/ORBITX_DEX"],
+          ["Whitepaper", "/whitepaper"],
+          ["Roadmap", "/roadmap"],
           ["Terms", "/terms"],
           ["Privacy", "/privacy"],
         ]} />
