@@ -612,28 +612,21 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
 
   const Composer = ({ inline, refEl }: { inline?: boolean; refEl: React.RefObject<HTMLTextAreaElement> }) => (
     <div className={cn("flex gap-3", inline && "border-b border-white/[0.08] px-4 py-3")}>
-      <img src={myAvatar} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-white/10" />
+      <img src={myAvatar} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
       <div className="min-w-0 flex-1">
         <textarea
           ref={refEl}
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, MAX_LEN))}
-          placeholder="What's happening?"
+          placeholder="What’s happening?"
           rows={inline ? 2 : 4}
-          className="w-full resize-none bg-transparent text-[17px] text-white placeholder:text-white/30 outline-none"
+          className="w-full resize-none bg-transparent text-[20px] leading-snug text-white placeholder:text-white/35 outline-none"
           onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") submit(); }}
         />
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {["$SOL", "$BONK", "#trenches", "gm ☀️", "🔥"].map((q) => (
-            <button key={q} type="button" onClick={() => setText((t) => (t + (t && !t.endsWith(" ") ? " " : "") + q + " ").slice(0, MAX_LEN))} className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[11px] font-bold text-[#1d9bf0]/90 transition hover:border-[#1d9bf0]/40 hover:bg-[#1d9bf0]/10 active:scale-95">
-            {q}
-            </button>
-          ))}
-        </div>
         {pendingImages.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {pendingImages.map((url) => (
-              <div key={url} className="relative h-16 w-16 overflow-hidden rounded-lg ring-1 ring-white/10">
+              <div key={url} className="relative h-16 w-16 overflow-hidden rounded-xl ring-1 ring-white/10">
                 <img src={url} alt="" className="h-full w-full object-cover" />
                 <button type="button" onClick={() => setPendingImages((prev) => prev.filter((u) => u !== url))} className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-black/70 text-white/80 transition hover:text-white" aria-label="Remove image">
                   <XIcon className="h-2.5 w-2.5" />
@@ -642,12 +635,12 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
             ))}
           </div>
         )}
-        <div className="mt-2 flex items-center justify-between border-t border-white/[0.06] pt-2">
-          <span className="relative flex items-center gap-2">
-            <button type="button" onClick={() => composerFileRef.current?.click()} disabled={uploadingImg} className="grid h-8 w-8 place-items-center rounded-full text-[#1d9bf0] transition hover:bg-[#1d9bf0]/10 disabled:opacity-50" title="Add image">
+        <div className="mt-2 flex items-center justify-between border-t border-white/[0.08] pt-2.5">
+          <span className="relative flex items-center gap-0.5">
+            <button type="button" onClick={() => composerFileRef.current?.click()} disabled={uploadingImg} className="grid h-9 w-9 place-items-center rounded-full text-[#1d9bf0] transition hover:bg-[#1d9bf0]/10 disabled:opacity-50" title="Add image">
               {uploadingImg ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ImageIcon className="h-[18px] w-[18px]" />}
             </button>
-            <button type="button" onClick={() => setEmojiOpen((v) => !v)} className="grid h-8 w-8 place-items-center rounded-full text-[#1d9bf0] transition hover:bg-[#1d9bf0]/10" title="Add emoji">
+            <button type="button" onClick={() => setEmojiOpen((v) => !v)} className="grid h-9 w-9 place-items-center rounded-full text-[#1d9bf0] transition hover:bg-[#1d9bf0]/10" title="Add emoji">
               <Smile className="h-[18px] w-[18px]" />
             </button>
             {emojiOpen && (
@@ -662,22 +655,18 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
                 </div>
               </>
             )}
-            {text.length > 0 && (
-              <svg width="18" height="18" viewBox="0 0 20 20" className="-rotate-90">
-                <circle cx="10" cy="10" r="8" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="2.5" />
-                <circle cx="10" cy="10" r="8" fill="none" stroke={text.length > MAX_LEN - 40 ? "#fb923c" : "#1d9bf0"} strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${(text.length / MAX_LEN) * 50.3} 50.3`} />
-              </svg>
+            {text.length > MAX_LEN - 40 && (
+              <span className="ml-1 text-[12px] font-bold text-orange-400">{MAX_LEN - text.length}</span>
             )}
-            <span className={cn("text-[11px] font-bold", text.length > MAX_LEN - 40 ? "text-orange-400" : "text-white/25")}>{text.length}/{MAX_LEN}</span>
           </span>
           <button
             type="button"
             disabled={(!text.trim() && pendingImages.length === 0) || posting}
             onClick={() => submit()}
             className={cn(
-              "rounded-full px-5 py-1.5 text-[14px] font-black transition-all duration-200 active:scale-95",
+              "rounded-full px-4 py-1.5 text-[14px] font-bold transition active:scale-95",
               (text.trim() || pendingImages.length > 0) && !posting
-                ? "bg-gradient-to-r from-[#1d9bf0] to-[#4a9ff5] text-white shadow-[0_4px_16px_rgba(29,155,240,0.4)] hover:shadow-[0_4px_24px_rgba(29,155,240,0.6)]"
+                ? "bg-[#1d9bf0] text-white hover:bg-[#1a8cd8]"
                 : "bg-[#1d9bf0]/40 text-white/50",
             )}
           >
@@ -836,193 +825,84 @@ export default function XSocialApp({ onSelectMint, initialTab }: { onSelectMint?
       case "home":
         return (
           <>
-            {/* ── Command deck hero ── */}
-            <div className="x-rise relative overflow-hidden border-b border-white/[0.06]">
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#1d9bf0]/[0.10] via-transparent to-[#9945FF]/[0.12]" />
-              <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#9945FF]/20 blur-[80px]" />
-              <div className="relative px-4 pb-4 pt-4">
-                <div className="flex items-center gap-3">
-                  <div className="relative shrink-0">
-                    <img src={myAvatar} alt="" className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white/15" />
-                    <span className="absolute -bottom-1.5 -right-1.5 grid h-5 w-5 place-items-center rounded-full bg-black text-[11px] ring-1 ring-white/20">👋</span>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/40">
-                      {(() => { const hr = new Date().getHours(); return hr < 5 ? "Late night" : hr < 12 ? "gm ☀️" : hr < 17 ? "Good afternoon" : hr < 21 ? "Good evening" : "Night owl 🌙"; })()}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[21px] font-black leading-tight text-white">
-                      <span className="truncate">{displayName}</span>
-                      {profile?.is_official_account && <BadgeCheck className="h-5 w-5 shrink-0 text-[#1d9bf0]" />}
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => setTab("notifications")} className="relative ml-auto grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.08] active:scale-95">
-                    <Bell className="h-5 w-5" />
-                    {unread > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#1d9bf0] px-1 text-[9px] font-black">{unread > 9 ? "9+" : unread}</span>}
-                  </button>
-                </div>
-
-                {/* live market pulse */}
-                <div className="mt-3.5 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-black/40 p-3 backdrop-blur-xl">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#9945FF]/30 to-[#1d9bf0]/25 ring-1 ring-white/10">
-                    <TrendingUp className="h-4 w-4 text-[#1d9bf0]" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-[9.5px] font-bold uppercase tracking-widest text-white/40">Market pulse</div>
-                    <div className="text-[15px] font-black text-white">
-                      {marketPulse.avg >= 0 ? "Risk-on" : "Cooling off"}{" "}
-                      <span className={marketPulse.avg >= 0 ? "text-emerald-400" : "text-rose-400"}>{marketPulse.avg >= 0 ? "+" : ""}{marketPulse.avg.toFixed(1)}%</span>
-                    </div>
-                  </div>
-                  <div className="ml-auto flex shrink-0 items-center gap-2.5 text-[12px] font-black">
-                    <span className="text-emerald-400">▲{marketPulse.gainers}</span>
-                    <span className="text-rose-400">▼{marketPulse.losers}</span>
-                    {marketPulse.sol?.priceUsd != null && <span className="rounded-full bg-white/[0.06] px-2.5 py-1 text-white/85">SOL ${marketPulse.sol.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>}
-                  </div>
-                </div>
-
-                {/* quick actions */}
-                <div className="mt-3 grid grid-cols-4 gap-2">
-                  {[
-                    { Icon: Feather, label: "Post", on: () => { setTab("home"); setTimeout(() => composerRef.current?.focus(), 60); } },
-                    { Icon: Search, label: "Explore", on: () => setTab("explore") },
-                    { Icon: Globe, label: "Communities", on: () => setTab("communities") },
-                    { Icon: Mail, label: "Messages", on: () => setTab("messages") },
-                  ].map((a) => (
-                    <button key={a.label} type="button" onClick={a.on} className="group flex flex-col items-center gap-1.5 rounded-2xl border border-white/[0.07] bg-white/[0.03] py-2.5 transition hover:border-[#1d9bf0]/40 hover:bg-[#1d9bf0]/[0.07] active:scale-95">
-                      <a.Icon className="h-5 w-5 text-white/70 transition group-hover:text-[#1d9bf0]" />
-                      <span className="text-[10.5px] font-bold text-white/60 group-hover:text-white">{a.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* ── Top movers rail ── */}
-            {marketPulse.topMovers.length > 0 && (
-              <div className="x-rise border-b border-white/[0.06] px-4 py-3" style={{ animationDelay: "70ms" }}>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-[13px] font-black text-white">🔥 Top movers</span>
-                  <button type="button" onClick={() => setTab("explore")} className="text-[11.5px] font-bold text-[#1d9bf0] hover:underline">See all</button>
-                </div>
-                <div className="flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-                  {marketPulse.topMovers.map((t) => {
-                    const up = (t.change24h ?? 0) >= 0;
-                    return (
-                      <button key={t.mint} type="button" onClick={() => onSelectMint?.(t.mint)} className="x-tilt w-32 shrink-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-3 text-left">
-                        <div className="text-[13px] font-black text-white">${t.symbol}</div>
-                        <div className="mt-0.5 truncate text-[11px] text-white/40">{t.priceUsd != null ? "$" + (t.priceUsd < 0.01 ? t.priceUsd.toExponential(1) : t.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 4 })) : "—"}</div>
-                        <div className={cn("mt-2 inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-black", up ? "bg-emerald-400/10 text-emerald-400" : "bg-rose-400/10 text-rose-400")}>{up ? "▲" : "▼"} {Math.abs(t.change24h ?? 0).toFixed(1)}%</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* ── Suggested to follow ── */}
-            {whoToFollow.length > 0 && (
-              <div className="x-rise border-b border-white/[0.06] px-4 py-3" style={{ animationDelay: "140ms" }}>
-                <div className="mb-2 text-[13px] font-black text-white">Suggested for you</div>
-                <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none]">
-                  {whoToFollow.slice(0, 12).map((sg) => (
-                    <div key={sg.user_id} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
-                      <div className="rounded-full bg-gradient-to-tr from-[#1d9bf0] via-[#9945FF] to-[#f91880] p-[2px]">
-                        <img src={avatarOf(sg.avatar_url, sg.user_id)} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-black" />
-                      </div>
-                      <span className="w-16 truncate text-center text-[10px] font-semibold text-white/70">{sg.username || "anon"}</span>
-                      <button type="button" onClick={() => follow(sg.user_id)} className="rounded-full bg-white px-2.5 py-0.5 text-[10px] font-black text-black transition hover:bg-white/90 active:scale-95">Follow</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Sticky header with feed mode tabs + live dot */}
-            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/55 shadow-[0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-2xl">
+            {/* Sticky For you / Following — clean X header */}
+            <div className="sticky top-0 z-10 border-b border-white/[0.08] bg-black/70 backdrop-blur-xl">
               <div className="flex">
                 {([["foryou", "For you"], ["following", "Following"]] as const).map(([id, label]) => (
-                  <button key={id} type="button" onClick={() => setFeedMode(id)} className="relative flex-1 py-3.5 text-[15px] font-bold text-white/50 transition hover:bg-white/[0.03]">
-                    <span className={cn("inline-flex items-center gap-1.5", feedMode === id && "font-black text-white")}>
-                      {id === "foryou" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" style={{ animation: "xGlowPulse 2s ease infinite" }} />}
-                      {label}
-                    </span>
-                    {feedMode === id && <span className="absolute bottom-0 left-1/2 h-[3px] w-14 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#1d9bf0] to-[#9945FF] shadow-[0_0_10px_rgba(29,155,240,0.6)]" />}
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setFeedMode(id)}
+                    className="relative flex-1 py-3.5 text-[15px] font-bold text-white/50 transition hover:bg-white/[0.03]"
+                  >
+                    <span className={cn(feedMode === id && "font-black text-white")}>{label}</span>
+                    {feedMode === id && (
+                      <span className="absolute bottom-0 left-1/2 h-1 w-14 -translate-x-1/2 rounded-full bg-[#1d9bf0]" />
+                    )}
                   </button>
                 ))}
               </div>
-              {/* live market marquee */}
-              {ticker.length > 3 && (
-                <div className="x-marquee border-t border-white/[0.05]">
-                  <div className="x-marquee-track">
-                    {[...ticker, ...ticker].map((t, i) => {
-                      const up = (t.change24h ?? 0) >= 0;
-                      return (
-                        <button key={`${t.mint}-${i}`} type="button" onClick={() => onSelectMint?.(t.mint)} className="flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-[11.5px] font-bold transition hover:bg-white/[0.04]">
-                          <span className="text-white/85">${t.symbol}</span>
-                          <span className={up ? "text-emerald-400" : "text-rose-400"}>{up ? "▲" : "▼"}{Math.abs(t.change24h ?? 0).toFixed(1)}%</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
+
             <Composer inline refEl={composerRef} />
+
             {loading ? (
               <div>
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="flex animate-pulse gap-3 border-b border-white/[0.06] px-4 py-4" style={{ animationDelay: `${i * 150}ms` }}>
-                    <div className="h-10 w-10 shrink-0 rounded-full bg-white/[0.07]" />
-                    <div className="flex-1 space-y-2 py-1">
-                      <div className="h-3 w-36 rounded-full bg-white/[0.07]" />
-                      <div className="h-3 w-full rounded-full bg-white/[0.05]" />
-                      <div className="h-3 w-2/3 rounded-full bg-white/[0.05]" />
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="flex gap-3 border-b border-white/[0.08] px-4 py-4">
+                    <div className="h-10 w-10 shrink-0 rounded-full bg-white/[0.06]" />
+                    <div className="flex-1 space-y-2.5 py-1">
+                      <div className="h-3 w-40 rounded-full bg-white/[0.06]" />
+                      <div className="h-3 w-full rounded-full bg-white/[0.04]" />
+                      <div className="h-3 w-3/5 rounded-full bg-white/[0.04]" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : shownPosts.length === 0 ? (
-              <div className="px-8 py-14 text-center">
-                <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#1d9bf0]/15 to-[#9945FF]/10 ring-1 ring-white/[0.08]">
-                  <TrendingUp className="h-6 w-6 text-[#1d9bf0]/70" />
+              <div className="px-8 py-16 text-center">
+                <div className="text-[20px] font-black text-white">
+                  {feedMode === "following" ? "Nothing here yet" : "Welcome to OrbitX"}
                 </div>
-                <div className="text-[17px] font-black text-white">{feedMode === "following" ? "Nothing here yet" : "Welcome to OrbitX"}</div>
-                <div className="mt-1 text-[13px] text-white/40">{feedMode === "following" ? "Follow people to see their posts here." : "Break the silence — one tap:"}</div>
+                <p className="mx-auto mt-2 max-w-xs text-[14px] leading-relaxed text-white/40">
+                  {feedMode === "following"
+                    ? "Follow people to see their posts in your timeline."
+                    : "Share what’s happening — your first post kicks off the feed."}
+                </p>
                 {feedMode === "foryou" && (
-                  <div className="mx-auto mt-4 flex max-w-xs flex-col gap-2">
-                    {["gm to the trenches ☀️", "What is everyone aping today? 👀", "First post on OrbitX 🚀"].map((q) => (
-                      <button key={q} type="button" onClick={() => submit(q)} className="rounded-full border border-[#1d9bf0]/30 bg-[#1d9bf0]/[0.07] px-4 py-2 text-[13px] font-bold text-[#1d9bf0] transition hover:bg-[#1d9bf0]/[0.15] active:scale-95">
-                        {q}
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => composerRef.current?.focus()}
+                    className="mt-5 rounded-full bg-[#1d9bf0] px-5 py-2 text-[14px] font-bold text-white transition hover:bg-[#1a8cd8]"
+                  >
+                    Write a post
+                  </button>
                 )}
               </div>
             ) : (
-              shownPosts.map((p, i) => (
-                <React.Fragment key={p.id}>
-                  <PostCard p={p} onOpen={setOpenPostId} />
-                  {i === 2 && feedMode === "foryou" && ticker.length >= 3 && (
-                    <div className="border-b border-white/[0.06] bg-gradient-to-b from-white/[0.02] to-transparent px-4 py-3">
-                      <div className="mb-1 flex items-center justify-between">
-                        <span className="text-[13px] font-black text-white">🔥 Moving right now</span>
-                        <button type="button" onClick={() => setTab("explore")} className="text-[11.5px] font-bold text-[#1d9bf0] hover:underline">See all</button>
-                      </div>
-                      <div className="flex gap-2 overflow-x-auto pb-1">
-                        {ticker.slice(0, 6).map((t) => {
-                          const up = (t.change24h ?? 0) >= 0;
-                          return (
-                            <button key={t.mint} type="button" onClick={() => onSelectMint?.(t.mint)} className="flex shrink-0 flex-col items-start gap-0.5 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 transition hover:border-[#1d9bf0]/40 hover:bg-[#1d9bf0]/[0.06] active:scale-95">
-                              <span className="text-[12.5px] font-black text-white">${t.symbol}</span>
-                              <span className={cn("text-[11px] font-bold", up ? "text-emerald-400" : "text-rose-400")}>{up ? "+" : ""}{(t.change24h ?? 0).toFixed(1)}%</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </React.Fragment>
-              ))
+              <>
+                {shownPosts.map((p, i) => (
+                  <React.Fragment key={p.id}>
+                    <PostCard p={p} onOpen={setOpenPostId} />
+                    {/* One quiet “Who to follow” card, Twitter-style — not a carousel wall */}
+                    {i === 3 && feedMode === "foryou" && whoToFollow.length > 0 && (
+                      <section className="border-b border-white/[0.08] py-1">
+                        <div className="px-4 py-3 text-[18px] font-black text-white">Who to follow</div>
+                        {whoToFollow.slice(0, 3).map((s) => (
+                          <FollowCard key={s.user_id} s={s} />
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setTab("explore")}
+                          className="w-full px-4 py-3.5 text-left text-[14px] text-[#1d9bf0] transition hover:bg-white/[0.03]"
+                        >
+                          Show more
+                        </button>
+                      </section>
+                    )}
+                  </React.Fragment>
+                ))}
+              </>
             )}
           </>
         );
