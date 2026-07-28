@@ -21,7 +21,8 @@ describe("interior collision", () => {
   });
 
   it("makes trading desks solid while preserving the aisles", () => {
-    expect(collidesInInterior(-1.8, -0.35, 0.45, tradingFloor)).toBe(true);
+    // The left monitor desk sits against the rear wall; the center-left aisle remains open.
+    expect(collidesInInterior(-1.8, -2.9, 0.45, tradingFloor)).toBe(true);
     expect(collidesInInterior(-0.9, 1.6, 0.45, tradingFloor)).toBe(false);
   });
 });
