@@ -1,83 +1,76 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Clone, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import type { CityId, StreetSegment } from "@/lib/orbitxcity/types";
+import { getWorldStreets } from "@/lib/orbitxcity/worlds";
 
 interface CarSpec {
-  /** Rectangular loop the car drives around (lane offset already applied). */
-  minX: number;
-  maxX: number;
-  minZ: number;
-  maxZ: number;
+  street: StreetSegment;
   speed: number;
   phase: number;
-  body: string;
   glow: string;
   reverse: boolean;
+  laneOffset: number;
 }
 
-const CARS: CarSpec[] = [
-  { minX: -26.5, maxX: 26.5, minZ: -26.5, maxZ: 26.5, speed: 7, phase: 0, body: "#131c2e", glow: "#3de7ff", reverse: false },
-  { minX: -25.3, maxX: 25.3, minZ: -25.3, maxZ: 25.3, speed: 6, phase: 0.45, body: "#241430", glow: "#ff4d9a", reverse: true },
-  { minX: -26.5, maxX: 26.5, minZ: -26.5, maxZ: 26.5, speed: 8, phase: 0.7, body: "#102518", glow: "#17ff4d", reverse: false },
-  { minX: -29.6, maxX: 54, minZ: -29.6, maxZ: 29.6, speed: 9, phase: 0.2, body: "#2a2110", glow: "#f5c542", reverse: false },
-  { minX: -54, maxX: 29.6, minZ: -29.6, maxZ: 29.6, speed: 8.5, phase: 0.6, body: "#1c1430", glow: "#a78bfa", reverse: true },
-  { minX: -54, maxX: 54, minZ: -26.2, maxZ: 26.2, speed: 10, phase: 0.9, body: "#301620", glow: "#ff6b35", reverse: false },
-];
+const GLOWS = ["#5b8def", "#5bc48a", "#c5a26f", "#f2f5f7"];
 
-/** Position along a rectangular loop for parameter t ∈ [0,1). */
-function loopPoint(spec: CarSpec, t: number): { x: number; z: number; yaw: number } {
-  const w = spec.maxX - spec.minX;
-  const d = spec.maxZ - spec.minZ;
-  const perimeter = 2 * (w + d);
-  let dist = (t % 1) * perimeter;
-  if (spec.reverse) dist = perimeter - dist;
-
-  if (dist < w) return { x: spec.minX + dist, z: spec.minZ, yaw: spec.reverse ? -Math.PI / 2 : Math.PI / 2 };
-  dist -= w;
-  if (dist < d) return { x: spec.maxX, z: spec.minZ + dist, yaw: spec.reverse ? Math.PI : 0 };
-  dist -= d;
-  if (dist < w) return { x: spec.maxX - dist, z: spec.maxZ, yaw: spec.reverse ? Math.PI / 2 : -Math.PI / 2 };
-  dist -= w;
-  return { x: spec.minX, z: spec.maxZ - dist, yaw: spec.reverse ? 0 : Math.PI };
+function buildCars(cityId: CityId, count: number): CarSpec[] {
+  const usable = getWorldStreets(cityId).filter((street) => Math.abs(street.to - street.from) > 20);
+  if (!usable.length) return [];
+  return Array.from({ length: Math.min(count, usable.length) }, (_, index) => {
+    const street = usable[(index * 3) % usable.length]!;
+    const lane = Math.max(0.65, Math.min(1.35, street.w * 0.2));
+    return {
+      street,
+      speed: 5.2 + (index % 4) * 0.8,
+      phase: (index * 0.173) % 1,
+      glow: GLOWS[index % GLOWS.length]!,
+      reverse: index % 2 === 1,
+      laneOffset: index % 2 === 1 ? -lane : lane,
+    };
+  });
 }
 
-function HoverCar({ spec }: { spec: CarSpec }) {
+function pointOnStreet(spec: CarSpec, progress: number) {
+  const { street, reverse, laneOffset } = spec;
+  const t = reverse ? 1 - progress : progress;
+  const along = THREE.MathUtils.lerp(street.from, street.to, t);
+  if (street.o === "h") {
+    return { x: along, z: street.at + laneOffset, yaw: reverse ? -Math.PI / 2 : Math.PI / 2 };
+  }
+  return { x: street.at + laneOffset, z: along, yaw: reverse ? 0 : Math.PI };
+}
+
+function RoadCar({ spec }: { spec: CarSpec }) {
   const group = useRef<THREE.Group>(null);
-  const t = useRef(spec.phase);
+  const progress = useRef(spec.phase);
   const { scene } = useGLTF("/orbitxcity/models/citybits/car_sedan.gltf");
+  const distance = Math.max(1, Math.abs(spec.street.to - spec.street.from));
 
   useFrame(({ clock }, rawDt) => {
-    const dt = Math.min(rawDt, 0.05);
-    const perimeter = 2 * (spec.maxX - spec.minX + spec.maxZ - spec.minZ);
-    t.current = (t.current + (spec.speed * dt) / perimeter) % 1;
-    const p = loopPoint(spec, t.current);
+    progress.current = (progress.current + (spec.speed * Math.min(rawDt, 0.05)) / distance) % 1;
+    const point = pointOnStreet(spec, progress.current);
     if (!group.current) return;
-    group.current.position.set(p.x, 0.42 + Math.sin(clock.elapsedTime * 5 + spec.phase * 10) * 0.05, p.z);
-    // Smooth heading
-    let dy = p.yaw - group.current.rotation.y;
-    while (dy > Math.PI) dy -= Math.PI * 2;
-    while (dy < -Math.PI) dy += Math.PI * 2;
-    group.current.rotation.y += dy * Math.min(1, dt * 8);
+    group.current.position.set(point.x, 0.42 + Math.sin(clock.elapsedTime * 4 + spec.phase * 8) * 0.025, point.z);
+    group.current.rotation.y = point.yaw;
   });
 
   return (
     <group ref={group}>
       <Clone object={scene} scale={[14, 7, 14]} position={[0, 0.18, 0]} castShadow receiveShadow />
-      {/* Headlights */}
       <mesh position={[0, 0.02, 1.02]}>
         <boxGeometry args={[0.6, 0.08, 0.05]} />
-        <meshBasicMaterial color="#e8f4ff" toneMapped={false} />
+        <meshBasicMaterial color="#f2f5f7" toneMapped={false} />
       </mesh>
-      {/* Tail glow */}
       <mesh position={[0, 0.02, -1.02]}>
         <boxGeometry args={[0.6, 0.08, 0.05]} />
-        <meshBasicMaterial color="#ff3b3b" toneMapped={false} />
+        <meshBasicMaterial color="#ff4d6a" toneMapped={false} />
       </mesh>
-      {/* Underglow */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.2, 0]}>
         <planeGeometry args={[1.2, 2.3]} />
-        <meshBasicMaterial color={spec.glow} transparent opacity={0.3} toneMapped={false} />
+        <meshBasicMaterial color={spec.glow} transparent opacity={0.22} toneMapped={false} />
       </mesh>
     </group>
   );
@@ -85,14 +78,12 @@ function HoverCar({ spec }: { spec: CarSpec }) {
 
 useGLTF.preload("/orbitxcity/models/citybits/car_sedan.gltf");
 
-/** Ambient hover-car traffic looping the ring roads. */
-export function Traffic({ count = CARS.length }: { count?: number }) {
-  const cars = CARS.slice(0, Math.max(1, Math.min(count, CARS.length)));
+/** Road-bound ambient traffic generated from each city's rendered street segments. */
+export function Traffic({ cityId, count = 4 }: { cityId: CityId; count?: number }) {
+  const cars = useMemo(() => buildCars(cityId, Math.max(1, Math.min(count, 8))), [cityId, count]);
   return (
     <group>
-      {cars.map((c, i) => (
-        <HoverCar key={i} spec={c} />
-      ))}
+      {cars.map((car, index) => <RoadCar key={`${cityId}-${index}`} spec={car} />)}
     </group>
   );
 }

@@ -349,7 +349,7 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       {high && <Drones />}
       {high && <OxiGuide />}
       {high && block.cityId === "nyc" && <Park />}
-      <Traffic count={high ? 6 : 2} />
+      <Traffic cityId={block.cityId} count={high ? 4 : 2} />
     </group>
   );
 }

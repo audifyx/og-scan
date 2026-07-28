@@ -72,6 +72,11 @@ interface CityContextValue {
   interiorBuildingId: string | null;
   enterBuilding: (buildingId: string) => void;
   exitBuilding: () => void;
+  venueBuildingId: string | null;
+  openVenue: (buildingId: string) => void;
+  closeVenue: () => void;
+  recoverPlayer: () => void;
+  worldInputLocked: boolean;
 }
 
 /** Exported so the R3F canvas can bridge this context across renderers. */
@@ -167,7 +172,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [quality, setQuality] = useState<"high" | "lite">(IS_COARSE_POINTER ? "lite" : "high");
   const [emoteAt, setEmoteAt] = useState(0);
   const [interiorBuildingId, setInteriorBuildingId] = useState<string | null>(null);
+  const [venueBuildingId, setVenueBuildingId] = useState<string | null>(null);
   const inventory = STARTER_INVENTORY;
+  const worldInputLocked = panel !== "none" || venueBuildingId !== null;
 
   // The public lobby follows the selected district. Custom/private lobbies
   // remain untouched so friends can keep their room while changing views.
@@ -209,6 +216,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
     setPanel("none");
     setActiveZone(null);
     setInteriorBuildingId(null);
+    setVenueBuildingId(null);
     setEnteredState(false);
     setGateState("menu");
   }, []);
@@ -254,7 +262,28 @@ export function CityProvider({ children }: { children: ReactNode }) {
     [user?.id, publicKey],
   );
 
-  const openPanel = useCallback((p: HudPanel) => setPanel(p), []);
+  const openVenue = useCallback((buildingId: string) => {
+    setPanel("none");
+    setVenueBuildingId(buildingId);
+    cityAudio.play("whoosh");
+  }, []);
+  const closeVenue = useCallback(() => setVenueBuildingId(null), []);
+  const recoverPlayer = useCallback(() => {
+    const spawn = getWorldBlock(selectedCityId).spawn;
+    setInteriorBuildingId(null);
+    setVenueBuildingId(null);
+    setPanel("none");
+    setActiveZone(null);
+    setPlayerPos(spawn);
+    setPlayerYaw(0);
+    setTeleportTarget((prev) => ({ x: spawn.x, z: spawn.z, seq: (prev?.seq ?? 0) + 1 }));
+    cityAudio.play("confirm");
+  }, [selectedCityId]);
+
+  const openPanel = useCallback((p: HudPanel) => {
+    setVenueBuildingId(null);
+    setPanel(p);
+  }, []);
   const closePanel = useCallback(() => setPanel("none"), []);
   const collectShard = useCallback(() => {
     cityAudio.play("coin");
@@ -301,33 +330,20 @@ export function CityProvider({ children }: { children: ReactNode }) {
       openToken(activeZone.tokenMint);
       return;
     }
-    if (activeZone.kind === "voice") {
-      setVoiceOpen(true);
-      // A building is a playable space first. Keep the HUD clear so players
-      // can explore it; voice and district tools remain available from dock.
-      if (activeZone.buildingId) {
-        enterBuilding(activeZone.buildingId);
+    if (activeZone.buildingId) {
+      const building = getWorldBlock(selectedCityId).buildings.find((item) => item.id === activeZone.buildingId);
+      if (building?.interaction) {
+        openVenue(building.id);
         return;
       }
+    }
+    if (activeZone.kind === "voice") {
+      setVoiceOpen(true);
       openPanel("voice");
       return;
     }
-    if (activeZone.buildingId) {
-      const block = getWorldBlock(selectedCityId);
-      const b = block.buildings.find((x) => x.id === activeZone.buildingId);
-      // Any venue-sized shell (or shop / interactive landmark) is walk-in.
-      if (
-        b &&
-        (b.interaction ||
-          b.kind === "shop" ||
-          (b.size.width >= 5 && b.size.depth >= 5))
-      ) {
-        enterBuilding(b.id);
-        return;
-      }
-    }
     openPanel(zoneToPanel(activeZone.kind));
-  }, [activeZone, openPanel, openToken, interiorBuildingId, exitBuilding, enterBuilding, panel, selectedCityId]);
+  }, [activeZone, openPanel, openToken, openVenue, interiorBuildingId, exitBuilding, panel, selectedCityId]);
 
   const prompt = useMemo(() => {
     if (interiorBuildingId && panel === "none") {
@@ -340,7 +356,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
     return {
       label: activeZone.label,
       hint: activeZone.buildingId
-        ? activeZone.hint || "Press E to walk inside · tap stations for tools"
+        ? "Press E to open this venue · walking inside is optional"
         : activeZone.hint || "Press E to interact",
     };
   }, [activeZone, panel, interiorBuildingId]);
@@ -432,6 +448,11 @@ export function CityProvider({ children }: { children: ReactNode }) {
       interiorBuildingId,
       enterBuilding,
       exitBuilding,
+      venueBuildingId,
+      openVenue,
+      closeVenue,
+      recoverPlayer,
+      worldInputLocked,
     }),
     [
       gate,
@@ -469,6 +490,11 @@ export function CityProvider({ children }: { children: ReactNode }) {
       interiorBuildingId,
       enterBuilding,
       exitBuilding,
+      venueBuildingId,
+      openVenue,
+      closeVenue,
+      recoverPlayer,
+      worldInputLocked,
     ],
   );
 

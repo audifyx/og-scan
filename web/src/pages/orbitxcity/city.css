@@ -1,4 +1,4 @@
-﻿/* OrbitX City — holographic cyber + gold/crypto (space chamber art direction) */
+/* OrbitX City — holographic cyber + gold/crypto (space chamber art direction) */
 
 @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
 
@@ -3784,3 +3784,31 @@ button.oxc-token-row {
   list-style: none;
 }
 .oxc-chars-catalog summary::-webkit-details-marker { display: none; }
+
+/* Full-screen building venue command center */
+.oxc-venue { position: fixed; inset: 0; z-index: 120; display: flex; overflow-y: auto; padding: max(1rem, var(--oxc-safe-top)) max(1rem, var(--oxc-safe-right)) max(1rem, var(--oxc-safe-bottom)) max(1rem, var(--oxc-safe-left)); background: rgba(4, 5, 10, 0.96); pointer-events: auto; }
+.oxc-venue-shell { width: min(72rem, 100%); min-height: 100%; display: flex; flex-direction: column; gap: 1.25rem; margin: auto; border: 1px solid var(--oxc-line); background: #0a0c12; padding: clamp(1rem, 3vw, 2rem); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55); }
+.oxc-venue-header { display: flex; align-items: flex-start; gap: 1rem; }
+.oxc-venue-mark { display: grid; flex: 0 0 3rem; width: 3rem; height: 3rem; place-items: center; border: 1px solid rgba(91, 141, 239, 0.5); background: rgba(91, 141, 239, 0.12); color: var(--oxc-cyan); }
+.oxc-venue-mark svg, .oxc-venue-close svg, .oxc-venue-open svg, .oxc-venue-secondary svg, .oxc-venue-context svg { width: 1rem; height: 1rem; }
+.oxc-venue-heading { min-width: 0; flex: 1; }
+.oxc-venue-heading > span, .oxc-venue-tag { color: var(--oxc-gold); font-family: var(--oxc-font-mono); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.oxc-venue-heading h2 { margin: 0.3rem 0 0; font-family: var(--oxc-font-display); font-size: clamp(1.55rem, 5vw, 3rem); line-height: 1.05; letter-spacing: -0.04em; }
+.oxc-venue-heading p { max-width: 44rem; margin: 0.65rem 0 0; color: var(--oxc-muted); line-height: 1.55; }
+.oxc-venue-close { display: grid; flex: 0 0 2.5rem; width: 2.5rem; height: 2.5rem; place-items: center; border: 1px solid var(--oxc-line); background: #11151d; color: var(--oxc-text); }
+.oxc-venue-close:hover, .oxc-venue-close:focus-visible { border-color: var(--oxc-cyan); color: var(--oxc-cyan); outline: none; }
+.oxc-venue-context { display: flex; flex-wrap: wrap; gap: 0.5rem; border-top: 1px solid var(--oxc-line); border-bottom: 1px solid var(--oxc-line); padding: 0.7rem 0; }
+.oxc-venue-context span { display: flex; align-items: center; gap: 0.35rem; border-right: 1px solid var(--oxc-line); padding-right: 0.75rem; color: var(--oxc-muted); font-family: var(--oxc-font-mono); font-size: 0.68rem; text-transform: uppercase; }
+.oxc-venue-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; flex: 1; }
+.oxc-venue-card { min-height: 11rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.7rem; border: 1px solid var(--oxc-line); background: #0f131a; padding: 1rem; color: var(--oxc-text); text-align: left; transition: border-color 150ms ease, transform 150ms ease, background 150ms ease; }
+.oxc-venue-card:hover, .oxc-venue-card:focus-visible { border-color: var(--oxc-cyan); background: #131923; transform: translateY(-2px); outline: none; }
+.oxc-venue-card strong { font-size: 1rem; }
+.oxc-venue-card p { margin: 0; color: var(--oxc-muted); font-size: 0.78rem; line-height: 1.5; }
+.oxc-venue-open { display: flex; align-items: center; gap: 0.35rem; margin-top: auto; color: var(--oxc-cyan); font-size: 0.72rem; font-weight: 700; }
+.oxc-venue-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; border-top: 1px solid var(--oxc-line); padding-top: 1rem; }
+.oxc-venue-secondary { display: flex; align-items: center; gap: 0.45rem; border: 1px solid var(--oxc-line); background: #11151d; padding: 0.7rem 0.9rem; color: var(--oxc-text); font-size: 0.75rem; font-weight: 700; }
+.oxc-venue-secondary:hover, .oxc-venue-secondary:focus-visible { border-color: var(--oxc-gold); color: var(--oxc-gold); outline: none; }
+.oxc-venue-footer > span { margin-left: auto; color: var(--oxc-muted); font-size: 0.68rem; }
+.oxc-help button { pointer-events: auto; border: 0; border-bottom: 1px solid var(--oxc-gold); background: transparent; padding: 0; color: var(--oxc-gold); font: inherit; cursor: pointer; }
+@media (max-width: 760px) { .oxc-venue { padding: 0; } .oxc-venue-shell { border: 0; padding: 1rem; } .oxc-venue-grid { grid-template-columns: 1fr; } .oxc-venue-card { min-height: 9rem; } .oxc-venue-footer > span { width: 100%; margin-left: 0; } }
+@media (min-width: 761px) and (max-width: 1024px) { .oxc-venue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

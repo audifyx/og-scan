@@ -388,7 +388,7 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
 }
 
 export function BuildingMesh({ building }: { building: BuildingDefinition }) {
-  const { enterBuilding, quality } = useCity();
+  const { enterBuilding, openVenue, quality } = useCity();
   const { position, size, accent, label, name } = building;
   const rand = useMemo(() => mulberry32(hashSeed(`bld-${building.id}`)), [building.id]);
   const modelPath = CITY_MODEL_PATHS[hashSeed(building.id) % CITY_MODEL_PATHS.length]!;
@@ -510,7 +510,8 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         position={[0, 1.05, size.depth / 2 + 0.22]}
         onClick={(e) => {
           e.stopPropagation();
-          enterBuilding(building.id);
+          if (building.interaction) openVenue(building.id);
+          else enterBuilding(building.id);
         }}
       >
         <planeGeometry args={[doorW, 2.1]} />
@@ -535,7 +536,8 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         outlineColor="#05080c"
         onClick={(e) => {
           e.stopPropagation();
-          enterBuilding(building.id);
+          if (building.interaction) openVenue(building.id);
+          else enterBuilding(building.id);
         }}
       >
         {building.interaction ? "CLICK · ENTER" : "ENTER"}

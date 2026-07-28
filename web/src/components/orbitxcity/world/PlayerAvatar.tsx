@@ -52,6 +52,8 @@ interface PlayerAvatarProps {
   ignoreBuildingId?: string | null;
   /** Active interior receives its own walls and furniture collision. */
   interiorBuilding?: BuildingDefinition | null;
+  /** Prevent world movement while a focused HUD or venue overlay is open. */
+  inputLocked?: boolean;
 }
 
 export function PlayerAvatar({
@@ -63,6 +65,7 @@ export function PlayerAvatar({
   block = NYC_DEMO_BLOCK,
   ignoreBuildingId = null,
   interiorBuilding = null,
+  inputLocked = false,
 }: PlayerAvatarProps) {
   const group = useRef<THREE.Group>(null);
   const flame = useRef<THREE.Mesh>(null);
@@ -130,6 +133,11 @@ export function PlayerAvatar({
     // Merge touch joystick (analog) with keyboard (digital)
     inputX += virtualInput.axisX;
     inputZ += virtualInput.axisZ;
+    if (inputLocked) {
+      inputX = 0;
+      inputZ = 0;
+      keys.clear();
+    }
     inputX = Math.max(-1, Math.min(1, inputX));
     inputZ = Math.max(-1, Math.min(1, inputZ));
 

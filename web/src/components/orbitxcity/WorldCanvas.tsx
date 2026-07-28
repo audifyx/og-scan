@@ -30,6 +30,7 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
     selectedCityId,
     interiorBuildingId,
     exitBuilding,
+    worldInputLocked,
   } = useCity();
   const block = getWorldBlock(selectedCityId);
 
@@ -61,6 +62,7 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
         block={block}
         ignoreBuildingId={interiorBuildingId}
         interiorBuilding={interiorBuilding}
+        inputLocked={worldInputLocked}
       />
       <RemoteAvatars client={realtime} />
       <InteractionMarkers

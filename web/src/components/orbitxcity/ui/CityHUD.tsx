@@ -21,6 +21,7 @@ import { Minimap } from "./Minimap";
 import { TouchControls } from "./TouchControls";
 import { ChatToastHost } from "./ChatToastHost";
 import { AudioToggle } from "./AudioToggle";
+import { BuildingVenueMenu } from "./BuildingVenueMenu";
 
 function useIsPhone() {
   const [phone, setPhone] = useState(
@@ -144,6 +145,9 @@ export function CityHUD() {
     exitToMenu,
     lobby,
     selectedCityId,
+    venueBuildingId,
+    closeVenue,
+    recoverPlayer,
   } = useCity();
   const isPhone = useIsPhone();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -164,7 +168,7 @@ export function CityHUD() {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.code === "KeyE") {
+      if (e.code === "KeyE" && !venueBuildingId) {
         e.preventDefault();
         cityAudio.play("interact");
         interact();
@@ -183,12 +187,13 @@ export function CityHUD() {
         e.preventDefault();
         cityAudio.play("ui");
         setMoreOpen(false);
-        closePanel();
+        if (venueBuildingId) closeVenue();
+        else closePanel();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [interact, closePanel, openPanel, triggerEmote]);
+  }, [interact, closePanel, openPanel, triggerEmote, venueBuildingId, closeVenue]);
 
   useEffect(() => {
     if (panel !== "none") setMoreOpen(false);
@@ -387,13 +392,15 @@ export function CityHUD() {
 
       <div className="oxc-help">
         <span>WASD · Shift sprint · Space jump · B dance</span>
-        <span>E Interact / Exit · Enter Chat · Esc Close</span>
+        <span>E Venue / Exit · Enter Chat · Esc Close</span>
+        <button type="button" onClick={recoverPlayer}>Stuck? Reset</button>
       </div>
 
       {touchControls && <TouchControls />}
 
       <ChatToastHost />
       <CityPanelHost />
+      <BuildingVenueMenu />
     </div>
   );
 }
