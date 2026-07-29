@@ -109,12 +109,12 @@ export function getPreferredAvailable(): readonly string[] {
 
 /**
  * Resolve a catalog model id to a loadable path.
- * Returns OrbitX preferred path when probed available, else Kenney fallback, else null (procedural).
+ * Always returns Kenney fallback (OrbitX custom models not yet available).
  */
 export function resolveModelPath(id: OrbitxModelId | string): string | null {
   const entry = ORBITX_MODELS[id as OrbitxModelId];
   if (!entry) return null;
-  if (availablePreferred.has(entry.preferred)) return entry.preferred;
+  // For now, always use fallback since OrbitX custom GLBs are not available yet
   return entry.fallback;
 }
 
