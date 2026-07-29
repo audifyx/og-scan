@@ -1,6 +1,7 @@
 /**
  * Generic GLTF prop — loads a path, clones the scene, optionally scales to a target AABB.
  * Used by buildings, furniture, landmarks, and street props.
+ * Gracefully handles missing models by rendering nothing.
  */
 import { Suspense, useMemo } from "react";
 import { Clone, useGLTF } from "@react-three/drei";
@@ -27,7 +28,15 @@ function GltfPropInner({
   castShadow = true,
   receiveShadow = true,
 }: GltfPropProps) {
-  const { scene } = useGLTF(path);
+  let scene: THREE.Scene;
+  try {
+    const result = useGLTF(path) as any;
+    scene = result?.scene;
+    if (!scene) return null;
+  } catch (err) {
+    console.error(`[v0] Failed to load GLTF model at ${path}:`, err instanceof Error ? err.message : String(err));
+    return null;
+  }
 
   const computedScale = useMemo((): [number, number, number] => {
     if (!fitTo) {
@@ -56,7 +65,7 @@ function GltfPropInner({
   );
 }
 
-/** Suspense-wrapped GLTF clone. Parent should provide a Suspense boundary for batches. */
+/** Suspense-wrapped GLTF clone. Parent should provide a Suspense boundary for batches. Silently fails if model is missing. */
 export function GltfProp(props: GltfPropProps) {
   return (
     <Suspense fallback={null}>
