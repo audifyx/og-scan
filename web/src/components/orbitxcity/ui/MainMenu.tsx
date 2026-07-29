@@ -86,7 +86,7 @@ const TILES: MenuTile[] = [
     label: "Inventory",
     blurb: `${FEATURES_PER_SYSTEM} bag systems`,
     icon: Backpack,
-    accent: "#3d9a6a",
+    accent: "#00ff9f",
     badge: "168",
   },
   {
@@ -130,6 +130,13 @@ const TILES: MenuTile[] = [
     badge: "168",
   },
 ];
+
+const TILE_UI_ICONS: Partial<Record<MenuAction, string>> = {
+  play: "/orbitxcity/ui/icon-play.svg",
+  characters: "/orbitxcity/ui/icon-characters.svg",
+  marketplace: "/orbitxcity/ui/icon-marketplace.svg",
+  missions: "/orbitxcity/ui/icon-missions.svg",
+};
 
 export function MainMenu() {
   const { setGate, setEntered, openPanel, selectedCityId, setSelectedCityId } = useCity();
@@ -317,6 +324,7 @@ export function MainMenu() {
       <nav className="oxc-menu-grid" aria-label="Main menu">
         {TILES.map((tile, i) => {
           const Icon = tile.icon;
+          const uiIcon = TILE_UI_ICONS[tile.id];
           return (
             <button
               key={tile.id}
@@ -330,7 +338,11 @@ export function MainMenu() {
             >
               {tile.badge && <span className="oxc-menu-tile-badge">{tile.badge}</span>}
               <span className="oxc-menu-tile-icon">
-                <Icon size={18} strokeWidth={2.2} />
+                {uiIcon ? (
+                  <img src={uiIcon} alt="" width={18} height={18} draggable={false} />
+                ) : (
+                  <Icon size={18} strokeWidth={2.2} />
+                )}
               </span>
               <span className="oxc-menu-tile-copy">
                 <span className="oxc-menu-tile-label">{tile.label}</span>

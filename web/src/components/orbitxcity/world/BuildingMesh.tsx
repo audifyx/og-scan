@@ -9,15 +9,12 @@ import * as THREE from "three";
 import type { BuildingDefinition } from "@/lib/orbitxcity/types";
 import { hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
 import { createFacadeTexture } from "@/lib/orbitxcity/textures";
+import { CITY_BUILDING_MODELS } from "@/lib/orbitxcity/assets/catalog";
+import { getBuildingKit, gltfPathForBuilding } from "@/lib/orbitxcity/assets/buildingKits";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const ROOF_MAT = new THREE.MeshStandardMaterial({ color: "#3e464e", metalness: 0.28, roughness: 0.72 });
-const CITY_MODEL_PATHS = [
-  "/orbitxcity/models/citybits/building_A.gltf",
-  "/orbitxcity/models/citybits/building_B.gltf",
-  "/orbitxcity/models/citybits/building_C.gltf",
-  "/orbitxcity/models/citybits/building_D.gltf",
-] as const;
+const CITY_MODEL_PATHS = Object.values(CITY_BUILDING_MODELS);
 
 interface Tier {
   w: number;
@@ -391,11 +388,14 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
   const { enterBuilding, quality } = useCity();
   const { position, size, accent, label, name } = building;
   const rand = useMemo(() => mulberry32(hashSeed(`bld-${building.id}`)), [building.id]);
-  const modelPath = CITY_MODEL_PATHS[hashSeed(building.id) % CITY_MODEL_PATHS.length]!;
+  const kit = useMemo(() => getBuildingKit(building.kind), [building.kind]);
+  const modelPath = gltfPathForBuilding(building.id, building.kind);
   const { scene } = useGLTF(modelPath);
   const hasFootprint = Boolean(building.footprint && building.footprint.length >= 3);
-  // Prefer modular procedural massing for game-like readability; GLTF only rare high-quality spice.
-  const useAssetShell = !hasFootprint && quality === "high" && hashSeed(building.id) % 5 === 0;
+  // Prefer OrbitX custom shell when available; else Kenney hash sample on high quality.
+  const useAssetShell =
+    !hasFootprint && quality === "high" && (kit.isOrbitx || hashSeed(building.id) % 5 === 0);
+  const marqueeIntensity = kit.marqueeIntensity;
   const tiers = useMemo(() => buildTiers(building, rand), [building, rand]);
   const top = tiers[tiers.length - 1]!;
   const roofY = hasFootprint ? size.height : top.yBase + top.h;
@@ -438,7 +438,7 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         topD={hasFootprint ? size.depth * 0.35 : top.d}
         accent={accent}
         seed={hashSeed(`roof-${building.id}`)}
-        showBeacon={size.height >= 8}
+        showBeacon={size.height >= 8 && kit.beacon}
       />
 
       <WallGraffiti
@@ -458,7 +458,7 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         <meshStandardMaterial
           color="#0a121c"
           emissive={accent}
-          emissiveIntensity={building.interaction ? 0.22 : 0.08}
+          emissiveIntensity={building.interaction ? marqueeIntensity * 0.35 : marqueeIntensity * 0.12}
           metalness={0.2}
           roughness={0.32}
           transparent
@@ -476,7 +476,7 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         <meshStandardMaterial
           color={accent}
           emissive={accent}
-          emissiveIntensity={isHq ? 0.85 : 0.62}
+          emissiveIntensity={isHq ? marqueeIntensity : marqueeIntensity * 0.72}
           toneMapped={false}
         />
       </mesh>

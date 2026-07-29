@@ -1,0 +1,98 @@
+{
+  "version": 2,
+  "license": "Kenney citybits + furniture (fallback). Custom OrbitX GLBs: CC-BY OrbitX / see docs/orbitxcity/GLTF_EXPORT_SPEC.md",
+  "orbitx": {
+    "characters": [
+      { "id": "character-trader", "path": "/orbitxcity/models/orbitx/characters/orbitx_character_trader.glb", "role": "hero", "status": "pending" },
+      { "id": "character-builder", "path": "/orbitxcity/models/orbitx/characters/orbitx_character_builder.glb", "role": "hero", "status": "pending" },
+      { "id": "character-gamer", "path": "/orbitxcity/models/orbitx/characters/orbitx_character_gamer.glb", "role": "hero", "status": "pending" },
+      { "id": "character-creator", "path": "/orbitxcity/models/orbitx/characters/orbitx_character_creator.glb", "role": "hero", "status": "pending" },
+      { "id": "character-explorer", "path": "/orbitxcity/models/orbitx/characters/orbitx_character_explorer.glb", "role": "hero", "status": "pending" }
+    ],
+    "buildings": [
+      { "id": "building-hq-tower", "path": "/orbitxcity/models/orbitx/buildings/orbitx_building_hq_tower.glb", "role": "shell", "status": "pending" },
+      { "id": "building-trade-glass", "path": "/orbitxcity/models/orbitx/buildings/orbitx_building_trade_glass.glb", "role": "shell", "status": "pending" },
+      { "id": "building-launch-stage", "path": "/orbitxcity/models/orbitx/buildings/orbitx_building_launch_stage.glb", "role": "shell", "status": "pending" },
+      { "id": "building-retail-neon", "path": "/orbitxcity/models/orbitx/buildings/orbitx_building_retail_neon.glb", "role": "shell", "status": "pending" },
+      { "id": "building-lounge-glass", "path": "/orbitxcity/models/orbitx/buildings/orbitx_building_lounge_glass.glb", "role": "shell", "status": "pending" },
+      { "id": "building-ad-spire", "path": "/orbitxcity/models/orbitx/buildings/orbitx_building_ad_spire.glb", "role": "shell", "status": "pending" },
+      { "id": "building-midrise", "path": "/orbitxcity/models/orbitx/buildings/orbitx_building_midrise.glb", "role": "shell", "status": "pending" }
+    ],
+    "landmarks": [
+      { "id": "landmark-nyc", "path": "/orbitxcity/models/orbitx/landmarks/orbitx_landmark_midtown_screen.glb", "role": "landmark", "status": "pending" },
+      { "id": "landmark-miami", "path": "/orbitxcity/models/orbitx/landmarks/orbitx_landmark_boardwalk.glb", "role": "landmark", "status": "pending" },
+      { "id": "landmark-la", "path": "/orbitxcity/models/orbitx/landmarks/orbitx_landmark_creator_stage.glb", "role": "landmark", "status": "pending" },
+      { "id": "landmark-boston", "path": "/orbitxcity/models/orbitx/landmarks/orbitx_landmark_lab_dome.glb", "role": "landmark", "status": "pending" }
+    ],
+    "props": [
+      { "id": "prop-neon-blade", "path": "/orbitxcity/models/orbitx/props/orbitx_prop_neon_blade.glb", "status": "pending" },
+      { "id": "prop-hydrant", "path": "/orbitxcity/models/orbitx/props/orbitx_prop_hydrant.glb", "status": "pending" },
+      { "id": "prop-news-kiosk", "path": "/orbitxcity/models/orbitx/props/orbitx_prop_news_kiosk.glb", "status": "pending" },
+      { "id": "prop-palm-cluster", "path": "/orbitxcity/models/orbitx/props/orbitx_prop_palm_cluster.glb", "status": "pending" },
+      { "id": "prop-lifeguard", "path": "/orbitxcity/models/orbitx/props/orbitx_prop_lifeguard.glb", "status": "pending" },
+      { "id": "prop-stage-truss", "path": "/orbitxcity/models/orbitx/props/orbitx_prop_stage_truss.glb", "status": "pending" },
+      { "id": "prop-lab-pylon", "path": "/orbitxcity/models/orbitx/props/orbitx_prop_lab_pylon.glb", "status": "pending" },
+      { "id": "prop-antenna", "path": "/orbitxcity/models/orbitx/props/orbitx_prop_antenna.glb", "status": "pending" }
+    ],
+    "interiors": [
+      { "id": "interior-terminal-desk", "path": "/orbitxcity/models/orbitx/interiors/orbitx_interior_terminal_desk.glb", "status": "pending" },
+      { "id": "interior-command-table", "path": "/orbitxcity/models/orbitx/interiors/orbitx_interior_command_table.glb", "status": "pending" },
+      { "id": "interior-hologram-pillar", "path": "/orbitxcity/models/orbitx/interiors/orbitx_interior_hologram_pillar.glb", "status": "pending" },
+      { "id": "interior-stage-riser", "path": "/orbitxcity/models/orbitx/interiors/orbitx_interior_stage_riser.glb", "status": "pending" },
+      { "id": "interior-countdown", "path": "/orbitxcity/models/orbitx/interiors/orbitx_interior_countdown.glb", "status": "pending" },
+      { "id": "interior-neon-bar", "path": "/orbitxcity/models/orbitx/interiors/orbitx_interior_neon_bar.glb", "status": "pending" },
+      { "id": "interior-dj-booth", "path": "/orbitxcity/models/orbitx/interiors/orbitx_interior_dj_booth.glb", "status": "pending" },
+      { "id": "interior-retail-counter", "path": "/orbitxcity/models/orbitx/interiors/orbitx_interior_retail_counter.glb", "status": "pending" }
+    ]
+  },
+  "citybits": [
+    { "id": "building-a", "path": "/orbitxcity/models/citybits/building_A.gltf", "role": "shell", "tags": ["midrise", "retail"] },
+    { "id": "building-b", "path": "/orbitxcity/models/citybits/building_B.gltf", "role": "shell", "tags": ["office", "trade"] },
+    { "id": "building-c", "path": "/orbitxcity/models/citybits/building_C.gltf", "role": "shell", "tags": ["hq", "tower"] },
+    { "id": "building-d", "path": "/orbitxcity/models/citybits/building_D.gltf", "role": "shell", "tags": ["spire", "ad", "launch"] },
+    { "id": "bench", "path": "/orbitxcity/models/citybits/bench.gltf", "role": "street", "tags": ["seating"] },
+    { "id": "car-sedan", "path": "/orbitxcity/models/citybits/car_sedan.gltf", "role": "street", "tags": ["vehicle", "traffic"] }
+  ],
+  "furniture": [
+    { "id": "armchair", "path": "/orbitxcity/models/furniture/armchair.gltf", "role": "seating", "tags": ["lounge"] },
+    { "id": "armchair-pillows", "path": "/orbitxcity/models/furniture/armchair_pillows.gltf", "role": "seating", "tags": ["lounge"] },
+    { "id": "chair-a", "path": "/orbitxcity/models/furniture/chair_A.gltf", "role": "seating", "tags": ["office", "trade"] },
+    { "id": "chair-b", "path": "/orbitxcity/models/furniture/chair_B.gltf", "role": "seating", "tags": ["office"] },
+    { "id": "chair-stool", "path": "/orbitxcity/models/furniture/chair_stool.gltf", "role": "seating", "tags": ["bar", "club"] },
+    { "id": "couch", "path": "/orbitxcity/models/furniture/couch.gltf", "role": "seating", "tags": ["lounge"] },
+    { "id": "couch-pillows", "path": "/orbitxcity/models/furniture/couch_pillows.gltf", "role": "seating", "tags": ["lounge", "hq"] },
+    { "id": "table-small", "path": "/orbitxcity/models/furniture/table_small.gltf", "role": "surface", "tags": ["cafe"] },
+    { "id": "table-medium", "path": "/orbitxcity/models/furniture/table_medium.gltf", "role": "surface", "tags": ["office"] },
+    { "id": "table-medium-long", "path": "/orbitxcity/models/furniture/table_medium_long.gltf", "role": "surface", "tags": ["trade", "meeting"] },
+    { "id": "table-low", "path": "/orbitxcity/models/furniture/table_low.gltf", "role": "surface", "tags": ["lounge"] },
+    { "id": "cabinet-small", "path": "/orbitxcity/models/furniture/cabinet_small.gltf", "role": "storage", "tags": ["retail"] },
+    { "id": "cabinet-medium", "path": "/orbitxcity/models/furniture/cabinet_medium.gltf", "role": "storage", "tags": ["office"] },
+    { "id": "cabinet-medium-decorated", "path": "/orbitxcity/models/furniture/cabinet_medium_decorated.gltf", "role": "storage", "tags": ["hq"] },
+    { "id": "shelf-large", "path": "/orbitxcity/models/furniture/shelf_B_large.gltf", "role": "storage", "tags": ["market"] },
+    { "id": "shelf-large-decorated", "path": "/orbitxcity/models/furniture/shelf_B_large_decorated.gltf", "role": "storage", "tags": ["nft", "gallery"] },
+    { "id": "lamp-standing", "path": "/orbitxcity/models/furniture/lamp_standing.gltf", "role": "light", "tags": ["lounge"] },
+    { "id": "lamp-table", "path": "/orbitxcity/models/furniture/lamp_table.gltf", "role": "light", "tags": ["office"] },
+    { "id": "rug-rectangle", "path": "/orbitxcity/models/furniture/rug_rectangle_A.gltf", "role": "floor", "tags": ["lounge"] },
+    { "id": "rug-stripes", "path": "/orbitxcity/models/furniture/rug_rectangle_stripes_A.gltf", "role": "floor", "tags": ["creator"] },
+    { "id": "pictureframe-large", "path": "/orbitxcity/models/furniture/pictureframe_large_A.gltf", "role": "decor", "tags": ["nft", "gallery"] },
+    { "id": "pictureframe-medium", "path": "/orbitxcity/models/furniture/pictureframe_medium.gltf", "role": "decor", "tags": ["office"] },
+    { "id": "book-set", "path": "/orbitxcity/models/furniture/book_set.gltf", "role": "decor", "tags": ["academy", "hq"] },
+    { "id": "cactus-small", "path": "/orbitxcity/models/furniture/cactus_small_A.gltf", "role": "decor", "tags": ["miami", "creator"] }
+  ],
+  "procedural": [
+    { "id": "facade-texture", "generator": "createFacadeTexture", "module": "textures" },
+    { "id": "graffiti-texture", "generator": "createGraffitiTexture", "module": "textures" },
+    { "id": "ad-texture", "generator": "createAdTexture", "module": "textures" },
+    { "id": "character-mesh", "generator": "CharacterMesh", "module": "world/CharacterMesh" },
+    { "id": "street-lamps", "generator": "LampField", "module": "world/StreetProps" },
+    { "id": "landmark-placeholder", "generator": "LandmarkMesh", "module": "world/LandmarkMesh" },
+    { "id": "gltf-prop", "generator": "GltfProp", "module": "world/GltfProp" }
+  ],
+  "ui": [
+    { "id": "icon-play", "path": "/orbitxcity/ui/icon-play.svg" },
+    { "id": "icon-characters", "path": "/orbitxcity/ui/icon-characters.svg" },
+    { "id": "icon-marketplace", "path": "/orbitxcity/ui/icon-marketplace.svg" },
+    { "id": "icon-missions", "path": "/orbitxcity/ui/icon-missions.svg" },
+    { "id": "pod-frame", "path": "/orbitxcity/ui/pod-frame.svg" }
+  ]
+}

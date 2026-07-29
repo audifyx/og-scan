@@ -95,7 +95,7 @@ export const CHARACTER_CLASSES: CharacterClassDef[] = [
     id: "explorer",
     name: "Explorer",
     tagline: "Frontier routes · discovery",
-    neon: "#3d9a6a",
+    neon: "#00ff9f",
     gold: "#d4af37",
     bodyColor: "#1e2a22",
     accentColor: "#3d9a6a",

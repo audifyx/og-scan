@@ -338,4 +338,14 @@ export const MIAMI_BLOCK: WorldBlockConfig = {
       tokenMint: OGSCAN_TOKEN_MINT,
     },
   ],
+  landmarks: [
+    {
+      id: "miami-boardwalk-landmark",
+      modelId: "landmark-miami",
+      position: { x: -6, y: 0, z: 30 },
+      rotationY: 0.2,
+      size: { width: 12, height: 6, depth: 4 },
+      label: "BOARDWALK",
+    },
+  ],
 };

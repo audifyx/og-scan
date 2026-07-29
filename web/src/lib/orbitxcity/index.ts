@@ -9,3 +9,4 @@ export * from "./collision";
 export * from "./textures";
 export * from "./realtime";
 export * from "./tokenApi";
+export * from "./assets";

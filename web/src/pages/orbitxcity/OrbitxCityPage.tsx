@@ -8,6 +8,7 @@ import { LobbiesGate } from "@/components/orbitxcity/ui/LobbiesGate";
 import { CityHUD } from "@/components/orbitxcity/ui/CityHUD";
 import { CityAudioController } from "@/components/orbitxcity/ui/CityAudioController";
 import { fetchCityMarketSnapshot } from "@/lib/orbitxcity/marketData";
+import { preloadCityAssets } from "@/lib/orbitxcity/assets/preload";
 import "./city.css";
 
 function CityShell() {
@@ -23,6 +24,7 @@ function CityShell() {
 
   useEffect(() => {
     document.body.classList.add("oxc-lock");
+    preloadCityAssets();
     return () => document.body.classList.remove("oxc-lock");
   }, []);
 

@@ -5,6 +5,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { getCharacterKit, type CharacterAccessory } from "@/lib/orbitxcity/assets/characterKits";
 import type { AvatarAppearance, FaceStyle, HairStyle, OutfitStyle } from "@/lib/orbitxcity/types";
 
 export interface CharacterAnimationState {
@@ -277,6 +278,72 @@ function OutfitShell({
   );
 }
 
+function ClassAccessory({
+  accessory,
+  accent,
+  glow,
+}: {
+  accessory: CharacterAccessory;
+  accent: string;
+  glow: number;
+}) {
+  switch (accessory) {
+    case "briefcase":
+      return (
+        <mesh position={[0.42, 0.72, 0.08]} rotation={[0, -0.35, 0]} castShadow>
+          <boxGeometry args={[0.28, 0.22, 0.08]} />
+          <meshStandardMaterial color="#1a1410" metalness={0.35} roughness={0.55} />
+        </mesh>
+      );
+    case "hard-hat":
+      return (
+        <mesh position={[0, 1.82, 0]} castShadow>
+          <sphereGeometry args={[0.3, 12, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color="#f5c542" emissive="#f5c542" emissiveIntensity={glow * 0.4} roughness={0.55} />
+        </mesh>
+      );
+    case "headset":
+      return (
+        <>
+          <mesh position={[-0.24, 1.58, 0]}>
+            <torusGeometry args={[0.1, 0.035, 8, 12, Math.PI]} />
+            <meshStandardMaterial color="#141820" metalness={0.4} roughness={0.45} />
+          </mesh>
+          <mesh position={[0.24, 1.58, 0]} rotation={[0, Math.PI, 0]}>
+            <torusGeometry args={[0.1, 0.035, 8, 12, Math.PI]} />
+            <meshStandardMaterial color="#141820" metalness={0.4} roughness={0.45} />
+          </mesh>
+          <mesh position={[0, 1.72, -0.02]}>
+            <boxGeometry args={[0.48, 0.06, 0.12]} />
+            <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={glow} toneMapped={false} />
+          </mesh>
+        </>
+      );
+    case "hand-mic":
+      return (
+        <group position={[0.38, 1.05, 0.12]} rotation={[0, -0.4, 0.15]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.035, 0.04, 0.22, 8]} />
+            <meshStandardMaterial color="#2a2830" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, 0.14, 0]}>
+            <sphereGeometry args={[0.06, 10, 10]} />
+            <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={glow} toneMapped={false} />
+          </mesh>
+        </group>
+      );
+    case "compass":
+      return (
+        <mesh position={[0, 1.18, 0.28]}>
+          <cylinderGeometry args={[0.12, 0.12, 0.05, 16]} />
+          <meshStandardMaterial color="#1a2830" metalness={0.55} roughness={0.35} />
+        </mesh>
+      );
+    default:
+      return null;
+  }
+}
+
 /** Modern street avatar — solid game proportions, city outfits. */
 export function CharacterMesh(props: CharacterMeshProps) {
   const root = useRef<THREE.Group>(null);
@@ -309,6 +376,7 @@ export function CharacterMesh(props: CharacterMeshProps) {
 
   // Builder = thicker limbs; Gamer = leaner; Trader = balanced.
   const limbBoost = character.classId === "builder" ? 1.15 : character.classId === "gamer" ? 0.92 : 1;
+  const kit = useMemo(() => getCharacterKit(character.classId), [character.classId]);
 
   useFrame(({ clock }) => {
     const animation = props.animation;
@@ -449,6 +517,8 @@ export function CharacterMesh(props: CharacterMeshProps) {
           />
         </mesh>
       </group>
+
+      <ClassAccessory accessory={kit.accessory} accent={character.accentColor} glow={kit.glow} />
     </group>
   );
 }

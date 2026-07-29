@@ -1,12 +1,43 @@
 import { Text } from "@react-three/drei";
 import type { BuildingDefinition, HudPanel } from "@/lib/orbitxcity/types";
 import {
+  furnitureSlots,
   panelForBuilding,
   resolveRoomTheme,
   roomTitle,
   type RoomTheme,
 } from "@/lib/orbitxcity/interiorLayout";
+import { getFurnitureSet } from "@/lib/orbitxcity/assets/catalog";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
+import { GltfProp } from "./GltfProp";
+import { useMemo } from "react";
+
+function FurnitureLayer({
+  theme,
+  width,
+  depth,
+}: {
+  theme: RoomTheme;
+  width: number;
+  depth: number;
+}) {
+  const paths = getFurnitureSet(theme);
+  const slots = useMemo(() => furnitureSlots(theme, width, depth, paths), [theme, width, depth, paths]);
+  if (!slots.length) return null;
+  return (
+    <group>
+      {slots.map((s, i) => (
+        <GltfProp
+          key={`${s.path}-${i}`}
+          path={s.path}
+          position={[s.x, 0, s.z]}
+          rotation={[0, s.rotY, 0]}
+          scale={s.scale}
+        />
+      ))}
+    </group>
+  );
+}
 
 function NeonStrip({
   position,
@@ -411,6 +442,7 @@ export function InteriorRoom({
       </Text>
 
       <ThemeSet theme={theme} width={w} depth={d} height={h} accent={building.accent} building={building} />
+      <FurnitureLayer theme={theme} width={w} depth={d} />
 
       <mesh
         position={[0, 0.06, d / 2 - 0.9]}

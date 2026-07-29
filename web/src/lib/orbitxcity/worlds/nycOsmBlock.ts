@@ -4013,6 +4013,16 @@ export const NYC_OSM_BLOCK: WorldBlockConfig = {
     buildingId: "osm-266170759"
   }
 ],
+  landmarks: [
+    {
+      id: "nyc-osm-midtown-screen",
+      modelId: "landmark-nyc",
+      position: { x: 8, y: 0, z: 12 },
+      rotationY: -0.35,
+      size: { width: 12, height: 16, depth: 3.5 },
+      label: "TIMES SQUARE FEED",
+    },
+  ],
 };
 
 export const OSM_ATTRIBUTION =

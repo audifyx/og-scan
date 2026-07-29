@@ -4,9 +4,10 @@ import * as THREE from "three";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt } from "@/lib/orbitxcity/collision";
 import type { WorldBlockConfig } from "@/lib/orbitxcity/types";
+import { CITY_STREET_MODELS } from "@/lib/orbitxcity/assets/catalog";
 import { getWorldStreets } from "@/lib/orbitxcity/worlds";
 
-const BENCH_PATH = "/orbitxcity/models/citybits/bench.gltf";
+const BENCH_PATH = CITY_STREET_MODELS.bench;
 useGLTF.preload(BENCH_PATH);
 
 const LAMP_SPACING = 16;

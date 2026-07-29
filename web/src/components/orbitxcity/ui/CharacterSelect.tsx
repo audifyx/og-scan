@@ -74,6 +74,10 @@ function HoloAvatar({
         ["--pod-body" as string]: cls.bodyColor,
         ["--pod-skin" as string]: cls.skinColor,
         ["--pod-accent" as string]: cls.accentColor,
+        backgroundImage: "url(/orbitxcity/ui/pod-frame.svg)",
+        backgroundSize: "contain",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
       }}
       aria-hidden
     >

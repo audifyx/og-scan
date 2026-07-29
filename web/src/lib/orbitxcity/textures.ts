@@ -32,11 +32,11 @@ export const GRAFFITI_TAGS = [
 ];
 
 const PALETTES: Array<[string, string]> = [
-  ["#17ff4d", "#0affc2"],
-  ["#ff4d9a", "#ff9ae0"],
-  ["#3de7ff", "#8ff5ff"],
-  ["#f5c542", "#ffe28a"],
-  ["#a78bfa", "#d9c8ff"],
+  ["#00ff9f", "#39ff14"],
+  ["#ff4d6a", "#ff9ae0"],
+  ["#5b8def", "#8ff5ff"],
+  ["#c5a26f", "#e0c48a"],
+  ["#b388ff", "#d9c8ff"],
   ["#ff6b35", "#ffd166"],
 ];
 

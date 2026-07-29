@@ -162,3 +162,48 @@ export function furnitureSolids(theme: RoomTheme, width: number, depth: number):
       ];
   }
 }
+
+export interface FurnitureSlot {
+  path: string;
+  x: number;
+  z: number;
+  rotY: number;
+  scale: number;
+}
+
+/**
+ * Place catalog furniture set into room slots along walls / lounge areas.
+ * Paths come from FURNITURE_SETS; positions avoid the south doorway.
+ */
+export function furnitureSlots(
+  theme: RoomTheme,
+  width: number,
+  depth: number,
+  paths: readonly string[],
+): FurnitureSlot[] {
+  if (!paths.length) return [];
+  const wallZ = -depth / 2 + 0.85;
+  const side = Math.min(width / 2 - 1.1, 2.8);
+  const presets: Array<{ x: number; z: number; rotY: number; scale: number }> = [
+    { x: -side * 0.7, z: wallZ, rotY: 0, scale: 1 },
+    { x: side * 0.7, z: wallZ, rotY: 0, scale: 1 },
+    { x: 0, z: wallZ + 0.15, rotY: 0, scale: 1.05 },
+    { x: -side, z: 0.35, rotY: Math.PI / 2, scale: 0.95 },
+    { x: side, z: 0.35, rotY: -Math.PI / 2, scale: 0.95 },
+    { x: 0, z: 0.2, rotY: Math.PI, scale: 1 },
+  ];
+  // Theme-specific first slots (trade desks along back wall, etc.)
+  if (theme === "lounge" || theme === "lobby") {
+    presets[0] = { x: -side * 0.55, z: -0.15, rotY: Math.PI, scale: 1 };
+    presets[1] = { x: side * 0.55, z: -0.15, rotY: Math.PI, scale: 1 };
+  }
+  if (theme === "launch") {
+    presets[0] = { x: -side, z: wallZ, rotY: 0, scale: 0.9 };
+    presets[1] = { x: side, z: wallZ, rotY: 0, scale: 0.9 };
+  }
+  return paths.slice(0, presets.length).map((path, i) => {
+    const p = presets[i]!;
+    return { path, x: p.x, z: p.z, rotY: p.rotY, scale: p.scale };
+  });
+}
+

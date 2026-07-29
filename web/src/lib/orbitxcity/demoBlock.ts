@@ -180,6 +180,16 @@ export const NYC_DEMO_BLOCK: WorldBlockConfig = {
     { id: "z-cinema", kind: "community", label: "Starlight Cinema", hint: "Enter the cinema lobby", position: { x: 0, y: 0, z: 51 }, radius: 4, buildingId: "b-cinema" },
     { id: "z-coffee", kind: "marketplace", label: "Orbit Brew", hint: "Enter the neighborhood café", position: { x: 22, y: 0, z: 37 }, radius: 3.8, buildingId: "b-coffee" },
   ],
+  landmarks: [
+    {
+      id: "nyc-midtown-screen",
+      modelId: "landmark-nyc",
+      position: { x: 10, y: 0, z: -6 },
+      rotationY: -0.4,
+      size: { width: 10, height: 14, depth: 3 },
+      label: "MIDTOWN SCREEN",
+    },
+  ],
 };
 
 /** Safe fast-travel landing spots per district (clear of colliders). */

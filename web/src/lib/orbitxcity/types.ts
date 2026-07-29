@@ -102,6 +102,18 @@ export interface InteractionZone {
   tokenMint?: string;
 }
 
+/** Signature landmark mesh (one hero asset per city when OrbitX GLB is present). */
+export interface LandmarkDefinition {
+  id: string;
+  /** Catalog model id, e.g. landmark-nyc */
+  modelId: string;
+  position: Vec3;
+  rotationY?: number;
+  /** Target AABB for fit-to-box scaling (meters). */
+  size: { width: number; height: number; depth: number };
+  label?: string;
+}
+
 export interface WorldBlockConfig {
   cityId: CityId;
   name: string;
@@ -111,6 +123,8 @@ export interface WorldBlockConfig {
   buildings: BuildingDefinition[];
   billboards: BillboardDefinition[];
   zones: InteractionZone[];
+  /** Optional hero landmarks — rendered when custom GLB is available. */
+  landmarks?: LandmarkDefinition[];
 }
 
 export type HudPanel =

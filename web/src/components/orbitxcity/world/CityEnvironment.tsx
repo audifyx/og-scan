@@ -8,6 +8,7 @@ import * as THREE from "three";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import type { ScreenerRow } from "@/lib/orbitxcity/marketData";
 import type { CityId, WorldBlockConfig } from "@/lib/orbitxcity/types";
+import { getWorldTheme, getMarketScreenPlacements } from "@/lib/orbitxcity/assets/worldThemes";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { mulberry32, hashSeed } from "@/lib/orbitxcity/collision";
 import { Ground } from "./Ground";
@@ -25,71 +26,17 @@ import { Park } from "./Park";
 import { Traffic } from "./Traffic";
 import { SkyCycle } from "./SkyCycle";
 import { UrbanNature } from "./UrbanNature";
+import { PropScatter } from "./PropScatter";
+import { LandmarkMesh } from "./LandmarkMesh";
+import { landmarkModelId } from "@/lib/orbitxcity/assets/catalog";
+import type { LandmarkDefinition } from "@/lib/orbitxcity/types";
 
 function cityTheme(cityId: CityId) {
-  // Cool dusk cyber — soft haze with neon-readable fog tint.
-  switch (cityId) {
-    case "miami":
-      return {
-        primary: "#3d9a6a",
-        secondary: "#5b8def",
-        warm: "#c5a26f",
-        magenta: "#ff4d6a",
-        background: "#0c1218",
-        fog: "#152028",
-        hemiSky: "#1a2834",
-        hemiGround: "#0a1014",
-        sun: "#c8d4dc",
-      };
-    case "la":
-      return {
-        primary: "#b388ff",
-        secondary: "#5b8def",
-        warm: "#c5a26f",
-        magenta: "#ff4d6a",
-        background: "#100e18",
-        fog: "#1a1624",
-        hemiSky: "#221830",
-        hemiGround: "#0c0a12",
-        sun: "#d4c8e0",
-      };
-    case "nyc":
-    case "boston":
-    default:
-      return {
-        primary: "#5b8def",
-        secondary: "#3de7ff",
-        warm: "#c5a26f",
-        magenta: "#ff4d6a",
-        background: "#0a0e14",
-        fog: "#121820",
-        hemiSky: "#182028",
-        hemiGround: "#0a0c10",
-        sun: "#d0d8e0",
-      };
-  }
+  return getWorldTheme(cityId);
 }
 
-function marketScreensFor(cityId: CityId): Array<{ position: [number, number, number]; rotationY: number; width: number; height: number }> {
-  switch (cityId) {
-    case "miami":
-      return [
-        { position: [-9, 6.5, 24], rotationY: Math.PI * 0.08, width: 7.2, height: 4 },
-        { position: [24, 6, -15], rotationY: Math.PI * 0.82, width: 6.2, height: 3.5 },
-      ];
-    case "la":
-      return [
-        { position: [0, 9.5, 13.8], rotationY: Math.PI, width: 8.4, height: 4.6 },
-        { position: [38, 10.5, 4.8], rotationY: -Math.PI / 2, width: 7, height: 4 },
-      ];
-    case "nyc":
-    case "boston":
-    default:
-      return [
-        { position: [18, 11.5, 15.4], rotationY: Math.PI * 0.78, width: 8.5, height: 4.8 },
-        { position: [-4.2, 6.2, 17.8], rotationY: Math.PI * -0.12, width: 6.5, height: 3.6 },
-      ];
-  }
+function marketScreensFor(cityId: CityId) {
+  return getMarketScreenPlacements(cityId);
 }
 
 /** Floating translucent glass shards near plaza / HQ. */
@@ -109,7 +56,7 @@ function GlassShards({ origin, count }: { origin: { x: number; z: number }; coun
       rz: r() * Math.PI,
       speed: 0.15 + r() * 0.35,
       phase: r() * Math.PI * 2,
-      tint: i % 3 === 0 ? "#3de7ff" : i % 3 === 1 ? "#c5a26f" : "#ff4d6a",
+      tint: i % 3 === 0 ? "#00ff9f" : i % 3 === 1 ? "#c5a26f" : "#ff4d6a",
     }));
   }, [origin.x, origin.z, count]);
 
@@ -281,6 +228,19 @@ function CentralPlaza({ block }: { block: WorldBlockConfig }) {
   );
 }
 
+function defaultLandmark(block: WorldBlockConfig): LandmarkDefinition {
+  const hq = block.buildings.find((b) => b.kind === "hq");
+  const pos = hq?.position ?? block.spawn;
+  return {
+    id: `landmark-${block.cityId}`,
+    modelId: landmarkModelId(block.cityId),
+    position: { x: pos.x + 6, y: 0, z: pos.z - 8 },
+    rotationY: Math.PI * 0.15,
+    size: { width: 8, height: 12, depth: 4 },
+    label: `${block.cityId.toUpperCase()} LANDMARK`,
+  };
+}
+
 /** Full scenic layer — env, districts, graffiti, screens, ambient life. */
 export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { tickerRows: ScreenerRow[]; block?: WorldBlockConfig }) {
   const theme = cityTheme(block.cityId);
@@ -289,6 +249,7 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
   const screens = high ? marketScreensFor(block.cityId) : marketScreensFor(block.cityId).slice(0, 1);
   const hq = block.buildings.find((b) => b.kind === "hq");
   const shardOrigin = hq?.position ?? block.spawn;
+  const landmarks = block.landmarks?.length ? block.landmarks : [defaultLandmark(block)];
 
   return (
     <group>
@@ -321,15 +282,22 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
           distance={40}
         />
       )}
+      {/* Spec neon green accent fill */}
+      <pointLight position={[block.spawn.x - 4, 5, block.spawn.z + 4]} intensity={0.35} color={theme.neon} distance={24} />
 
       <Ground block={block} />
       <UrbanNature block={block} lite={!high} />
       {high && <Skyline block={block} />}
       <StreetProps block={block} />
+      <PropScatter block={block} />
       {high && <GraffitiLayer block={block} />}
 
       {block.buildings.map((b) => (
         <BuildingMesh key={b.id} building={b} />
+      ))}
+
+      {landmarks.map((lm) => (
+        <LandmarkMesh key={lm.id} landmark={lm} />
       ))}
 
       {block.billboards.map((bb) => (

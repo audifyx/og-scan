@@ -8,6 +8,9 @@ import { collidesAt, collidesInInterior, pointInBuilding } from "@/lib/orbitxcit
 import { consumeZoom, virtualInput } from "@/lib/orbitxcity/input";
 import type { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
 import { CharacterMesh, type CharacterAnimationState } from "./CharacterMesh";
+import { CharacterGltf } from "./CharacterGltf";
+import { getCharacterGltfPath } from "@/lib/orbitxcity/assets/characterKits";
+import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const WALK_SPEED = 7.5;
 const SPRINT_SPEED = 11.8;
@@ -68,7 +71,9 @@ export function PlayerAvatar({
   const flame = useRef<THREE.Mesh>(null);
   const bob = useRef(0);
   const { camera } = useThree();
+  const { quality } = useCity();
   useKeyboard();
+  const heroPath = quality === "high" ? getCharacterGltfPath(appearance.classId) : null;
 
   const spawn = block.spawn;
   const blockRef = useRef(block);
@@ -242,7 +247,11 @@ export function PlayerAvatar({
 
   return (
     <group ref={group} position={[spawn.x, 0, spawn.z]}>
-      <CharacterMesh appearance={appearance} animation={characterAnimation.current} />
+      {heroPath ? (
+        <CharacterGltf path={heroPath} appearance={appearance} animation={characterAnimation.current} />
+      ) : (
+        <CharacterMesh appearance={appearance} animation={characterAnimation.current} />
+      )}
       <mesh ref={flame} position={[0, 1.05, -0.28]} rotation-x={Math.PI} visible={false}>
         <coneGeometry args={[0.14, 0.6, 10]} />
         <meshBasicMaterial color="#ffb054" transparent opacity={0.9} toneMapped={false} />

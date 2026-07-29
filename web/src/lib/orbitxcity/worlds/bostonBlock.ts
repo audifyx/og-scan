@@ -49,4 +49,14 @@ export const BOSTON_BLOCK: WorldBlockConfig = {
     { id: "z-boston-academy", kind: "community", label: "Developer Academy", hint: "Enter the academy lounge", position: { x: -24, y: 0, z: -19 }, radius: 4, buildingId: "boston-academy" },
     { id: "z-boston-theater", kind: "games", label: "Demo Theater", hint: "Enter the project demo hall", position: { x: 24, y: 0, z: -19 }, radius: 4.5, buildingId: "boston-theater" },
   ],
+  landmarks: [
+    {
+      id: "boston-lab-dome",
+      modelId: "landmark-boston",
+      position: { x: 0, y: 0, z: 4 },
+      rotationY: 0,
+      size: { width: 10, height: 10, depth: 10 },
+      label: "LAB DOME",
+    },
+  ],
 };

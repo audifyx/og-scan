@@ -341,4 +341,14 @@ export const LA_BLOCK: WorldBlockConfig = {
       tokenMint: OGSCAN_TOKEN_MINT,
     },
   ],
+  landmarks: [
+    {
+      id: "la-creator-stage-landmark",
+      modelId: "landmark-la",
+      position: { x: 0, y: 0, z: 8 },
+      rotationY: Math.PI,
+      size: { width: 14, height: 8, depth: 6 },
+      label: "CREATOR STAGE",
+    },
+  ],
 };
