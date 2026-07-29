@@ -23,6 +23,8 @@ import { CityRealtimeClient, MAIN_LOBBY, type LobbyDescriptor } from "@/lib/orbi
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { getBuildingEntrances, checkDoorwayCrossing } from "@/lib/orbitxcity/doorwayEntry";
+import { Vector2 } from "three";
 
 interface CityContextValue {
   /** AAA gate: menu → characters → lobbies → world */
@@ -173,6 +175,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [emoteAt, setEmoteAt] = useState(0);
   const [interiorBuildingId, setInteriorBuildingId] = useState<string | null>(null);
   const [venueBuildingId, setVenueBuildingId] = useState<string | null>(null);
+  const prevPlayerPosRef = useRef<Vector2>(new Vector2(playerPos.x, playerPos.z));
   const inventory = STARTER_INVENTORY;
   const worldInputLocked = panel !== "none" || venueBuildingId !== null;
 
@@ -318,6 +321,23 @@ export function CityProvider({ children }: { children: ReactNode }) {
     setSelectedMint(mint);
     setPanel("token");
   }, []);
+
+  // Detect doorway crossings for automatic interior entry
+  useEffect(() => {
+    if (interiorBuildingId) return; // Already inside
+    const block = getWorldBlock(selectedCityId);
+    const entrances = getBuildingEntrances(block.buildings);
+    const curr = new Vector2(playerPos.x, playerPos.z);
+
+    for (const entrance of entrances) {
+      if (checkDoorwayCrossing(prevPlayerPosRef.current, curr, entrance)) {
+        // Auto-enter the building when crossing the threshold
+        enterBuilding(entrance.buildingId);
+        break;
+      }
+    }
+    prevPlayerPosRef.current.copy(curr);
+  }, [playerPos, interiorBuildingId, selectedCityId, enterBuilding]);
 
   const interact = useCallback(() => {
     // Inside a building: E exits (and closes the district panel)

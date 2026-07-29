@@ -13,6 +13,8 @@ import { mulberry32, hashSeed } from "@/lib/orbitxcity/collision";
 import { Ground } from "./Ground";
 import { BuildingMesh } from "./BuildingMesh";
 import { BillboardMesh } from "./BillboardMesh";
+import { NYCFacades } from "./NYCFacades";
+import { SignageSystem } from "./SignageSystem";
 import { GraffitiLayer } from "./GraffitiLayer";
 import { Skyline } from "./Skyline";
 import { StreetProps } from "./StreetProps";
@@ -328,9 +330,11 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       <StreetProps block={block} />
       {high && <GraffitiLayer block={block} />}
 
+      {block.cityId === "nyc" && <NYCFacades buildings={block.buildings} />}
       {block.buildings.map((b) => (
         <BuildingMesh key={b.id} building={b} />
       ))}
+      {block.cityId === "nyc" && <SignageSystem buildings={block.buildings} />}
 
       {block.billboards.map((bb) => (
         <BillboardMesh key={bb.id} board={bb} />
