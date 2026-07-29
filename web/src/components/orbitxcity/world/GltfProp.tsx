@@ -3,7 +3,7 @@
  * Used by buildings, furniture, landmarks, and street props.
  * Gracefully handles missing models by rendering nothing.
  */
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, Component, ReactNode } from "react";
 import { Clone, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
@@ -19,6 +19,32 @@ export interface GltfPropProps {
   receiveShadow?: boolean;
 }
 
+/** Error boundary to catch GLTF loading errors (including Suspense promise rejections) */
+class GltfErrorBoundary extends Component<
+  { children: ReactNode; path: string },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; path: string }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error(`[v0] Failed to load GLTF model at ${this.props.path}:`, error.message);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
+}
+
 function GltfPropInner({
   path,
   position = [0, 0, 0],
@@ -28,15 +54,7 @@ function GltfPropInner({
   castShadow = true,
   receiveShadow = true,
 }: GltfPropProps) {
-  let scene: THREE.Scene;
-  try {
-    const result = useGLTF(path) as any;
-    scene = result?.scene;
-    if (!scene) return null;
-  } catch (err) {
-    console.error(`[v0] Failed to load GLTF model at ${path}:`, err instanceof Error ? err.message : String(err));
-    return null;
-  }
+  const { scene } = useGLTF(path);
 
   const computedScale = useMemo((): [number, number, number] => {
     if (!fitTo) {
@@ -65,11 +83,13 @@ function GltfPropInner({
   );
 }
 
-/** Suspense-wrapped GLTF clone. Parent should provide a Suspense boundary for batches. Silently fails if model is missing. */
+/** Suspense-wrapped GLTF clone with error boundary. Silently fails if model is missing. */
 export function GltfProp(props: GltfPropProps) {
   return (
-    <Suspense fallback={null}>
-      <GltfPropInner {...props} />
-    </Suspense>
+    <GltfErrorBoundary path={props.path}>
+      <Suspense fallback={null}>
+        <GltfPropInner {...props} />
+      </Suspense>
+    </GltfErrorBoundary>
   );
 }
