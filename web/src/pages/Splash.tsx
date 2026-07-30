@@ -400,7 +400,7 @@ export default function Splash() {
       if (!e.isIntersecting) return;
       e.target.classList.add("in");
       e.target.querySelectorAll<HTMLElement>(".stagger").forEach((child, i) => {
-        child.style.transitionDelay = `${i * 70}ms`;
+        child.style.transitionDelay = `${i * 100}ms`;
         child.classList.add("in");
       });
     }), { threshold: 0.14, rootMargin: "0px 0px -8% 0px" });
@@ -572,9 +572,11 @@ export default function Splash() {
         <h2 className="sp-h2">A complete OS<br />for on-chain.</h2>
         <div className="sp-grid">
           {FEATURES.map((f, i) => (
-            <article key={f.tag} className={`sp-card ${f.tone} stagger`} style={{ transitionDelay: `${i * 55}ms` }} onMouseMove={handleCardMouse}>
+            <article key={f.tag} className={`sp-card ${f.tone} stagger`} style={{ transitionDelay: `${i * 90}ms` }} onMouseMove={handleCardMouse}>
+              <div className="sp-card-border" aria-hidden />
               <div className="sp-card-glow" />
-              <div className="sp-card-icon"><Icon name={f.icon} /></div>
+              <div className="sp-card-corner" aria-hidden />
+              <div className="sp-card-icon"><span className="sp-card-ring" aria-hidden /><Icon name={f.icon} /></div>
               <span className="sp-card-tag">{f.tag}</span>
               <h3>{f.title}</h3>
               <p>{f.copy}</p>
@@ -631,20 +633,23 @@ export default function Splash() {
         <span className="sp-kicker">Ecosystem</span>
         <h2 className="sp-h2">Already live.</h2>
         <div className="sp-eco">
-          <a className="sp-eco-card stagger" href={LINKS.ogdex} onMouseMove={handleCardMouse}>
-            <div className="sp-eco-icon" style={{ ["--ic" as string]: "#60A5FA" }}><Icon name="dexchart" /></div>
+          <a className="sp-eco-card stagger" href={LINKS.ogdex} onMouseMove={handleCardMouse} style={{ ["--ic" as string]: "#60A5FA" }}>
+            <div className="sp-card-border" aria-hidden />
+            <div className="sp-eco-icon"><span className="sp-card-ring" aria-hidden /><Icon name="dexchart" /></div>
             <h3>OrbitX DEX</h3>
             <p>Real-time Solana screener, scanner & trading.</p>
             <span className="sp-eco-link">Open →</span>
           </a>
-          <a className="sp-eco-card stagger" href={LINKS.launchpad} onMouseMove={handleCardMouse}>
-            <div className="sp-eco-icon" style={{ ["--ic" as string]: "#F0C75E" }}><Icon name="launch" /></div>
+          <a className="sp-eco-card stagger" href={LINKS.launchpad} onMouseMove={handleCardMouse} style={{ ["--ic" as string]: "#F0C75E" }}>
+            <div className="sp-card-border" aria-hidden />
+            <div className="sp-eco-icon"><span className="sp-card-ring" aria-hidden /><Icon name="launch" /></div>
             <h3>Launchpad</h3>
             <p>Create, claim, rescue — anti-vamp from minute one.</p>
             <span className="sp-eco-link">Launch →</span>
           </a>
-          <a className="sp-eco-card stagger" href={LINKS.orbitxPrediction} target="_blank" rel="noreferrer" onMouseMove={handleCardMouse}>
-            <div className="sp-eco-icon" style={{ ["--ic" as string]: "#A8B0BC" }}><Icon name="target" /></div>
+          <a className="sp-eco-card stagger" href={LINKS.orbitxPrediction} target="_blank" rel="noreferrer" onMouseMove={handleCardMouse} style={{ ["--ic" as string]: "#A8B0BC" }}>
+            <div className="sp-card-border" aria-hidden />
+            <div className="sp-eco-icon"><span className="sp-card-ring" aria-hidden /><Icon name="target" /></div>
             <h3>Prediction Market</h3>
             <p>Markets + provably-fair 1v1 games.</p>
             <span className="sp-eco-link">solno.fun →</span>
@@ -717,7 +722,7 @@ const css = `
   --blue-hi: #60A5FA;
   --silver: #A8B0BC;
   --font-display: "Bricolage Grotesque", "Syne", system-ui, sans-serif;
-  --font-body: "Plus Jakarta Sans", "Manrope", system-ui, sans-serif;
+  --font-body: "Instrument Sans", "Manrope", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   background: var(--bg);
   color: var(--ink);
@@ -1217,46 +1222,95 @@ const css = `
 }
 .sp-chip:hover { border-color: rgba(212,175,55,0.4); color: #fff; transform: translateY(-1px); }
 
-.sp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 32px; }
+.sp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 32px; perspective: 1200px; }
 @media(max-width:900px) { .sp-grid { grid-template-columns: 1fr 1fr; } }
 @media(max-width:600px) { .sp-grid { grid-template-columns: 1fr; } }
 .sp-card {
-  position: relative; border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-  border-radius: 14px; padding: 22px; overflow: hidden;
-  transition: border-color .3s, transform .35s cubic-bezier(0.16,1,0.3,1);
+  position: relative; isolation: isolate;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(165deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012) 55%, rgba(8,14,24,0.6)) padding-box,
+    linear-gradient(145deg, rgba(255,255,255,0.16), rgba(255,255,255,0.03) 40%, color-mix(in srgb, var(--ic,#D4AF37) 35%, transparent)) border-box;
+  border-radius: 16px; padding: 24px; overflow: hidden;
+  transform-style: preserve-3d;
+  transition: transform .45s cubic-bezier(0.16,1,0.3,1), box-shadow .4s ease;
+  box-shadow: 0 18px 40px -28px rgba(0,0,0,0.7);
+}
+.sp-card-border {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse 80% 55% at 50% -10%, color-mix(in srgb, var(--ic,#D4AF37) 18%, transparent), transparent 70%);
+  opacity: 0.7;
 }
 .sp-card-glow {
-  position: absolute; inset: 0; opacity: 0; pointer-events: none;
-  background: radial-gradient(circle 140px at var(--card-x,50%) var(--card-y,50%), var(--c, rgba(212,175,55,0.12)), transparent);
-  transition: opacity .3s;
+  position: absolute; inset: 0; opacity: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(circle 160px at var(--card-x,50%) var(--card-y,50%), var(--c, rgba(212,175,55,0.16)), transparent 70%);
+  transition: opacity .35s;
+}
+.sp-card-corner {
+  position: absolute; top: 12px; right: 12px; width: 18px; height: 18px; z-index: 1;
+  border-top: 1.5px solid color-mix(in srgb, var(--ic,#D4AF37) 55%, transparent);
+  border-right: 1.5px solid color-mix(in srgb, var(--ic,#D4AF37) 55%, transparent);
+  opacity: 0.35; transition: opacity .35s, transform .45s cubic-bezier(0.16,1,0.3,1);
 }
 .sp-card:hover .sp-card-glow { opacity: 1; }
-.sp-card:hover { border-color: color-mix(in srgb, var(--ic,#D4AF37) 40%, transparent); transform: translateY(-4px); }
-.sp-ico-svg { width: 22px; height: 22px; }
+.sp-card:hover .sp-card-corner { opacity: 1; transform: translate(2px, -2px); }
+.sp-card:hover {
+  transform: translateY(-7px) rotateX(2.5deg);
+  box-shadow:
+    0 28px 56px -22px rgba(0,0,0,0.75),
+    0 0 36px -12px color-mix(in srgb, var(--ic,#D4AF37) 45%, transparent);
+}
+.sp-ico-svg { width: 22px; height: 22px; position: relative; z-index: 1; }
 .sp-for-check svg { width: 12px; height: 12px; }
-.sp-card.f1{--c:rgba(59,130,246,0.14);--ic:#60A5FA}
-.sp-card.f2{--c:rgba(212,175,55,0.14);--ic:#F0C75E}
-.sp-card.f3{--c:rgba(168,176,188,0.14);--ic:#A8B0BC}
-.sp-card.f4{--c:rgba(240,199,94,0.14);--ic:#F0C75E}
-.sp-card.f5{--c:rgba(59,130,246,0.14);--ic:#3B82F6}
-.sp-card.f6{--c:rgba(96,165,250,0.14);--ic:#60A5FA}
-.sp-card.f7{--c:rgba(212,175,55,0.12);--ic:#D4AF37}
-.sp-card.f8{--c:rgba(168,176,188,0.14);--ic:#A8B0BC}
-.sp-card.f9{--c:rgba(96,165,250,0.12);--ic:#60A5FA}
+.sp-card.f1{--c:rgba(59,130,246,0.16);--ic:#60A5FA}
+.sp-card.f2{--c:rgba(212,175,55,0.16);--ic:#F0C75E}
+.sp-card.f3{--c:rgba(168,176,188,0.16);--ic:#A8B0BC}
+.sp-card.f4{--c:rgba(240,199,94,0.16);--ic:#F0C75E}
+.sp-card.f5{--c:rgba(59,130,246,0.16);--ic:#3B82F6}
+.sp-card.f6{--c:rgba(96,165,250,0.16);--ic:#60A5FA}
+.sp-card.f7{--c:rgba(212,175,55,0.14);--ic:#D4AF37}
+.sp-card.f8{--c:rgba(168,176,188,0.16);--ic:#A8B0BC}
+.sp-card.f9{--c:rgba(96,165,250,0.14);--ic:#60A5FA}
 .sp-card-icon {
-  width: 44px; height: 44px; margin-bottom: 14px;
-  display: grid; place-items: center; border-radius: 12px;
+  position: relative;
+  width: 48px; height: 48px; margin-bottom: 16px;
+  display: grid; place-items: center; border-radius: 14px;
   color: var(--ic,#F0C75E);
-  background: color-mix(in srgb, var(--ic,#F0C75E) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ic,#F0C75E) 28%, transparent);
+  background: color-mix(in srgb, var(--ic,#F0C75E) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ic,#F0C75E) 32%, transparent);
+  z-index: 1;
+}
+.sp-card-ring {
+  position: absolute; inset: -5px; border-radius: 18px; pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--ic,#D4AF37) 35%, transparent);
+  opacity: 0; transform: scale(0.92) rotate(0deg);
+}
+.sp-card:hover .sp-card-ring,
+.sp-eco-card:hover .sp-card-ring {
+  opacity: 0.85;
+  animation: ringSpin 4.5s linear infinite;
+}
+@keyframes ringSpin {
+  from { transform: scale(1) rotate(0deg); }
+  to { transform: scale(1) rotate(360deg); }
 }
 .sp-card-tag {
+  position: relative; z-index: 1;
+  display: inline-flex; align-items: center;
   font-family: var(--font-mono);
-  font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-hi);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ic,#F0C75E);
+  padding: 4px 9px; border-radius: 999px;
+  background: color-mix(in srgb, var(--ic,#D4AF37) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ic,#D4AF37) 26%, transparent);
 }
-.sp-card h3 { margin: 8px 0 6px; font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: -0.03em; }
-.sp-card p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--muted); }
+.sp-card h3 {
+  position: relative; z-index: 1;
+  margin: 12px 0 8px;
+  font-family: var(--font-display);
+  font-size: 18.5px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.2;
+}
+.sp-card p { position: relative; z-index: 1; margin: 0; font-size: 13.5px; line-height: 1.58; color: var(--muted); }
 
 .sp-why { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 28px; }
 @media(max-width:600px) { .sp-why { grid-template-columns: 1fr; } }
@@ -1271,14 +1325,18 @@ const css = `
 @media(max-width:900px) { .sp-phases { grid-template-columns: 1fr 1fr; } }
 @media(max-width:520px) { .sp-phases { grid-template-columns: 1fr; } }
 .sp-phase {
-  border: 1px solid var(--line); border-radius: 14px; padding: 18px;
-  background: rgba(255,255,255,0.015);
-  transition: transform .3s, border-color .3s;
+  border: 1px solid transparent; border-radius: 16px; padding: 20px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)) padding-box,
+    linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03)) border-box;
+  transition: transform .4s cubic-bezier(0.16,1,0.3,1), box-shadow .35s ease;
 }
 .sp-phase:hover { transform: translateY(-3px); }
 .sp-phase-active {
-  border-color: rgba(212,175,55,0.35);
-  background: linear-gradient(160deg, rgba(212,175,55,0.08), transparent);
+  background:
+    linear-gradient(160deg, rgba(212,175,55,0.1), rgba(255,255,255,0.01)) padding-box,
+    linear-gradient(145deg, rgba(212,175,55,0.45), rgba(240,199,94,0.12), rgba(255,255,255,0.04)) border-box;
+  box-shadow: 0 0 32px -12px rgba(212,175,55,0.35);
 }
 .sp-phase-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .sp-phase-k { font-family: var(--font-display); font-size: 13px; font-weight: 700; }
@@ -1301,24 +1359,49 @@ const css = `
   border-radius: 6px; background: rgba(212,175,55,0.12); color: var(--gold-hi);
 }
 
-.sp-eco { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 28px; }
+.sp-eco { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 28px; }
 @media(max-width:760px) { .sp-eco { grid-template-columns: 1fr; } }
 .sp-eco-card {
-  border: 1px solid var(--line); border-radius: 14px; padding: 24px;
-  background: linear-gradient(160deg, rgba(212,175,55,0.05), rgba(255,255,255,0.01));
-  transition: border-color .3s, transform .35s cubic-bezier(0.16,1,0.3,1);
+  position: relative; isolation: isolate; overflow: hidden;
+  border: 1px solid transparent; border-radius: 16px; padding: 26px;
+  background:
+    linear-gradient(160deg, rgba(212,175,55,0.07), rgba(255,255,255,0.015) 50%, rgba(8,12,20,0.5)) padding-box,
+    linear-gradient(145deg, rgba(255,255,255,0.18), color-mix(in srgb, var(--ic,#D4AF37) 35%, transparent), rgba(255,255,255,0.04)) border-box;
+  transition: transform .45s cubic-bezier(0.16,1,0.3,1), box-shadow .4s ease;
+  box-shadow: 0 18px 40px -28px rgba(0,0,0,0.7);
 }
-.sp-eco-card:hover { border-color: rgba(212,175,55,0.4); transform: translateY(-3px); }
+.sp-eco-card .sp-card-border {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(ellipse 70% 50% at 20% 0%, color-mix(in srgb, var(--ic,#D4AF37) 22%, transparent), transparent 65%);
+  opacity: 0.65;
+}
+.sp-eco-card:hover {
+  transform: translateY(-6px) rotateX(1.5deg);
+  box-shadow:
+    0 28px 56px -22px rgba(0,0,0,0.75),
+    0 0 40px -10px color-mix(in srgb, var(--ic,#D4AF37) 40%, transparent);
+}
 .sp-eco-icon {
-  width: 46px; height: 46px; margin-bottom: 12px;
-  display: grid; place-items: center; border-radius: 12px;
+  position: relative;
+  width: 50px; height: 50px; margin-bottom: 14px;
+  display: grid; place-items: center; border-radius: 14px;
   color: var(--ic,#F0C75E);
-  background: color-mix(in srgb, var(--ic,#F0C75E) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ic,#F0C75E) 28%, transparent);
+  background: color-mix(in srgb, var(--ic,#F0C75E) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ic,#F0C75E) 32%, transparent);
 }
-.sp-eco-card h3 { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.03em; }
-.sp-eco-card p { margin: 8px 0 14px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
-.sp-eco-link { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--gold-hi); }
+.sp-eco-card h3 { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -0.035em; }
+.sp-eco-card p { margin: 10px 0 16px; font-size: 14px; color: var(--muted); line-height: 1.55; }
+.sp-eco-link {
+  position: relative;
+  display: inline-block;
+  font-family: var(--font-display); font-size: 13.5px; font-weight: 700; color: var(--gold-hi);
+}
+.sp-eco-link::after {
+  content: ""; position: absolute; left: 0; bottom: -3px; height: 1.5px; width: 0;
+  background: linear-gradient(90deg, var(--gold-hi), transparent);
+  transition: width .4s cubic-bezier(0.16,1,0.3,1);
+}
+.sp-eco-card:hover .sp-eco-link::after { width: 100%; }
 
 .sp-close {
   position: relative; z-index: 2; text-align: center;
@@ -1369,24 +1452,43 @@ const css = `
 
 .reveal {
   opacity: 0;
-  transform: translateY(36px) scale(0.985);
+  transform: translateY(28px) scale(0.985);
+  filter: blur(6px);
+  clip-path: inset(8% 0 0 0);
+  transition:
+    opacity .95s cubic-bezier(0.16,1,0.3,1),
+    transform .95s cubic-bezier(0.16,1,0.3,1),
+    filter .95s cubic-bezier(0.16,1,0.3,1),
+    clip-path .95s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  clip-path: inset(0 0 0 0);
+}
+.stagger {
+  opacity: 0;
+  transform: translateY(18px) scale(0.98);
   filter: blur(4px);
   transition:
-    opacity .9s cubic-bezier(0.16,1,0.3,1),
-    transform .9s cubic-bezier(0.16,1,0.3,1),
-    filter .9s ease;
+    opacity .7s cubic-bezier(0.16,1,0.3,1),
+    transform .7s cubic-bezier(0.16,1,0.3,1),
+    filter .7s cubic-bezier(0.16,1,0.3,1);
 }
-.reveal.in { opacity: 1; transform: none; filter: none; }
-.stagger {
-  opacity: 0; transform: translateY(16px);
-  transition: opacity .65s cubic-bezier(0.16,1,0.3,1), transform .65s cubic-bezier(0.16,1,0.3,1);
+.stagger.in {
+  opacity: 1;
+  transform: none;
+  filter: none;
 }
-.stagger.in { opacity: 1; transform: none; }
 .sp ::selection { background: rgba(212,175,55,0.3); color: #fff; }
 @media (prefers-reduced-motion: no-preference) { .sp { scroll-behavior: smooth; } }
 @media (prefers-reduced-motion: reduce) {
-  .sp-hero-globe, .sp-live-dot, .sp-marquee-track, .sp-hero-scroll i, .sp-show-slide.is-on, .sp-show-progress i { animation: none !important; }
-  .sp-hero-plane, .sp-show-slide { transition: opacity .35s ease !important; }
-  .reveal, .stagger { filter: none; transform: none; }
+  .sp-hero-globe, .sp-live-dot, .sp-marquee-track, .sp-hero-scroll i, .sp-show-slide.is-on, .sp-show-progress i, .sp-card-ring { animation: none !important; }
+  .sp-hero-plane, .sp-show-slide, .sp-card, .sp-eco-card { transition: opacity .35s ease !important; transform: none !important; }
+  .reveal, .stagger {
+    opacity: 1 !important; transform: none !important; filter: none !important;
+    clip-path: none !important; animation: none !important;
+  }
 }
 `;
