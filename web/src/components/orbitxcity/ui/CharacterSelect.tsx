@@ -1,8 +1,8 @@
 /**
- * OrbitX City — Character Selection (holographic recruitment chamber).
- * Wallet at top · operative pods · live dossier preview · Start at bottom.
+ * OrbitX City — Character Select (console recruitment).
+ * Full-bleed city art · featured operative · compact class strip · callsign CTA.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -16,36 +16,27 @@ import {
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { MenuBackdrop } from "./MenuBackdrop";
 
-const CLASS_FLAVOR: Record<
-  CharacterClassId,
-  { lore: string; perk: string; synergy: string; badge?: string }
-> = {
+const CLASS_FLAVOR: Record<CharacterClassId, { lore: string; perk: string; badge?: string }> = {
   trader: {
-    lore: "Reads tape like a battlefield. Prefers clean entries, hard exits, and no mercy for late bags.",
-    perk: "Perk · Priority lane on trading-floor terminals",
-    synergy: "Class Synergy · DEX desks + live screener walls amplify Instinct.",
+    lore: "Reads tape like a battlefield. Clean entries, hard exits.",
+    perk: "Priority lane on trading-floor terminals",
   },
   builder: {
-    lore: "Architect of rails and rituals. Turns Midtown infrastructure into leverage.",
-    perk: "Perk · Faster mission claim cooldown at OrbitX HQ",
-    synergy: "Class Synergy · HQ command floor + builder pods stack Focus.",
+    lore: "Architect of rails and rituals. Turns Midtown into leverage.",
+    perk: "Faster mission claim cooldown at OrbitX HQ",
   },
   gamer: {
-    lore: "Born for heat checks. Treats every candle and every round as a ranked match.",
-    perk: "Perk · Highlighted games-district markers",
-    synergy: "Class Synergy · Arenas + launch stages spike Reflex under pressure.",
-    badge: "Recommended for degens",
+    lore: "Born for heat checks. Every candle is a ranked match.",
+    perk: "Highlighted games-district markers",
+    badge: "Recommended",
   },
   creator: {
-    lore: "Broadcasts the culture layer. Memes become markets when Creators walk the boulevard.",
-    perk: "Perk · Boosted social-feed presence aura",
-    synergy: "Class Synergy · Community lounges + neon clubs feed Reach.",
+    lore: "Broadcasts the culture layer. Memes become markets.",
+    perk: "Boosted social-feed presence aura",
   },
   explorer: {
-    lore: "Maps the unknown districts first. Always two blocks ahead of the crowd.",
-    perk: "Perk · Extended teleport reveal radius",
-    synergy: "Class Synergy · Frontier routes pair with launchpad discovery.",
-    badge: "Wallet compatible",
+    lore: "Maps unknown districts first. Always two blocks ahead.",
+    perk: "Extended teleport reveal radius",
   },
 };
 
@@ -60,7 +51,7 @@ function HoloAvatar({
 }: {
   cls: CharacterClassDef;
   selected: boolean;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "hero";
 }) {
   const outfit = outfitFor(cls);
   return (
@@ -72,7 +63,7 @@ function HoloAvatar({
         ["--pod-body" as string]: cls.bodyColor,
         ["--pod-skin" as string]: cls.skinColor,
         ["--pod-accent" as string]: cls.accentColor,
-        backgroundImage: "url(/orbitxcity/ui/pod-frame.svg)",
+        backgroundImage: size === "sm" ? undefined : "url(/orbitxcity/ui/pod-frame.svg)",
         backgroundSize: "contain",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
@@ -108,49 +99,6 @@ function HoloAvatar({
   );
 }
 
-function StatRadar({ cls }: { cls: CharacterClassDef }) {
-  const cx = 74;
-  const cy = 74;
-  const r = 52;
-  const pts = cls.stats.map((s, i) => {
-    const a = -Math.PI / 2 + (i * Math.PI * 2) / cls.stats.length;
-    const rr = r * (s.value / 100);
-    return `${cx + Math.cos(a) * rr},${cy + Math.sin(a) * rr}`;
-  });
-  const grids = [0.35, 0.65, 1].map((t) =>
-    cls.stats
-      .map((_, i) => {
-        const a = -Math.PI / 2 + (i * Math.PI * 2) / cls.stats.length;
-        return `${cx + Math.cos(a) * r * t},${cy + Math.sin(a) * r * t}`;
-      })
-      .join(" "),
-  );
-
-  return (
-    <svg className="oxc-chars-radar" viewBox="0 0 148 148" aria-hidden>
-      {grids.map((ring) => (
-        <polygon key={ring} points={ring} fill="none" stroke="rgba(255,255,255,0.08)" />
-      ))}
-      {cls.stats.map((s, i) => {
-        const a = -Math.PI / 2 + (i * Math.PI * 2) / cls.stats.length;
-        const x = cx + Math.cos(a) * r;
-        const y = cy + Math.sin(a) * r;
-        const lx = cx + Math.cos(a) * (r + 14);
-        const ly = cy + Math.sin(a) * (r + 14);
-        return (
-          <g key={s.label}>
-            <line x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(255,255,255,0.08)" />
-            <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fill="rgba(210,220,215,0.55)" fontSize="8">
-              {s.label}
-            </text>
-          </g>
-        );
-      })}
-      <polygon points={pts.join(" ")} fill={`${cls.neon}33`} stroke={cls.neon} strokeWidth="1.5" />
-    </svg>
-  );
-}
-
 export function CharacterSelect() {
   const { setGate, setEntered, setAvatar, avatar, selectedCityId } = useCity();
   const { user, profile } = useAuth();
@@ -165,6 +113,8 @@ export function CharacterSelect() {
     [selectedId],
   );
   const flavor = CLASS_FLAVOR[selected.id];
+  const ready = Boolean(user || connected);
+  const displayName = name.trim() || "Traveler";
 
   useEffect(() => {
     const t = requestAnimationFrame(() => setVisible(true));
@@ -173,6 +123,7 @@ export function CharacterSelect() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const idx = CHARACTER_CLASSES.findIndex((c) => c.id === selectedId);
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
@@ -184,13 +135,16 @@ export function CharacterSelect() {
         const prev = CHARACTER_CLASSES[(idx - 1 + CHARACTER_CLASSES.length) % CHARACTER_CLASSES.length]!;
         cityAudio.play("ui");
         setSelectedId(prev.id);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (ready) commitAndEnter(false);
+        else commitAndSkipLobby(true);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId]);
-
-  const ready = Boolean(user || connected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, ready, name, selected]);
 
   const playEnterFlash = () => {
     setFlash(true);
@@ -222,149 +176,128 @@ export function CharacterSelect() {
     }, 220);
   };
 
-  const randomize = () => {
-    const pick = CHARACTER_CLASSES[Math.floor(Math.random() * CHARACTER_CLASSES.length)]!;
-    cityAudio.play("ui");
-    setSelectedId(pick.id);
-  };
-
   const walletLabel =
     connected && publicKey
-      ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)} · ready`
+      ? `${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
       : "Wallet offline";
 
-  const displayName = name.trim() || "Traveler";
-
   return (
-    <div className={`oxc-chars ${visible ? "is-in" : ""}`} style={{ ["--pod-neon" as string]: selected.neon }}>
+    <div
+      className={`oxc-chars ${visible ? "is-in" : ""}`}
+      style={
+        {
+          ["--pod-neon" as string]: selected.neon,
+          ["--pod-gold" as string]: selected.gold,
+        } as CSSProperties
+      }
+    >
       <MenuBackdrop cityId={selectedCityId} intensity="chamber" />
       <div className={`oxc-chars-flash ${flash ? "is-on" : ""}`} aria-hidden />
 
-      <header className="oxc-chars-top">
-        <div className="oxc-chars-top-row">
-          <button type="button" className="oxc-chars-back" onClick={() => setGate("menu")}>
-            ← Menu
-          </button>
-          <div className="oxc-chars-wallet-slot">
-            <WalletConnectButton />
-          </div>
+      <header className="oxc-chars-bar">
+        <button type="button" className="oxc-chars-back" onClick={() => setGate("menu")}>
+          ← Menu
+        </button>
+        <div className="oxc-chars-bar-center">
+          <p className="oxc-chars-kicker">Operatives</p>
+          <h1 className="oxc-chars-title">
+            SELECT <span className="oxc-chars-title-x">CLASS</span>
+          </h1>
         </div>
-        <p className="oxc-chars-kicker">Select operative</p>
-        <h1 className="oxc-chars-title">
-          ORBIT<span className="oxc-chars-title-x">X</span> CITY
-        </h1>
-        <p className="oxc-chars-sub">Pick a class, set your callsign, enter the district.</p>
-        <p className={`oxc-chars-wallet-status ${connected ? "is-on" : ""}`}>{walletLabel}</p>
+        <div className="oxc-chars-wallet-slot">
+          <WalletConnectButton />
+        </div>
       </header>
 
-      <div className="oxc-chars-body">
-        <section className="oxc-chars-rail-wrap">
-          <div className="oxc-pod-rail" role="listbox" aria-label="Character classes">
-            {CHARACTER_CLASSES.map((cls, i) => {
-              const on = cls.id === selectedId;
-              const badge = CLASS_FLAVOR[cls.id].badge;
-              return (
-                <button
-                  key={cls.id}
-                  type="button"
-                  role="option"
-                  aria-selected={on}
-                  className={`oxc-pod ${on ? "is-on" : ""}`}
-                  style={{
-                    animationDelay: `${80 + i * 60}ms`,
-                    ["--pod-neon" as string]: cls.neon,
-                    ["--pod-gold" as string]: cls.gold,
-                  }}
-                  onClick={() => {
-                    cityAudio.play("ui");
-                    setSelectedId(cls.id);
-                  }}
-                >
-                  {badge && <span className="oxc-pod-badge">{badge}</span>}
-                  <HoloAvatar cls={cls} selected={on} size="md" />
-                  <div className="oxc-pod-card">
-                    <strong>{cls.name}</strong>
-                    <small>{cls.tagline}</small>
-                    <ul className="oxc-pod-stats">
-                      {cls.stats.slice(0, 3).map((s) => (
-                        <li key={s.label}>
-                          <span>{s.label}</span>
-                          <div className="oxc-pod-bar">
-                            <i style={{ width: `${s.value}%` }} />
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </button>
-              );
-            })}
+      <div className="oxc-chars-stage">
+        <section className="oxc-chars-hero" aria-live="polite">
+          <div className="oxc-chars-hero-fig">
+            <HoloAvatar key={selected.id} cls={selected} selected size="hero" />
           </div>
-          <div className="oxc-chars-tools">
-            <button type="button" className="oxc-btn ghost oxc-chars-random" onClick={randomize}>
-              Randomize Operative
-            </button>
-          </div>
-        </section>
-
-        <aside className="oxc-chars-preview glass" aria-live="polite">
-          <div className="oxc-chars-dossier">
-            <div className="oxc-chars-preview-fig">
-              <HoloAvatar cls={selected} selected size="lg" />
-            </div>
-            <div className="oxc-chars-preview-meta">
-              <p className="oxc-chars-dossier-kicker">Operative dossier</p>
-              <h2 style={{ color: selected.neon }}>{displayName}</h2>
-              <p>
-                <b style={{ color: selected.neon }}>{selected.name}</b>
-                <span className="oxc-chars-gold"> · {selected.tagline}</span>
-              </p>
-              {flavor.badge && <span className="oxc-chars-badge">{flavor.badge}</span>}
-              <p className="oxc-chars-lore">{flavor.lore}</p>
-              <p className="oxc-chars-perk" style={{ color: selected.neon }}>
-                {flavor.perk}
-              </p>
-              <p className="oxc-chars-synergy">{flavor.synergy}</p>
-              <label>
-                Callsign
-                <input
-                  value={name}
-                  maxLength={24}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Traveler"
-                />
-              </label>
-            </div>
-          </div>
-          <div className="oxc-chars-stats-grid">
-            <ul className="oxc-pod-stats oxc-chars-stats-full">
+          <div className="oxc-chars-hero-meta">
+            {flavor.badge && <span className="oxc-chars-badge">{flavor.badge}</span>}
+            <p className="oxc-chars-class-label" style={{ color: selected.neon }}>
+              {selected.name}
+            </p>
+            <h2 className="oxc-chars-callsign">{displayName}</h2>
+            <p className="oxc-chars-tagline">{selected.tagline}</p>
+            <p className="oxc-chars-lore">{flavor.lore}</p>
+            <p className="oxc-chars-perk" style={{ color: selected.neon }}>
+              Perk · {flavor.perk}
+            </p>
+            <ul className="oxc-chars-statrow">
               {selected.stats.map((s) => (
                 <li key={s.label}>
                   <span>{s.label}</span>
                   <div className="oxc-pod-bar">
-                    <i key={`${selected.id}-${s.label}`} style={{ width: `${s.value}%` }} />
+                    <i key={`${selected.id}-${s.label}`} style={{ width: `${s.value}%`, background: selected.neon }} />
                   </div>
                   <em>{s.value}</em>
                 </li>
               ))}
             </ul>
-            <StatRadar cls={selected} />
+            <label className="oxc-chars-namefield">
+              Callsign
+              <input
+                value={name}
+                maxLength={24}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Traveler"
+                autoComplete="nickname"
+              />
+            </label>
           </div>
-        </aside>
+        </section>
+
+        <nav className="oxc-chars-strip" role="listbox" aria-label="Character classes">
+          {CHARACTER_CLASSES.map((cls, i) => {
+            const on = cls.id === selectedId;
+            return (
+              <button
+                key={cls.id}
+                type="button"
+                role="option"
+                aria-selected={on}
+                className={`oxc-chars-chip ${on ? "is-on" : ""}`}
+                style={{
+                  animationDelay: `${70 + i * 45}ms`,
+                  ["--pod-neon" as string]: cls.neon,
+                }}
+                onClick={() => {
+                  cityAudio.play("ui");
+                  setSelectedId(cls.id);
+                }}
+              >
+                <span className="oxc-chars-chip-fig">
+                  <HoloAvatar cls={cls} selected={on} size="sm" />
+                </span>
+                <span className="oxc-chars-chip-name">{cls.name}</span>
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       <footer className="oxc-chars-foot">
-        <button
-          type="button"
-          className="oxc-btn primary oxc-chars-enter"
-          onClick={() => commitAndEnter(false)}
-          disabled={!ready}
-        >
-          {ready ? "Continue → Multiplayer" : "Connect wallet to start"}
-        </button>
-        <button type="button" className="oxc-btn ghost oxc-chars-demo" onClick={() => commitAndSkipLobby(true)}>
-          Enter City Now
-        </button>
+        <div className="oxc-chars-foot-meta">
+          <span className={connected ? "is-on" : ""}>{walletLabel}</span>
+          <span aria-hidden>·</span>
+          <span>← → switch class · Enter confirm</span>
+        </div>
+        <div className={`oxc-chars-actions ${ready ? "has-secondary" : ""}`}>
+          <button
+            type="button"
+            className="oxc-chars-cta oxc-chars-cta--primary"
+            onClick={() => (ready ? commitAndEnter(false) : commitAndSkipLobby(true))}
+          >
+            {ready ? "Continue → Multiplayer" : "Enter City"}
+          </button>
+          {ready && (
+            <button type="button" className="oxc-chars-cta oxc-chars-cta--ghost" onClick={() => commitAndSkipLobby(true)}>
+              Skip lobby
+            </button>
+          )}
+        </div>
       </footer>
     </div>
   );

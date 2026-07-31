@@ -10,19 +10,17 @@ export function LobbiesGate() {
   return (
     <div className="oxc-chars is-in oxc-lobbies-gate">
       <MenuBackdrop cityId={selectedCityId} intensity="chamber" />
-      <header className="oxc-chars-top">
-        <div className="oxc-chars-top-row">
-          <button type="button" className="oxc-chars-back" onClick={() => setGate("characters")}>
-            ← Operatives
-          </button>
-          <span className="oxc-chars-kicker" style={{ margin: 0 }}>
-            Multiplayer
-          </span>
+      <header className="oxc-chars-bar">
+        <button type="button" className="oxc-chars-back" onClick={() => setGate("characters")}>
+          ← Operatives
+        </button>
+        <div className="oxc-chars-bar-center">
+          <p className="oxc-chars-kicker">Multiplayer</p>
+          <h1 className="oxc-chars-title">
+            ORBIT<span className="oxc-chars-title-x">X</span> LOBBIES
+          </h1>
         </div>
-        <h1 className="oxc-chars-title">
-          ORBIT<span className="oxc-chars-title-x">X</span> LOBBIES
-        </h1>
-        <p className="oxc-chars-sub">Main lobby · public rooms · private password sessions.</p>
+        <span className="oxc-chars-bar-spacer" aria-hidden />
       </header>
       <div className="oxc-lobbies-body">
         <LobbyBrowser
