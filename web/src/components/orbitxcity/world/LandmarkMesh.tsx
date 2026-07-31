@@ -11,8 +11,8 @@ function LandmarkPlaceholder({ landmark }: { landmark: LandmarkDefinition }) {
   const { width, height, depth } = landmark.size;
   const accent = "#00ff9f";
   const gold = "#c5a26f";
-  const shaftW = Math.max(1.2, width * 0.28);
-  const shaftD = Math.max(1.2, depth * 0.28);
+  const coreW = Math.max(1.2, width * 0.28);
+  const coreD = Math.max(1.2, depth * 0.28);
 
   return (
     <group position={[landmark.position.x, 0, landmark.position.z]} rotation={[0, landmark.rotationY ?? 0, 0]}>
@@ -26,15 +26,15 @@ function LandmarkPlaceholder({ landmark }: { landmark: LandmarkDefinition }) {
         <meshStandardMaterial color={gold} metalness={0.55} roughness={0.35} emissive={gold} emissiveIntensity={0.15} />
       </mesh>
 
-      {/* Main shaft */}
+      {/* Tower core */}
       <mesh position={[0, height * 0.42, 0]} castShadow>
-        <boxGeometry args={[shaftW, height * 0.78, shaftD]} />
+        <boxGeometry args={[coreW, height * 0.78, coreD]} />
         <meshStandardMaterial color="#141a22" metalness={0.5} roughness={0.38} />
       </mesh>
 
       {/* Glass faces */}
-      <mesh position={[0, height * 0.45, shaftD / 2 + 0.04]}>
-        <planeGeometry args={[shaftW * 0.85, height * 0.55]} />
+      <mesh position={[0, height * 0.45, coreD / 2 + 0.04]}>
+        <planeGeometry args={[coreW * 0.85, height * 0.55]} />
         <meshStandardMaterial
           color="#0a1218"
           emissive={accent}
@@ -47,12 +47,12 @@ function LandmarkPlaceholder({ landmark }: { landmark: LandmarkDefinition }) {
 
       {/* Mid ring */}
       <mesh position={[0, height * 0.55, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[Math.max(shaftW, shaftD) * 0.72, 0.08, 8, 36]} />
+        <torusGeometry args={[Math.max(coreW, coreD) * 0.72, 0.08, 8, 36]} />
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.75} toneMapped={false} />
       </mesh>
 
-      {/* Crown screen */}
-      <mesh position={[0, height * 0.82, shaft * 0.12]} castShadow>
+      {/* Crown screen — offset from tower face */}
+      <mesh position={[0, height * 0.82, coreD * 0.35]} castShadow>
         <boxGeometry args={[width * 0.95, height * 0.22, 0.14]} />
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} toneMapped={false} />
       </mesh>
