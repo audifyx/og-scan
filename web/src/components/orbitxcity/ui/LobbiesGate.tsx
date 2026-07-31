@@ -1,27 +1,28 @@
 /**
- * Lightweight AAA lobby gate — wraps LobbyBrowser with cosmic chamber chrome.
+ * Multiplayer gate — lobby browser on shared cinematic backdrop.
  */
-import { CosmicBackdrop } from "./CosmicBackdrop";
+import { MenuBackdrop } from "./MenuBackdrop";
 import { LobbyBrowser } from "./LobbyBrowser";
-import { LobbiesSystemExtras } from "./CitySystemPanels";
-import { FEATURES_PER_SYSTEM } from "@/lib/orbitxcity/cityFeatureCatalog";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 export function LobbiesGate() {
-  const { setGate } = useCity();
+  const { setGate, selectedCityId } = useCity();
   return (
     <div className="oxc-chars is-in oxc-lobbies-gate">
-      <CosmicBackdrop variant="chamber" />
-      <header className="oxc-chars-head">
-        <button type="button" className="oxc-chars-back" onClick={() => setGate("characters")}>
-          ← Characters
-        </button>
+      <MenuBackdrop cityId={selectedCityId} intensity="chamber" />
+      <header className="oxc-chars-top">
+        <div className="oxc-chars-top-row">
+          <button type="button" className="oxc-chars-back" onClick={() => setGate("characters")}>
+            ← Operatives
+          </button>
+          <span className="oxc-chars-kicker" style={{ margin: 0 }}>
+            Multiplayer
+          </span>
+        </div>
         <h1 className="oxc-chars-title">
           ORBIT<span className="oxc-chars-title-x">X</span> LOBBIES
         </h1>
-        <p className="oxc-chars-sub">
-          Public directory · private rooms · main lobby · voice-ready · {FEATURES_PER_SYSTEM} lobby systems
-        </p>
+        <p className="oxc-chars-sub">Main lobby · public rooms · private password sessions.</p>
       </header>
       <div className="oxc-lobbies-body">
         <LobbyBrowser
@@ -30,7 +31,6 @@ export function LobbiesGate() {
             /* setEntered handled inside LobbyBrowser */
           }}
         />
-        <LobbiesSystemExtras />
       </div>
     </div>
   );

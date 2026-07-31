@@ -14,9 +14,7 @@ import {
   type CharacterClassId,
 } from "@/lib/orbitxcity/characterClasses";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
-import { CosmicBackdrop } from "./CosmicBackdrop";
-import { CharactersSystemExtras } from "./CitySystemPanels";
-import { FEATURES_PER_SYSTEM } from "@/lib/orbitxcity/cityFeatureCatalog";
+import { MenuBackdrop } from "./MenuBackdrop";
 
 const CLASS_FLAVOR: Record<
   CharacterClassId,
@@ -154,7 +152,7 @@ function StatRadar({ cls }: { cls: CharacterClassDef }) {
 }
 
 export function CharacterSelect() {
-  const { setGate, setEntered, setAvatar, avatar } = useCity();
+  const { setGate, setEntered, setAvatar, avatar, selectedCityId } = useCity();
   const { user, profile } = useAuth();
   const { connected, publicKey } = useWallet();
   const [selectedId, setSelectedId] = useState<CharacterClassId>(avatar.classId ?? "trader");
@@ -239,7 +237,7 @@ export function CharacterSelect() {
 
   return (
     <div className={`oxc-chars ${visible ? "is-in" : ""}`} style={{ ["--pod-neon" as string]: selected.neon }}>
-      <CosmicBackdrop variant="chamber" />
+      <MenuBackdrop cityId={selectedCityId} intensity="chamber" />
       <div className={`oxc-chars-flash ${flash ? "is-on" : ""}`} aria-hidden />
 
       <header className="oxc-chars-top">
@@ -251,11 +249,11 @@ export function CharacterSelect() {
             <WalletConnectButton />
           </div>
         </div>
-        <p className="oxc-chars-kicker">Holographic Recruitment Chamber</p>
+        <p className="oxc-chars-kicker">Select operative</p>
         <h1 className="oxc-chars-title">
           ORBIT<span className="oxc-chars-title-x">X</span> CITY
         </h1>
-        <p className="oxc-chars-sub">Select your operative · {FEATURES_PER_SYSTEM} character systems</p>
+        <p className="oxc-chars-sub">Pick a class, set your callsign, enter the district.</p>
         <p className={`oxc-chars-wallet-status ${connected ? "is-on" : ""}`}>{walletLabel}</p>
       </header>
 
@@ -355,11 +353,6 @@ export function CharacterSelect() {
         </aside>
       </div>
 
-      <details className="oxc-chars-catalog glass">
-        <summary>{FEATURES_PER_SYSTEM} character capabilities</summary>
-        <CharactersSystemExtras />
-      </details>
-
       <footer className="oxc-chars-foot">
         <button
           type="button"
@@ -367,12 +360,11 @@ export function CharacterSelect() {
           onClick={() => commitAndEnter(false)}
           disabled={!ready}
         >
-          {ready ? "Enter OrbitX City → Lobbies" : "Connect wallet to start"}
+          {ready ? "Continue → Multiplayer" : "Connect wallet to start"}
         </button>
         <button type="button" className="oxc-btn ghost oxc-chars-demo" onClick={() => commitAndSkipLobby(true)}>
-          Quick Demo Mode
+          Enter City Now
         </button>
-        <p className="oxc-chars-powered">Powered by OrbitX · holographic chamber v2</p>
       </footer>
     </div>
   );

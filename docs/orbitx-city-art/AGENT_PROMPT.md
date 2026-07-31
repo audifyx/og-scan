@@ -28,8 +28,8 @@ Use this document + the concept references in chat as the **source of truth** fo
 
 ## Screen map (priority)
 
-1. **Main Game Menu** — OrbitX CITY logo + glass tile grid (Play, Characters, Marketplace, Inventory, Missions, Leaderboards, Friends, Settings) + cosmic bg.
-2. **Character Selection** — 5 holographic pods: Trader, Builder, Gamer, Creator, Explorer.
+1. **Main Game Menu** — Console title screen: full-bleed city image backdrop + OrbitX CITY brand + vertical rail (Play, Multiplayer, Settings, Quick Play) + district chips. No tile dashboard.
+2. **Character Selection** — 5 holographic pods: Trader, Builder, Gamer, Creator, Explorer — same image backdrop language.
 3. Tower Lobby · Trading Terminal · OS Dashboard · Social/Gaming (later).
 
 ## Tech anchors
