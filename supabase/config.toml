@@ -67,6 +67,10 @@ verify_jwt = true
 verify_jwt = true
 [functions.jupiter-tokens]
 verify_jwt = true
+[functions.orbitx-execution]
+verify_jwt = true
+[functions.orbitx-pumpfun]
+verify_jwt = true
 [functions.livekit-token]
 verify_jwt = false
 [functions.pngtest]
