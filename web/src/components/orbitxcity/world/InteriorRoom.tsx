@@ -16,6 +16,7 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { GltfProp } from "./GltfProp";
 import { CharacterMesh } from "./CharacterMesh";
 import { useEffect, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
 
 const NPC_BODY = ["#233a5c", "#3c2a4d", "#1e4436", "#4d3a1e", "#2a3d4d"];
 const VENDOR_RADIUS = 1.85;
@@ -164,11 +165,17 @@ function InteriorNpc({
   slot,
   accent,
   seed,
+  originX,
+  originZ,
 }: {
   slot: InteriorNpcSlot;
   accent: string;
   seed: number;
+  originX: number;
+  originZ: number;
 }) {
+  const { playerPos } = useCity();
+  const group = useRef<THREE.Group>(null);
   const appearance = useMemo<AvatarAppearance>(() => {
     const base = appearanceFromClass(getCharacterClass(slot.classId), slot.vendorLabel ?? slot.id);
     return {
@@ -196,9 +203,31 @@ function InteriorNpc({
     };
   }, [slot.lines, seed]);
 
+  useFrame((_, rawDt) => {
+    if (!group.current) return;
+    const dt = Math.min(rawDt, 0.05);
+    const wx = originX + slot.x;
+    const wz = originZ + slot.z;
+    const dx = playerPos.x - wx;
+    const dz = playerPos.z - wz;
+    const dist = Math.hypot(dx, dz);
+    // Face the player when nearby; otherwise hold authored rotY.
+    const targetYaw = dist < 4.5 ? Math.atan2(dx, dz) : slot.rotY;
+    let y = group.current.rotation.y;
+    let delta = targetYaw - y;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    group.current.rotation.y = y + delta * Math.min(1, dt * 6);
+  });
+
   return (
-    <group position={[slot.x, 0, slot.z]} rotation={[0, slot.rotY, 0]}>
-      <CharacterMesh appearance={appearance} moving={false} walkIntensity={0.35} />
+    <group ref={group} position={[slot.x, 0, slot.z]} rotation={[0, slot.rotY, 0]}>
+      <CharacterMesh
+        appearance={appearance}
+        moving={false}
+        dancing={Boolean(slot.dancing)}
+        walkIntensity={slot.dancing ? 0.9 : 0.35}
+      />
       {slot.role === "vendor" && (
         <mesh position={[0, 0.04, 0.55]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.45, 0.58, 28]} />
@@ -292,7 +321,13 @@ function InteriorCrowd({
               : undefined
           }
         >
-          <InteriorNpc slot={slot} accent={building.accent} seed={i * 97 + theme.length} />
+          <InteriorNpc
+            slot={slot}
+            accent={building.accent}
+            seed={i * 97 + theme.length}
+            originX={originX}
+            originZ={originZ}
+          />
         </group>
       ))}
     </group>

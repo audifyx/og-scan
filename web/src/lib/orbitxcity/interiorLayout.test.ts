@@ -15,6 +15,12 @@ describe("interiorNpcSlots", () => {
     }
   });
 
+  it("marks club dancers as dancing", () => {
+    const club = interiorNpcSlots("club", 10, 10);
+    const dancers = club.filter((s) => s.dancing);
+    expect(dancers.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("keeps south doorway clear of NPC x near exit", () => {
     const slots = interiorNpcSlots("hq", 10, 10);
     for (const s of slots) {

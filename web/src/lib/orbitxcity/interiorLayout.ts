@@ -34,6 +34,8 @@ export interface InteriorNpcSlot {
   panel?: HudPanel;
   vendorLabel?: string;
   vendorHint?: string;
+  /** Club / theater patrons bob to the beat. */
+  dancing?: boolean;
 }
 
 /** Pick a furnished room template from venue role / OSM interaction / id. */
@@ -369,6 +371,7 @@ export function interiorNpcSlots(theme: RoomTheme, width: number, depth: number)
           classId: "gamer",
           outfit: "sport",
           lines: ["This drop slaps", "LFG"],
+          dancing: true,
         },
         {
           id: "dancer-b",
@@ -379,6 +382,7 @@ export function interiorNpcSlots(theme: RoomTheme, width: number, depth: number)
           classId: "creator",
           outfit: "neon",
           lines: ["Stream is live", "Say gm in chat"],
+          dancing: true,
         },
       ];
     case "hq":
@@ -487,6 +491,7 @@ export function interiorNpcSlots(theme: RoomTheme, width: number, depth: number)
           classId: "creator",
           outfit: "neon",
           lines: ["Clip that moment", "W streak loading"],
+          dancing: true,
         },
       ];
     case "lounge":

@@ -110,6 +110,11 @@ class CityAudioEngine {
   private master: GainNode | null = null;
   private musicGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
+  private ambientGain: GainNode | null = null;
+  private ambientOsc: OscillatorNode[] = [];
+  private ambientNoise: AudioBufferSourceNode | null = null;
+  private ambientStopTimer: number | null = null;
+  private ambientRunning = false;
   private mediaEl: HTMLAudioElement | null = null;
   private mediaNode: MediaElementAudioSourceNode | null = null;
   private graphOk = false;
@@ -210,6 +215,7 @@ class CityAudioEngine {
       this.kickedPlay = false;
       void this.playTheme({ fadeIn: true });
     }
+    if (this.unlocked && this.mode === "world" && this.musicOn) this.startWorldAmbient();
   }
 
   private ensureMedia() {
@@ -242,7 +248,9 @@ class CityAudioEngine {
       void this.playTheme({ fadeIn: true });
     } else if (!on) {
       void this.fadeThemeTo(0, true);
+      this.stopWorldAmbient();
     }
+    if (on && this.unlocked && this.mode === "world") this.startWorldAmbient();
     this.notify();
   }
 
@@ -306,21 +314,127 @@ class CityAudioEngine {
     this.setTrack(prev.id);
   }
 
-  /** Switch bed: menu plays theme; world fades it out; off stops. */
+  /** Switch bed: menu plays theme; world fades theme + starts soft city pad; off stops. */
   setTheme(mode: ThemeMode) {
     const prev = this.mode;
     this.mode = mode;
     if (mode === "off") {
       void this.fadeThemeTo(0, true);
+      this.stopWorldAmbient();
     } else if (mode === "world") {
-      // Fade out as the player enters the city.
+      // Fade menu theme; keep a soft procedural Midtown bed under the streets.
       void this.fadeThemeTo(0, true);
+      if (this.unlocked && this.musicOn) this.startWorldAmbient();
     } else if (mode === "menu") {
+      this.stopWorldAmbient();
       if (this.unlocked && this.musicOn) {
         void this.playTheme({ fadeIn: prev !== "menu" });
       }
     }
     this.notify();
+  }
+
+  /** Soft pad + distant traffic hiss while walking the city. */
+  private startWorldAmbient() {
+    if (!this.ctx || !this.master || !this.musicOn || this.ambientRunning) return;
+    if (this.ambientStopTimer != null) {
+      window.clearTimeout(this.ambientStopTimer);
+      this.ambientStopTimer = null;
+    }
+    this.teardownAmbientNodes();
+
+    const g = this.ctx.createGain();
+    g.gain.value = 0.0001;
+    g.connect(this.master);
+    this.ambientGain = g;
+
+    const mkOsc = (freq: number, type: OscillatorType, level: number) => {
+      const o = this.ctx!.createOscillator();
+      const og = this.ctx!.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      og.gain.value = level;
+      o.connect(og);
+      og.connect(g);
+      o.start();
+      this.ambientOsc.push(o);
+    };
+    mkOsc(NOTE.A2, "sine", 0.045);
+    mkOsc(NOTE.E3, "triangle", 0.022);
+    mkOsc(NOTE.A3, "sine", 0.012);
+
+    // Looped filtered noise = distant traffic / AC hum.
+    const seconds = 2.5;
+    const buf = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * seconds), this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.35;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buf;
+    noise.loop = true;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 380;
+    const ng = this.ctx.createGain();
+    ng.gain.value = 0.028;
+    noise.connect(filter);
+    filter.connect(ng);
+    ng.connect(g);
+    noise.start();
+    this.ambientNoise = noise;
+
+    const target = Math.max(0.04, this.musicVol * 0.38);
+    const t0 = this.ctx.currentTime;
+    g.gain.cancelScheduledValues(t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(target, t0 + 1.4);
+    this.ambientRunning = true;
+  }
+
+  private stopWorldAmbient() {
+    if (!this.ambientGain || !this.ctx || !this.ambientRunning) {
+      this.teardownAmbientNodes();
+      return;
+    }
+    const t0 = this.ctx.currentTime;
+    this.ambientGain.gain.cancelScheduledValues(t0);
+    this.ambientGain.gain.setValueAtTime(Math.max(0.0001, this.ambientGain.gain.value), t0);
+    this.ambientGain.gain.linearRampToValueAtTime(0.0001, t0 + 0.85);
+    if (this.ambientStopTimer != null) window.clearTimeout(this.ambientStopTimer);
+    this.ambientStopTimer = window.setTimeout(() => {
+      this.ambientStopTimer = null;
+      this.teardownAmbientNodes();
+    }, 920);
+    this.ambientRunning = false;
+  }
+
+  private teardownAmbientNodes() {
+    for (const o of this.ambientOsc) {
+      try {
+        o.stop();
+        o.disconnect();
+      } catch {
+        /* already stopped */
+      }
+    }
+    this.ambientOsc = [];
+    if (this.ambientNoise) {
+      try {
+        this.ambientNoise.stop();
+        this.ambientNoise.disconnect();
+      } catch {
+        /* already stopped */
+      }
+      this.ambientNoise = null;
+    }
+    if (this.ambientGain) {
+      try {
+        this.ambientGain.disconnect();
+      } catch {
+        /* ignore */
+      }
+      this.ambientGain = null;
+    }
+    this.ambientRunning = false;
   }
 
   private async playTheme(opts: { fadeIn?: boolean; restart?: boolean } = {}) {
@@ -475,6 +589,8 @@ class CityAudioEngine {
 
   dispose() {
     if (this.fadeTimer != null) window.clearTimeout(this.fadeTimer);
+    if (this.ambientStopTimer != null) window.clearTimeout(this.ambientStopTimer);
+    this.teardownAmbientNodes();
     try {
       this.mediaEl?.pause();
     } catch {

@@ -77,6 +77,7 @@ function StreetLocal({
   block: WorldBlockConfig;
   idle: boolean;
 }) {
+  const { playerPos, emoteAt } = useCity();
   const rand = useMemo(() => mulberry32(seed), [seed]);
   const streets = useMemo(() => getWorldStreets(block.cityId), [block.cityId]);
   const start = useMemo(() => sidewalkPoint(streets, rand, block), [rand, block, streets]);
@@ -104,11 +105,14 @@ function StreetLocal({
   const [isMoving, setIsMoving] = useState(false);
   const [bubble, setBubble] = useState<string | null>(idle ? PHRASES[seed % PHRASES.length]! : null);
   const lineRef = useRef(PHRASES[seed % PHRASES.length]!);
+  const noticedRef = useRef(false);
+  const lastEmoteRef = useRef(0);
 
   useEffect(() => {
     let hideTimer: ReturnType<typeof setTimeout> | undefined;
     const localRand = mulberry32(seed ^ 0x51f15e);
     const cycle = setInterval(() => {
+      if (noticedRef.current) return;
       if (localRand() > (idle ? 0.25 : 0.45)) {
         const line = PHRASES[Math.floor(localRand() * PHRASES.length)]!;
         lineRef.current = line;
@@ -125,8 +129,29 @@ function StreetLocal({
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
+    const toPlayerX = playerPos.x - pos.current.x;
+    const toPlayerZ = playerPos.z - pos.current.z;
+    const playerDist = Math.hypot(toPlayerX, toPlayerZ);
+    const noticing = playerDist < TALK_RADIUS;
 
-    if (!idle) {
+    if (noticing && !noticedRef.current) {
+      noticedRef.current = true;
+      const greet = PHRASES[(seed + Math.floor(playerPos.x * 3)) % PHRASES.length]!;
+      lineRef.current = greet;
+      setBubble(greet);
+    } else if (!noticing && noticedRef.current) {
+      noticedRef.current = false;
+    }
+
+    // Dance emote nearby → hyped reply
+    if (emoteAt > lastEmoteRef.current && playerDist < 5.5 && Date.now() - emoteAt < 400) {
+      lastEmoteRef.current = emoteAt;
+      const hype = ["nice moves", "LFG", "WAGMI", "floor is lava"][seed % 4]!;
+      lineRef.current = hype;
+      setBubble(hype);
+    }
+
+    if (!idle && !noticing) {
       const dx = target.current.x - pos.current.x;
       const dz = target.current.z - pos.current.z;
       const dist = Math.hypot(dx, dz);
@@ -153,7 +178,24 @@ function StreetLocal({
       if (group.current) {
         group.current.position.copy(pos.current);
         const targetYaw = Math.atan2(dx, dz);
-        group.current.rotation.y += (targetYaw - group.current.rotation.y) * Math.min(1, dt * 8);
+        let y = group.current.rotation.y;
+        let delta = targetYaw - y;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        group.current.rotation.y = y + delta * Math.min(1, dt * 8);
+      }
+    } else {
+      if (isMoving) setIsMoving(false);
+      if (group.current) {
+        group.current.position.copy(pos.current);
+        if (noticing) {
+          const targetYaw = Math.atan2(toPlayerX, toPlayerZ);
+          let y = group.current.rotation.y;
+          let delta = targetYaw - y;
+          while (delta > Math.PI) delta -= Math.PI * 2;
+          while (delta < -Math.PI) delta += Math.PI * 2;
+          group.current.rotation.y = y + delta * Math.min(1, dt * 7);
+        }
       }
     }
 
@@ -198,11 +240,13 @@ function StreetLocal({
 function StreetTalkBridge() {
   const { playerPos, interiorBuildingId, activeZone, setStreetNpc } = useCity();
   const nearRef = useRef<string | null>(null);
+  const lineRef = useRef<string | null>(null);
 
   useFrame(() => {
     if (interiorBuildingId || activeZone) {
       if (nearRef.current) {
         nearRef.current = null;
+        lineRef.current = null;
         setStreetNpc(null);
       }
       return;
@@ -217,8 +261,10 @@ function StreetTalkBridge() {
       }
     }
     const id = best?.id ?? null;
-    if (id === nearRef.current) return;
+    const line = best?.line ?? null;
+    if (id === nearRef.current && line === lineRef.current) return;
     nearRef.current = id;
+    lineRef.current = line;
     if (best) {
       setStreetNpc({ name: best.name, line: best.line });
     } else {

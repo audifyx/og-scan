@@ -264,6 +264,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
       const b = block.buildings.find((x) => x.id === interiorBuildingId);
       setInteriorBuildingId(null);
       setInteriorVendor(null);
+      cityAudio.play("whoosh");
       // Soft exit = walked out through the door; keep current position.
       if (opts?.soft || !b) return;
       const x = b.position.x;
@@ -292,7 +293,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
         z,
         seq: (prev?.seq ?? 0) + 1,
       }));
-      cityAudio.play("confirm");
+      cityAudio.play("enter");
     },
     [selectedCityId],
   );
