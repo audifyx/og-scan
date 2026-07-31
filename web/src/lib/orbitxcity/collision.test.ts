@@ -55,8 +55,11 @@ const block: WorldBlockConfig = {
 
 describe("interior collision", () => {
   it("keeps players within furnished interior walls", () => {
-    expect(collidesInInterior(0, 0, 0.45, tradingFloor)).toBe(true);
-    expect(collidesInInterior(0, 2, 0.45, tradingFloor)).toBe(false);
+    // North wall / desk band
+    expect(collidesInInterior(0, -3.2, 0.45, tradingFloor)).toBe(true);
+    // Open center aisle between desks
+    expect(collidesInInterior(0, 1.2, 0.45, tradingFloor)).toBe(false);
+    // South wall outside the doorway gap
     expect(collidesInInterior(0, 4, 0.45, tradingFloor)).toBe(true);
   });
 

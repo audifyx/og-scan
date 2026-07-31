@@ -54,6 +54,10 @@ Walk-in venues get marquees, blade signs, open doorways, and roof crowns. Generi
 
 `InteriorRoom` uses per-theme floor/wall/light palettes (`hq`, `trade`, `club`, `market`, `launch`, `theater`, `lounge`).
 
+Walk-ins also spawn theme NPCs + one vendor (`interiorNpcSlots`). Walk through the door to enter; **E** talks to the nearby vendor / opens venue tools (never teleports).
+
+Class perks: **Gamer** highlights games/launch markers; **Explorer** sorts Map teleports by distance and reveals nearby venues.
+
 ## Teleport points
 
 ```ts

@@ -3,7 +3,7 @@ import { Gamepad2, Keyboard, MessageSquare, MousePointer2, Smartphone } from "lu
 const DESKTOP_CONTROLS = [
   ["WASD", "Move through city streets"],
   ["Mouse", "Look around"],
-  ["E", "Interact with nearby prompts"],
+  ["E", "Venue tools / talk to vendors (not enter)"],
   ["Shift", "Sprint"],
   ["Space", "Jump"],
   ["Enter", "Open world chat"],
@@ -14,7 +14,7 @@ const DESKTOP_CONTROLS = [
 const MOBILE_TIPS = [
   "Turn on touch controls from Settings or the HUD gamepad button.",
   "Use the left joystick to move and drag the screen to look around.",
-  "Tap E near prompts for shops, lobbies, voice, tokens, and portals.",
+  "Walk through open doorways to enter venues. Tap E near prompts for tools.",
   "Use Lite graphics if your phone heats up or frames dip.",
 ];
 
@@ -24,7 +24,7 @@ export function HelpPanel() {
       <div className="oxc-menu-section-head">
         <span className="oxc-kicker">Help</span>
         <h2>City controls</h2>
-        <p>Move, chat, sprint, jump, and interact with OrbitX plazas on desktop or phone.</p>
+        <p>Walk into open venues, talk to vendors with E, and use Map for fast travel.</p>
       </div>
 
       <div className="oxc-help-grid">

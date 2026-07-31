@@ -23,6 +23,7 @@ import { CityRealtimeClient, MAIN_LOBBY, type LobbyDescriptor } from "@/lib/orbi
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { toast } from "sonner";
 
 interface CityContextValue {
   /** AAA gate: menu → characters → lobbies → world */
@@ -76,6 +77,12 @@ interface CityContextValue {
   exitBuilding: (opts?: { soft?: boolean }) => void;
   /** Open a building's branded venue tools menu (E only — never teleports). */
   openVenue: (buildingId: string) => void;
+  /** Nearby interior vendor — InteriorRoom reports proximity; E opens their panel. */
+  interiorVendor: { label: string; hint: string; panel: HudPanel } | null;
+  setInteriorVendor: (v: { label: string; hint: string; panel: HudPanel } | null) => void;
+  /** Nearby street local — NPCs report proximity; E triggers a talk toast. */
+  streetNpc: { name: string; line: string } | null;
+  setStreetNpc: (v: { name: string; line: string } | null) => void;
 }
 
 /** Exported so the R3F canvas can bridge this context across renderers. */
@@ -191,6 +198,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const [quality, setQuality] = useState<"high" | "lite">(IS_COARSE_POINTER ? "lite" : "high");
   const [emoteAt, setEmoteAt] = useState(0);
   const [interiorBuildingId, setInteriorBuildingId] = useState<string | null>(null);
+  const [interiorVendor, setInteriorVendor] = useState<{
+    label: string;
+    hint: string;
+    panel: HudPanel;
+  } | null>(null);
+  const [streetNpc, setStreetNpc] = useState<{ name: string; line: string } | null>(null);
   const inventory = STARTER_INVENTORY;
 
   // The public lobby follows the selected district. Custom/private lobbies
@@ -217,6 +230,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
         setPlayerYaw(0);
         setPanel("none");
         setInteriorBuildingId(null);
+        setInteriorVendor(null);
         setGateState("world");
       }
       setEnteredState(v);
@@ -233,6 +247,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
     setPanel("none");
     setActiveZone(null);
     setInteriorBuildingId(null);
+    setInteriorVendor(null);
+    setStreetNpc(null);
     setEnteredState(false);
     setGateState("menu");
   }, []);
@@ -243,6 +259,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
       const block = getWorldBlock(selectedCityId);
       const b = block.buildings.find((x) => x.id === interiorBuildingId);
       setInteriorBuildingId(null);
+      setInteriorVendor(null);
       // Soft exit = walked out through the door; keep current position.
       if (opts?.soft || !b) return;
       const x = b.position.x;
@@ -263,6 +280,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
       const x = b.position.x;
       const z = b.position.z + interiorDepth / 2 - 1.35;
       setInteriorBuildingId(buildingId);
+      setInteriorVendor(null);
       setPanel("none");
       setPlayerPos({ x, y: 0, z });
       setTeleportTarget((prev) => ({
@@ -308,6 +326,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const resetPlayer = useCallback(() => {
     const spawn = getWorldBlock(selectedCityId).spawn;
     setInteriorBuildingId(null);
+    setInteriorVendor(null);
     setPanel("none");
     setPlayerPos(spawn);
     setTeleportTarget((prev) => ({ x: spawn.x, z: spawn.z, seq: (prev?.seq ?? 0) + 1 }));
@@ -341,47 +360,75 @@ export function CityProvider({ children }: { children: ReactNode }) {
   );
 
   const interact = useCallback(() => {
-    // Inside a building: E opens venue tools (exit is by walking out).
+    // Inside a building: E opens nearby vendor panel or venue tools (exit is walk-out).
     if (interiorBuildingId) {
+      if (interiorVendor) {
+        cityAudio.play("interact");
+        if (interiorVendor.panel === "voice") setVoiceOpen(true);
+        openPanel(interiorVendor.panel);
+        return;
+      }
       openVenue(interiorBuildingId);
       return;
     }
-    if (!activeZone) return;
-    if (activeZone.tokenMint) {
-      openToken(activeZone.tokenMint);
+    if (activeZone) {
+      if (activeZone.tokenMint) {
+        openToken(activeZone.tokenMint);
+        return;
+      }
+      if (activeZone.kind === "voice") {
+        setVoiceOpen(true);
+        openPanel("voice");
+        return;
+      }
+      if (activeZone.buildingId) {
+        openVenue(activeZone.buildingId);
+        return;
+      }
+      openPanel(zoneToPanel(activeZone.kind));
       return;
     }
-    if (activeZone.kind === "voice") {
-      setVoiceOpen(true);
-      openPanel("voice");
-      return;
+    if (streetNpc) {
+      cityAudio.play("interact");
+      toast.message(`@${streetNpc.name}`, {
+        description: streetNpc.line,
+        duration: 3800,
+        className: "oxc-chat-toast",
+      });
     }
-    if (activeZone.buildingId) {
-      openVenue(activeZone.buildingId);
-      return;
-    }
-    openPanel(zoneToPanel(activeZone.kind));
-  }, [activeZone, openPanel, openToken, interiorBuildingId, openVenue]);
+  }, [activeZone, openPanel, openToken, interiorBuildingId, interiorVendor, openVenue, streetNpc]);
 
   const prompt = useMemo(() => {
     if (interiorBuildingId && panel === "none") {
+      if (interiorVendor) {
+        return { label: interiorVendor.label, hint: interiorVendor.hint };
+      }
       return {
         label: "Inside · venue floor",
         hint: "Walk out the open door to leave · E opens venue tools",
       };
     }
-    if (!activeZone || panel !== "none") return null;
-    if (activeZone.buildingId) {
+    if (panel !== "none") return null;
+    if (activeZone) {
+      if (activeZone.buildingId) {
+        return {
+          label: activeZone.label,
+          hint: "Walk through the open door · E for venue tools",
+        };
+      }
       return {
         label: activeZone.label,
-        hint: "Walk through the open door to enter · E for venue tools",
+        hint: activeZone.hint || "E · interact",
       };
     }
-    return {
-      label: activeZone.label,
-      hint: activeZone.hint || "Press E to interact",
-    };
-  }, [activeZone, panel, interiorBuildingId]);
+    if (streetNpc) {
+      return {
+        label: `@${streetNpc.name}`,
+        hint: "E · talk",
+      };
+    }
+    return null;
+  }, [activeZone, panel, interiorBuildingId, interiorVendor, streetNpc]);
 
   useEffect(() => {
     if (!entered) {
@@ -472,6 +519,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
       enterBuilding,
       exitBuilding,
       openVenue,
+      interiorVendor,
+      setInteriorVendor,
+      streetNpc,
+      setStreetNpc,
     }),
     [
       gate,
@@ -503,6 +554,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       teleportTarget,
       resetPlayer,
       openVenue,
+      interiorVendor,
+      streetNpc,
       teleport,
       touchControls,
       quality,

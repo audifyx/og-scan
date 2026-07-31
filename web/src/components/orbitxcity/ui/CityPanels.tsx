@@ -33,6 +33,7 @@ import {
   CityDistrictCatalog,
 } from "./CitySystemPanels";
 import { FEATURES_PER_SYSTEM } from "@/lib/orbitxcity/cityFeatureCatalog";
+import { hasExplorerMapPerk } from "@/lib/orbitxcity/characterClasses";
 import { X, ExternalLink, Rocket, LineChart, Store, Users, Map, Backpack, UserRound, Radio, MessageSquare, Mic, Gamepad2, Image as ImageIcon, Dices, Wand2 } from "lucide-react";
 
 const TITLES: Partial<Record<Exclude<HudPanel, "none">, string>> = {
@@ -171,12 +172,41 @@ function NftPanel() {
 }
 
 function MapPanel() {
-  const { teleport, selectedCityId } = useCity();
+  const { teleport, selectedCityId, playerPos, avatar } = useCity();
   const block = getWorldBlock(selectedCityId);
-  const teleports = getTeleportPoints(selectedCityId);
+  const explorerPerk = hasExplorerMapPerk(avatar.classId);
+  const teleports = getTeleportPoints(selectedCityId)
+    .map((p) => ({
+      ...p,
+      dist: Math.hypot(playerPos.x - p.x, playerPos.z - p.z),
+    }))
+    .sort((a, b) => a.dist - b.dist);
+
+  // Explorer perk: extended reveal — nearby venue zones as discoverable waypoints.
+  const discoverRadius = explorerPerk ? 95 : 0;
+  const discoveries =
+    discoverRadius > 0
+      ? block.zones
+          .filter((z) => Math.hypot(playerPos.x - z.position.x, playerPos.z - z.position.z) <= discoverRadius)
+          .map((z) => ({
+            id: z.id,
+            label: z.label,
+            x: z.position.x,
+            z: z.position.z,
+            accent: z.kind === "hq" ? "#17ff4d" : "#3de7ff",
+            dist: Math.hypot(playerPos.x - z.position.x, playerPos.z - z.position.z),
+            hint: z.hint || "Venue",
+          }))
+          .sort((a, b) => a.dist - b.dist)
+          .slice(0, 8)
+      : [];
+
   return (
     <div className="oxc-stack">
-      <div className="oxc-section-label"><Map className="h-3.5 w-3.5" /> Fast travel</div>
+      <div className="oxc-section-label">
+        <Map className="h-3.5 w-3.5" /> Fast travel
+        {explorerPerk ? " · Explorer range" : ""}
+      </div>
       <div className="oxc-teleport-grid">
         {teleports.map((p) => (
           <button
@@ -186,14 +216,41 @@ function MapPanel() {
             style={{ ["--tp" as string]: p.accent }}
             onClick={() => teleport(p.x, p.z)}
           >
-            {p.label}
+            <span>{p.label}</span>
+            <span className="oxc-muted" style={{ display: "block", fontSize: "0.68rem", marginTop: 2 }}>
+              {Math.round(p.dist)}m · {p.x.toFixed(0)}, {p.z.toFixed(0)}
+            </span>
           </button>
         ))}
       </div>
 
+      {explorerPerk && discoveries.length > 0 && (
+        <>
+          <div className="oxc-section-label">Nearby venues · extended reveal</div>
+          <div className="oxc-teleport-grid">
+            {discoveries.map((d) => (
+              <button
+                key={`disc-${d.id}`}
+                type="button"
+                className="oxc-teleport-btn"
+                style={{ ["--tp" as string]: d.accent }}
+                onClick={() => teleport(d.x, d.z)}
+                title={d.hint}
+              >
+                <span>{d.label}</span>
+                <span className="oxc-muted" style={{ display: "block", fontSize: "0.68rem", marginTop: 2 }}>
+                  {Math.round(d.dist)}m · walk-in / tools
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       <p className="oxc-muted">
-        All four OrbitX City districts are playable — each ships {FEATURES_PER_SYSTEM} district capabilities.
-        Choose a district from the main menu, then fast travel between its landmarks.
+        {explorerPerk
+          ? "Explorer perk: teleports sorted by distance with venue discovery inside 95m."
+          : `All four OrbitX City districts are playable — each ships ${FEATURES_PER_SYSTEM} district capabilities. Choose a district from the main menu, then fast travel between its landmarks.`}
       </p>
       {selectedCityId === "nyc" && (
         <p className="oxc-muted" style={{ fontSize: "0.72rem", opacity: 0.75 }}>

@@ -1,4 +1,9 @@
-import type { BuildingDefinition, HudPanel } from "./types";
+import type {
+  BuildingDefinition,
+  HudPanel,
+  OutfitStyle,
+} from "./types";
+import type { CharacterClassId } from "./characterClasses";
 
 export type RoomTheme =
   | "trade"
@@ -11,6 +16,25 @@ export type RoomTheme =
   | "lobby";
 
 export type FurnitureSolid = { x: number; z: number; w: number; d: number };
+
+export type InteriorNpcRole = "vendor" | "patron" | "staff";
+
+/** Local-space crowd slot inside a walk-in venue. */
+export interface InteriorNpcSlot {
+  id: string;
+  role: InteriorNpcRole;
+  x: number;
+  z: number;
+  rotY: number;
+  classId: CharacterClassId;
+  outfit: OutfitStyle;
+  /** Idle speech bubble lines (cycled). */
+  lines: string[];
+  /** Vendor interaction — E opens this panel when nearby. */
+  panel?: HudPanel;
+  vendorLabel?: string;
+  vendorHint?: string;
+}
 
 /** Pick a furnished room template from venue role / OSM interaction / id. */
 export function resolveRoomTheme(building: BuildingDefinition): RoomTheme {
@@ -236,5 +260,297 @@ export function furnitureSlots(
     const p = presets[i]!;
     return { path, x: p.x, z: p.z, rotY: p.rotY, scale: p.scale };
   });
+}
+
+/**
+ * Theme-matched NPCs + one vendor per room. Positions stay clear of the south doorway
+ * (±1.4 on X near +depth/2) so walk-in/out stays open.
+ */
+export function interiorNpcSlots(theme: RoomTheme, width: number, depth: number): InteriorNpcSlot[] {
+  const wallZ = -depth / 2 + 1.15;
+  const midZ = -depth * 0.05;
+  const side = Math.min(width / 2 - 1.25, 2.9);
+  const doorClearZ = depth / 2 - 2.1;
+
+  switch (theme) {
+    case "trade":
+      return [
+        {
+          id: "desk-trader",
+          role: "vendor",
+          x: 0,
+          z: wallZ + 0.35,
+          rotY: Math.PI,
+          classId: "trader",
+          outfit: "suit",
+          lines: ["Tape is hot", "Size in carefully", "Liquidity looks clean"],
+          panel: "trading",
+          vendorLabel: "Floor desk",
+          vendorHint: "E · open trading tools",
+        },
+        {
+          id: "side-scout",
+          role: "patron",
+          x: -side * 0.85,
+          z: midZ,
+          rotY: Math.PI / 2,
+          classId: "explorer",
+          outfit: "street",
+          lines: ["Charts look spicy", "Don't chase the wick"],
+        },
+        {
+          id: "chart-watcher",
+          role: "patron",
+          x: side * 0.85,
+          z: midZ + 0.2,
+          rotY: -Math.PI / 2,
+          classId: "gamer",
+          outfit: "sport",
+          lines: ["Clutch entry", "I'm long bias"],
+        },
+      ];
+    case "market":
+      return [
+        {
+          id: "cashier",
+          role: "vendor",
+          x: 0,
+          z: 0.35,
+          rotY: Math.PI,
+          classId: "trader",
+          outfit: "street",
+          lines: ["Fresh mints up front", "Bags or browse?"],
+          panel: "marketplace",
+          vendorLabel: "Market cashier",
+          vendorHint: "E · open marketplace",
+        },
+        {
+          id: "stall-left",
+          role: "staff",
+          x: -side * 0.7,
+          z: wallZ + 0.25,
+          rotY: Math.PI,
+          classId: "creator",
+          outfit: "neon",
+          lines: ["Limited drops only", "Scan before you ape"],
+        },
+        {
+          id: "browser",
+          role: "patron",
+          x: side * 0.55,
+          z: doorClearZ - 0.4,
+          rotY: -0.4,
+          classId: "builder",
+          outfit: "street",
+          lines: ["Need a holder key", "Floor looks healthy"],
+        },
+      ];
+    case "club":
+      return [
+        {
+          id: "bartender",
+          role: "vendor",
+          x: 0,
+          z: wallZ + 0.2,
+          rotY: Math.PI,
+          classId: "creator",
+          outfit: "neon",
+          lines: ["Voice booths live", "gm — grab a seat"],
+          panel: "voice",
+          vendorLabel: "Pulse bartender",
+          vendorHint: "E · open voice plaza",
+        },
+        {
+          id: "dancer-a",
+          role: "patron",
+          x: -side * 0.55,
+          z: midZ,
+          rotY: 0.6,
+          classId: "gamer",
+          outfit: "sport",
+          lines: ["This drop slaps", "LFG"],
+        },
+        {
+          id: "dancer-b",
+          role: "patron",
+          x: side * 0.55,
+          z: midZ + 0.15,
+          rotY: -0.5,
+          classId: "creator",
+          outfit: "neon",
+          lines: ["Stream is live", "Say gm in chat"],
+        },
+      ];
+    case "hq":
+      return [
+        {
+          id: "front-desk",
+          role: "vendor",
+          x: 0,
+          z: depth / 2 - 2.55,
+          rotY: Math.PI,
+          classId: "builder",
+          outfit: "suit",
+          lines: ["Welcome to OrbitX HQ", "Missions at the desk"],
+          panel: "missions",
+          vendorLabel: "HQ front desk",
+          vendorHint: "E · claim missions",
+        },
+        {
+          id: "ops-left",
+          role: "staff",
+          x: -side * 0.75,
+          z: 0.15,
+          rotY: Math.PI / 2,
+          classId: "trader",
+          outfit: "suit",
+          lines: ["DEX rails green", "Launch queue clear"],
+        },
+        {
+          id: "ops-right",
+          role: "staff",
+          x: side * 0.75,
+          z: 0.15,
+          rotY: -Math.PI / 2,
+          classId: "explorer",
+          outfit: "street",
+          lines: ["Map is updated", "Midtown is online"],
+        },
+      ];
+    case "launch":
+      return [
+        {
+          id: "stage-host",
+          role: "vendor",
+          x: 0,
+          z: -0.35,
+          rotY: Math.PI,
+          classId: "gamer",
+          outfit: "sport",
+          lines: ["Next launch in queue", "Stage is hot"],
+          panel: "launch",
+          vendorLabel: "Launch host",
+          vendorHint: "E · open launchpad",
+        },
+        {
+          id: "hype-a",
+          role: "patron",
+          x: -side * 0.7,
+          z: wallZ + 0.4,
+          rotY: 0.3,
+          classId: "creator",
+          outfit: "neon",
+          lines: ["Aped already", "Don't miss the open"],
+        },
+        {
+          id: "hype-b",
+          role: "patron",
+          x: side * 0.7,
+          z: wallZ + 0.4,
+          rotY: -0.3,
+          classId: "trader",
+          outfit: "suit",
+          lines: ["Size wisely", "I'm watching the curve"],
+        },
+      ];
+    case "theater":
+      return [
+        {
+          id: "arcade-host",
+          role: "vendor",
+          x: side * 0.85,
+          z: wallZ + 0.5,
+          rotY: -Math.PI / 2,
+          classId: "gamer",
+          outfit: "sport",
+          lines: ["Queues open", "Ranked heat check"],
+          panel: "games",
+          vendorLabel: "Games host",
+          vendorHint: "E · open games",
+        },
+        {
+          id: "seat-a",
+          role: "patron",
+          x: -1.1,
+          z: 0.55,
+          rotY: Math.PI,
+          classId: "explorer",
+          outfit: "street",
+          lines: ["This trailer hits", "Pass the controller"],
+        },
+        {
+          id: "seat-b",
+          role: "patron",
+          x: 1.1,
+          z: 0.55,
+          rotY: Math.PI,
+          classId: "creator",
+          outfit: "neon",
+          lines: ["Clip that moment", "W streak loading"],
+        },
+      ];
+    case "lounge":
+      return [
+        {
+          id: "host",
+          role: "vendor",
+          x: 0,
+          z: wallZ + 0.25,
+          rotY: Math.PI,
+          classId: "creator",
+          outfit: "neon",
+          lines: ["Community desk open", "Pull up a seat"],
+          panel: "community",
+          vendorLabel: "Lounge host",
+          vendorHint: "E · open social tools",
+        },
+        {
+          id: "sofa-a",
+          role: "patron",
+          x: -side * 0.55,
+          z: -0.05,
+          rotY: Math.PI * 0.15,
+          classId: "builder",
+          outfit: "street",
+          lines: ["gm ser", "Building in public"],
+        },
+        {
+          id: "sofa-b",
+          role: "patron",
+          x: side * 0.55,
+          z: -0.05,
+          rotY: -Math.PI * 0.15,
+          classId: "trader",
+          outfit: "suit",
+          lines: ["Quiet before the storm", "Coffee then charts"],
+        },
+      ];
+    default:
+      return [
+        {
+          id: "concierge",
+          role: "vendor",
+          x: 0,
+          z: wallZ + 0.2,
+          rotY: Math.PI,
+          classId: "explorer",
+          outfit: "street",
+          lines: ["Need directions?", "Map has fast travel"],
+          panel: "map",
+          vendorLabel: "Concierge",
+          vendorHint: "E · open world map",
+        },
+        {
+          id: "waiting",
+          role: "patron",
+          x: -side * 0.65,
+          z: 0.35,
+          rotY: 0.4,
+          classId: "builder",
+          outfit: "street",
+          lines: ["Waiting on a friend", "City feels alive"],
+        },
+      ];
+  }
 }
 

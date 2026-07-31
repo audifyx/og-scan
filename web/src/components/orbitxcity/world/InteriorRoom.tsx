@@ -1,16 +1,24 @@
-import { Text } from "@react-three/drei";
-import type { BuildingDefinition, HudPanel } from "@/lib/orbitxcity/types";
+import { Billboard, Text } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
+import type { AvatarAppearance, BuildingDefinition, HudPanel } from "@/lib/orbitxcity/types";
 import {
   furnitureSlots,
+  interiorNpcSlots,
   panelForBuilding,
   resolveRoomTheme,
   roomTitle,
+  type InteriorNpcSlot,
   type RoomTheme,
 } from "@/lib/orbitxcity/interiorLayout";
 import { getFurnitureSet } from "@/lib/orbitxcity/assets/catalog";
+import { appearanceFromClass, getCharacterClass } from "@/lib/orbitxcity/characterClasses";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { GltfProp } from "./GltfProp";
-import { useMemo } from "react";
+import { CharacterMesh } from "./CharacterMesh";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+const NPC_BODY = ["#233a5c", "#3c2a4d", "#1e4436", "#4d3a1e", "#2a3d4d"];
+const VENDOR_RADIUS = 1.85;
 
 type RoomPalette = {
   floor: string;
@@ -147,6 +155,145 @@ function FurnitureLayer({
           rotation={[0, s.rotY, 0]}
           scale={s.scale}
         />
+      ))}
+    </group>
+  );
+}
+
+function InteriorNpc({
+  slot,
+  accent,
+  seed,
+}: {
+  slot: InteriorNpcSlot;
+  accent: string;
+  seed: number;
+}) {
+  const appearance = useMemo<AvatarAppearance>(() => {
+    const base = appearanceFromClass(getCharacterClass(slot.classId), slot.vendorLabel ?? slot.id);
+    return {
+      ...base,
+      bodyColor: NPC_BODY[seed % NPC_BODY.length]!,
+      accentColor: slot.role === "vendor" ? accent : base.accentColor,
+      outfit: slot.outfit,
+      name: slot.vendorLabel ?? "npc",
+    };
+  }, [slot, accent, seed]);
+
+  const [bubble, setBubble] = useState<string | null>(slot.lines[0] ?? null);
+
+  useEffect(() => {
+    let hide: ReturnType<typeof setTimeout> | undefined;
+    const cycle = setInterval(() => {
+      const line = slot.lines[Math.floor(Math.random() * slot.lines.length)];
+      if (!line) return;
+      setBubble(line);
+      hide = setTimeout(() => setBubble(null), 3400);
+    }, 5200 + (seed % 2800));
+    return () => {
+      clearInterval(cycle);
+      if (hide) clearTimeout(hide);
+    };
+  }, [slot.lines, seed]);
+
+  return (
+    <group position={[slot.x, 0, slot.z]} rotation={[0, slot.rotY, 0]}>
+      <CharacterMesh appearance={appearance} moving={false} walkIntensity={0.35} />
+      {slot.role === "vendor" && (
+        <mesh position={[0, 0.04, 0.55]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.45, 0.58, 28]} />
+          <meshStandardMaterial
+            color={accent}
+            emissive={accent}
+            emissiveIntensity={0.35}
+            transparent
+            opacity={0.45}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
+      {bubble && (
+        <Billboard position={[0, 2.45, 0]}>
+          <Text
+            fontSize={0.2}
+            color="#eef4ff"
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={2.8}
+            outlineWidth={0.04}
+            outlineColor="#04070f"
+          >
+            {bubble}
+          </Text>
+        </Billboard>
+      )}
+    </group>
+  );
+}
+
+/** Theme NPCs + vendor proximity → CityProvider prompt / E. */
+function InteriorCrowd({
+  theme,
+  width,
+  depth,
+  building,
+}: {
+  theme: RoomTheme;
+  width: number;
+  depth: number;
+  building: BuildingDefinition;
+}) {
+  const { playerPos, setInteriorVendor, openPanel, setVoiceOpen } = useCity();
+  const slots = useMemo(() => interiorNpcSlots(theme, width, depth), [theme, width, depth]);
+  const vendor = useMemo(() => slots.find((s) => s.role === "vendor" && s.panel), [slots]);
+  const originX = building.position.x;
+  const originZ = building.position.z;
+  const nearVendor = useRef(false);
+
+  useFrame(() => {
+    if (!vendor?.panel) {
+      if (nearVendor.current) {
+        nearVendor.current = false;
+        setInteriorVendor(null);
+      }
+      return;
+    }
+    const wx = originX + vendor.x;
+    const wz = originZ + vendor.z;
+    const dist = Math.hypot(playerPos.x - wx, playerPos.z - wz);
+    const near = dist <= VENDOR_RADIUS;
+    if (near === nearVendor.current) return;
+    nearVendor.current = near;
+    if (near) {
+      setInteriorVendor({
+        label: vendor.vendorLabel ?? "Vendor",
+        hint: vendor.vendorHint ?? "E · talk",
+        panel: vendor.panel,
+      });
+    } else {
+      setInteriorVendor(null);
+    }
+  });
+
+  useEffect(() => () => setInteriorVendor(null), [setInteriorVendor]);
+
+  return (
+    <group>
+      {slots.map((slot, i) => (
+        <group
+          key={slot.id}
+          onClick={
+            slot.role === "vendor" && slot.panel
+              ? (e) => {
+                  e.stopPropagation();
+                  if (slot.panel === "voice") setVoiceOpen(true);
+                  openPanel(slot.panel!);
+                }
+              : undefined
+          }
+        >
+          <InteriorNpc slot={slot} accent={building.accent} seed={i * 97 + theme.length} />
+        </group>
       ))}
     </group>
   );
@@ -581,6 +728,7 @@ export function InteriorRoom({
 
       <ThemeSet theme={theme} width={w} depth={d} height={h} accent={building.accent} building={building} />
       <FurnitureLayer theme={theme} width={w} depth={d} />
+      <InteriorCrowd theme={theme} width={w} depth={d} building={building} />
 
       <mesh
         position={[0, 0.06, d / 2 - 0.9]}

@@ -313,9 +313,9 @@ export function CityEnvironment({ tickerRows, block = NYC_DEMO_BLOCK }: { ticker
       <GlassShards origin={shardOrigin} count={high ? 18 : 8} />
 
       {high && <RocketShow />}
-      <NPCs block={block} count={high ? 6 : 3} />
+      <NPCs block={block} count={high ? 9 : 4} />
       {high && <Drones />}
-      {high && <OxiGuide />}
+      {high && <OxiGuide spawn={block.spawn} />}
       {high && block.cityId === "nyc" && <Park />}
       <Traffic count={high ? 10 : 3} block={block} />
     </group>

@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Billboard, Text } from "@react-three/drei";
 import * as THREE from "three";
+import type { Vec3 } from "@/lib/orbitxcity/types";
 
 const TIPS = [
   "Welcome to OrbitX City. I'm OXI, your guide.",
-  "Press E near glowing rings to interact.",
+  "Walk through open doorways to enter venues.",
+  "E opens tools and talks to vendors — it does not teleport.",
   "Billboards are LIVE — tap one to buy the token.",
   "Enter opens world chat. Say gm.",
   "Fast travel from the Map panel.",
@@ -14,14 +16,14 @@ const TIPS = [
   "Launch Arena connects to the OrbitX Launchpad.",
 ];
 
-const POSITION: [number, number, number] = [2.6, 0, 4.2];
-
-/** OXI — holographic AI guide NPC at the spawn plaza. */
-export function OxiGuide() {
+/** OXI — holographic AI guide NPC near the active city spawn. */
+export function OxiGuide({ spawn }: { spawn: Vec3 }) {
   const core = useRef<THREE.Mesh>(null);
   const ringA = useRef<THREE.Mesh>(null);
   const ringB = useRef<THREE.Mesh>(null);
   const [tip, setTip] = useState(0);
+  // Offset so OXI stands just off the spawn pad, visible on load.
+  const position: [number, number, number] = [spawn.x + 2.4, 0, spawn.z + 3.1];
 
   useEffect(() => {
     const id = setInterval(() => setTip((t) => (t + 1) % TIPS.length), 6000);
@@ -47,7 +49,7 @@ export function OxiGuide() {
   });
 
   return (
-    <group position={POSITION}>
+    <group position={position}>
       {/* Pedestal */}
       <mesh position={[0, 0.1, 0]}>
         <cylinderGeometry args={[0.65, 0.75, 0.2, 24]} />

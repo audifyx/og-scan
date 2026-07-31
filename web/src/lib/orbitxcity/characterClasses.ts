@@ -114,6 +114,19 @@ export function getCharacterClass(id: CharacterClassId | string | undefined): Ch
   return CHARACTER_CLASSES.find((c) => c.id === id) ?? CHARACTER_CLASSES[0]!;
 }
 
+/** Live class perks used by InteractionMarkers / Map panel. */
+export function hasGamerMarkerPerk(classId?: CharacterClassId | string | null): boolean {
+  return classId === "gamer";
+}
+
+export function hasExplorerMapPerk(classId?: CharacterClassId | string | null): boolean {
+  return classId === "explorer";
+}
+
+export function hasTraderTerminalPerk(classId?: CharacterClassId | string | null): boolean {
+  return classId === "trader";
+}
+
 export function appearanceFromClass(cls: CharacterClassDef, name?: string): AvatarAppearance {
   const hairByClass = {
     trader: { hairStyle: "short" as const, hairColor: "#2a2218" },
