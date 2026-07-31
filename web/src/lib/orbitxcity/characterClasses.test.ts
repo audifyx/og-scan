@@ -3,6 +3,9 @@ import {
   CHARACTER_CLASSES,
   appearanceFromClass,
   getCharacterClass,
+  hasBuilderMissionPerk,
+  hasCreatorPresencePerk,
+  missionClaimCooldownMs,
 } from "./characterClasses";
 
 describe("characterClasses", () => {
@@ -39,5 +42,13 @@ describe("characterClasses", () => {
     }
     expect(appearanceFromClass(getCharacterClass("gamer")).hairStyle).toBe("mohawk");
     expect(appearanceFromClass(getCharacterClass("builder")).outfit).toBe("street");
+  });
+
+  it("ships builder / creator cooldown and presence perks", () => {
+    expect(hasBuilderMissionPerk("builder")).toBe(true);
+    expect(hasCreatorPresencePerk("creator")).toBe(true);
+    expect(missionClaimCooldownMs("trader", false)).toBe(30_000);
+    expect(missionClaimCooldownMs("builder", false)).toBe(8_000);
+    expect(missionClaimCooldownMs("builder", true)).toBe(2_000);
   });
 });

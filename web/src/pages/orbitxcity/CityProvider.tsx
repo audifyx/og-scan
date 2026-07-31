@@ -21,6 +21,7 @@ import type {
 import { getWorldBlock } from "@/lib/orbitxcity/worlds";
 import { CityRealtimeClient, MAIN_LOBBY, type LobbyDescriptor } from "@/lib/orbitxcity/realtime";
 import { cityAudio } from "@/lib/orbitxcity/cityAudio";
+import { missionClaimCooldownMs } from "@/lib/orbitxcity/characterClasses";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { toast } from "sonner";
@@ -52,7 +53,9 @@ interface CityContextValue {
   shards: number;
   collectShard: () => void;
   claimedMissionIds: string[];
-  claimMission: (missionId: string, reward: number) => void;
+  /** Epoch ms when the next city-board claim is allowed. */
+  missionClaimReadyAt: number;
+  claimMission: (missionId: string, reward: number) => boolean;
   selectedMint: string | null;
   openToken: (mint: string) => void;
   setSelectedMint: (mint: string | null) => void;
@@ -191,6 +194,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
       return [];
     }
   });
+  const [missionClaimReadyAt, setMissionClaimReadyAt] = useState(0);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [realtime, setRealtime] = useState<CityRealtimeClient | null>(null);
   const [teleportTarget, setTeleportTarget] = useState<{ x: number; z: number; seq: number } | null>(null);
@@ -304,20 +308,43 @@ export function CityProvider({ children }: { children: ReactNode }) {
     cityAudio.play("coin");
     setShards((s) => s + 1);
   }, []);
-  const claimMission = useCallback((missionId: string, reward: number) => {
-    setClaimedMissionIds((current) => {
-      if (current.includes(missionId)) return current;
-      const next = [...current, missionId];
-      try {
-        localStorage.setItem("oxc_claimed_missions", JSON.stringify(next));
-      } catch {
-        /* local persistence is optional */
+  const claimMission = useCallback(
+    (missionId: string, reward: number) => {
+      const now = Date.now();
+      if (now < missionClaimReadyAt) {
+        const secs = Math.ceil((missionClaimReadyAt - now) / 1000);
+        toast.message("Mission cooldown", { description: `Ready in ${secs}s` });
+        return false;
       }
-      setShards((shardCount) => shardCount + reward);
-      cityAudio.play("confirm");
-      return next;
-    });
-  }, []);
+      let claimed = false;
+      setClaimedMissionIds((current) => {
+        if (current.includes(missionId)) return current;
+        claimed = true;
+        const next = [...current, missionId];
+        try {
+          localStorage.setItem("oxc_claimed_missions", JSON.stringify(next));
+        } catch {
+          /* local persistence is optional */
+        }
+        setShards((shardCount) => shardCount + reward);
+        cityAudio.play("confirm");
+        return next;
+      });
+      if (!claimed) return false;
+      const block = getWorldBlock(selectedCityId);
+      const interior = interiorBuildingId
+        ? block.buildings.find((b) => b.id === interiorBuildingId)
+        : null;
+      const atHq =
+        interior?.kind === "hq" ||
+        interior?.interaction === "hq" ||
+        activeZone?.kind === "hq";
+      const cd = missionClaimCooldownMs(avatar.classId, atHq);
+      setMissionClaimReadyAt(now + cd);
+      return true;
+    },
+    [missionClaimReadyAt, selectedCityId, interiorBuildingId, activeZone, avatar.classId],
+  );
   const teleport = useCallback((x: number, z: number) => {
     setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
     setPanel("none");
@@ -497,6 +524,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
       shards,
       collectShard,
       claimedMissionIds,
+      missionClaimReadyAt,
       claimMission,
       selectedMint,
       openToken,
@@ -544,6 +572,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
       shards,
       collectShard,
       claimedMissionIds,
+      missionClaimReadyAt,
       claimMission,
       selectedMint,
       openToken,

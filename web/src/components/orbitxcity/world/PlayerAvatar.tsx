@@ -312,11 +312,23 @@ export function PlayerAvatar({
         <coneGeometry args={[0.14, 0.6, 10]} />
         <meshBasicMaterial color="#ffb054" transparent opacity={0.9} toneMapped={false} />
       </mesh>
-      {/* Ground ring */}
+      {/* Ground ring — Creator presence aura is a wider double ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
         <ringGeometry args={[0.45, 0.55, 32]} />
         <meshBasicMaterial color={appearance.accentColor} transparent opacity={0.55} toneMapped={false} />
       </mesh>
+      {appearance.classId === "creator" && (
+        <>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
+            <ringGeometry args={[0.7, 0.82, 40]} />
+            <meshBasicMaterial color={appearance.accentColor} transparent opacity={0.35} toneMapped={false} />
+          </mesh>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
+            <ringGeometry args={[0.95, 1.05, 40]} />
+            <meshBasicMaterial color="#c5a26f" transparent opacity={0.22} toneMapped={false} />
+          </mesh>
+        </>
+      )}
 
       {chat && (
         <Billboard position={[0, 2.9, 0]}>

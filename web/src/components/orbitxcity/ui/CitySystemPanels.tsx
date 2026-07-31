@@ -2,7 +2,7 @@
  * Fully built OrbitX City system panels (Inventory → Events) + Play overview.
  * Each includes a live ops tab and a 168-capability FeatureCatalog.
  */
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   Backpack,
@@ -26,6 +26,11 @@ import {
   type CitySystemId,
 } from "@/lib/orbitxcity/cityFeatureCatalog";
 import { ORBITX_CITIES } from "@/lib/orbitxcity/cities";
+import {
+  hasBuilderMissionPerk,
+  missionClaimCooldownMs,
+} from "@/lib/orbitxcity/characterClasses";
+import { getWorldBlock } from "@/lib/orbitxcity/worlds";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { FeatureCatalog, SystemTabs } from "./FeatureCatalog";
 import { DAILY_MISSIONS, WEEKLY_MISSIONS } from "@/gaming/catalogs/progressionCatalog";
@@ -174,9 +179,37 @@ function missionReady(
 }
 
 export function MissionsSystemPanel() {
-  const { shards, entered, voiceOpen, claimedMissionIds, claimMission, selectedCityId } = useCity();
+  const {
+    shards,
+    entered,
+    voiceOpen,
+    claimedMissionIds,
+    claimMission,
+    selectedCityId,
+    avatar,
+    interiorBuildingId,
+    activeZone,
+    missionClaimReadyAt,
+  } = useCity();
   const { profile, updateProfile } = useGameProfile();
   const ctx = { entered, shards, voiceOpen };
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (missionClaimReadyAt <= Date.now()) return;
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [missionClaimReadyAt]);
+
+  const builder = hasBuilderMissionPerk(avatar.classId);
+  const block = getWorldBlock(selectedCityId);
+  const interior = interiorBuildingId
+    ? block.buildings.find((b) => b.id === interiorBuildingId)
+    : null;
+  const atHq =
+    interior?.kind === "hq" || interior?.interaction === "hq" || activeZone?.kind === "hq";
+  const cooldownMs = missionClaimCooldownMs(avatar.classId, atHq);
+  const cooldownLeft = Math.max(0, missionClaimReadyAt - now);
 
   const board = useMemo(
     () =>
@@ -194,27 +227,37 @@ export function MissionsSystemPanel() {
             <div className="oxc-tile-title">Missions · city contracts</div>
             <p className="oxc-muted">
               District bounties + Play progression dailies · {FEATURES_PER_SYSTEM} mission rails.
+              {builder
+                ? ` Builder perk: ${atHq ? "2s HQ" : "8s"} claim cooldown.`
+                : ` Claim cooldown ${Math.round(cooldownMs / 1000)}s.`}
             </p>
           </div>
         </div>
       }
     >
+      {cooldownLeft > 0 && (
+        <p className="oxc-muted">
+          Next city claim in {Math.ceil(cooldownLeft / 1000)}s
+          {builder && atHq ? " · HQ fast lane" : builder ? " · Builder lane" : ""}
+        </p>
+      )}
       <div className="oxc-section-label">City board · {selectedCityId.toUpperCase()}</div>
       {board.map((mission) => {
         const claimed = claimedMissionIds.includes(mission.id);
         const ready = missionReady(mission.require, ctx);
+        const cooling = cooldownLeft > 0;
         return (
           <div key={mission.id} className="oxc-tile on">
             <div className="oxc-tile-title">{mission.title}</div>
             <p className="oxc-muted">{mission.detail}</p>
             <div className="oxc-actions">
               <span className={`oxc-pill ${claimed || ready ? "on" : ""}`}>
-                {claimed ? "Claimed" : ready ? "Ready" : "In progress"}
+                {claimed ? "Claimed" : cooling && ready ? "Cooldown" : ready ? "Ready" : "In progress"}
               </span>
               <button
                 type="button"
                 className="oxc-btn primary compact"
-                disabled={!ready || claimed}
+                disabled={!ready || claimed || cooling}
                 onClick={() => claimMission(mission.id, mission.reward)}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" /> Claim {mission.reward} ◈

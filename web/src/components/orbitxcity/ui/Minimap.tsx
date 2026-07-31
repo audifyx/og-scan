@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { getWorldBlock, getWorldStreets } from "@/lib/orbitxcity/worlds";
+import { useEffect, useMemo, useRef } from "react";
+import { getNearestLandmark, getWorldBlock, getWorldStreets } from "@/lib/orbitxcity/worlds";
 import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const SIZE = 148;
@@ -10,6 +10,7 @@ export function Minimap() {
   const { playerPos, selectedCityId } = useCity();
   const block = getWorldBlock(selectedCityId);
   const streets = getWorldStreets(selectedCityId);
+  const nearest = useMemo(() => getNearestLandmark(block, playerPos), [block, playerPos]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -77,7 +78,9 @@ export function Minimap() {
   return (
     <div className="oxc-minimap" aria-hidden>
       <canvas ref={canvasRef} width={SIZE} height={SIZE} />
-      <span>{block.name.toUpperCase()}</span>
+      <span>
+        {nearest.label.toUpperCase()} · {Math.round(nearest.dist)}M
+      </span>
     </div>
   );
 }

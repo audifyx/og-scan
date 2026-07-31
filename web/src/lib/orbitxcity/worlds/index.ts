@@ -1,5 +1,5 @@
 import { NYC_DEMO_BLOCK, STREETS, TELEPORT_POINTS } from "../demoBlock";
-import type { CityId, StreetSegment, WorldBlockConfig } from "../types";
+import type { CityId, StreetSegment, Vec3, WorldBlockConfig } from "../types";
 import { BOSTON_BLOCK, BOSTON_STREETS, BOSTON_TELEPORT_POINTS } from "./bostonBlock";
 import { LA_BLOCK, LA_STREETS, LA_TELEPORT_POINTS } from "./laBlock";
 import { MIAMI_BLOCK, MIAMI_STREETS, MIAMI_TELEPORT_POINTS } from "./miamiBlock";
@@ -59,4 +59,20 @@ export function getTeleportPoints(cityId: CityId): TeleportPoint[] {
 
 export function getWorldSize(block: WorldBlockConfig): number {
   return Math.max(block.bounds.maxX - block.bounds.minX, block.bounds.maxZ - block.bounds.minZ);
+}
+
+export type NearestLandmark = { label: string; dist: number; kind: "zone" | "district" };
+
+/** Nearest interaction zone (or district centroid) for HUD / minimap orientation. */
+export function getNearestLandmark(block: WorldBlockConfig, pos: Vec3): NearestLandmark {
+  let best: NearestLandmark | null = null;
+  for (const z of block.zones) {
+    const dist = Math.hypot(pos.x - z.position.x, pos.z - z.position.z);
+    if (!best || dist < best.dist) best = { label: z.label, dist, kind: "zone" };
+  }
+  for (const d of block.districts) {
+    const dist = Math.hypot(pos.x - d.center.x, pos.z - d.center.z);
+    if (!best || dist < best.dist) best = { label: d.name, dist, kind: "district" };
+  }
+  return best ?? { label: block.name, dist: 0, kind: "district" };
 }

@@ -127,6 +127,23 @@ export function hasTraderTerminalPerk(classId?: CharacterClassId | string | null
   return classId === "trader";
 }
 
+export function hasBuilderMissionPerk(classId?: CharacterClassId | string | null): boolean {
+  return classId === "builder";
+}
+
+export function hasCreatorPresencePerk(classId?: CharacterClassId | string | null): boolean {
+  return classId === "creator";
+}
+
+/** City-board claim cooldown. Builder at HQ is nearly instant. */
+export function missionClaimCooldownMs(
+  classId?: CharacterClassId | string | null,
+  atHq = false,
+): number {
+  if (hasBuilderMissionPerk(classId)) return atHq ? 2_000 : 8_000;
+  return 30_000;
+}
+
 export function appearanceFromClass(cls: CharacterClassDef, name?: string): AvatarAppearance {
   const hairByClass = {
     trader: { hairStyle: "short" as const, hairColor: "#2a2218" },
