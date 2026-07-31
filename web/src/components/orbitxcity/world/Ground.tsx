@@ -258,23 +258,56 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
                 <meshStandardMaterial map={asphaltMap} color="#1a1e24" metalness={0.22} roughness={0.7} />
               )}
             </mesh>
-            <mesh
-              rotation={[-Math.PI / 2, 0, 0]}
-              position={horizontal ? [mid, 0.045 + i * 0.002, s.at] : [s.at, 0.045 + i * 0.002, mid]}
-            >
-              <planeGeometry args={horizontal ? [len - 2, 0.08] : [0.08, len - 2]} />
-              <meshStandardMaterial color="#c9c3a8" transparent opacity={0.4} roughness={0.75} />
-            </mesh>
+            {/* Center dashed lane paint */}
+            {Array.from({ length: Math.max(2, Math.floor(Math.abs(len) / 4.5)) }).map((_, di) => {
+              const t = (di + 0.5) / Math.max(1, Math.floor(Math.abs(len) / 4.5));
+              const along = s.from + (s.to - s.from) * t;
+              return (
+                <mesh
+                  key={`dash-${di}`}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  position={horizontal ? [along, 0.046 + i * 0.002, s.at] : [s.at, 0.046 + i * 0.002, along]}
+                >
+                  <planeGeometry args={horizontal ? [1.4, 0.12] : [0.12, 1.4]} />
+                  <meshStandardMaterial color="#d8d2b8" transparent opacity={0.55} roughness={0.7} />
+                </mesh>
+              );
+            })}
+            {/* Crosswalk bars near segment ends */}
+            {[0.12, 0.88].map((t) => {
+              const along = s.from + (s.to - s.from) * t;
+              return (
+                <group key={`xw-${t}`}>
+                  {Array.from({ length: 5 }).map((_, bi) => {
+                    const lat = (bi - 2) * 0.42;
+                    return (
+                      <mesh
+                        key={bi}
+                        rotation={[-Math.PI / 2, 0, 0]}
+                        position={
+                          horizontal
+                            ? [along, 0.048 + i * 0.002, s.at + lat]
+                            : [s.at + lat, 0.048 + i * 0.002, along]
+                        }
+                      >
+                        <planeGeometry args={horizontal ? [0.55, 0.28] : [0.28, 0.55]} />
+                        <meshStandardMaterial color="#e8e4d4" transparent opacity={0.5} roughness={0.75} />
+                      </mesh>
+                    );
+                  })}
+                </group>
+              );
+            })}
             {[-1, 1].map((side) => {
               const off = s.at + side * (s.w / 2 + 0.95);
               return (
                 <mesh
                   key={`walk-${side}`}
                   rotation={[-Math.PI / 2, 0, 0]}
-                  position={horizontal ? [mid, 0.035 + i * 0.002, off] : [off, 0.035 + i * 0.002, mid]}
+                  position={horizontal ? [mid, 0.055 + i * 0.002, off] : [off, 0.055 + i * 0.002, mid]}
                   receiveShadow
                 >
-                  <planeGeometry args={horizontal ? [len, 1.4] : [1.4, len]} />
+                  <planeGeometry args={horizontal ? [len, 1.55] : [1.55, len]} />
                   <meshStandardMaterial map={cementMap} color="#6a7178" roughness={0.9} metalness={0.04} />
                 </mesh>
               );
@@ -284,11 +317,11 @@ export function Ground({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig })
               return (
                 <mesh
                   key={side}
-                  position={horizontal ? [mid, 0.05, off] : [off, 0.05, mid]}
+                  position={horizontal ? [mid, 0.08, off] : [off, 0.08, mid]}
                   castShadow
                   receiveShadow
                 >
-                  <boxGeometry args={horizontal ? [len, 0.1, 0.28] : [0.28, 0.1, len]} />
+                  <boxGeometry args={horizontal ? [len, 0.16, 0.32] : [0.32, 0.16, len]} />
                   <meshStandardMaterial color="#6a7178" metalness={0.08} roughness={0.86} />
                 </mesh>
               );

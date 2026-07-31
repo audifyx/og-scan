@@ -62,6 +62,8 @@ interface CityContextValue {
   setVoiceOpen: (v: boolean) => void;
   teleportTarget: { x: number; z: number; seq: number } | null;
   teleport: (x: number, z: number) => void;
+  /** Recovery: snap back to the city spawn and clear any interior / menu. */
+  resetPlayer: () => void;
   touchControls: boolean;
   setTouchControls: (v: boolean) => void;
   quality: "high" | "lite";
@@ -71,7 +73,9 @@ interface CityContextValue {
   /** When set, player is inside this building (collision ignored + interior room). */
   interiorBuildingId: string | null;
   enterBuilding: (buildingId: string) => void;
-  exitBuilding: () => void;
+  exitBuilding: (opts?: { soft?: boolean }) => void;
+  /** Open a building's branded venue tools menu (E only — never teleports). */
+  openVenue: (buildingId: string) => void;
 }
 
 /** Exported so the R3F canvas can bridge this context across renderers. */
@@ -98,6 +102,26 @@ const STARTER_INVENTORY: InventoryItem[] = [
   { id: "ad-slot-a", kind: "ad_slot", label: "Billboard Slot A", detail: "Rentable Midtown ad face" },
   { id: "token-obx", kind: "token", label: "OBX Watchlist Slot", detail: "Pin a mint on your HUD tape" },
 ];
+
+/** Map a building's structural kind to a venue interaction when it has none set. */
+function kindToInteraction(kind: string): InteractionKind {
+  switch (kind) {
+    case "market":
+    case "shop":
+      return "marketplace";
+    case "trading_floor":
+      return "trading";
+    case "launch_arena":
+      return "launch";
+    case "social_hub":
+      return "community";
+    case "ad_tower":
+      return "billboard";
+    case "hq":
+    default:
+      return "hq";
+  }
+}
 
 function zoneToPanel(kind: InteractionKind): HudPanel {
   switch (kind) {
@@ -213,18 +237,21 @@ export function CityProvider({ children }: { children: ReactNode }) {
     setGateState("menu");
   }, []);
 
-  const exitBuilding = useCallback(() => {
-    if (!interiorBuildingId) return;
-    const block = getWorldBlock(selectedCityId);
-    const b = block.buildings.find((x) => x.id === interiorBuildingId);
-    setInteriorBuildingId(null);
-    if (b) {
+  const exitBuilding = useCallback(
+    (opts?: { soft?: boolean }) => {
+      if (!interiorBuildingId) return;
+      const block = getWorldBlock(selectedCityId);
+      const b = block.buildings.find((x) => x.id === interiorBuildingId);
+      setInteriorBuildingId(null);
+      // Soft exit = walked out through the door; keep current position.
+      if (opts?.soft || !b) return;
       const x = b.position.x;
       const z = b.position.z + b.size.depth / 2 + 1.6;
       setPlayerPos({ x, y: 0, z });
       setTeleportTarget((prev) => ({ x, z, seq: (prev?.seq ?? 0) + 1 }));
-    }
-  }, [interiorBuildingId, selectedCityId]);
+    },
+    [interiorBuildingId, selectedCityId],
+  );
 
   const enterBuilding = useCallback(
     (buildingId: string) => {
@@ -232,10 +259,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
       const b = block.buildings.find((x) => x.id === buildingId);
       if (!b) return;
       const interiorDepth = Math.max(5.2, Math.min(14, b.size.depth - 0.8));
-      // Enter from the south-side doorway, just inside the room — never
-      // teleport through a desk or drop the player at the room's center.
+      // Just inside the south doorway — matches walk-in threshold + open door gap.
       const x = b.position.x;
-      const z = b.position.z + interiorDepth / 2 - 1.85;
+      const z = b.position.z + interiorDepth / 2 - 1.35;
       setInteriorBuildingId(buildingId);
       setPanel("none");
       setPlayerPos({ x, y: 0, z });
@@ -279,6 +305,15 @@ export function CityProvider({ children }: { children: ReactNode }) {
     setPanel("none");
   }, []);
 
+  const resetPlayer = useCallback(() => {
+    const spawn = getWorldBlock(selectedCityId).spawn;
+    setInteriorBuildingId(null);
+    setPanel("none");
+    setPlayerPos(spawn);
+    setTeleportTarget((prev) => ({ x: spawn.x, z: spawn.z, seq: (prev?.seq ?? 0) + 1 }));
+    cityAudio.play("confirm");
+  }, [selectedCityId]);
+
   const triggerEmote = useCallback(() => {
     setEmoteAt(Date.now());
     realtime?.sendEmote();
@@ -289,11 +324,26 @@ export function CityProvider({ children }: { children: ReactNode }) {
     setPanel("token");
   }, []);
 
+  /**
+   * Open a building's branded venue tools menu. Never teleports —
+   * physical entry is the doorway crossing in the movement loop.
+   */
+  const openVenue = useCallback(
+    (buildingId: string) => {
+      const block = getWorldBlock(selectedCityId);
+      const b = block.buildings.find((x) => x.id === buildingId);
+      if (!b) return;
+      cityAudio.play("interact");
+      const kind = b.interaction ?? kindToInteraction(b.kind);
+      setPanel(zoneToPanel(kind));
+    },
+    [selectedCityId],
+  );
+
   const interact = useCallback(() => {
-    // Inside a building: E exits (and closes the district panel)
+    // Inside a building: E opens venue tools (exit is by walking out).
     if (interiorBuildingId) {
-      exitBuilding();
-      if (panel !== "none") setPanel("none");
+      openVenue(interiorBuildingId);
       return;
     }
     if (!activeZone) return;
@@ -303,45 +353,33 @@ export function CityProvider({ children }: { children: ReactNode }) {
     }
     if (activeZone.kind === "voice") {
       setVoiceOpen(true);
-      // A building is a playable space first. Keep the HUD clear so players
-      // can explore it; voice and district tools remain available from dock.
-      if (activeZone.buildingId) {
-        enterBuilding(activeZone.buildingId);
-        return;
-      }
       openPanel("voice");
       return;
     }
     if (activeZone.buildingId) {
-      const block = getWorldBlock(selectedCityId);
-      const b = block.buildings.find((x) => x.id === activeZone.buildingId);
-      // Any venue-sized shell (or shop / interactive landmark) is walk-in.
-      if (
-        b &&
-        (b.interaction ||
-          b.kind === "shop" ||
-          (b.size.width >= 5 && b.size.depth >= 5))
-      ) {
-        enterBuilding(b.id);
-        return;
-      }
+      openVenue(activeZone.buildingId);
+      return;
     }
     openPanel(zoneToPanel(activeZone.kind));
-  }, [activeZone, openPanel, openToken, interiorBuildingId, exitBuilding, enterBuilding, panel, selectedCityId]);
+  }, [activeZone, openPanel, openToken, interiorBuildingId, openVenue]);
 
   const prompt = useMemo(() => {
     if (interiorBuildingId && panel === "none") {
       return {
-        label: "Inside · tap glowing stations",
-        hint: "Click a TAP station for tools · E or green pad to exit",
+        label: "Inside · venue floor",
+        hint: "Walk out the open door to leave · E opens venue tools",
       };
     }
     if (!activeZone || panel !== "none") return null;
+    if (activeZone.buildingId) {
+      return {
+        label: activeZone.label,
+        hint: "Walk through the open door to enter · E for venue tools",
+      };
+    }
     return {
       label: activeZone.label,
-      hint: activeZone.buildingId
-        ? activeZone.hint || "Press E to walk inside · tap stations for tools"
-        : activeZone.hint || "Press E to interact",
+      hint: activeZone.hint || "Press E to interact",
     };
   }, [activeZone, panel, interiorBuildingId]);
 
@@ -423,6 +461,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
       setVoiceOpen,
       teleportTarget,
       teleport,
+      resetPlayer,
       touchControls,
       setTouchControls,
       quality,
@@ -432,6 +471,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
       interiorBuildingId,
       enterBuilding,
       exitBuilding,
+      openVenue,
     }),
     [
       gate,
@@ -461,6 +501,8 @@ export function CityProvider({ children }: { children: ReactNode }) {
       playerId,
       voiceOpen,
       teleportTarget,
+      resetPlayer,
+      openVenue,
       teleport,
       touchControls,
       quality,

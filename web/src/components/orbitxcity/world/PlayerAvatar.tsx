@@ -4,7 +4,13 @@ import { Billboard, Text } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarAppearance, BuildingDefinition, Vec3, WorldBlockConfig } from "@/lib/orbitxcity/types";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
-import { collidesAt, collidesInInterior, pointInBuilding } from "@/lib/orbitxcity/collision";
+import {
+  collidesAt,
+  collidesInInterior,
+  pointInBuilding,
+  crossedEntryDoorway,
+  crossedExitDoorway,
+} from "@/lib/orbitxcity/collision";
 import { consumeZoom, virtualInput } from "@/lib/orbitxcity/input";
 import type { CityRealtimeClient } from "@/lib/orbitxcity/realtime";
 import { CharacterMesh, type CharacterAnimationState } from "./CharacterMesh";
@@ -14,8 +20,9 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const WALK_SPEED = 7.5;
 const SPRINT_SPEED = 11.8;
-const JUMP_VELOCITY = 7.4;
-const GRAVITY = 18;
+const JUMP_VELOCITY = 6.6;
+const GRAVITY = 26;
+const COYOTE = 0.09;
 
 const keys = new Set<string>();
 
@@ -55,6 +62,12 @@ interface PlayerAvatarProps {
   ignoreBuildingId?: string | null;
   /** Active interior receives its own walls and furniture collision. */
   interiorBuilding?: BuildingDefinition | null;
+  /** Fired once when the player walks through a building's front doorway. */
+  onEnterBuilding?: (buildingId: string) => void;
+  /** Fired once when the player walks back out the interior exit doorway. */
+  onExitBuilding?: () => void;
+  /** Freeze walking while a focused venue menu is open. */
+  locked?: boolean;
 }
 
 export function PlayerAvatar({
@@ -66,6 +79,9 @@ export function PlayerAvatar({
   block = NYC_DEMO_BLOCK,
   ignoreBuildingId = null,
   interiorBuilding = null,
+  onEnterBuilding,
+  onExitBuilding,
+  locked = false,
 }: PlayerAvatarProps) {
   const group = useRef<THREE.Group>(null);
   const flame = useRef<THREE.Mesh>(null);
@@ -82,6 +98,14 @@ export function PlayerAvatar({
   ignoreRef.current = ignoreBuildingId;
   const interiorRef = useRef(interiorBuilding);
   interiorRef.current = interiorBuilding;
+  const onEnterRef = useRef(onEnterBuilding);
+  onEnterRef.current = onEnterBuilding;
+  const onExitRef = useRef(onExitBuilding);
+  onExitRef.current = onExitBuilding;
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
+  const transitionCd = useRef(0);
+  const coyote = useRef(0);
   const pos = useRef(new THREE.Vector3(spawn.x, 0, spawn.z));
   const yaw = useRef(0);
   const vy = useRef(0);
@@ -125,6 +149,7 @@ export function PlayerAvatar({
   useFrame(({ clock }, rawDt) => {
     // Allow up to 120ms steps so low-FPS devices keep full movement speed
     const t = Math.min(rawDt, 0.12);
+    if (transitionCd.current > 0) transitionCd.current -= t;
     let inputX = 0;
     let inputZ = 0;
     if (keys.has("KeyW") || keys.has("ArrowUp")) inputZ -= 1;
@@ -138,9 +163,15 @@ export function PlayerAvatar({
     inputX = Math.max(-1, Math.min(1, inputX));
     inputZ = Math.max(-1, Math.min(1, inputZ));
 
+    if (lockedRef.current) {
+      inputX = 0;
+      inputZ = 0;
+    }
+
     const sprinting = keys.has("ShiftLeft") || keys.has("ShiftRight") || virtualInput.sprint;
     const speed = sprinting ? SPRINT_SPEED : WALK_SPEED;
     const moving = Math.abs(inputX) > 0.08 || Math.abs(inputZ) > 0.08;
+    const prevZ = pos.current.z;
 
     if (moving) {
       const len = Math.hypot(inputX, inputZ) || 1;
@@ -166,17 +197,42 @@ export function PlayerAvatar({
         pos.current.z = nextZ;
       }
       bob.current += t * (sprinting ? 14 : 10);
+
+      // Automatic doorway entry/exit — E is reserved for venue menus only.
+      if (transitionCd.current <= 0) {
+        if (!interior && !ignore) {
+          const buildings = world.buildings;
+          for (let i = 0; i < buildings.length; i++) {
+            const b = buildings[i]!;
+            if (Math.abs(pos.current.x - b.position.x) > b.size.width / 2 + 2) continue;
+            if (crossedEntryDoorway(prevZ, pos.current.z, pos.current.x, b)) {
+              transitionCd.current = 0.7;
+              onEnterRef.current?.(b.id);
+              break;
+            }
+          }
+        } else if (interior) {
+          if (crossedExitDoorway(prevZ, pos.current.z, pos.current.x, interior)) {
+            transitionCd.current = 0.7;
+            onExitRef.current?.();
+          }
+        }
+      }
     } else {
       bob.current *= 0.9;
     }
 
-    // Jump / gravity (touch jumps are buffered until grounded)
+    // Jump / gravity — snappier fall, short coyote time
     const grounded = yPos.current <= 0.001;
-    if ((keys.has("Space") || virtualInput.jumpQueued) && grounded) {
+    if (grounded) coyote.current = COYOTE;
+    else coyote.current = Math.max(0, coyote.current - t);
+    if ((keys.has("Space") || virtualInput.jumpQueued) && (grounded || coyote.current > 0) && vy.current <= 0.01) {
       vy.current = JUMP_VELOCITY;
+      coyote.current = 0;
       virtualInput.jumpQueued = false;
     }
     vy.current -= GRAVITY * t;
+    if (vy.current < -22) vy.current = -22;
     yPos.current = Math.max(0, yPos.current + vy.current * t);
     if (yPos.current === 0 && vy.current < 0) vy.current = 0;
     const airborne = yPos.current > 0.05;

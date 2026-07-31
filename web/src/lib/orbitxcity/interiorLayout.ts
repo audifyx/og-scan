@@ -100,65 +100,84 @@ export function roomTitle(theme: RoomTheme, building: BuildingDefinition): strin
   }
 }
 
-/** Collision solids in local room space — keep the south doorway clear. */
+/** Collision solids in local room space — keep the south doorway clear (±1.4 on X). */
 export function furnitureSolids(theme: RoomTheme, width: number, depth: number): FurnitureSolid[] {
   const wallZ = -depth / 2 + 0.7;
-  const side = Math.min(width / 2 - 1.2, 3.0);
+  const midZ = -depth * 0.08;
+  const side = Math.min(width / 2 - 1.15, 3.2);
   switch (theme) {
     case "trade":
       return [
-        { x: -side * 0.65, z: wallZ, w: 2.4, d: 0.85 },
-        { x: side * 0.65, z: wallZ, w: 2.4, d: 0.85 },
-        { x: 0, z: 0.2, w: 1.7, d: 0.85 },
+        { x: -side * 0.72, z: wallZ, w: 2.55, d: 0.9 },
+        { x: side * 0.72, z: wallZ, w: 2.55, d: 0.9 },
+        { x: -side * 0.55, z: midZ, w: 1.85, d: 0.85 },
+        { x: side * 0.55, z: midZ, w: 1.85, d: 0.85 },
+        { x: 0, z: wallZ + 1.1, w: 1.55, d: 0.8 },
+        { x: -side, z: 0.55, w: 1.05, d: 0.75 },
+        { x: side, z: 0.55, w: 1.05, d: 0.75 },
       ];
     case "lounge":
       return [
-        { x: -side * 0.55, z: -0.2, w: 1.55, d: 0.85 },
-        { x: side * 0.55, z: -0.2, w: 1.55, d: 0.85 },
-        { x: 0, z: wallZ, w: Math.min(width - 1.6, 4), d: 0.95 },
-        { x: -side, z: 0.5, w: 1.1, d: 0.8 },
-        { x: side, z: 0.5, w: 1.1, d: 0.8 },
+        { x: -side * 0.55, z: -0.15, w: 1.65, d: 0.9 },
+        { x: side * 0.55, z: -0.15, w: 1.65, d: 0.9 },
+        { x: 0, z: wallZ, w: Math.min(width - 1.6, 4.2), d: 0.95 },
+        { x: -side, z: 0.55, w: 1.15, d: 0.85 },
+        { x: side, z: 0.55, w: 1.15, d: 0.85 },
+        { x: -side * 0.35, z: wallZ + 1.35, w: 1.2, d: 0.7 },
+        { x: side * 0.35, z: wallZ + 1.35, w: 1.2, d: 0.7 },
       ];
     case "market":
       return [
-        { x: -side * 0.7, z: wallZ + 0.1, w: 1.45, d: 1.0 },
-        { x: 0, z: wallZ + 0.1, w: 1.45, d: 1.0 },
-        { x: side * 0.7, z: wallZ + 0.1, w: 1.45, d: 1.0 },
-        { x: 0, z: 0.55, w: Math.min(width - 2, 3.2), d: 0.95 },
+        { x: -side * 0.75, z: wallZ + 0.1, w: 1.5, d: 1.05 },
+        { x: 0, z: wallZ + 0.1, w: 1.5, d: 1.05 },
+        { x: side * 0.75, z: wallZ + 0.1, w: 1.5, d: 1.05 },
+        { x: -side * 0.55, z: midZ + 0.2, w: 1.35, d: 0.9 },
+        { x: side * 0.55, z: midZ + 0.2, w: 1.35, d: 0.9 },
+        { x: 0, z: 0.7, w: Math.min(width - 2.2, 2.8), d: 0.9 },
       ];
     case "club":
       return [
-        { x: 0, z: wallZ, w: Math.min(width - 1.8, 4.2), d: 0.95 },
-        { x: -side, z: 0.3, w: 1.1, d: 0.8 },
-        { x: side, z: 0.3, w: 1.1, d: 0.8 },
+        { x: 0, z: wallZ, w: Math.min(width - 1.8, 4.4), d: 1.0 },
+        { x: -side, z: 0.2, w: 1.15, d: 0.85 },
+        { x: side, z: 0.2, w: 1.15, d: 0.85 },
+        { x: -side * 0.45, z: midZ, w: 1.25, d: 0.75 },
+        { x: side * 0.45, z: midZ, w: 1.25, d: 0.75 },
       ];
     case "theater":
       return [
-        { x: -1.3, z: 0.55, w: 1.55, d: 0.85 },
-        { x: 0, z: 0.55, w: 1.55, d: 0.85 },
-        { x: 1.3, z: 0.55, w: 1.55, d: 0.85 },
-        { x: side, z: wallZ + 0.4, w: 1.1, d: 0.8 },
+        { x: -1.45, z: 0.35, w: 1.55, d: 0.85 },
+        { x: 0, z: 0.35, w: 1.55, d: 0.85 },
+        { x: 1.45, z: 0.35, w: 1.55, d: 0.85 },
+        { x: -1.45, z: -0.85, w: 1.55, d: 0.85 },
+        { x: 1.45, z: -0.85, w: 1.55, d: 0.85 },
+        { x: side, z: wallZ + 0.35, w: 1.15, d: 0.85 },
       ];
     case "hq":
       return [
-        { x: 0, z: wallZ, w: Math.min(width - 1.2, 5.4), d: 1.2 },
-        { x: -side * 0.7, z: 0.15, w: 1.7, d: 0.95 },
-        { x: side * 0.7, z: 0.15, w: 1.7, d: 0.95 },
-        { x: -side, z: 0.85, w: 1.1, d: 0.8 },
-        { x: side, z: 0.85, w: 1.1, d: 0.8 },
-        { x: 0, z: -0.35, w: 2.4, d: 1.2 },
+        { x: 0, z: wallZ, w: Math.min(width - 1.2, 5.6), d: 1.25 },
+        { x: -side * 0.72, z: 0.1, w: 1.8, d: 0.95 },
+        { x: side * 0.72, z: 0.1, w: 1.8, d: 0.95 },
+        { x: -side, z: 0.9, w: 1.15, d: 0.85 },
+        { x: side, z: 0.9, w: 1.15, d: 0.85 },
+        { x: 0, z: -0.55, w: 2.2, d: 1.05 },
+        { x: -side * 0.45, z: wallZ + 1.45, w: 1.25, d: 0.75 },
+        { x: side * 0.45, z: wallZ + 1.45, w: 1.25, d: 0.75 },
       ];
     case "launch":
       return [
-        { x: 0, z: -0.1, w: 2.8, d: 2.8 },
-        { x: -side, z: wallZ + 0.2, w: 1.1, d: 0.8 },
-        { x: side, z: wallZ + 0.2, w: 1.1, d: 0.8 },
+        { x: 0, z: -0.15, w: 2.9, d: 2.9 },
+        { x: -side, z: wallZ + 0.15, w: 1.15, d: 0.85 },
+        { x: side, z: wallZ + 0.15, w: 1.15, d: 0.85 },
+        { x: -side * 0.55, z: 1.0, w: 1.1, d: 0.75 },
+        { x: side * 0.55, z: 1.0, w: 1.1, d: 0.75 },
       ];
     default:
       return [
-        { x: 0, z: wallZ, w: Math.min(width - 1.6, 3.8), d: 0.95 },
-        { x: -side * 0.7, z: 0.35, w: 1.55, d: 0.85 },
-        { x: side * 0.7, z: 0.35, w: 1.55, d: 0.85 },
+        { x: 0, z: wallZ, w: Math.min(width - 1.6, 4.0), d: 0.95 },
+        { x: -side * 0.7, z: 0.25, w: 1.6, d: 0.85 },
+        { x: side * 0.7, z: 0.25, w: 1.6, d: 0.85 },
+        { x: -side, z: wallZ + 1.2, w: 1.1, d: 0.75 },
+        { x: side, z: wallZ + 1.2, w: 1.1, d: 0.75 },
       ];
   }
 }
@@ -190,16 +209,28 @@ export function furnitureSlots(
     { x: 0, z: wallZ + 0.15, rotY: 0, scale: 1.05 },
     { x: -side, z: 0.35, rotY: Math.PI / 2, scale: 0.95 },
     { x: side, z: 0.35, rotY: -Math.PI / 2, scale: 0.95 },
-    { x: 0, z: 0.2, rotY: Math.PI, scale: 1 },
+    { x: -side * 0.45, z: -depth * 0.05, rotY: Math.PI * 0.15, scale: 0.92 },
+    { x: side * 0.45, z: -depth * 0.05, rotY: -Math.PI * 0.15, scale: 0.92 },
+    { x: 0, z: wallZ + 1.2, rotY: Math.PI, scale: 0.9 },
   ];
-  // Theme-specific first slots (trade desks along back wall, etc.)
   if (theme === "lounge" || theme === "lobby") {
     presets[0] = { x: -side * 0.55, z: -0.15, rotY: Math.PI, scale: 1 };
     presets[1] = { x: side * 0.55, z: -0.15, rotY: Math.PI, scale: 1 };
+    presets[5] = { x: -side * 0.35, z: wallZ + 1.4, rotY: 0, scale: 0.88 };
+    presets[6] = { x: side * 0.35, z: wallZ + 1.4, rotY: 0, scale: 0.88 };
+  }
+  if (theme === "trade" || theme === "hq") {
+    presets[5] = { x: -side * 0.55, z: -depth * 0.08, rotY: Math.PI / 2, scale: 0.95 };
+    presets[6] = { x: side * 0.55, z: -depth * 0.08, rotY: -Math.PI / 2, scale: 0.95 };
   }
   if (theme === "launch") {
     presets[0] = { x: -side, z: wallZ, rotY: 0, scale: 0.9 };
     presets[1] = { x: side, z: wallZ, rotY: 0, scale: 0.9 };
+    presets[2] = { x: 0, z: wallZ + 0.2, rotY: 0, scale: 0.85 };
+  }
+  if (theme === "market") {
+    presets[5] = { x: -side * 0.5, z: 0.4, rotY: Math.PI, scale: 0.9 };
+    presets[6] = { x: side * 0.5, z: 0.4, rotY: Math.PI, scale: 0.9 };
   }
   return paths.slice(0, presets.length).map((path, i) => {
     const p = presets[i]!;

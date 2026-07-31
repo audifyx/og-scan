@@ -29,7 +29,9 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
     emoteAt,
     selectedCityId,
     interiorBuildingId,
+    enterBuilding,
     exitBuilding,
+    panel,
   } = useCity();
   const block = getWorldBlock(selectedCityId);
 
@@ -61,6 +63,9 @@ function WorldScene({ tickerRows }: { tickerRows: ScreenerRow[] }) {
         block={block}
         ignoreBuildingId={interiorBuildingId}
         interiorBuilding={interiorBuilding}
+        onEnterBuilding={enterBuilding}
+        onExitBuilding={() => exitBuilding({ soft: true })}
+        locked={panel !== "none"}
       />
       <RemoteAvatars client={realtime} />
       <InteractionMarkers

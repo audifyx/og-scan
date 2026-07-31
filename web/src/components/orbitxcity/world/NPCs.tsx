@@ -4,8 +4,25 @@ import { Billboard, Text } from "@react-three/drei";
 import * as THREE from "three";
 import { NYC_DEMO_BLOCK } from "@/lib/orbitxcity/demoBlock";
 import { collidesAt, mulberry32, randomOpenPoint } from "@/lib/orbitxcity/collision";
-import type { AvatarAppearance, WorldBlockConfig } from "@/lib/orbitxcity/types";
+import type { AvatarAppearance, StreetSegment, WorldBlockConfig } from "@/lib/orbitxcity/types";
+import { getWorldStreets } from "@/lib/orbitxcity/worlds";
 import { CharacterMesh } from "./CharacterMesh";
+
+/** Pick a sidewalk point offset from a street segment. */
+function sidewalkPoint(streets: StreetSegment[], rand: () => number, block: WorldBlockConfig): { x: number; z: number } {
+  if (!streets.length) return randomOpenPoint(rand, 3, block);
+  for (let i = 0; i < 16; i++) {
+    const s = streets[Math.floor(rand() * streets.length)]!;
+    const t = 0.1 + rand() * 0.8;
+    const along = s.from + (s.to - s.from) * t;
+    const side = rand() > 0.5 ? 1 : -1;
+    const offset = s.w * 0.55 + 0.9;
+    const x = s.o === "h" ? along : s.at + side * offset;
+    const z = s.o === "h" ? s.at + side * offset : along;
+    if (!collidesAt(x, z, 0.5, block)) return { x, z };
+  }
+  return randomOpenPoint(rand, 3, block);
+}
 
 const PHRASES = [
   "gm ser",
@@ -37,7 +54,8 @@ const CLASSES: NonNullable<AvatarAppearance["classId"]>[] = [
 
 function TraderNPC({ seed, block }: { seed: number; block: WorldBlockConfig }) {
   const rand = useMemo(() => mulberry32(seed), [seed]);
-  const start = useMemo(() => randomOpenPoint(rand, 3, block), [rand, block]);
+  const streets = useMemo(() => getWorldStreets(block.cityId), [block.cityId]);
+  const start = useMemo(() => sidewalkPoint(streets, rand, block), [rand, block, streets]);
   const appearance = useMemo<AvatarAppearance>(
     () => ({
       bodyColor: NPC_COLORS[Math.floor(rand() * NPC_COLORS.length)]!,
@@ -56,7 +74,7 @@ function TraderNPC({ seed, block }: { seed: number; block: WorldBlockConfig }) {
 
   const group = useRef<THREE.Group>(null);
   const pos = useRef(new THREE.Vector3(start.x, 0, start.z));
-  const target = useRef(randomOpenPoint(mulberry32(seed ^ 0x9e3779b9), 3, block));
+  const target = useRef(sidewalkPoint(streets, mulberry32(seed ^ 0x9e3779b9), block));
   const [isMoving, setIsMoving] = useState(false);
   const [bubble, setBubble] = useState<string | null>(null);
 
@@ -83,9 +101,9 @@ function TraderNPC({ seed, block }: { seed: number; block: WorldBlockConfig }) {
 
     let nowMoving = false;
     if (dist < 0.5) {
-      target.current = randomOpenPoint(
+      target.current = sidewalkPoint(
+        streets,
         mulberry32((seed ^ ((pos.current.x * 97) | 0) ^ ((pos.current.z * 131) | 0)) >>> 0),
-        3,
         block,
       );
     } else {
@@ -95,7 +113,7 @@ function TraderNPC({ seed, block }: { seed: number; block: WorldBlockConfig }) {
         pos.current.set(nx, 0, nz);
         nowMoving = true;
       } else {
-        target.current = randomOpenPoint(mulberry32((seed + 7) >>> 0), 3, block);
+        target.current = sidewalkPoint(streets, mulberry32((seed + 7) >>> 0), block);
       }
     }
     if (nowMoving !== isMoving) setIsMoving(nowMoving);

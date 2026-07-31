@@ -194,7 +194,7 @@ function OutfitShell({
         </mesh>
         <mesh position={[0, 1.28, 0.25]} castShadow>
           <boxGeometry args={[0.09, 0.32, 0.04]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.28} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.12} />
         </mesh>
         <mesh position={[-0.2, 1.12, 0.22]} castShadow>
           <boxGeometry args={[0.16, 0.5, 0.06]} />
@@ -216,7 +216,7 @@ function OutfitShell({
       <>
         <mesh position={[0, 1.28, 0.22]} castShadow>
           <boxGeometry args={[0.58, 0.14, 0.07]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.45} toneMapped={false} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.18} />
         </mesh>
         <mesh position={[0, 0.95, 0.2]} castShadow>
           <boxGeometry args={[0.52, 0.1, 0.06]} />
@@ -224,7 +224,7 @@ function OutfitShell({
         </mesh>
         <mesh position={[-0.22, 1.1, 0.2]}>
           <boxGeometry args={[0.08, 0.35, 0.04]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.35} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.14} />
         </mesh>
       </>
     );
@@ -234,15 +234,15 @@ function OutfitShell({
       <>
         <mesh position={[0, 1.1, 0.23]}>
           <boxGeometry args={[0.55, 0.09, 0.05]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.85} toneMapped={false} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.28} />
         </mesh>
         <mesh position={[0, 1.28, 0.23]}>
           <boxGeometry args={[0.42, 0.06, 0.05]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.65} toneMapped={false} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.2} />
         </mesh>
         <mesh position={[0, 0.9, 0.22]}>
           <boxGeometry args={[0.48, 0.05, 0.04]} />
-          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.5} toneMapped={false} />
+          <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.16} />
         </mesh>
       </>
     );
@@ -384,24 +384,45 @@ export function CharacterMesh(props: CharacterMeshProps) {
     const moving = animation?.moving ?? props.moving ?? false;
     const dancing = animation?.dancing ?? props.dancing ?? false;
     const intensity = animation?.walkIntensity ?? props.walkIntensity ?? 1;
-    const walk = moving ? Math.sin(t * 9.2) * 0.48 * intensity : Math.sin(t * 1.5) * 0.03;
+    const cadence = moving ? 8.4 * (0.85 + intensity * 0.15) : 1.4;
+    const stride = moving ? Math.sin(t * cadence) * 0.55 * intensity : Math.sin(t * 1.4) * 0.025;
     const dance = dancing ? Math.sin(t * 12) * 0.7 : 0;
     const bounce = dancing
       ? Math.abs(Math.sin(t * 9)) * 0.09
       : moving
-        ? Math.abs(Math.sin(t * 9.2)) * 0.04
-        : Math.sin(t * 1.5) * 0.01;
+        ? Math.abs(Math.sin(t * cadence)) * 0.055 * intensity
+        : Math.sin(t * 1.4) * 0.008;
 
     if (root.current) root.current.position.y = bounce;
     if (torso.current) {
-      torso.current.rotation.z = dancing ? Math.sin(t * 7) * 0.16 : Math.sin(t * 1.4) * 0.02;
-      torso.current.rotation.x = moving ? -0.05 : 0;
+      torso.current.rotation.z = dancing
+        ? Math.sin(t * 7) * 0.16
+        : moving
+          ? Math.sin(t * cadence) * 0.06 * intensity
+          : Math.sin(t * 1.3) * 0.015;
+      torso.current.rotation.x = moving ? -0.08 * intensity : dancing ? Math.sin(t * 6) * 0.05 : 0;
+      torso.current.rotation.y = moving ? Math.sin(t * cadence * 0.5) * 0.04 : 0;
     }
-    if (head.current) head.current.rotation.z = dancing ? Math.sin(t * 9) * 0.12 : Math.sin(t * 1.3) * 0.02;
-    if (legL.current) legL.current.rotation.x = dancing ? dance * 0.4 : walk;
-    if (legR.current) legR.current.rotation.x = dancing ? -dance * 0.4 : -walk;
-    if (armL.current) armL.current.rotation.x = dancing ? -1.0 + dance : -walk * 0.8 - 0.1;
-    if (armR.current) armR.current.rotation.x = dancing ? -1.0 - dance : walk * 0.8 - 0.1;
+    if (head.current) {
+      head.current.rotation.z = dancing ? Math.sin(t * 9) * 0.12 : Math.sin(t * 1.25) * 0.02;
+      head.current.rotation.x = moving ? -0.04 : 0;
+    }
+    if (legL.current) {
+      legL.current.rotation.x = dancing ? dance * 0.4 : stride;
+      legL.current.position.z = moving ? Math.sin(t * cadence) * 0.04 : 0;
+    }
+    if (legR.current) {
+      legR.current.rotation.x = dancing ? -dance * 0.4 : -stride;
+      legR.current.position.z = moving ? -Math.sin(t * cadence) * 0.04 : 0;
+    }
+    if (armL.current) {
+      armL.current.rotation.x = dancing ? -1.0 + dance : -stride * 0.95 - 0.12;
+      armL.current.rotation.z = moving ? 0.18 : 0.12;
+    }
+    if (armR.current) {
+      armR.current.rotation.x = dancing ? -1.0 - dance : stride * 0.95 - 0.12;
+      armR.current.rotation.z = moving ? -0.18 : -0.12;
+    }
   });
 
   return (
@@ -492,7 +513,7 @@ export function CharacterMesh(props: CharacterMeshProps) {
           <meshStandardMaterial
             color={shoeColor}
             emissive={character.outfit === "neon" ? character.accentColor : "#000"}
-            emissiveIntensity={character.outfit === "neon" ? 0.4 : 0}
+            emissiveIntensity={character.outfit === "neon" ? 0.18 : 0}
             roughness={0.42}
           />
         </mesh>
@@ -512,7 +533,7 @@ export function CharacterMesh(props: CharacterMeshProps) {
           <meshStandardMaterial
             color={shoeColor}
             emissive={character.outfit === "neon" ? character.accentColor : "#000"}
-            emissiveIntensity={character.outfit === "neon" ? 0.4 : 0}
+            emissiveIntensity={character.outfit === "neon" ? 0.18 : 0}
             roughness={0.42}
           />
         </mesh>

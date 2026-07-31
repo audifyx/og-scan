@@ -144,6 +144,7 @@ export function CityHUD() {
     exitToMenu,
     lobby,
     selectedCityId,
+    resetPlayer,
   } = useCity();
   const isPhone = useIsPhone();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -223,6 +224,17 @@ export function CityHUD() {
             title="Return to main menu"
           >
             Menu
+          </button>
+          <button
+            type="button"
+            className="oxc-toggle-btn"
+            onClick={() => {
+              cityAudio.play("ui");
+              resetPlayer();
+            }}
+            title="Unstuck — return to district spawn"
+          >
+            Stuck?
           </button>
 
           {/* Desktop / tablet extras */}

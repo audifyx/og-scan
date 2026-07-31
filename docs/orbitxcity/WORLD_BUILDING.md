@@ -5,31 +5,47 @@ World configs live under `web/src/lib/orbitxcity/`.
 ## API
 
 ```ts
-import { getWorldBlock } from "@/lib/orbitxcity";
+import { getWorldBlock, getWorldStreets, getTeleportPoints } from "@/lib/orbitxcity";
 
 const block = getWorldBlock(selectedCityId);
+const streets = getWorldStreets(selectedCityId);
 ```
 
-`getWorldBlock(cityId)` returns a `WorldBlockConfig` with spawn, bounds, districts, buildings, billboards, and interaction zones. Frontend should pass that block into the world scene; `CityEnvironment` and owned scenery components accept an optional `block` prop and default to NYC for backward compatibility.
-
-Boston is still locked and currently falls back to the NYC block.
+`getWorldBlock(cityId)` returns a `WorldBlockConfig` with spawn, bounds, districts, buildings, billboards, and interaction zones.
 
 ## Cities
 
-- **NYC** (`demoBlock.ts`) - dense downtown financial hub with trading, launch, meme market, NFT, casino, nightlife, and park districts.
-- **Miami** (`worlds/miamiBlock.ts`) - coastal, open layout with boardwalk streets, pastel/cyan accents, low-rise cabanas, social plazas, community zones, and a sunset launch pier.
-- **LA** (`worlds/laBlock.ts`) - creator strip with a central stage/plaza, magenta/pink accents, creator studios, media billboards, NFT gallery, games backlot, and rooftop social row.
+- **NYC** (`worlds/nycOsmBlock.ts`) — primary Midtown OSM map (extruded footprints). Showcase district.
+- **Miami** (`worlds/miamiBlock.ts`) — coastal authored block.
+- **LA** (`worlds/laBlock.ts`) — creator strip authored block.
+- **Boston** (`worlds/bostonBlock.ts`) — innovation core authored block (unlocked).
+
+`demoBlock.ts` remains as fallback / default only.
+
+## Walk-in buildings
+
+Designed venues (`hq`, `market`, `trading_floor`, `social_hub`, `launch_arena`, `ad_tower`, `shop`, or any building with `interaction`) have:
+
+- South-face collision doorway gaps (`collision.ts`)
+- Automatic enter/exit when walking through the threshold
+- **E = venue tools only** (never teleports)
+
+Generic OSM fill buildings stay solid.
+
+## Streets & traffic
+
+`getWorldStreets(cityId)` drives:
+
+- Asphalt / sidewalks in `Ground.tsx`
+- Cars in `Traffic.tsx` (lane-bound, no hover loops)
+- NPC sidewalk waypoints in `NPCs.tsx`
+
+## Facades
+
+`BuildingMesh` assigns Manhattan-inspired families (brick / limestone / glass / retail) from massing + venue role, with awnings + cornices on high quality.
 
 ## Teleport points
 
-Helpers in `web/src/lib/orbitxcity/worlds/index.ts` expose city-specific teleport metadata:
-
 ```ts
-import { getTeleportPoints } from "@/lib/orbitxcity";
-
 const points = getTeleportPoints(selectedCityId);
 ```
-
-Miami points: Ocean Arrival Plaza, Neon Boardwalk, Community Cabana, Social Sands, Coastal Market, Sunset Launch Pier.
-
-LA points: Creator Stage Plaza, Creator Strip West, Creator Strip East, Melrose NFT Gallery, Arcade Backlot, Rooftop Social.

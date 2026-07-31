@@ -402,23 +402,57 @@ export function InteriorRoom({
         <planeGeometry args={[w, d]} />
         <meshStandardMaterial color="#151a20" roughness={0.8} side={2} />
       </mesh>
+      {/* North wall */}
+      <mesh position={[0, h / 2, -d / 2]} castShadow receiveShadow>
+        <boxGeometry args={[w, h, 0.18]} />
+        <meshStandardMaterial color="#1c242c" roughness={0.68} metalness={0.22} />
+      </mesh>
+      {/* South wall split around open doorway */}
+      {([-1, 1] as const).map((side) => {
+        const doorW = Math.min(2.8, Math.max(1.8, w * 0.28));
+        const seg = Math.max(0.2, (w - doorW - 0.35) / 2);
+        return (
+          <mesh key={`sw-${side}`} position={[side * (doorW / 2 + seg / 2 + 0.1), h / 2, d / 2]} castShadow receiveShadow>
+            <boxGeometry args={[seg, h, 0.18]} />
+            <meshStandardMaterial color="#1c242c" roughness={0.68} metalness={0.22} />
+          </mesh>
+        );
+      })}
+      {/* East / west walls */}
+      <mesh position={[-w / 2, h / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.18, h, d]} />
+        <meshStandardMaterial color="#1c242c" roughness={0.68} metalness={0.22} />
+      </mesh>
+      <mesh position={[w / 2, h / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.18, h, d]} />
+        <meshStandardMaterial color="#1c242c" roughness={0.68} metalness={0.22} />
+      </mesh>
+
+      {/* Street-facing window slits — light continuity with Midtown */}
       {[
-        { pos: [0, h / 2, -d / 2] as const, size: [w, h, 0.18] as const },
-        { pos: [0, h / 2, d / 2] as const, size: [w, h, 0.18] as const },
-        { pos: [-w / 2, h / 2, 0] as const, size: [0.18, h, d] as const },
-        { pos: [w / 2, h / 2, 0] as const, size: [0.18, h, d] as const },
-      ].map((wall, i) => (
-        <mesh key={i} position={wall.pos} castShadow receiveShadow>
-          <boxGeometry args={wall.size} />
-          <meshStandardMaterial color="#1c242c" roughness={0.68} metalness={0.22} />
+        { pos: [0, h * 0.62, -d / 2 + 0.12] as const, size: [w * 0.55, 0.55, 0.06] as const },
+        { pos: [-w / 2 + 0.12, h * 0.55, -d * 0.15] as const, size: [0.06, 0.7, d * 0.35] as const },
+        { pos: [w / 2 - 0.12, h * 0.55, -d * 0.15] as const, size: [0.06, 0.7, d * 0.35] as const },
+      ].map((win, i) => (
+        <mesh key={`win-${i}`} position={win.pos}>
+          <boxGeometry args={win.size} />
+          <meshStandardMaterial
+            color="#0a1218"
+            emissive={building.accent}
+            emissiveIntensity={0.35}
+            transparent
+            opacity={0.85}
+            toneMapped={false}
+          />
         </mesh>
       ))}
 
       <pointLight position={[0, h - 0.4, 0]} intensity={1.35} distance={13} color="#efe6d6" />
       <pointLight position={[0, 1.8, -d / 2 + 0.8]} intensity={0.7} distance={9} color={building.accent} />
+      <pointLight position={[0, 1.4, d / 2 - 0.6]} intensity={0.45} distance={6} color="#cfe8ff" />
 
       <Text
-        position={[0, h - 0.5, d / 2 - 0.22]}
+        position={[0, h - 0.5, -d / 2 + 0.22]}
         fontSize={0.26}
         color="#eef2f4"
         anchorX="center"
@@ -431,14 +465,14 @@ export function InteriorRoom({
         {roomTitle(theme, building)}
       </Text>
       <Text
-        position={[0, 2.35, d / 2 - 1.5]}
-        fontSize={0.18}
+        position={[0, 2.2, d / 2 - 1.35]}
+        fontSize={0.16}
         color="#d5e0e8"
         anchorX="center"
         outlineWidth={0.012}
         outlineColor="#0a1014"
       >
-        TAP glowing stations · E exits
+        Walk out the door · E opens tools · TAP stations
       </Text>
 
       <ThemeSet theme={theme} width={w} depth={d} height={h} accent={building.accent} building={building} />
@@ -455,8 +489,8 @@ export function InteriorRoom({
         <circleGeometry args={[0.75, 28]} />
         <meshStandardMaterial color="#6a8f6e" emissive="#3d5c3a" emissiveIntensity={0.32} />
       </mesh>
-      <Text position={[0, 1.05, d / 2 - 0.9]} fontSize={0.26} color="#d8e8d6" anchorX="center" outlineWidth={0.02} outlineColor="#1a221c">
-        [E] EXIT TO STREET
+      <Text position={[0, 1.05, d / 2 - 0.9]} fontSize={0.22} color="#d8e8d6" anchorX="center" outlineWidth={0.02} outlineColor="#1a221c">
+        DOOR → STREET
       </Text>
     </group>
   );

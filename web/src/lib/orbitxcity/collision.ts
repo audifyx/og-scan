@@ -9,7 +9,51 @@ export function interiorMetrics(building: BuildingDefinition) {
   return { width, depth, theme, solids: furnitureSolids(theme, width, depth) };
 }
 
-/** 2D collision against building AABBs + world bounds. */
+/** Depth of the passable south doorway slot carved out of a facade. */
+const DOOR_GAP_DEPTH = 1.6;
+
+/** Structural kinds that represent designed, enterable OrbitX venues. */
+const VENUE_KINDS = new Set<string>([
+  "hq",
+  "market",
+  "trading_floor",
+  "social_hub",
+  "launch_arena",
+  "ad_tower",
+  "shop",
+]);
+
+/**
+ * A building is "walk-in" (has a physical doorway you can stroll through) only
+ * when it is a designed venue — one with a venue interaction or a venue kind.
+ * Generic city/OSM fill buildings stay solid.
+ */
+export function isWalkInBuilding(b: BuildingDefinition): boolean {
+  return Boolean(b.interaction) || VENUE_KINDS.has(b.kind);
+}
+
+/** Physical door opening width — shared by facade geometry and collision gap. */
+export function buildingDoorWidth(b: BuildingDefinition): number {
+  return Math.min(2.8, Math.max(1.8, b.size.width * 0.3));
+}
+
+/** World-space south face + doorway of a walk-in building. */
+export function buildingDoorway(b: BuildingDefinition) {
+  return {
+    cx: b.position.x,
+    faceZ: b.position.z + b.size.depth / 2,
+    halfDoor: buildingDoorWidth(b) / 2,
+  };
+}
+
+/** True when point (x,z) sits inside the open south doorway slot of `b`. */
+function inDoorwaySlot(x: number, z: number, radius: number, b: BuildingDefinition): boolean {
+  if (!isWalkInBuilding(b)) return false;
+  const { cx, faceZ, halfDoor } = buildingDoorway(b);
+  return Math.abs(x - cx) + radius <= halfDoor && z + radius > faceZ - DOOR_GAP_DEPTH;
+}
+
+/** 2D collision against building AABBs + world bounds, with south doorway gaps. */
 export function collidesAt(
   x: number,
   z: number,
@@ -25,6 +69,7 @@ export function collidesAt(
     const minZ = b.position.z - b.size.depth / 2;
     const maxZ = b.position.z + b.size.depth / 2;
     if (x + radius > minX && x - radius < maxX && z + radius > minZ && z - radius < maxZ) {
+      if (inDoorwaySlot(x, z, radius, b)) continue;
       return true;
     }
   }
@@ -32,10 +77,8 @@ export function collidesAt(
 }
 
 /**
- * Collision for the active building interior. Coordinates are world-space so
- * this layers cleanly over exterior collision while the active shell is
- * ignored. It keeps players within the furnished room and makes counters /
- * stages solid without adding a heavyweight physics engine.
+ * Collision for the active building interior. South wall has an exit doorway
+ * so the player can walk back out the same opening they entered.
  */
 export function collidesInInterior(
   x: number,
@@ -49,14 +92,18 @@ export function collidesInInterior(
   const halfW = width / 2;
   const halfD = depth / 2;
   const wall = 0.28;
+  const halfDoor = buildingDoorWidth(building) / 2;
 
   if (
     localX - radius < -halfW + wall ||
     localX + radius > halfW - wall ||
-    localZ - radius < -halfD + wall ||
-    localZ + radius > halfD - wall
+    localZ - radius < -halfD + wall
   ) {
     return true;
+  }
+  if (localZ + radius > halfD - wall) {
+    const inDoor = Math.abs(localX) + radius <= halfDoor;
+    if (!inDoor || localZ + radius > halfD + 0.7) return true;
   }
 
   if (theme === "launch" && Math.hypot(localX, localZ + 0.15) < 1.45 + radius) {
@@ -70,6 +117,37 @@ export function collidesInInterior(
       localZ + radius > s.z - s.d / 2 &&
       localZ - radius < s.z + s.d / 2,
   );
+}
+
+/**
+ * Detect the player crossing a building's front threshold, walking inward
+ * (south → north, i.e. decreasing z) through the door opening.
+ */
+export function crossedEntryDoorway(
+  prevZ: number,
+  nextZ: number,
+  x: number,
+  b: BuildingDefinition,
+): boolean {
+  if (!isWalkInBuilding(b)) return false;
+  const { cx, faceZ, halfDoor } = buildingDoorway(b);
+  return prevZ > faceZ && nextZ <= faceZ && Math.abs(x - cx) <= halfDoor;
+}
+
+/**
+ * Detect the player walking back out through the interior's south exit doorway
+ * (north → south, increasing z past the interior wall).
+ */
+export function crossedExitDoorway(
+  prevZ: number,
+  nextZ: number,
+  x: number,
+  b: BuildingDefinition,
+): boolean {
+  const { depth } = interiorMetrics(b);
+  const faceZ = b.position.z + depth / 2;
+  const halfDoor = buildingDoorWidth(b) / 2;
+  return prevZ <= faceZ && nextZ > faceZ && Math.abs(x - b.position.x) <= halfDoor;
 }
 
 /** Deterministic PRNG so world decoration is stable across renders. */
@@ -105,8 +183,6 @@ function cameraSolidsFor(block: WorldBlockConfig, ignoreBuildingId?: string | nu
         minY: 0,
         maxY: b.size.height + 0.7,
       })),
-    // Billboards are rotated thin planes — use a conservative square footprint
-    // so the chase camera never parks inside their neon glow.
     ...block.billboards.map((bb) => {
       const half = bb.width / 2 + 0.4;
       return {
@@ -137,7 +213,11 @@ export function pointInBuilding(
 }
 
 /** Random walkable point inside the block (NPC waypoints, coin spawns). */
-export function randomOpenPoint(rand: () => number, margin = 3, block: WorldBlockConfig = NYC_DEMO_BLOCK): { x: number; z: number } {
+export function randomOpenPoint(
+  rand: () => number,
+  margin = 3,
+  block: WorldBlockConfig = NYC_DEMO_BLOCK,
+): { x: number; z: number } {
   const { bounds } = block;
   for (let i = 0; i < 24; i++) {
     const x = bounds.minX + margin + rand() * (bounds.maxX - bounds.minX - margin * 2);

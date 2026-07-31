@@ -7,7 +7,7 @@ import { useFrame } from "@react-three/fiber";
 import { Text, Billboard, Clone, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { BuildingDefinition } from "@/lib/orbitxcity/types";
-import { hashSeed, mulberry32 } from "@/lib/orbitxcity/collision";
+import { hashSeed, mulberry32, isWalkInBuilding, buildingDoorWidth } from "@/lib/orbitxcity/collision";
 import { createFacadeTexture } from "@/lib/orbitxcity/textures";
 import { CITY_BUILDING_MODELS } from "@/lib/orbitxcity/assets/catalog";
 import { getBuildingKit, gltfPathForBuilding } from "@/lib/orbitxcity/assets/buildingKits";
@@ -15,6 +15,77 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 
 const ROOF_MAT = new THREE.MeshStandardMaterial({ color: "#3e464e", metalness: 0.28, roughness: 0.72 });
 const CITY_MODEL_PATHS = Object.values(CITY_BUILDING_MODELS);
+
+/** Manhattan-inspired facade family from massing + venue role. */
+export type FacadeFamily = "brick" | "limestone" | "glass" | "retail";
+
+export function facadeFamily(b: BuildingDefinition): FacadeFamily {
+  const { height, width } = b.size;
+  if (b.interaction || b.kind === "shop") return "retail";
+  if (height >= 20) return "glass";
+  if (height >= 11 && width >= 9) return "limestone";
+  return "brick";
+}
+
+const FAMILY_TRIM: Record<FacadeFamily, string> = {
+  brick: "#6a4a3a",
+  limestone: "#b9b2a0",
+  glass: "#3a4652",
+  retail: "#2a3038",
+};
+
+const FAMILY_WALL: Record<FacadeFamily, string> = {
+  brick: "#6b3f32",
+  limestone: "#c4b6a0",
+  glass: "#1a222c",
+  retail: "#3a3530",
+};
+
+function Cornice({ w, d, y, color }: { w: number; d: number; y: number; color: string }) {
+  return (
+    <group position={[0, y, 0]}>
+      <mesh castShadow>
+        <boxGeometry args={[w + 0.5, 0.5, d + 0.5]} />
+        <meshStandardMaterial color={color} metalness={0.14} roughness={0.82} />
+      </mesh>
+      <mesh position={[0, -0.36, 0]}>
+        <boxGeometry args={[w + 0.24, 0.26, d + 0.24]} />
+        <meshStandardMaterial color={color} metalness={0.1} roughness={0.86} />
+      </mesh>
+    </group>
+  );
+}
+
+function Awning({ w, z, accent }: { w: number; z: number; accent: string }) {
+  return (
+    <group position={[0, 2.8, z + 0.55]}>
+      <mesh rotation={[-0.34, 0, 0]} castShadow>
+        <boxGeometry args={[w, 0.08, 1.15]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.16} metalness={0.2} roughness={0.6} />
+      </mesh>
+      <mesh position={[0, -0.24, 0.04]}>
+        <boxGeometry args={[w, 0.22, 0.05]} />
+        <meshStandardMaterial color="#0a1016" emissive={accent} emissiveIntensity={0.3} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function RoofCrown({ y, radius, accent }: { y: number; radius: number; accent: string }) {
+  return (
+    <mesh position={[0, y + 0.55, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <torusGeometry args={[Math.max(1, radius), 0.12, 8, 40]} />
+      <meshStandardMaterial
+        color={accent}
+        emissive={accent}
+        emissiveIntensity={0.9}
+        toneMapped={false}
+        metalness={0.4}
+        roughness={0.3}
+      />
+    </mesh>
+  );
+}
 
 interface Tier {
   w: number;
@@ -276,11 +347,12 @@ function FacadeTier({
   index: number;
 }) {
   const materials = useMemo(() => {
+    const family = facadeFamily(building);
     const tex = createFacadeTexture(
       hashSeed(`${building.id}-tier-${index}`),
       Math.max(tier.w, tier.d),
       tier.h,
-      building.color,
+      FAMILY_WALL[family],
       building.accent,
       tier.ground,
     );
@@ -288,12 +360,12 @@ function FacadeTier({
       map: tex,
       emissiveMap: tex,
       emissive: new THREE.Color("#ffffff"),
-      emissiveIntensity: 0.16,
-      metalness: 0.2,
-      roughness: 0.74,
+      emissiveIntensity: family === "glass" ? 0.22 : 0.14,
+      metalness: family === "glass" ? 0.45 : 0.18,
+      roughness: family === "glass" ? 0.35 : 0.78,
     });
     return [side, side, ROOF_MAT, ROOF_MAT, side, side];
-  }, [building.id, building.color, building.accent, tier.w, tier.d, tier.h, tier.ground, index]);
+  }, [building, tier.w, tier.d, tier.h, tier.ground, index]);
 
   return (
     <group>
@@ -335,11 +407,12 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
   }, [footprint, height]);
 
   const material = useMemo(() => {
+    const family = facadeFamily(building);
     const tex = createFacadeTexture(
       hashSeed(`${building.id}-footprint`),
       Math.max(building.size.width, building.size.depth),
       height,
-      building.color,
+      FAMILY_WALL[family],
       building.accent,
       true,
     );
@@ -347,11 +420,11 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
       map: tex,
       emissiveMap: tex,
       emissive: new THREE.Color("#ffffff"),
-      emissiveIntensity: 0.16,
-      metalness: 0.24,
-      roughness: 0.7,
+      emissiveIntensity: family === "glass" ? 0.22 : 0.14,
+      metalness: family === "glass" ? 0.42 : 0.2,
+      roughness: family === "glass" ? 0.38 : 0.72,
     });
-  }, [building.id, building.color, building.accent, building.size.width, building.size.depth, height]);
+  }, [building, height]);
 
   return (
     <>
@@ -385,7 +458,7 @@ function FootprintShell({ building }: { building: BuildingDefinition }) {
 }
 
 export function BuildingMesh({ building }: { building: BuildingDefinition }) {
-  const { enterBuilding, quality } = useCity();
+  const { openVenue, quality } = useCity();
   const { position, size, accent, label, name } = building;
   const rand = useMemo(() => mulberry32(hashSeed(`bld-${building.id}`)), [building.id]);
   const kit = useMemo(() => getBuildingKit(building.kind), [building.kind]);
@@ -399,8 +472,11 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
   const tiers = useMemo(() => buildTiers(building, rand), [building, rand]);
   const top = tiers[tiers.length - 1]!;
   const roofY = hasFootprint ? size.height : top.yBase + top.h;
-  const doorW = Math.min(2.4, Math.max(1.4, size.width * 0.28));
+  const walkIn = isWalkInBuilding(building);
+  const doorW = buildingDoorWidth(building);
   const isHq = building.kind === "hq" || building.interaction === "hq";
+  const family = facadeFamily(building);
+  const showCornice = quality === "high" && (family === "brick" || family === "limestone");
 
   return (
     <group position={[position.x, 0, position.z]}>
@@ -448,23 +524,49 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         seed={hashSeed(`graf-${building.id}`)}
       />
 
-      {/* Ground-floor storefront + neon marquee */}
-      <mesh position={[0, 1.55, size.depth / 2 + 0.02]} castShadow>
-        <boxGeometry args={[Math.min(size.width * 0.92, size.width - 0.4), 3.0, 0.12]} />
-        <meshStandardMaterial color="#12171d" metalness={0.35} roughness={0.45} />
-      </mesh>
-      <mesh position={[0, 1.55, size.depth / 2 + 0.09]}>
-        <planeGeometry args={[Math.min(size.width * 0.85, size.width - 0.8), 2.55]} />
-        <meshStandardMaterial
-          color="#0a121c"
-          emissive={accent}
-          emissiveIntensity={building.interaction ? marqueeIntensity * 0.35 : marqueeIntensity * 0.12}
-          metalness={0.2}
-          roughness={0.32}
-          transparent
-          opacity={0.92}
-        />
-      </mesh>
+      {showCornice && <Cornice w={hasFootprint ? size.width * 0.92 : top.w} d={hasFootprint ? size.depth * 0.92 : top.d} y={roofY} color={FAMILY_TRIM[family]} />}
+      {walkIn && (
+        <>
+          <Awning w={Math.min(doorW + 1.6, size.width - 0.6)} z={size.depth / 2} accent={accent} />
+          <RoofCrown y={roofY} radius={Math.min(size.width, size.depth) * 0.32} accent={accent} />
+        </>
+      )}
+
+      {/* Ground-floor storefront — split around doorway for walk-in venues */}
+      {(() => {
+        const totalW = Math.min(size.width * 0.92, size.width - 0.4);
+        const glassW = Math.min(size.width * 0.85, size.width - 0.8);
+        const openW = walkIn ? doorW + 0.9 : 0;
+        const segFrame = walkIn ? Math.max(0, (totalW - openW) / 2) : totalW;
+        const segGlass = walkIn ? Math.max(0, (glassW - openW) / 2) : glassW;
+        const sides = walkIn ? [-1, 1] : [0];
+        return sides.map((s) => {
+          const cx = walkIn ? s * (openW / 2 + segFrame / 2) : 0;
+          if (walkIn && segFrame <= 0.05) return null;
+          return (
+            <group key={`store-${s}`}>
+              <mesh position={[cx, 1.55, size.depth / 2 + 0.02]} castShadow>
+                <boxGeometry args={[segFrame, 3.0, 0.12]} />
+                <meshStandardMaterial color={FAMILY_WALL[family]} metalness={0.28} roughness={0.55} />
+              </mesh>
+              {segGlass > 0.05 && (
+                <mesh position={[cx, 1.55, size.depth / 2 + 0.09]}>
+                  <planeGeometry args={[segGlass, 2.55]} />
+                  <meshStandardMaterial
+                    color="#0a121c"
+                    emissive={accent}
+                    emissiveIntensity={building.interaction ? marqueeIntensity * 0.35 : marqueeIntensity * 0.12}
+                    metalness={0.2}
+                    roughness={0.32}
+                    transparent
+                    opacity={0.92}
+                  />
+                </mesh>
+              )}
+            </group>
+          );
+        });
+      })()}
       <mesh position={[0, 3.35, size.depth / 2 + 0.2]} castShadow>
         <boxGeometry
           args={[
@@ -501,49 +603,50 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
         </Text>
       )}
 
-      {/* Recessed enterable door */}
-      <mesh position={[0, 1.05, size.depth / 2 + 0.12]} castShadow>
-        <boxGeometry args={[doorW + 0.4, 2.45, 0.18]} />
+      {/* Open doorway — walk through to enter; click opens venue tools */}
+      <mesh position={[-doorW / 2 - 0.12, 1.15, size.depth / 2 + 0.1]} castShadow>
+        <boxGeometry args={[0.22, 2.5, 0.22]} />
         <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
       </mesh>
-      <mesh
-        position={[0, 1.05, size.depth / 2 + 0.22]}
-        onClick={(e) => {
-          e.stopPropagation();
-          enterBuilding(building.id);
-        }}
-      >
-        <planeGeometry args={[doorW, 2.1]} />
-        <meshStandardMaterial
-          color="#0c1014"
-          emissive={accent}
-          emissiveIntensity={0.28}
-          metalness={0.15}
-          roughness={0.4}
-        />
+      <mesh position={[doorW / 2 + 0.12, 1.15, size.depth / 2 + 0.1]} castShadow>
+        <boxGeometry args={[0.22, 2.5, 0.22]} />
+        <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
       </mesh>
-      <mesh position={[-doorW * 0.18, 1.05, size.depth / 2 + 0.24]}>
-        <sphereGeometry args={[0.04, 8, 8]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.9} toneMapped={false} />
+      <mesh position={[0, 2.4, size.depth / 2 + 0.12]} castShadow>
+        <boxGeometry args={[doorW + 0.55, 0.18, 0.28]} />
+        <meshStandardMaterial color="#2a3036" metalness={0.25} roughness={0.65} />
       </mesh>
+      {walkIn ? (
+        <mesh position={[0, 1.05, size.depth / 2 - 0.05]}>
+          <planeGeometry args={[doorW * 0.92, 2.05]} />
+          <meshStandardMaterial color="#080c10" transparent opacity={0.35} depthWrite={false} />
+        </mesh>
+      ) : (
+        <mesh
+          position={[0, 1.05, size.depth / 2 + 0.22]}
+          onClick={(e) => {
+            e.stopPropagation();
+            openVenue(building.id);
+          }}
+        >
+          <planeGeometry args={[doorW, 2.1]} />
+          <meshStandardMaterial color="#0c1014" emissive={accent} emissiveIntensity={0.28} metalness={0.15} roughness={0.4} />
+        </mesh>
+      )}
       <Text
-        position={[0, 0.32, size.depth / 2 + 0.26]}
-        fontSize={0.16}
+        position={[0, 0.28, size.depth / 2 + 0.28]}
+        fontSize={0.14}
         color={accent}
         anchorX="center"
         outlineWidth={0.01}
         outlineColor="#05080c"
         onClick={(e) => {
           e.stopPropagation();
-          enterBuilding(building.id);
+          openVenue(building.id);
         }}
       >
-        {building.interaction ? "CLICK · ENTER" : "ENTER"}
+        {walkIn ? "WALK IN · E TOOLS" : "E · VENUE"}
       </Text>
-      <mesh position={[0, 2.4, size.depth / 2 + 0.42]} castShadow>
-        <boxGeometry args={[doorW + 0.75, 0.14, 0.6]} />
-        <meshStandardMaterial color="#3a4046" metalness={0.25} roughness={0.7} />
-      </mesh>
       <mesh position={[0, 0.02, size.depth / 2 + 1.15]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[doorW + 2.6, 2.4]} />
         <meshStandardMaterial color="#6a7178" roughness={0.9} metalness={0.06} />
