@@ -24,13 +24,20 @@ function segmentLength(s: StreetSegment): number {
   return Math.abs(s.to - s.from);
 }
 
-function pointOnSegment(s: StreetSegment, t: number, reverse: boolean): { x: number; z: number; yaw: number } {
+function pointOnSegment(
+  s: StreetSegment,
+  t: number,
+  reverse: boolean,
+  laneOffset = 0,
+): { x: number; z: number; yaw: number } {
   const u = reverse ? 1 - t : t;
   const a = s.from + (s.to - s.from) * u;
+  // Opposite travel sits in the opposite lane half
+  const lane = (reverse ? -1 : 1) * Math.min(1.1, s.w * 0.22) + laneOffset;
   if (s.o === "h") {
-    return { x: a, z: s.at, yaw: reverse ? -Math.PI / 2 : Math.PI / 2 };
+    return { x: a, z: s.at + lane, yaw: reverse ? -Math.PI / 2 : Math.PI / 2 };
   }
-  return { x: s.at, z: a, yaw: reverse ? Math.PI : 0 };
+  return { x: s.at + lane, z: a, yaw: reverse ? Math.PI : 0 };
 }
 
 function StreetCar({
@@ -96,7 +103,7 @@ export function Traffic({ count = 6, block }: { count?: number; block?: WorldBlo
   const cars = useMemo<LaneCar[]>(() => {
     if (!streets.length) return [];
     const sorted = [...streets].sort((a, b) => segmentLength(b) - segmentLength(a));
-    const n = Math.max(1, Math.min(count, sorted.length * 2, 10));
+    const n = Math.max(1, Math.min(count, sorted.length * 2, 14));
     const out: LaneCar[] = [];
     for (let i = 0; i < n; i++) {
       const segmentIndex = i % sorted.length;

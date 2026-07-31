@@ -28,6 +28,8 @@ function LampField({ block }: { block: WorldBlockConfig }) {
       }
     }
 
+    if (!spots.length) return { poles: null, heads: null };
+
     const poleGeo = new THREE.CylinderGeometry(0.07, 0.1, 4.8, 8);
     const poleMat = new THREE.MeshStandardMaterial({ color: "#1a2232", metalness: 0.75, roughness: 0.3 });
     const polesMesh = new THREE.InstancedMesh(poleGeo, poleMat, spots.length);
@@ -53,6 +55,8 @@ function LampField({ block }: { block: WorldBlockConfig }) {
     headsMesh.instanceMatrix.needsUpdate = true;
     return { poles: polesMesh, heads: headsMesh };
   }, [block, streets]);
+
+  if (!poles || !heads) return null;
 
   return (
     <group>
@@ -159,12 +163,98 @@ function StreetFurniture({ block }: { block: WorldBlockConfig }) {
   );
 }
 
-/** Street furniture: lamps, crossings, benches, and quiet zone markers. */
+const CURB_SPACING = 11;
+
+/** Hydrants, trash cans, bollards — sidewalk-bound from the street graph. */
+function SidewalkScatter({ block }: { block: WorldBlockConfig }) {
+  const streets = getWorldStreets(block.cityId);
+  const { hydrants, cans, bollards } = useMemo(() => {
+    type Spot = { x: number; z: number; yaw: number };
+    const hydrantSpots: Spot[] = [];
+    const canSpots: Spot[] = [];
+    const bollardSpots: Spot[] = [];
+
+    streets.forEach((s, si) => {
+      const curb = s.w / 2 + 0.85;
+      for (let t = s.from + 4; t <= s.to - 3; t += CURB_SPACING) {
+        const side = ((Math.floor(t / CURB_SPACING) + si) % 2 === 0 ? 1 : -1);
+        const x = s.o === "h" ? t : s.at + side * curb;
+        const z = s.o === "h" ? s.at + side * curb : t;
+        if (collidesAt(x, z, 0.35, block)) continue;
+        const yaw = s.o === "h" ? 0 : Math.PI / 2;
+        const kind = (Math.floor(t * 3 + si * 7) % 5);
+        if (kind === 0) hydrantSpots.push({ x, z, yaw });
+        else if (kind === 1 || kind === 2) canSpots.push({ x, z, yaw });
+        else bollardSpots.push({ x, z, yaw });
+      }
+    });
+
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const scale = new THREE.Vector3(1, 1, 1);
+
+    const pack = (
+      spots: Spot[],
+      geo: THREE.BufferGeometry,
+      mat: THREE.Material,
+      y: number,
+    ) => {
+      if (!spots.length) return null;
+      const mesh = new THREE.InstancedMesh(geo, mat, spots.length);
+      spots.forEach((p, i) => {
+        q.setFromEuler(new THREE.Euler(0, p.yaw, 0));
+        m.compose(new THREE.Vector3(p.x, y, p.z), q, scale);
+        mesh.setMatrixAt(i, m);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.castShadow = true;
+      return mesh;
+    };
+
+    return {
+      hydrants: pack(
+        hydrantSpots,
+        new THREE.CylinderGeometry(0.16, 0.2, 0.72, 8),
+        new THREE.MeshStandardMaterial({ color: "#b23a3a", metalness: 0.45, roughness: 0.48 }),
+        0.36,
+      ),
+      cans: pack(
+        canSpots,
+        new THREE.CylinderGeometry(0.22, 0.24, 0.85, 10),
+        new THREE.MeshStandardMaterial({ color: "#3a424c", metalness: 0.55, roughness: 0.42 }),
+        0.42,
+      ),
+      bollards: pack(
+        bollardSpots,
+        new THREE.CylinderGeometry(0.09, 0.11, 0.95, 8),
+        new THREE.MeshStandardMaterial({
+          color: "#c5a26f",
+          metalness: 0.5,
+          roughness: 0.4,
+          emissive: "#c5a26f",
+          emissiveIntensity: 0.12,
+        }),
+        0.48,
+      ),
+    };
+  }, [block, streets]);
+
+  return (
+    <group>
+      {hydrants && <primitive object={hydrants} />}
+      {cans && <primitive object={cans} />}
+      {bollards && <primitive object={bollards} />}
+    </group>
+  );
+}
+
+/** Street furniture: lamps, crossings, benches, curb scatter, zone markers. */
 export function StreetProps({ block = NYC_DEMO_BLOCK }: { block?: WorldBlockConfig }) {
   return (
     <group>
       <LampField block={block} />
       <Crosswalks block={block} />
+      <SidewalkScatter block={block} />
       <StreetFurniture block={block} />
       {block.zones.slice(0, 6).map((zone) => (
         <ZoneMarker key={zone.id} x={zone.position.x} z={zone.position.z} />

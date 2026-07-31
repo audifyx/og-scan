@@ -12,6 +12,119 @@ import { useCity } from "@/pages/orbitxcity/CityProvider";
 import { GltfProp } from "./GltfProp";
 import { useMemo } from "react";
 
+type RoomPalette = {
+  floor: string;
+  wall: string;
+  ceiling: string;
+  entry: string;
+  key: string;
+  fill: string;
+  floorRough: number;
+  floorMetal: number;
+  keyIntensity: number;
+};
+
+function roomPalette(theme: RoomTheme): RoomPalette {
+  switch (theme) {
+    case "hq":
+      return {
+        floor: "#0c1218",
+        wall: "#152028",
+        ceiling: "#0e141a",
+        entry: "#101820",
+        key: "#d8ebe4",
+        fill: "#c5a26f",
+        floorRough: 0.32,
+        floorMetal: 0.48,
+        keyIntensity: 1.45,
+      };
+    case "trade":
+      return {
+        floor: "#101820",
+        wall: "#18222c",
+        ceiling: "#0c1218",
+        entry: "#121a22",
+        key: "#cfe4f0",
+        fill: "#3de7ff",
+        floorRough: 0.45,
+        floorMetal: 0.35,
+        keyIntensity: 1.5,
+      };
+    case "club":
+      return {
+        floor: "#120e18",
+        wall: "#1a1222",
+        ceiling: "#0e0a14",
+        entry: "#18101e",
+        key: "#f0c8e0",
+        fill: "#ff4d9a",
+        floorRough: 0.4,
+        floorMetal: 0.42,
+        keyIntensity: 1.2,
+      };
+    case "market":
+      return {
+        floor: "#1a1814",
+        wall: "#242018",
+        ceiling: "#161410",
+        entry: "#1e1a14",
+        key: "#f0e2c8",
+        fill: "#c5a26f",
+        floorRough: 0.7,
+        floorMetal: 0.15,
+        keyIntensity: 1.35,
+      };
+    case "launch":
+      return {
+        floor: "#2a2418",
+        wall: "#2c261c",
+        ceiling: "#1a160e",
+        entry: "#241e14",
+        key: "#f7ecd0",
+        fill: "#ffb84d",
+        floorRough: 0.62,
+        floorMetal: 0.22,
+        keyIntensity: 1.4,
+      };
+    case "theater":
+      return {
+        floor: "#12161c",
+        wall: "#1a2028",
+        ceiling: "#0c1016",
+        entry: "#141a20",
+        key: "#e8eef4",
+        fill: "#a78bfa",
+        floorRough: 0.55,
+        floorMetal: 0.25,
+        keyIntensity: 1.25,
+      };
+    case "lounge":
+      return {
+        floor: "#1a1c22",
+        wall: "#22262e",
+        ceiling: "#141820",
+        entry: "#1c2028",
+        key: "#efe6d6",
+        fill: "#00ff9f",
+        floorRough: 0.6,
+        floorMetal: 0.2,
+        keyIntensity: 1.3,
+      };
+    default:
+      return {
+        floor: "#1a1f26",
+        wall: "#1c242c",
+        ceiling: "#151a20",
+        entry: "#10161c",
+        key: "#efe6d6",
+        fill: "#cfe8ff",
+        floorRough: 0.55,
+        floorMetal: 0.28,
+        keyIntensity: 1.35,
+      };
+  }
+}
+
 function FurnitureLayer({
   theme,
   width,
@@ -377,35 +490,26 @@ export function InteriorRoom({
   const d = Math.max(5.4, Math.min(14, building.size.depth - 0.8));
   const h = Math.min(4.5, Math.max(3.4, building.size.height * 0.32));
   const { x, z } = building.position;
-  const floor =
-    theme === "hq"
-      ? "#0c1218"
-      : theme === "club"
-        ? "#121018"
-        : theme === "launch"
-          ? "#2a2418"
-          : theme === "trade"
-            ? "#121820"
-            : "#1a1f26";
+  const palette = roomPalette(theme);
 
   return (
     <group position={[x, 0, z]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} receiveShadow>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial color={floor} roughness={0.55} metalness={0.28} />
+        <meshStandardMaterial color={palette.floor} roughness={palette.floorRough} metalness={palette.floorMetal} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.055, d / 2 - 1.5]}>
         <planeGeometry args={[Math.min(w - 1, 3.4), 1.2]} />
-        <meshStandardMaterial color="#10161c" emissive={building.accent} emissiveIntensity={0.18} />
+        <meshStandardMaterial color={palette.entry} emissive={building.accent} emissiveIntensity={0.2} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, h, 0]}>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial color="#151a20" roughness={0.8} side={2} />
+        <meshStandardMaterial color={palette.ceiling} roughness={0.8} side={2} />
       </mesh>
       {/* North wall */}
       <mesh position={[0, h / 2, -d / 2]} castShadow receiveShadow>
         <boxGeometry args={[w, h, 0.18]} />
-        <meshStandardMaterial color="#1c242c" roughness={0.68} metalness={0.22} />
+        <meshStandardMaterial color={palette.wall} roughness={0.68} metalness={0.22} />
       </mesh>
       {/* South wall split around open doorway */}
       {([-1, 1] as const).map((side) => {
@@ -414,18 +518,18 @@ export function InteriorRoom({
         return (
           <mesh key={`sw-${side}`} position={[side * (doorW / 2 + seg / 2 + 0.1), h / 2, d / 2]} castShadow receiveShadow>
             <boxGeometry args={[seg, h, 0.18]} />
-            <meshStandardMaterial color="#1c242c" roughness={0.68} metalness={0.22} />
+            <meshStandardMaterial color={palette.wall} roughness={0.68} metalness={0.22} />
           </mesh>
         );
       })}
       {/* East / west walls */}
       <mesh position={[-w / 2, h / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.18, h, d]} />
-        <meshStandardMaterial color="#1c242c" roughness={0.68} metalness={0.22} />
+        <meshStandardMaterial color={palette.wall} roughness={0.68} metalness={0.22} />
       </mesh>
       <mesh position={[w / 2, h / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.18, h, d]} />
-        <meshStandardMaterial color="#1c242c" roughness={0.68} metalness={0.22} />
+        <meshStandardMaterial color={palette.wall} roughness={0.68} metalness={0.22} />
       </mesh>
 
       {/* Street-facing window slits — light continuity with Midtown */}
@@ -439,7 +543,7 @@ export function InteriorRoom({
           <meshStandardMaterial
             color="#0a1218"
             emissive={building.accent}
-            emissiveIntensity={0.35}
+            emissiveIntensity={0.4}
             transparent
             opacity={0.85}
             toneMapped={false}
@@ -447,9 +551,9 @@ export function InteriorRoom({
         </mesh>
       ))}
 
-      <pointLight position={[0, h - 0.4, 0]} intensity={1.35} distance={13} color="#efe6d6" />
-      <pointLight position={[0, 1.8, -d / 2 + 0.8]} intensity={0.7} distance={9} color={building.accent} />
-      <pointLight position={[0, 1.4, d / 2 - 0.6]} intensity={0.45} distance={6} color="#cfe8ff" />
+      <pointLight position={[0, h - 0.4, 0]} intensity={palette.keyIntensity} distance={13} color={palette.key} />
+      <pointLight position={[0, 1.8, -d / 2 + 0.8]} intensity={0.75} distance={9} color={building.accent} />
+      <pointLight position={[0, 1.4, d / 2 - 0.6]} intensity={0.5} distance={6} color={palette.fill} />
 
       <Text
         position={[0, h - 0.5, -d / 2 + 0.22]}

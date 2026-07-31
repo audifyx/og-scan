@@ -163,14 +163,14 @@ function NeonWindowStrips({
 }) {
   const strips = useMemo(() => {
     const r = mulberry32(seed);
-    const rows = Math.max(2, Math.floor(h / 2.4));
+    const rows = Math.max(2, Math.floor(h / 1.9));
     const out: Array<{ x: number; y: number; z: number; ww: number; side: 0 | 1 | 2 | 3 }> = [];
     for (let row = 0; row < rows; row++) {
       const y = yBase + 1.1 + row * (h / (rows + 0.4));
       if (y > yBase + h - 0.6) continue;
       for (const side of [0, 1, 2, 3] as const) {
-        if (r() > 0.72) continue;
-        const ww = Math.min(w, d) * (0.35 + r() * 0.35);
+        if (r() > 0.58) continue;
+        const ww = Math.min(w, d) * (0.28 + r() * 0.42);
         out.push({ x: 0, y, z: 0, ww, side });
       }
     }
@@ -525,146 +525,134 @@ export function BuildingMesh({ building }: { building: BuildingDefinition }) {
       />
 
       {showCornice && <Cornice w={hasFootprint ? size.width * 0.92 : top.w} d={hasFootprint ? size.depth * 0.92 : top.d} y={roofY} color={FAMILY_TRIM[family]} />}
+
+      {/* Generic fill: solid base band only — no fake doors on every OSM box */}
+      {!walkIn && (
+        <mesh position={[0, 1.35, size.depth / 2 + 0.02]} castShadow>
+          <boxGeometry args={[Math.min(size.width * 0.96, size.width - 0.2), 2.7, 0.1]} />
+          <meshStandardMaterial color={FAMILY_TRIM[family]} metalness={0.22} roughness={0.72} />
+        </mesh>
+      )}
+
       {walkIn && (
         <>
           <Awning w={Math.min(doorW + 1.6, size.width - 0.6)} z={size.depth / 2} accent={accent} />
           <RoofCrown y={roofY} radius={Math.min(size.width, size.depth) * 0.32} accent={accent} />
+
+          {/* Storefront split around open doorway */}
+          {([-1, 1] as const).map((s) => {
+            const totalW = Math.min(size.width * 0.92, size.width - 0.4);
+            const glassW = Math.min(size.width * 0.85, size.width - 0.8);
+            const openW = doorW + 0.9;
+            const segFrame = Math.max(0, (totalW - openW) / 2);
+            const segGlass = Math.max(0, (glassW - openW) / 2);
+            const cx = s * (openW / 2 + segFrame / 2);
+            if (segFrame <= 0.05) return null;
+            return (
+              <group key={`store-${s}`}>
+                <mesh position={[cx, 1.55, size.depth / 2 + 0.02]} castShadow>
+                  <boxGeometry args={[segFrame, 3.0, 0.12]} />
+                  <meshStandardMaterial color={FAMILY_WALL[family]} metalness={0.28} roughness={0.55} />
+                </mesh>
+                {segGlass > 0.05 && (
+                  <mesh position={[cx, 1.55, size.depth / 2 + 0.09]}>
+                    <planeGeometry args={[segGlass, 2.55]} />
+                    <meshStandardMaterial
+                      color="#0a121c"
+                      emissive={accent}
+                      emissiveIntensity={marqueeIntensity * 0.38}
+                      metalness={0.2}
+                      roughness={0.32}
+                      transparent
+                      opacity={0.92}
+                    />
+                  </mesh>
+                )}
+              </group>
+            );
+          })}
+
+          {/* Marquee + blade sign */}
+          <mesh position={[0, 3.35, size.depth / 2 + 0.2]} castShadow>
+            <boxGeometry args={[Math.min(size.width * 0.78, isHq ? 7.4 : 6.5), isHq ? 0.68 : 0.48, 0.3]} />
+            <meshStandardMaterial
+              color={accent}
+              emissive={accent}
+              emissiveIntensity={isHq ? marqueeIntensity : marqueeIntensity * 0.72}
+              toneMapped={false}
+            />
+          </mesh>
+          <mesh position={[size.width / 2 + 0.12, 2.4, size.depth / 2 - 0.4]} castShadow>
+            <boxGeometry args={[0.12, 1.8, 0.55]} />
+            <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} toneMapped={false} />
+          </mesh>
+          <Text
+            position={[0, 3.35, size.depth / 2 + 0.38]}
+            fontSize={isHq ? 0.3 : 0.22}
+            color="#061018"
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={Math.min(size.width * 0.7, 6)}
+          >
+            {isHq ? "ORBITX HQ" : (label ?? name).toUpperCase()}
+          </Text>
+          {isHq && (
+            <Text position={[0, 2.92, size.depth / 2 + 0.38]} fontSize={0.14} color="#061018" anchorX="center" maxWidth={6}>
+              DEX · LAUNCHPAD · SOCIAL
+            </Text>
+          )}
+
+          {/* Open doorway — walk through to enter; E / click opens venue tools */}
+          <mesh position={[-doorW / 2 - 0.12, 1.15, size.depth / 2 + 0.1]} castShadow>
+            <boxGeometry args={[0.22, 2.5, 0.22]} />
+            <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
+          </mesh>
+          <mesh position={[doorW / 2 + 0.12, 1.15, size.depth / 2 + 0.1]} castShadow>
+            <boxGeometry args={[0.22, 2.5, 0.22]} />
+            <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
+          </mesh>
+          <mesh position={[0, 2.4, size.depth / 2 + 0.12]} castShadow>
+            <boxGeometry args={[doorW + 0.55, 0.18, 0.28]} />
+            <meshStandardMaterial color="#2a3036" metalness={0.25} roughness={0.65} />
+          </mesh>
+          <mesh position={[0, 1.05, size.depth / 2 - 0.05]}>
+            <planeGeometry args={[doorW * 0.92, 2.05]} />
+            <meshStandardMaterial color="#080c10" transparent opacity={0.35} depthWrite={false} />
+          </mesh>
+          <Text
+            position={[0, 0.28, size.depth / 2 + 0.28]}
+            fontSize={0.14}
+            color={accent}
+            anchorX="center"
+            outlineWidth={0.01}
+            outlineColor="#05080c"
+            onClick={(e) => {
+              e.stopPropagation();
+              openVenue(building.id);
+            }}
+          >
+            WALK IN · E TOOLS
+          </Text>
+          <mesh position={[0, 0.02, size.depth / 2 + 1.15]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+            <planeGeometry args={[doorW + 2.6, 2.4]} />
+            <meshStandardMaterial color="#6a7178" roughness={0.9} metalness={0.06} />
+          </mesh>
+
+          <Billboard position={[0, roofY + 1.7, 0]}>
+            <Text
+              fontSize={0.42}
+              color="#e8eef2"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.025}
+              outlineColor="#12161a"
+              maxWidth={8}
+            >
+              {label ?? name}
+            </Text>
+          </Billboard>
         </>
       )}
-
-      {/* Ground-floor storefront — split around doorway for walk-in venues */}
-      {(() => {
-        const totalW = Math.min(size.width * 0.92, size.width - 0.4);
-        const glassW = Math.min(size.width * 0.85, size.width - 0.8);
-        const openW = walkIn ? doorW + 0.9 : 0;
-        const segFrame = walkIn ? Math.max(0, (totalW - openW) / 2) : totalW;
-        const segGlass = walkIn ? Math.max(0, (glassW - openW) / 2) : glassW;
-        const sides = walkIn ? [-1, 1] : [0];
-        return sides.map((s) => {
-          const cx = walkIn ? s * (openW / 2 + segFrame / 2) : 0;
-          if (walkIn && segFrame <= 0.05) return null;
-          return (
-            <group key={`store-${s}`}>
-              <mesh position={[cx, 1.55, size.depth / 2 + 0.02]} castShadow>
-                <boxGeometry args={[segFrame, 3.0, 0.12]} />
-                <meshStandardMaterial color={FAMILY_WALL[family]} metalness={0.28} roughness={0.55} />
-              </mesh>
-              {segGlass > 0.05 && (
-                <mesh position={[cx, 1.55, size.depth / 2 + 0.09]}>
-                  <planeGeometry args={[segGlass, 2.55]} />
-                  <meshStandardMaterial
-                    color="#0a121c"
-                    emissive={accent}
-                    emissiveIntensity={building.interaction ? marqueeIntensity * 0.35 : marqueeIntensity * 0.12}
-                    metalness={0.2}
-                    roughness={0.32}
-                    transparent
-                    opacity={0.92}
-                  />
-                </mesh>
-              )}
-            </group>
-          );
-        });
-      })()}
-      <mesh position={[0, 3.35, size.depth / 2 + 0.2]} castShadow>
-        <boxGeometry
-          args={[
-            Math.min(size.width * 0.78, isHq ? 7.4 : 6.5),
-            isHq ? 0.68 : 0.48,
-            0.3,
-          ]}
-        />
-        <meshStandardMaterial
-          color={accent}
-          emissive={accent}
-          emissiveIntensity={isHq ? marqueeIntensity : marqueeIntensity * 0.72}
-          toneMapped={false}
-        />
-      </mesh>
-      {/* Side neon blade signs */}
-      <mesh position={[size.width / 2 + 0.12, 2.4, size.depth / 2 - 0.4]} castShadow>
-        <boxGeometry args={[0.12, 1.8, 0.55]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.7} toneMapped={false} />
-      </mesh>
-      <Text
-        position={[0, 3.35, size.depth / 2 + 0.38]}
-        fontSize={isHq ? 0.3 : 0.22}
-        color="#061018"
-        anchorX="center"
-        anchorY="middle"
-        maxWidth={Math.min(size.width * 0.7, 6)}
-      >
-        {isHq ? "ORBITX HQ" : (label ?? name).toUpperCase()}
-      </Text>
-      {isHq && (
-        <Text position={[0, 2.92, size.depth / 2 + 0.38]} fontSize={0.14} color="#061018" anchorX="center" maxWidth={6}>
-          DEX · LAUNCHPAD · SOCIAL
-        </Text>
-      )}
-
-      {/* Open doorway — walk through to enter; click opens venue tools */}
-      <mesh position={[-doorW / 2 - 0.12, 1.15, size.depth / 2 + 0.1]} castShadow>
-        <boxGeometry args={[0.22, 2.5, 0.22]} />
-        <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
-      </mesh>
-      <mesh position={[doorW / 2 + 0.12, 1.15, size.depth / 2 + 0.1]} castShadow>
-        <boxGeometry args={[0.22, 2.5, 0.22]} />
-        <meshStandardMaterial color="#1a1e22" metalness={0.3} roughness={0.55} />
-      </mesh>
-      <mesh position={[0, 2.4, size.depth / 2 + 0.12]} castShadow>
-        <boxGeometry args={[doorW + 0.55, 0.18, 0.28]} />
-        <meshStandardMaterial color="#2a3036" metalness={0.25} roughness={0.65} />
-      </mesh>
-      {walkIn ? (
-        <mesh position={[0, 1.05, size.depth / 2 - 0.05]}>
-          <planeGeometry args={[doorW * 0.92, 2.05]} />
-          <meshStandardMaterial color="#080c10" transparent opacity={0.35} depthWrite={false} />
-        </mesh>
-      ) : (
-        <mesh
-          position={[0, 1.05, size.depth / 2 + 0.22]}
-          onClick={(e) => {
-            e.stopPropagation();
-            openVenue(building.id);
-          }}
-        >
-          <planeGeometry args={[doorW, 2.1]} />
-          <meshStandardMaterial color="#0c1014" emissive={accent} emissiveIntensity={0.28} metalness={0.15} roughness={0.4} />
-        </mesh>
-      )}
-      <Text
-        position={[0, 0.28, size.depth / 2 + 0.28]}
-        fontSize={0.14}
-        color={accent}
-        anchorX="center"
-        outlineWidth={0.01}
-        outlineColor="#05080c"
-        onClick={(e) => {
-          e.stopPropagation();
-          openVenue(building.id);
-        }}
-      >
-        {walkIn ? "WALK IN · E TOOLS" : "E · VENUE"}
-      </Text>
-      <mesh position={[0, 0.02, size.depth / 2 + 1.15]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[doorW + 2.6, 2.4]} />
-        <meshStandardMaterial color="#6a7178" roughness={0.9} metalness={0.06} />
-      </mesh>
-
-      <Billboard position={[0, roofY + 1.7, 0]}>
-        <Text
-          fontSize={0.42}
-          color="#e8eef2"
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.025}
-          outlineColor="#12161a"
-          maxWidth={8}
-        >
-          {label ?? name}
-        </Text>
-      </Billboard>
     </group>
   );
 }

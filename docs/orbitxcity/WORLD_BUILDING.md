@@ -44,6 +44,16 @@ Generic OSM fill buildings stay solid.
 
 `BuildingMesh` assigns Manhattan-inspired families (brick / limestone / glass / retail) from massing + venue role, with awnings + cornices on high quality.
 
+Walk-in venues get marquees, blade signs, open doorways, and roof crowns. Generic OSM fill stays solid (base band only — no fake doors).
+
+## Street life
+
+`StreetProps` places lamps, crosswalks, hydrants, trash cans, and bollards along `getWorldStreets()` sidewalks.
+
+## Interiors
+
+`InteriorRoom` uses per-theme floor/wall/light palettes (`hq`, `trade`, `club`, `market`, `launch`, `theater`, `lounge`).
+
 ## Teleport points
 
 ```ts

@@ -1,12 +1,15 @@
+packages:
+  - "."
+
 allowBuilds:
-  '@stellar/stellar-sdk': set this to true or false
-  '@swc/core': set this to true or false
-  bigint-buffer: set this to true or false
-  blake-hash: set this to true or false
-  bufferutil: set this to true or false
-  core-js: set this to true or false
-  esbuild: set this to true or false
-  protobufjs: set this to true or false
-  tiny-secp256k1: set this to true or false
-  usb: set this to true or false
-  utf-8-validate: set this to true or false
+  "@stellar/stellar-sdk": false
+  "@swc/core": false
+  bigint-buffer: false
+  blake-hash: false
+  bufferutil: false
+  core-js: false
+  esbuild: false
+  protobufjs: false
+  tiny-secp256k1: false
+  usb: false
+  utf-8-validate: false
