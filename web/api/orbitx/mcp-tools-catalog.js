@@ -335,7 +335,7 @@ export function buildGeneratedTools() {
     push(
       tool(
         `orbitx_create_token_${lane}`,
-        `Create token on ${lane} lane → Phantom launchpad openUrl.`,
+        `Launch execution on ${lane} lane → Phantom openUrl (same as orbitx_execute_launch).`,
         {
           type: "object",
           properties: {
@@ -518,9 +518,15 @@ export async function dispatchGenerated(name, args, ctx) {
         ok: true,
         status: "awaiting_phantom_launch",
         requiresSignature: true,
+        tool: "orbitx_execute_launch",
         openUrl: `${base}/agent/create-token?${qs.toString()}`,
         lane: meta.lane,
-        instructions: ["Open openUrl", "Connect Phantom on launchpad", "Sign create"],
+        instructions: [
+          "Open openUrl — this completes launch execution via Phantom.",
+          "Connect Phantom on launchpad",
+          "Sign create",
+        ],
+        note: "Prefer orbitx_execute_launch for the final pump.fun create transaction.",
       };
     }
     case "trade_sign": {

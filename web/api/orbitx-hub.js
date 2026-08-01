@@ -592,6 +592,9 @@ const WALLET_TOOLS = new Set([
   "orbitx_prepare_buy",
   "orbitx_prepare_sell",
   "orbitx_prepare_launch",
+  "orbitx_execute_launch",
+  "orbitx_launch_execution",
+  "orbitx_create_token",
   "orbitx_launch_ipfs",
   "orbitx_launch_record",
   "orbitx_claim_fees",
@@ -624,8 +627,17 @@ const SESSION_TOOLS = new Set([
 const TOOL_ALIASES = {
   orbitx_buy: "orbitx_prepare_buy",
   orbitx_sell: "orbitx_prepare_sell",
-  orbitx_launch_token: "orbitx_create_token",
-  orbitx_create_coin: "orbitx_create_token",
+  orbitx_launch_token: "orbitx_execute_launch",
+  orbitx_create_coin: "orbitx_execute_launch",
+  orbitx_create_token: "orbitx_execute_launch",
+  orbitx_prepare_launch: "orbitx_execute_launch",
+  orbitx_launch_execution: "orbitx_execute_launch",
+  orbit_launch_execution: "orbitx_execute_launch",
+  orbitx_launch_execute: "orbitx_execute_launch",
+  orbit_execute_launch: "orbitx_execute_launch",
+  orbitx_execute_token_launch: "orbitx_execute_launch",
+  execute_launch: "orbitx_execute_launch",
+  launch_execution: "orbitx_execute_launch",
   orbitx_grok_image: "orbitx_generate_image",
   orbitx_grok_video: "orbitx_generate_video",
   orbitx_gen_image: "orbitx_generate_image",
@@ -853,9 +865,35 @@ const CORE_TOOLS = [
     },
   },
   {
+    name: "orbitx_execute_launch",
+    description:
+      "LAUNCH EXECUTION — complete the final Pump.fun create transaction via OrbitX + Phantom. This is the orbit launch execution tool. Returns openUrl — user opens it, connects Phantom, pays fee, signs create. Use after orbitx_launch_ipfs (optional) or with imageUrl. Required to finish a pump.fun launch.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        symbol: { type: "string" },
+        description: { type: "string" },
+        imageUrl: { type: "string", description: "Public image URL for the token logo" },
+        metadataUri: {
+          type: "string",
+          description: "Optional IPFS metadata URI from orbitx_launch_ipfs (handoff still uses launchpad)",
+        },
+        twitter: { type: "string" },
+        telegram: { type: "string" },
+        website: { type: "string" },
+        lane: { type: "string", enum: ["pump", "custom"], default: "pump" },
+        publicKey: { type: "string" },
+        mintPublicKey: { type: "string", description: "Optional vanity mint pubkey hint" },
+        devBuySol: { type: "number", default: 0 },
+      },
+      required: ["name", "symbol"],
+    },
+  },
+  {
     name: "orbitx_create_token",
     description:
-      "CREATE a new Pump.fun token via OrbitX launchpad + Phantom. Returns openUrl — user opens it, connects Phantom, pays fee, signs create. Prefer this over raw prepare_launch. Optional imageUrl or call orbitx_launch_ipfs first.",
+      "Alias for orbitx_execute_launch — CREATE / finish Pump.fun token via Phantom launchpad openUrl.",
     inputSchema: {
       type: "object",
       properties: {
@@ -875,7 +913,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_prepare_launch",
     description:
-      "Low-level launch step. Prefer orbitx_create_token (opens Phantom launchpad). Needs metadataUri + mintPublicKey from orbitx_vanity_mint.",
+      "Alias for orbitx_execute_launch — use that tool to complete the final pump.fun create in Phantom.",
     inputSchema: {
       type: "object",
       properties: {
@@ -884,11 +922,31 @@ const CORE_TOOLS = [
         symbol: { type: "string" },
         metadataUri: { type: "string" },
         mintPublicKey: { type: "string" },
+        imageUrl: { type: "string" },
+        description: { type: "string" },
         devBuySol: { type: "number", default: 0 },
         slippage: { type: "number", default: 10 },
         chain: { type: "string", default: "solana" },
       },
-      required: ["name", "symbol", "metadataUri", "mintPublicKey"],
+      required: ["name", "symbol"],
+    },
+  },
+  {
+    name: "orbitx_launch_execution",
+    description:
+      "Alias for orbitx_execute_launch — the orbit launch execution tool for the final Pump.fun create tx.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        symbol: { type: "string" },
+        description: { type: "string" },
+        imageUrl: { type: "string" },
+        metadataUri: { type: "string" },
+        publicKey: { type: "string" },
+        lane: { type: "string", enum: ["pump", "custom"], default: "pump" },
+      },
+      required: ["name", "symbol"],
     },
   },
   {
@@ -1024,7 +1082,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_launch_token",
-    description: "Alias for orbitx_create_token — opens Phantom launchpad.",
+    description: "Alias for orbitx_execute_launch — opens Phantom launchpad for final create.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1043,7 +1101,7 @@ const CORE_TOOLS = [
   },
   {
     name: "orbitx_create_coin",
-    description: "Alias for orbitx_create_token.",
+    description: "Alias for orbitx_execute_launch.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1678,6 +1736,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
         : "Anonymous — intel tools work. Identity required for social writes.",
       agentSetupUrl: "https://orbitx.world/agent",
       sessionTools: [...SESSION_TOOLS],
+      launchExecutionTool: "orbitx_execute_launch",
       totalTools: TOOLS.length,
     };
   }
@@ -1741,7 +1800,14 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       generatedTools: _generated.length,
       generatedStats: generatedStats(),
       categoryCounts: byPrefix,
-      create: ["orbitx_create_token", "orbitx_launch_token", "orbitx_create_token_pump", "orbitx_create_token_custom"],
+      create: [
+        "orbitx_execute_launch",
+        "orbitx_launch_execution",
+        "orbitx_create_token",
+        "orbitx_launch_token",
+        "orbitx_create_token_pump",
+        "orbitx_create_token_custom",
+      ],
       trade: ["orbitx_buy", "orbitx_sell", "orbitx_buy_auto", "orbitx_sell_pump", "orbitx_claim_fees", "orbitx_burn", "orbitx_rent_refund"],
       nft: ["orbitx_mint_nft", "orbitx_nft_list_for_sale", "orbitx_nft_make_offer", "orbitx_nft_auctions"],
       media: [
@@ -1754,7 +1820,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       social: ["orbitx_social_communities", "orbitx_social_post", "orbitx_social_join", "orbitx_communities_top20"],
       intel: ["orbitx_search", "orbitx_screen_trending_1h_solana", "orbitx_chart_1h_solana", "orbitx_xray", "orbitx_research"],
       examples: TOOLS.slice(0, 40).map((t) => t.name),
-      note: "500+ tools. Image/video: orbitx_generate_image → orbitx_media_status. Tx tools return signUrl/openUrl for Phantom — never broadcast unsigned.",
+      note: "Pump.fun launch execution: orbitx_execute_launch (open openUrl → Phantom). Image/video: orbitx_generate_image → orbitx_media_status. Tx tools return signUrl/openUrl — never broadcast unsigned.",
     };
   }
 
@@ -1811,40 +1877,52 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
 
   if (get[name]) return fetchJson(get[name]());
 
-  if (name === "orbitx_create_token") {
+  if (
+    name === "orbitx_execute_launch" ||
+    name === "orbitx_create_token" ||
+    name === "orbitx_launch_execution"
+  ) {
     const tokName = String(args.name || "").trim();
     const symbol = String(args.symbol || "").trim().toUpperCase();
     if (!tokName || !symbol) throw new Error("name and symbol required");
+    const lane = args.lane === "custom" ? "custom" : "pump";
     const q = new URLSearchParams({
       name: tokName,
       symbol,
       description: String(args.description || ""),
-      lane: args.lane === "custom" ? "custom" : "pump",
+      lane,
     });
     if (args.imageUrl) q.set("imageUrl", String(args.imageUrl));
     if (args.twitter) q.set("twitter", String(args.twitter));
     if (args.telegram) q.set("telegram", String(args.telegram));
     if (args.website) q.set("website", String(args.website));
+    if (args.metadataUri) q.set("metadataUri", String(args.metadataUri));
+    if (args.mintPublicKey) q.set("mintPublicKey", String(args.mintPublicKey));
     if (wallet) q.set("publicKey", wallet);
     const openUrl = `${base}/agent/create-token?${q.toString()}`;
     return {
       ok: true,
       status: "awaiting_phantom_launch",
       requiresSignature: true,
+      tool: "orbitx_execute_launch",
       openUrl,
-      launchpadUrl: `${base}/orbitxlaunch/create/pump`,
+      launchpadUrl: `${base}/orbitxlaunch/create/${lane}`,
       name: tokName,
       symbol,
+      lane,
+      metadataUri: args.metadataUri ? String(args.metadataUri) : null,
+      mintPublicKey: args.mintPublicKey ? String(args.mintPublicKey) : null,
       instructions: [
-        "Open openUrl in the user's browser.",
+        "This IS the orbit launch execution tool — open openUrl now.",
         "Connect Phantom on the OrbitX launchpad.",
         "Confirm image/details, pay the small launch fee, then Sign create in Phantom.",
         "Token is not live until Phantom confirms the create transaction.",
+        "After confirmation, optionally call orbitx_launch_record with mint + payment_tx.",
       ],
-      tip: args.imageUrl
-        ? "Image URL prefilled — user can still replace the logo on the launchpad."
-        : "Provide imageUrl, or user uploads a logo on the launchpad before launch.",
-      note: "Non-custodial create. Do not attempt to mint/create without Phantom.",
+      tip: args.imageUrl || args.metadataUri
+        ? "Metadata/image prefilled when possible — user can still replace the logo on the launchpad."
+        : "Provide imageUrl or call orbitx_launch_ipfs first; user can also upload a logo on the launchpad.",
+      note: "Non-custodial launch execution. Mint key stays in the browser — never broadcast unsigned create txs from MCP.",
     };
   }
 
@@ -1982,36 +2060,7 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
     });
   }
 
-  if (name === "orbitx_prepare_launch") {
-    if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
-    const tokName = String(args.name || "");
-    const symbol = String(args.symbol || "");
-    const q = new URLSearchParams({
-      name: tokName,
-      symbol,
-      description: "",
-      lane: "pump",
-      publicKey: wallet,
-    });
-    const openUrl = `${base}/agent/create-token?${q.toString()}`;
-    // Prefer Phantom launchpad handoff — raw create txs need a mint keypair Claude cannot safely hold.
-    return {
-      ok: true,
-      status: "awaiting_phantom_launch",
-      requiresSignature: true,
-      openUrl,
-      preferredTool: "orbitx_create_token",
-      metadataUri: String(args.metadataUri || ""),
-      mintPublicKey: String(args.mintPublicKey || ""),
-      wallet,
-      instructions: [
-        "Prefer opening openUrl (or call orbitx_create_token) so the user signs create in Phantom on the launchpad.",
-        "Do not broadcast an unsigned create transaction.",
-        "After confirmation, call orbitx_launch_record with mint + payment_tx if needed.",
-      ],
-      note: "Use orbitx_create_token for the full Phantom flow. Low-level PumpPortal create requires a mint secret that must stay in the browser.",
-    };
-  }
+  // orbitx_prepare_launch is aliased to orbitx_execute_launch above.
 
   if (name === "orbitx_launch_record") {
     return fetchJson(`${base}/api/ogdex/launch`, {
@@ -2503,6 +2552,18 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       });
       return { following: true };
     }
+  }
+
+  if (/launch|create_token|create_coin|pump.*creat/i.test(name)) {
+    return {
+      ok: false,
+      error: "unknown_tool_use_execute_launch",
+      tool: name,
+      useInstead: "orbitx_execute_launch",
+      message:
+        "Use orbitx_execute_launch (aliases: orbitx_launch_execution, orbitx_create_token, orbitx_prepare_launch) to complete the final Pump.fun create via Phantom openUrl.",
+      example: { name: "MyCoin", symbol: "MYC", imageUrl: "https://...", publicKey: "WalletBase58" },
+    };
   }
 
   throw new Error(`Unknown tool: ${name}`);
