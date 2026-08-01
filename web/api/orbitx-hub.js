@@ -8,6 +8,12 @@
  *   /api/orbitx/*       → /api/orbitx-hub?path=*
  */
 import { createHash, randomBytes } from "crypto";
+import {
+  preparePumpClaim,
+  prepareRentRefund,
+  prepareBurn,
+  nftEdge,
+} from "./orbitx/mcp-ops.js";
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
@@ -607,17 +613,50 @@ const TOOLS = [
     },
   },
   {
-    name: "orbitx_prepare_launch",
-    description:
-      "Prepare a Pump.fun launch create transaction (unsigned). Returns base64 tx for the user wallet to sign. Non-custodial — OrbitX never holds keys. Requires name, symbol, metadataUri, mintPublicKey, publicKey.",
+    name: "orbitx_launch_check",
+    description: "Check if a launch name/symbol is available (duplicate guard).",
     inputSchema: {
       type: "object",
       properties: {
-        publicKey: { type: "string", description: "Creator wallet (defaults to linked agent wallet)" },
         name: { type: "string" },
         symbol: { type: "string" },
-        metadataUri: { type: "string", description: "IPFS metadata URI from prior upload" },
-        mintPublicKey: { type: "string", description: "New mint keypair public key" },
+        chain: { type: "string", default: "solana" },
+      },
+      required: ["name", "symbol"],
+    },
+  },
+  {
+    name: "orbitx_launch_ipfs",
+    description:
+      "Upload token metadata/image to IPFS for a Pump.fun / OrbitX launch. Returns metadataUri for create step.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        symbol: { type: "string" },
+        description: { type: "string" },
+        imageBase64: { type: "string" },
+        imageMimeType: { type: "string", default: "image/png" },
+        twitter: { type: "string" },
+        telegram: { type: "string" },
+        website: { type: "string" },
+        chain: { type: "string", default: "solana" },
+      },
+      required: ["name", "symbol", "imageBase64"],
+    },
+  },
+  {
+    name: "orbitx_prepare_launch",
+    description:
+      "Prepare unsigned Pump.fun / SPL launch create tx. Needs metadataUri + mintPublicKey (use orbitx_vanity_mint).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        publicKey: { type: "string" },
+        name: { type: "string" },
+        symbol: { type: "string" },
+        metadataUri: { type: "string" },
+        mintPublicKey: { type: "string" },
         devBuySol: { type: "number", default: 0 },
         slippage: { type: "number", default: 10 },
         chain: { type: "string", default: "solana" },
@@ -626,15 +665,45 @@ const TOOLS = [
     },
   },
   {
-    name: "orbitx_prepare_buy",
-    description:
-      "Build an unsigned BUY transaction (PumpPortal/Jupiter). User signs in their wallet. Non-custodial.",
+    name: "orbitx_launch_record",
+    description: "Record a completed launch after fee payment + create tx confirmed.",
     inputSchema: {
       type: "object",
       properties: {
         mint: { type: "string" },
-        amountSol: { type: "number", description: "SOL to spend" },
-        publicKey: { type: "string", description: "Defaults to linked agent wallet" },
+        payment_tx: { type: "string" },
+        creator_wallet: { type: "string" },
+        name: { type: "string" },
+        symbol: { type: "string" },
+        launch_tx: { type: "string" },
+        description: { type: "string" },
+        icon: { type: "string" },
+        chain: { type: "string", default: "solana" },
+      },
+      required: ["mint", "payment_tx"],
+    },
+  },
+  {
+    name: "orbitx_vanity_mint",
+    description: "Generate a vanity mint keypair (e.g. suffix obx) for a new launch.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        suffix: { type: "string", default: "obx" },
+        maxIterations: { type: "integer", default: 500000 },
+      },
+    },
+  },
+  {
+    name: "orbitx_prepare_buy",
+    description:
+      "Build unsigned BUY tx (Pump / Jupiter). User signs in wallet. Non-custodial.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amountSol: { type: "number" },
+        publicKey: { type: "string" },
         slippage: { type: "number", default: 10 },
         pool: {
           type: "string",
@@ -647,18 +716,146 @@ const TOOLS = [
   },
   {
     name: "orbitx_prepare_sell",
-    description:
-      "Build an unsigned SELL transaction. amount can be token units or a percent string like '100%'. User signs in wallet.",
+    description: "Build unsigned SELL tx. amount as tokens or '100%'.",
     inputSchema: {
       type: "object",
       properties: {
         mint: { type: "string" },
-        amount: { type: ["number", "string"], description: "Token amount or '50%' / '100%'" },
+        amount: { type: ["number", "string"] },
         publicKey: { type: "string" },
         slippage: { type: "number", default: 10 },
         pool: { type: "string", default: "auto" },
       },
       required: ["mint", "amount"],
+    },
+  },
+  {
+    name: "orbitx_claim_fees",
+    description:
+      "Prepare unsigned pump.fun collectCreatorFee tx — claim trading fees for coins you launched.",
+    inputSchema: {
+      type: "object",
+      properties: { publicKey: { type: "string" } },
+    },
+  },
+  {
+    name: "orbitx_rent_refund",
+    description:
+      "Scan empty token accounts and build unsigned close-account txs to reclaim rent SOL.",
+    inputSchema: {
+      type: "object",
+      properties: { publicKey: { type: "string" } },
+    },
+  },
+  {
+    name: "orbitx_burn",
+    description:
+      "Prepare unsigned burn tx for a mint. Use amount (tokens) or percent (0-100). Full burn also closes ATA for rent.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        mint: { type: "string" },
+        amount: { type: ["number", "string"] },
+        percent: { type: "number" },
+        publicKey: { type: "string" },
+      },
+      required: ["mint"],
+    },
+  },
+  {
+    name: "orbitx_social_communities",
+    description: "List OrbitX World communities (public/unlisted).",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 30 } },
+    },
+  },
+  {
+    name: "orbitx_social_feed",
+    description: "Fetch community social feed posts (optional communityId filter).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        communityId: { type: "string" },
+        limit: { type: "integer", default: 40 },
+      },
+    },
+  },
+  {
+    name: "orbitx_social_join",
+    description: "Join an OrbitX community as the authenticated agent user.",
+    inputSchema: {
+      type: "object",
+      properties: { communityId: { type: "string" } },
+      required: ["communityId"],
+    },
+  },
+  {
+    name: "orbitx_social_post",
+    description: "Create a post in an OrbitX community (authenticated user).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        communityId: { type: "string" },
+        body: { type: "string" },
+      },
+      required: ["communityId", "body"],
+    },
+  },
+  {
+    name: "orbitx_social_create_community",
+    description: "Create a new OrbitX community (slug + name).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        slug: { type: "string" },
+        description: { type: "string" },
+        visibility: { type: "string", enum: ["public", "unlisted", "private"], default: "public" },
+      },
+      required: ["name", "slug"],
+    },
+  },
+  {
+    name: "orbitx_nft_collections",
+    description: "List OrbitX NFT collections.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 40 } },
+    },
+  },
+  {
+    name: "orbitx_nft_listings",
+    description: "List active OrbitX NFT marketplace listings.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 40 } },
+    },
+  },
+  {
+    name: "orbitx_nft_prepare_buy",
+    description:
+      "Build unsigned NFT purchase tx (listing/offer/auction). User signs; OrbitX settles via marketplace.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceId: { type: "string", description: "Listing / offer / auction id" },
+        mode: { type: "string", enum: ["listing", "offer", "auction"], default: "listing" },
+        buyerWallet: { type: "string" },
+      },
+      required: ["sourceId"],
+    },
+  },
+  {
+    name: "orbitx_nft_submit_buy",
+    description: "Submit a signed NFT purchase transaction after orbitx_nft_prepare_buy.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        pendingSaleId: { type: "string" },
+        signedTransactionBase64: { type: "string" },
+      },
+      required: ["pendingSaleId", "signedTransactionBase64"],
     },
   },
   {
@@ -769,6 +966,38 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
     };
   }
 
+  if (name === "orbitx_launch_check") {
+    return fetchJson(`${base}/api/ogdex/launch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        step: "check",
+        name: String(args.name || ""),
+        symbol: String(args.symbol || ""),
+        chain: String(args.chain || "solana"),
+      }),
+    });
+  }
+
+  if (name === "orbitx_launch_ipfs") {
+    return fetchJson(`${base}/api/ogdex/launch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        step: "ipfs",
+        name: String(args.name || ""),
+        symbol: String(args.symbol || ""),
+        description: String(args.description || ""),
+        imageBase64: String(args.imageBase64 || ""),
+        imageMimeType: String(args.imageMimeType || "image/png"),
+        twitter: args.twitter || undefined,
+        telegram: args.telegram || undefined,
+        website: args.website || undefined,
+        chain: String(args.chain || "solana"),
+      }),
+    });
+  }
+
   if (name === "orbitx_prepare_launch") {
     if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
     const data = await fetchJson(`${base}/api/ogdex/launch`, {
@@ -788,10 +1017,162 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
     });
     return {
       ...data,
-      note:
-        "Unsigned create tx. Sign with the creator wallet. Then call launch record via the OrbitX Launchpad UI if needed.",
+      note: "Unsigned create tx. Sign with creator wallet, then orbitx_launch_record.",
       wallet,
     };
+  }
+
+  if (name === "orbitx_launch_record") {
+    return fetchJson(`${base}/api/ogdex/launch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        step: "record",
+        mint: String(args.mint || ""),
+        payment_tx: String(args.payment_tx || ""),
+        creator_wallet: wallet || args.creator_wallet || undefined,
+        name: args.name,
+        symbol: args.symbol,
+        launch_tx: args.launch_tx,
+        description: args.description,
+        icon: args.icon,
+        chain: String(args.chain || "solana"),
+      }),
+    });
+  }
+
+  if (name === "orbitx_vanity_mint") {
+    return fetchJson(`${base}/api/vanity-mint`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        suffix: String(args.suffix || "obx"),
+        maxIterations: Number(args.maxIterations) || 500000,
+      }),
+    });
+  }
+
+  if (name === "orbitx_claim_fees") {
+    if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
+    return preparePumpClaim(wallet);
+  }
+
+  if (name === "orbitx_rent_refund") {
+    if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
+    return prepareRentRefund(wallet);
+  }
+
+  if (name === "orbitx_burn") {
+    if (!wallet) throw new Error("publicKey required (or link wallet on /agent)");
+    if (args.amount == null && args.percent == null) throw new Error("amount or percent required");
+    return prepareBurn(wallet, String(args.mint || ""), args.amount, args.percent);
+  }
+
+  if (name === "orbitx_social_communities") {
+    const limit = Math.min(Number(args.limit) || 30, 100);
+    return sb(
+      `oxw_communities?visibility=in.(public,unlisted)&order=member_count.desc&limit=${limit}&select=id,slug,name,description,visibility,member_count,avatar_url,created_at`,
+    );
+  }
+
+  if (name === "orbitx_social_feed") {
+    const limit = Math.min(Number(args.limit) || 40, 100);
+    let path = `oxw_community_posts?deleted_at=is.null&order=created_at.desc&limit=${limit}&select=id,community_id,author_id,body,media,like_count,comment_count,created_at`;
+    if (args.communityId) path += `&community_id=eq.${encodeURIComponent(String(args.communityId))}`;
+    return sb(path);
+  }
+
+  if (name === "orbitx_social_join") {
+    if (!auth?.userId) throw new Error("Authentication required");
+    return sb("oxw_community_members", {
+      method: "POST",
+      body: JSON.stringify({
+        community_id: String(args.communityId),
+        user_id: auth.userId,
+        role: "member",
+      }),
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    });
+  }
+
+  if (name === "orbitx_social_post") {
+    if (!auth?.userId) throw new Error("Authentication required");
+    const body = String(args.body || "").trim();
+    if (body.length < 1) throw new Error("body required");
+    return sb("oxw_community_posts", {
+      method: "POST",
+      body: JSON.stringify({
+        community_id: String(args.communityId),
+        author_id: auth.userId,
+        body,
+        media: [],
+      }),
+    });
+  }
+
+  if (name === "orbitx_social_create_community") {
+    if (!auth?.userId) throw new Error("Authentication required");
+    const nameStr = String(args.name || "").trim();
+    const slug = String(args.slug || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-");
+    if (!nameStr || !slug) throw new Error("name and slug required");
+    const created = await sb("oxw_communities", {
+      method: "POST",
+      body: JSON.stringify({
+        name: nameStr,
+        slug,
+        description: String(args.description || ""),
+        owner_id: auth.userId,
+        visibility: ["public", "unlisted", "private"].includes(args.visibility)
+          ? args.visibility
+          : "public",
+      }),
+    });
+    const community = Array.isArray(created) ? created[0] : created;
+    try {
+      await sb("oxw_community_members", {
+        method: "POST",
+        body: JSON.stringify({
+          community_id: community.id,
+          user_id: auth.userId,
+          role: "owner",
+        }),
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      });
+    } catch {
+      /* membership optional if trigger handles it */
+    }
+    return community;
+  }
+
+  if (name === "orbitx_nft_collections") {
+    const limit = Math.min(Number(args.limit) || 40, 100);
+    return sb(`orbitx_nft_collections?order=created_at.desc&limit=${limit}&select=*`);
+  }
+
+  if (name === "orbitx_nft_listings") {
+    const limit = Math.min(Number(args.limit) || 40, 100);
+    return sb(
+      `orbitx_nft_listings?status=eq.active&order=created_at.desc&limit=${limit}&select=*,nft:orbitx_nfts(*)`,
+    );
+  }
+
+  if (name === "orbitx_nft_prepare_buy") {
+    if (!wallet) throw new Error("buyerWallet required (or link wallet on /agent)");
+    return nftEdge("build", {
+      mode: args.mode || "listing",
+      sourceId: String(args.sourceId),
+      buyerWallet: wallet,
+    });
+  }
+
+  if (name === "orbitx_nft_submit_buy") {
+    return nftEdge("submit", {
+      pendingSaleId: String(args.pendingSaleId),
+      signedTransactionBase64: String(args.signedTransactionBase64),
+    });
   }
 
   throw new Error(`Unknown tool: ${name}`);

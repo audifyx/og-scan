@@ -175,7 +175,8 @@ export function AgentDashboard() {
         <div>
           <h1 className="text-3xl font-black tracking-tight">OrbitX Agent MCP</h1>
           <p className="mt-1 text-sm text-white/50">
-            Link your wallet, create an API key, then one-click add to Claude or ChatGPT.
+            Link your wallet, create an API key, then connect Claude or ChatGPT — DEX buy/sell,
+            launch, claim fees, rent refund, burn, NFT market, and OrbitX communities.
           </p>
         </div>
         <button
