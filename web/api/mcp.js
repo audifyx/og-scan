@@ -1,7 +1,13 @@
 /**
  * Claude-compatible MCP entrypoint at /api/mcp (path ends with /mcp).
  * Delegates to orbitx-hub (lazy import so this function always boots).
+ *
+ * Image wait/poll can take 30-90s. Must exceed the vercel.json wildcard
+ * api JS maxDuration of 30s, or quality-mode wait=true returns opaque
+ * 504 FUNCTION_INVOCATION_TIMEOUT.
  */
+export const config = { maxDuration: 120 };
+
 const BASE = "https://orbitx.world";
 
 const LEGACY_ROUTES = {

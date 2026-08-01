@@ -1691,7 +1691,7 @@ const CORE_TOOLS = [
   {
     name: "orbitx_generate_image",
     description:
-      "Generate images with Grok Imagine only (kie.ai / KIE_API_KEY). Quality mode ~4 images. Defaults to wait=true; returns imageUrls or taskId for orbitx_media_status.",
+      "Generate images with Grok Imagine only (kie.ai / KIE_API_KEY). Quality mode ~4 images. Defaults to wait=true (soft-returns taskId if still generating — never treat empty/timeout as OrbitX down; poll orbitx_media_status).",
     inputSchema: {
       type: "object",
       properties: {
@@ -1707,7 +1707,12 @@ const CORE_TOOLS = [
           description: "true = quality (~4 imgs), false = speed (~6 imgs)",
         },
         nsfw_checker: { type: "boolean", default: false },
-        wait: { type: "boolean", default: true, description: "Wait up to ~100s for imageUrls" },
+        wait: {
+          type: "boolean",
+          default: true,
+          description: "Wait up to ~90s for imageUrls; if pending, poll orbitx_media_status with taskId",
+        },
+        waitMs: { type: "number", description: "Optional wait budget ms (capped under function limit)" },
       },
       required: ["prompt"],
     },
@@ -1962,13 +1967,18 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
     try {
       return await gi.generateImage(args);
     } catch (e) {
+      const code = e?.code || (/KIE_API_KEY/i.test(String(e?.message || "")) ? "KIE_API_KEY_MISSING" : "KIE_UPSTREAM");
+      const missing = code === "KIE_API_KEY_MISSING";
       return {
         ok: false,
         kind: "image",
+        code,
         error: e?.message || "image generation failed",
-        fix: /KIE_API_KEY/i.test(String(e?.message || ""))
+        // Agents must not narrate this as "OrbitX server down".
+        outage: false,
+        fix: missing
           ? "Set KIE_API_KEY in Vercel env (https://kie.ai/api-key), redeploy, retry."
-          : "Grok Imagine only — retry later or simplify the prompt. Poll orbitx_media_status if you have a taskId.",
+          : "kie.ai / Grok Imagine upstream error — retry later or simplify the prompt. If you already have a taskId, poll orbitx_media_status.",
       };
     }
   }
@@ -1978,13 +1988,17 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
     try {
       return await gi.generateVideo(args);
     } catch (e) {
+      const code = e?.code || (/KIE_API_KEY/i.test(String(e?.message || "")) ? "KIE_API_KEY_MISSING" : "KIE_UPSTREAM");
       return {
         ok: false,
         kind: "video",
+        code,
         error: e?.message || "video generation failed",
-        fix: /KIE_API_KEY/i.test(String(e?.message || ""))
-          ? "Set KIE_API_KEY in Vercel env and redeploy."
-          : "Retry later — Grok video capacity may be limited.",
+        outage: false,
+        fix:
+          code === "KIE_API_KEY_MISSING"
+            ? "Set KIE_API_KEY in Vercel env and redeploy."
+            : "kie.ai video upstream error — retry later (capacity may be limited).",
       };
     }
   }
@@ -1996,15 +2010,23 @@ async function callTool(rawName, args, auth, base = FALLBACK_BASE) {
       return {
         ...status,
         imageUrls: status.imageUrls || status.resultUrls || [],
+        outage: false,
         instructions:
           status.state === "success"
             ? "Use resultUrls / imageUrls for the media files."
             : status.state === "fail"
-              ? `Failed: ${status.failMsg || status.failCode || "unknown"}. Retry orbitx_generate_image (Grok Imagine / kie.ai).`
-              : "Still processing — call orbitx_media_status again shortly.",
+              ? `kie.ai failed: ${status.failMsg || status.failCode || "unknown"}. Retry orbitx_generate_image.`
+              : "Still processing on kie.ai — call orbitx_media_status again shortly (OrbitX is responding).",
       };
     } catch (e) {
-      return { ok: false, error: e?.message || "status check failed", taskId: args.taskId || null };
+      return {
+        ok: false,
+        code: e?.code || "KIE_STATUS_FAILED",
+        error: e?.message || "status check failed",
+        taskId: args.taskId || null,
+        outage: false,
+        fix: "Retry orbitx_media_status; if KIE_API_KEY is missing, set it in Vercel env.",
+      };
     }
   }
 

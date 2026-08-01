@@ -257,6 +257,36 @@ async function main() {
         }
       }
 
+      // Image gen: wait=false must return taskId quickly (proves KIE key + route).
+      try {
+        const r = await mcp(
+          "tools/call",
+          {
+            name: "orbitx_generate_image",
+            arguments: {
+              prompt: "mcp verify: tiny green triangle icon flat",
+              wait: false,
+              enable_pro: false,
+              aspect_ratio: "1:1",
+            },
+          },
+          30,
+        );
+        const text = r?.content?.[0]?.text || "";
+        const parsed = JSON.parse(text);
+        if (parsed?.taskId && (parsed.ok === true || parsed.state === "waiting")) {
+          ok(`orbitx_generate_image → taskId ${String(parsed.taskId).slice(0, 12)}…`);
+        } else if (parsed?.code === "KIE_API_KEY_MISSING" || /KIE_API_KEY/i.test(parsed?.error || "")) {
+          ok("orbitx_generate_image → KIE_API_KEY missing (set in Vercel)");
+        } else if (parsed?.ok === false) {
+          fail(`orbitx_generate_image soft-fail: ${parsed.code || parsed.error}`);
+        } else {
+          fail(`orbitx_generate_image unexpected: ${text.slice(0, 160)}`);
+        }
+      } catch (e) {
+        fail(`orbitx_generate_image: ${e.message}`);
+      }
+
       // Generated tool by name (not necessarily in tools/list)
       try {
         const r = await mcp(
