@@ -1,10 +1,8 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import { AgentDashboard } from '../components/agent/agent-dashboard';
 import { TokenGatingVerifier } from '../components/agent/token-gating-verifier';
 
-export default function AgentPage() {
+function AgentPage() {
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -54,3 +52,5 @@ export default function AgentPage() {
     </main>
   );
 }
+
+export default AgentPage;
