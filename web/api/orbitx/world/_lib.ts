@@ -11,7 +11,7 @@ const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 export const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-orbitx-client",
+  "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-orbitx-client, mcp-session-id, last-event-id, accept",
   "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
   "Content-Type": "application/json",
 };

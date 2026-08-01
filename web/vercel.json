@@ -11,6 +11,14 @@
       "destination": "/api/orbitx-world?path=$1"
     },
     {
+      "source": "/api/orbitx-agent/(.*)",
+      "destination": "/api/orbitx-agent?path=$1"
+    },
+    {
+      "source": "/api/orbitx-mcp/(.*)",
+      "destination": "/api/orbitx-mcp?path=$1"
+    },
+    {
       "source": "/api/orbitx/(.*)",
       "destination": "/api/orbitx?path=$1"
     },
@@ -21,6 +29,14 @@
     {
       "source": "/api/kol/(.*)",
       "destination": "/api/kol?action=$1"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource",
+      "destination": "/api/orbitx-mcp?path=.well-known/oauth-protected-resource"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "/api/orbitx-mcp?path=.well-known/oauth-authorization-server"
     },
     {
       "source": "/api/(.*)",

@@ -150,6 +150,7 @@ import ClipVideoExport from "./pages/ClipVideoExport";
 import InstallApp from "./pages/InstallApp";
 import AgentPage from "./pages/Agent";
 import AgentDetailPage from "./pages/AgentDetail";
+import McpAuthPage from "./pages/McpAuthPage";
 import { AppLayout } from "./components/layout/AppLayout";
 import { NotificationListener } from "./components/notifications/NotificationListener";
 import { PushNotificationPrompt } from "./components/notifications/PushNotificationPrompt";
@@ -583,6 +584,7 @@ const App = () => (
             <Route path="/ox-desk-m4k9q/intel" element={<AdminRoute><IntelligenceAdmin /></AdminRoute>} />
             <Route path="/alert-settings" element={<OgdexRedirect to="/ORBITX_DEX/alerts" />} />
             <Route path="/agent" element={<ProtectedRoute><AgentPage /></ProtectedRoute>} />
+            <Route path="/agent/mcp-auth" element={<McpAuthPage />} />
             <Route path="/agent/:id" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
             <Route path="/:toolSlug" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
