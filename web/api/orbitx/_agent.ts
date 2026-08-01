@@ -1,19 +1,10 @@
 /**
- * OrbitX Agent API — session-authenticated bootstrap, keys, wallet link.
- *
- * Routes (via /api/orbitx-agent?path=... rewrite):
- *  GET  /health
- *  POST /bootstrap
- *  GET  /
- *  POST /
- *  GET  /keys
- *  POST /keys
- *  DELETE /keys/:id
- *  POST /link-wallet
- *  POST /oauth/approve   — mint auth code after wallet confirm on /agent/mcp-auth
+ * OrbitX Agent API — mounted at /api/orbitx/agent/*
+ * (consolidated into orbitx.ts to stay under Hobby function limits)
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
+  PUBLIC_BASE,
   adminClient,
   createKey,
   ensureDefaultAgent,
@@ -22,24 +13,23 @@ import {
   generateOpaqueToken,
   handleOptions,
   json,
-  linkWallet,
-  listKeys,
-  mapAgent,
   pathParts,
   requireUser,
   revokeKey,
   sha256,
-} from "./orbitx/agent/_lib";
+  linkWallet,
+  listKeys,
+  mapAgent,
+} from "./agent/_lib";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (handleOptions(req, res)) return;
 
-    const parts = pathParts(req, "orbitx-agent");
+    const parts = pathParts(req, "agent");
     const route = parts.join("/") || "";
 
-    // Health: /api/orbitx-agent/health or GET /api/orbitx-agent?path=health
-    if (req.method === "GET" && (route === "health" || req.query.health === "1")) {
+    if (req.method === "GET" && (route === "health" || route === "")) {
       return json(res, { ok: true, service: "orbitx-agent" });
     }
 
@@ -61,12 +51,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           lastUsedAt: k.last_used_at,
         })),
         mintedKey: minted,
-        mcpUrl: `${process.env.PUBLIC_APP_URL || "https://ogscan.fun"}/api/orbitx-mcp`,
+        mcpUrl: `${PUBLIC_BASE}/api/orbitx/mcp`,
       });
     }
 
     // ---- list agents ----
-    if (route === "" && req.method === "GET") {
+    if (route === "list" && req.method === "GET") {
       const { id: userId } = await requireUser(req);
       const db = adminClient();
       const { data, error } = await db
@@ -79,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ---- create agent ----
-    if (route === "" && req.method === "POST") {
+    if (route === "create" && req.method === "POST") {
       const { id: userId } = await requireUser(req);
       const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
       const name = String(body.name || "").trim();

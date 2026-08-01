@@ -12,16 +12,25 @@
     },
     {
       "source": "/api/orbitx-agent/(.*)",
-      "destination": "/api/orbitx-agent?path=$1"
+      "destination": "/api/orbitx?path=agent/$1"
+    },
+    {
+      "source": "/api/orbitx-agent",
+      "destination": "/api/orbitx?path=agent"
     },
     {
       "source": "/api/orbitx-mcp/(.*)",
-      "destination": "/api/orbitx-mcp?path=$1"
+      "destination": "/api/orbitx?path=mcp/$1"
+    },
+    {
+      "source": "/api/orbitx-mcp",
+      "destination": "/api/orbitx?path=mcp"
     },
     {
       "source": "/api/orbitx/(.*)",
       "destination": "/api/orbitx?path=$1"
     },
+
     {
       "source": "/api/ogdex/(.*)",
       "destination": "/api/ogdex?path=$1"
@@ -32,12 +41,13 @@
     },
     {
       "source": "/.well-known/oauth-protected-resource",
-      "destination": "/api/orbitx-mcp?path=.well-known/oauth-protected-resource"
+      "destination": "/api/orbitx?path=mcp/.well-known/oauth-protected-resource"
     },
     {
       "source": "/.well-known/oauth-authorization-server",
-      "destination": "/api/orbitx-mcp?path=.well-known/oauth-authorization-server"
+      "destination": "/api/orbitx?path=mcp/.well-known/oauth-authorization-server"
     },
+
     {
       "source": "/api/(.*)",
       "destination": "/api/$1"

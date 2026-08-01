@@ -1,11 +1,6 @@
 /**
- * OrbitX Agent MCP — Streamable HTTP JSON-RPC + OAuth for Claude/ChatGPT.
- *
- *  GET  /api/orbitx-mcp                     — server info / OAuth resource metadata
- *  POST /api/orbitx-mcp                     — JSON-RPC (initialize, tools/list, tools/call)
- *  GET  /api/orbitx-mcp/oauth/authorize     — redirect to /agent/mcp-auth
- *  POST /api/orbitx-mcp/oauth/token         — exchange code → access_token
- *  GET  /api/orbitx-mcp/.well-known/...     — OAuth discovery
+ * OrbitX Agent MCP — mounted at /api/orbitx/mcp/*
+ * (consolidated into orbitx.ts to stay under Hobby function limits)
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
@@ -19,9 +14,9 @@ import {
   pathParts,
   resolveMcpAuth,
   sha256,
-} from "./orbitx/agent/_lib";
+} from "./agent/_lib";
 
-const MCP_URL = `${PUBLIC_BASE}/api/orbitx-mcp`;
+const MCP_URL = `${PUBLIC_BASE}/api/orbitx/mcp`;
 const AUTH_PAGE = `${PUBLIC_BASE}/agent/mcp-auth`;
 
 const TOOLS = [
@@ -152,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const parts = pathParts(req, "orbitx-mcp");
+  const parts = pathParts(req, "mcp");
   const route = parts.join("/");
 
   try {
