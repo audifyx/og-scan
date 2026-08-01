@@ -63,6 +63,8 @@ export function AgentDashboard() {
   const exempt = isTokenGateExemptWallet(walletAddress);
   const linkedWallet = boot?.agent.walletAddress || walletAddress;
   const hasKey = Boolean(revealedKey || (boot?.keys?.length ?? 0) > 0);
+  const bearerToken = revealedKey;
+  const bearerHeader = bearerToken ? `Bearer ${bearerToken}` : "";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -77,6 +79,15 @@ export function AgentDashboard() {
         } catch {
           /* ignore */
         }
+      } else {
+        try {
+          const cached = localStorage.getItem("agent_api_key");
+          if (cached?.startsWith("oxo_") || cached?.startsWith("oxk_")) {
+            setRevealedKey((prev) => prev || cached);
+          }
+        } catch {
+          /* ignore */
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load agent");
@@ -86,6 +97,14 @@ export function AgentDashboard() {
   }, []);
 
   useEffect(() => {
+    try {
+      const cached = localStorage.getItem("agent_api_key");
+      if (cached?.startsWith("oxo_") || cached?.startsWith("oxk_")) {
+        setRevealedKey(cached);
+      }
+    } catch {
+      /* ignore */
+    }
     refresh();
   }, [refresh]);
 
@@ -362,7 +381,7 @@ export function AgentDashboard() {
         </div>
         <p className="mb-4 text-xs text-white/45">
           ChatGPT asks for these when you add a custom MCP connector. Copy each field — leave Client Secret
-          blank.
+          blank. Use the Bearer token as the connector request header when OAuth is flaky.
         </p>
 
         <div className="mb-5 space-y-2">
@@ -389,11 +408,35 @@ export function AgentDashboard() {
                 label: "Token auth method",
                 value: oauth.tokenEndpointAuthMethod,
               },
-            ] as Array<{ id: string; label: string; value: string; copyValue?: string }>
+              {
+                id: "bearer",
+                label: "Bearer token",
+                value: bearerToken || "(create an API key above — shown once)",
+                copyValue: bearerToken || "",
+                emphasize: true,
+              },
+              {
+                id: "bearerHeader",
+                label: "Authorization header",
+                value: bearerHeader || "Bearer <create API key first>",
+                copyValue: bearerHeader || "",
+                emphasize: true,
+              },
+            ] as Array<{
+              id: string;
+              label: string;
+              value: string;
+              copyValue?: string;
+              emphasize?: boolean;
+            }>
           ).map((row) => (
             <div
               key={row.id}
-              className="flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-black/30 px-3 py-2"
+              className={`flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
+                row.emphasize
+                  ? "border-emerald-400/25 bg-emerald-400/8"
+                  : "border-white/8 bg-black/30"
+              }`}
             >
               <div className="min-w-[8rem] text-[11px] font-semibold uppercase tracking-wide text-white/35">
                 {row.label}
@@ -413,29 +456,22 @@ export function AgentDashboard() {
           ))}
         </div>
 
-        {revealedKey && (
+        {bearerToken ? (
           <div className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/8 px-3 py-3">
             <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
-              Bearer API key (fixes “not authenticated” in Claude)
+              How to use the Bearer token
             </p>
-            <p className="mb-2 text-[11px] text-white/45">
-              Claude → connector Advanced / Request headers → add{" "}
-              <code className="text-white/60">Authorization</code> ={" "}
-              <code className="text-white/60">Bearer {"<paste key>"}</code>
-              . Or click Authenticate again after approving on this site.
+            <p className="text-[11px] text-white/45">
+              Claude / ChatGPT → connector Advanced / Request headers → name{" "}
+              <code className="text-white/60">Authorization</code>, value{" "}
+              <code className="text-white/60">Bearer {"<token>"}</code> (copy the Authorization header
+              row above). Preview: <code className="text-white/60">{shortKey(bearerToken)}</code>
             </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <code className="min-w-0 flex-1 break-all font-mono text-xs text-white/70">
-                {shortKey(revealedKey)}
-              </code>
-              <button
-                type="button"
-                onClick={() => copy("key", revealedKey)}
-                className="rounded-lg bg-emerald-400 px-3 py-1.5 text-[11px] font-bold text-black"
-              >
-                Copy full key
-              </button>
-            </div>
+          </div>
+        ) : (
+          <div className="mb-5 rounded-xl border border-amber-400/20 bg-amber-400/8 px-3 py-3 text-[11px] text-amber-100/80">
+            Create an API key in step 2 — the full Bearer token appears here so you can paste it into
+            the connector.
           </div>
         )}
 
@@ -506,18 +542,32 @@ export function AgentDashboard() {
                   ["Token URL", oauth.tokenUrl, "token"],
                   ["Client ID", oauth.clientId, "client"],
                   ["Scope", oauth.scope, "scope"],
-                ] as const
-              ).map(([label, value, id]) => (
+                  [
+                    "Bearer token",
+                    bearerToken || "(create API key on this page first)",
+                    "bearer",
+                    bearerToken || "",
+                  ],
+                  [
+                    "Authorization header",
+                    bearerHeader || "Bearer <create API key first>",
+                    "bearerHeader",
+                    bearerHeader || "",
+                  ],
+                ] as Array<[string, string, string, string?]>
+              ).map(([label, value, id, copyValue]) => (
                 <div key={id} className="rounded-xl border border-white/10 bg-black/40 px-3 py-2">
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <span className="text-[11px] font-semibold text-white/40">{label}</span>
-                    <button
-                      type="button"
-                      onClick={() => copy(id, value)}
-                      className="text-[11px] font-semibold text-emerald-300 hover:underline"
-                    >
-                      {copied === id ? "Copied" : "Copy"}
-                    </button>
+                    {copyValue !== "" && (
+                      <button
+                        type="button"
+                        onClick={() => copy(id, copyValue ?? value)}
+                        className="text-[11px] font-semibold text-emerald-300 hover:underline"
+                      >
+                        {copied === id ? "Copied" : "Copy"}
+                      </button>
+                    )}
                   </div>
                   <code className="block break-all font-mono text-[11px] text-white/75">{value}</code>
                 </div>
