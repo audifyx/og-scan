@@ -90,6 +90,11 @@ async function readJson(r: Response): Promise<Record<string, unknown>> {
     return JSON.parse(text) as Record<string, unknown>;
   } catch {
     const snippet = text.replace(/\s+/g, " ").slice(0, 180);
+    if (/FUNCTION_INVOCATION_FAILED/i.test(snippet)) {
+      throw new Error(
+        "Server was restarting — hard-refresh and try again. MCP URL: https://orbitx.world/api/mcp",
+      );
+    }
     throw new Error(
       r.ok
         ? `Invalid JSON from server: ${snippet}`

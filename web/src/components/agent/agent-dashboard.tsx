@@ -216,6 +216,18 @@ export function AgentDashboard() {
               Apply SQL from <code className="font-mono">sql/Aug_SQL/</code> in Supabase if tables are missing.
             </p>
           )}
+          {(error.includes("FUNCTION_INVOCATION") || error.includes("restarting") || error.includes("500")) && (
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-red-200/80">
+              <button
+                type="button"
+                onClick={() => refresh()}
+                className="rounded-lg border border-red-300/30 px-2 py-1 font-semibold hover:bg-red-500/20"
+              >
+                Retry now
+              </button>
+              <span>Claude MCP URL: https://orbitx.world/api/mcp</span>
+            </p>
+          )}
         </div>
       )}
 
