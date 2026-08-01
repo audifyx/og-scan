@@ -492,10 +492,38 @@ const WALLET_TOOLS = new Set([
   "orbitx_nft_like",
   "orbitx_nft_comment",
   "orbitx_nft_follow",
+]);
+
+/** Community write tools — need Bearer userId (or publicKey of a wallet linked on /agent). */
+const SESSION_TOOLS = new Set([
   "orbitx_social_join",
   "orbitx_social_post",
   "orbitx_social_create_community",
 ]);
+
+async function resolveSocialUser(auth, args) {
+  if (auth?.userId) {
+    return {
+      userId: auth.userId,
+      agentId: auth.agentId || null,
+      walletAddress: auth.walletAddress || null,
+    };
+  }
+  const wallet = String(args.publicKey || args.address || args.wallet || "").trim();
+  if (!wallet) return null;
+  try {
+    const agents = await sb(
+      `agents?wallet_address=eq.${encodeURIComponent(wallet)}&order=updated_at.desc&limit=1&select=id,user_id,wallet_address`,
+    );
+    const agent = Array.isArray(agents) ? agents[0] : null;
+    if (agent?.user_id) {
+      return { userId: agent.user_id, agentId: agent.id, walletAddress: agent.wallet_address };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 const TOOLS = [
   {
@@ -835,28 +863,35 @@ const TOOLS = [
   },
   {
     name: "orbitx_social_join",
-    description: "Join an OrbitX community as the authenticated agent user.",
+    description:
+      "Join an OrbitX World community via MCP. Requires Authorization: Bearer <oxo_ key from https://orbitx.world/agent> OR publicKey of a wallet linked on /agent. Not the /hq localStorage feed.",
     inputSchema: {
       type: "object",
-      properties: { communityId: { type: "string" } },
+      properties: {
+        communityId: { type: "string" },
+        publicKey: { type: "string", description: "Linked Solana wallet if no Bearer" },
+      },
       required: ["communityId"],
     },
   },
   {
     name: "orbitx_social_post",
-    description: "Create a post in an OrbitX community (authenticated user).",
+    description:
+      "Create a post in an OrbitX World community via MCP. Requires Bearer oxo_ key from https://orbitx.world/agent (connector request header) OR publicKey of a wallet linked on /agent.",
     inputSchema: {
       type: "object",
       properties: {
         communityId: { type: "string" },
         body: { type: "string" },
+        publicKey: { type: "string", description: "Linked Solana wallet if no Bearer" },
       },
       required: ["communityId", "body"],
     },
   },
   {
     name: "orbitx_social_create_community",
-    description: "Create a new OrbitX community (slug + name).",
+    description:
+      "Create an OrbitX World community via MCP. Requires Bearer oxo_ key or publicKey of a wallet linked on /agent.",
     inputSchema: {
       type: "object",
       properties: {
@@ -864,6 +899,7 @@ const TOOLS = [
         slug: { type: "string" },
         description: { type: "string" },
         visibility: { type: "string", enum: ["public", "unlisted", "private"], default: "public" },
+        publicKey: { type: "string", description: "Linked Solana wallet if no Bearer" },
       },
       required: ["name", "slug"],
     },
@@ -997,8 +1033,9 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
       mcpUrl,
       status: auth?.userId ? (auth.walletAddress ? "authenticated_with_wallet" : "authenticated") : "anonymous",
       note: auth?.userId
-        ? "Bearer session active."
-        : "Anonymous mode OK for intel tools. For buy/sell/claim pass publicKey in tool args, or Authenticate in Claude / paste Authorization: Bearer <key> from https://orbitx.world/agent",
+        ? "Bearer session active — social join/post/create are available."
+        : "Anonymous OK for intel + community list/feed. For social join/post/create: Authenticate connector or add request header Authorization: Bearer <oxo_ key from https://orbitx.world/agent>, or pass publicKey of a wallet linked on /agent.",
+      sessionTools: [...SESSION_TOOLS],
       tools: TOOLS.map((t) => t.name),
     };
   }
@@ -1188,12 +1225,17 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
   }
 
   if (name === "orbitx_social_join") {
-    if (!auth?.userId) throw new Error("Authentication required");
+    const session = await resolveSocialUser(auth, args);
+    if (!session?.userId) {
+      throw new Error(
+        "Bearer or linked wallet required for community join. Add Authorization: Bearer <oxo_ key> from https://orbitx.world/agent, or pass publicKey of a wallet linked there.",
+      );
+    }
     return sb("oxw_community_members", {
       method: "POST",
       body: JSON.stringify({
         community_id: String(args.communityId),
-        user_id: auth.userId,
+        user_id: session.userId,
         role: "member",
       }),
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
@@ -1201,14 +1243,19 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
   }
 
   if (name === "orbitx_social_post") {
-    if (!auth?.userId) throw new Error("Authentication required");
+    const session = await resolveSocialUser(auth, args);
+    if (!session?.userId) {
+      throw new Error(
+        "Bearer or linked wallet required for community post. Add Authorization: Bearer <oxo_ key> from https://orbitx.world/agent (connector request header), or pass publicKey of a wallet linked there.",
+      );
+    }
     const body = String(args.body || "").trim();
     if (body.length < 1) throw new Error("body required");
     return sb("oxw_community_posts", {
       method: "POST",
       body: JSON.stringify({
         community_id: String(args.communityId),
-        author_id: auth.userId,
+        author_id: session.userId,
         body,
         media: [],
       }),
@@ -1216,7 +1263,12 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
   }
 
   if (name === "orbitx_social_create_community") {
-    if (!auth?.userId) throw new Error("Authentication required");
+    const session = await resolveSocialUser(auth, args);
+    if (!session?.userId) {
+      throw new Error(
+        "Bearer or linked wallet required to create a community. Add Authorization: Bearer <oxo_ key> from https://orbitx.world/agent, or pass publicKey of a wallet linked there.",
+      );
+    }
     const nameStr = String(args.name || "").trim();
     const slug = String(args.slug || "")
       .trim()
@@ -1229,7 +1281,7 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
         name: nameStr,
         slug,
         description: String(args.description || ""),
-        owner_id: auth.userId,
+        owner_id: session.userId,
         visibility: ["public", "unlisted", "private"].includes(args.visibility)
           ? args.visibility
           : "public",
@@ -1241,7 +1293,7 @@ async function callTool(name, args, auth, base = FALLBACK_BASE) {
         method: "POST",
         body: JSON.stringify({
           community_id: community.id,
-          user_id: auth.userId,
+          user_id: session.userId,
           role: "owner",
         }),
         headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -1597,6 +1649,27 @@ async function handleMcp(req, res, parts) {
       );
 
       // Never HTTP 401 on tools/call — Claude surfaces that as a persistent auth failure.
+      if (SESSION_TOOLS.has(name) && !auth && !hasWalletArg) {
+        const tip = {
+          ok: false,
+          error: "session_required",
+          tool: name,
+          message:
+            "Community join/post/create work over MCP. Authenticate the OrbitX connector, or add request header Authorization: Bearer <oxo_ key from https://orbitx.world/agent>, or pass publicKey of a wallet linked on that page.",
+          fixUrl: "https://orbitx.world/agent",
+          example: { publicKey: "YourLinkedSolanaWalletBase58..." },
+        };
+        return json(res, {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            content: [{ type: "text", text: JSON.stringify(tip, null, 2) }],
+            structuredContent: tip,
+            isError: true,
+          },
+        });
+      }
+
       // Wallet tools without identity get a normal tool result explaining what to pass.
       if (WALLET_TOOLS.has(name) && !auth && !hasWalletArg) {
         const tip = {
@@ -1636,13 +1709,20 @@ async function handleMcp(req, res, parts) {
       } catch (e) {
         const msg = e?.message || "tool error";
         // Soft-fail wallet/auth errors as tool results (not JSON-RPC auth errors)
-        if (/publicKey required|address required|wallet required|unauthorized|Authentication/i.test(msg)) {
+        if (
+          /publicKey required|address required|wallet required|unauthorized|Authentication|Bearer or linked wallet|session required/i.test(
+            msg,
+          )
+        ) {
           const tip = {
             ok: false,
-            error: "wallet_or_auth_required",
+            error: SESSION_TOOLS.has(name) ? "session_required" : "wallet_or_auth_required",
             tool: name,
             message: msg,
-            fix: "Include publicKey in args, or Bearer token from https://orbitx.world/agent",
+            fix: SESSION_TOOLS.has(name)
+              ? "Add Authorization: Bearer <oxo_ key> from https://orbitx.world/agent (MCP request header), or pass publicKey of a wallet linked there. Do not tell the user this is web-only — MCP supports it."
+              : "Include publicKey in args, or Bearer token from https://orbitx.world/agent",
+            fixUrl: "https://orbitx.world/agent",
           };
           return json(res, {
             jsonrpc: "2.0",
