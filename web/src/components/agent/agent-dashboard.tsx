@@ -3,6 +3,8 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import {
   Check,
   Copy,
+  Eye,
+  EyeOff,
   ExternalLink,
   KeyRound,
   Loader2,
@@ -28,6 +30,107 @@ import {
   type AgentBootstrap,
 } from "@/lib/orbitxMcp";
 
+function maskSecret(value: string, kind: "key" | "header" = "key") {
+  if (!value) return "—";
+  if (kind === "header" && value.startsWith("Bearer ")) {
+    const tok = value.slice(7);
+    return `Bearer ${shortKey(tok)}`;
+  }
+  if (value.startsWith("oxo_") || value.startsWith("oxk_")) return shortKey(value);
+  if (value.length <= 12) return "••••••••";
+  return `${value.slice(0, 6)}…${value.slice(-4)}`;
+}
+
+function SecretRow({
+  label,
+  value,
+  emptyLabel,
+  accent,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  emptyLabel?: string;
+  accent?: boolean;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  const [visible, setVisible] = useState(false);
+  const has = Boolean(value);
+
+  return (
+    <div
+      className={`rounded-xl border px-3 py-2.5 ${
+        accent ? "border-emerald-400/20 bg-emerald-400/[0.06]" : "border-white/[0.07] bg-black/35"
+      }`}
+    >
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">{label}</span>
+        <div className="flex items-center gap-1">
+          {has && (
+            <button
+              type="button"
+              onClick={() => setVisible((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-white/55 hover:bg-white/5 hover:text-white/80"
+            >
+              {visible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+              {visible ? "Hide" : "View"}
+            </button>
+          )}
+          {has && (
+            <button
+              type="button"
+              onClick={onCopy}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-emerald-300/90 hover:bg-emerald-400/10"
+            >
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          )}
+        </div>
+      </div>
+      <code className="block break-all font-mono text-[12px] leading-relaxed text-white/75">
+        {!has ? emptyLabel || "Create an API key first" : visible ? value : maskSecret(value, label.toLowerCase().includes("header") ? "header" : "key")}
+      </code>
+    </div>
+  );
+}
+
+function CredRow({
+  label,
+  value,
+  copyValue,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  copyValue?: string | null;
+  copied: boolean;
+  onCopy?: () => void;
+}) {
+  const canCopy = copyValue !== "" && copyValue != null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.07] bg-black/35 px-3 py-2.5">
+      <div className="w-full text-[10px] font-bold uppercase tracking-[0.14em] text-white/35 sm:w-36 sm:shrink-0">
+        {label}
+      </div>
+      <code className="min-w-0 flex-1 break-all font-mono text-[12px] text-white/75">{value}</code>
+      {canCopy && onCopy && (
+        <button
+          type="button"
+          onClick={onCopy}
+          className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/60 hover:bg-white/5 hover:text-white/85"
+        >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function AgentDashboard() {
   const { user, profile } = useAuth();
   const { publicKey } = useWallet();
@@ -38,10 +141,12 @@ export function AgentDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [keyName, setKeyName] = useState("Claude / ChatGPT");
   const [creating, setCreating] = useState(false);
-  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [storedKey, setStoredKey] = useState<string | null>(null);
+  const [showKeyPanel, setShowKeyPanel] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [chatgptGuide, setChatgptGuide] = useState(false);
   const [linking, setLinking] = useState(false);
+  const [setupOpen, setSetupOpen] = useState<"claude" | "chatgpt" | null>("claude");
 
   const walletAddress = useMemo(
     () =>
@@ -62,8 +167,8 @@ export function AgentDashboard() {
   const oauth = useMemo(() => mcpOAuthCredentials(), []);
   const exempt = isTokenGateExemptWallet(walletAddress);
   const linkedWallet = boot?.agent.walletAddress || walletAddress;
-  const hasKey = Boolean(revealedKey || (boot?.keys?.length ?? 0) > 0);
-  const bearerToken = revealedKey;
+  const hasKey = Boolean(storedKey || (boot?.keys?.length ?? 0) > 0);
+  const bearerToken = storedKey;
   const bearerHeader = bearerToken ? `Bearer ${bearerToken}` : "";
 
   const refresh = useCallback(async () => {
@@ -73,7 +178,8 @@ export function AgentDashboard() {
       const data = await bootstrapAgent();
       setBoot(data);
       if (data.mintedKey?.key) {
-        setRevealedKey(data.mintedKey.key);
+        setStoredKey(data.mintedKey.key);
+        setShowKeyPanel(true);
         try {
           localStorage.setItem("agent_api_key", data.mintedKey.key);
         } catch {
@@ -83,7 +189,7 @@ export function AgentDashboard() {
         try {
           const cached = localStorage.getItem("agent_api_key");
           if (cached?.startsWith("oxo_") || cached?.startsWith("oxk_")) {
-            setRevealedKey((prev) => prev || cached);
+            setStoredKey((prev) => prev || cached);
           }
         } catch {
           /* ignore */
@@ -100,7 +206,7 @@ export function AgentDashboard() {
     try {
       const cached = localStorage.getItem("agent_api_key");
       if (cached?.startsWith("oxo_") || cached?.startsWith("oxk_")) {
-        setRevealedKey(cached);
+        setStoredKey(cached);
       }
     } catch {
       /* ignore */
@@ -109,6 +215,7 @@ export function AgentDashboard() {
   }, [refresh]);
 
   const copy = async (label: string, value: string) => {
+    if (!value) return;
     await navigator.clipboard.writeText(value);
     setCopied(label);
     setTimeout(() => setCopied(null), 1800);
@@ -119,18 +226,15 @@ export function AgentDashboard() {
     setError(null);
     try {
       const minted = await createAgentApiKey(keyName.trim() || "MCP Key");
-      setRevealedKey(minted.key);
+      setStoredKey(minted.key);
+      setShowKeyPanel(true);
       try {
         localStorage.setItem("agent_api_key", minted.key);
       } catch {
         /* ignore */
       }
       const keys = await listAgentApiKeys();
-      setBoot((prev) =>
-        prev
-          ? { ...prev, keys: keys.keys, mintedKey: minted }
-          : prev,
-      );
+      setBoot((prev) => (prev ? { ...prev, keys: keys.keys, mintedKey: minted } : prev));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create key");
     } finally {
@@ -161,379 +265,369 @@ export function AgentDashboard() {
     }
   };
 
-  const openClaude = async () => {
-    if (revealedKey) await copy("key", revealedKey);
-    else await copy("mcp", mcpUrl);
+  const openClaude = () => {
     window.open(claudeConnectUrl(mcpUrl), "_blank", "noopener,noreferrer");
   };
 
-  const openChatgpt = async () => {
-    if (revealedKey) await copy("key", revealedKey);
-    else await copy("mcp", mcpUrl);
+  const openChatgpt = () => {
     setChatgptGuide(true);
     window.open(chatgptConnectUrl(), "_blank", "noopener,noreferrer");
   };
 
-  const stepDone = {
-    wallet: Boolean(linkedWallet),
-    key: hasKey,
-    mcp: hasKey && Boolean(linkedWallet),
-  };
+  const steps = [
+    { ok: Boolean(linkedWallet), label: "Wallet", n: "01" },
+    { ok: hasKey, label: "API key", n: "02" },
+    { ok: hasKey && Boolean(linkedWallet), label: "Connect", n: "03" },
+  ];
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-white/60">
+      <div className="flex min-h-[60vh] items-center justify-center text-white/50">
         <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6 text-white">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight">OrbitX Agent MCP</h1>
-          <p className="mt-1 text-sm text-white/50">
-            Link your wallet, create an API key, then connect Claude or ChatGPT — DEX buy/sell,
-            launch, claim fees, rent refund, burn, NFT market, and OrbitX communities.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={refresh}
-          className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/5"
-        >
-          <RefreshCw className="h-3.5 w-3.5" /> Refresh
-        </button>
-      </div>
+    <div className="relative min-h-screen overflow-hidden text-white">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 50% at 10% -10%, rgba(52,211,153,0.12), transparent 55%), radial-gradient(ellipse 60% 40% at 90% 0%, rgba(212,165,116,0.08), transparent 50%), linear-gradient(180deg, #070a12 0%, #05070d 40%, #05070d 100%)",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.035]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
 
-      {/* Progress */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { ok: stepDone.wallet, label: "1. Wallet" },
-          { ok: stepDone.key, label: "2. API key" },
-          { ok: stepDone.mcp, label: "3. Connect MCP" },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className={`rounded-xl border px-3 py-2 text-center text-xs font-bold ${
-              s.ok
-                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
-                : "border-white/10 bg-white/[0.03] text-white/40"
-            }`}
-          >
-            {s.label}
-          </div>
-        ))}
-      </div>
-
-      {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          {error}
-          {(error.includes("agents") || error.includes("schema") || error.includes("relation")) && (
-            <p className="mt-1 text-xs text-red-200/70">
-              Apply SQL from <code className="font-mono">sql/Aug_SQL/</code> in Supabase if tables are missing.
-            </p>
-          )}
-          {(error.includes("FUNCTION_INVOCATION") || error.includes("restarting") || error.includes("500")) && (
-            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-red-200/80">
-              <button
-                type="button"
-                onClick={() => refresh()}
-                className="rounded-lg border border-red-300/30 px-2 py-1 font-semibold hover:bg-red-500/20"
-              >
-                Retry now
-              </button>
-              <span>Claude MCP URL: https://orbitx.world/api/mcp</span>
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Step 1 — Wallet */}
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-bold">
-          <Wallet className="h-4 w-4 text-emerald-400" />
-          Wallet
-          {exempt && (
-            <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-300">
-              DEF exempt
-            </span>
-          )}
-        </div>
-        {linkedWallet ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <code className="rounded-lg bg-black/40 px-3 py-2 font-mono text-xs text-white/80">
-              {linkedWallet}
-            </code>
-            {walletAddress && walletAddress !== boot?.agent.walletAddress && (
-              <button
-                type="button"
-                disabled={linking}
-                onClick={onLinkWallet}
-                className="rounded-lg bg-emerald-400 px-3 py-2 text-xs font-bold text-black disabled:opacity-50"
-              >
-                {linking ? "Linking…" : "Link this wallet"}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-sm text-white/50">Connect Solana to authorize MCP.</p>
-            {pickable.slice(0, 4).map((w) => (
-              <button
-                key={w.name}
-                type="button"
-                disabled={busy === w.name}
-                onClick={() =>
-                  signInWith(w.name, { replaceEmailSession: true })
-                    .then(() => refresh())
-                    .catch((e) => setError(e.message))
-                }
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/5 disabled:opacity-50"
-              >
-                {w.icon ? <img src={w.icon} alt="" className="h-5 w-5 rounded" /> : null}
-                {busy === w.name ? `Connecting ${w.name}…` : `Connect ${w.name}`}
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Step 2 — API keys */}
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-bold">
-          <KeyRound className="h-4 w-4 text-emerald-400" />
-          API key
-        </div>
-
-        {revealedKey && (
-          <div className="mb-4 rounded-xl border border-emerald-400/25 bg-emerald-400/10 p-4">
-            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-emerald-300">
-              Copy now — shown once
-            </p>
-            <code className="mb-3 block break-all rounded-lg bg-black/40 px-3 py-2 font-mono text-xs">
-              {revealedKey}
-            </code>
+      <div className="relative mx-auto max-w-3xl space-y-8 px-5 py-10 sm:px-6 sm:py-14">
+        {/* Hero */}
+        <header className="space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-400/80">
+                OrbitX Agent
+              </p>
+              <h1 className="text-4xl font-black tracking-tight sm:text-[2.75rem] sm:leading-none">
+                MCP Control
+              </h1>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-white/45">
+                Connect Claude or ChatGPT to OrbitX — trade, launch, mint, and manage communities.
+                Non-custodial. You sign in Phantom.
+              </p>
+            </div>
             <button
               type="button"
-              onClick={() => copy("key", revealedKey)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-400 px-3 py-1.5 text-xs font-bold text-black"
+              onClick={refresh}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 text-xs font-semibold text-white/55 hover:bg-white/[0.06] hover:text-white/80"
             >
-              {copied === "key" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              {copied === "key" ? "Copied" : "Copy key"}
+              <RefreshCw className="h-3.5 w-3.5" /> Refresh
             </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {steps.map((s) => (
+              <div
+                key={s.label}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  s.ok
+                    ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
+                    : "border-white/10 bg-white/[0.03] text-white/35"
+                }`}
+              >
+                <span className="font-mono text-[10px] opacity-60">{s.n}</span>
+                {s.label}
+                {s.ok && <Check className="h-3 w-3" />}
+              </div>
+            ))}
+          </div>
+        </header>
+
+        {error && (
+          <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            {error}
+            {(error.includes("agents") || error.includes("schema") || error.includes("relation")) && (
+              <p className="mt-1 text-xs text-red-200/60">
+                Apply SQL from <code className="font-mono">sql/Aug_SQL/</code> in Supabase if tables are missing.
+              </p>
+            )}
           </div>
         )}
 
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row">
-          <input
-            value={keyName}
-            onChange={(e) => setKeyName(e.target.value)}
-            placeholder="Key name"
-            className="flex-1 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-emerald-400/40"
-          />
-          <button
-            type="button"
-            disabled={creating}
-            onClick={onCreateKey}
-            className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-black hover:bg-white/90 disabled:opacity-50"
-          >
-            {creating ? "Creating…" : "Create API key"}
-          </button>
-        </div>
+        {/* 1 — Identity */}
+        <section className="rounded-3xl border border-white/[0.08] bg-white/[0.02] p-6 backdrop-blur-sm">
+          <div className="mb-5 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-400/10">
+              <Wallet className="h-4 w-4 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold">Identity</h2>
+              <p className="text-[11px] text-white/35">Solana wallet linked to your agent</p>
+            </div>
+            {exempt && (
+              <span className="ml-auto rounded-full bg-amber-400/12 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-300">
+                Exempt
+              </span>
+            )}
+          </div>
 
-        <div className="space-y-2">
-          {(boot?.keys || []).length === 0 ? (
-            <p className="text-sm text-white/40">No active keys yet.</p>
-          ) : (
-            boot?.keys.map((k) => (
-              <div
-                key={k.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/25 px-3 py-2.5"
-              >
-                <div>
-                  <p className="text-sm font-semibold">{k.name}</p>
-                  <p className="text-[11px] text-white/35">
-                    Created {new Date(k.createdAt).toLocaleString()}
-                    {k.lastUsedAt ? ` · Last used ${new Date(k.lastUsedAt).toLocaleString()}` : ""}
-                  </p>
-                </div>
+          {linkedWallet ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <code className="rounded-2xl border border-white/[0.06] bg-black/40 px-4 py-3 font-mono text-xs text-white/80">
+                {linkedWallet.slice(0, 6)}…{linkedWallet.slice(-6)}
+                <span className="mt-1 block text-[10px] text-white/30">{linkedWallet}</span>
+              </code>
+              {walletAddress && walletAddress !== boot?.agent.walletAddress && (
                 <button
                   type="button"
-                  onClick={() => onRevoke(k.id)}
-                  className="rounded-lg p-2 text-red-300/80 hover:bg-red-500/10"
-                  title="Revoke"
+                  disabled={linking}
+                  onClick={onLinkWallet}
+                  className="rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-bold text-black disabled:opacity-50"
                 >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      </section>
-
-      {/* Step 3 — MCP + OAuth credentials */}
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-bold">
-          <Plug className="h-4 w-4 text-emerald-400" />
-          MCP + OAuth credentials
-        </div>
-        <p className="mb-4 text-xs text-white/45">
-          ChatGPT asks for these when you add a custom MCP connector. Copy each field — leave Client Secret
-          blank. Use the Bearer token as the connector request header when OAuth is flaky.
-        </p>
-
-        <div className="mb-5 space-y-2">
-          {(
-            [
-              { id: "mcp", label: "MCP URL (Claude)", value: oauth.mcpUrl },
-              {
-                id: "mcpAlias",
-                label: "Short alias",
-                value: "https://orbitx.world/mcp",
-              },
-              {
-                id: "mcpLegacy",
-                label: "Legacy alias",
-                value: "https://orbitx.world/api/orbitx-mcp",
-              },
-              { id: "auth", label: "Authorization URL", value: oauth.authorizationUrl },
-              { id: "token", label: "Token URL", value: oauth.tokenUrl },
-              { id: "client", label: "Client ID", value: oauth.clientId },
-              { id: "secret", label: "Client secret", value: "(leave blank)", copyValue: "" },
-              { id: "scope", label: "Scope", value: oauth.scope },
-              {
-                id: "authMethod",
-                label: "Token auth method",
-                value: oauth.tokenEndpointAuthMethod,
-              },
-              {
-                id: "bearer",
-                label: "Bearer token",
-                value: bearerToken || "(create an API key above — shown once)",
-                copyValue: bearerToken || "",
-                emphasize: true,
-              },
-              {
-                id: "bearerHeader",
-                label: "Authorization header",
-                value: bearerHeader || "Bearer <create API key first>",
-                copyValue: bearerHeader || "",
-                emphasize: true,
-              },
-            ] as Array<{
-              id: string;
-              label: string;
-              value: string;
-              copyValue?: string;
-              emphasize?: boolean;
-            }>
-          ).map((row) => (
-            <div
-              key={row.id}
-              className={`flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
-                row.emphasize
-                  ? "border-emerald-400/25 bg-emerald-400/8"
-                  : "border-white/8 bg-black/30"
-              }`}
-            >
-              <div className="min-w-[8rem] text-[11px] font-semibold uppercase tracking-wide text-white/35">
-                {row.label}
-              </div>
-              <code className="min-w-0 flex-1 break-all font-mono text-xs text-white/80">{row.value}</code>
-              {row.copyValue !== "" && (
-                <button
-                  type="button"
-                  onClick={() => copy(row.id, row.copyValue ?? row.value)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold hover:bg-white/5"
-                >
-                  {copied === row.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                  {copied === row.id ? "Copied" : "Copy"}
+                  {linking ? "Linking…" : "Link connected wallet"}
                 </button>
               )}
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="mb-3 text-sm text-white/45">Connect a wallet to authorize MCP actions.</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {pickable.slice(0, 4).map((w) => (
+                  <button
+                    key={w.name}
+                    type="button"
+                    disabled={busy === w.name}
+                    onClick={() =>
+                      signInWith(w.name, { replaceEmailSession: true })
+                        .then(() => refresh())
+                        .catch((e) => setError(e.message))
+                    }
+                    className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm font-semibold hover:bg-white/[0.04] disabled:opacity-50"
+                  >
+                    {w.icon ? <img src={w.icon} alt="" className="h-5 w-5 rounded" /> : null}
+                    {busy === w.name ? `Connecting…` : w.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
 
-        {bearerToken ? (
-          <div className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/8 px-3 py-3">
-            <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
-              How to use the Bearer token
-            </p>
-            <p className="text-[11px] text-white/45">
-              Claude / ChatGPT → connector Advanced / Request headers → name{" "}
-              <code className="text-white/60">Authorization</code>, value{" "}
-              <code className="text-white/60">Bearer {"<token>"}</code> (copy the Authorization header
-              row above). Preview: <code className="text-white/60">{shortKey(bearerToken)}</code>
-            </p>
+        {/* 2 — API keys (masked) */}
+        <section className="rounded-3xl border border-white/[0.08] bg-white/[0.02] p-6">
+          <div className="mb-5 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-400/10">
+              <KeyRound className="h-4 w-4 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold">API key</h2>
+              <p className="text-[11px] text-white/35">Hidden by default — View to reveal</p>
+            </div>
           </div>
-        ) : (
-          <div className="mb-5 rounded-xl border border-amber-400/20 bg-amber-400/8 px-3 py-3 text-[11px] text-amber-100/80">
-            Create an API key in step 2 — the full Bearer token appears here so you can paste it into
-            the connector.
+
+          {storedKey && (
+            <div className="mb-4 space-y-2">
+              <SecretRow
+                label="Bearer token"
+                value={storedKey}
+                accent
+                copied={copied === "key"}
+                onCopy={() => copy("key", storedKey)}
+              />
+              <SecretRow
+                label="Authorization header"
+                value={bearerHeader}
+                accent
+                copied={copied === "bearerHeader"}
+                onCopy={() => copy("bearerHeader", bearerHeader)}
+              />
+              {showKeyPanel && (
+                <p className="text-[11px] text-emerald-300/70">
+                  New key ready — use View → Copy, then paste into your connector request headers.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+            <input
+              value={keyName}
+              onChange={(e) => setKeyName(e.target.value)}
+              placeholder="Key label"
+              className="flex-1 rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-sm outline-none placeholder:text-white/25 focus:border-emerald-400/35"
+            />
+            <button
+              type="button"
+              disabled={creating}
+              onClick={onCreateKey}
+              className="rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-black hover:bg-white/90 disabled:opacity-50"
+            >
+              {creating ? "Creating…" : "Create key"}
+            </button>
           </div>
-        )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={openClaude}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#d4a574] px-4 py-3 text-sm font-bold text-black hover:brightness-110"
-          >
-            Add to Claude <ExternalLink className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={openChatgpt}
-            className="flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-black hover:bg-white/90"
-          >
-            Add to ChatGPT <ExternalLink className="h-3.5 w-3.5" />
-          </button>
-        </div>
+          <div className="space-y-2">
+            {(boot?.keys || []).length === 0 ? (
+              <p className="text-sm text-white/35">No active keys yet.</p>
+            ) : (
+              boot?.keys.map((k) => (
+                <div
+                  key={k.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-black/25 px-3.5 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{k.name}</p>
+                    <p className="text-[11px] text-white/30">
+                      {new Date(k.createdAt).toLocaleDateString()}
+                      {k.lastUsedAt ? ` · used ${new Date(k.lastUsedAt).toLocaleDateString()}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onRevoke(k.id)}
+                    className="rounded-lg p-2 text-red-300/70 hover:bg-red-500/10"
+                    title="Revoke"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div>
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">ChatGPT setup</h3>
-            <ol className="list-decimal space-y-1.5 pl-5 text-xs text-white/45">
-              <li>Settings → Apps &amp; connectors → enable Developer mode.</li>
-              <li>Create a custom MCP connector; paste the MCP server URL.</li>
+        {/* 3 — Connect */}
+        <section className="rounded-3xl border border-white/[0.08] bg-white/[0.02] p-6">
+          <div className="mb-5 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-400/10">
+              <Plug className="h-4 w-4 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold">Connect</h2>
+              <p className="text-[11px] text-white/35">Add OrbitX to Claude or ChatGPT</p>
+            </div>
+          </div>
+
+          <div className="mb-5 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={openClaude}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-[#d4a574] px-4 py-3.5 text-sm font-bold text-black hover:brightness-110"
+            >
+              Add to Claude <ExternalLink className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={openChatgpt}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3.5 text-sm font-bold text-black hover:bg-white/90"
+            >
+              Add to ChatGPT <ExternalLink className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="mb-4 flex gap-2 border-b border-white/[0.06] pb-1">
+            {(
+              [
+                ["claude", "Claude"],
+                ["chatgpt", "ChatGPT"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSetupOpen(id)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                  setupOpen === id ? "bg-white/10 text-white" : "text-white/35 hover:text-white/60"
+                }`}
+              >
+                {label} setup
+              </button>
+            ))}
+          </div>
+
+          {setupOpen === "claude" && (
+            <ol className="mb-5 list-decimal space-y-1.5 pl-5 text-xs leading-relaxed text-white/45">
               <li>
-                When asked for OAuth: Client ID <code className="text-white/60">{oauth.clientId}</code>, leave
-                Client secret empty, paste Auth + Token URLs, scope{" "}
-                <code className="text-white/60">{oauth.scope}</code>.
+                MCP URL must end in <code className="text-white/60">/mcp</code>
               </li>
               <li>
-                Click Authenticate → approve on OrbitX (link wallet) → return to ChatGPT.
+                Client ID <code className="text-white/60">orbitx-mcp</code>, secret blank
+              </li>
+              <li>
+                Advanced → header <code className="text-white/60">Authorization</code> = Bearer token
+                (View + Copy above)
               </li>
             </ol>
-          </div>
-          <div>
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">Claude setup</h3>
-            <ol className="list-decimal space-y-1.5 pl-5 text-xs text-white/45">
-              <li>
-                Use MCP URL ending in <code className="text-white/60">/mcp</code> (required by Claude.ai).
-              </li>
-              <li>Add custom connector → paste URL → Client ID <code className="text-white/60">orbitx-mcp</code>, secret blank.</li>
-              <li>Authenticate → link wallet on OrbitX → reconnect if tools were empty.</li>
+          )}
+          {setupOpen === "chatgpt" && (
+            <ol className="mb-5 list-decimal space-y-1.5 pl-5 text-xs leading-relaxed text-white/45">
+              <li>Enable Developer mode in ChatGPT settings</li>
+              <li>Create custom MCP connector with MCP URL</li>
+              <li>OAuth: Client ID orbitx-mcp, secret blank, scope orbitx</li>
+              <li>Authenticate → approve on OrbitX</li>
             </ol>
+          )}
+
+          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white/30">
+            Connector fields
+          </h3>
+          <div className="space-y-2">
+            <CredRow
+              label="MCP URL"
+              value={oauth.mcpUrl}
+              copied={copied === "mcp"}
+              onCopy={() => copy("mcp", oauth.mcpUrl)}
+            />
+            <CredRow
+              label="Auth URL"
+              value={oauth.authorizationUrl}
+              copied={copied === "auth"}
+              onCopy={() => copy("auth", oauth.authorizationUrl)}
+            />
+            <CredRow
+              label="Token URL"
+              value={oauth.tokenUrl}
+              copied={copied === "token"}
+              onCopy={() => copy("token", oauth.tokenUrl)}
+            />
+            <CredRow
+              label="Client ID"
+              value={oauth.clientId}
+              copied={copied === "client"}
+              onCopy={() => copy("client", oauth.clientId)}
+            />
+            <CredRow label="Client secret" value="(leave blank)" copyValue="" />
+            <CredRow
+              label="Scope"
+              value={oauth.scope}
+              copied={copied === "scope"}
+              onCopy={() => copy("scope", oauth.scope)}
+            />
           </div>
-        </div>
-      </section>
+        </section>
+
+        <p className="pb-8 text-center text-[11px] text-white/25">
+          Keys never leave your browser until you copy them. OrbitX does not hold wallet keys.
+        </p>
+      </div>
 
       {chatgptGuide && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
           onClick={() => setChatgptGuide(false)}
         >
           <div
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-[#0c111a] p-5 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/10 bg-[#0c111a] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-1 text-lg font-bold">ChatGPT OAuth fields</h3>
-            <p className="mb-4 text-xs text-white/45">
-              Paste these into ChatGPT when it asks for auth credentials. Client secret stays empty.
-            </p>
+            <h3 className="mb-1 text-lg font-bold">ChatGPT OAuth</h3>
+            <p className="mb-4 text-xs text-white/40">Paste into ChatGPT. Client secret stays empty.</p>
             <div className="mb-4 space-y-2">
               {(
                 [
@@ -542,62 +636,32 @@ export function AgentDashboard() {
                   ["Token URL", oauth.tokenUrl, "token"],
                   ["Client ID", oauth.clientId, "client"],
                   ["Scope", oauth.scope, "scope"],
-                  [
-                    "Bearer token",
-                    bearerToken || "(create API key on this page first)",
-                    "bearer",
-                    bearerToken || "",
-                  ],
-                  [
-                    "Authorization header",
-                    bearerHeader || "Bearer <create API key first>",
-                    "bearerHeader",
-                    bearerHeader || "",
-                  ],
-                ] as Array<[string, string, string, string?]>
-              ).map(([label, value, id, copyValue]) => (
-                <div key={id} className="rounded-xl border border-white/10 bg-black/40 px-3 py-2">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold text-white/40">{label}</span>
-                    {copyValue !== "" && (
-                      <button
-                        type="button"
-                        onClick={() => copy(id, copyValue ?? value)}
-                        className="text-[11px] font-semibold text-emerald-300 hover:underline"
-                      >
-                        {copied === id ? "Copied" : "Copy"}
-                      </button>
-                    )}
-                  </div>
-                  <code className="block break-all font-mono text-[11px] text-white/75">{value}</code>
-                </div>
+                ] as const
+              ).map(([label, value, id]) => (
+                <CredRow
+                  key={id}
+                  label={label}
+                  value={value}
+                  copied={copied === id}
+                  onCopy={() => copy(id, value)}
+                />
               ))}
-              <div className="rounded-xl border border-amber-400/20 bg-amber-400/8 px-3 py-2 text-xs text-amber-100/80">
-                Client secret: <strong>leave blank</strong> (public PKCE client)
-              </div>
+              <SecretRow
+                label="Bearer token"
+                value={bearerToken || ""}
+                emptyLabel="Create an API key on this page first"
+                accent
+                copied={copied === "bearer"}
+                onCopy={() => bearerToken && copy("bearer", bearerToken)}
+              />
             </div>
-            <ol className="mb-4 list-decimal space-y-2 pl-5 text-sm text-white/65">
-              <li>Enable Developer mode in ChatGPT settings.</li>
-              <li>Add connector → paste MCP URL above.</li>
-              <li>Fill OAuth fields from this dialog.</li>
-              <li>Authenticate → approve + link wallet on OrbitX.</li>
-            </ol>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => copy("mcp", mcpUrl)}
-                className="flex-1 rounded-xl border border-white/10 py-2 text-sm font-semibold"
-              >
-                Copy MCP URL
-              </button>
-              <button
-                type="button"
-                onClick={() => setChatgptGuide(false)}
-                className="flex-1 rounded-xl bg-white py-2 text-sm font-bold text-black"
-              >
-                Done
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setChatgptGuide(false)}
+              className="w-full rounded-xl bg-white py-2.5 text-sm font-bold text-black"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}
